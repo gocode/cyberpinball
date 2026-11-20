@@ -1,8 +1,7 @@
 // Catalogue anglais : settings. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  // packages/core/src/vr.ts, systemmenu.ts : Menu système > Borne > Réalité virtuelle
+  // packages/core/src/vr.ts, systemmenu.ts : Menu système > Ma borne > VR et vision 3D
   'Réalité virtuelle': 'Virtual reality',
-  'Activer le casque, caler la borne, manettes du casque, recopie sur le playfield': 'Turn the headset on, align the cabinet, headset controllers, mirror on the playfield',
   // app/src/frontend.ts : la pause dans le casque, « Ajuster les écrans » (plugin CyberPinball)
   'Ajuster les écrans': 'Adjust screens',
   'Joystick : choisir · A : régler · B : retour': 'Stick: choose · A: adjust · B: back',
@@ -63,7 +62,7 @@ export const messages: Record<string, string> = {
   'Partie dans le casque': 'Game in the headset',
   'Mettez le casque : la table démarre quand il est sur la tête': 'Put the headset on: the table starts once it’s on your head',
   'Exit : arrêter (au clavier : {keys} ou Échap)': 'Exit: stop (on the keyboard: {keys} or Esc)',
-  'Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle': 'To play on the screens: System menu > Cabinet > Virtual reality',
+  'Pour jouer sur les écrans : Menu système > Ma borne > VR et vision 3D': 'To play on the screens: System menu > My cabinet > VR and 3D vision',
   // app/src/frontend.ts : menu du casque (≡ de la manette gauche)
   'Menu du casque': 'Headset menu',
   'Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.': 'The same buttons everywhere: A confirms, B goes back, the thumbsticks move the selection.',
@@ -217,7 +216,7 @@ export const messages: Record<string, string> = {
   'Sur une borne, c’est la vraie caisse qui bouge : la table reste immobile à l’écran, seule la bille réagit aux secousses.':
     'On a cabinet, the real cabinet is what moves: the table stays still on screen, only the ball reacts to nudges.',
   'Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).': 'It follows the tilt chosen for the cabinet (cabinet tilt bob or simulated by VPX).',
-  'Pour la changer : menu système > Borne > Configuration de la borne > Tilt.': 'To change it: system menu > Borne (Cabinet) > Configuration de la borne (Cabinet setup) > Tilt.',
+  'Pour la changer : menu système > Ma borne > Configuration de la borne > Boutons > Tilt.': 'To change it: system menu > Ma borne (My cabinet) > Configuration de la borne (Cabinet setup) > Boutons (Buttons) > Tilt.',
   'Pour la changer, relancez l’assistant (étape Son).': 'To change it, run the wizard again (Sound step).',
   'Elle découle de l’affectation des écrans de la borne.': 'It follows the cabinet’s screen assignment.',
   'Pour la changer, relancez l’assistant d’écrans.': 'To change it, run the screen wizard again.',
@@ -425,7 +424,7 @@ export const messages: Record<string, string> = {
   'Cette table a sa propre valeur ; la retirer lui rend le réglage général.': 'This table has its own value; removing it gives the table the general setting back.',
   'Retirer la valeur de cette table': 'Remove this table’s value',
   'En partie': 'In game',
-  // packages/core/src/vision3d.ts, systemmenu.ts, app/src/frontend.ts : Menu système > Borne > Vision 3D
+  // packages/core/src/vision3d.ts, systemmenu.ts, app/src/frontend.ts : Menu système > Ma borne > VR et vision 3D > Vision 3D
   'Vision 3D': '3D vision',
   Webcam: 'Webcam',
   'Kinect pour Xbox 360': 'Kinect for Xbox 360',

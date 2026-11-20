@@ -37,7 +37,7 @@ import {
 } from '../activity';
 import { NOTICE_GATHER_MS, NOTICE_RULES, NOTICE_STARTUP_QUIET_MS, createNoticeCenter, noticeText, type NoticeEvent, type NoticeKind } from '../notices';
 import { ZONE_SCREENS, noticeZone, type NoticeZone } from '../noticezone';
-import { SYSTEM_GROUPS, SYSTEM_ROOT_SHORTCUTS } from '../systemmenu';
+import { SYSTEM_GROUPS, SYSTEM_ROOT_ITEMS } from '../systemmenu';
 import { newSocialState } from '../social';
 import { REPO_ROOT } from './i18n-scan';
 import { fakeActivityFriends, fakeActivityLive, fakeMenuLibrary } from './doublures';
@@ -379,10 +379,9 @@ test('activité : jamais de pastille rouge, ni une mise à jour installée ni ri
   assert.equal(menu.unread(), 6, 'à relire dans l’écran');
   assert.ok(!menu.item.attention, 'jamais de pastille : chaque chose a la sienne là où on y répond');
   assert.match(menu.item.detail!, /^6 non lues · /);
-  // En tête du menu système, rangée sous Cyber Pinball (elle parle de tout, pas que des amis) : plus dans Amis,
+  // À la racine du menu système, seulement là (elle parle de tout, pas que des amis) : plus dans la Communauté,
   // où elle faisait remonter par la rubrique une pastille de mise à jour.
-  assert.ok(SYSTEM_ROOT_SHORTCUTS.includes('activity'));
-  assert.ok(SYSTEM_GROUPS.cyberpinball.entries.includes('activity'));
+  assert.ok(SYSTEM_ROOT_ITEMS.includes('activity'));
   assert.ok(!SYSTEM_GROUPS.amis.entries.includes('activity'));
 });
 

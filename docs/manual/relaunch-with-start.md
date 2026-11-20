@@ -5,7 +5,7 @@
 A **long press (2 s) on Start**, when Start is a joystick button (Pinscape on a KL25Z, encoder in gamepad mode, recorded in the “Boutons” (Buttons) step), reopens Cyber Pinball from Windows:
 
 - **Cyber Pinball closed** (“Quitter Cyber Pinball” (Quit Cyber Pinball), Alt+F4, crash): it starts again, as from its shortcut;
-- **Cyber Pinball open in desktop mode** (system menu > “Borne” (Cabinet) > “Bureau Windows” (Windows desktop)): the menu comes back on all its screens, as with Ctrl+Shift+D or the taskbar.
+- **Cyber Pinball open in desktop mode** (system menu > “Quitter ou éteindre” (Quit or shut down) > “Bureau Windows” (Windows desktop)): the menu comes back on all its screens, as with Ctrl+Shift+D or the taskbar.
   The Start press that picked “Bureau Windows” does not count: release it, then hold it again.
 
 Nothing happens during a VPX game started from the desktop (a “Visual Pinball Player” window on screen: Start is a game button there), nor while the menu is open.
@@ -22,7 +22,7 @@ While Cyber Pinball is open (`<data>\relance-start\application.pid`, pid checked
   From the sources, nothing is placed (the executable is Electron).
 - **Updates**: the watcher keeps `CyberPinball.exe` open.
   It is stopped (`<data>\relance-start\veilleur.pid`) before the installer or the light update, by the installer itself (run by hand), by the uninstaller and by `npm run deployer`; Cyber Pinball, once restarted, starts it again.
-- **Setting**: system menu > “Borne” (Cabinet) > “Relance par Start” (Relaunch with Start), which says “oui” (yes) or “non” (no) (`<data>\relance-start\reglage.json`, yes by default).
+- **Setting**: system menu > “Ma borne” (My cabinet) > “Démarrage et accès” (Startup and access) > “Relance par Start” (Relaunch with Start), which says “oui” (yes) or “non” (no) (`<data>\relance-start\reglage.json`, yes by default).
   Greyed out, with the reason, when Start is not a joystick button and on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet), where Cyber Pinball relaunches by itself.
   “Non” (No) removes the shortcut and stops the watcher.
 - **Log**: the watcher writes to the same `journal.txt` (“Relance par Start : …”): button followed, press recognised, launch or reason for doing nothing.

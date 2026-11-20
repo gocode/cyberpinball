@@ -3108,7 +3108,7 @@ function save(): void {
       {
         severity: 'info',
         message: created
-          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Borne > Configuration de la borne > Configurations de la borne.', { name: configuration.name })
+          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Ma borne > Configuration de la borne > Configurations de la borne.', { name: configuration.name })
           : t('Configuration « {name} » mise à jour.', { name: configuration.name }),
       },
       ...channelNotices(),

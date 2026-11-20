@@ -1,4 +1,4 @@
-// Mode invité (Menu système > Borne > Mode invité) : on choisit une table, on lit sa fiche, son
+// Mode invité (Menu système > Ma borne > Démarrage et accès > Mode invité) : on choisit une table, on lit sa fiche, son
 // prospectus, ses règles et les commandes, on joue ; rien d'autre. Ces tests fixent la classe de
 // problème, pas seulement les portes d'aujourd'hui :
 // - la liste des portes ouvertes à l'invité est figée ici : en ouvrir une de plus demande de
@@ -137,8 +137,9 @@ test('mode invité : le téléphone (télécommande) passe par les mêmes portes
   assert.ok(SYSTEM_GROUPS.borne.entries.includes('phone-remote'));
 });
 
-test('mode invité : l’entrée est dans la rubrique Borne', () => {
-  assert.ok(SYSTEM_GROUPS.borne.entries.includes('guest-mode'));
+test('mode invité : l’entrée est dans Ma borne > Démarrage et accès', () => {
+  assert.ok(SYSTEM_GROUPS.demarrage.entries.includes('guest-mode'));
+  assert.ok(SYSTEM_GROUPS.borne.entries.includes('demarrage'));
 });
 
 function sandbox(): string {

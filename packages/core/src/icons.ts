@@ -145,9 +145,9 @@ export const ICON_NAMES = [
   'phone',
   'backspace',
   'upload',
-  // Réalité virtuelle (Menu système > Borne)
+  // Réalité virtuelle (Menu système > Ma borne)
   'vr',
-  // Crédits de la communauté (fiche d'une table, Menu système > Cyber Pinball > La communauté)
+  // Crédits de la communauté (fiche d'une table, Menu système > Aide et infos > Crédits)
   'credits',
   // « J'aime » du profil public : pouce levé, rempli quand on aime déjà
   'thumb-up',

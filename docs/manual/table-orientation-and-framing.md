@@ -5,7 +5,7 @@
 After the playfield is chosen, the wizard asks where the player stands: the flippers rotate the display until the text is upright, with the "Flippers · vous êtes ici" (Flippers · you are here) band on the player's side.
 It then asks for the diagonal, suggested from the EDID (the millimeter size from the detailed timing, otherwise the centimeters), and discarded if it does not match the image proportions, as happens with some TVs and with projectors.
 All of this is stored in `cabinet.json` (`playfield.flipperEdge`, `playfield.manualSizeCm` only if the diagonal differs from the EDID; `packages/core/src/layout.ts`).
-These questions can be redone on their own through system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Orientation et taille du playfield" (Playfield orientation and size) (`--assistant --playfield`), and with "Écrans et rôles" (Screens and roles) when the playfield moves to another screen.
+These questions can be redone on their own through system menu > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup) > "Écrans" (Screens) > "Orientation et taille du playfield" (Playfield orientation and size) (`--assistant --playfield`), and with "Écrans et rôles" (Screens and roles) when the playfield moves to another screen.
 
 Keys written to `VPinballX.ini` (`vpxLayoutSettings`, read from `ViewSetup.cpp` and `player.cpp` in VPX 10.8.1):
 

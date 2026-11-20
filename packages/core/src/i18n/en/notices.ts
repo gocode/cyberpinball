@@ -8,7 +8,7 @@ export const messages: Record<string, string> = {
   '{n} ami vient de se connecter': '{n} friend just came online',
   '{n} amis viennent de se connecter': '{n} friends just came online',
   'Demande d’ami : {name}': 'Friend request: {name}',
-  'Menu système > Communauté > Demandes d’amis': 'System menu > Community > Friend requests',
+  'Menu système > Communauté > Mes amis > Demandes d’amis': 'System menu > Community > My friends > Friend requests',
   '{n} demande d’ami': '{n} friend request',
   '{n} demandes d’ami': '{n} friend requests',
   '{name} a accepté votre demande': '{name} accepted your request',

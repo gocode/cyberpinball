@@ -3,7 +3,7 @@
 // Le bureau ne se voit plus jamais, même pendant les 1 à 2 s du démarrage de l'application.
 //
 // Désactivée par défaut : rien n'est écrit dans Windows tant que l'utilisateur ne l'active pas
-// lui-même (menu système > Borne > « Borne dédiée »). Toute écriture passe par UN script
+// lui-même (menu système > Ma borne > « Démarrage et accès » > « Borne dédiée »). Toute écriture passe par UN script
 // PowerShell, lancé avec l'autorisation de Windows (UAC), qui :
 //   1. relève l'état de Windows (fonctions facultatives, réglages de Shell Launcher, valeur
 //      Shell de Winlogon, que SetEnabled réécrit) ;

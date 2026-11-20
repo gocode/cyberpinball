@@ -50,7 +50,7 @@ The unit number of a native Pinscape or of a DudesCab is set on the board: 1 is 
 
 The folder is **shared by every VPX 10.8 on the PC** (another cabinet frontend included): it is the same cabinet, the same controllers.
 
-**System menu > “Borne” > “LED et retours (DOF)”** (LED and feedback) ([app/src/dof-menu.ts](../../app/src/dof-menu.ts)):
+**System menu > “Ma borne” > “DMD et LED” > “LED et retours (DOF)”** (LED and feedback) ([app/src/dof-menu.ts](../../app/src/dof-menu.ts)):
 
 - **Controllers**: those recognised over USB (with the ini number they read) and those only declared in Cabinet.xml;
 - **Configuration**: the ini files found and their folder, how many ROMs are configured, Cabinet.xml (written by Cyber Pinball or by hand, number of strips);

@@ -39,7 +39,7 @@ Pour chaque écran, le front-end prend le premier média trouvé : `(Type) <nom 
 - **Avec la table** : une archive qui contient des médias rangés à la façon de PinUP Popper (`POPMedia\…\Wheel\<jeu>.png`), de PinballX ou de VPinFE est reconnue à l'ajout (« Ajouter une table ») ; les médias sont renommés `(Type) <dossier>` dans `medias\`.
   Un pack de médias seul, sans `.vpx`, complète une table installée.
   Voir « Import des médias ».
-- **Depuis une installation de PinUP Popper ou de PinballX** : menu système > « Cyber Pinball » > « Migration » > « Reprendre les médias » (de PinUP Popper / PinballX).
+- **Depuis une installation de PinUP Popper ou de PinballX** : menu système > « Tables » > « Migration » > « Reprendre les médias » (de PinUP Popper / PinballX).
   Tout est copié, l'installation d'origine n'est pas modifiée.
 - **À la main** : copier le fichier dans `medias\` sous son nom `(Type) <nom du dossier>.ext`.
   Le front-end le montre aussitôt sur chaque écran, sans redémarrer (voir « Changements en direct »).
@@ -170,7 +170,7 @@ Hors de l'écran des tables, rien de la dernière table de la roue ne reste à l
 ### Son du front-end
 
 Le son du front-end sort d'une seule fenêtre, celle du playfield (`app/renderer/menu-audio.js`).
-Le processus principal décide quoi jouer à chaque moment (`menuSound`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)) ; tout se règle dans **Menu système > « Médias » > « Médias, son et attente »** (`app/src/menu-settings.ts`), enregistré dans `<données>\medias.json` et appliqué aussitôt.
+Le processus principal décide quoi jouer à chaque moment (`menuSound`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)) ; tout se règle dans **Menu système > « Tables » > « Son et mode attente »** (`app/src/menu-settings.ts`), enregistré dans `<données>\medias.json` et appliqué aussitôt.
 
 | Moment | On entend | Réglage (défaut) |
 | --- | --- | --- |
@@ -227,7 +227,7 @@ Le registre, ce qui déclenche chaque son et la règle qui décide s'il joue son
 | Fanfare d'un badge (`badge-rare`) | un badge rare, épique ou légendaire reçu, au retour sur l'écran des tables, calé sur son animation | synthèse WebAudio (un souffle qui monte, un impact grave à l'arrivée du badge, un arpège, puis les accords fa, sol, do pendant le texte ; des tics pendant le défilement des XP ; 5,6 s, réverbéré) ; même licence |
 | Passage de niveau (`level-up`) | le niveau monte, pendant le moment d'un badge ou seul ; la musique de la table et le son de la vidéo du plateau se taisent le temps du moment | synthèse WebAudio (une fanfare : un impact grave et l'accord de do avec un arpège qui monte, un accord de sol en appel, puis le grand accord de do tenu, sa basse et ses cloches ; 4 s, réverbérée) ; même licence |
 
-- **Réglages** : **Menu système > Médias > « Médias, son et attente »** : « Sons de l'interface » (joués par défaut ; Start coupe ou rétablit, et fait entendre le clic) et « Volume des sons de l'interface » (50 % par défaut ; le choix fait entendre la pièce).
+- **Réglages** : **Menu système > Tables > « Son et mode attente »** : « Sons de l'interface » (joués par défaut ; Start coupe ou rétablit, et fait entendre le clic) et « Volume des sons de l'interface » (50 % par défaut ; le choix fait entendre la pièce).
   Gardés dans `<données>\medias.json` (`uiSounds`, `uiSoundsVolume`).
 - **Jamais pendant une partie** : le processus principal ne demande aucun son pendant la partie ni en mode attente (`uiSoundCue`) ; la fenêtre, de son côté, refuse tout son tant que l'état dit « partie en cours », fait taire celui qui sonne encore et ferme son contexte audio : aucun flux ouvert sur la sortie pendant que VPX joue.
   La pièce tombe pendant le chargement, avant que VPX ne prenne les écrans.
@@ -287,7 +287,7 @@ Ce que montre chaque écran du lancement à la fin de la partie (`momentScreen`,
 
 Quand Cyber Pinball s'ouvre, chaque écran de la borne joue son animation d'ouverture, une seule fois, puis **garde sa dernière image** (le plateau, lui, continue en boucle, très discrètement) ; le premier bouton (ou un clic) affiche la roue.
 Un bouton pendant la lecture passe l'ouverture.
-Réglage **Menu système > Médias > « Médias, son et attente » > « Ouverture au démarrage »** : jouée par défaut, ou coupée (le front-end s'ouvre droit sur la roue).
+Réglage **Menu système > Tables > « Son et mode attente » > « Ouverture au démarrage »** : jouée par défaut, ou coupée (le front-end s'ouvre droit sur la roue).
 Gardé dans `<données>\medias.json`, champ `intro`.
 Code : [packages/core/src/intro.ts](../../packages/core/src/intro.ts) (réglages, fichiers, rythme, vues), [app/renderer/intro.js](../../app/renderer/intro.js) et `intro.css` (les animations), [app/src/intro-menu.ts](../../app/src/intro-menu.ts) (l'écran de réglages).
 
@@ -324,7 +324,7 @@ Code : [packages/core/src/intro.ts](../../packages/core/src/intro.ts) (réglages
 ### Lancement en cinéma
 
 Au Start sur « Jouer », le lancement se joue comme une ouverture de film, sur tous les écrans de la borne : le logo du jeu s'allume au centre du plateau et s'envole vers le fronton, une tache de lumière traverse le DMD, le logo se pose sur le fronton et y attend ; quand VPX prend la main, un coup de bobine sonne et tout s'efface.
-Réglage « Lancement en cinéma » de **Menu système > Médias > « Médias, son et attente »** : joué par défaut ; Start le coupe (le chargement redevient celui d'avant : ni logo, ni passage sur le DMD, ni coup de bobine) ou le rétablit (le coup de bobine se fait entendre).
+Réglage « Lancement en cinéma » de **Menu système > Tables > « Son et mode attente »** : joué par défaut ; Start le coupe (le chargement redevient celui d'avant : ni logo, ni passage sur le DMD, ni coup de bobine) ou le rétablit (le coup de bobine se fait entendre).
 Gardé dans `<données>\medias.json`, champ `cinema`.
 Le réglage de l'affichage en partie (fiche > « Régler l'affichage en partie ») n'a pas de cinéma, comme il n'a pas de pièce.
 
@@ -391,7 +391,7 @@ Chaque canevas déborde de son élément pour laisser à un flou de `b` pixels s
 ### Roue : ses réglages
 
 Tous les réglages de la roue des tables sont sur un même écran, **Menu système > Tables > Roue**, à côté des Collections (demande du 12/11/2026).
-Ils étaient mêlés au son et au mode attente dans Menu système > Médias > « Médias, son et attente », qui garde le son, l'attente, le DMD et les médias.
+Ils étaient mêlés au son et au mode attente dans Menu système > Tables > « Son et mode attente », qui garde le son, l'attente, le DMD et les médias.
 Code : [app/src/wheel-settings.ts](../../app/src/wheel-settings.ts) ; tout est gardé dans `<données>\medias.json`, et s'applique aussitôt.
 
 - **« Présentation des tables »** (Start : la liste) : roue Médaillons (par défaut), Bandeau, Minimaliste, Arche, ou la liste des titres (`menuLayout`).
@@ -414,7 +414,7 @@ Tests : [roue-reglages.test.ts](../../packages/core/src/test/roue-reglages.test.
 
 ### Réglages du Juke-box
 
-Tous les réglages du Juke-box sont sur un même écran, **Menu système > Médias > Réglages du Juke-box**, juste après la gestion du Juke-box, et aussi en ligne « Réglages du Juke-box » en tête de cette gestion, où Exit ramène (demande du 13/11/2026 : la configuration du Juke-box, pas la gestion de son contenu).
+Tous les réglages du Juke-box sont sur un même écran, **Menu système > Juke-box > Réglages du Juke-box**, juste après la gestion du Juke-box, et aussi en ligne « Réglages du Juke-box » en tête de cette gestion, où Exit ramène (demande du 13/11/2026 : la configuration du Juke-box, pas la gestion de son contenu).
 Code : [app/src/jukebox-settings.ts](../../app/src/jukebox-settings.ts), [packages/core/src/jukebox-audio.ts](../../packages/core/src/jukebox-audio.ts) ; tout est gardé dans `<données>\medias.json` (`jukeboxAudio`, `jukeboxVisualizer`, `jukebox`) et s'applique aussitôt, même au morceau en cours.
 
 - **« Sorties du son »** (Start : la liste) : les sorties de Windows (sans les virtuelles, comme le casque, comme à l'étape « Son »), celle de la borne en tête.
@@ -487,10 +487,10 @@ Code : [packages/core/src/collections.ts](../../packages/core/src/collections.ts
 - **Changer de collection** : **MagnaSave gauche ou droit** sur la roue, collection précédente ou suivante, appliquée aussitôt, en boucle ; une collection vide est sautée.
   Seul le repère change : aucune liste ne paraît plus par-dessus la roue (retirée le 13/11/2026, le médaillon Collections la remplace).
   À la souris : un clic sur le repère passe à la suivante.
-  Pour voir toutes les collections : le **médaillon Collections** (ci-dessous) ou **Menu système > Collections** (en tête du menu système, et dans Tables), la même liste aux flippers et à Start.
+  Pour voir toutes les collections : le **médaillon Collections** (ci-dessous) ou **Menu système > Tables > Collections** (en tête du menu système, et dans Tables), la même liste aux flippers et à Start.
 - **Le médaillon Collections** (13/11/2026) : dans la roue, après le Juke-box et la Communauté, le dernier des médaillons de tête, juste avant la première table.
   Son nom en vert, dessous le nombre de collections et celle que la roue montre.
-  Start (ou un clic au centre de la roue, ou une touche sur le téléphone) ouvre la **liste des collections**, la même que Menu système > Collections, le curseur sur la collection montrée : Start sur une collection l'affiche sur la roue, sur la table qu'elle retient ; Exit revient au médaillon.
+  Start (ou un clic au centre de la roue, ou une touche sur le téléphone) ouvre la **liste des collections**, la même que Menu système > Tables > Collections, le curseur sur la collection montrée : Start sur une collection l'affiche sur la roue, sur la table qu'elle retient ; Exit revient au médaillon.
   On y trouve aussi « Nouvelle collection… », « Gérer mes collections… » et « Boutons des collections ».
   Choisi dans la roue, il montre son **affiche**, comme la Communauté : derrière la roue et au fronton, le nombre de collections et de tables, la collection montrée, quelques autres, et « Start · Choisir une collection ».
   Il se masque dans Menu système > Tables > Roue (« Collections dans la roue ») ; il disparaît quand le mode invité impose une collection ou ferme le choix des collections.
@@ -509,7 +509,7 @@ Code : [packages/core/src/collections.ts](../../packages/core/src/collections.ts
   La collection active est gardée d'un démarrage à l'autre (`<données>\collections.json`) ; « Table au démarrage » y choisit la table.
 - **Les favoris** : « Ajouter aux favoris » (ou « Retirer des favoris ») sur la fiche d'une table ; une étoile blanche pleine se pose devant le titre, sur la roue comme sur la fiche (jamais en vert ; sa place est gardée hors des favoris, le titre ne bouge pas).
   C'est le champ `User.Favorite` du `.info` (1 ou 0), celui qu'écrivent d'autres frontends : une table reprise d'une autre installation garde son favori, même quand la table d'ici a déjà ses statistiques (`mergeFavorite`, tableimport.ts).
-- **Mode invité** : son écran (Menu système > Borne > Mode invité) propose « Tables proposées » : toutes (les MagnaSave restent libres), ou une collection non vide (Start : choix suivant).
+- **Mode invité** : son écran (Menu système > Ma borne > Démarrage et accès > Mode invité) propose « Tables proposées » : toutes (les MagnaSave restent libres), ou une collection non vide (Start : choix suivant).
   Limité, le front-end verrouillé ne montre qu'elle : le cadenas remplace l'icône du repère, l'aide ne parle plus des MagnaSave, et un MagnaSave ne fait que l'indice « Verrouillé » (porte `menu.collection-locked`).
   Le choix est gardé avec le mode invité (`<données>\mode-invite.json`, champ `collection`) ; au déverrouillage, la collection d'avant revient.
   Ajouter ou retirer un favori est fermé à l'invité (`sheet.favorite`).
@@ -528,13 +528,13 @@ Après un temps sans bouton sur l'écran des tables, la borne se présente toute
 - **Son** : « Son en attente » coupé par défaut ; réduit, la musique de la table montrée (ou le son de sa vidéo) joue à 30 % de son volume.
 - **Crédits** : une ligne discrète en bas du plateau, au-dessus de l'invite, cite qui a fait la table montrée : « Table TastyWasps, JPSalas et 12 autres · Fronton HauntFreaks · Couleurs Enthusiast » (ceux qu'on connaît, deux lignes au plus ; voir [Crédits de la communauté](credits-de-la-communaute.md#crédits-de-la-communauté)).
   « Crédits de la table » : affichés par défaut, ou masqués (`<données>\medias.json`, champ `attractCredits`).
-- **Ses réglages, au même endroit** : Menu système > « Médias » > « Médias, son et attente » > **« Mode attente »** ouvre un écran à lui (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../../app/src/menu-settings.ts)) : délai, table suivante, son, crédits de la table, horaire de la borne.
+- **Ses réglages, au même endroit** : Menu système > « Tables » > « Son et mode attente » > **« Mode attente »** ouvre un écran à lui (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../../app/src/menu-settings.ts)) : délai, table suivante, son, crédits de la table, horaire de la borne.
   La ligne de « Médias, son et attente » les résume (« une table toutes les 20 s · son coupé · crédits affichés »).
 
 ### Horaire de la borne
 
 Comme une borne de salle d'arcade, la borne vit seule quand personne ne joue (le mode attente, ci-dessus), et un horaire règle sa journée (`ArcadeHours`, [packages/core/src/arcadehours.ts](../../packages/core/src/arcadehours.ts) ; dans le front-end, [app/src/frontend.ts](../../app/src/frontend.ts) et [app/src/arcade-hours.ts](../../app/src/arcade-hours.ts)).
-Menu système > « Médias » > « Médias, son et attente » > « Mode attente » > **« Horaire de la borne »** ; les réglages vont dans `<données>\medias.json` (champ `hours`).
+Menu système > « Tables » > « Son et mode attente » > « Mode attente » > **« Horaire de la borne »** ; les réglages vont dans `<données>\medias.json` (champ `hours`).
 
 - **Horaire de la borne : désactivé** par défaut.
   Désactivé, ses réglages restent visibles et modifiables (« Réglages conservés ; aucun effet tant que l'horaire est désactivé »).
@@ -568,7 +568,7 @@ Menu système > « Médias » > « Médias, son et attente » > « Mode attente 
 
 Pendant la navigation, Cyber Pinball dessine lui-même l'afficheur du DMD, comme une machine en attente : une grille de 128 × 32 points qui fait tourner le titre de la table choisie, l'invitation à jouer, ses records, l'heure et les crédits, avec le détail de sa wheel à l'arrivée et une courte scène de jeu un cycle sur deux.
 Les points restent affichés en permanence : le média DMD de la table ne les remplace jamais, il se voit autour d'eux (cadre du FullDMD, ci-dessous).
-Réglage « DMD du front-end » de **Menu système > « Borne » > « DMD »** ( Start passe de l'un à l'autre, enregistré dans `<données>\medias.json`, champ `dmd`) : **vivant** par défaut, ou **classique** (le média de la table seul, sinon le DMD généré qui fait défiler son titre, comme avant).
+Réglage « DMD du front-end » de **Menu système > « Ma borne » > « DMD et LED »** ( Start passe de l'un à l'autre, enregistré dans `<données>\medias.json`, champ `dmd`) : **vivant** par défaut, ou **classique** (le média de la table seul, sinon le DMD généré qui fait défiler son titre, comme avant).
 Ce média est celui de l'écran du DMD (`roleMedia`, `resolveMedia`) : sur un écran FullDMD, le média (FullDMD) de la table, et son (DMD) seulement s'il n'a pas de FullDMD ; sur un DMD seul, le (DMD) d'abord, le (FullDMD) à défaut.
 Quand la table a les deux, l'écran du DMD prend celui dont les proportions remplissent le mieux sa zone (`bestDmdMedia`, `dmdScreenAspect` : la zone du rôle dans le modèle de la borne, sinon 4:1 ou 16:9), quel que soit son libellé : un « (DMD) » en 21:9 repris de PinUP Popper passe devant un « (FullDMD) » en 16:9 sur un DMD 4:1, au lieu de laisser la moitié de l'écran vide.
 À égalité, ou si l'un des deux ne se mesure pas, l'ordre ci-dessus décide.
@@ -668,7 +668,7 @@ Partout où Cyber Pinball écrit sa marque ou dessine un afficheur à points, il
   Press Start 2P, l'ancienne police des petits textes, n'est plus livrée.
 - **La marque sur un afficheur** : empilée, 3 lignes libres en haut et en bas, 4 entre les mots.
   Un afficheur n'a qu'une couleur : la lumière porte la hiérarchie que l'interface donne par la couleur, CYBER à la nuance 11, PINBALL au plein éclat (15).
-- **Couleur du DMD** (Menu système > « Borne » > « DMD » > **« Couleur du DMD »**, gardée dans `<données>\medias.json`, champ `dmdColor`) : la couleur des points du DMD du front-end et des afficheurs de repli, pas celle du DMD de VPX en partie (celui de la table).
+- **Couleur du DMD** (Menu système > « Ma borne » > « DMD et LED » > « Couleur du DMD »**, gardée dans `<données>\medias.json`, champ `dmdColor`) : la couleur des points du DMD du front-end et des afficheurs de repli, pas celle du DMD de VPX en partie (celui de la table).
   **Vert signal** `#8BE23A` par défaut (jeton `dmd` du design system), ou un préréglage : sarcelle `#36C9B4`, encre claire `#E6F0EC`, bleu glacier `#5FB4CF`, ambre doux `#F2B33D`, orange plasma `#FF8A1F` (l'ancienne couleur) ; ou **« Couleur libre… »**, écrite en hexadécimal au clavier à l'écran (`#8BE23A`, `8be23a` ou `#8be`).
   Une couleur trop sombre (aucune composante à 112 ou plus) est refusée, avec la raison ; une valeur illisible dans `medias.json` revient au vert signal.
   Le choix revient sur sa ligne ; le DMD, qui montre la marque dans le menu système, change aussitôt (`setDmdColor`, [app/renderer/fallback.js](../../app/renderer/fallback.js), appliqué à chaque état ; le repli minimal suit le jeton `--dmd`).
@@ -827,7 +827,7 @@ Cyber Pinball les télécharge **à la demande seulement**, jamais d'office.
   La source est citée dans le plan, sur la fiche du média (« Source : VPinMediaDB (github.com/superhac/vpinmediadb), téléchargé le … », puis l'adresse du fichier) et ici.
 - **Deux entrées** :
   - fiche d'une table > « Médias du jeu » > « Chercher les médias » : tout ce que VPinMediaDB a pour ce jeu ;
-  - menu système > « Médias » > « Trouver les médias manquants » : ce qui manque à chaque table, une table par dossier.
+  - menu système > « Tables » > « Trouver les médias manquants » : ce qui manque à chaque table, une table par dossier.
     D'ici, un média existant n'est jamais remplacé, et une table reconnue au titre seulement n'est pas servie d'office.
 - **Correspondance** : par le `VPSId` du `.info`.
   Sinon, par le nom de la table (titre, initiales, fabricant, année) rapproché de la base VPS (section « Base VPS »), qui donne l'identifiant.
@@ -848,7 +848,7 @@ Cyber Pinball les télécharge **à la demande seulement**, jamais d'office.
   Non repris : `cab.png` (photo du meuble), `fss.png` (plateau et fronton pour un seul écran), `realdmd*.png` (DMD physique, que Cyber Pinball ne gère pas).
   VPinMediaDB n'a jamais d'afficheur 4:1, de topper, de vidéo de chargement, de son de lancement ni de règles.
 - **1k ou 4k** : seule l'image du plateau existe en 4k.
-  Le réglage « Qualité téléchargée (VPinMediaDB) » se trouve dans menu système > « Médias » > « Médias, son et attente » :
+  Le réglage « Qualité téléchargée (VPinMediaDB) » se trouve dans menu système > « Tables » > « Son et mode attente » :
   - automatique : 4k si la zone du plateau, dans la configuration active, dépasse 2 560 points de côté ;
   - ou 1k, ou 4k, imposé.
 

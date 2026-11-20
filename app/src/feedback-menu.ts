@@ -1,4 +1,4 @@
-// « Retours et propositions » (Menu système > Cyber Pinball) : le seul formulaire des retours, où mènent
+// « Retours et propositions » (Menu système > Aide et infos) : le seul formulaire des retours, où mènent
 // aussi l'écran d'un plantage de VPX, la fiche technique et l'appli du téléphone :
 // chaque porte peut y mener, sans y obliger. Une partie échouée et le Diagnostic d'une table ont
 // en plus « Envoyer un rapport aux développeurs » : un appui, le problème déjà connu (openSendReport).

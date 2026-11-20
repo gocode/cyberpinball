@@ -1,4 +1,4 @@
-// Sorties du son du Juke-box (Menu système > Médias > Réglages du Juke-box, demandé le 13/11/2026) :
+// Sorties du son du Juke-box (Menu système > Juke-box > Réglages du Juke-box, demandé le 13/11/2026) :
 // une ou plusieurs sorties de Windows, chacune avec son volume par rapport aux autres, un profil
 // (complet, basses seules, médiums et aigus, ou personnalisé : basses, médiums, aigus) et un retard
 // pour caler des haut-parleurs qui ne répondent pas en même temps.

@@ -11,7 +11,7 @@ Pour chacune : identifiant MMDevice (`{0.0.0.00000000}.{guid}`), nom attendu par
 Une sortie HDMI se rattache à son écran par le ContainerId du moniteur PnP (`ObservedDisplay.containerId`) ; le conteneur commun à tout ce qui est intégré au PC (`{00000000-0000-0000-FFFF-FFFFFFFFFFFF}`) ne rattache rien.
 `npm run probe` affiche tout cela.
 
-**Étape « Son » de l'assistant**, après les écrans, ou seule (menu système > « Borne » > « Configuration de la borne » > « Son de la borne », `--assistant --son` : seules `SoundDevice`, `SoundDeviceBG` et `Sound3D` sont écrites).
+**Étape « Son » de l'assistant**, après les écrans, ou seule (menu système > « Ma borne » > « Configuration de la borne » > « Son de la borne », `--assistant --son` : seules `SoundDevice`, `SoundDeviceBG` et `Sound3D` sont écrites).
 Les sorties virtuelles (Steam, Oculus : bus `ROOT`) et Bluetooth sont écartées, sauf si elles avaient déjà un rôle.
 Chaque sortie joue sur elle-même un son généré par oscillateur (aucun fichier), n bips pour la sortie n, en boucle : `AudioContext.setSinkId` dans une fenêtre de l'assistant, la sortie étant trouvée par `enumerateDevices` sous son nom Windows (Chromium ajoute « (vid:pid) » au nom des sorties USB, ignoré pour la comparaison).
 Le joueur répond aux boutons :

@@ -60,7 +60,7 @@ export const messages: Record<string, string> = {
   'Partage désactivé : Communauté > Partage et réseau': 'Sharing off: Community > Sharing and network',
   'Empreinte de la table en calcul…': 'Computing the table’s fingerprint…',
   'Version de la table illisible : pas de classement': 'Table version unreadable: no ranking',
-  'Pays non choisi : Mon compte > Mon pays': 'No country chosen: My account > My country',
+  'Pays non choisi : Mon profil > Modifier mon profil > Mon pays': 'No country chosen: My profile > Edit my profile > My country',
   'Aucun ami pour l’instant : Communauté > Trouver un joueur': 'No friends yet: Community > Find a player',
   'Même version de la table que la vôtre, {n} billes par partie': 'Same table version as yours, {n} balls per game',
   'Même version de la table que la vôtre': 'Same table version as yours',

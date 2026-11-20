@@ -1,4 +1,4 @@
-// Mode invité (Menu système > Borne > Mode invité) : une soirée, des enfants. On choisit une
+// Mode invité (Menu système > Ma borne > Démarrage et accès > Mode invité) : une soirée, des enfants. On choisit une
 // table, on ouvre sa fiche, on joue, on lit le prospectus, les règles et les commandes ; rien
 // d'autre ne se modifie, ne se supprime ni ne se dérègle.
 //

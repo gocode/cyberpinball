@@ -1,4 +1,4 @@
-// Horaire de la borne, façon salle d'arcade (Menu système > Médias > « Médias, son et attente »
+// Horaire de la borne, façon salle d'arcade (Menu système > Tables > « Son et mode attente »
 // > « Horaire de la borne ») : la nuit, en attente, un voile noir baisse les écrans et l'attente
 // se tait ; à l'heure dite, la borne s'arrête (veille ou extinction) si personne ne joue.
 //

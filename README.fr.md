@@ -209,7 +209,7 @@ Au premier lancement, Cyber Pinball installe VPX pendant qu'il vous guide pour r
 
 ## Mise à jour
 
-Depuis la borne : **menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »**. Rien ne s'installe sans votre accord. Cyber Pinball vérifie discrètement s'il existe une nouvelle version peu après le démarrage, puis toutes les 6 heures. S'il en trouve une, une pastille rouge apparaît sur la roue dentée du front-end et sur cette entrée. Vous y lisez les nouveautés de chaque version manquée, et « Mettre à jour maintenant » l'installe en un seul geste. Quand seule l'application a changé, un paquet léger s'installe en quelques secondes ; sinon Cyber Pinball se ferme le temps de l'installation (environ une minute), redémarre tout seul et indique la version installée. Si l'installation échoue, la version précédente est rétablie.
+Depuis la borne : **menu système > « Aide et infos » > « Mise à jour de Cyber Pinball »**. Rien ne s'installe sans votre accord. Cyber Pinball vérifie discrètement s'il existe une nouvelle version peu après le démarrage, puis toutes les 6 heures. S'il en trouve une, une pastille rouge apparaît sur la roue dentée du front-end et sur cette entrée. Vous y lisez les nouveautés de chaque version manquée, et « Mettre à jour maintenant » l'installe en un seul geste. Quand seule l'application a changé, un paquet léger s'installe en quelques secondes ; sinon Cyber Pinball se ferme le temps de l'installation (environ une minute), redémarre tout seul et indique la version installée. Si l'installation échoue, la version précédente est rétablie.
 
 Chaque version publiée s'accompagne d'un flux signé (`cyberpinball-maj.json`, Ed25519). L'installeur n'est téléchargé que si la signature correspond à la clé fournie avec l'application, et il n'est exécuté que si sa taille et son SHA-256 sont les bons. Les préversions (`0.2.0-essai.1`) ne sont proposées qu'aux bornes réglées sur « Versions reçues : préversions ».
 
@@ -282,7 +282,7 @@ Signalements de bogues, correctifs et traductions sont les bienvenus. Le guide [
 
 ## Conditions d'utilisation
 
-L'installeur, puis le front-end tant qu'elles ne sont pas acceptées, présentent les conditions d'utilisation de Cyber Pinball ; elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation. En bref : Cyber Pinball ne fournit aucune table, ROM ni média de jeu commercial, et c'est à vous de vérifier que vous avez le droit de télécharger, d'installer, d'utiliser et de partager chaque contenu. Il est fourni sans garantie, et ses lumières clignotantes peuvent gêner les personnes sujettes à l'épilepsie photosensible. Ces conditions ne restreignent pas la licence ci-dessous.
+L'installeur, puis le front-end tant qu'elles ne sont pas acceptées, présentent les conditions d'utilisation de Cyber Pinball ; elles restent à lire dans Menu système > Aide et infos > Conditions d’utilisation. En bref : Cyber Pinball ne fournit aucune table, ROM ni média de jeu commercial, et c'est à vous de vérifier que vous avez le droit de télécharger, d'installer, d'utiliser et de partager chaque contenu. Il est fourni sans garantie, et ses lumières clignotantes peuvent gêner les personnes sujettes à l'épilepsie photosensible. Ces conditions ne restreignent pas la licence ci-dessous.
 
 ## Licence
 

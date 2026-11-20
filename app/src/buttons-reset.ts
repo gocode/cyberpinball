@@ -62,7 +62,7 @@ export function resetButtons(origin = 'commande'): ButtonsReset | undefined {
   if (!cabinet) return undefined;
   const backup = saveButtonsBackup(loc.dataDir, cabinet);
   const reset = apply(withDefaultButtons(cabinet));
-  console.log(`Boutons : touches par défaut des encodeurs remises (${origin}) ; relevé remplacé gardé (${joystickButtonCount(cabinet)} bouton(s) de joystick, ${backup.at}), à rétablir par Menu système > Borne > Configuration de la borne.`); // i18n-ignore : journal
+  console.log(`Boutons : touches par défaut des encodeurs remises (${origin}) ; relevé remplacé gardé (${joystickButtonCount(cabinet)} bouton(s) de joystick, ${backup.at}), à rétablir par Menu système > Ma borne > Configuration de la borne.`); // i18n-ignore : journal
   return reset;
 }
 

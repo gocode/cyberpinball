@@ -1,4 +1,4 @@
-// Santé de la borne (Menu système > Borne) : un bilan qui réunit ce que d'autres écrans
+// Santé de la borne (Menu système > Ma borne) : un bilan qui réunit ce que d'autres écrans
 // savent déjà, sans le recalculer autrement. L'espace disque des lecteurs qui comptent
 // (tables, téléchargements, données) ; les tables qui ne démarrent pas, d'après le médecin
 // (doctor.ts, playable.ts) ; les PuP-Packs que le médecin voit éteints en partie (cause et

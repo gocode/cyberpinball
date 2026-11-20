@@ -2,7 +2,7 @@
 
 ## Nouveautés
 
-**Menu système > Nouveautés** montre les grandes nouveautés de Cyber Pinball, choisies une à une : ce qui change vraiment ce qu'on fait avec la borne.
+**Menu système > Aide et infos > Nouveautés** montre les grandes nouveautés de Cyber Pinball, choisies une à une : ce qui change vraiment ce qu'on fait avec la borne.
 Ce n'est pas la liste des corrections : celle-ci reste dans les notes de chaque version (« Mise à jour de Cyber Pinball » et le CHANGELOG).
 
 - **Une chronologie** : la plus récente en haut, la date et la version dites une seule fois pour les nouveautés du même jour.

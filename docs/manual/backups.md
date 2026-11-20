@@ -2,9 +2,9 @@
 
 ## Backups
 
-Menu système > « Cyber Pinball » > « Sauvegardes » (System menu > Cyber Pinball > Backups) copies the cabinet to a USB drive, an external disk or a network drive, and restores it, on this cabinet (after a failure or a settings mistake) or on another PC.
+Menu système > « Ma borne » (My cabinet) > « Santé et sauvegardes » (Health and backups) > « Sauvegardes » (Backups)My cabinet > Health and backups > Backups) copies the cabinet to a USB drive, an external disk or a network drive, and restores it, on this cabinet (after a failure or a settings mistake) or on another PC.
 The entry shows the date and level of the last backup.
-Every backup also holds your account (nickname, avatar, level, badges, friends); System menu > "Mon compte" (My account) > "Protéger et transférer mon compte" (Protect and transfer my account), then "Reprendre un compte sur cette borne…" (Take back an account on this cabinet…) > "Depuis une sauvegarde…" (From a backup…), also leads here (see [My account](my-account.md#my-account)).
+Every backup also holds your account (nickname, avatar, level, badges, friends); System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Mon compte" (My account) > "Protéger et transférer mon compte" (Protect and transfer my account), then "Reprendre un compte sur cette borne…" (Take back an account on this cabinet…) > "Depuis une sauvegarde…" (From a backup…), also leads here (see [My account](my-account.md#my-account)).
 
 **Three levels, each containing the previous one** (`LEVEL_PARTS`, [packages/core/src/backup.ts](../../packages/core/src/backup.ts)):
 

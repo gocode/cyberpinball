@@ -6,7 +6,7 @@
 //   l'installeur, ou mise à jour qui change le texte) : « J'accepte » l'enregistre dans
 //   <données>\conditions.json et reprend le démarrage ; « Je refuse » demande confirmation, puis
 //   ferme Cyber Pinball. Exit n'y fait que revenir à la page précédente : on n'en sort pas sans choisir ;
-// - Menu système > Cyber Pinball > Conditions d’utilisation : le même texte, à relire, avec la date
+// - Menu système > Aide et infos > Conditions d’utilisation : le même texte, à relire, avec la date
 //   de l'acceptation.
 //
 // Sans electron à l'exécution : les tests du cœur peuvent charger ce module.

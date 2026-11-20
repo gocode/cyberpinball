@@ -60,7 +60,7 @@ The Community there is the same as at the cabinet (System menu > Community): the
   The field, 500 characters at most, goes through the cabinet, which checks the friend, the text and the reaction (`chat-send`, `chat-react`).
   Unable to write (sharing off, messaging disabled, former friend): the field is greyed out and the reason shows in place of the status line.
 - **Unavailable**: sharing off or messaging disabled, Messages and Players say so ("Messagerie indisponible", Messaging unavailable, with the cabinet's reason); in guest mode, messaging is closed on the phone ("Fermée en mode invité.", Closed in guest mode), as at the cabinet.
-  On a cabinet that plays locally, the Community on the phone is removed ("Removed: this cabinet plays locally (System menu › Community › Local play).").
+  On a cabinet that plays locally, the Community on the phone is removed ("Removed: this cabinet plays locally (System menu › Community › Community settings › Local play).").
 - **What goes to the phone**: only what is displayed: names, presence, texts, times already formatted, and each friend's public key (the one used to write to them, as for the in-game conversation).
   Avatars under a token (`/images/<token>`).
   The phone only sends the key of the open conversation (`chat-open`, 64 hexadecimal characters, or nothing for the list), the text and the reaction.

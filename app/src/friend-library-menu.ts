@@ -298,7 +298,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         s.state === 'loading'
           ? { text: t('Demandée à sa borne…'), tone: 'quiet', icon: 'clock' }
           : s.state === 'off'
-            ? { text: t('{name} ne partage pas sa bibliothèque', { name: plain }), detail: t('Il peut l’activer dans Menu système > Communauté > « Partage et réseau ».'), tone: 'info', icon: 'lock' }
+            ? { text: t('{name} ne partage pas sa bibliothèque', { name: plain }), detail: t('Il peut l’activer dans Menu système > Communauté > « Réglages de la communauté » > « Partage et réseau ».'), tone: 'info', icon: 'lock' }
             : { text: t('{name} n’est pas en ligne', { name: plain }), detail: t('Sa bibliothèque se voit quand sa borne est allumée'), tone: 'quiet', icon: 'clock' };
       sections.push({ rows: [row] });
     } else {

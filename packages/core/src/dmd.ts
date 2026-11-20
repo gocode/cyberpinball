@@ -166,7 +166,7 @@ export function zedmdDoubt(d: DetectedDmd, hints: DmdPortHints | undefined, setu
 }
 
 // ---------------------------------------------------------------------------
-// Choix de l'utilisateur (Menu système > Borne > DMD > DMD réel)
+// Choix de l'utilisateur (Menu système > Ma borne > DMD et LED > DMD réel)
 
 /**
  * Pour chaque modèle : « auto », allumé quand il est reconnu à son identifiant USB (et ses clés
@@ -309,12 +309,12 @@ export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: st
     // Lu, mais refusé : rien ne se règle sur la borne, libdmdutil compare le nom à sa liste.
     if (probe.code >= 0 && probe.product) {
       return t(
-        'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.',
+        'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Aide et infos > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.',
         { product: probe.product, known: formatList(PIN2DMD_PRODUCTS.map((p) => `« ${p} »`)) },
       );
     }
     return t(
-      'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).',
+      'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).',
       { why: probe.code < 0 ? t('erreur {code}', { code: probe.code }) : t('nom vide') },
     );
   }
@@ -329,7 +329,7 @@ export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: st
       service: service ?? t('inconnu'),
     });
   }
-  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).', {
+  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).', {
     code: probe.code,
     stage: probe.stage,
   });
@@ -445,7 +445,7 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
     const where = [d.device.name, d.device.port].filter(Boolean).join(', ');
     const usb = where ? `${d.usb}${t(' ; ')}${where}` : d.usb;
     if (choice === 'off') {
-      findings.push({ severity: 'info', message: t('{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Borne > DMD > DMD réel.', { model: d.model, usb }) });
+      findings.push({ severity: 'info', message: t('{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.', { model: d.model, usb }) });
       continue;
     }
     findings.push({ severity: 'info', message: t("DMD réel : {model} reconnu à son identifiant USB ({usb}). VPX l'alimente par le plugin DMDUtil.", { model: d.model, usb }) });
@@ -455,7 +455,7 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
       findings.push({
         severity: 'info',
         message: t(
-          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Borne > DMD > DMD réel.",
+          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.",
           { model: d.model, usb: usbIdLabel(d.device.vid, d.device.pid) },
         ),
       });

@@ -2,7 +2,7 @@
 // chiffrement et la lecture des messages). La borne sert sur le réseau local la page du téléphone
 // (app/renderer/telephone/*) et sa liaison WebSocket tant qu'un QR code est affiché ou qu'un
 // téléphone est là. Trois endroits montrent le QR (RemoteSurface) : le bandeau du navigateur intégré
-// « Récupérer », l'écran Menu système > Borne > Télécommande du téléphone, et le clavier à l'écran ;
+// « Récupérer », l'écran Menu système > Ma borne > Télécommande du téléphone, et le clavier à l'écran ;
 // puis le téléphone à accepter, puis celui qui pilote.
 //
 // Ce que pilote le téléphone dépend de ce que la borne montre (RemoteMode) : la page du site quand

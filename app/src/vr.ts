@@ -1,4 +1,4 @@
-// Réalité virtuelle (packages/core/src/vr.ts) : le réglage du joueur (Menu système > Borne >
+// Réalité virtuelle (packages/core/src/vr.ts) : le réglage du joueur (Menu système > Ma borne >
 // Réalité virtuelle), le runtime du casque, et le VPinballX.ini d'une partie dans le casque.
 // Gardé dans <données>\vr\ : reglage.json (le choix ; illisible ou absent : désactivée) et
 // VPinballX.ini (celui de la dernière partie en VR, d'où viennent orientation et place de la table).

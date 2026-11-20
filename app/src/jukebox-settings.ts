@@ -1,4 +1,4 @@
-// Menu système > Médias > Réglages du Juke-box (demandé le 13/11/2026) : tous les réglages du
+// Menu système > Juke-box > Réglages du Juke-box (demandé le 13/11/2026) : tous les réglages du
 // Juke-box au même endroit, à part de la gestion de ses playlists. Les sorties du son (une ou
 // plusieurs, chacune avec son volume, son profil, ses basses, médiums et aigus, son retard), le
 // visualiseur du DMD et le médaillon dans la roue (le même réglage que Tables > Roue).

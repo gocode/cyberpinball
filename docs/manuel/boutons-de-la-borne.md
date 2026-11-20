@@ -63,7 +63,7 @@ Tant qu'un bouton reste à essayer (ou qu'un bouton obligatoire manque), « Vali
 Valider passe aux écrans (ou enregistre, étape seule).
 Dans l'assistant complet, si personne n'appuie sur rien pendant 20 secondes, les touches actuelles sont gardées (celles des encodeurs sur une borne neuve) : une borne sans opérateur passe ainsi aux écrans comme avant.
 
-Seules : menu système (Exit) > « Borne » > « Configuration de la borne » > « Boutons du jeu » (`npm run assistant -- --boutons`, action `boutons` du lanceur, ou l'action « Affecter les boutons de la borne » d'une touche dans les réglages de VPX) ou « Boutons de l'interface » (`npm run assistant -- --interface`).
+Seules : menu système (Exit) > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu » (`npm run assistant -- --boutons`, action `boutons` du lanceur, ou l'action « Affecter les boutons de la borne » d'une touche dans les réglages de VPX) ou « Boutons de l'interface » (`npm run assistant -- --interface`).
 Le reste du modèle est gardé : l'étape du jeu ne reprend en main que les clés `[Input]`, celle de l'interface n'écrit rien dans `VPinballX.ini` (« VPinballX.ini inchangé : VPX ne lit pas les boutons de l'interface. »).
 Dans l'étape du jeu, « Touches par défaut des encodeurs » remet celles des encodeurs ; dans celle de l'interface, « Touches par défaut » remet les flippers, Start et Exit du jeu en vigueur.
 
@@ -72,7 +72,7 @@ Depuis l'écran des tables et ses messages, une roue dentée discrète en haut �
 Dans ces menus, Tab et Maj+Tab déplacent le curseur quels que soient les boutons relevés, et chaque ligne se clique.
 Tab et Retour arrière sont réservés : l'étape « Boutons » les refuse, et un relevé qui en contiendrait est traité comme incohérent (touches par défaut).
 
-**Touches par défaut des encodeurs** (Maj gauche / droite, 1, Échap, 5, Entrée…), le recours quand un relevé enregistré ne pilote plus une borne aux boutons de clavier : menu système > « Borne » > « Configuration de la borne » > « Touches par défaut des encodeurs », la dernière ligne (à la souris : clic sur « Exit : Menu système » au pied de l'écran, puis sur les lignes), « Remettre les touches par défaut des encodeurs » dans le détail d'une touche des réglages de VPX (Avancé > Input), et sans aucun bouton l'action `boutons-defaut` du lanceur (`node app/dist/sync-cli.js --boutons-par-defaut`).
+**Touches par défaut des encodeurs** (Maj gauche / droite, 1, Échap, 5, Entrée…), le recours quand un relevé enregistré ne pilote plus une borne aux boutons de clavier : menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Touches par défaut des encodeurs », la dernière ligne (à la souris : clic sur « Exit : Menu système » au pied de l'écran, puis sur les lignes), « Remettre les touches par défaut des encodeurs » dans le détail d'une touche des réglages de VPX (Avancé > Input), et sans aucun bouton l'action `boutons-defaut` du lanceur (`node app/dist/sync-cli.js --boutons-par-defaut`).
 `cabinet.json` reprend les touches par défaut, pour les deux jeux (l'interface sur les flippers, Start et Exit des encodeurs), et `[Input]` est réécrit : les actions de VPX qui avaient perdu leur touche la retrouvent (`withDefaultButtons`, `app/src/buttons-reset.ts`).
 
 - **Jamais d'une seule pression** : la ligne (détail « Pour une borne aux boutons de clavier ; demande confirmation ») ouvre « Remplacer les boutons par les touches par défaut ? », qui dit ce qui va changer, « Annuler » présélectionné ; « Remplacer » se choisit exprès (`resetConsequences`).

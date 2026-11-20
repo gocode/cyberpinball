@@ -133,7 +133,7 @@ export const messages: Record<string, string> = {
   'Décrivez la borne, puis « Generate Config » : le ZIP téléchargé revient à « LED et retours (DOF) » et s’importe.': 'Describe the cabinet, then “Generate Config”: the downloaded ZIP comes back to “LED et retours (DOF)” and is imported.',
   'Configuration DOF': 'DOF configuration',
   'Cyber Pinball allume le plugin DOF dès qu’un contrôleur de retours est branché (Pinscape, LedWiz, Teensy…) ou que la borne a une configuration DOF.': 'Cyber Pinball turns the DOF plugin on as soon as a feedback controller is plugged in (Pinscape, LedWiz, Teensy…) or the cabinet has a DOF configuration.',
-  'Voir Menu système > Borne > « LED et retours (DOF) ». {keep}': 'See System menu > Borne > “LED et retours (DOF)”. {keep}',
+  'Voir Menu système > Ma borne > « DMD et LED » > « LED et retours (DOF) ». {keep}': 'See System menu > My cabinet > “DMD and LEDs” > “LED and feedback (DOF)”. {keep}',
   'Configuration DOF propre à la table': 'Table-specific DOF configuration',
   '{files} dans le dossier de la table passe avant la configuration DOF de la borne : pour cette table, DOF ne lit que ce fichier, souvent un reste d’archive.': '{files} in the table folder takes precedence over the cabinet’s DOF configuration: for this table, DOF only reads this file, often a leftover from an archive.',
   'Mettre ce fichier à la corbeille et garder la configuration de la borne': 'Move this file to the recycle bin and keep the cabinet configuration',

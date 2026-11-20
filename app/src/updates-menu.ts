@@ -1,4 +1,4 @@
-// Menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball » : recherche de la dernière version
+// Menu système > « Aide et infos » > « Mise à jour de Cyber Pinball » : recherche de la dernière version
 // publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
 // installation (packages/core/src/update.ts).
 //

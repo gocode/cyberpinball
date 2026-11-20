@@ -46,11 +46,11 @@ DMDUtil cherche lui-même le port : Cyber Pinball n'écrit ni `ZeDMDDevice` ni `
 Débranché, le DMD garde ses clés telles quelles.
 `npm run probe` affiche les DMD reconnus (`npm run probe -- --usb` : tous les périphériques USB).
 
-**La rubrique DMD (Menu système > Borne > DMD).**
+**La rubrique DMD (Menu système > Ma borne > DMD et LED).**
 Tous les réglages du DMD ensemble (16/11/2026) : « Écran du DMD » (FullDMD ou DMD seul, voir [Écran du DMD](#écran-du-dmd--fulldmd-ou-dmd-seul)), « DMD du front-end » (vivant ou classique) et « Couleur du DMD » (voir [DMD du front-end](medias-des-jeux.md#dmd-du-front-end)), « DMD réel ».
 Le DMD sur la roue reste sur la fiche de chaque table, qui le règle pour elle seule.
 
-**Menu système > Borne > DMD > « DMD réel » (bêta).**
+**Menu système > Ma borne > DMD et LED > « DMD réel » (bêta).**
 L'écran (`app/src/hardware-dmd-menu.ts`) montre les DMD reconnus, ce qui empêchera VPX de les ouvrir, et règle chaque modèle.
 La prise en charge reste en bêta tant que des bornes équipées ne l'ont pas confirmée : le badge « BÊTA » le dit sur l'entrée.
 
@@ -159,7 +159,7 @@ Ce que montre l'écran, FullDMD ou DMD seul, se dit une fois pour toutes ([Écra
 `splitBackglassDmd` partage un écran entre le backglass en haut et une bande DMD centrée en bas, aux proportions demandées (4:1 pour un DMD seul, 16:9 pour un FullDMD), au plus un tiers de la hauteur.
 
 - **Synchronisation** : signale deux rôles qui se recouvrent sur un même écran (le cas de deux rôles affectés au même écran sans zone), une zone invalide dans `cabinet.json` (l'écran entier est alors utilisé), un rôle incrusté sur tout le playfield, et une incrustation vue de côté ou à l'envers par le joueur : VPX ne tourne pas les incrustations.
-- **Disposition des écrans** ([app/src/arrange.ts](../../app/src/arrange.ts)) : étape de l'assistant après les rôles, ouverte sur « Terminer » (un Start garde tout tel quel), ou seule depuis le menu système > « Borne » > « Configuration de la borne » > « Disposition des écrans », ou `--assistant --disposition` ; à l'étape des écrans, « Placer librement… » l'ouvre sur un rôle et revient à l'assistant.
+- **Disposition des écrans** ([app/src/arrange.ts](../../app/src/arrange.ts)) : étape de l'assistant après les rôles, ouverte sur « Terminer » (un Start garde tout tel quel), ou seule depuis le menu système > « Ma borne » > « Configuration de la borne » > « Écrans » > « Disposition des écrans », ou `--assistant --disposition` ; à l'étape des écrans, « Placer librement… » l'ouvre sur un rôle et revient à l'assistant.
   Le panneau s'affiche sur l'écran du playfield ; chaque écran montre ses zones, celle choisie avec ses coins.
   Lignes : la zone (n'importe quel rôle), son écran (« Aucun écran » pour un rôle annexe), le format conservé (Libre, 16:9, 16:10, 4:3, 5:4, 21:9, 4:1, 9:16, 3:4), le plein écran (avec un format verrouillé : la plus grande zone à ce format, centrée), la position horizontale et verticale, la largeur, la hauteur, la taille précise, la position précise, le placement au-dessus, en dessous, à gauche ou à droite d'un autre rôle du même écran (réduit, format gardé, s'il manque de la place), l'alignement sur un bord ou au centre, l'aimantation et « Annuler les changements ».
   Position et taille sont libres au pixel près sur tout l'écran ; une zone n'en sort jamais et garde au moins 16 px de côté.
@@ -201,7 +201,7 @@ Code : [packages/core/src/dmdscreen.ts](../../packages/core/src/dmdscreen.ts).
 
 - **Où le dire** : à l'assistant, étape « Écrans et rôles » : un écran large libre est proposé deux fois au DMD, « FullDMD ? » (tout l'écran) puis « DMD en bande 4:1 au centre ? » ; un écran déjà 4:1 seulement en « DMD ? » ; le bas du fronton en 4:1 (DMD seul) ou 16:9 (FullDMD) ; l'incrustation dans le playfield est toujours un DMD seul.
   Placé librement, le DMD prend le type de la forme de sa zone.
-  Ou, sans refaire l'assistant, menu système > « Borne » > « DMD » > « Écran du DMD » (aussi dans « Configuration de la borne », après la disposition) : l'état actuel, puis « C'est un FullDMD » et « C'est un DMD seul », chacun avec son schéma.
+  Ou, sans refaire l'assistant, menu système > « Ma borne » > « DMD et LED » > « Écran du DMD » (aussi dans « Configuration de la borne », après la disposition) : l'état actuel, puis « C'est un FullDMD » et « C'est un DMD seul », chacun avec son schéma.
   Start enregistre et relance le front-end ; ses fenêtres, `VPinballX.ini` et les PuP-Packs suivent.
   La zone ne change que si elle n'a pas la forme du choix : FullDMD seul sur son écran, l'écran entier ; DMD seul, une bande 4:1 centrée ; sous le fronton, la bande du bas à la nouvelle forme (`withDmdKind`).
   Une bande déjà en forme est gardée telle quelle.

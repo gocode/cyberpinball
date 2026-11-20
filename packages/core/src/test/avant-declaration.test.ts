@@ -109,7 +109,7 @@ test('télécommande : réveil différé au démarrage, écoute en échec retent
     assert.equal(calls, 0, 'setMenu ne lit rien pendant l’initialisation de l’appelant : le réveil attend');
     await new Promise((r) => setTimeout(r, 300));
     assert.equal(calls, 1, 'le réveil a lieu juste après');
-    // L'écran Menu système > Télécommande du téléphone : ce qu'il dit.
+    // L'écran Menu système > Ma borne > Télécommande du téléphone : ce qu'il dit.
     remote.show('menu', true);
     const shown = remote.bar();
     assert.equal(shown?.phase, 'off');

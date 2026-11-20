@@ -2,7 +2,7 @@
 
 ## Feedback and ideas
 
-System menu > Cyber Pinball > "Retours et propositions" (Feedback and ideas): the public board of players' ideas and the feedback form, the same wherever you come from.
+System menu > "Aide et infos" (Help and info) > "Retours et propositions" (Feedback and ideas): the public board of players' ideas and the feedback form, the same wherever you come from.
 Five doors can lead there, never forcing you: this system menu entry; the failure screen of a game ("Flipper : envoyer un rapport aux développeurs" (Flipper: send a report to the developers), the problem already filled in) and a table's diagnosis ("Envoyer un rapport aux développeurs" (Send a report to the developers)), which send a private report in one press, the tech sheet attached, encrypted and anonymised, a description remaining optional; the tech sheet ("Envoyer un rapport" > "À l'équipe de Cyber Pinball" (To the Cyber Pinball team), technical report attached and description carried over); the phone app (⋮ menu > Feedback and ideas, and "Send a report to the developers" on the failure screen).
 
 **The board.**

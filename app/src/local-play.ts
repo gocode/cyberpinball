@@ -1,4 +1,4 @@
-// Menu système > Communauté > Jouer en local (packages/core/src/localplay.ts) : un joueur qui ne joue
+// Menu système > Communauté > Réglages de la communauté > Jouer en local (packages/core/src/localplay.ts) : un joueur qui ne joue
 // que sur sa borne retire toute la partie sociale d'un coup, niveaux compris (demande d'un joueur,
 // 18/11/2026). Un écran dit ce qui part et ce qui reste avant de confirmer ; activé, la rubrique ne
 // garde que cette entrée, qui ramène la communauté.

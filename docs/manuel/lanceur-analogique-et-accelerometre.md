@@ -4,7 +4,7 @@
 
 Un **lanceur analogique** (plunger à potentiomètre ou à capteur, lu par un Pinscape sur KL25Z ou par un autre contrôleur en mode joystick) n'est pas un bouton : c'est un **axe** de joystick, dont la valeur suit la course du lanceur.
 L'étape « Lanceur » de l'assistant l'affecte et le règle, avec l'accéléromètre du Pinscape pour les tremblements ([app/src/plunger-step.ts](../../app/src/plunger-step.ts), [packages/core/src/plunger.ts](../../packages/core/src/plunger.ts)).
-Elle suit les boutons du jeu dans l'assistant complet ; seule : menu système > « Borne » > « Configuration de la borne » > « Lanceur analogique » (`npm run assistant -- --lanceur`, action `plunger` du lanceur).
+Elle suit les boutons du jeu dans l'assistant complet ; seule : menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Lanceur analogique » (`npm run assistant -- --lanceur`, action `plunger` du lanceur).
 
 - **Détection** : « Tirez le lanceur à fond, puis lâchez-le ».
   Cyber Pinball lit tous les axes de tous les joysticks par la bibliothèque SDL de VPX (les mêmes numéros que VPX) ; l'axe qui a le plus bougé, et qui est revenu au repos, devient le lanceur, avec son sens (tirer fait monter ou baisser la valeur).

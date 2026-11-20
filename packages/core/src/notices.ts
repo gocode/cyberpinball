@@ -449,7 +449,7 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'friend-online':
       return fit(one ? { title: t('{name} vient de se connecter', { name: who(one) }) } : { title: tn(n, '{n} ami vient de se connecter', '{n} amis viennent de se connecter'), detail: names() });
     case 'friend-request':
-      return fit(one ? { title: t('Demande d’ami : {name}', { name: who(one) }), detail: t('Menu système > Communauté > Demandes d’amis') } : { title: tn(n, '{n} demande d’ami', '{n} demandes d’ami'), detail: names() });
+      return fit(one ? { title: t('Demande d’ami : {name}', { name: who(one) }), detail: t('Menu système > Communauté > Mes amis > Demandes d’amis') } : { title: tn(n, '{n} demande d’ami', '{n} demandes d’ami'), detail: names() });
     case 'friend-accepted':
       return fit(one ? { title: t('{name} a accepté votre demande', { name: who(one) }), detail: t('Vous êtes maintenant amis') } : { title: tn(n, '{n} demande acceptée', '{n} demandes acceptées'), detail: names() });
     case 'friend-playing':

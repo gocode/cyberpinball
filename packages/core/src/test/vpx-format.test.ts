@@ -84,7 +84,7 @@ test('invariant : table plus récente que son VPX → signalée ; même format o
   const own = tableTooNew(1090, {}, OWN, [])!;
   assert.deepEqual(own, { table: '10.9', player: 'VPX 10.8.1 de Cyber Pinball', able: [] });
   assert.match(tooNewReason(own), /VPX 10\.8\.1 de Cyber Pinball ne sait pas ouvrir une table enregistrée par VPX 10\.9/);
-  assert.match(tooNewAdvice(own), /Menu système > Borne > Autres versions de VPX/);
+  assert.match(tooNewAdvice(own), /Menu système > Ma borne > VPX > Autres versions de VPX/);
 
   // Un autre VPX assez récent dans la liste : proposé, la 10.8.0 non.
   const able = tableTooNew(1090, {}, OWN, [V1080, V1090])!;
@@ -114,7 +114,7 @@ test('médecin : la table de VPX 10.9 est signalée, la correction la fait jouer
   // Sans autre VPX : signalée, où l'ajouter, pas de correction.
   const alone = diagnose(entry(), { tablesDir, script, vpx: { own: OWN, others: [] } }).find((f) => f.code === 'tableTooNew')!;
   assert.equal(alone.title, 'Table enregistrée par VPX 10.9');
-  assert.match(alone.detail, /Menu système > Borne > Autres versions de VPX/);
+  assert.match(alone.detail, /Menu système > Ma borne > VPX > Autres versions de VPX/);
   assert.equal(alone.fix, undefined);
 
   // Avec une préversion 10.9 dans la liste : « La jouer avec VPX 10.8.1.6012 », écrit dans le .info comme la fiche.
@@ -136,7 +136,7 @@ test('textes en anglais', () => {
   try {
     const c = tableTooNew(1090, {}, OWN, [])!;
     assert.equal(tooNewReason(c), 'Cyber Pinball’s VPX 10.8.1 cannot open a table saved with VPX 10.9: the game would fail.');
-    assert.match(tooNewAdvice(c), /System menu > Cabinet > Other VPX versions/);
+    assert.match(tooNewAdvice(c), /System menu > My cabinet > VPX > Other VPX versions/);
     assert.equal(tooNewRefusal(c).title, 'Cyber Pinball’s VPX 10.8.1 cannot open this table');
   } finally {
     setLanguage('fr');

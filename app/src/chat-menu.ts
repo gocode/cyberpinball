@@ -591,7 +591,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       { text: t('Amis en sourdine'), detail: muted.length ? muted.join(', ') : t('Aucun'), icon: 'volume-mute', tone: muted.length ? 'info' : 'quiet' },
       { text: t('En mode invité, pas de messagerie'), detail: t('Le menu système est fermé ; les notifications de message attendent le déverrouillage.'), icon: 'guest', tone: 'quiet' },
     ];
-    return { heading: t('Messagerie'), icon: 'message', subheading: t('Menu système · Amis'), sections: [...takeFlash(), { rows }], actions, back: () => settingsBack() };
+    return { heading: t('Messagerie'), icon: 'message', subheading: t('Communauté'), sections: [...takeFlash(), { rows }], actions, back: () => settingsBack() };
   }
 
   // ---------- Entrée du menu système ----------

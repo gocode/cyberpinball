@@ -274,14 +274,15 @@ export function remoteEntries(e: RemoteEntries): RemoteEntries {
  * L'arbre des menus pour le téléphone, d'après celui du menu système : chaque rubrique et chaque
  * entrée que l'application fournit (`provided` : undefined pour une entrée qu'elle ne fournit pas
  * sur cette borne, comme « Bureau Windows » sur une borne dédiée), dans l'ordre de la borne. Chaque
- * rubrique y est, comme à la borne ; la pastille rouge d'une entrée remonte à sa rubrique.
+ * rubrique qui a une entrée y est, comme à la borne ; la pastille rouge d'une entrée remonte à sa rubrique.
  */
 export function remoteMenuTree(provided: (id: SystemItemId) => RemoteProvidedItem | undefined): RemoteMenuNode[] {
   const node = (id: SystemEntryId): RemoteMenuNode | undefined => {
     if (isSystemGroup(id)) {
       const g = SYSTEM_GROUPS[id];
-      // Une rubrique vide reste, comme à la borne (systemEntries garde toutes les rubriques).
+      // Une rubrique dont il ne reste rien n'est pas montrée, comme à la borne (systemEntries, 20/11/2026).
       const entries = g.entries.map(node).filter((n): n is RemoteMenuNode => Boolean(n));
+      if (!entries.length) return undefined;
       return { id, ...toRemoteEntry({ label: g.label, detail: g.detail, icon: g.icon, attention: entries.some((e) => e.attention) }), entries };
     }
     const item = provided(id);

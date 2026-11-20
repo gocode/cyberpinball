@@ -21,8 +21,8 @@ export const messages: Record<string, string> = {
   'PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».':
     'PIN2DMD: VPX’s libusb cannot open it with its current driver ({service}). The DMD will stay dark. Replace that driver with WinUSB using Zadig (Options > List All Devices, pick the PIN2DMD, WinUSB, Replace Driver), then “Check again”.',
   'inconnu': 'unknown',
-  'PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).':
-    'PIN2DMD: VPX’s libusb cannot open it (error {code}, step {stage}). The DMD will probably stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Cyber Pinball > Feedback and ideas).',
+  'PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).':
+    'PIN2DMD: VPX’s libusb cannot open it (error {code}, step {stage}). The DMD will probably stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Help and info > Feedback and ideas).',
   'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-le avant de jouer.':
     'Real DMD: {programs} is open and may be holding the real DMD; VPX could not light it. Close it before playing.',
   'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-les avant de jouer.':
@@ -33,9 +33,9 @@ export const messages: Record<string, string> = {
   'pilote du port série USB': 'USB serial port driver',
   '{model} : Windows ne lui a pas donné de port COM{why}. VPX ne pourra pas l’ouvrir. Installez le {chip} (souvent proposé par Windows Update), débranchez et rebranchez, puis « Vérifier de nouveau ».':
     '{model}: Windows has not given it a COM port{why}. VPX will not be able to open it. Install the {chip} (often offered by Windows Update), unplug and plug it back in, then “Check again”.',
-  '{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Borne > DMD > DMD réel.': '{model} recognized ({usb}), but turned off: “{model}: no” in System menu > Cabinet > DMD > Real DMD.',
-  "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Borne > DMD > DMD réel.":
-    '{model}: {usb} is a common USB-serial converter. If it is not a {model} (Arduino board, button controller…), DMDUtil will still send it its connection request: choose “{model}: no” in System menu > Cabinet > DMD > Real DMD.',
+  '{model} reconnu ({usb}), mais éteint : « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.': '{model} recognized ({usb}), but turned off: “{model}: no” in System menu > My cabinet > DMD and LEDs > Real DMD.',
+  "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.":
+    '{model}: {usb} is a common USB-serial converter. If it is not a {model} (Arduino board, button controller…), DMDUtil will still send it its connection request: choose “{model}: no” in System menu > My cabinet > DMD and LEDs > Real DMD.',
   'ZeDMD en wifi ({address})': 'ZeDMD over Wi-Fi ({address})',
   // health.ts
   'Ouvrir DMD réel': 'Open Real DMD',
@@ -45,9 +45,8 @@ export const messages: Record<string, string> = {
     'VPX drives it during games; “Menu image” makes it show the menu too (beta support)',
   // settings.ts
   'Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade) et les choix de « DMD réel ».': 'It follows the real DMD recognized by its USB ID (ZeDMD, PIN2DMD, Pixelcade) and the choices in “Real DMD”.',
-  'Elle change quand on branche le DMD, ou dans Menu système > Borne > DMD > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}': 'It changes when the DMD is plugged in, or in System menu > Cabinet > DMD > Real DMD (automatic, yes, no, ZeDMD over Wi-Fi). {keep}',
+  'Elle change quand on branche le DMD, ou dans Menu système > Ma borne > DMD et LED > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}': 'It changes when the DMD is plugged in, or in System menu > My cabinet > DMD and LEDs > Real DMD (automatic, yes, no, ZeDMD over Wi-Fi). {keep}',
   // Rubrique Borne > DMD (systemmenu.ts, frontend.ts)
-  'Écran du DMD, DMD du front-end et sa couleur, DMD réel (ZeDMD, PIN2DMD, Pixelcade)': 'DMD screen, menu DMD and its colour, real DMD (ZeDMD, PIN2DMD, Pixelcade)',
   'DMD du front-end': 'Menu DMD',
   'Indisponible : la borne n’a pas d’écran de DMD (assistant d’écrans, étape « Disposition »)': 'Unavailable: the cabinet has no DMD screen (screen wizard, “Disposition” (Layout) step)',
   // hardware-dmd-menu.ts
@@ -56,8 +55,8 @@ export const messages: Record<string, string> = {
   'Reconnu ({names}) : allumé pendant les parties (Start : oui)': 'Recognized ({names}): on during games (Start: yes)',
   'Allumé dès qu’un {model} est reconnu à son identifiant USB (Start : oui)': 'On as soon as a {model} is recognized by its USB ID (Start: yes)',
   'Borne à configurer': 'Cabinet to set up',
-  'Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Borne > Configuration de la borne).':
-    'The real DMD choices are kept with the cabinet configuration: run the screen wizard first (System menu > Cabinet > Cabinet setup).',
+  'Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Ma borne > Configuration de la borne).':
+    'The real DMD choices are kept with the cabinet configuration: run the screen wizard first (System menu > My cabinet > Cabinet setup).',
   '{width} × {height} points': '{width} × {height} dots',
   'éteint par « {model} : non »': 'turned off by “{model}: no”',
   'pilote à installer': 'driver to install',
@@ -116,17 +115,17 @@ export const messages: Record<string, string> = {
   'Image du front-end : oui. Le serveur du DMD démarre ; le DMD réel montre le front-end dès qu’il répond.': 'Menu image: yes. The DMD server is starting; the real DMD shows the menu as soon as it answers.',
   'DMD réel : dmdserver tient l’afficheur (image du front-end, bêta) ; VPX lui envoie ses images pendant les parties.': 'Real DMD: dmdserver holds the display (menu image, beta); VPX sends it its frames during games.',
   'Image du front-end sur le DMD réel : {problem}': 'Menu image on the real DMD: {problem}',
-  'Écrit par Cyber Pinball (Menu système > Borne > DMD > DMD réel) : réécrit à chaque lancement du serveur.': 'Written by Cyber Pinball (System menu > Cabinet > DMD > Real DMD): rewritten each time the server starts.',
+  'Écrit par Cyber Pinball (Menu système > Ma borne > DMD et LED > DMD réel) : réécrit à chaque lancement du serveur.': 'Written by Cyber Pinball (System menu > My cabinet > DMD and LEDs > Real DMD): rewritten each time the server starts.',
   // Sonde du PIN2DMD : le nom de la carte (dmd.ts), serveur du DMD sans afficheur (dmdserver.ts)
-  'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.':
-    'PIN2DMD: the board calls itself “{product}”, a name VPX’s DMD module (libdmdutil) does not know: it only accepts {known}. VPX will not drive it and the DMD will stay dark. Cyber Pinball cannot work around this: send a report (System menu > Cyber Pinball > Feedback and ideas) so that this name is reported to the VPX authors.',
-  'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions).':
-    'PIN2DMD: the board opens, but does not give its name to VPX’s libusb ({why}). VPX’s DMD module (libdmdutil) only drives it after reading that name: the DMD will stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Cyber Pinball > Feedback and ideas).',
+  'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Aide et infos > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.':
+    'PIN2DMD: the board calls itself “{product}”, a name VPX’s DMD module (libdmdutil) does not know: it only accepts {known}. VPX will not drive it and the DMD will stay dark. Cyber Pinball cannot work around this: send a report (System menu > Help and info > Feedback and ideas) so that this name is reported to the VPX authors.',
+  'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).':
+    'PIN2DMD: the board opens, but does not give its name to VPX’s libusb ({why}). VPX’s DMD module (libdmdutil) only drives it after reading that name: the DMD will stay dark. Unplug it, plug it back in, then “Check again”; if nothing changes, send a report (System menu > Help and info > Feedback and ideas).',
   'erreur {code}': 'error {code}',
   'nom vide': 'empty name',
   'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)': 'The DMD server cannot find the display (no answer within {seconds} s)',
-  'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions)':
-    'The DMD server cannot find the display (no answer within {seconds} s), and no cause was found: send a report (System menu > Cyber Pinball > Feedback and ideas)',
+  'Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Aide et infos > Retours et propositions)':
+    'The DMD server cannot find the display (no answer within {seconds} s), and no cause was found: send a report (System menu > Help and info > Feedback and ideas)',
   // Pont USB-série qui n'est sans doute pas un ZeDMD (contrôleur de LED…)
   '« ZeDMD : oui » si c’en est bien un': '“ZeDMD: yes” if it really is one',
   '{port} est le port d’un contrôleur de DOF (Cabinet.xml) : ZeDMD n’y est pas allumé d’office ({yes}).': '{port} is the port of a DOF controller (Cabinet.xml): ZeDMD is not turned on there by default ({yes}).',

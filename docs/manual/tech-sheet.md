@@ -2,7 +2,7 @@
 
 ## Tech sheet
 
-System menu > "Borne" (Cabinet) > "Fiche technique" (Tech sheet) sums up everything the cabinet is made of, to spot a problem yourself or describe it to whoever helps, and builds the report to send them.
+System menu > "Ma borne" (My cabinet) > "Santé et sauvegardes" (Health and backups) > "Fiche technique" (Tech sheet) sums up everything the cabinet is made of, to spot a problem yourself or describe it to whoever helps, and builds the report to send them.
 The page shows six blocks, each with its state written out ("✓ OK", "! À vérifier" (To check), "✕ Bloquant" (Blocking), never colour alone) and the gist on one line; Start opens the block's detail, in a "label | value" grid (every value starts from the same edge, `Section.kind` `spec`, `Row.label`), followed by its "À vérifier" (To check) points explained and the menu entries that fix them.
 
 | Block | What it shows | What it offers |

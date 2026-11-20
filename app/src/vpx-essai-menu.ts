@@ -1,4 +1,4 @@
-// Menu système > Borne > VPX d'essai (vpx-essai.ts) : basculer entre le VPX de Cyber Pinball et une préversion de
+// Menu système > Ma borne > VPX > VPX d’essai (vpx-essai.ts) : basculer entre le VPX de Cyber Pinball et une préversion de
 // VPX décrite dans le manifeste, sur la même installation. Fournie seulement quand le mode est permis (clé
 // développeur signée de la machine, cle-developpeur.ts) : ailleurs, l'entrée n'existe pas.
 //

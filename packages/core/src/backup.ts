@@ -1,4 +1,4 @@
-// Sauvegardes de la borne (Menu système > Cyber Pinball > Sauvegardes) : une copie de la racine sur
+// Sauvegardes de la borne (Menu système > Ma borne > Santé et sauvegardes > Sauvegardes) : une copie de la racine sur
 // une clé USB, un disque ou un dossier, à trois niveaux, et sa restauration.
 //
 // Une destination est un dossier (E:\CyberPinball-Sauvegardes, ou <racine>\data\sauvegardes pour

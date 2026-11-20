@@ -2,7 +2,7 @@
 // dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente et
 // horaire de la borne (nuit voilée, arrêt à heure fixe : packages/core/src/arcadehours.ts),
 // médias pendant la partie, qualité téléchargée depuis VPinMediaDB. Le DMD du menu (vivant ou classique)
-// et sa couleur sont rangés depuis le 16/11/2026 dans Menu système > Borne > DMD (tous les réglages
+// et sa couleur sont rangés depuis le 16/11/2026 dans Menu système > Ma borne > DMD et LED (tous les réglages
 // du DMD ensemble) : ce fichier les fournit encore, comme entrées de cette rubrique (MenuSettingsItems).
 // La roue des tables (présentation, ordre, Start, logos animés, couleur, Juke-box) a son propre
 // écran depuis le 12/11/2026 : Menu système > Tables > Roue (wheel-settings.ts).
@@ -315,7 +315,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
     return {
       heading: heading(),
       icon: 'music',
-      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Borne > DMD.', {
+      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Ma borne > DMD et LED.', {
         output: output ?? t('sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'),
       }),
       sections: [],

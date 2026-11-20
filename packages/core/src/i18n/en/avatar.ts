@@ -2,7 +2,7 @@
 // son entrée dans friends-menu.ts et frontend.ts, « Télécharger cette image » du navigateur
 // intégré). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  // Menu système > Mon compte > Mon avatar
+  // Menu système > Communauté > Mon profil > Modifier mon profil > Mon avatar
   'Mon avatar': 'My avatar',
   'Votre image, vue par vos amis': 'Your picture, seen by your friends',
   'Pas encore d’avatar : une photo ou une image à vous': 'No avatar yet: a photo or a picture of your own',
@@ -90,7 +90,7 @@ export const messages: Record<string, string> = {
   'Au clavier à l’écran, de {min} à {max} caractères': 'With the on-screen keyboard, {min} to {max} characters',
   'Mettre un avatar…': 'Add an avatar…',
   'Une image de ce PC ou du web, recadrée aux boutons': 'A picture from this PC or the web, cropped with the buttons',
-  'Tout se change plus tard : Menu système > Mon compte': 'Everything can be changed later: System menu > My account',
+  'Tout se change plus tard : Menu système > Communauté > Mon profil > Mon compte': 'Everything can be changed later: System menu > Community > My profile > My account',
   'Choisissez d’abord votre pseudo': 'Choose your nickname first',
   'Choisissez d’abord votre pseudo : il est obligatoire pour jouer': 'Choose your nickname first: it is mandatory to play',
   'C’est le nom donné d’office : choisissez le vôtre': 'That is the default name: choose your own',

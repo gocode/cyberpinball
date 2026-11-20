@@ -1,4 +1,4 @@
-// Fiche technique de la borne (Menu système > Borne > « Fiche technique ») : ce que l'application
+// Fiche technique de la borne (Menu système > Ma borne > « Santé et sauvegardes » > « Fiche technique ») : ce que l'application
 // relève du PC, de Windows, des écrans, des contrôleurs, des logiciels et d'elle-même
 // (app/src/tech-facts.ts), mis en blocs lisibles, avec l'état de chacun ; les contrôles du PC
 // que « Santé de la borne » ajoute aux siens (groupe « PC et Windows ») ; et le rapport à

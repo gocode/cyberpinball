@@ -2,7 +2,7 @@
 // (une ligne par message, l'heure, le drapeau, <pseudo> à la teinte de sa clé), les présents, écrire
 // (phrases préparées, clavier à l'écran, téléphone), les options d'une ligne (répondre, profil, demande
 // d'ami, ignorer, bloquer), les règles acceptées une fois, la liste des salons et les réglages de la
-// communauté (Menu système > Communauté > Réglages de la communauté), dont les phrases préparées.
+// communauté (Menu système > Communauté > Réglages de la communauté > Présence et salons), dont les phrases préparées.
 //
 // Le salon à l'écran est annoncé au réseau (net.roomOpen) : j'y suis présent, son historique est
 // demandé ; dès que son écran n'est plus affiché, je n'y suis plus.
@@ -97,7 +97,7 @@ export interface RoomsMenu {
   door(): { label: string; detail: string; attention: boolean; quiet: boolean };
   /** Le salon par défaut d'un coup d'œil (affiche du médaillon Communauté) : son nom, ses présents, sa dernière ligne. */
   glance(): RoomGlance;
-  /** Menu système > Communauté > Réglages de la communauté. */
+  /** Menu système > Communauté > Réglages de la communauté > Présence et salons. */
   settingsItem: ProvidedSystemItem;
   /** Nom d'un salon (« Salon France », « Salon Monde »). */
   roomName(room: RoomId): string;
@@ -111,7 +111,7 @@ export interface RoomsMenu {
   shown(): RoomId | undefined;
   /** Écrire depuis le téléphone (ou un autre clavier) dans un salon : la raison d'un refus, en clair. */
   write(room: RoomId, text: string): string | undefined;
-  /** Menu système > Communauté > Modération (modérateurs seulement) : la file des signalements. */
+  /** Menu système > Communauté > Réglages de la communauté > Modération (modérateurs seulement) : la file des signalements. */
   moderationItem: ProvidedSystemItem;
   /** Clic sur la notification d'un signalement : la file, son « Retour » vers `back`. */
   openModeration(back: () => void): void;
@@ -1007,7 +1007,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         { label: t('Règles des salons'), detail: s.rulesAt ? t('Acceptées le {date}', { date: new Date(s.rulesAt).toLocaleDateString(locale()) }) : t('Pas encore acceptées'), icon: 'rules', run: () => openRules(() => here(8)) },
         { label: t('Retour'), icon: 'back', run: back },
       ];
-      return { heading: t('Réglages de la communauté'), icon: 'sliders', subheading: t('Menu système · Amis'), lead: t('En mode invité, la communauté est fermée : le menu système l’est aussi.'), sections: [], actions, back };
+      return { heading: t('Présence et salons'), icon: 'sliders', subheading: t('Réglages de la communauté'), lead: t('En mode invité, la communauté est fermée : le menu système l’est aussi.'), sections: [], actions, back };
     };
     lib.openCustom(build, at);
   }

@@ -37,7 +37,6 @@ export const messages: Record<string, string> = {
   'Réseau des bornes indisponible : nouvel essai tout seul': 'Cabinet network unavailable: it will retry by itself',
   'Connexion au réseau des bornes…': 'Connecting to the cabinet network…',
   '{filter} : {reason}': '{filter}: {reason}',
-  'Le choisir : Mon compte › Mon pays': 'Choose it: My account › My country',
   'Personne pour ce filtre en ce moment': 'Nobody for this filter right now',
   'MagnaSave : filtre suivant': 'MagnaSave: next filter',
   'La liste se remplit à mesure que les bornes se signalent': 'The list fills up as cabinets announce themselves',
@@ -78,7 +77,7 @@ export const messages: Record<string, string> = {
   'Communauté dans la roue : masquée': 'Community on the wheel: hidden',
   'Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)':
     'The Community medallion follows the Juke-box at the head of each collection: players online, messages, leaderboards (Start: hide it)',
-  'La communauté reste dans Menu système › Amis (Start : afficher le médaillon)': 'The community stays in System menu › Friends (Start: show the medallion)',
+  'La communauté reste dans Menu système › Communauté (Start : afficher le médaillon)': 'The community stays in System menu › Community (Start: show the medallion)',
   // L'affiche du médaillon (plateau, fronton), comme celle du Juke-box
   'Le flipper se joue à plusieurs': 'Pinball is better together',
   'Votre borne. Vos joueurs.': 'Your cabinet. Your players.',
@@ -87,7 +86,6 @@ export const messages: Record<string, string> = {
   'Ouvrir la Communauté': 'Open Community',
   'Le réseau des bornes vous attend.': 'The cabinet network is waiting for you.',
   'Activez le partage': 'Turn on sharing',
-  'Menu système › Communauté › Partage et réseau': 'System menu › Community › Sharing and network',
   'Amis en ligne : {names}': 'Friends online: {names}',
   'Joueurs en ligne, messages, salon, classements': 'Players online, messages, room, leaderboards',
   'Start pour ouvrir la Communauté': 'Start to open Community',

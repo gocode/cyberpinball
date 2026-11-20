@@ -6,7 +6,7 @@
 //   « Retirer de mes amis » (17/11/2026 : la fiche d'ami et le profil public faisaient doublon).
 //   Pour un autre joueur, ce qui est réservé aux amis est dit, grisé ; « Écrire un message » reste
 //   visible, grisé avec sa raison ;
-// - « Mon profil public » (Menu système > Mon compte) : ce que voient les autres, et qui a aimé chaque
+// - « Mon profil public » (Menu système > Communauté > Mon profil > Confidentialité) : ce que voient les autres, et qui a aimé chaque
 //   évènement (pour moi seul).
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module.
@@ -97,7 +97,7 @@ export interface ProfileMenu {
    * actions qui le redessinent appellent `refresh` au lieu d'ouvrir le profil à la borne.
    */
   remote(key: string, refresh: () => void): Built;
-  /** « Mon profil public » (Menu système > Mon compte). */
+  /** « Mon profil public » (Menu système > Communauté > Mon profil > Confidentialité). */
   item: ProvidedSystemItem;
   /** Clic sur la notification d'un « J'aime » : « Mon profil public ». */
   openMine(back?: () => void): void;

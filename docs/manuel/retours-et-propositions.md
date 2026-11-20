@@ -2,7 +2,7 @@
 
 ## Retours et propositions
 
-Menu système > Cyber Pinball > Retours et propositions : le tableau public des propositions des joueurs et le formulaire des retours, le même d'où que l'on vienne.
+Menu système > Aide et infos > Retours et propositions : le tableau public des propositions des joueurs et le formulaire des retours, le même d'où que l'on vienne.
 Cinq portes peuvent y mener, sans jamais y obliger : cette entrée du menu système ; l'écran d'une partie échouée (« Flipper : envoyer un rapport aux développeurs », le problème déjà rappelé) et le diagnostic d'une table (« Envoyer un rapport aux développeurs »), qui envoient d'un appui un rapport privé, la fiche technique jointe, chiffré et anonymisé, une description restant facultative ; la fiche technique (« Envoyer un rapport » > « À l'équipe de Cyber Pinball », rapport technique joint et description reprise) ; l'appli du téléphone (menu ⋮ > « Retours et propositions », et « Envoyer un rapport aux développeurs » sur l'écran d'échec).
 
 **Le tableau.**

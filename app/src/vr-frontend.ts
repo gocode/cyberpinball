@@ -555,7 +555,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     if (headset?.worn) offerCalibration('premier-port');
   }
 
-  // « Réalité virtuelle » (Menu système > Borne, vr.ts) : désactivée, ou les tables dans le casque quand il
+  // « Réalité virtuelle » (Menu système > Ma borne, vr.ts) : désactivée, ou les tables dans le casque quand il
   // est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
   let vrMode = readVrMode(loc.dataDir);
   /** Sonde LibOVR (sonde-ovr.ts, 13 novembre 2026) : ce que Link donne à un client invisible, au journal. */
@@ -621,7 +621,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     },
   });
 
-  // « Recopie sur le playfield » (Menu système > Borne > Réalité virtuelle) : la vue d'un œil du casque sur l'écran du plateau
+  // « Recopie sur le playfield » (Menu système > Ma borne > VR et vision 3D) : la vue d'un œil du casque sur l'écran du plateau
   // pendant une partie dans le casque. Éteinte par défaut (vr.ts, VR_NO_MIRROR) : VPX ne la tourne pas en
   // portrait, et la copier en 4K à chaque image coûte à la carte graphique pour une image couchée.
   let vrMirror = readVrMirror(loc.dataDir);
@@ -640,7 +640,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     },
   });
 
-  // « Caler la borne » (Menu système > Borne > Réalité virtuelle, après l'activation) : la borne du casque et les
+  // « Caler la borne » (Menu système > Ma borne > VR et vision 3D, après l'activation) : la borne du casque et les
   // tables de VPX posées sur la vraie barre avant, touchée aux manettes (calage.ts). Grisée, avec sa
   // raison, tant que le menu n'est pas dans le casque. Dans le casque : ≡ de la manette gauche (menu du casque).
   library.provideSystemItem('vr-calibrate', {
@@ -653,7 +653,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     run: () => (calibrateUnavailable() ? library.openSystem() : openCalibration()),
   });
 
-  // « Manettes du casque » (Menu système > Borne > Réalité virtuelle, après « Caler la borne ») : l'assistant des manettes,
+  // « Manettes du casque » (Menu système > Ma borne > VR et vision 3D, après « Caler la borne ») : l'assistant des manettes,
   // grisé avec sa raison tant que le menu n'est pas dans le casque ou que les manettes ne sont pas connues.
   library.provideSystemItem('vr-controllers', {
     get detail() {

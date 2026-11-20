@@ -9,6 +9,14 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- System menu redone to be shorter: at most eight lines per screen (Cabinet had 17, Cyber Pinball 14), in order of use: Tables, My cabinet, Downloads, Recent activity, Community, Juke-box, Help and info, Quit or shut down.
+- My cabinet gathers what depends on the cabinet: Cabinet setup, VPX, DMD and LEDs, VR and 3D vision, Phone remote, Startup and access, Health and backups.
+- Cabinet setup fits in six lines: Buttons, Screens, Sound, Language / Langue, Cabinet configurations, Full wizard.
+- The Community in the System menu is now the same screen as the wheel medallion, with My profile (level, badges, history, nickname, avatar, country, privacy, account) and the community settings gathered.
+- Help and info gathers Cabinet controls, What's new, Update, Feedback and ideas, Follow us, Terms of use and Credits (formerly "The community").
+- Quit or shut down gathers the Windows desktop, quitting or restarting Cyber Pinball, sleep, restarting and shutting down the cabinet.
+- The System menu opens on the last section chosen at its root, even after a restart.
+- Collections and Migration move into Tables; the Juke-box settings open from its own screen.
 - Future Pinball, Pinball FX or Pinball FX3 game: the loading image no longer stays in front of the game's backglass. When the game goes full screen, Windows moves screens; shifted by a few pixels, the front-end window was no longer recognised as hiding the game and stayed in front for the whole game. It now goes behind as soon as it covers half of the screen the game uses.
 - Pinball FX3: before each game, the table gets its backglass picture if it has none: its backglass in Cyber Pinball, otherwise the one from the archive.org catalog (along with the game's home picture). FX3's backglass window then shows the table's picture instead of the path of the file it was looking for. A picture already there is never replaced. A table without a backglass in Cyber Pinball takes that picture, and the wheel shows it.
 - Pinball FX and FX3: a landscape picture stored next to a table counts as its backglass (that is where FX3 shows it), no longer as a playfield picture.
@@ -54,7 +62,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Cabinet sound: when a sound card (or an amplifier connected over HDMI) is set to stereo in Windows, the wizard asks whether there are exciters or speakers on the playfield (SSF, surround). On a yes, it opens the Windows Sound panel, explains the 5.1 or 7.1 setting and starts the speaker test as soon as the card reports it. Before, SSF was never offered on a card left in stereo, without a word.
 - Cabinet sound: setups with only two exciters are recognized. SSF in 5.1 sends them the whole playfield sound, and the wizard recommends this setting over 7.1, where part of each sound went to a silent jack. The summary no longer reports SSF in 5.1 as an error.
 - Cabinet sound: nothing heard on the rear or sides of a motherboard card: the wizard explains the case of three-jack cards (jack to reassign in the maker's audio console, or the front headphone jack).
-- System menu > Cabinet > Cabinet setup: the "Cabinet sound" entry now mentions SSF and exciters.
+- System menu > My cabinet > Cabinet setup: the "Cabinet sound" entry now mentions SSF and exciters.
 - My account: checking the recovery code now only offers its first three words, shuffled, to put back in order with the flippers (no extra decoy words any more).
 - Publishing: the release date and the manuals review date use the computer's local time instead of UTC, so a version published just after midnight is no longer dated the day before.
 - Pinball FX3 from a game folder chosen by hand: System menu > Tables > Add a table > "Pinball FX3 tables" > "Choose the game folder…", for tables kept outside the Steam library. The folder is checked ("Pinball FX Classic.exe" or "Pinball FX3.exe", tables in data\steam), kept, and the screen's tables come from it; "Forget this folder" goes back to Steam.

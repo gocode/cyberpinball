@@ -6,8 +6,7 @@
 // ouvre lui-même (Action.link), sans QR code.
 //
 // La page s'ouvre, discrète, depuis les écrans où l'on cherche de l'aide : Retours et propositions,
-// le diagnostic d'une table (`action`). Son entrée du Menu système (`systemItem`) attend la refonte
-// des menus, qui lui choisira sa place.
+// le diagnostic d'une table (`action`), et du Menu système, dans Aide et infos (`systemItem`).
 
 import { followLinks, t, type FollowLink } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem } from './library';
@@ -82,7 +81,7 @@ export function createFollowMenu(host: FollowMenuHost) {
         run: () => open(back),
       };
     },
-    /** Entrée du Menu système, à brancher (provideSystemItem) quand la refonte des menus lui aura donné sa place. */
+    /** Entrée du Menu système : Aide et infos > Nous suivre. */
     systemItem: {
       get detail() {
         return t('Tutoriels vidéo, nouveautés, questions');

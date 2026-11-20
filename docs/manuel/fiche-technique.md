@@ -2,7 +2,7 @@
 
 ## Fiche technique
 
-Menu système > « Borne » > « Fiche technique » récapitule tout ce qui compose la borne, pour repérer un problème soi-même ou le décrire à qui aide, et fait le rapport à lui transmettre.
+Menu système > « Ma borne » > « Santé et sauvegardes » > « Fiche technique » récapitule tout ce qui compose la borne, pour repérer un problème soi-même ou le décrire à qui aide, et fait le rapport à lui transmettre.
 La page montre six blocs, chacun avec son état écrit (« ✓ OK », « ! À vérifier », « ✕ Bloquant », jamais la couleur seule) et l'essentiel en une ligne ; Start ouvre le détail du bloc, en grille « libellé | valeur » (toutes les valeurs partent du même bord, `Section.kind` `spec`, `Row.label`), suivi de ses points « À vérifier » expliqués et des entrées du front-end qui réparent.
 
 | Bloc | Ce qu'il montre | Ce qu'il propose |

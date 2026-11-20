@@ -1,4 +1,4 @@
-// Menu système > Borne > « LED et retours (DOF) » : les contrôleurs de retours que DOF verra
+// Menu système > Ma borne > « DMD et LED » > « LED et retours (DOF) » : les contrôleurs de retours que DOF verra
 // (reconnus à leur identifiant USB, sans rien ouvrir), sa configuration (les directoutputconfig.ini
 // du configtool, Cabinet.xml), ce qui empêchera une LED de s'allumer, et trois gestes :
 // - ouvrir configtool.vpuniverse.com dans « Récupérer » : le ZIP téléchargé revient ici et s'importe ;

@@ -5,7 +5,7 @@
 Le joueur gagne des points d'expérience (XP) en jouant, en progressant, aux classements de la semaine, avec ses badges et dans la vie entre joueurs.
 Ils font monter un niveau qui ne baisse jamais.
 Le niveau se voit en permanence en haut de l'écran des tables et des écrans pleins, sur le profil public et dans les tableaux de scores.
-Sur une borne qui joue en local (Menu système > Communauté > Jouer en local), rien de tout cela ne s'affiche : ni carte du joueur, ni Mon niveau, ni Mes badges, ni moments ; les XP continuent de se compter en silence, et ce qui a été gagné entre-temps revient avec la communauté, sans son moment.
+Sur une borne qui joue en local (Menu système > Communauté > Réglages de la communauté > Jouer en local), rien de tout cela ne s'affiche : ni carte du joueur, ni Mon niveau, ni Mes badges, ni moments ; les XP continuent de se compter en silence, et ce qui a été gagné entre-temps revient avec la communauté, sans son moment.
 Règles : [packages/core/src/levels.ts](../../packages/core/src/levels.ts) ; badges : [packages/core/src/badges.ts](../../packages/core/src/badges.ts) ; suivi dans l'application : [app/src/level-tracker.ts](../../app/src/level-tracker.ts).
 
 ### Courbe et paliers

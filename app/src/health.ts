@@ -1,4 +1,4 @@
-// « Santé de la borne » (Menu système > Borne) : le relevé en tâche de fond, gardé d'un
+// « Santé de la borne » (Menu système > Ma borne) : le relevé en tâche de fond, gardé d'un
 // lancement à l'autre (<données>\cache\sante.json), et la page qui le montre. Les lignes et
 // leurs états viennent de packages/core/src/health.ts ; chaque ligne ouvre l'écran qui
 // répare : une entrée du menu système, le médecin de la table, l'installation de VPX.

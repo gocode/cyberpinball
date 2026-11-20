@@ -5,7 +5,7 @@
 Après le choix du playfield, l'assistant demande où se tient le joueur : les flippers font tourner l'affichage jusqu'à ce que le texte soit à l'endroit, la bande « Flippers · vous êtes ici » de son côté.
 Il demande ensuite la diagonale, proposée d'après l'EDID (la taille au millimètre du timing détaillé, sinon les centimètres), et refusée si elle ne colle pas aux proportions de l'image : c'est le cas de certains téléviseurs et des projecteurs.
 Le tout est rangé dans `cabinet.json` (`playfield.flipperEdge`, `playfield.manualSizeCm` seulement si la diagonale diffère de l'EDID ; `packages/core/src/layout.ts`).
-Ces questions se refont seules par menu système > « Borne » > « Configuration de la borne » > « Orientation et taille du playfield » (`--assistant --playfield`), et avec « Écrans et rôles » quand le playfield change d'écran.
+Ces questions se refont seules par menu système > « Ma borne » > « Configuration de la borne » > « Écrans » > « Orientation et taille du playfield » (`--assistant --playfield`), et avec « Écrans et rôles » quand le playfield change d'écran.
 
 Clés écrites dans `VPinballX.ini` (`vpxLayoutSettings`, relevées dans `ViewSetup.cpp` et `player.cpp` de VPX 10.8.1) :
 

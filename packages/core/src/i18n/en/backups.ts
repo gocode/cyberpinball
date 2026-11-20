@@ -1,4 +1,4 @@
-// Catalogue anglais : Sauvegardes (Menu système > Cyber Pinball > Sauvegardes), sauvegarde et
+// Catalogue anglais : Sauvegardes (Menu système > Ma borne > Santé et sauvegardes > Sauvegardes), sauvegarde et
 // restauration de la borne (packages/core/src/backup.ts, app/src/backups-menu.ts). Clé : le texte
 // français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {

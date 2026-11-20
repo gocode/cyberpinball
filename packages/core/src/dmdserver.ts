@@ -136,7 +136,7 @@ export function dmdServerNotFoundProblem(devices: ObservedUsbDevice[], setup: Ha
   const known = detectHardwareDmds(devices).some((d) => hardwareDmdChoice(setup, d.model) !== 'off' && hardwareDmdDriverProblem(d));
   return known
     ? t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)', { seconds })
-    : t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Cyber Pinball > Retours et propositions)', { seconds });
+    : t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Aide et infos > Retours et propositions)', { seconds });
 }
 
 /**
@@ -150,7 +150,7 @@ export function dmdServerIni(devices: ObservedUsbDevice[], setup: HardwareDmdSet
   const on = (m: 'ZeDMD' | 'PIN2DMD' | 'Pixelcade') => ((!onlyPin2dmd || m === 'PIN2DMD') && modelOn(devices, setup, m) ? 1 : 0);
   const wifi = !onlyPin2dmd && setup?.zedmdWifi?.enabled ? setup.zedmdWifi.address.trim() : '';
   return [
-    `; ${t('Écrit par Cyber Pinball (Menu système > Borne > DMD > DMD réel) : réécrit à chaque lancement du serveur.')}`,
+    `; ${t('Écrit par Cyber Pinball (Menu système > Ma borne > DMD et LED > DMD réel) : réécrit à chaque lancement du serveur.')}`,
     '[DMDServer]',
     `Addr = ${DMDSERVER_ADDR}`,
     `Port = ${DMDSERVER_PORT}`,

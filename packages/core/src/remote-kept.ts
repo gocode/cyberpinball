@@ -2,7 +2,7 @@
 // borne, un téléphone garde sa clé : il revient ensuite sans QR ni acceptation. La borne range
 // les clés dans data\telephones.json, une par téléphone, avec son nom (« Android · Chrome »), le
 // jour de son ajout et sa dernière venue ; REMOTE_KEPT_MAX au plus, le plus anciennement vu cède
-// sa place. « Oublier » (Menu système > Borne > Télécommande du téléphone) retire la clé.
+// sa place. « Oublier » (Menu système > Ma borne > Télécommande du téléphone) retire la clé.
 //
 // Le fichier est un secret de la borne, comme les clés du réseau des amis : jamais dans un
 // journal ni une capture. Les sauvegardes de la borne l'emportent avec ses réglages (data\) :

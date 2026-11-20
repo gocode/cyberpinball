@@ -2,7 +2,7 @@
 
 ## Mode invité
 
-Pour une soirée ou les enfants : Menu système > Borne > Mode invité, puis « Activer le mode invité ».
+Pour une soirée ou les enfants : Menu système > Ma borne > Démarrage et accès > Mode invité, puis « Activer le mode invité ».
 L'écran des tables s'ouvre verrouillé, et le reste jusqu'au déverrouillage, même après un redémarrage (`mode-invite.json` dans le dossier des données).
 
 - **Ce qui reste ouvert** : choisir une table (flippers, flèches, roue, clic), ouvrir sa fiche, jouer, lire le prospectus et les règles, l'aide-mémoire des commandes (bouton Aide, H, F1), arrêter une partie bloquée (Ctrl+Maj+K).

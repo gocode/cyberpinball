@@ -7,7 +7,7 @@ Dates and numbers follow the language (`fr-FR` or `en-GB`).
 Console logs, test reports and files written for other tools stay in French.
 
 - **By default**: the Windows language if it is French, English otherwise (`app.getPreferredSystemLanguages()`).
-- **System menu > "Cyber Pinball" > "Language / Langue"**: the entry is named in both languages, so it can be found whatever language is shown, and each language is offered in its own words ("Français", "English").
+- **System menu > "My cabinet" > "Cabinet setup" > "Language / Langue"**: the entry is named in both languages, so it can be found whatever language is shown, and each language is offered in its own words ("Français", "English").
   The choice, made with the cabinet buttons like everything else, is kept in `<data>\language.json` (`{ "language": "en" }`); the menu restarts at once through the screen guard (`relaunchCovered`), as for a change of configuration, and reopens its windows in the new language.
 - **At installation**: the small window at the start of the installer (or `/LANGUE=fr|en`) writes the same `language.json`; see [Windows installer](installation-and-file-layout.md#windows-installer).
 - **`CYBERPINBALL_LANGUE=fr|en`** forces the language (tests, screenshots); a choice made in the menu also replaces it for the restart.

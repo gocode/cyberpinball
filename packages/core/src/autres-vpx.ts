@@ -33,7 +33,7 @@ export interface OtherVpx {
 /** Fichier de la liste, dans le dossier des données. */
 export const OTHER_VPX_FILE = 'autres-vpx.json';
 
-/** Ce que Cyber Pinball ne fait pas pour une table jouée avec un autre VPX (fiche, Menu système > Borne). */
+/** Ce que Cyber Pinball ne fait pas pour une table jouée avec un autre VPX (fiche, Menu système > Ma borne). */
 export const OTHER_VPX_LIMITS: LaterText[] = [
   tLater('réalité virtuelle'),
   tLater('réglage de l’affichage en partie'),
@@ -233,7 +233,7 @@ export function tooNewReason(c: TooNewTable): string {
 export function tooNewAdvice(c: TooNewTable): string {
   const first = c.able[0];
   if (first) return t('{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.', { vpx: first.label });
-  return t('Ajoutez un VPX {table} ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».', { table: c.table });
+  return t('Ajoutez un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».', { table: c.table });
 }
 
 /** Message qui remplace la partie, avant de lancer VPX (même forme qu'otherVpxRefusal). */

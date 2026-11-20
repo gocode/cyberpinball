@@ -124,7 +124,7 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
         back();
       },
     });
-    actions.push(inv.declared ? { label: t('Valider'), icon: 'check', tone: 'ok', run: back } : { label: t('Plus tard'), detail: t('Menu système > Mon compte > Mon profil public, pendant un mois'), icon: 'back', run: back });
+    actions.push(inv.declared ? { label: t('Valider'), icon: 'check', tone: 'ok', run: back } : { label: t('Plus tard'), detail: t('Menu système > Communauté > Mon profil > Confidentialité > Mon profil public, pendant un mois'), icon: 'back', run: back });
     if (!sections.length) sections.push({ rows: [{ text: t('Personne sur votre réseau local pour l’instant'), detail: t('Cherchez son pseudo dans l’annuaire'), tone: 'info', icon: 'info' }] });
     return {
       heading: t('Qui vous a fait découvrir Cyber Pinball ?'),

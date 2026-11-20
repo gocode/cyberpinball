@@ -2,7 +2,7 @@
 
 ## Santé de la borne
 
-Menu système > « Borne » > « Santé de la borne » réunit sur une page ce que d'autres écrans savent déjà, pour voir d'un coup d'œil ce qui empêche de jouer ou mérite un détour.
+Menu système > « Ma borne » > « Santé et sauvegardes » > « Santé de la borne » réunit sur une page ce que d'autres écrans savent déjà, pour voir d'un coup d'œil ce qui empêche de jouer ou mérite un détour.
 Chaque ligne a un état — **OK** (coche, vert), **À vérifier** (point d'exclamation, ambre), **Bloquant** (croix, rouge), jamais la couleur seule — et ouvre, à Start ou au clic, l'écran qui répare ; son « Retour » ramène à la page.
 Le bilan en tête compte les lignes de chaque état et dit quand le relevé date.
 

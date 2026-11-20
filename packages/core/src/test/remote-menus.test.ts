@@ -60,16 +60,17 @@ test('accès direct : l’arbre du téléphone reprend celui du menu système, d
   for (const n of tree.filter((x) => !x.entries)) assert.equal(n.icon, SYSTEM_ITEMS[n.id as SystemItemId].icon);
 });
 
-test('accès direct : une entrée que la borne ne fournit pas n’y est pas (ses rubriques restent, comme à la borne) ; indisponible et pastille suivent', () => {
+test('accès direct : une entrée que la borne ne fournit pas n’y est pas, ni une rubrique dont il ne reste rien (comme à la borne) ; indisponible et pastille suivent', () => {
   const provided = new Set<SystemItemId>(['phone-remote', 'vr', 'updates']);
   const tree = remoteMenuTree((id) => (provided.has(id) ? { detail: id === 'vr' ? 'Indisponible : aucun casque' : 'ok', tone: id === 'vr' ? 'quiet' : undefined, attention: id === 'updates' } : undefined));
-  assert.deepEqual(new Set(ids(tree)), new Set(['phone-remote', ...SYSTEM_GROUP_IDS, 'vr', 'updates']));
-  assert.deepEqual(tree.find((n) => n.id === 'amis')?.entries, [], 'une rubrique sans entrée fournie : vide, pas absente');
+  // 20/11/2026 : une rubrique vide (jeu local, entrées absentes de cette borne) n'est plus montrée, à la borne comme au téléphone.
+  assert.deepEqual(new Set(ids(tree)), new Set(['borne', 'phone-remote', 'realite-virtuelle', 'vr', 'aide', 'updates']));
+  assert.equal(tree.find((n) => n.id === 'amis'), undefined, 'une rubrique sans entrée fournie : absente');
   const borne = tree.find((n) => n.id === 'borne')!;
   const vr = borne.entries!.find((n) => n.id === 'realite-virtuelle')!.entries!.find((n) => n.id === 'vr')!;
   assert.equal(vr.quiet, true, 'indisponible : grisée');
   assert.equal(vr.detail, 'Indisponible : aucun casque', 'avec sa raison');
-  assert.equal(tree.find((n) => n.id === 'cyberpinball')?.attention, true, 'la pastille rouge remonte à la rubrique');
+  assert.equal(tree.find((n) => n.id === 'aide')?.attention, true, 'la pastille rouge remonte à la rubrique');
   assert.equal(borne.attention, undefined);
 });
 

@@ -377,7 +377,7 @@ for (const entry of VPX_ENTRIES) test(`chaque clé écrite pour VPX ${entry.vers
 });
 
 // ---------------------------------------------------------------------------
-// DMD réel : choix par modèle, ZeDMD en wifi, pilotes (Menu système > Borne > DMD > DMD réel)
+// DMD réel : choix par modèle, ZeDMD en wifi, pilotes (Menu système > Ma borne > DMD et LED > DMD réel)
 
 const PIN2DMD_WINUSB = usb('USB\\VID_0314&PID_E457\\5&1&0&2', { service: 'WinUSB', product: 'PIN2DMD HD' });
 const PIN2DMD_SANS_PILOTE = usb('USB\\VID_0314&PID_E457\\5&1&0&2', { problem: 28 });
@@ -397,7 +397,7 @@ test('DMD réel : « non » écrit 0 même branché, « oui » écrit 1 même ab
   ]);
   // Automatique, puce courante : allumé, avec le conseil de passer à « non » dans le menu (plus dans l'ini).
   const auto = vpxDmdSettings([CH340]);
-  assert.ok(auto.findings.some((f) => f.message.includes('Menu système > Borne > DMD > DMD réel')));
+  assert.ok(auto.findings.some((f) => f.message.includes('Menu système > Ma borne > DMD et LED > DMD réel')));
 });
 
 test('DMD réel : ZeDMD en wifi, adresse gardée quand on le coupe', () => {

@@ -2,7 +2,7 @@
 
 ## Download manager
 
-One place to follow everything that is coming, from a site or a friend, the way a game console does: **Menu système (System menu) > Téléchargements (Downloads)** (at the root, between Médias (Media) and Borne (Cabinet): from the tables menu, Exit, the right flipper three times, then Start), also kept in **Menu système (System menu) > Tables > Téléchargements (Downloads)**.
+One place to follow everything that is coming, from a site or a friend, the way a game console does: **Menu système (System menu) > Téléchargements (Downloads)** (at the root, between Médias (Media) and Borne (Cabinet): from the tables menu, Exit, the right flipper three times, then Start), also kept in **Menu système (System menu) > Téléchargements (Downloads)**.
 On the tables menu, a **pill** left of the gear sums it up ("2 en cours · 45 %" (2 downloading · 45%), "En attente" (Waiting), "1 bloqué" (1 blocked), "1 prêt" (1 ready), a single text at a time, by priority; "blocked" and "ready" are news, gone as soon as the list is opened); a click opens it, Exit brings you back.
 
 - **The list**: "En cours et en attente" (Downloading and waiting), then "Terminés et bloqués" (Finished and blocked), in the order they were requested.

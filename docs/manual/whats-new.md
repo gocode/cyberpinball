@@ -2,7 +2,7 @@
 
 ## What's new
 
-**Menu système (System menu) > Nouveautés (What's new)** shows the big new things in Cyber Pinball, picked one by one: what really changes what you do with the cabinet.
+**Menu système (System menu) > Aide et infos (Help and info) > Nouveautés (What’s new)** shows the big new things in Cyber Pinball, picked one by one: what really changes what you do with the cabinet.
 It is not the list of fixes: that one stays in each version's notes ("Mise à jour de Cyber Pinball" (Cyber Pinball update) and the CHANGELOG).
 
 - **A timeline**: the most recent at the top, the date and version given only once for the new things of the same day.

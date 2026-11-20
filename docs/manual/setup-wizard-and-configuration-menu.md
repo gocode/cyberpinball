@@ -15,7 +15,7 @@ The "Lanceur" (Plunger) and "Tilt" steps have "Revenir" in addition to their own
 A click goes through the same handling as a press of the cabinet button, under a code no keyboard or joystick can send: it does exactly the same thing.
 The whole first setup can thus be done from a PC, remote desktop included; only button mapping needs the real cabinet buttons to be pressed.
 
-**System menu (Exit, Tab or ⚙) > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration)** gathers everything that sets up the cabinet.
+**System menu (Exit, Tab or ⚙) > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup)** gathers everything that sets up the cabinet.
 Each step can be redone there on its own and returns to the table menu, saved or not:
 
 | Entry | Option | What is redone | `VPinballX.ini` keys written |

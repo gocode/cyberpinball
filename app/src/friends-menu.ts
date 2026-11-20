@@ -125,7 +125,7 @@ export interface FriendsMenu {
   openRequests(back?: () => void): void;
   /** « Trouver un joueur » (l'annuaire). */
   openFind(): void;
-  /** « Supprimer mon compte » (Menu système > Mon compte) : son « Annuler » vers `back`. */
+  /** « Supprimer mon compte » (Menu système > Communauté > Mon profil > Mon compte) : son « Annuler » vers `back`. */
   openDeleteAccount(back: () => void): void;
   /** Historique des parties : le détail d'une partie, s'il la garde (son « Retour » vers `back`). */
   history: { has(id: string): boolean; openGame(id: string, back: () => void): void };
@@ -304,7 +304,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   /** Amis qui partagent leur bibliothèque et qui ont des tables absentes de la borne : combien. */
   function addFromFriendDetail(): string {
     const friends = net.state().friends;
-    if (!friends.length) return t('Pas encore d’ami : Menu système > Communauté > « Trouver un joueur »');
+    if (!friends.length) return t('Pas encore d’ami : Menu système > Communauté > « Mes amis » > « Trouver un joueur »');
     const online = friends.filter((f) => net.online(f.key)).length;
     return online
       ? tn(online, 'Les tables d’un ami, récupérées de sa borne · {n} ami en ligne', 'Les tables d’un ami, récupérées de sa borne · {n} amis en ligne')
@@ -672,7 +672,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       vpxRow(),
       ...[repairRow()].filter((r): r is Row => !!r),
     ];
-    // Pseudo, avatar, pays, ce que voient les autres et la suppression du compte : Menu système > Mon compte (account-menu.ts).
+    // Pseudo, avatar, pays, ce que voient les autres et la suppression du compte : Menu système > Communauté > Mon profil > Mon compte (account-menu.ts).
     const actions: Action[] = [];
     if (firewallToAllow()) actions.push(allowAction(() => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER)));
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
@@ -722,7 +722,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   // ---------- Supprimer mon compte (account-delete.ts, forget.ts) ----------
 
-  /** Le « Annuler » de la suppression : Menu système > Mon compte, d'où elle s'ouvre (account-menu.ts). */
+  /** Le « Annuler » de la suppression : Menu système > Communauté > Mon profil > Mon compte, d'où elle s'ouvre (account-menu.ts). */
   let toSharing = () => host.library.openSystem();
 
   /** Ce qui part et ce qui reste, puis la confirmation ; le curseur sur « Annuler ». */
@@ -754,7 +754,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
             title: t('Gardé'),
             rows: [
               { text: t('Vos tables, leurs scores et vos réglages'), icon: 'tables' },
-              { text: t('Les sauvegardes déjà faites : elles contiennent votre compte'), detail: t('Menu système > Cyber Pinball > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+              { text: t('Les sauvegardes déjà faites : elles contiennent votre compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
             ],
           },
         ],
@@ -817,7 +817,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
               report.failed.length
                 ? { text: tn(report.failed.length, '{n} fichier n’a pas pu être effacé', '{n} fichiers n’ont pas pu être effacés'), detail: report.failed.join(' · '), tone: 'warning', icon: 'alert' }
                 : { text: t('Fichiers du compte effacés de cette borne'), tone: 'ok', icon: 'check' },
-              { text: t('Les sauvegardes déjà faites contiennent encore votre compte'), detail: t('Menu système > Cyber Pinball > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+              { text: t('Les sauvegardes déjà faites contiennent encore votre compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
             ],
           },
         ],

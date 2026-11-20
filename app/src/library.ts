@@ -22,7 +22,8 @@ import {
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
   SYSTEM_ITEMS,
-  SYSTEM_ROOT,
+  loadSystemMemory,
+  saveSystemMemory,
   systemEntry,
   systemPathOf,
   remoteMenuTree,
@@ -520,6 +521,15 @@ export function createLibrary(host: LibraryHost) {
    */
   let systemReturn: (() => void) | undefined;
   /**
+   * Rubrique ouverte hors du Menu système, comme écran d'une fonction (la Communauté, depuis son
+   * médaillon) : son « Retour » ramène à `back` au lieu de la racine. Oubliée au retour aux tables.
+   */
+  let systemExit: { group: SystemGroupId; back: () => void } | undefined;
+  /** Ce qu'une rubrique ajoute à son écran (le compte des joueurs en ligne sous « Communauté »). */
+  const systemDecor = new Map<SystemGroupId, () => { subheading?: string; lead?: string }>();
+  /** Dernière entrée de la racine choisie : le Menu système s'ouvre dessus (systemmemory.ts). */
+  let systemLast = loadSystemMemory(host.dataDir);
+  /**
    * Fiche ouverte depuis « Toutes les tables » : son « Retour » ramène à la liste, sur cette
    * table, au lieu de la roue. Les écrans ouverts de la fiche y reviennent par openSheet, qui le
    * garde ; oublié au retour aux tables, au lancement d'une partie et quand la roue ouvre une fiche.
@@ -673,6 +683,7 @@ export function createLibrary(host: LibraryHost) {
     systemGroup = undefined;
     systemChosen = undefined;
     systemReturn = undefined;
+    systemExit = undefined;
     sheetReturn = undefined;
     sheetManage = undefined;
     backTrail.reset();
@@ -707,7 +718,11 @@ export function createLibrary(host: LibraryHost) {
    * s'en est ouvert (son « Retour ») : la rubrique d'où l'on venait, sur l'entrée choisie.
    */
   function openSystem(): void {
-    if (!screen) systemGroup = systemChosen = systemReturn = undefined;
+    if (!screen) {
+      systemGroup = systemChosen = systemReturn = systemExit = undefined;
+      // Depuis les tables : la racine, le curseur sur la dernière entrée choisie (systemmemory.ts).
+      systemChosen = systemLast;
+    }
     const back = systemReturn;
     systemReturn = undefined;
     if (back) return back();
@@ -717,7 +732,24 @@ export function createLibrary(host: LibraryHost) {
   /** Les rubriques du menu système, quel que soit l'écran ouvert (roue dentée). */
   function openSystemRoot(): void {
     systemReturn = undefined;
-    openSystemGroup(undefined);
+    systemExit = undefined;
+    openSystemGroup(undefined, systemLast);
+  }
+
+  /**
+   * Une rubrique comme écran d'une fonction, hors du Menu système (la Communauté, depuis son
+   * médaillon) : le même écran que dans le menu, dont le « Retour » ramène à `back`.
+   */
+  function openSystemGroupFrom(group: SystemGroupId, back: () => void): void {
+    if (!host.guest.knock('menu.system')) return back();
+    systemReturn = undefined;
+    systemExit = { group, back };
+    openSystemGroup(group);
+  }
+
+  /** Ce qu'une rubrique ajoute en tête de son écran (sous-titre, texte d'introduction). */
+  function decorateSystemGroup(group: SystemGroupId, decor: () => { subheading?: string; lead?: string }): void {
+    systemDecor.set(group, decor);
   }
 
   /** Une entrée du menu système ouverte depuis un autre écran : son « Retour » ramène à `back`. */
@@ -730,10 +762,13 @@ export function createLibrary(host: LibraryHost) {
     runAction(item.run, back);
   }
 
-  /** Entrées d'une rubrique (de la racine : ses raccourcis, Téléchargements, puis les rubriques) que l'application fournit. */
+  /**
+   * Entrées d'une rubrique (de la racine : ses rubriques et ses entrées) que l'application fournit. Une
+   * rubrique dont il ne reste rien (jeu local, entrées absentes de cette borne) n'est pas montrée.
+   */
   function systemEntries(group: SystemGroupId | undefined): SystemEntryId[] {
     const local = localPlay();
-    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || (systemItems.has(id) && !hiddenInLocalPlay(id, local) && (group !== undefined || systemItems.get(id)!.atRoot !== false)));
+    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => (isSystemGroup(id) ? systemEntries(id).length > 0 : systemItems.has(id) && !hiddenInLocalPlay(id, local)));
   }
 
   /** « Jouer en local » activé (localplay.ts). */
@@ -763,6 +798,14 @@ export function createLibrary(host: LibraryHost) {
     // Mode invité : aucune entrée du menu système, par quelque chemin qu'on y arrive (clic, autopilote).
     if (!host.guest.knock('menu.system')) return;
     systemChosen = id;
+    if (systemGroup === undefined) {
+      // Choisie à la racine : le menu s'y rouvrira, et la rubrique ramène à la racine (pas au médaillon).
+      systemExit = undefined;
+      if (systemLast !== id) {
+        systemLast = id;
+        saveSystemMemory(host.dataDir, id);
+      }
+    }
     if (isSystemGroup(id)) return openSystemGroup(id);
     section = SYSTEM_ITEMS[id].icon;
     runAction(systemItems.get(id)!.run, () => openSystemGroup(undefined));
@@ -770,6 +813,12 @@ export function createLibrary(host: LibraryHost) {
 
   /** Remonte d'un cran : la rubrique parente (ou la racine), la sélection sur celle qu'on quitte. */
   function systemUp(group: SystemGroupId): void {
+    if (systemExit?.group === group) {
+      const back = systemExit.back;
+      systemExit = undefined;
+      systemGroup = systemChosen = undefined;
+      return back();
+    }
     const path = systemPathOf(group) ?? [];
     systemChosen = group;
     openSystemGroup(path.at(-1), group);
@@ -1029,6 +1078,8 @@ export function createLibrary(host: LibraryHost) {
       return true;
     },
   });
+  // Aide et infos > Nous suivre (20/11/2026).
+  provideSystemItem('follow', follow.systemItem);
 
   // ---------- Gestionnaire de téléchargements ----------
   // Tout ce qui arrive, d'un site ou d'un ami (packages/core/src/downloadmanager.ts) : la file
@@ -1331,7 +1382,7 @@ export function createLibrary(host: LibraryHost) {
     downloads,
   });
 
-  // Santé de la borne (Menu système > Borne) : relevé en tâche de fond, gardé ; une page de bilan.
+  // Santé de la borne (Menu système > Ma borne) : relevé en tâche de fond, gardé ; une page de bilan.
   const health = createHealth({
     host,
     layout,
@@ -1365,7 +1416,7 @@ export function createLibrary(host: LibraryHost) {
     showing: (build) => screen?.kind === 'custom' && screen.build === build,
   });
 
-  // Fiche technique (Menu système > Borne) : le relevé du PC et de la borne, et le rapport à envoyer.
+  // Fiche technique (Menu système > Ma borne) : le relevé du PC et de la borne, et le rapport à envoyer.
   const techSheet = createTechSheet({
     dataDir: host.dataDir,
     collect: () =>
@@ -1436,7 +1487,7 @@ export function createLibrary(host: LibraryHost) {
     feedback: host.feedbackService ? (text, back) => feedback!.openForm({ attach: true, ...(text ? { text } : {}) }, back) : undefined,
   });
 
-  // Retours et propositions (Menu système > Cyber Pinball) : le formulaire des retours et le tableau des propositions.
+  // Retours et propositions (Menu système > Aide et infos) : le formulaire des retours et le tableau des propositions.
   const feedback = host.feedbackService
     ? createFeedbackMenu({
         dataDir: host.dataDir,
@@ -1600,7 +1651,7 @@ export function createLibrary(host: LibraryHost) {
     void health.refresh();
   });
 
-  // Télécommande du téléphone (Menu système > Borne) : le QR code hors du navigateur intégré.
+  // Télécommande du téléphone (Menu système > Ma borne) : le QR code hors du navigateur intégré.
   const remoteMenu = host.phoneRemote
     ? createPhoneRemoteMenu({
         remote: host.phoneRemote,
@@ -2194,7 +2245,8 @@ export function createLibrary(host: LibraryHost) {
     if (!group) return { heading: t('Menu système'), icon: 'gear', sections: [], actions: [...actions, { label: t('Retour aux tables'), icon: 'back', run: leave }], back: leave };
     const up = () => systemUp(group);
     const g = SYSTEM_GROUPS[group];
-    return { heading: g.label, icon: g.icon, sections: [], actions: [...actions, { label: t('Retour'), icon: 'back', run: up }], back: up };
+    const decor = systemDecor.get(group)?.() ?? {};
+    return { heading: g.label, icon: g.icon, ...decor, sections: [], actions: [...actions, { label: t('Retour'), icon: 'back', run: up }], back: up };
   }
 
   /** L'écran affiché ; en mode invité, sans les actions dont la porte est fermée (ou qui n'en ont pas). */
@@ -4969,7 +5021,7 @@ export function createLibrary(host: LibraryHost) {
           });
         }
       }
-      // Le VPX de la table, seulement quand un autre VPX est dans Menu système > Borne > Autres versions de VPX.
+      // Le VPX de la table, seulement quand un autre VPX est dans Menu système > Ma borne > VPX > Autres versions de VPX.
       if (others.length && tp.steps.some((st) => st.kind === 'table')) {
         const choice = planVpx.choiceFor(s, tp, others, host.vpxVersion?.());
         const chosen = others.find((v) => v.id === choice);
@@ -6433,6 +6485,9 @@ export function createLibrary(host: LibraryHost) {
     health,
     openSystem,
     openSystemRoot,
+    /** Une rubrique comme écran d'une fonction (la Communauté, depuis son médaillon) : son « Retour » ramène à `back`. */
+    openSystemGroupFrom,
+    decorateSystemGroup,
     openCustom,
     /** Lecture du disque d'un écran fourni : faite à son ouverture, gardée tant qu'il reste affiché. */
     kept,

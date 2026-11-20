@@ -580,8 +580,8 @@ test('règles : ce qui se montre partout, et son son ; les sons des notification
   assert.match(window, /const CALL = new Set\(\['invite', 'news', 'friend'\]\)/);
 });
 
-test('réglage « Masquer les notifications pendant les parties » : dans la rubrique Amis, désactivé par défaut, gardé', () => {
-  assert.ok(SYSTEM_GROUPS.amis.entries.includes('quiet-in-game'));
+test('réglage « Masquer les notifications pendant les parties » : dans les réglages de la communauté, désactivé par défaut, gardé', () => {
+  assert.ok(SYSTEM_GROUPS['reglages-communaute'].entries.includes('quiet-in-game'));
   assert.equal(SYSTEM_ITEMS['quiet-in-game'].label, 'Masquer les notifications pendant les parties');
   /* eslint-disable @typescript-eslint/no-require-imports */
   const setting = require(path.join(REPO_ROOT, 'app', 'dist', 'quiet-in-game-setting.js')) as { readQuietInGame(d: string): boolean; writeQuietInGame(d: string, v: boolean): void };

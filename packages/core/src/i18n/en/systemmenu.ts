@@ -1,0 +1,42 @@
+// Catalogue anglais : arbre du Menu système refondu le 20/11/2026 (packages/core/src/systemmenu.ts),
+// Configuration de la borne en six lignes (app/src/frontend.ts), accueil Communauté (app/src/community-menu.ts).
+// Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // packages/core/src/systemmenu.ts
+  'Toutes les tables, collections, ajouter une table, médias, ROM, roue, son et mode attente, migration': 'All tables, collections, add a table, media, ROMs, wheel, sound and attract mode, migration',
+  'Ma borne': 'My cabinet',
+  'Configuration, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes': 'Setup, VPX, DMD and LEDs, VR and 3D vision, remote, startup, health and backups',
+  'Réglages de VPX pour toutes les tables, autres versions installées': 'VPX settings for every table, other installed versions',
+  'DMD et LED': 'DMD and LEDs',
+  'Écran du DMD, DMD du front-end et sa couleur, DMD réel, LED et retours (DOF)': 'DMD screen, menu DMD and its colour, real DMD, LEDs and feedback (DOF)',
+  'VR et vision 3D': 'VR and 3D vision',
+  'Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D': 'Turn the headset on, align the cabinet, headset controllers, playfield mirror, 3D vision',
+  'Démarrage et accès': 'Startup and access',
+  'Borne dédiée, lancement au démarrage, relance par Start, mode invité': 'Dedicated cabinet, launch at startup, relaunch with Start, guest mode',
+  'Santé et sauvegardes': 'Health and backups',
+  'Santé de la borne, fiche technique, sauvegardes': 'Cabinet health, tech sheet, backups',
+  'Mon profil, joueurs en ligne, amis, messages, groupes et salons, classements, réglages': 'My profile, players online, friends, messages, groups and rooms, leaderboards, settings',
+  'Mon profil': 'My profile',
+  'Niveau et badges, historique des parties, pseudo, avatar, pays, confidentialité, compte': 'Level and badges, game history, nickname, avatar, country, privacy, account',
+  'Modifier mon profil': 'Edit my profile',
+  'Pseudo, avatar, pays': 'Nickname, avatar, country',
+  'Confidentialité': 'Privacy',
+  'Profil public, ce que voient les autres': 'Public profile, what others see',
+  'Protéger, transférer ou supprimer mon compte': 'Protect, transfer or delete my account',
+  'Groupes et salons': 'Groups and rooms',
+  'Groupes publics ou privés, salons des pays': 'Public or private groups, country rooms',
+  'Présence et salons, partage et réseau, scores des amis, notifications, jouer en local': 'Presence and rooms, sharing and network, friends’ scores, notifications, local play',
+  'Aide et infos': 'Help and info',
+  'Commandes, nouveautés, mise à jour, retours et propositions, nous suivre, conditions, crédits': 'Controls, what’s new, update, feedback and ideas, follow us, terms, credits',
+  'Quitter ou éteindre': 'Quit or shut down',
+  'Bureau Windows, quitter ou redémarrer Cyber Pinball, veille, redémarrer ou éteindre la borne': 'Windows desktop, quit or restart Cyber Pinball, sleep, restart or shut down the cabinet',
+  'Son et mode attente': 'Sound and attract mode',
+  'Présence et salons': 'Presence and rooms',
+  // app/src/frontend.ts
+  'Boutons, écrans, son, langue, configurations, ou l’assistant complet': 'Buttons, screens, sound, language, configurations, or the full wizard',
+  'Boutons du jeu et de l’interface, lanceur analogique, tilt, touches par défaut': 'Game and interface buttons, analog plunger, tilt, default keys',
+  'Écrans, playfield, disposition, écran du DMD': 'Screens, playfield, layout, DMD screen',
+  // app/src/community-menu.ts
+  'Le choisir : Mon profil › Modifier mon profil › Mon pays': 'Choose it: My profile › Edit my profile › My country',
+  'Menu système › Communauté › Réglages de la communauté › Partage et réseau': 'System menu › Community › Community settings › Sharing and network',
+};

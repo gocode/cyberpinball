@@ -91,5 +91,5 @@ export const messages: Record<string, string> = {
   'Collections dans la roue : affichées': 'Collections on the wheel: shown',
   'Collections dans la roue : masquées': 'Collections on the wheel: hidden',
   'Le médaillon Collections suit la Communauté en tête de chaque collection : Start ouvre la liste des collections (Start : le masquer)': 'The Collections medallion follows Community at the head of every collection: Start opens the list of collections (Start: hide it)',
-  'Les MagnaSave et Menu système › Collections changent toujours de collection (Start : afficher le médaillon)': 'The MagnaSave buttons and System menu › Collections still change collection (Start: show the medallion)',
+  'Les MagnaSave et Menu système › Tables › Collections changent toujours de collection (Start : afficher le médaillon)': 'The MagnaSave buttons and System menu › Tables › Collections still change collection (Start: show the medallion)',
 };

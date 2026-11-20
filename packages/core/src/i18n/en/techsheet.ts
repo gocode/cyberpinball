@@ -1,4 +1,4 @@
-// Catalogue anglais : Fiche technique (Menu système > Borne > Fiche technique) et rapport de la borne
+// Catalogue anglais : Fiche technique (Menu système > Ma borne > Santé et sauvegardes > Fiche technique) et rapport de la borne
 // (packages/core/src/techsheet.ts, app/src/tech-sheet.ts, page du téléphone). Clé : le texte français
 // tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
@@ -38,7 +38,7 @@ export const messages: Record<string, string> = {
   "Aucune clé branchée : elle apparaît ici dès qu’elle l’est": "No stick plugged in: it shows up here as soon as it is",
   "À un ami": "To a friend",
   "Le résumé, dans la messagerie · {online}": "The summary, in messages · {online}",
-  "Aucun ami pour l’instant : Menu système > Communauté > Trouver un joueur": "No friends yet: System menu > Community > Find a player",
+  "Aucun ami pour l’instant : Menu système > Communauté > Mes amis > Trouver un joueur": "No friends yet: System menu > Community > My friends > Find a player",
   "Réseau des amis coupé": "Friends network off",
   "Dans un dossier de la borne": "In a cabinet folder",
   "{dir} · à copier vous-même": "{dir} · to copy yourself",
@@ -122,7 +122,6 @@ export const messages: Record<string, string> = {
   "Rapport de la borne": "Cabinet report",
   "Téléchargez-le, puis joignez-le à un e-mail ou à un message.": "Download it, then attach it to an email or a message.",
   "PC et Windows": "PC and Windows",
-  "Santé, fiche technique, boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, DMD, bureau Windows, mode invité": "Health, tech sheet, buttons, screens, sound, VPX settings, virtual reality, 3D vision, phone remote, DMD, Windows desktop, guest mode",
   "Fiche technique": "Tech sheet",
   "AZERTY (France)": "AZERTY (France)",
   "AZERTY (Belgique)": "AZERTY (Belgium)",

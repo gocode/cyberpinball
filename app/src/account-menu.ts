@@ -1,4 +1,4 @@
-// Menu système > Mon compte (18/11/2026) : tout ce qui est « moi » et de quoi retrouver son compte
+// Menu système > Communauté > Mon profil > Mon compte (18/11/2026) : tout ce qui est « moi » et de quoi retrouver son compte
 // ailleurs. Un joueur avait perdu son niveau et ses XP en réinstallant Cyber Pinball : le compte
 // n'existait que dans le dossier de la borne. Entrées de la rubrique fournies ici :
 // - « Protéger et transférer mon compte » : copie de secours sur ce PC (toujours), code de

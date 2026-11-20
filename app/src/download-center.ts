@@ -1,5 +1,5 @@
 // Écran « Téléchargements » (première entrée du menu système, pastille du menu des tables, et
-// Menu système > Tables > Téléchargements) : tout ce qui arrive, d'un site ou d'un ami, suivi en
+// Menu système > Téléchargements) : tout ce qui arrive, d'un site ou d'un ami, suivi en
 // temps réel, à la manière d'une console de jeu (packages/core/src/downloadmanager.ts).
 // - la liste : en cours et en attente, puis terminés et bloqués, chacune du plus récent au plus
 //   ancien (newestFirst) ; chaque ligne dit son état en

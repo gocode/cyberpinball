@@ -13,7 +13,7 @@ Cyber Pinball cite leurs auteurs sans encombrer le jeu ([packages/core/src/credi
   **Start l'ouvre directement** dans le navigateur intégré (fenêtre « Récupérer », sans destinataire : un fichier téléchargé va à la liste d'attente comme depuis une fiche de VPS) ; le bandeau dit la table, le rôle et tous ses auteurs, et rappelle qu'un merci fait plaisir.
   Fermer (Échap) revient aux crédits.
 - **Une ligne sans page mais avec plus de quatre auteurs** : Start ouvre tous ses auteurs et ce qu'ils ont fait d'autre sur la borne.
-- **La communauté** : Menu système > Cyber Pinball > « La communauté » (aussi depuis la page Crédits) : les auteurs de la borne, des plus présents aux moins présents (« HauntFreaks · 8 frontons · 4 tables » ; 40 au plus, puis « … et N autres »), chacun avec ses tables ; puis les logiciels et les sites sans lesquels rien ne marche (VPX, PinMAME, B2S, Serum, PinUP Player, DOF ; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
+- **La communauté** : Menu système > « Aide et infos » > « Crédits » (aussi depuis la page Crédits) : les auteurs de la borne, des plus présents aux moins présents (« HauntFreaks · 8 frontons · 4 tables » ; 40 au plus, puis « … et N autres »), chacun avec ses tables ; puis les logiciels et les sites sans lesquels rien ne marche (VPX, PinMAME, B2S, Serum, PinUP Player, DOF ; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
   Ce classement ne lit que les `.info` (pas les tables elles-mêmes), refait au plus toutes les 30 s.
 - **Le mode attente** : la ligne discrète décrite dans [Mode attente](medias-des-jeux.md#mode-attente).
 

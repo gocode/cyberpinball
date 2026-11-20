@@ -1,4 +1,4 @@
-// Nouveautés (Menu système > Nouveautés, app/src/news-menu.ts) : les grandes nouveautés de Cyber
+// Nouveautés (Menu système > Aide et infos > Nouveautés, app/src/news-menu.ts) : les grandes nouveautés de Cyber
 // Pinball, choisies à la main, jamais tirées du CHANGELOG (17/11/2026). Une chronologie : la plus
 // récente en haut, la date dite une seule fois pour les nouveautés du même jour ; chaque ligne a son
 // détail et, si elle en a un, un petit aperçu ; Start l'agrandit (grand aperçu, texte entier) et
@@ -66,7 +66,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Essayer une configuration la vérifie paire par paire. Carte en stéréo dans Windows : le panneau Son s’ouvre et l’assistant attend le 5.1 ou le 7.1. Sinon, « Régler pas à pas » reste là.'),
       ];
     },
-    get where() { return t('Menu système › Borne › Configuration de la borne › Son de la borne'); },
+    get where() { return t('Menu système › Ma borne › Configuration de la borne › Son de la borne'); },
     reach: { kind: 'system', id: 'cabinet' },
   },
   {
@@ -118,7 +118,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Dans Scores : votre niveau et vos badges, les classements de toutes vos tables, et la cloche de l’Activité récente en haut.'),
       ];
     },
-    get where() { return t('Menu système › Télécommande du téléphone'); },
+    get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
     reach: { kind: 'system', id: 'phone-remote' },
     preview: true,
   },
@@ -135,7 +135,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.'),
       ];
     },
-    get where() { return t('Menu système › Mon compte'); },
+    get where() { return t('Menu système › Communauté › Mon profil › Mon compte'); },
     reach: { kind: 'system', id: 'account' },
     preview: true,
   },
@@ -151,7 +151,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.'),
       ];
     },
-    get where() { return t('Menu système › Borne › Autres versions de VPX'); },
+    get where() { return t('Menu système › Ma borne › VPX › Autres versions de VPX'); },
     reach: { kind: 'system', id: 'other-vpx' },
   },
   {
@@ -167,7 +167,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Des LED adressables sans Cabinet.xml sont signalées avec le port probable de leur contrôleur, et des bandes pilotées par une Wemos D1 reçoivent d’office les réglages qu’attend son micrologiciel.'),
       ];
     },
-    get where() { return t('Menu système › Borne › LED et retours (DOF)'); },
+    get where() { return t('Menu système › Ma borne › DMD et LED › LED et retours (DOF)'); },
     reach: { kind: 'system', id: 'dof' },
   },
   {
@@ -247,7 +247,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.'),
       ];
     },
-    get where() { return t('Menu système › Cyber Pinball › Retours et propositions'); },
+    get where() { return t('Menu système › Aide et infos › Retours et propositions'); },
     reach: { kind: 'system', id: 'feedback' },
     preview: true,
   },
@@ -326,7 +326,7 @@ export const NEWS: readonly NewsItem[] = [
         t('« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.'),
       ];
     },
-    get where() { return t('Menu système › Borne › Réalité virtuelle'); },
+    get where() { return t('Menu système › Ma borne › VR et vision 3D'); },
     reach: { kind: 'system', id: 'realite-virtuelle' },
     beta: true,
     preview: true,
@@ -343,7 +343,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.'),
       ];
     },
-    get where() { return t('Menu système › Borne › Vision 3D'); },
+    get where() { return t('Menu système › Ma borne › VR et vision 3D › Vision 3D'); },
     reach: { kind: 'system', id: 'vision3d' },
     beta: true,
   },
@@ -375,7 +375,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Accepté une fois, il est gardé : il revient ensuite sans QR code.'),
       ];
     },
-    get where() { return t('Menu système › Télécommande du téléphone'); },
+    get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
     reach: { kind: 'system', id: 'phone-remote' },
     preview: true,
   },
@@ -422,7 +422,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Pour restaurer, un plan dit d’abord, partie par partie, ce qui sera remplacé, remis ou gardé.'),
       ];
     },
-    get where() { return t('Menu système › Cyber Pinball › Sauvegardes'); },
+    get where() { return t('Menu système › Ma borne › Santé et sauvegardes › Sauvegardes'); },
     reach: { kind: 'system', id: 'backups' },
     preview: true,
   },
@@ -438,7 +438,7 @@ export const NEWS: readonly NewsItem[] = [
         t('Parcourez la bibliothèque d’un ami pour récupérer une table ou les médias qui vous manquent. Vos bornes se relient directement, par Internet ou sur le réseau local.'),
       ];
     },
-    get where() { return t('Menu système › Amis'); },
+    get where() { return t('Menu système › Communauté'); },
     reach: { kind: 'system', id: 'amis' },
     preview: true,
   },
@@ -481,16 +481,6 @@ export function markNewsSeen(state: NewsState, ids: readonly string[]): boolean 
   if (!add.length) return false;
   state.seen.push(...add);
   return true;
-}
-
-/** Durée pendant laquelle « Nouveautés » reste en tête du menu système après sa dernière date, même lue. */
-export const NEWS_ROOT_DAYS = 21;
-
-/** « Nouveautés » en tête du menu système : tant qu'il y en a une à voir, ou que la dernière a moins de trois semaines. */
-export function newsAtRoot(state: NewsState, now: number, items: readonly NewsItem[] = NEWS): boolean {
-  if (unreadNews(state, items).length) return true;
-  const newest = newestNewsDate(items);
-  return newest !== undefined && now - Date.parse(`${newest}T12:00:00`) < NEWS_ROOT_DAYS * 86_400_000;
 }
 
 // ---------------------------------------------------------------------------

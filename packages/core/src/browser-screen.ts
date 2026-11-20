@@ -74,7 +74,7 @@ export function browserScreenNotice(pick: Pick<BrowserScreenPick<unknown>, 'role
   const screen = pick.roles[0] ? browserRoleLabel(pick.roles[0]) : t('l’écran principal');
   const parts: string[] = [];
   if (pick.missing) parts.push(t('Écran du navigateur intégré : {role} n’est pas branché, ouvert sur {screen} (automatique).', { role: browserRoleLabel(pick.missing), screen }));
-  if (pick.tilted) parts.push(t('Playfield tourné : la page et la souris y vont de travers. Autre écran : Menu système > Borne > Configuration de la borne > « Écran du navigateur intégré ».'));
+  if (pick.tilted) parts.push(t('Playfield tourné : la page et la souris y vont de travers. Autre écran : Menu système > Ma borne > Configuration de la borne > « Écran du navigateur intégré ».'));
   return parts.join(' ') || undefined;
 }
 

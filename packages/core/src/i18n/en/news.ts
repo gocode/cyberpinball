@@ -1,10 +1,8 @@
-// Catalogue anglais : Nouveautés (Menu système > Nouveautés : packages/core/src/news.ts,
+// Catalogue anglais : Nouveautés (Menu système > Aide et infos > Nouveautés : packages/core/src/news.ts,
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties instantanées, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
-  'Langue, mise à jour, nouveautés, retours et propositions, activité récente, sauvegardes, migration, conditions d’utilisation, la communauté, quitter ou redémarrer, veille et extinction':
-    'Language, update, what’s new, feedback and ideas, recent activity, backups, migration, terms of use, the community, quit or restart, sleep and shutdown',
 
   // packages/core/src/news.ts : les nouveautés
   'Le son de la borne se règle presque seul': 'Cabinet sound almost sets itself up',
@@ -14,7 +12,7 @@ export const messages: Record<string, string> = {
     'The “Cabinet sound” step reads the sound card’s jacks and your screens’ speakers, then suggests a few setups, the most likely first, with a drawing of the cabinet.',
   'Essayer une configuration la vérifie paire par paire. Carte en stéréo dans Windows : le panneau Son s’ouvre et l’assistant attend le 5.1 ou le 7.1. Sinon, « Régler pas à pas » reste là.':
     'Trying a setup checks it pair by pair. Card in stereo in Windows: the Sound panel opens and the wizard waits for 5.1 or 7.1. Otherwise, “Step by step” is still there.',
-  'Menu système › Borne › Configuration de la borne › Son de la borne': 'System menu › Cabinet › Cabinet setup › Cabinet sound',
+  'Menu système › Ma borne › Configuration de la borne › Son de la borne': 'System menu › My cabinet › Cabinet setup › Cabinet sound',
   'Future Pinball sur la roue': 'Future Pinball on the wheel',
   'Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.': 'Your Future Pinball tables (.fpt) next to your VPX tables, started with one press.',
   'Cyber Pinball trouve Future Pinball sur ce PC et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias.':
@@ -37,7 +35,7 @@ export const messages: Record<string, string> = {
     'Cyber Pinball automatically keeps a backup copy of your account on this PC, outside its folder: a reinstall finds it and offers to take it back.',
   'Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.':
     'Write down your recovery code, 24 words or their QR code to photograph, to get your account back on any PC. A password works too: your nickname becomes your ID, and the server only keeps an encrypted copy it cannot open.',
-  'Menu système › Mon compte': 'System menu › My account',
+  'Menu système › Communauté › Mon profil › Mon compte': 'System menu › Community › My profile › My account',
   'Votre configuration DOF reprise': 'Your DOF setup carried over',
   'Une borne venue d’un autre front-end retrouve ses LED et ses toys, sans rien refaire dans le configtool.':
     'A cabinet coming from another front-end gets its LEDs and toys back, without redoing anything in the configtool.',
@@ -45,7 +43,7 @@ export const messages: Record<string, string> = {
     'Cyber Pinball looks for the old DOF on the drives and shows what it found. “Reuse the old DOF configuration” copies its configtool files and, if it is consistent, its Cabinet.xml, backing up whatever was in place.',
   'Des LED adressables sans Cabinet.xml sont signalées avec le port probable de leur contrôleur, et des bandes pilotées par une Wemos D1 reçoivent d’office les réglages qu’attend son micrologiciel.':
     'Addressable LEDs without a Cabinet.xml are flagged with the likely port of their controller, and strips driven by a Wemos D1 automatically get the settings its firmware expects.',
-  'Menu système › Borne › LED et retours (DOF)': 'System menu › Cabinet › LED and feedback (DOF)',
+  'Menu système › Ma borne › DMD et LED › LED et retours (DOF)': 'System menu › My cabinet › DMD and LEDs › LED and feedback (DOF)',
   'Niveaux': 'Levels',
   'Vos parties, vos progrès, vos badges et la vie entre joueurs vous font monter de niveau.': 'Your games, your progress, your badges and life among players raise your level.',
   'Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Votre niveau monte et ne baisse jamais ; votre carte de joueur, en haut de l’écran des tables, le montre avec sa barre.':
@@ -81,7 +79,7 @@ export const messages: Record<string, string> = {
     'A public board of the ideas and problems reported by players. Vote for an idea, or post your own with the on-screen keyboard or your phone: similar ideas show up while you type.',
   'Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.':
     'A problem can also be reported from the screen of a game that could not run, with a technical report read by the team only.',
-  'Menu système › Cyber Pinball › Retours et propositions': 'System menu › Cyber Pinball › Feedback and ideas',
+  'Menu système › Aide et infos › Retours et propositions': 'System menu › Help and info › Feedback and ideas',
 
   'La Communauté': 'The Community',
   'Les joueurs en ligne du monde entier, et un salon de discussion par pays.': 'Players online from all over the world, and a chat room for each country.',
@@ -120,14 +118,14 @@ export const messages: Record<string, string> = {
     'With a headset (Meta Quest through Link or Virtual Desktop, SteamVR), the front-end shows up in a decorated cabinet, and each table plays full size in front of you.',
   '« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.':
     '“Line up the cabinet” sets the headset’s cabinet exactly on the real one: you play with your cabinet’s buttons, under your hands.',
-  'Menu système › Borne › Réalité virtuelle': 'System menu › Cabinet › Virtual reality',
+  'Menu système › Ma borne › VR et vision 3D': 'System menu › My cabinet › VR and 3D vision',
 
   'La perspective de la table suit votre tête, avec une webcam ou une Kinect.': 'The table’s perspective follows your head, with a webcam or a Kinect.',
   'La table se voit comme par une fenêtre : penchez-vous, elle change de perspective, sans casque ni lunettes.':
     'You see the table as through a window: lean over, its perspective changes, with no headset or glasses.',
   'Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.':
     'A webcam is enough; an Xbox 360 or Xbox One Kinect works too, and its driver installs in one click.',
-  'Menu système › Borne › Vision 3D': 'System menu › Cabinet › 3D vision',
+  'Menu système › Ma borne › VR et vision 3D › Vision 3D': 'System menu › My cabinet › VR and 3D vision › 3D vision',
 
   'Collections et favoris': 'Collections and favourites',
   'Favoris, récentes, fabricants, décennies, les vôtres : la roue montre celle de votre choix.': 'Favourites, recent, manufacturers, decades, your own: the wheel shows the one you choose.',
@@ -141,7 +139,7 @@ export const messages: Record<string, string> = {
   'Visez le QR code de la borne : votre téléphone devient sa télécommande, dans tout le front-end. Il ouvre directement n’importe quel écran, tape un texte, envoie un fichier.':
     'Scan the cabinet’s QR code: your phone becomes its remote, all over the front-end. It opens any screen directly, types text, sends a file.',
   'Accepté une fois, il est gardé : il revient ensuite sans QR code.': 'Accepted once, it is kept: it comes back without the QR code afterwards.',
-  'Menu système › Télécommande du téléphone': 'System menu › Phone remote',
+  'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 
   'Les règles de chaque table': 'Every table’s rules',
   'Prospectus, règles trouvées toutes seules et commandes de la partie, page par page.': 'Flyer, rules found automatically and game controls, page by page.',
@@ -161,7 +159,7 @@ export const messages: Record<string, string> = {
   'Copiez vos réglages et vos scores, vos tables en plus si vous le voulez, sur un autre disque ou une clé USB. Une sauvegarde automatique peut s’en charger chaque jour ou chaque semaine.':
     'Copy your settings and scores, and your tables too if you like, to another drive or a USB stick. An automatic backup can do it every day or every week.',
   'Pour restaurer, un plan dit d’abord, partie par partie, ce qui sera remplacé, remis ou gardé.': 'To restore, a plan first says, part by part, what will be replaced, put back or kept.',
-  'Menu système › Cyber Pinball › Sauvegardes': 'System menu › Cyber Pinball › Backups',
+  'Menu système › Ma borne › Santé et sauvegardes › Sauvegardes': 'System menu › My cabinet › Health and backups › Backups',
 
   'Amis, de borne à borne': 'Friends, cabinet to cabinet',
   'Jouer en direct jusqu’à quatre bornes, échanger des tables, sans serveur ni compte.': 'Play live with up to four cabinets, swap tables, with no server or account.',
@@ -169,7 +167,7 @@ export const messages: Record<string, string> = {
     'Invite up to three friends to a table: a shared countdown starts the game everywhere at once, and everyone’s scores show live.',
   'Parcourez la bibliothèque d’un ami pour récupérer une table ou les médias qui vous manquent. Vos bornes se relient directement, par Internet ou sur le réseau local.':
     'Browse a friend’s library to get a table or the media you are missing. Your cabinets link up directly, over the Internet or the local network.',
-  'Menu système › Amis': 'System menu › Friends',
+  'Menu système › Communauté': 'System menu › Community',
 
   // app/src/news-menu.ts : l'écran
   'Les grandes nouveautés de Cyber Pinball, une ligne chacune': 'The big new things in Cyber Pinball, one line each',

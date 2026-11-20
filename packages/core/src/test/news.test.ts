@@ -18,11 +18,10 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { setLanguage } from '../i18n';
 import { EN_MESSAGES } from '../i18n/en';
-import { NEWS, NEWS_FILE, NEWS_ROOT_DAYS, loadNewsState, markNewsSeen, newestNewsDate, newsAtRoot, saveNewsState, unreadNews, type NewsItem, type NewsReach } from '../news';
-import { SYSTEM_GROUPS, SYSTEM_GROUP_IDS, SYSTEM_ITEM_IDS, SYSTEM_ROOT_SHORTCUTS } from '../systemmenu';
+import { NEWS, NEWS_FILE, loadNewsState, markNewsSeen, newestNewsDate, saveNewsState, unreadNews, type NewsItem, type NewsReach } from '../news';
+import { SYSTEM_GROUPS, SYSTEM_GROUP_IDS, SYSTEM_ITEM_IDS, SYSTEM_ROOT_ENTRIES } from '../systemmenu';
 import { REPO_ROOT } from './i18n-scan';
 
-const DAY = 86_400_000;
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'nouveautes-'));
 const PREVIEWS = path.join(REPO_ROOT, 'app', 'renderer', 'nouveautes');
 
@@ -114,14 +113,10 @@ test('nouveautés : pastille dès la première installation, éteinte une fois v
   assert.equal(loadNewsState(file).fresh, true);
 });
 
-test('nouveautés : en tête du menu système tant qu’elles sont récentes ou pas vues', () => {
-  const newest = Date.parse(`${newestNewsDate()}T12:00:00`);
-  const all = { seen: NEWS.map((n) => n.id) };
-  assert.equal(newsAtRoot(all, newest + 2 * DAY), true, 'récentes : en tête');
-  assert.equal(newsAtRoot(all, newest + (NEWS_ROOT_DAYS + 1) * DAY), false, 'vues et anciennes : seulement dans Cyber Pinball');
-  assert.equal(newsAtRoot({ seen: [] }, newest + 365 * DAY), true, 'pas vues : en tête, quel que soit leur âge');
-  assert.equal(SYSTEM_ROOT_SHORTCUTS[0], 'news');
-  assert.ok(SYSTEM_GROUPS.cyberpinball.entries.includes('news'), 'toujours dans la rubrique Cyber Pinball');
+test('nouveautés : dans Aide et infos seulement, la pastille sur la ligne de la rubrique', () => {
+  // 20/11/2026 : « Nouveautés est très bien dans Aide et infos, pas besoin de l'avoir dans le menu principal ».
+  assert.ok(SYSTEM_GROUPS.aide.entries.includes('news'));
+  assert.ok(!SYSTEM_ROOT_ENTRIES.includes('news'));
 });
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -134,7 +129,7 @@ interface Built {
   back: () => void;
 }
 const { createNewsMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'news-menu.js')) as {
-  createNewsMenu(host: object): { open(back?: () => void): void; unread(): number; item: { attention?: boolean; atRoot?: boolean; detail?: string; run(): void } };
+  createNewsMenu(host: object): { open(back?: () => void): void; unread(): number; item: { attention?: boolean; detail?: string; run(): void } };
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -158,7 +153,6 @@ test('nouveautés, écran : la date une fois par jour, « Nouveau » sur ce qui 
   const dir = tmp();
   const { menu, shown } = newsScreen(dir);
   assert.equal(menu.item.attention, true, 'pastille dès la première installation');
-  assert.equal(menu.item.atRoot, true);
   assert.match(menu.item.detail!, /nouvelles? :/);
   menu.open();
   assert.equal(menu.item.attention, false, 'ouvrir l’écran, c’est les avoir vues');

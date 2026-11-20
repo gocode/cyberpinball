@@ -5,7 +5,7 @@
 Un **appui long (2 s) sur Start**, quand Start est un bouton de joystick (Pinscape sur KL25Z, encodeur en mode manette, relevé dans l'étape « Boutons »), rouvre Cyber Pinball depuis Windows :
 
 - **Cyber Pinball fermé** (« Quitter Cyber Pinball », Alt+F4, plantage) : il se relance, comme par son raccourci ;
-- **Cyber Pinball ouvert en mode bureau** (menu système > « Borne » > « Bureau Windows ») : le front-end revient sur tous ses écrans, comme par Ctrl+Maj+D ou la barre des tâches.
+- **Cyber Pinball ouvert en mode bureau** (menu système > « Quitter ou éteindre » > « Bureau Windows ») : le front-end revient sur tous ses écrans, comme par Ctrl+Maj+D ou la barre des tâches.
   Le Start qui a choisi « Bureau Windows » ne compte pas : il faut le relâcher, puis le tenir de nouveau.
 
 Rien ne se passe pendant une partie de VPX lancée depuis le bureau (fenêtre « Visual Pinball Player » à l'écran : Start y est un bouton du jeu), ni tant que le front-end est ouvert.
@@ -22,7 +22,7 @@ Tant que Cyber Pinball est ouvert (`<données>\relance-start\application.pid`, p
   Depuis les sources, rien n'est posé (l'exécutable est Electron).
 - **Mises à jour** : le veilleur tient `CyberPinball.exe` ouvert.
   Il est arrêté (`<données>\relance-start\veilleur.pid`) avant l'installeur ou la mise à jour légère, par l'installeur lui-même (lancé à la main), par le désinstalleur et par `npm run deployer` ; Cyber Pinball relancé le relance.
-- **Réglage** : menu système > « Borne » > « Relance par Start », qui dit « oui » ou « non » (`<données>\relance-start\reglage.json`, oui par défaut).
+- **Réglage** : menu système > « Ma borne » > « Démarrage et accès » > « Relance par Start », qui dit « oui » ou « non » (`<données>\relance-start\reglage.json`, oui par défaut).
   Grisée, avec la raison, quand Start n'est pas un bouton de joystick et en [borne dédiée](borne-dediee.md#borne-dédiée), où Cyber Pinball est relancé de lui-même.
   « Non » retire le raccourci et arrête le veilleur.
 - **Journal** : le veilleur écrit dans le même `journal.txt` (« Relance par Start : … ») : bouton suivi, appui reconnu, lancement ou raison de ne rien faire.

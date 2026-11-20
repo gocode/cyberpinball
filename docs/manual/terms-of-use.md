@@ -13,6 +13,6 @@ They do not restrict the GPL licence of the code.
   "I accept" records it and resumes the startup; "I decline" asks for confirmation, then closes Cyber Pinball.
   Exit only goes back to the previous page.
   Not in guest mode nor during an unattended test (unless `CYBERPINBALL_CONDITIONS=1`).
-- **To read again** in System menu > Cyber Pinball > Terms of use, with the date it was accepted.
+- **To read again** in System menu > Help and info > Terms of use, with the date it was accepted.
 
 Safeguard: [terms.test.ts](../../packages/core/src/test/terms.test.ts) checks the text in both languages, its form for the installer, and that the application reads back the file written by the installer.

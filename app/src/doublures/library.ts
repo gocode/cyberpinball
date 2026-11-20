@@ -57,6 +57,8 @@ export function fakeMenuLibrary(over?: Partial<MenuLibrary>): MenuLibrary {
     {
       openCustom: noop,
       openSystem: noop,
+      openSystemGroupFrom: noop,
+      decorateSystemGroup: noop,
       openPrompt: noop,
       openNotice: noop,
       openScores: noop,

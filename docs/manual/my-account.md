@@ -2,11 +2,11 @@
 
 ## My account
 
-System menu > "Mon compte" (My account), at the top of the sections, gathers what is yours: what you need to get your account back on another PC, your nickname, your avatar, your country, your badges, your public profile, what others see and deleting the account.
+System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Mon compte" (My account), at the top of the sections, gathers what is yours: what you need to get your account back on another PC, your nickname, your avatar, your country, your badges, your public profile, what others see and deleting the account.
 The account is the cabinet's player key (see "Identity" in [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)), with its nickname, country, friends, badges, level and avatar.
 It lives in Cyber Pinball's data folder; the backup copy, the recovery code and the password also keep it elsewhere, for a reinstallation or another PC.
 In guest mode, the section is closed, like the whole system menu.
-On a cabinet that plays locally (System menu > Community > Local play), My badges, My public profile and What others see are removed; the other entries stay, and everything comes back with the community (see "Local play" in [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)).
+On a cabinet that plays locally (System menu > Community > Community settings > Local play), My badges, My public profile and What others see are removed; the other entries stay, and everything comes back with the community (see "Local play" in [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)).
 
 | Entry | What it does |
 | --- | --- |

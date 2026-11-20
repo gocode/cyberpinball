@@ -22,7 +22,7 @@ Rien à installer, aucun magasin d'applications : la page reste celle que sert l
   Coupé à la borne (« Déconnecter »), après 20 minutes sans geste ou remplacé par un autre téléphone : **« Reprendre »** revient d'un geste, sans QR.
   Cyber Pinball fermé : « Ce téléphone se reconnectera tout seul dès que Cyber Pinball sera relancé » (un essai toutes les 5 s).
   Oublié à la borne : « Ce téléphone n'est plus reconnu », sa clé est effacée.
-- **À la borne** : Menu système > Borne > Télécommande du téléphone, section « Téléphones gardés » : chaque téléphone, « Accepté le … · vu … », « Pilote maintenant » pour celui qui pilote.
+- **À la borne** : Menu système > Ma borne > Télécommande du téléphone, section « Téléphones gardés » : chaque téléphone, « Accepté le … · vu … », « Pilote maintenant » pour celui qui pilote.
   Le choisir ouvre « Oublier ce téléphone ? » ; oublié, il devra scanner le QR et être accepté de nouveau (déconnecté s'il pilotait).
   « Déconnecter le téléphone » ne l'oublie pas.
 - **Plein écran sur Android** : Chrome ouvre le raccourci d'une page HTTP dans un onglet, barre d'adresse comprise (seule une page HTTPS installable s'ouvre sans elle).
@@ -66,7 +66,7 @@ Rien à installer, aucun magasin d'applications : la page reste celle que sert l
   Elle ne suit qu'une IPv4 privée, même bien chiffrée.
   Service injoignable : la dernière adresse connue, gardée sur le téléphone (la page du service reste disponible hors ligne, service worker) ; aucune : « Borne introuvable ».
   Le service ne fait que renvoyer : une page HTTPS ne peut pas ouvrir de WebSocket en HTTP vers la borne.
-  À la borne : Menu système > Borne > Télécommande du téléphone, « Couper l'adresse stable par Internet » (active par défaut ; son détail dit si la déclaration est passée).
+  À la borne : Menu système > Ma borne > Télécommande du téléphone, « Couper l'adresse stable par Internet » (active par défaut ; son détail dit si la déclaration est passée).
   Jamais pendant un essai : `CYBERPINBALL_RELAIS` désigne un autre service.
   Mise en ligne du service : `node scripts/service-telephone.mjs kv` (une fois), puis `deployer`, avec le compte Cloudflare de `npx wrangler login`, gardé hors du dépôt.
   Essais : `telephone-domaine.test.ts` (rien de lisible dans la déclaration, signature, rejeu, horloge, effacement, adresse publique refusée, repli, nouvel essai espacé, en-têtes du service).

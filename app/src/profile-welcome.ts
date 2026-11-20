@@ -167,7 +167,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
           ]
         : []),
       hasName
-        ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Mon compte'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
+        ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Communauté > Mon profil > Mon compte'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
         : { label: t('Continuer'), detail: t('Choisissez d’abord votre pseudo'), icon: 'check', tone: 'quiet', run: leave },
     ];
     return {

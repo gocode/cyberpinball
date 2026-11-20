@@ -215,7 +215,7 @@ export interface Cabinet {
    */
   browserScreen?: RoleId;
   /**
-   * Real DMDs (system menu > Borne > DMD > DMD réel, dmd.ts): each model automatic, forced or
+   * Real DMDs (system menu > Ma borne > DMD et LED > DMD réel, dmd.ts): each model automatic, forced or
    * off, and the ZeDMD over wifi. Absent: all automatic, from the USB identifiers.
    */
   hardwareDmd?: HardwareDmdSetup;

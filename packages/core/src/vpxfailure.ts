@@ -180,7 +180,7 @@ export function vpxStartupCrash(exitCode: number | null | undefined, launch: Vpx
       t('VPX s’est arrêté ({exit}) avant d’écrire la moindre ligne de son journal : il n’avait pas encore ouvert la table. La panne vient de VPX, pas de cette table.', { exit }),
       changed.length
         ? t('Des fichiers de VPX ont été remplacés hors de Cyber Pinball : {files}. Start : remettre ses fichiers d’origine.', { files: changed.slice(0, 3).join(', ') + (changed.length > 3 ? '…' : '') })
-        : t('Menu système > Borne > « Santé de la borne » vérifie VPX et ses fichiers.'),
+        : t('Menu système > Ma borne > « Santé et sauvegardes » > « Santé de la borne » vérifie VPX et ses fichiers.'),
     ],
     journal: `VPX arrêté au démarrage, avant son journal (${file}) : ${exit}${changed.length ? ` ; fichiers de VPX modifiés : ${changed.join(', ')}` : ''}.`, // i18n-ignore : journal
     startup: true,
@@ -247,7 +247,7 @@ export function diagnoseVpxFailure(
       title: t('Il manque une bibliothèque à VPX'),
       lines: [
         t('VPX n’a pas pu démarrer ({exit}).', { exit: exit! }),
-        t('Le plus souvent, c’est le runtime Visual C++ de Microsoft, absent d’un Windows neuf. Menu système > Borne > « Santé de la borne » l’installe, avec l’accord de Windows.'),
+        t('Le plus souvent, c’est le runtime Visual C++ de Microsoft, absent d’un Windows neuf. Menu système > Ma borne > « Santé et sauvegardes » > « Santé de la borne » l’installe, avec l’accord de Windows.'),
       ],
       journal: `VPX non démarré (${file}) : ${exit}, runtime Visual C++ à vérifier.`, // i18n-ignore : journal
     };

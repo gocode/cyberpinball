@@ -2,11 +2,11 @@
 
 ## Mon compte
 
-Menu système > « Mon compte », en tête des rubriques, rassemble ce qui est à vous : de quoi retrouver votre compte sur un autre PC, votre pseudo, votre avatar, votre pays, vos badges, votre profil public, ce que voient les autres et la suppression du compte.
+Menu système > « Communauté » > « Mon profil » > « Mon compte », en tête des rubriques, rassemble ce qui est à vous : de quoi retrouver votre compte sur un autre PC, votre pseudo, votre avatar, votre pays, vos badges, votre profil public, ce que voient les autres et la suppression du compte.
 Le compte, c'est la clé du joueur de la borne (voir « Identité » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)), avec son pseudo, son pays, ses amis, ses badges, son niveau et son avatar.
 Il vit dans le dossier des données de Cyber Pinball ; la copie de secours, le code de récupération et le mot de passe le gardent aussi ailleurs, pour une réinstallation ou un autre PC.
 En mode invité, la rubrique est fermée, comme tout le menu système.
-Sur une borne qui joue en local (Menu système > Communauté > Jouer en local), Mes badges, Mon profil public et Ce que voient les autres sont retirés ; les autres entrées restent, et tout revient avec la communauté (voir « Jouer en local » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)).
+Sur une borne qui joue en local (Menu système > Communauté > Réglages de la communauté > Jouer en local), Mes badges, Mon profil public et Ce que voient les autres sont retirés ; les autres entrées restent, et tout revient avec la communauté (voir « Jouer en local » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)).
 
 | Entrée | Ce qu'elle fait |
 | --- | --- |

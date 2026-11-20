@@ -23,7 +23,7 @@
 // La clé d'un téléphone ne quitte jamais le téléphone : le fragment d'une adresse n'est pas envoyé,
 // la page du service le lit en JavaScript, déchiffre l'adresse sur le téléphone, et le recopie dans
 // l'adresse locale. Seules sont publiées une adresse IPv4 privée et un port, jamais un nom ni rien de
-// la machine. La fonction se désactive dans Menu système > Borne > Télécommande du téléphone.
+// la machine. La fonction se désactive dans Menu système > Ma borne > Télécommande du téléphone.
 
 import * as crypto from 'node:crypto';
 import { aeadOpen, aeadSeal } from './chacha';

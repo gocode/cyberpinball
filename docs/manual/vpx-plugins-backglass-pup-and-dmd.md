@@ -46,11 +46,11 @@ DMDUtil finds the port itself: Cyber Pinball writes neither `ZeDMDDevice` nor `P
 When the DMD is unplugged, its keys are kept as they are.
 `npm run probe` shows the recognized DMDs (`npm run probe -- --usb`: all USB devices).
 
-**The DMD section (System menu > Cabinet > DMD).**
+**The DMD section (System menu > My cabinet > DMD and LEDs).**
 All DMD settings together (16/11/2026): "Écran du DMD" (DMD screen: FullDMD or DMD only, see [DMD screen](#dmd-screen-fulldmd-or-dmd-only)), "DMD du menu" (Menu DMD: live or classic) and "Couleur du DMD" (DMD colour) (see [Menu DMD](game-media.md#menu-dmd)), "DMD réel" (Real DMD).
 The DMD on the wheel stays on each table's page, which sets it for that table only.
 
-**System menu > Cabinet > DMD > "DMD réel" (Real DMD, beta).**
+**System menu > My cabinet > DMD et LED > "DMD réel" (Real DMD).**
 The screen (`app/src/hardware-dmd-menu.ts`) shows the recognized DMDs, what will prevent VPX from opening them, and sets each model.
 Support stays in beta until equipped cabinets have confirmed it: the "BÊTA" (BETA) badge says so on the entry.
 
@@ -159,7 +159,7 @@ What the screen shows, FullDMD or DMD only, is said once and for all ([DMD scree
 `splitBackglassDmd` splits a screen between the backglass at the top and a centered DMD strip at the bottom, at the requested proportions (4:1 for a DMD alone, 16:9 for a FullDMD), taking at most one third of the height.
 
 - **Synchronization**: reports two roles overlapping on one screen (the case of two roles assigned to the same screen without a zone), an invalid zone in `cabinet.json` (the whole screen is then used), a role embedded over the whole playfield, and an embedded display that the player would see sideways or upside down: VPX does not rotate embedded displays.
-- **Screen layout** ([app/src/arrange.ts](../../app/src/arrange.ts)): a wizard step after the roles, opened on "Terminer" (Finish) (a Start keeps everything as it is), or on its own from the system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Disposition des écrans" (Screen layout), or `--assistant --disposition`; at the screens step, "Placer librement…" (Place freely…) opens it on a role and returns to the wizard afterwards.
+- **Screen layout** ([app/src/arrange.ts](../../app/src/arrange.ts)): a wizard step after the roles, opened on "Terminer" (Finish) (a Start keeps everything as it is), or on its own from the system menu > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup) > "Écrans" (Screens) > "Disposition des écrans" (Screen layout), or `--assistant --disposition`; at the screens step, "Placer librement…" (Place freely…) opens it on a role and returns to the wizard afterwards.
   The panel appears on the playfield screen; each screen shows its zones, the selected one with its corners.
   Rows: the zone (any role), its screen ("Aucun écran" (No screen) for a secondary role), the kept aspect ratio ("Libre" (Free), 16:9, 16:10, 4:3, 5:4, 21:9, 4:1, 9:16, 3:4), full screen (with a locked ratio: the largest zone at that ratio, centered), horizontal and vertical position, width, height, exact size, exact position, placement above, below, left or right of another role on the same screen (shrunk, ratio kept, if there is not enough room), alignment to an edge or to the center, snapping, and "Annuler les changements" (Undo changes).
   Position and size are free to the pixel across the whole screen; a zone never leaves the screen and stays at least 16 px on each side.
@@ -201,7 +201,7 @@ Code: [packages/core/src/dmdscreen.ts](../../packages/core/src/dmdscreen.ts).
 
 - **Where to say it**: in the wizard, "Écrans et rôles" (Screens and roles) step: a free wide screen is offered twice for the DMD, "FullDMD ?" (the whole screen) then "DMD en bande 4:1 au centre ?" (DMD as a 4:1 strip in the middle?); a screen that is already 4:1 only as "DMD ?"; the bottom of the backglass at 4:1 (DMD only) or 16:9 (FullDMD); embedding in the playfield is always a DMD only.
   Placed freely, the DMD takes the type of its zone's shape.
-  Or, without redoing the wizard, system menu > "Borne" (Cabinet) > "DMD" > "Écran du DMD" (DMD screen) (also in "Configuration de la borne" (Cabinet setup), after the layout): the current state, then "C'est un FullDMD" (It's a FullDMD) and "C'est un DMD seul" (It's a DMD only), each with its sketch.
+  Or, without redoing the wizard, system menu > "Ma borne" (My cabinet) > "DMD et LED" (DMD and LEDs) > "Écran du DMD" (DMD screen) (also in "Configuration de la borne" (Cabinet setup), after the layout): the current state, then "C'est un FullDMD" (It's a FullDMD) and "C'est un DMD seul" (It's a DMD only), each with its sketch.
   Start saves and relaunches the menu; its windows, `VPinballX.ini` and the PuP-Packs follow.
   The zone only changes if it does not have the shape of the choice: a FullDMD alone on its screen gets the whole screen; a DMD only, a centered 4:1 strip; under the backglass, the bottom strip at the new shape (`withDmdKind`).
   A strip that already has the right shape is kept as it is.

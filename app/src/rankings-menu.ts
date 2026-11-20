@@ -454,7 +454,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     const s = host.players?.state();
     if (!s) return t('Réseau des bornes absent');
     if (!s.enabled) return t('Partage désactivé : Communauté > Partage et réseau');
-    if (sc === 'country' && !s.country) return t('Pays non choisi : Mon compte > Mon pays');
+    if (sc === 'country' && !s.country) return t('Pays non choisi : Mon profil > Modifier mon profil > Mon pays');
     return undefined;
   }
 

@@ -161,7 +161,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         label: v.community ? t('Communauté dans la roue : affichée') : t('Communauté dans la roue : masquée'),
         detail: v.community
           ? t('Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)')
-          : t('La communauté reste dans Menu système › Amis (Start : afficher le médaillon)'),
+          : t('La communauté reste dans Menu système › Communauté (Start : afficher le médaillon)'),
         icon: 'friends',
         run: () => set({ community: !v.community }),
       },
@@ -169,7 +169,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         label: v.collectionsMedallion ? t('Collections dans la roue : affichées') : t('Collections dans la roue : masquées'),
         detail: v.collectionsMedallion
           ? t('Le médaillon Collections suit la Communauté en tête de chaque collection : Start ouvre la liste des collections (Start : le masquer)')
-          : t('Les MagnaSave et Menu système › Collections changent toujours de collection (Start : afficher le médaillon)'),
+          : t('Les MagnaSave et Menu système › Tables › Collections changent toujours de collection (Start : afficher le médaillon)'),
         icon: 'star',
         run: () => set({ collectionsMedallion: !v.collectionsMedallion }),
       },

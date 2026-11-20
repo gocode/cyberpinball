@@ -1,4 +1,4 @@
-// Catalogue anglais : Retours et propositions (Menu système > Cyber Pinball), le formulaire des retours,
+// Catalogue anglais : Retours et propositions (Menu système > Aide et infos), le formulaire des retours,
 // la question des rapports de plantage automatiques (app/src/feedback-menu.ts, packages/core/src/feedback.ts),
 // et leurs portes (écran d'échec d'une partie, fiche technique, téléphone). Clé : le texte français.
 export const messages: Record<string, string> = {

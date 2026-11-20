@@ -1,4 +1,4 @@
-// Menu système > Borne > DMD > « DMD réel » (bêta) : les afficheurs à LED branchés à la borne (ZeDMD,
+// Menu système > Ma borne > DMD et LED > « DMD réel » (bêta) : les afficheurs à LED branchés à la borne (ZeDMD,
 // PIN2DMD, Pixelcade), reconnus à leur identifiant USB sans rien ouvrir, et ce qui empêchera VPX
 // de les ouvrir (pilote manquant). Trois choix par modèle (automatique, oui, non) et le ZeDMD en
 // wifi, gardés dans la configuration de la borne (cabinet.json, hardwareDmd) : VPinballX.ini
@@ -122,7 +122,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
   }
 
   function noCabinet(): void {
-    library.openNotice(t('Borne à configurer'), [t('Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Borne > Configuration de la borne).')], () => open());
+    library.openNotice(t('Borne à configurer'), [t('Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Ma borne > Configuration de la borne).')], () => open());
   }
 
   function build(): Built {

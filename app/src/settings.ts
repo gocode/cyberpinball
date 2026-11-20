@@ -1008,13 +1008,13 @@ function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: W
   if (def.section === 'Plugin.DMDUtil') {
     return {
       why: t('Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade) et les choix de « DMD réel ».'),
-      how: t('Elle change quand on branche le DMD, ou dans Menu système > Borne > DMD > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}', { keep: keepYours() }),
+      how: t('Elle change quand on branche le DMD, ou dans Menu système > Ma borne > DMD et LED > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}', { keep: keepYours() }),
     };
   }
   if (def.section === 'Plugin.DOF') {
     return {
       why: t('Cyber Pinball allume le plugin DOF dès qu’un contrôleur de retours est branché (Pinscape, LedWiz, Teensy…) ou que la borne a une configuration DOF.'),
-      how: t('Voir Menu système > Borne > « LED et retours (DOF) ». {keep}', { keep: keepYours() }),
+      how: t('Voir Menu système > Ma borne > « DMD et LED » > « LED et retours (DOF) ». {keep}', { keep: keepYours() }),
     };
   }
   if (def.key.startsWith('Priority.')) {
@@ -1036,7 +1036,7 @@ function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: W
     return { why: t('Sur une borne, c’est la vraie caisse qui bouge : la table reste immobile à l’écran, seule la bille réagit aux secousses.'), how: keepYours() };
   }
   if (def.section === 'Player' && (VPX_TILT_OWNED_KEYS as readonly string[]).includes(def.key)) {
-    return { why: t('Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).'), how: t('Pour la changer : menu système > Borne > Configuration de la borne > Tilt.') };
+    return { why: t('Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).'), how: t('Pour la changer : menu système > Ma borne > Configuration de la borne > Boutons > Tilt.') };
   }
   if (def.section === 'Player' && VPX_AUDIO_OWNED_KEYS.includes(def.key)) {
     return { why: t('Elle découle de l’affectation des sorties audio de la borne.'), how: t('Pour la changer, relancez l’assistant (étape Son).'), wizard: 'full' };

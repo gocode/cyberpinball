@@ -1,10 +1,8 @@
 // Catalogue anglais : Mon compte (app/src/account-menu.ts, la rubrique du Menu système, la reprise d'un
 // compte au premier lancement dans profile-welcome.ts). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  // Menu système > Mon compte
+  // Menu système > Communauté > Mon profil > Mon compte
   'Mon compte': 'My account',
-  'Protéger et transférer mon compte, pseudo, avatar, pays, niveau et badges, profil public': 'Protect and transfer my account, nickname, avatar, country, level and badges, public profile',
-  'Joueurs en ligne, messages, mes amis, historique des parties, trouver un joueur, demandes, salons, partage et réseau, jouer en local': 'Players online, messages, my friends, game history, find a player, requests, rooms, sharing and network, local play',
   'Protéger et transférer mon compte': 'Protect and transfer my account',
   'Mon pseudo': 'My nickname',
   'Ce que voient les autres': 'What others see',

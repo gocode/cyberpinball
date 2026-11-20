@@ -7,7 +7,7 @@ Cyber Pinball ne l'installe jamais : c'est l'installation du joueur, avec ses pr
 Tant qu'aucun autre VPX n'est ajouté, rien de ce qui suit n'apparaît, ni dans la fiche d'une table, ni dans le plan d'installation, sauf l'avertissement d'une table enregistrée par un VPX plus récent (plus bas).
 
 **La liste.**
-Menu système > « Borne » > « Autres versions de VPX » ; son détail nomme les VPX ajoutés, sinon « Aucune : toutes les tables sont jouées avec le VPX de Cyber Pinball ».
+Menu système > « Ma borne » > « VPX » > « Autres versions de VPX » ; son détail nomme les VPX ajoutés, sinon « Aucune : toutes les tables sont jouées avec le VPX de Cyber Pinball ».
 À l'ouverture, Cyber Pinball cherche les VPX des autres installations du PC (dossier de VPX seul, émulateurs de PinUP Popper) et propose chacun d'un Start (« Ajouter VPX 10.8.0 », « Trouvé sur ce PC : … ») ; une version déjà dans la liste n'est pas reproposée.
 « Ajouter un autre VPX… » le fait choisir par son exécutable, dans le sélecteur de fichiers.
 Seul un `VPinballX*.exe` de VPX 10 est accepté, reconnu à sa version de fichier (`checkOtherVpx`) ; la version que Cyber Pinball utilise déjà est refusée, ses tables n'y perdant que les fonctions de Cyber Pinball.
@@ -37,7 +37,7 @@ Cyber Pinball compare ce format à celui que lit le VPX qui jouerait la table, l
 - **Le Diagnostic et la Santé de la borne** la signalent (« Table enregistrée par VPX 10.9 ») ; si un autre VPX assez récent est dans la liste, la correction « La jouer avec VPX 10.8.1.6012 » le choisit pour elle.
 - **Le plan d'installation** le dit en orange (« VPX 10.8.1 de Cyber Pinball ne sait pas ouvrir une table enregistrée par VPX 10.9 : la partie échouerait. »), et choisit d'office le premier VPX de la liste qui sait l'ouvrir, le plus récent d'abord ; « Changer le VPX » reste possible.
 - **La partie** est refusée avant de lancer VPX : « VPX 10.8.1 de Cyber Pinball ne peut pas ouvrir cette table », « Elle a été enregistrée par VPX 10.9, plus récent. », puis ce qu'il faut faire, et Start ou Exit revient au front-end ; le journal dit « Partie (…) refusée : enregistrée par VPX 10.9, plus récent que … ».
-- **Ce qu'il faut faire** : quand un VPX de la liste sait l'ouvrir, « VPX 10.8.1.6012 sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir. » ; sinon, « Ajoutez un VPX 10.9 ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ». ».
+- **Ce qu'il faut faire** : quand un VPX de la liste sait l'ouvrir, « VPX 10.8.1.6012 sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir. » ; sinon, « Ajoutez un VPX 10.9 ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ». ».
 - **Le script** d'une telle table est lu directement dans le `.vpx`, sans lancer un VPX qui ne sait pas l'ouvrir et resterait bloqué sur sa fenêtre d'erreur (`app/src/vbs.ts`).
 
 Code : [packages/core/src/autres-vpx.ts](../../packages/core/src/autres-vpx.ts) (liste, choix d'une table, vérification de l'exécutable, reprise d'une autre installation, table trop récente), [packages/core/src/vpx-format.ts](../../packages/core/src/vpx-format.ts) (format lu par chaque version), [app/src/autres-vpx-menu.ts](../../app/src/autres-vpx-menu.ts) (écrans) ; tests `autres-vpx.test.ts` et `vpx-format.test.ts`.

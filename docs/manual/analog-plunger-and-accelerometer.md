@@ -4,7 +4,7 @@
 
 An **analog plunger** (potentiometer or sensor plunger, read by a Pinscape on KL25Z or another controller in joystick mode) is not a button: it is a joystick **axis**, whose value follows the plunger's travel.
 The wizard's "Lanceur" (Plunger) step assigns and sets it, along with the Pinscape's accelerometer for nudging ([app/src/plunger-step.ts](../../app/src/plunger-step.ts), [packages/core/src/plunger.ts](../../packages/core/src/plunger.ts)).
-It follows the game buttons in the full wizard; on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Lanceur analogique" (Analog plunger) (`npm run assistant -- --lanceur`, `plunger` action of the launcher).
+It follows the game buttons in the full wizard; on its own: system menu > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup) > "Boutons" (Buttons) > "Lanceur analogique" (Analog plunger) (`npm run assistant -- --lanceur`, `plunger` action of the launcher).
 
 - **Detection**: "Tirez le lanceur à fond, puis lâchez-le" (Pull the plunger all the way, then let go).
   Cyber Pinball reads every axis of every joystick through VPX's SDL library (the same numbers as VPX); the axis that moved the most, and came back to rest, becomes the plunger, with its direction (pulling raises or lowers the value).

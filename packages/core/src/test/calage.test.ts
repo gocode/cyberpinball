@@ -103,7 +103,7 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
   assert.match(frontend, /const keys = c\.placing \? '' : t\('Gâchette : placer · A : valider'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
-  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vision3d', 'realite-virtuelle', 'controls'[\s\S]*entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'\]/);
+  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /entries: \['cabinet', 'vpx', 'dmd', 'realite-virtuelle'[\s\S]*entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d'\]/);
 });
 
 test('une seule pose : la table de VPX exactement où est la borne du casque, calée ou non', () => {

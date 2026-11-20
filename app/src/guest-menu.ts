@@ -1,4 +1,4 @@
-// Menu système > Borne > « Mode invité » : pour une soirée ou les enfants. L'écran dit ce que
+// Menu système > Ma borne > « Démarrage et accès » > « Mode invité » : pour une soirée ou les enfants. L'écran dit ce que
 // l'invité peut faire, la combinaison qui déverrouille (seul endroit où elle est écrite : ni le
 // menu ni la partie ne la montrent) et ce qui reste fermé ; Start l'active, et le menu des tables
 // s'ouvre aussitôt, verrouillé (guestmode.ts). « Tables proposées » peut le restreindre à une

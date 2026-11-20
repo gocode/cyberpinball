@@ -32,10 +32,8 @@ export const messages: Record<string, string> = {
   'Configuration de la borne': 'Cabinet setup',
   // packages/core/src/systemmenu.ts : rubriques du menu système
   'Tables': 'Tables',
-  'Toutes les tables et leur fiche, collections, réglages de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, collections, wheel settings, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
   'Migration': 'Migration',
-  'Images et vidéos des tables, musique et mode attente du front-end, Juke-box et ses réglages': 'Table images and videos, menu music and attract mode, Juke-box and its settings',
   'Reprendre les médias de PinUP Popper ou PinballX, regrouper les ROM': 'Import media from PinUP Popper or PinballX, gather ROMs',
   'Menu système': 'System menu',
   'Trouver les médias manquants': 'Find missing media',
@@ -71,11 +69,10 @@ export const messages: Record<string, string> = {
   'Un FullDMD montre le média FullDMD du jeu et l’écran 5 des PuP-Packs, avec le DMD du jeu incrusté. Un DMD seul ne montre que le DMD, en bande 4:1.':
     'A FullDMD shows the game’s FullDMD media and PuP-Pack screen 5, with the game DMD inset. A DMD-only screen shows just the DMD, as a 4:1 strip.',
   'Ce que montre cet écran': 'What this screen shows',
-  'Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.':
-    'DMD screen to check: FullDMD or DMD only? System menu > Cabinet > Cabinet setup > DMD screen.',
+  'Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Ma borne > Configuration de la borne > Écrans > Écran du DMD.':
+    'DMD screen to check: FullDMD or DMD only? System menu > My cabinet > Cabinet setup > Screens > DMD screen.',
   // app/renderer/library.js : schéma de l'écran du DMD
   'Média 16:9': '16:9 media',
-  'Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet': 'Buttons, screens, playfield, layout, sound: one step at a time, or the full wizard',
   'Assistant complet': 'Full wizard',
   'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son': 'Every step in a row: buttons, screens, playfield, layout, sound',
   'Touches par défaut des encodeurs': 'Encoder default keys',
@@ -164,7 +161,7 @@ export const messages: Record<string, string> = {
   'Ne débranchez pas la borne.': 'Don’t unplug the cabinet.',
   'Visual Pinball X {version} est installé et vérifié.': 'Visual Pinball X {version} is installed and verified.',
   'Start ou Exit : aller aux tables.': 'Start or Exit: go to the tables.',
-  'Joystick lu : {names}. Relevez ses boutons dans Menu système > « Borne » > « Configuration de la borne » > « Boutons du jeu », puis « Lanceur analogique ».': 'Joystick found: {names}. Set up its buttons in System menu > “Cabinet” > “Cabinet setup” > “Game buttons”, then “Analog plunger”.',
+  'Joystick lu : {names}. Relevez ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».': 'Joystick found: {names}. Set up its buttons in System menu > “My cabinet” > “Cabinet setup” > “Buttons” > “Game buttons”, then “Analog plunger”.',
   'L’installation a échoué : {error}': 'Installation failed: {error}',
   'Start : réessayer · Exit : plus tard': 'Start: retry · Exit: later',
 
@@ -288,7 +285,7 @@ export const messages: Record<string, string> = {
     '4k if the playfield screen exceeds {pixels} pixels, else 1k; only the playfield image comes in 4k (Start: change)',
   'Image du plateau en 4k, environ 4 fois plus lourde (Start : changer)': 'Playfield image in 4k, about 4 times larger (Start: change)',
   'Image du plateau en 1k, la plus légère (Start : changer)': 'Playfield image in 1k, the lightest (Start: change)',
-  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Borne > DMD.': 'Sound output: {output}. Per-game volume: its game page, “Game media”. The menu DMD and its colour: Cabinet > DMD.',
+  'Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ». Le DMD du front-end et sa couleur : Ma borne > DMD et LED.': 'Sound output: {output}. Per-game volume: its game page, “Game media”. The menu DMD and its colour: My cabinet > DMD and LEDs.',
   'sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)': 'Windows default output (the wizard assigned none to the backbox)',
   'Volume de la musique': 'Music volume',
   'Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.': 'Selected game’s music while browsing, before each game’s own volume.',
@@ -455,7 +452,7 @@ export const messages: Record<string, string> = {
   'Fronton': 'Backglass',
   'l’écran principal': 'the main screen',
   'Écran du navigateur intégré : {role} n’est pas branché, ouvert sur {screen} (automatique).': 'Built-in browser screen: {role} is not connected, opened on {screen} (automatic).',
-  'Playfield tourné : la page et la souris y vont de travers. Autre écran : Menu système > Borne > Configuration de la borne > « Écran du navigateur intégré ».':
+  'Playfield tourné : la page et la souris y vont de travers. Autre écran : Menu système > Ma borne > Configuration de la borne > « Écran du navigateur intégré ».':
     'Playfield turned: the page and the mouse go sideways there. Another screen: menu, Cabinet configurations, “Built-in browser screen”.',
   'Pas branché : la fenêtre prendrait l’écran automatique': 'Not connected: the window would take the automatic screen',
   'maintenant : {roles}': 'now: {roles}',
@@ -554,7 +551,7 @@ export const messages: Record<string, string> = {
   'bibliothèque (DLL) incompatible': 'incompatible library (DLL)',
   'Il manque une bibliothèque à VPX': 'VPX is missing a library',
   'VPX n’a pas pu démarrer ({exit}).': 'VPX could not start ({exit}).',
-  'Le plus souvent, c’est le runtime Visual C++ de Microsoft, absent d’un Windows neuf. Menu système > Borne > « Santé de la borne » l’installe, avec l’accord de Windows.': 'Most often it is Microsoft’s Visual C++ runtime, missing from a fresh Windows. System menu > Cabinet > “Cabinet health” installs it, with Windows’ approval.',
+  'Le plus souvent, c’est le runtime Visual C++ de Microsoft, absent d’un Windows neuf. Menu système > Ma borne > « Santé et sauvegardes » > « Santé de la borne » l’installe, avec l’accord de Windows.': 'Most often it is Microsoft’s Visual C++ runtime, missing from a fresh Windows. System menu > My cabinet > “Health and backups” > “Cabinet health” installs it, with Windows’ approval.',
   'Runtime Visual C++': 'Visual C++ runtime',
   'Installer le runtime Visual C++ de Microsoft, sans lequel VPX ne démarre pas (19 Mo, sans fenêtre).': 'Install Microsoft’s Visual C++ runtime, without which VPX won’t start (19 MB, no window).',
   'Le runtime Visual C++ de Microsoft est installé : VPX peut démarrer.': 'Microsoft’s Visual C++ runtime is installed: VPX can start.',
@@ -563,7 +560,7 @@ export const messages: Record<string, string> = {
   'VPX s’est arrêté en démarrant': 'VPX stopped while starting',
   'VPX s’est arrêté ({exit}) avant d’écrire la moindre ligne de son journal : il n’avait pas encore ouvert la table. La panne vient de VPX, pas de cette table.': 'VPX stopped ({exit}) before writing a single line of its log: it had not opened the table yet. The fault is in VPX, not in this table.',
   'Des fichiers de VPX ont été remplacés hors de Cyber Pinball : {files}. Start : remettre ses fichiers d’origine.': 'Some VPX files were replaced outside Cyber Pinball: {files}. Start: put its original files back.',
-  'Menu système > Borne > « Santé de la borne » vérifie VPX et ses fichiers.': 'System menu > Cabinet > “Cabinet health” checks VPX and its files.',
+  'Menu système > Ma borne > « Santé et sauvegardes » > « Santé de la borne » vérifie VPX et ses fichiers.': 'System menu > My cabinet > “Health and backups” > “Cabinet health” checks VPX and its files.',
   'Le fichier d’origine de VPX est remis.': 'The original VPX file is back.',
   'Les {n} fichiers d’origine de VPX sont remis.': 'The {n} original VPX files are back.',
   'Les fichiers de VPX n’ont pas été remis : {error}': 'The VPX files were not put back: {error}',

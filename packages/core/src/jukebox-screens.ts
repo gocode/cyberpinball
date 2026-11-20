@@ -4,7 +4,7 @@
 // fixent les zones ; rien ici ne dépend d’Electron.
 //
 // - Roue : le médaillon est la première entrée de chaque collection, au rang d'une table ; il compte
-//   dans le compteur (« 1 / 8 » pour sept tables). Un réglage le masque (Menu système > Médias).
+//   dans le compteur (« 1 / 8 » pour sept tables). Un réglage le masque (Menu système > Tables).
 // - Liste : huit lignes en borne, sept au bureau ; elle ne se déplace que quand le choix quitte sa
 //   fenêtre visible (rien ne saute), et s'ouvre le choix vers le milieu.
 // - Vue : le morceau choisi (focus vert) et le morceau en cours (filet sarcelle) sont distincts ;

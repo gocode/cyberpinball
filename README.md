@@ -209,7 +209,7 @@ On first launch, Cyber Pinball installs VPX while it walks you through buttons, 
 
 ## Updating
 
-From the cabinet: **system menu > "Cyber Pinball" > "Cyber Pinball update"**. Nothing is installed automatically: Cyber Pinball quietly checks for a new release after start-up and every 6 hours, and when one is out, a red dot appears on the menu's gear and on that entry. The entry then lists what's new in every version you missed, and installs it in one press if you choose "Update now". When only the application has changed, a light package installs in a few seconds; otherwise Cyber Pinball closes while the installer runs (about a minute), then restarts on its own and tells you which version is installed. If the installation fails, the previous version is put back.
+From the cabinet: **system menu > "Help and info" > "Cyber Pinball update"**. Nothing is installed automatically: Cyber Pinball quietly checks for a new release after start-up and every 6 hours, and when one is out, a red dot appears on the menu's gear and on that entry. The entry then lists what's new in every version you missed, and installs it in one press if you choose "Update now". When only the application has changed, a light package installs in a few seconds; otherwise Cyber Pinball closes while the installer runs (about a minute), then restarts on its own and tells you which version is installed. If the installation fails, the previous version is put back.
 
 Each release ships a signed feed (`cyberpinball-maj.json`, Ed25519). The installer is downloaded only if the signature matches the key built into the application, and it is launched only if its size and SHA-256 match. Pre-releases (`0.2.0-essai.1`) are offered only to cabinets set to "Versions received: pre-releases".
 
@@ -282,7 +282,7 @@ Bug reports, fixes and translations are welcome. [CONTRIBUTING.md](CONTRIBUTING.
 
 ## Terms of use
 
-The installer, then the menu for as long as they have not been accepted, show Cyber Pinball's terms of use; they can be read again in System menu > Cyber Pinball > Terms of use. In short: Cyber Pinball supplies no table, ROM or media from any commercial game, and it is up to you to make sure you have the right to download, install, use and share each piece of content. It comes with no warranty, and its flashing lights can affect people with photosensitive epilepsy. These terms do not restrict the licence below.
+The installer, then the menu for as long as they have not been accepted, show Cyber Pinball's terms of use; they can be read again in System menu > Help and info > Terms of use. In short: Cyber Pinball supplies no table, ROM or media from any commercial game, and it is up to you to make sure you have the right to download, install, use and share each piece of content. It comes with no warranty, and its flashing lights can affect people with photosensitive epilepsy. These terms do not restrict the licence below.
 
 ## Licence
 

@@ -1,6 +1,6 @@
 // Médaillon Collections de la roue (demande du 13/11/2026), comme ceux du Juke-box et de la
 // Communauté : le dernier des médaillons de tête, le plus près des tables ; Start ouvre la liste des
-// collections (la même que Menu système › Collections) ; Start sur une collection l'affiche sur la
+// collections (la même que Menu système › Tables › Collections) ; Start sur une collection l'affiche sur la
 // roue, sur sa table ; Exit revient au médaillon. Son affiche : la collection montrée et les autres.
 
 import assert from 'node:assert/strict';
@@ -127,7 +127,7 @@ test('Start sur le médaillon : la liste des collections ; Start sur l’une l�
   assert.equal(h.events.at(-1), 'médaillon');
 });
 
-test('Menu système › Collections reste ce qu’il était : retour au menu système, choix vers la roue', () => {
+test('Menu système › Tables › Collections reste ce qu’il était : retour au menu système, choix vers la roue', () => {
   const h = harness();
   h.item.openFromWheel(
     () => h.events.push('médaillon'),

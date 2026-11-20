@@ -118,7 +118,7 @@ export function displayOf<D extends CoverRect>(rect: CoverRect, displays: D[]): 
 }
 
 /**
- * Mode bureau (menu système > « Borne » > « Bureau Windows ») : l'inverse. Aucune fenêtre des processus
+ * Mode bureau (menu système > « Quitter ou éteindre » > « Bureau Windows ») : l'inverse. Aucune fenêtre des processus
  * `pids` ne doit plus rien recouvrir de l'écran `display` ; rend celles qui le font encore.
  */
 export function desktopBlockers(display: CoverRect, stack: StackedWindow[], pids: number[]): StackedWindow[] {

@@ -558,7 +558,7 @@ test('ancrage sur la limite du Quest (13 novembre 2026) : la borne reposée par 
 test('option « Recalage automatique » retirée (13 novembre 2026, l’ancrage la remplace) : ni réglage, ni relevés, ni repos appris', () => {
   const menu = read('packages', 'core', 'src', 'systemmenu.ts');
   assert.equal(menu.includes('vr-auto-calibrate'), false);
-  assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror'\]/);
+  assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d'\]/);
   const front = frontendSource();
   assert.equal(/vr-auto-calibrate|autoRecalSample|watchRest|Borne recalée sur les manettes posées/.test(front), false);
   const casque = read('app', 'src', 'casque.ts');

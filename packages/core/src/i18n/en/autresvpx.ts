@@ -24,7 +24,7 @@ export const messages: Record<string, string> = {
   'Partie entre amis impossible avec {vpx}': 'Game with friends not available with {vpx}',
   'Une partie entre amis se joue avec le VPX de Cyber Pinball : Gérer la table, puis « Jouée avec {vpx} », pour le choisir.':
     'Games with friends are played with Cyber Pinball’s VPX: Manage table, then “Played with {vpx}”, to choose it.',
-  // Menu système > Borne > Autres versions de VPX
+  // Menu système > Ma borne > VPX > Autres versions de VPX
   'Autres versions de VPX': 'Other VPX versions',
   '{exe} · {tables} (Start : retirer)': '{exe} · {tables} (Start: remove)',
   'aucune table': 'no table',
@@ -66,8 +66,8 @@ export const messages: Record<string, string> = {
   'Table enregistrée par VPX {table}': 'Table saved with VPX {table}',
   '{vpx} ne sait pas ouvrir une table enregistrée par VPX {table} : la partie échouerait.': '{vpx} cannot open a table saved with VPX {table}: the game would fail.',
   '{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.': '{vpx} can play it: Manage table, then “Played with”, to choose it.',
-  'Ajoutez un VPX {table} ou plus récent (Menu système > Borne > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».':
-    'Add a VPX {table} or newer (System menu > Cabinet > Other VPX versions), then choose it in Manage table, “Played with”.',
+  'Ajoutez un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».':
+    'Add a VPX {table} or newer (System menu > My cabinet > VPX > Other VPX versions), then choose it in Manage table, “Played with”.',
   '{vpx} ne peut pas ouvrir cette table': '{vpx} cannot open this table',
   'Elle a été enregistrée par VPX {table}, plus récent.': 'It was saved with VPX {table}, a newer version.',
   'La jouer avec {vpx}': 'Play it with {vpx}',
@@ -78,8 +78,8 @@ export const messages: Record<string, string> = {
     'Add a VPX already installed on this PC (those of other installations are offered right away), then choose it on a table’s sheet or when it is installed. A table taken over from another installation keeps the VPX that played it.',
   'Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.':
     'Cyber Pinball launches it with its own settings; virtual reality, display adjustment and games with friends stay with Cyber Pinball’s VPX.',
-  'Menu système › Borne › Autres versions de VPX': 'System menu › Cabinet › Other VPX versions',
-  // Menu système > Borne > VPX d'essai (vpx-essai-menu.ts)
+  'Menu système › Ma borne › VPX › Autres versions de VPX': 'System menu › My cabinet › VPX › Other VPX versions',
+  // Menu système > Ma borne > VPX > VPX d’essai (vpx-essai-menu.ts)
   'VPX d’essai': 'Trial VPX',
   'VPX {number} (essai {build})': 'VPX {number} (trial {build})',
   'VPX {number} (essai)': 'VPX {number} (trial)',

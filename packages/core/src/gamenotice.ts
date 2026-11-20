@@ -219,7 +219,7 @@ export interface LiveBoardScreens {
   zones?: { backglass?: Rect; topper?: Rect };
 }
 
-/** Où le joueur veut la bande des scores des amis (Menu système > Communauté > « Scores des amis pendant la partie »). */
+/** Où le joueur veut la bande des scores des amis (Menu système > Communauté > « Réglages de la communauté » > « Scores des amis pendant la partie »). */
 export type LiveScoresPlace = 'auto' | 'backglass' | 'topper' | 'playfield-bottom' | 'playfield-side';
 
 export const LIVE_SCORES_PLACES: readonly LiveScoresPlace[] = ['auto', 'backglass', 'topper', 'playfield-bottom', 'playfield-side'];

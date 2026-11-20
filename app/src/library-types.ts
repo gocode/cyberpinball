@@ -224,11 +224,6 @@ export interface SystemItem {
   tone?: Tone;
   /** Raccourci clavier qui fait la même chose sans passer par le menu (ActionShortcut). */
   shortcut?: ActionShortcut;
-  /**
-   * Raccourci de la racine (SYSTEM_ROOT_SHORTCUTS) qui n'y est pas toujours : faux, l'entrée ne reste que
-   * dans sa rubrique (Nouveautés : à la racine tant qu'elles sont récentes ou pas vues, newsAtRoot).
-   */
-  atRoot?: boolean;
   run: () => void;
 }
 

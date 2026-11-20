@@ -1,4 +1,4 @@
-// Menu système > Cyber Pinball > « Sauvegardes » : une copie de la borne sur une clé USB ou un
+// Menu système > « Ma borne » > « Santé et sauvegardes » > « Sauvegardes » : une copie de la borne sur une clé USB ou un
 // disque, à trois niveaux (réglages et scores, avec les tables, toute l'installation), et sa
 // restauration, sur cette borne ou sur une autre, avec le plan avant d'écrire (backup.ts du cœur).
 //

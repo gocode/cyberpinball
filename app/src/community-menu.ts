@@ -1,5 +1,6 @@
-// Communauté (décidée le 12/11/2026) : l'accueil ouvert par le médaillon
-// de la roue (Joueurs en ligne, Parties instantanées, Messages, Salon de mon pays, Classements, Retours et propositions) et la liste
+// Communauté (décidée le 12/11/2026) : l'accueil ouvert par le médaillon de la roue, qui est la
+// rubrique Communauté du Menu système depuis le 20/11/2026 (Mon profil, Joueurs en ligne, Partie
+// instantanée, Mes amis, Messages, Groupes et salons, Classements, Réglages), et la liste
 // « Joueurs en ligne », amis ou non (livepresence.ts).
 //
 // La liste réunit mes amis en ligne (leur présence entre amis, friendpresence.ts) et les joueurs dont
@@ -46,6 +47,9 @@ export interface CommunityMenuHost {
   library: {
     openCustom(build: () => Built, at?: number): void;
     openSystem(): void;
+    /** La rubrique Communauté ouverte depuis le médaillon (library.ts). */
+    openSystemGroupFrom(group: 'amis', back: () => void): void;
+    decorateSystemGroup(group: 'amis', decor: () => { subheading?: string; lead?: string }): void;
   };
   net: SocialNet;
   /** Touches MagnaSave relevées (la gauche d'abord) : le filtre suivant, ou le précédent. */
@@ -65,8 +69,6 @@ export interface CommunityMenuHost {
   instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
   rankings: { detail(): string; open(back: () => void): void; standing?(): PlayerStanding | undefined };
-  /** Retours et propositions (feedback-menu.ts), la même entrée que dans le Menu système : tout en bas de l'accueil. */
-  feedback?: { detail(): string; open(back: () => void): void };
   /** Mon niveau (level-menu.ts) : ce que dit l'entrée, et l'ouvrir. En tête de l'accueil, avec mon avatar. */
   level?: { detail(): string; avatar(): AvatarView; open(back: () => void): void; view?(): LevelView & { week: number } };
   /** Partage et réseau (activer le partage, le réseau local, la présence publique). */
@@ -81,6 +83,8 @@ export interface CommunityMenu {
   openPlayers(back?: () => void): void;
   /** Menu système > Communauté > Joueurs en ligne. */
   item: ProvidedSystemItem;
+  /** Les autres entrées de l'accueil fournies ici : Mon niveau, Partie instantanée, Groupes, salon du pays, Classements. */
+  homeItems: Partial<Record<'my-level' | 'instant' | 'groups' | 'rooms' | 'rankings', ProvidedSystemItem>>;
   /** Ce que dit le médaillon : joueurs en ligne, ceux de mon pays, mes amis ; quelque chose attend. */
   summary(): { online: number; country: number; friends: number; attention: boolean };
   /** Les joueurs en ligne, amis compris, dans l'ordre de la liste (téléphone). */
@@ -135,7 +139,6 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   const now = () => host.now?.() ?? new Date();
   let filter: OnlineFilter = 'all';
   let playersBack: (() => void) | undefined;
-  let homeBack: (() => void) | undefined;
 
   /** Les joueurs en ligne : mes amis (présence entre amis), puis les signaux publics des autres. */
   function players(): OnlinePlayer[] {
@@ -387,7 +390,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       sections.push({
         rows: [
           problem
-            ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Mon compte › Mon pays'), icon: 'info', tone: 'quiet' }
+            ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Mon profil › Modifier mon profil › Mon pays'), icon: 'info', tone: 'quiet' }
             : list.length
               ? { text: t('Personne pour ce filtre en ce moment'), detail: t('MagnaSave : filtre suivant'), icon: 'info', tone: 'quiet' }
               : { text: t('Aucun joueur connu pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
@@ -438,82 +441,86 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   }
 
   // ---------- Accueil Communauté ----------
+  // L'accueil EST la rubrique Communauté du Menu système (systemmenu.ts, 20/11/2026) : le même écran
+  // depuis le médaillon de la roue et depuis le menu, rangé par l'arbre. Ce module en fournit les
+  // entrées qui sont à lui, et ce qu'il ajoute en tête (le compte des joueurs, ce que voient les autres).
+  // Les écrans ouverts de là reviennent à l'accueil par le menu système (openSystem).
 
-  function buildHome(): Built {
+  const toHome = () => lib.openSystem();
+
+  function homeDecor(): { subheading: string; lead: string } {
     const s = net.state();
-    const list = players();
-    const back = homeBack ?? (() => lib.openSystem());
-    const here = () => lib.openCustom(buildHome);
-    const c = myCountry();
-    const actions: Action[] = [
-      // Mon niveau en tête : le récap, à un appui de la roue (17/11/2026).
-      ...(host.level ? [{ label: t('Mon niveau'), detail: host.level.detail(), icon: 'gauge' as const, run: () => host.level!.open(here) }] : []),
-      {
-        label: t('Joueurs en ligne'),
-        detail: s.enabled ? countsLine(list) : t('Indisponible : partage désactivé (Partage et réseau)'),
-        icon: 'friends',
-        ...(s.enabled ? {} : { tone: 'quiet' as const }),
-        run: () => openPlayers(here),
-      },
-      ...(host.instant
-        ? [
-            (() => {
-              const door = host.instant!.door();
-              return { label: door.label, detail: door.detail, icon: 'rocket' as const, ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.instant!.open(here) };
-            })(),
-          ]
-        : []),
-      ...(host.friends
-        ? [
-            {
-              label: t('Mes amis'),
-              detail: host.friends.detail(),
-              icon: 'friend-list' as const,
-              ...(host.friends.attention() ? { attention: true } : {}),
-              ...(s.enabled ? {} : { tone: 'quiet' as const }),
-              run: () => host.friends!.open(here),
-            },
-          ]
-        : []),
-      {
-        label: t('Messages'),
-        detail: host.messages.detail(),
-        icon: 'message',
-        ...(host.messages.attention() ? { attention: true } : {}),
-        ...(host.messages.quiet() ? { tone: 'quiet' as const } : {}),
-        run: () => host.messages.open(here),
-      },
-      // Les groupes, publics ou privés, entre Messages et le salon du pays (maquette du 15/11/2026).
-      ...(host.groups
-        ? [
-            (() => {
-              const door = host.groups!.door();
-              return { label: t('Groupes'), detail: door.detail, icon: 'group' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.groups!.open(here) };
-            })(),
-          ]
-        : []),
-      (() => {
-        const door = host.rooms?.door();
-        if (!door) return { label: c ? t('Salon {country}', { country: countryLabel(c)! }) : t('Salons par pays'), detail: t('Les salons de discussion par pays arrivent dans une prochaine version'), icon: 'globe' as const, tone: 'quiet' as const, run: here };
-        return { label: door.label, detail: door.detail, icon: 'globe' as const, ...(door.attention ? { attention: true } : {}), ...(door.quiet ? { tone: 'quiet' as const } : {}), run: () => host.rooms!.open(here) };
-      })(),
-      {
-        label: t('Classements'),
-        detail: host.rankings.detail(),
-        icon: 'trophy',
-        run: () => host.rankings.open(here),
-      },
-      ...(host.feedback ? [{ label: t('Retours et propositions'), detail: host.feedback.detail(), icon: 'inbox' as const, run: () => host.feedback!.open(here) }] : []),
-      { label: t('Retour'), icon: 'back', run: back },
-    ];
     return {
-      heading: t('Communauté'),
-      icon: 'friends',
-      subheading: s.enabled ? countsLine(list) : t('Partage désactivé'),
+      subheading: s.enabled ? countsLine(players()) : t('Partage désactivé'),
       lead: t('Ce que voient les autres joueurs : votre pseudo, votre avatar, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.'),
-      sections: [],
-      actions,
-      back,
+    };
+  }
+  lib.decorateSystemGroup('amis', homeDecor);
+
+  /** Entrées de l'accueil que ce module fournit (les autres viennent des amis, de la messagerie, de Mon compte). */
+  const homeItems: Partial<Record<'my-level' | 'instant' | 'groups' | 'rooms' | 'rankings', ProvidedSystemItem>> = {
+    rankings: {
+      get detail() {
+        return host.rankings.detail();
+      },
+      run: () => host.rankings.open(toHome),
+    },
+    rooms: {
+      get label() {
+        const door = host.rooms?.door();
+        if (door) return door.label;
+        const c = myCountry();
+        return c ? t('Salon {country}', { country: countryLabel(c)! }) : t('Salons par pays');
+      },
+      get detail() {
+        return host.rooms?.door().detail ?? t('Les salons de discussion par pays arrivent dans une prochaine version');
+      },
+      get attention() {
+        return Boolean(host.rooms?.door().attention);
+      },
+      get tone() {
+        return !host.rooms || host.rooms.door().quiet ? ('quiet' as const) : undefined;
+      },
+      run: () => (host.rooms ? host.rooms.open(toHome) : toHome()),
+    },
+  };
+  if (host.level) {
+    const level = host.level;
+    homeItems['my-level'] = {
+      get detail() {
+        return level.detail();
+      },
+      run: () => level.open(toHome),
+    };
+  }
+  if (host.instant) {
+    const instant = host.instant;
+    homeItems.instant = {
+      get label() {
+        return instant.door().label;
+      },
+      get detail() {
+        return instant.door().detail;
+      },
+      get tone() {
+        return instant.door().quiet ? ('quiet' as const) : undefined;
+      },
+      run: () => instant.open(toHome),
+    };
+  }
+  if (host.groups) {
+    const groups = host.groups;
+    homeItems.groups = {
+      get detail() {
+        return groups.door().detail;
+      },
+      get attention() {
+        return groups.door().attention;
+      },
+      get tone() {
+        return groups.door().quiet ? ('quiet' as const) : undefined;
+      },
+      run: () => groups.open(toHome),
     };
   }
 
@@ -523,7 +530,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function poster(): CommunityPosterView {
     const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Joueurs, salons, classements.'), start: t('Start'), open: t('Ouvrir la Communauté') };
     if (!net.state().enabled)
-      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Partage et réseau') };
+      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Réglages de la communauté › Partage et réseau') };
     const list = players();
     const room = host.rooms?.glance?.();
     const friends = list.filter((p) => p.friend);
@@ -572,14 +579,15 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     return { tiles, ...(parts.length ? { week: parts.map((p) => p.replace(/ /g, nbsp)).join(' · ') } : {}) };
   }
 
+  /** L'accueil, ouvert par le médaillon : la rubrique Communauté, son « Retour » vers `back`. */
   function openHome(back: () => void): void {
-    homeBack = back;
-    lib.openCustom(buildHome);
+    lib.openSystemGroupFrom('amis', back);
   }
 
   return {
     openHome,
     openPlayers,
+    homeItems,
     item: {
       get detail() {
         const s = net.state();

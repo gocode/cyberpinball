@@ -131,7 +131,6 @@ export const messages: Record<string, string> = {
   'Amis en sourdine': 'Muted friends',
   'En mode invité, pas de messagerie': 'No messaging in guest mode',
   'Le menu système est fermé ; les notifications de message attendent le déverrouillage.': 'The system menu is closed; message notifications wait until it is unlocked.',
-  'Menu système · Amis': 'System menu · Friends',
 
   // packages/core/src/notices.ts : notification d'un message
   'Message de {name}': 'Message from {name}',

@@ -1,5 +1,5 @@
 // Supprimer mon compte (RGPD, droit à l'effacement), novembre 2026 :
-// Menu système > Communauté > Partage et réseau > « Supprimer mon compte… ». Le compte, c'est la clé du joueur (social.ts) ; ce qu'il en reste
+// Menu système > Communauté > Réglages de la communauté > Partage et réseau > « Supprimer mon compte… ». Le compte, c'est la clé du joueur (social.ts) ; ce qu'il en reste
 // ailleurs est effacé par l'avis d'oubli (packages/core/src/forget.ts) et par le service des retours.
 //
 // Dans l'ordre :

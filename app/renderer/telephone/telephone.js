@@ -170,8 +170,8 @@ const MESSAGES = {
   quit: { icon: 'info', title: () => t('Cyber Pinball fermé'), text: () => t('Une fois Cyber Pinball relancé, scannez un nouveau QR code sur la borne.'), again: true },
   closed: { icon: 'info', title: () => t('Navigateur de la borne fermé'), text: () => t('Rouvrez-le sur la borne, puis scannez son QR code pour vous reconnecter.'), again: true },
   replaced: { icon: 'phone', title: () => t('Un autre téléphone a pris la main'), text: () => t('Ce téléphone ne pilote plus la borne.'), again: true },
-  forgotten: { icon: 'alert', title: () => t('Ce téléphone n’est plus reconnu'), text: () => t('La borne l’a oublié. Pour le connecter de nouveau : Menu système > Borne > Télécommande du téléphone, puis scannez le QR code.'), again: true },
-  invalid: { icon: 'info', title: () => t('Scannez le QR code de la borne'), text: () => t('Sur la borne : Menu système > Borne > Télécommande du téléphone, puis scannez le QR code affiché.'), again: true },
+  forgotten: { icon: 'alert', title: () => t('Ce téléphone n’est plus reconnu'), text: () => t('La borne l’a oublié. Pour le connecter de nouveau : Menu système > Ma borne > Télécommande du téléphone, puis scannez le QR code.'), again: true },
+  invalid: { icon: 'info', title: () => t('Scannez le QR code de la borne'), text: () => t('Sur la borne : Menu système > Ma borne > Télécommande du téléphone, puis scannez le QR code affiché.'), again: true },
 };
 
 /**

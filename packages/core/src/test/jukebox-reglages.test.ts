@@ -1,4 +1,4 @@
-// Menu système > Médias > Réglages du Juke-box (13/11/2026) : tous les réglages du Juke-box au même
+// Menu système > Juke-box, puis « Réglages du Juke-box » (13/11/2026, dans l'écran du Juke-box depuis le 20/11/2026) : tous les réglages du Juke-box au même
 // endroit (app/src/jukebox-settings.ts), à part de la gestion de ses playlists. Sorties du son : une
 // ou plusieurs, chacune avec son volume, son profil, ses basses, médiums et aigus, son retard, et un
 // extrait d'essai ; visualiseur du DMD ; médaillon dans la roue (le même réglage que Tables > Roue).
@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { DEFAULT_MENU_MEDIA_SETTINGS, type MenuMediaSettings } from '../mediaview';
-import { SYSTEM_GROUPS, systemPathOf } from '../systemmenu';
+import { SYSTEM_ITEM_IDS, systemPathOf } from '../systemmenu';
 import type { JukeboxAudioRoute } from '../jukebox-audio';
 import { frontendSource } from './frontend-source';
 
@@ -57,10 +57,11 @@ function bench() {
   return { s, settings: () => settings, screen, top, press, tests, system: () => system };
 }
 
-test('menu système : « Réglages du Juke-box » dans Médias, juste après la gestion du Juke-box', () => {
-  assert.deepEqual(systemPathOf('jukebox-settings'), ['medias']);
-  const entries = SYSTEM_GROUPS.medias.entries as readonly string[];
-  assert.equal(entries.indexOf('jukebox-settings'), entries.indexOf('jukebox') + 1);
+test('menu système : « Réglages du Juke-box » dans l’écran du Juke-box, plus d’entrée à part (20/11/2026)', () => {
+  assert.deepEqual(systemPathOf('jukebox'), []);
+  assert.ok(!(SYSTEM_ITEM_IDS as readonly string[]).includes('jukebox-settings'));
+  const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'jukebox-menu.ts'), 'utf8');
+  assert.match(menu, /label: t\('Réglages du Juke-box'\), key: 'settings'/);
 });
 
 test('écran principal : sorties du son, visualiseur, médaillon ; le visualiseur a quitté « Médias, son et attente »', () => {

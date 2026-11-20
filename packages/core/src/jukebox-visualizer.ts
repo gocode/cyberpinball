@@ -1,6 +1,6 @@
 // Visualiseur du DMD pendant le Juke-box, quand aucun habillage n'est choisi : le spectre de
 // jukebox-screens.ts (24 colonnes de 3 points), en couleurs. Trois modes, réglage « Visualiseur
-// du Juke-box » (Menu système > Médias) :
+// du Juke-box » (Menu système > Tables) :
 //   - Pochette (défaut) : deux ou trois couleurs tirées de la pochette du morceau en cours, en
 //     dégradé du pied au sommet des colonnes ; sans pochette (ou une pochette sans couleur), le
 //     mode Multicolore ;

@@ -3,7 +3,7 @@
 ## Tilt
 
 Ce qui fait tilter la borne se décide à l'étape « Tilt » de l'assistant ([app/src/tilt-step.ts](../../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../../packages/core/src/tilt.ts)).
-Elle suit l'étape « Lanceur » dans l'assistant complet, qui la passe sans rien écrire sur une borne sans accéléromètre réglé ni Pinscape branché (ou dont l'accéléromètre a été éteint), sans balancier relevé ni tilt enregistré (VPX garde alors son balancier simulé) ; seule : menu système > « Borne » > « Configuration de la borne » > « Tilt » (`npm run assistant -- --tilt`, action `tilt` du lanceur).
+Elle suit l'étape « Lanceur » dans l'assistant complet, qui la passe sans rien écrire sur une borne sans accéléromètre réglé ni Pinscape branché (ou dont l'accéléromètre a été éteint), sans balancier relevé ni tilt enregistré (VPX garde alors son balancier simulé) ; seule : menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Tilt » (`npm run assistant -- --tilt`, action `tilt` du lanceur).
 
 **Ce que VPX en fait** (VPX 10.8.1, commit `af26b2d93`) :
 

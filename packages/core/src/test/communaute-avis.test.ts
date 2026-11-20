@@ -1,8 +1,9 @@
-// Accueil Communauté (app/src/community-menu.ts) : « Retours et propositions » tout en bas (16/11/2026), la même
-// entrée que Menu système > Cyber Pinball. Ces tests fixent :
-// - la porte est la dernière avant « Retour », avec ce que dit l'entrée du menu système ;
-// - Start l'ouvre avec un « Retour » qui ramène à l'accueil Communauté ;
-// - sans service des retours, pas de porte (jamais une entrée morte).
+// Accueil Communauté (app/src/community-menu.ts). Depuis le 20/11/2026, l'accueil du médaillon EST la rubrique
+// Communauté du Menu système (un seul écran) ; « Retours et propositions » n'y est plus, il est dans Aide et
+// infos. Ces tests fixent :
+// - le médaillon ouvre la rubrique elle-même, son « Retour » vers la roue, avec le compte des joueurs en tête ;
+// - les entrées propres à l'accueil (classements, salon du pays, niveau, parties instantanées, groupes) sont fournies ;
+// - le nombre de joueurs en ligne ne se dit qu'au-delà de cinq.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -10,7 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT, interfaceSources } from './i18n-scan';
 import { SYSTEM_ITEMS, createPlayerKey, newSocialState, setLanguage } from '../index';
-import { fakeCommunityMessages, fakeSocialNet } from './doublures';
+import { fakeCommunityMessages, fakeMenuLibrary, fakeSocialNet } from './doublures';
 
 interface Built {
   heading: string;
@@ -19,54 +20,71 @@ interface Built {
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { createCommunityMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'community-menu.js')) as {
-  createCommunityMenu(host: object): { openHome(back: () => void): void };
+  createCommunityMenu(host: object): {
+    openHome(back: () => void): void;
+    homeItems: Partial<Record<'my-level' | 'instant' | 'groups' | 'rooms' | 'rankings', { label?: string; detail?: string; tone?: string; attention?: boolean; run(): void }>>;
+  };
 };
 
-function harness(withFeedback: boolean) {
-  let screen: (() => Built) | undefined;
-  const feedbackOpened: (() => void)[] = [];
+/** Ce que le module demande à l'écran des tables, noté : la rubrique ouverte, et ce qu'elle porte en tête. */
+function harness(extra: object = {}) {
+  const did: string[] = [];
+  let decor: (() => { subheading?: string; lead?: string }) | undefined;
   const menu = createCommunityMenu({
-    library: { openCustom: (build: () => Built) => (screen = build), openSystem: () => (screen = undefined) },
+    library: fakeMenuLibrary({
+      openCustom: () => void did.push('écran'),
+      openSystem: () => void did.push('menu système'),
+      openSystemGroupFrom: (group: string, back: () => void) => {
+        did.push(`rubrique ${group}`);
+        back();
+      },
+      decorateSystemGroup: (group: string, d: () => { subheading?: string; lead?: string }) => {
+        did.push(`décor ${group}`);
+        decor = d;
+      },
+    }),
     net: { state: () => ({ enabled: false }), country: () => undefined, rankings: () => ({ scores: [] }) },
     zoneKeys: () => [],
     tables: () => [],
     openProfile: () => {},
     openFriend: () => {},
-    messages: fakeCommunityMessages({ }),
-    rankings: { detail: () => '', open: () => {} },
+    messages: fakeCommunityMessages({}),
+    rankings: { detail: () => '3 tables classées', open: (back: () => void) => (did.push('classements'), back()) },
     openSharing: () => {},
-    ...(withFeedback ? { feedback: { detail: () => '3 propositions · 1 de vous', open: (back: () => void) => feedbackOpened.push(back) } } : {}),
+    ...extra,
   });
-  menu.openHome(() => (screen = undefined));
-  return { built: () => screen!(), feedbackOpened };
+  return { menu, did, decor: () => decor!() };
 }
 
-test('Communauté : « Retours et propositions » tout en bas, juste avant « Retour »', () => {
+test('Communauté : le médaillon ouvre la rubrique du Menu système elle-même, pas un écran à part', () => {
   setLanguage('fr');
-  const h = harness(true);
-  const b = h.built();
-  assert.equal(b.heading, 'Communauté');
-  const labels = b.actions.map((a) => a.label);
-  assert.deepEqual(labels.slice(-2), ['Retours et propositions', 'Retour']);
-  const door = b.actions.at(-2)!;
-  assert.equal(door.detail, '3 propositions · 1 de vous');
-  assert.equal(door.icon, 'inbox');
+  const h = harness();
+  assert.deepEqual(h.did, ['décor amis'], 'l’accueil se décore à la création');
+  let back = 0;
+  h.menu.openHome(() => back++);
+  assert.deepEqual(h.did, ['décor amis', 'rubrique amis']);
+  assert.equal(back, 1, 'son « Retour » est celui du médaillon');
+  assert.equal(h.decor().subheading, 'Partage désactivé');
+  assert.match(h.decor().lead!, /^Ce que voient les autres joueurs/);
 });
 
-test('Communauté : « Retours et propositions » revient à l’accueil Communauté', () => {
+test('Communauté : l’accueil a ses entrées à lui, qui reviennent à l’accueil', () => {
   setLanguage('fr');
-  const h = harness(true);
-  h.built().actions.find((a) => a.label === 'Retours et propositions')!.run();
-  assert.equal(h.feedbackOpened.length, 1);
-  h.feedbackOpened[0]!();
-  assert.equal(h.built().heading, 'Communauté');
-});
-
-test('Communauté : sans service des retours, pas de porte', () => {
-  setLanguage('fr');
-  const labels = harness(false).built().actions.map((a) => a.label);
-  assert.ok(!labels.includes('Retours et propositions'));
-  assert.equal(labels.at(-1), 'Retour');
+  const h = harness();
+  assert.deepEqual(Object.keys(h.menu.homeItems).sort(), ['rankings', 'rooms'], 'sans niveau, parties instantanées ni groupes : leurs entrées n’existent pas');
+  assert.equal(h.menu.homeItems.rankings!.detail, '3 tables classées');
+  h.menu.homeItems.rankings!.run();
+  assert.deepEqual(h.did.slice(-2), ['classements', 'menu système'], 'le « Retour » des classements ramène à la rubrique');
+  // Pas encore de salons : l'entrée le dit, grisée, et ne mène nulle part ailleurs.
+  assert.equal(h.menu.homeItems.rooms!.tone, 'quiet');
+  const full = harness({
+    level: { detail: () => 'Niveau 4', avatar: () => ({}), open: () => {} },
+    instant: { door: () => ({ label: 'Partie instantanée', detail: 'Aucune ouverte', quiet: true }), open: () => {} },
+    groups: { door: () => ({ detail: '2 groupes', attention: true, quiet: false }), open: () => {} },
+  });
+  assert.deepEqual(Object.keys(full.menu.homeItems).sort(), ['groups', 'instant', 'my-level', 'rankings', 'rooms']);
+  assert.equal(full.menu.homeItems.groups!.attention, true);
+  assert.equal(full.menu.homeItems.instant!.tone, 'quiet');
 });
 
 // Joueurs en ligne (16/11/2026) : leur nombre, et celui de mon pays, ne se disent qu'au-delà de cinq
@@ -81,7 +99,7 @@ test('Communauté : le nombre de joueurs en ligne ne se dit qu’au-delà de cin
     const beacons = Array.from({ length: n }, (_, i) => ({ key: String(i).padStart(64, 'a'), name: `Joueur${i}`, country: 'FR', status: 'online', at }));
     let screen: (() => Built & { tabs?: { label: string; count: string }[]; subheading?: string }) | undefined;
     const menu = createCommunityMenu({
-      library: { openCustom: (build: () => Built) => (screen = build), openSystem: () => undefined },
+      library: fakeMenuLibrary({ openCustom: (build: () => unknown) => void (screen = build as () => Built) }),
       net: fakeSocialNet({
         state: () => ({ ...base, enabled: true, key: createPlayerKey(), friends: [friend] }),
         country: () => 'FR',

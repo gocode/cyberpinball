@@ -5,7 +5,7 @@
 Players earn experience points (XP) by playing, by improving, in the weekly rankings, with their badges and through life between players.
 XP raises a level that never goes down.
 The level is always visible at the top of the tables screen and of full-screen pages, on the public profile and in the score tables.
-On a cabinet that plays locally (System menu > Community > Local play), none of this shows: no player card, no My level, no My badges, no moments; XP keeps counting quietly, and what was earned meanwhile comes back with the community, without its moment.
+On a cabinet that plays locally (System menu > Community > Community settings > Local play), none of this shows: no player card, no My level, no My badges, no moments; XP keeps counting quietly, and what was earned meanwhile comes back with the community, without its moment.
 Rules: [packages/core/src/levels.ts](../../packages/core/src/levels.ts); badges: [packages/core/src/badges.ts](../../packages/core/src/badges.ts); tracking in the app: [app/src/level-tracker.ts](../../app/src/level-tracker.ts).
 
 ### Curve and tiers

@@ -60,7 +60,7 @@ export function collectionsPoster(collections: Pick<CollectionsMenu, 'list' | 'c
 }
 
 /**
- * Menu système > Collections (à la racine, et dans Tables) : la même liste que les MagnaSave, à
+ * Menu système > Tables > Collections (à la racine, et dans Tables) : la même liste que les MagnaSave, à
  * choisir aux flippers et à Start, pour une borne dont les MagnaSave ne répondent pas (PinCab,
  * 06-10/11/2026). Une collection vide reste dans la liste, grisée avec sa raison ; Start n'y fait
  * rien. En dessous : créer une collection personnelle, gérer les siennes, et choisir les boutons

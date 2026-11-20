@@ -68,7 +68,7 @@ export interface InstallationLayout {
   /**
    * VPX executables of the installation: those of its VPX folder, then those of Popper's emulators
    * (one per version: "Visual Pinball X", "VPX 10.7"...). The first one is the one of the tables the menu
-   * says nothing about. What is offered for adding in system menu > Cabinet > "Autres versions de VPX"
+   * says nothing about. What is offered for adding in system menu > My cabinet > "VPX" > "Autres versions de VPX"
    * (Other VPX versions).
    */
   vpxExes?: string[];
@@ -401,7 +401,7 @@ export interface InstallationTable {
   /**
    * The VPX executable that played the table in this installation: the one its menu states (Popper), otherwise
    * the installation's one. Absent: no known VPX. At installation, it chooses the table's other VPX
-   * when it is in system menu > Cabinet > "Autres versions de VPX" (Other VPX versions).
+   * when it is in system menu > My cabinet > "VPX" > "Autres versions de VPX" (Other VPX versions).
    */
   vpxExe?: string;
 }

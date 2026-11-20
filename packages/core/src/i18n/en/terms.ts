@@ -32,7 +32,7 @@ export const messages: Record<string, string> = {
     'You alone are responsible for what you share and what you fetch: messages, images, media, tables. Do not share anything unlawful or offensive, or any content you have no right to pass on to other people.',
   'Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après votre attestation d’en avoir le droit : cette attestation vous engage.':
     'A ROM or a PuP-Pack can only be fetched from a friend once you have declared that you have the right to it: that declaration is binding on you.',
-  'Pour tout couper : Menu système > Communauté > Partage et réseau.': 'To turn it all off: System menu > Community > Sharing and network.',
+  'Pour tout couper : Menu système > Communauté > Réglages de la communauté > Partage et réseau.': 'To turn it all off: System menu > Community > Community settings > Sharing and network.',
 
   'Sites, services et logiciels tiers': 'Third-party sites, services and software',
   'Visual Pinball X, PinMAME, les sites de téléchargement, les bases de médias, YouTube et les autres services que Cyber Pinball utilise, ou vers lesquels il vous oriente, sont édités par des tiers indépendants. Cyber Pinball n’y est pas affilié et ne répond ni de leur contenu, ni de leur disponibilité.':
@@ -71,8 +71,8 @@ export const messages: Record<string, string> = {
     'What you share with other cabinets travels from cabinet to cabinet. Checking for updates queries GitHub, and the third-party services you use (YouTube, download sites) receive what using them requires.',
 
   'Évolution de ces conditions': 'Changes to these terms',
-  'Ces conditions peuvent évoluer : une nouvelle version vous est présentée avant de continuer. Elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation.':
-    'These terms may change: a new version is shown to you before you carry on. You can read them at any time in System menu > Cyber Pinball > Terms of use.',
+  'Ces conditions peuvent évoluer : une nouvelle version vous est présentée avant de continuer. Elles restent à lire dans Menu système > Aide et infos > Conditions d’utilisation.':
+    'These terms may change: a new version is shown to you before you carry on. You can read them at any time in System menu > Help and info > Terms of use.',
   'Si vous ne les acceptez pas, n’installez pas Cyber Pinball, ou cessez de l’utiliser.': 'If you do not accept them, do not install Cyber Pinball, or stop using it.',
   'Elles sont régies par le droit français, sans préjudice des règles impératives du pays où vous résidez.':
     'They are governed by French law, without prejudice to the mandatory rules of the country where you live.',

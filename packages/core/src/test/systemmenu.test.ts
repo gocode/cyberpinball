@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { setLanguage } from '../i18n';
@@ -7,19 +8,21 @@ import { MANUAL, MANUAL_TESTS_EN, MANUEL, TESTS_MANUELS, splitFiles } from './ma
 import { frontendSource } from './frontend-source';
 import {
   isSystemGroup,
+  MAX_SYSTEM_ENTRIES,
   SYSTEM_GROUP_IDS,
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
   SYSTEM_ITEMS,
   SYSTEM_ROOT,
   SYSTEM_ROOT_ENTRIES,
-  SYSTEM_ROOT_SHORTCUTS,
+  SYSTEM_ROOT_ITEMS,
   systemEntry,
   systemPathOf,
   type SystemEntryId,
   type SystemGroupId,
   type SystemItemId,
 } from '../systemmenu';
+import { loadSystemMemory, saveSystemMemory, SYSTEM_MEMORY_FILE } from '../systemmemory';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const APP = path.join(REPO, 'app', 'src');
@@ -41,32 +44,71 @@ test('menu système : une rubrique qui s’allume montre son état et son badge 
   assert.match(frontendSource(), /library\.provideSystemItem\('vr', \{\s*\/\/[^\n]*\n\s*badge: 'beta',\s*get label\(\) \{\s*return vrMenuText\(vrMode, probeVr\(\)\)\.label;/);
 });
 
-test('menu système : chaque entrée est rangée une fois, sous une seule rubrique', () => {
-  const seen = new Map<SystemEntryId, SystemGroupId>();
+test('menu système : chaque entrée est rangée une fois, à la racine ou sous une seule rubrique', () => {
+  const seen = new Map<SystemEntryId, SystemGroupId | 'racine'>();
+  for (const id of SYSTEM_ROOT_ENTRIES) seen.set(id, 'racine');
   for (const group of SYSTEM_GROUP_IDS) {
     for (const id of SYSTEM_GROUPS[group].entries) {
+      // 20/11/2026 : plus de raccourcis à la racine qui doublent une rubrique (« une entrée n'a qu'une place »).
       assert.ok(!seen.has(id), `« ${id} » est rangée dans « ${seen.get(id)} » et dans « ${group} »`);
       seen.set(id, group);
     }
   }
-  for (const id of SYSTEM_ITEM_IDS) assert.ok(seen.has(id), `« ${id} » n'est rangée dans aucune rubrique`);
-  for (const group of SYSTEM_GROUP_IDS) {
-    if (SYSTEM_ROOT.includes(group)) assert.ok(!seen.has(group), `la rubrique « ${group} » est aussi rangée dans « ${seen.get(group)} »`);
-    else assert.ok(systemPathOf(group), `« ${group} » n'est accessible depuis aucune rubrique`);
-  }
-  assert.equal(SYSTEM_ROOT.length, 6, 'six rubriques (Mon compte en tête depuis le 18/11/2026)');
+  for (const id of SYSTEM_ITEM_IDS) assert.ok(seen.has(id), `« ${id} » n'est rangée nulle part`);
+  for (const group of SYSTEM_GROUP_IDS) assert.ok(systemPathOf(group), `« ${group} » n'est accessible depuis aucune rubrique`);
 });
 
-test('menu système : la racine reprend les rubriques dans leur ordre, et chaque raccourci une fois', () => {
+test('menu système : aucun écran ne dépasse huit lignes', () => {
+  // 20/11/2026 : Borne avait 17 lignes, Cyber Pinball 14, Communauté 12 ; on ne voyait plus la liste
+  // d'un coup d'œil. Une entrée de plus va dans une sous-rubrique, jamais au bout d'une liste.
+  assert.equal(MAX_SYSTEM_ENTRIES, 8);
+  assert.ok(SYSTEM_ROOT_ENTRIES.length <= MAX_SYSTEM_ENTRIES, `la racine a ${SYSTEM_ROOT_ENTRIES.length} lignes`);
+  for (const group of SYSTEM_GROUP_IDS) {
+    // Bureau Windows et l'Explorateur ne sont jamais fournis ensemble (l'un remplace l'autre en borne dédiée).
+    const shown = SYSTEM_GROUPS[group].entries.filter((id) => id !== 'explorer');
+    assert.ok(shown.length <= MAX_SYSTEM_ENTRIES, `« ${SYSTEM_GROUPS[group].label} » a ${shown.length} lignes`);
+  }
+});
+
+test('menu système : la racine suit l’usage, « Quitter ou éteindre » en dernier', () => {
   assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => isSystemGroup(id)), [...SYSTEM_ROOT]);
-  assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => !isSystemGroup(id)), [...SYSTEM_ROOT_SHORTCUTS]);
-  // Ordre choisi le 29/10/2026 : Amis en premier, Téléchargements après Médias ; Activité récente en tête depuis le 06/11/2026,
-  // Télécommande du téléphone avant Borne (06/11/2026 : rangée seulement dans Borne, on ne la trouvait pas),
-  // Juke-box après Médias (09/11/2026 : « Menu système > Juke-box », chemin donné par le médaillon de la roue),
-  // Collections après Activité récente (10/11/2026 : sur une borne dont les MagnaSave ne répondent pas, Exit puis Collections),
-  // Nouveautés tout en tête (17/11/2026 : la pastille rouge y mène ; à la racine tant qu'elles sont récentes ou pas vues),
-  // Mon compte en tête des rubriques (18/11/2026), Amis devenue Communauté.
-  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['news', 'activity', 'collections', 'compte', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball']);
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => !isSystemGroup(id)), [...SYSTEM_ROOT_ITEMS]);
+  // Ordre décidé le 20/11/2026 : ce qu'on ouvre le plus d'abord ; Quitter ou éteindre en dernier,
+  // à deux appuis du flipper gauche depuis l'ouverture (la liste boucle, Retour entre les deux).
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['tables', 'borne', 'downloads', 'activity', 'amis', 'jukebox', 'aide', 'quitter']);
+  // Langue dans la Configuration de la borne, Nouveautés dans Aide et infos, Collections et Migration dans Tables.
+  assert.deepEqual(systemPathOf('news'), ['aide']);
+  assert.deepEqual(systemPathOf('collections'), ['tables']);
+  assert.deepEqual(systemPathOf('migration'), ['tables']);
+  assert.deepEqual(systemPathOf('backups'), ['borne', 'sante']);
+  assert.deepEqual(systemPathOf('follow'), ['aide']);
+  assert.ok(!(SYSTEM_ITEM_IDS as readonly string[]).includes('language'), 'la langue est une ligne de la Configuration de la borne');
+});
+
+test('menu système : il s’ouvre sur la dernière entrée choisie à sa racine, gardée sur le disque', () => {
+  // 20/11/2026 : l'ordre reste fixe, le curseur suit les habitudes ; gardée pour survivre à l'extinction.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-menu-systeme-'));
+  assert.equal(loadSystemMemory(dir), undefined, 'rien de gardé : la première ligne');
+  saveSystemMemory(dir, 'quitter');
+  assert.equal(loadSystemMemory(dir), 'quitter');
+  // Une entrée qui n'est plus à la racine (une version suivante l'a rangée ailleurs) : oubliée.
+  fs.writeFileSync(path.join(dir, SYSTEM_MEMORY_FILE), JSON.stringify({ last: 'cyberpinball' }));
+  assert.equal(loadSystemMemory(dir), undefined);
+  fs.writeFileSync(path.join(dir, SYSTEM_MEMORY_FILE), '{ abîmé');
+  assert.equal(loadSystemMemory(dir), undefined, 'un fichier abîmé ne bloque rien');
+  const library = fs.readFileSync(path.join(APP, 'library.ts'), 'utf8');
+  assert.match(library, /systemChosen = systemLast;/, 'depuis les tables, le curseur va sur la dernière entrée');
+  assert.match(library, /if \(systemGroup === undefined\) \{[\s\S]{0,300}saveSystemMemory\(host\.dataDir, id\);/, 'retenue quand on la choisit à la racine');
+});
+
+test('menu système : la Communauté et Mon compte ne vivent qu’à un endroit, l’accueil du médaillon', () => {
+  // 20/11/2026 : la rubrique Communauté doublait l'accueil du médaillon, et Mon compte ce qu'on y trouve de soi.
+  assert.ok(!SYSTEM_ROOT_ENTRIES.includes('compte'));
+  assert.deepEqual(systemPathOf('compte'), ['amis', 'mon-profil']);
+  assert.deepEqual(systemPathOf('local-play'), ['amis', 'reglages-communaute']);
+  const community = fs.readFileSync(path.join(APP, 'community-menu.ts'), 'utf8');
+  assert.match(community, /lib\.openSystemGroupFrom\('amis', back\)/, 'le médaillon ouvre la rubrique elle-même');
+  assert.doesNotMatch(community, /function buildHome/, 'plus d’accueil dessiné à part');
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {
@@ -205,13 +247,14 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments("Amis > Demandes d’amis'),"), ['Amis', 'Demandes d’amis'], 'chemin dans une chaîne de code');
   assert.deepEqual(segments("What's new): the big new things"), ["What's new"], 'apostrophe droite dans un nom anglais');
   assert.deepEqual(segments("Friends > Friend's requests'),"), ['Friends', "Friend's requests"], 'apostrophe dans le nom, puis fin de la chaîne de code');
-  assert.equal(checkPath(segments("What's new): the big new things")), undefined, '« What’s new » est une rubrique');
+  assert.equal(checkPath(segments("Help and info > What's new): the big new things")), undefined, '« What’s new » est dans Aide et infos');
   assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Nouveautés, Activité récente, Collections, Mon compte, Communauté, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
-  assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');
-  assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);
-  assert.equal(checkPath(['Cabinet', 'Cabinet setup', 'Tilt']), undefined);
+  assert.match(checkPath(['Tables', 'Téléchargements'])!, /n'est pas dans cette rubrique/, 'et seulement là (20/11/2026)');
+  assert.equal(checkPath(['Ma borne', 'Configuration de la borne', 'Language / Langue']), undefined, 'la configuration ouvre son propre écran');
+  assert.equal(checkPath(['My cabinet', 'Cabinet setup', 'Tilt']), undefined);
+  assert.equal(checkPath(['Communauté', 'Mon profil', 'Mon compte', 'Supprimer mon compte']), undefined);
 });
 
 // ---------- Entrées nommées avec leur rubrique, hors chemin « > » ----------
@@ -287,10 +330,10 @@ test('les entrées nommées « dans la rubrique … » du manuel et de l’inter
 });
 
 test('lecture des rubriques nommées : rubrique, section, chemin qui s’arrête sur une rubrique', () => {
-  assert.match(checkPlace('Dans la rubrique Borne du menu système : « Mettre en veille », « Redémarrer la borne ».')!, /Mettre en veille.+Cyber Pinball, pas dans Borne/);
-  assert.match(checkPlace('In the system menu\'s Borne (Cabinet) section: "Mettre en veille" (Sleep).')!, /pas dans Borne/);
-  assert.match(checkPlace('Menu système > Borne : « Éteindre la borne », « Annuler ».')!, /Éteindre la borne/);
-  assert.equal(checkPlace('Dans la rubrique Cyber Pinball, après « Quitter Cyber Pinball » : « Mettre en veille ».'), undefined);
-  assert.equal(checkPlace('« Borne dédiée : activée » dans la rubrique Borne.'), undefined);
+  assert.match(checkPlace('Dans la rubrique Ma borne du menu système : « Mettre en veille », « Redémarrer la borne ».')!, /Mettre en veille.+Quitter ou éteindre, pas dans Ma borne/);
+  assert.match(checkPlace('In the system menu\'s Ma borne (My cabinet) section: "Mettre en veille" (Sleep).')!, /pas dans Ma borne/);
+  assert.match(checkPlace('Menu système > Ma borne : « Éteindre la borne », « Annuler ».')!, /Éteindre la borne/);
+  assert.equal(checkPlace('Dans la rubrique Quitter ou éteindre, après « Quitter Cyber Pinball » : « Mettre en veille ».'), undefined);
+  assert.equal(checkPlace('« Borne dédiée : activée » dans la rubrique Ma borne.'), undefined);
   assert.equal(checkPlace('« Mettre en veille », sans rubrique nommée.'), undefined);
 });

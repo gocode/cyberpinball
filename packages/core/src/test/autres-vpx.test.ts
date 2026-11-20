@@ -166,7 +166,7 @@ test('PinUP Popper : l’exécutable de chaque table d’après son émulateur e
   assert.equal(exeOf('Ancienne'), path.join(old, 'VPinballX.exe'));
   // Une table que Popper ne connaît pas : le VPX de l'installation.
   assert.equal(exeOf('Inconnue de Popper'), path.join(vpx, 'VPinballX64.exe'));
-  // Ce qu'on propose d'ajouter dans Menu système > Borne > Autres versions de VPX.
+  // Ce qu'on propose d'ajouter dans Menu système > Ma borne > VPX > Autres versions de VPX.
   assert.deepEqual(
     [...layout.vpxExes!].sort(),
     [path.join(vpx, 'VPinballX64.exe'), path.join(vpx, 'VPinballX_GL64.exe'), path.join(old, 'VPinballX.exe')].sort(),

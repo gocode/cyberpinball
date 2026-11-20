@@ -7,7 +7,7 @@ Les dates et les nombres suivent la langue (`fr-FR` ou `en-GB`).
 Les journaux de la console, les rapports des essais et les fichiers écrits pour d'autres outils restent en français.
 
 - **Par défaut** : la langue de Windows si c'est le français, l'anglais sinon (`app.getPreferredSystemLanguages()`).
-- **Menu système > « Cyber Pinball » > « Langue / Language »** : l'entrée est nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée, et chaque langue se présente dans la sienne (« Français », « English »).
+- **Menu système > « Ma borne » > « Configuration de la borne » > « Langue / Language »** : l'entrée est nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée, et chaque langue se présente dans la sienne (« Français », « English »).
   Le choix, aux boutons comme le reste, est gardé dans `<données>\language.json` (`{ "language": "en" }`) ; le front-end se relance aussitôt par le gardien des écrans (`relaunchCovered`), comme pour un changement de configuration, et rouvre ses fenêtres dans la nouvelle langue.
 - **À l'installation** : la petite fenêtre du début de l'installeur (ou `/LANGUE=fr|en`) écrit le même `language.json` ; voir [Installeur Windows](installation-et-organisation-des-fichiers.md#installeur-windows).
 - **`CYBERPINBALL_LANGUE=fr|en`** impose la langue (essais, captures) ; un choix fait dans le front-end la remplace aussi pour la relance.

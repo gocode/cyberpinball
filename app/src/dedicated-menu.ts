@@ -1,4 +1,4 @@
-// Menu système > Borne > « Borne dédiée » : Cyber Pinball à la place du bureau Windows pour ce
+// Menu système > Ma borne > « Démarrage et accès » > « Borne dédiée » : Cyber Pinball à la place du bureau Windows pour ce
 // compte (Shell Launcher, dedicated.ts du cœur ; sans lui, sous Windows Pro ou Famille, le
 // réglage « Interface utilisateur personnalisée » du compte et le surveillant, windowssettings.ts),
 // ou seulement lancé au démarrage de Windows, le bureau masqué derrière (« Lancement au

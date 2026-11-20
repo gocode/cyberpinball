@@ -2,9 +2,9 @@
 
 ## Sauvegardes
 
-Menu système > « Cyber Pinball » > « Sauvegardes » fait une copie de la borne sur une clé USB, un disque externe ou un lecteur réseau, et la restaure, sur cette borne (après une panne, une erreur de réglage) ou sur un autre PC.
+Menu système > « Ma borne » > « Santé et sauvegardes » > « Sauvegardes » fait une copie de la borne sur une clé USB, un disque externe ou un lecteur réseau, et la restaure, sur cette borne (après une panne, une erreur de réglage) ou sur un autre PC.
 L'entrée dit la date et le niveau de la dernière sauvegarde.
-Chaque sauvegarde contient aussi votre compte (pseudo, avatar, niveau, badges, amis) ; Menu système > « Mon compte » > « Protéger et transférer mon compte », puis « Reprendre un compte sur cette borne… » > « Depuis une sauvegarde… », mène aussi ici (voir [Mon compte](mon-compte.md#mon-compte)).
+Chaque sauvegarde contient aussi votre compte (pseudo, avatar, niveau, badges, amis) ; Menu système > « Communauté » > « Mon profil » > « Mon compte » > « Protéger et transférer mon compte », puis « Reprendre un compte sur cette borne… » > « Depuis une sauvegarde… », mène aussi ici (voir [Mon compte](mon-compte.md#mon-compte)).
 
 **Trois niveaux, chacun contient le précédent** (`LEVEL_PARTS`, [packages/core/src/backup.ts](../../packages/core/src/backup.ts)) :
 

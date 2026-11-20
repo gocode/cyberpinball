@@ -154,7 +154,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
       if (version.state === 'pending') return { lines: [], players: 0, unavailable: t('Empreinte de la table en calcul…'), pending: true };
       if (version.state === 'none') return { lines: [], players: 0, unavailable: t('Version de la table illisible : pas de classement') };
       const country = opts.net.country();
-      if (scope === 'country' && !country) return { lines: [], players: 0, unavailable: t('Pays non choisi : Mon compte > Mon pays') };
+      if (scope === 'country' && !country) return { lines: [], players: 0, unavailable: t('Pays non choisi : Mon profil > Modifier mon profil > Mon pays') };
       if (scope === 'friends' && !state.friends.length) return { lines: [], players: 0, unavailable: t('Aucun ami pour l’instant : Communauté > Trouver un joueur') };
       const now = opts.now?.() ?? new Date();
       const board = rankingBoard(

@@ -1,5 +1,5 @@
-// Langue de l'interface dans le menu système : français ou anglais, aux boutons comme le
-// reste. L'entrée est nommée dans les deux langues (« Langue / Language »), pour qu'on la
+// Langue de l'interface (Menu système > Ma borne > Configuration de la borne) : français ou
+// anglais, aux boutons comme le reste. L'entrée est nommée dans les deux langues (« Langue / Language »), pour qu'on la
 // retrouve quelle que soit la langue affichée, et chaque langue se présente dans la sienne.
 // Le choix est gardé dans <données>\language.json ; le menu se relance pour l'appliquer.
 

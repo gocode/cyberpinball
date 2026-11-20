@@ -3,7 +3,7 @@
 //   une ligne ouvre la page d'où vient la pièce dans le navigateur intégré ; tant que la ligne est
 //   choisie, son QR code est sous les actions, à viser au téléphone. Une ligne sans page : tous ses
 //   auteurs. En mode invité (navigateur fermé) : les auteurs et le QR code ;
-// - Menu système > Cyber Pinball > La communauté : les auteurs de la borne, des plus présents aux
+// - Menu système > Aide et infos > Crédits : les auteurs de la borne, des plus présents aux
 //   moins présents, puis les logiciels et les sites sans lesquels rien ne marche ;
 // - la ligne de la roue (« par TastyWasps ») et celle du mode attente, demandées par le menu.
 //

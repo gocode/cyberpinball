@@ -1,5 +1,5 @@
 // Updating Cyber Pinball from the application: never automatically, always at the user's
-// request (system menu > "Cyber Pinball" > "Mise à jour de Cyber Pinball" (Cyber Pinball update)).
+// request (system menu > "Aide et infos" (Help and info) > "Mise à jour de Cyber Pinball" (Cyber Pinball update)).
 //
 // Each version is published as a GitHub release (scripts/publier.mjs) with three files:
 // the two installers and the cyberpinball-maj.json feed. The feed describes the version,

@@ -4,7 +4,7 @@
 
 System menu > "Communauté" (Community) links cabinets together **with no server**: each finds the others and talks to them directly, over the Internet or on the local network.
 Sharing is **on by default**; "Partage et réseau" (Sharing and network) turns it off.
-What is yours (nickname, avatar, country, badges, public profile, what others see, deleting the account) is in System menu > "Mon compte" (My account) (see [My account](my-account.md#my-account)).
+What is yours (nickname, avatar, country, badges, public profile, what others see, deleting the account) is in System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Mon compte" (My account) (see [My account](my-account.md#my-account)).
 
 | Entry | What it shows |
 | --- | --- |
@@ -18,7 +18,7 @@ What is yours (nickname, avatar, country, badges, public profile, what others se
 | Jouer en local (Local play) | For a cabinet that only plays locally: a single setting removes the whole social side, levels included. Start opens a screen saying what is removed and what stays, the cursor on "Annuler" (Cancel); "Jouer en local" confirms. Once on, the entry says "Jouer en local : activé" (Local play: on) and is the only one left in the section; Start offers "Remettre la communauté" (Bring the community back), the cursor on "Rester en local" (Stay local) (see "Local play" below). |
 
 **Local play.**
-System menu > Community > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
+System menu > Community > "Réglages de la communauté" (Community settings) > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
 Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community medallion on the wheel, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
 A table's scoreboard keeps only this cabinet's scores, with no scope tabs.
 In My account, My badges, My public profile and What others see are removed too.
@@ -35,7 +35,7 @@ A test guard (`noTag`, friends-menu.test.ts) rejects any tag attached to a name.
 An unreadable `social.json` is set aside (`social.json.illisible-<date>`), never overwritten.
 
 **Deleting your account (GDPR).**
-System menu > "Mon compte" (My account) > "Supprimer mon compte" (Delete my account) shows what goes (the account and its ID, friends, requests, conversations, rooms, avatar, published scores, public profile, suggestions and votes on the feedback board, reactions to What's new) and what stays (tables, their scores, settings, and backups already made, which contain the account, to delete in System menu > Cyber Pinball > Backups), with the cursor on "Annuler" (Cancel).
+System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Mon compte" (My account) > "Supprimer mon compte" (Delete my account) shows what goes (the account and its ID, friends, requests, conversations, rooms, avatar, published scores, public profile, suggestions and votes on the feedback board, reactions to What's new) and what stays (tables, their scores, settings, and backups already made, which contain the account, to delete in System menu > My cabinet > Health and backups > Backups), with the cursor on "Annuler" (Cancel).
 "Supprimer définitivement mon compte" (Permanently delete my account): the feedback service first erases the key's suggestions, votes and reactions, along with the account's encrypted copy and its password (`POST /api/oubli`, signed by it; if unreachable, the player retries or goes on without it); an **erasure notice** signed by the key (`forget`: the key, the time) goes to connected cabinets, with "unfriend" to friends and requests, and the network stops; the account files are erased (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, the received rankings); Cyber Pinball restarts with a new key.
 Every cabinet that receives the notice checks its signature, erases everything that comes from that key (directory, friends, requests, rankings, public card, likes, room lines, conversation), refuses whatever a relay would bring back, keeps the notice in `<data>\amis\oublis.json` (the key only, no name) and relays it; it is attached to every link's hello, for cabinets that were off.
 Modules: [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
@@ -191,7 +191,7 @@ Code: [packages/core/src/ratelimit.ts](../../packages/core/src/ratelimit.ts), `s
 Two entries.
 A friend's profile > "Inviter à une partie en direct" (Invite to a live game): choose a table (those they have in the same version first, see "Choosing the table of a live game" below).
 A table's page > "Jouer avec un ami" (Play with a friend), right under "Jouer" (Play): choose the friend (online ones first, those who have the table in the same version at the top, offline friends greyed out below).
-Both stay visible when you cannot invite, greyed out with their reason: "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected), "Aucun ami en ligne pour l'instant" (No friend online right now), "Pas encore d'ami : Menu système > Communauté > Trouver un joueur" (No friend yet: System menu > Community > Find a player); a friend in a game can be invited too ("En partie : il recevra une notification discrète sur sa table", In a game: they will get a discreet notification on their table).
+Both stay visible when you cannot invite, greyed out with their reason: "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected), "Aucun ami en ligne pour l'instant" (No friend online right now), "Pas encore d'ami : Menu système > Communauté > Trouver un joueur" (No friend yet: System menu > Community > My friends > Find a player); a friend in a game can be invited too ("En partie : il recevra une notification discrète sur sa table", In a game: they will get a discreet notification on their table).
 A room opens, the invitation leaves; up to four players ("Inviter un autre ami", Invite another friend).
 On the friend's side, the invitation chime rings and "Invitation de …" (Invitation from) opens by itself over the table menu, in the system menu and on the help (over the open screen, which "Répondre plus tard" gives back as it was), the cursor on "Répondre plus tard" (Answer later, with the time left): a button already pressed neither accepts nor declines; otherwise it waits at the top of "Mes amis", two minutes at most.
 The cabinet checks there that it has the same version as the host, mandatorily (a score to compete on, and tournaments later): the same `.vpx` (SHA-256 fingerprint, kept in `<data>\amis\empreintes.json`) and the same script played.
@@ -267,7 +267,7 @@ Guard (`LiveDmdTally`): setting on and DMD present, with no pass after 60 s of p
 A hardware DMD alone (ZeDMD, PIN2DMD) cannot be covered.
 **On the backglass**, free or taken by the table (its B2S, its PuP-Pack; the log says which, from `occupiedRoles`, read again every 2 s), permanently: "Partie entre amis" then one card per player, side by side, name, large score, "Bille 2 sur 3" (Ball 2 of 3); at the bottom of the backglass, like an electromechanical machine's score reels, discreetly (a fifth of its height at most, never below the readable size: a short backglass otherwise sent it to the playfield); without a backglass, in the middle of the topper.
 With neither backglass nor topper, **an inset at the bottom of the playfield**, in the player's left corner, turned with the playfield: on the apron, below the outlane exits, away from the drain and the shooter lane; one line per player (name, score, ball), a tenth of the playfield height at most.
-**The player's choice**: System menu > Community > "Scores des amis pendant la partie" (Friends' scores during the game) ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), kept in `<data>\amis\scores-en-partie.json`): Automatic (the above), On the backglass (at the bottom, over its image, its B2S or its PuP-Pack), On the topper (in the middle, likewise), At the bottom of the playfield, On the side of the playfield (in the middle of the player's left edge).
+**The player's choice**: System menu > Community > "Réglages de la communauté" (Community settings) > "Scores des amis pendant la partie" (Friends’ scores during the game) ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), kept in `<data>\amis\scores-en-partie.json`): Automatic (the above), On the backglass (at the bottom, over its image, its B2S or its PuP-Pack), On the topper (in the middle, likewise), At the bottom of the playfield, On the side of the playfield (in the middle of the player's left edge).
 Every choice stays visible; one the cabinet does not allow is greyed with its reason (no backglass screen, no topper).
 Separately, "Scores sur le DMD : activés" (Scores on the DMD: on, the default) or "désactivés" (off: nothing on the DMD any more), Start to switch; greyed with its reason without a DMD screen, or while the VPX firewall rule is not allowed (the DMD cannot be read).
 The settings apply to every table (the file allows a per-table setting, `tables`, not offered yet); a place a table does not allow falls back to automatic, and the log says why.
@@ -378,7 +378,7 @@ Cyber Pinball's log keeps one line of it: « VPX arrêté (file) : erreur du scr
 A player whose VPX stops before 20 s of play shows as "VPX stopped during their game", distinct from a game that never started.
 
 **Game history.**
-System menu > Community > "Historique des parties" (Game history): every live game finished on this cabinet, newest first, grouped by day ("Vendredi 30 octobre 2026", Friday 30 October 2026); for each, the table as the title, the start time, and below it the players with their rank and score ("1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement", 1. Bruno … · 2. Alexis (you) … · Chloé 9,999, not ranked).
+System menu > Community > "Mon profil" (My profile) > "Historique des parties" (Game history): every live game finished on this cabinet, newest first, grouped by day ("Vendredi 30 octobre 2026", Friday 30 October 2026); for each, the table as the title, the start time, and below it the players with their rank and score ("1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement", 1. Bruno … · 2. Alexis (you) … · Chloé 9,999, not ranked).
 A game you won carries a star.
 Choosing a game opens its details: the table version and its number of balls, the host, then each player, their rank and score ("Meilleur score", Best score), why they were not ranked (host's settings not received, different number of balls, more than one player on their table), the place taken on the table's high score board and the time played; without a score, "Score non disponible" (Score not available) and what happened to them ("La partie n'a pas démarré de son côté", The game did not start on their side; "A quitté la partie", Left the game; "Résultat pas arrivé à temps", Result did not arrive in time; or, for a cabinet that is behind, "Cyber Pinball 0.1.5-essai.10 sur sa borne : ni départ automatique ni score en direct, à mettre à jour", Cyber Pinball 0.1.5-essai.10 on their cabinet: no automatic start or live score, to update: each cabinet's version is kept).
 Back returns to the list, the cursor on that game.
@@ -523,7 +523,7 @@ You cannot write to a player who is not a friend: "Écrire un message" (Write a 
 "Masquer son activité" (Hide their activity) hides their events and likes on this cabinet, along with their level, badges and invited players; "Bloquer" (Block) cuts everything.
 
 **My public profile.**
-System menu > "Mon compte" (My account) > "Mon profil public" (My public profile) shows what others see (country, friends and high scores, level and bar, badges as medals, invited players, public groups) and, for each event of "Votre activité récente" (Your recent activity), who liked it (Start).
+System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Confidentialité" (Privacy) > "Mon profil public" (My public profile) shows what others see (country, friends and high scores, level and bar, badges as medals, invited players, public groups) and, for each event of "Votre activité récente" (Your recent activity), who liked it (Start).
 During the first month, it also offers "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below).
 A like received is announced by a notification in the table menu, grouped ("Dora and Kiko like your activity").
 The public profile is **on by default**; "Désactiver mon profil public" (Turn off my public profile), here or in "Ce que voient les autres" (What others see), leaves others only the nickname in the directory (and the scores, if they are published).
@@ -542,7 +542,7 @@ A player who introduced Cyber Pinball to others sees it on their profile, with t
 With no server and no account, only the invited player can say who invited them ([invitations.ts](../../packages/core/src/invitations.ts)).
 
 **The question.**
-"Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?) is asked on the "Votre profil de joueur" (Your player profile) screen at first launch, before "Continuer" (Continue), then in System menu > "Mon compte" (My account) > "Mon profil public" (My public profile), for the 30 days after that screen first opened (`DECLARE_DAYS`, `profileOffered`); it is always optional.
+"Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?) is asked on the "Votre profil de joueur" (Your player profile) screen at first launch, before "Continuer" (Continue), then in System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Confidentialité" (Privacy) > "Mon profil public" (My public profile), for the 30 days after that screen first opened (`DECLARE_DAYS`, `profileOffered`); it is always optional.
 The screen (`app/src/invite-menu.ts`) first offers the players "Sur votre réseau local" (On your local network), then "Vos amis" (Your friends; eight at most per list), "Chercher un joueur…" (Search for a player…: their nickname, or the ID shown on their profile, in the directory), "Personne : je l'ai trouvé seul" (Nobody: I found it myself; the question does not come back) and "Plus tard" (Later).
 The chosen player carries "Choisi" (Chosen), the screen says "Vous avez choisi …" (You picked …) and the entry becomes "Découvert grâce à …" (Discovered thanks to …); as long as nothing is confirmed, it can be changed.
 
@@ -789,7 +789,7 @@ The room door on the home screen and the Community medallion count unread mentio
 They also count in the messages pill of the tables menu, one line per room on "Messages en attente" (Waiting messages).
 
 **Community settings.**
-System menu > Community > Réglages de la communauté (Community settings): appear online to everyone, rooms on or off (off, they stay visible, greyed out with their reason: for the family), default room (your country or World), word filter, mentions during games, new messages in my rooms (notification or nothing), ready-made phrases, ignored players (to stop ignoring), room rules.
+System menu > Community > Réglages de la communauté (Community settings) > Présence et salons (Presence and rooms): appear online to everyone, rooms on or off (off, they stay visible, greyed out with their reason: for the family), default room (your country or World), word filter, mentions during games, new messages in my rooms (notification or nothing), ready-made phrases, ignored players (to stop ignoring), room rules.
 In guest mode, the community is closed along with the system menu.
 
 **Ready-made phrases.**
@@ -826,7 +826,7 @@ The report, signed by you, attaches the line as its author signed it (one cannot
 **The moderators.**
 Their player keys are listed in a numbered charter, signed by the project key (the same as the update key) and shipped with Cyber Pinball; a more recent charter travels from cabinet to cabinet and replaces the old one.
 Nobody else can claim to be a moderator.
-A moderator's cabinet has the entry System menu > Community > Modération (Moderation): the report queue, the most reported messages first.
+A moderator's cabinet has the entry System menu > Community > Réglages de la communauté (Community settings) > Modération (Moderation): the report queue, the most reported messages first.
 Opening a report shows the lines around the message, who reported it and why, and the decisions: hide the message, mute for 1 h, 24 h or 7 days (the message hidden too), ban from the rooms, lift a current sanction, or dismiss.
 The same decisions are in a line's options, and "Sujet du salon…" (Room topic…) sets the line shown at the top of the room.
 A new report is announced by a notification.
@@ -855,7 +855,7 @@ For now it is always a picture of one's own: a photo or a picture taken from the
   Without a picture: the initials ("AM" for "Alexis Martin") on a dark hue taken from the key, the same on every cabinet.
   The score insert at the bottom of the playfield, too small for readable initials, keeps the hue only.
 - **Choosing the picture.**
-  System menu > "Mon compte" (My account) > "Mon avatar" (My avatar) (or "Mettre un avatar…", Add an avatar…, on the first launch's "Votre profil de joueur" screen).
+  System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Modifier mon profil" (Edit my profile) > "Mon avatar" (My avatar) (or "Mettre un avatar…", Add an avatar…, on the first launch's "Votre profil de joueur" screen).
   "Choisir une image sur ce PC…" (Choose a picture on this PC…) opens Cyber Pinball's file picker (.jpg, .jpeg, .png, .webp, .gif, .bmp, .avif, 40 MB at most).
   "Chercher une image sur le web…" (Search the web for a picture…) opens the built-in browser on an image search: right-click a picture, "Télécharger cette image" (Download this image) (offered on every free search, media included, since image search engines have no download link), and the browser closes onto the cropping screen.
 - **Working picture.**

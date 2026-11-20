@@ -5,7 +5,7 @@
 Option désactivée par défaut : tant qu'on ne l'active pas, Cyber Pinball n'écrit rien dans Windows.
 Activée, elle fait de Cyber Pinball le *shell* de Windows pour le compte de la borne, à la place de l'Explorateur : à l'ouverture de la session, il s'ouvre au lieu du bureau et de la barre des tâches, et le bureau ne se voit plus jamais, même pendant les 1 à 2 s du démarrage (voir [Limites connues du prototype](limites-connues-du-prototype.md#limites-connues-du-prototype)).
 Les autres comptes, dont l'administrateur, gardent l'Explorateur.
-Entrée : Menu système > « Borne » > « Borne dédiée ».
+Entrée : Menu système > « Ma borne » > « Démarrage et accès » > « Borne dédiée ».
 
 **Moyen retenu : Shell Launcher**, la fonction de Windows faite pour les bornes (fonctions facultatives `Client-DeviceLockdown` et `Client-EmbeddedShellLauncher`, classe WMI `WESL_UserSetting`) : un shell par compte (SID), et une action à la sortie de l'application selon son code (0 relancer, 1 redémarrer le PC, 2 l'éteindre, 3 ne rien faire).
 Il n'existe que dans les éditions Entreprise, Éducation et IoT Enterprise (dont Windows 11 IoT Enterprise LTSC 2024), pas dans Pro ni Famille : là, l'écran passe par le réglage « Interface utilisateur personnalisée » du compte et un surveillant (voir plus bas, « Sans Shell Launcher »).
@@ -19,7 +19,7 @@ Tests : [dedicated.test.ts](../../packages/core/src/test/dedicated.test.ts) fait
 1. Créez d'abord un autre compte administrateur, avec un mot de passe : c'est par lui qu'on reprend la main en secours.
    Sans lui, l'écran refuse d'activer (« Bloquant »).
 2. Ouvrez la session du compte de la borne, avec Cyber Pinball installé (`<racine>\app\CyberPinball.exe` ; depuis les sources, l'activation est refusée).
-3. Menu système > « Borne » > « Borne dédiée » : l'écran dit ce qui change et vérifie l'édition de Windows et le compte de secours.
+3. Menu système > « Ma borne » > « Démarrage et accès » > « Borne dédiée » : l'écran dit ce qui change et vérifie l'édition de Windows et le compte de secours.
 4. « Activer pour ce compte » : Windows demande l'autorisation (UAC ; le mot de passe d'un administrateur si le compte de la borne est un compte standard).
    Un seul script, `<données>\borne-dediee\activer.ps1`, relève l'état de Windows, active les fonctions facultatives, met l'Explorateur comme shell des autres comptes s'il ne l'était pas, donne à ce compte la commande `"<racine>\app\CyberPinball.exe" --borne-dediee`, met Shell Launcher en service, puis relève de nouveau l'état ; l'écran vérifie chaque point.
    Une activation qui échoue en route remet l'état d'avant d'elle-même.
@@ -30,7 +30,7 @@ Sont gardés dans `<données>\borne-dediee` : `etat.json` (l'état de Windows d'
 
 ### Revenir en arrière
 
-Menu système > « Borne » > « Borne dédiée » > « Désactiver et rétablir le bureau » (autorisation de Windows).
+Menu système > « Ma borne » > « Démarrage et accès » > « Borne dédiée » > « Désactiver et rétablir le bureau » (autorisation de Windows).
 Le script remet chaque point dans son état d'avant, le relit, puis désactive les fonctions facultatives si elles l'étaient ; l'écran compare point par point et marque chacun « Vérifié ».
 Une différence reste affichée (« Bloquant »), et l'état d'avant est gardé pour réessayer.
 Le bureau revient à la prochaine ouverture de session ; les fonctions sont retirées tout à fait au prochain redémarrage.
@@ -76,7 +76,7 @@ Il propose maintenant, sur toutes les éditions, deux façons au choix, toujours
 - **« Lancer au démarrage de Windows »** : le raccourci `Cyber Pinball.lnk` dans le dossier Démarrage du compte (le même que la case de l'installeur), et le bureau masqué derrière : fond d'écran vide (`Control Panel\Desktop\WallPaper`), couleur de fond noire (`Control Panel\Colors\Background` = `0 0 0`), icônes masquées (`Explorer\Advanced\HideIcons` = 1).
   Sans UAC.
   Le bureau, noir, se voit 1 à 2 s avant que Cyber Pinball couvre les écrans.
-  Aussi dans Menu système > « Borne » > « Lancement au démarrage », qui ouvre la même page et dit dans son libellé si Cyber Pinball se lance déjà (raccourci de l'installeur compris).
+  Aussi dans Menu système > « Ma borne » > « Démarrage et accès » > « Lancement au démarrage », qui ouvre la même page et dit dans son libellé si Cyber Pinball se lance déjà (raccourci de l'installeur compris).
 
 **Le surveillant.**
 Windows ne relance pas un shell qui se ferme ; Cyber Pinball le fait lui-même, comme Shell Launcher : `--borne-compte` démarre un processus sans fenêtre (`app/src/supervisor.ts`, appelé par `main.ts` avant tout le reste) qui lance `CyberPinball.exe --borne-dediee` et le relance à chaque sortie, plantage compris.

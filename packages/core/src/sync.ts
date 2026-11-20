@@ -287,7 +287,7 @@ export function planVpxSync(
   }
 
   // DMD réel : DMDUtil quand un modèle connu est branché, ou forcé, éteint, en wifi dans
-  // Menu système > Borne > DMD > DMD réel ; sinon ses clés restent telles quelles, et leur
+  // Menu système > Ma borne > DMD et LED > DMD réel ; sinon ses clés restent telles quelles, et leur
   // dernière valeur écrite reste en mémoire.
   let dmd: DetectedDmd[] = [];
   if (options.usb) {

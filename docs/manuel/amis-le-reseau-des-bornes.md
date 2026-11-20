@@ -4,7 +4,7 @@
 
 Menu système > « Communauté » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
 Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
-Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Mon compte » (voir [Mon compte](mon-compte.md#mon-compte)).
+Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Communauté » > « Mon profil » > « Mon compte » (voir [Mon compte](mon-compte.md#mon-compte)).
 
 | Entrée | Ce qu'elle montre |
 | --- | --- |
@@ -18,7 +18,7 @@ Ce qui est à vous (pseudo, avatar, pays, badges, profil public, ce que voient l
 | Jouer en local | Pour une borne qui ne joue qu'en local : un seul réglage retire toute la partie sociale, niveaux compris. Start ouvre un écran qui dit ce qui est retiré et ce qui reste, le curseur sur « Annuler » ; « Jouer en local » confirme. Activé, l'entrée dit « Jouer en local : activé » et reste seule dans la rubrique ; Start propose « Remettre la communauté », le curseur sur « Rester en local » (voir « Jouer en local » plus bas). |
 
 **Jouer en local.**
-Menu système > Communauté > « Jouer en local » coupe le partage et arrête le réseau des bornes.
+Menu système > Communauté > « Réglages de la communauté » > « Jouer en local » coupe le partage et arrête le réseau des bornes.
 Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, le médaillon Communauté de la roue, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
 Le tableau des scores d'une table ne garde que ceux de cette borne, sans onglets de portée.
 Dans Mon compte, Mes badges, Mon profil public et Ce que voient les autres sont retirés aussi.
@@ -35,7 +35,7 @@ Une garde des tests (`noTag`, friends-menu.test.ts) refuse toute étiquette acco
 Un `social.json` illisible est mis de côté (`social.json.illisible-<date>`), jamais écrasé.
 
 **Supprimer son compte (RGPD).**
-Menu système > « Mon compte » > « Supprimer mon compte » montre ce qui part (le compte et son identifiant, les amis, les demandes, les conversations, les salons, l'avatar, les scores publiés, le profil public, les propositions et votes du tableau des retours, les réactions aux Nouveautés) et ce qui reste (les tables, leurs scores, les réglages, les sauvegardes déjà faites, qui contiennent le compte, à effacer dans Menu système > Cyber Pinball > Sauvegardes), le curseur sur « Annuler ».
+Menu système > « Communauté » > « Mon profil » > « Mon compte » > « Supprimer mon compte » montre ce qui part (le compte et son identifiant, les amis, les demandes, les conversations, les salons, l'avatar, les scores publiés, le profil public, les propositions et votes du tableau des retours, les réactions aux Nouveautés) et ce qui reste (les tables, leurs scores, les réglages, les sauvegardes déjà faites, qui contiennent le compte, à effacer dans Menu système > Ma borne > Santé et sauvegardes > Sauvegardes), le curseur sur « Annuler ».
 « Supprimer définitivement mon compte » : le service des retours efface d'abord les propositions, les votes et les réactions de la clé, avec la copie chiffrée du compte et son mot de passe (`POST /api/oubli`, signé par elle ; injoignable, le joueur réessaie ou continue sans lui) ; un **avis d'oubli** signé par la clé (`forget` : la clé, l'heure) part vers les bornes reliées, avec « unfriend » vers les amis et les demandes, et le réseau s'arrête ; les fichiers du compte sont effacés (`social.json`, `avatars\`, `amis\messagerie.json`, `amis\salons.json`, `amis\profils.json`, `amis\records.json`, `amis\parties.json`, les classements reçus) ; Cyber Pinball redémarre avec une clé neuve.
 Chaque borne qui reçoit l'avis vérifie sa signature, efface tout ce qui vient de cette clé (annuaire, amis, demandes, classements, carte publique, « J'aime », lignes de salon, conversation), refuse ce qui en reviendrait par un relais, garde l'avis dans `<données>\amis\oublis.json` (la clé seule, sans nom) et le relaie ; il est joint au bonjour de chaque liaison, pour les bornes qui étaient éteintes.
 Modules : [forget.ts](../../packages/core/src/forget.ts), `app/src/account-delete.ts`.
@@ -267,7 +267,7 @@ Garde-fou (`LiveDmdTally`) : réglage activé et DMD présent, sans passage apr�
 Un DMD matériel seul (ZeDMD, PIN2DMD) ne peut pas être recouvert.
 **Sur le fronton**, libre ou pris par la table (son B2S, son PuP-Pack ; le journal dit lequel, d'après `occupiedRoles`, relu toutes les 2 s), en permanence : « Partie entre amis » puis une carte par joueur, côte à côte, nom, score en grand, « Bille 2 sur 3 » ; en bas du fronton, comme les compteurs d'un électromécanique, discrète (au plus un cinquième de sa hauteur, sans descendre sous la taille lisible : un fronton peu haut la rejetait sinon vers le plateau) ; sans fronton, au centre du topper.
 Sans fronton ni topper, **un encart au bas du plateau**, dans le coin gauche pour le joueur, tourné avec le plateau : sur le tablier, sous la sortie des couloirs extérieurs, loin de l'écoulement et du couloir de lancement ; une ligne par joueur (nom, score, bille), au plus un dixième de la hauteur du plateau.
-**Au choix du joueur** : Menu système > Communauté > « Scores des amis pendant la partie » ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), gardé dans `<données>\amis\scores-en-partie.json`) : Automatique (ce qui précède), Sur le fronton (en bas, par-dessus son image, son B2S ou son PuP-Pack), Sur le topper (au centre, de même), En bas du plateau, Sur le côté du plateau (au milieu du bord gauche du joueur).
+**Au choix du joueur** : Menu système > Communauté > « Réglages de la communauté » > « Scores des amis pendant la partie » ([app/src/live-scores-menu.ts](../../app/src/live-scores-menu.ts), gardé dans `<données>\amis\scores-en-partie.json`) : Automatique (ce qui précède), Sur le fronton (en bas, par-dessus son image, son B2S ou son PuP-Pack), Sur le topper (au centre, de même), En bas du plateau, Sur le côté du plateau (au milieu du bord gauche du joueur).
 Chaque choix reste visible ; celui que la borne ne permet pas est grisé avec sa raison (pas d'écran de fronton, pas de topper).
 À part, « Scores sur le DMD : activés » (par défaut) ou « désactivés » (plus rien sur le DMD), Start pour basculer ; grisé avec sa raison sans écran du DMD, ou tant que le pare-feu de VPX n'est pas autorisé (le DMD ne se lit pas).
 Les réglages valent pour toutes les tables (le fichier prévoit un réglage par table, `tables`, pas encore proposé) ; une place qu'une table ne permet pas revient à l'automatique, et le journal dit pourquoi.
@@ -378,7 +378,7 @@ Le journal de Cyber Pinball en garde une ligne : « VPX arrêté (fichier) : err
 Un joueur dont VPX s'arrête avant 20 s de jeu apparaît « VPX s'est arrêté pendant sa partie », distinct d'une partie jamais démarrée.
 
 **Historique des parties.**
-Menu système > Communauté > « Historique des parties » : chaque partie en direct finie sur cette borne, de la plus récente à la plus ancienne, rangées par jour (« Vendredi 30 octobre 2026 ») ; pour chacune, la table en titre, l'heure du départ, et dessous les joueurs avec leur rang et leur score (« 1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement »).
+Menu système > Communauté > « Mon profil » > « Historique des parties » : chaque partie en direct finie sur cette borne, de la plus récente à la plus ancienne, rangées par jour (« Vendredi 30 octobre 2026 ») ; pour chacune, la table en titre, l'heure du départ, et dessous les joueurs avec leur rang et leur score (« 1. Bruno 2 841 350 120 · 2. Alexis (vous) 1 000 000 · Chloé 9 999, hors classement »).
 Une partie que vous avez gagnée porte une étoile.
 Choisir une partie ouvre son détail : la version de la table et son nombre de billes, l'hôte, puis chaque joueur, son rang et son score (« Meilleur score »), pourquoi il était hors classement (réglages de l'hôte non reçus, autre nombre de billes, plus d'un joueur dans sa table), la place prise au tableau d'honneur de la table et la durée jouée ; sans score, « Score non disponible » et ce qui lui est arrivé (« La partie n'a pas démarré de son côté », « A quitté la partie », « Résultat pas arrivé à temps », ou pour une borne en retard « Cyber Pinball 0.1.5-essai.10 sur sa borne : ni départ automatique ni score en direct, à mettre à jour » : la version de chaque borne est gardée).
 Retour ramène la liste, le curseur sur cette partie.
@@ -523,7 +523,7 @@ On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message
 « Masquer son activité » cache sur cette borne ses évènements et ses « J'aime », avec son niveau, ses badges et ses personnes invitées ; « Bloquer » coupe tout.
 
 **Mon profil public.**
-Menu système > « Mon compte » > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
+Menu système > « Communauté » > « Mon profil » > « Confidentialité » > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
 Pendant le premier mois, il propose aussi « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » ci-dessous).
 Un « J'aime » reçu s'annonce par une notification à l'écran des tables, regroupée (« Dora et Kiko aiment votre activité »).
 Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Ce que voient les autres », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
@@ -542,7 +542,7 @@ Un joueur qui a fait découvrir Cyber Pinball à d'autres le voit sur son profil
 Sans serveur ni compte, seule la personne invitée peut dire qui l'a invitée ([invitations.ts](../../packages/core/src/invitations.ts)).
 
 **La question.**
-« Qui vous a fait découvrir Cyber Pinball ? » se pose à l'écran « Votre profil de joueur » du premier lancement, avant « Continuer », puis dans Menu système > « Mon compte » > « Mon profil public », pendant les 30 jours qui suivent la première ouverture de cet écran (`DECLARE_DAYS`, `profileOffered`) ; elle est toujours facultative.
+« Qui vous a fait découvrir Cyber Pinball ? » se pose à l'écran « Votre profil de joueur » du premier lancement, avant « Continuer », puis dans Menu système > « Communauté » > « Mon profil » > « Confidentialité » > « Mon profil public », pendant les 30 jours qui suivent la première ouverture de cet écran (`DECLARE_DAYS`, `profileOffered`) ; elle est toujours facultative.
 L'écran (`app/src/invite-menu.ts`) propose d'abord les joueurs « Sur votre réseau local », puis « Vos amis » (huit au plus par liste), « Chercher un joueur… » (son pseudo, ou l'identifiant vu sur son profil, dans l'annuaire), « Personne : je l'ai trouvé seul » (la question ne revient plus) et « Plus tard ».
 Le joueur choisi porte « Choisi », l'écran dit « Vous avez choisi … » et l'entrée devient « Découvert grâce à … » ; tant que rien n'est confirmé, on peut en changer.
 
@@ -789,7 +789,7 @@ La porte du salon dans l'accueil et le médaillon Communauté comptent les menti
 Elles comptent aussi dans la pastille des messages de l'écran des tables, une ligne par salon sur « Messages en attente ».
 
 **Réglages de la communauté.**
-Menu système > Communauté > Réglages de la communauté : apparaître en ligne pour tous, salons activés ou désactivés (désactivés, ils restent visibles, grisés avec leur raison : pour la famille), salon par défaut (votre pays ou Monde), filtre de mots, mentions pendant les parties, nouveaux messages de mes salons (notification ou rien), phrases préparées, joueurs ignorés (à ne plus ignorer), règles des salons.
+Menu système > Communauté > Réglages de la communauté > Présence et salons : apparaître en ligne pour tous, salons activés ou désactivés (désactivés, ils restent visibles, grisés avec leur raison : pour la famille), salon par défaut (votre pays ou Monde), filtre de mots, mentions pendant les parties, nouveaux messages de mes salons (notification ou rien), phrases préparées, joueurs ignorés (à ne plus ignorer), règles des salons.
 En mode invité, la communauté est fermée avec le menu système.
 
 **Phrases préparées.**
@@ -826,7 +826,7 @@ Le signalement, signé par vous, joint la ligne telle que son auteur l'a signée
 **Les modérateurs.**
 Leurs clés de joueur sont listées dans une charte numérotée, signée par la clé du projet (la même que celle des mises à jour) et livrée avec Cyber Pinball ; une charte plus récente passe de borne en borne et remplace l'ancienne.
 Personne d'autre ne peut se dire modérateur.
-Une borne de modérateur a l'entrée Menu système > Communauté > Modération : la file des signalements, les messages les plus signalés d'abord.
+Une borne de modérateur a l'entrée Menu système > Communauté > Réglages de la communauté > Modération : la file des signalements, les messages les plus signalés d'abord.
 Ouvrir un signalement montre les lignes autour du message, qui l'a signalé et pourquoi, et les décisions : masquer le message, sourdine 1 h, 24 h ou 7 jours (le message masqué aussi), exclure des salons, lever une sanction en cours, ou classer sans suite.
 Les mêmes décisions sont dans les options d'une ligne, et « Sujet du salon… » pose la ligne affichée en tête du salon.
 Un nouveau signalement s'annonce par une notification.
@@ -855,7 +855,7 @@ Pour l'instant, c'est toujours une image à soi : une photo ou une image prise s
   Sans image : les initiales (« AM » pour « Alexis Martin ») sur une teinte sombre tirée de la clé, la même sur toutes les bornes.
   L'encart des scores au bas du plateau, trop petit pour des initiales lisibles, ne garde que la teinte.
 - **Choisir l'image.**
-  Menu système > « Mon compte » > « Mon avatar » (ou « Mettre un avatar… » à l'écran « Votre profil de joueur » du premier lancement).
+  Menu système > « Communauté » > « Mon profil » > « Modifier mon profil » > « Mon avatar » (ou « Mettre un avatar… » à l'écran « Votre profil de joueur » du premier lancement).
   « Choisir une image sur ce PC… » ouvre le sélecteur de fichiers de Cyber Pinball (.jpg, .jpeg, .png, .webp, .gif, .bmp, .avif, 40 Mo au plus).
   « Chercher une image sur le web… » ouvre le navigateur intégré sur une recherche d'images : un clic droit sur une image, « Télécharger cette image » (proposé sur toute recherche libre, médias compris, les moteurs d'images n'ayant pas de lien de téléchargement), et le navigateur se ferme sur le recadrage.
 - **Image de travail.**

@@ -11,6 +11,14 @@ son interface).
 
 ## 0.2.2
 
+- Menu système refait pour être plus court : huit lignes au plus par écran (Borne en avait 17, Cyber Pinball 14), dans l'ordre de l'usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre.
+- Ma borne regroupe ce qui dépend de la borne : Configuration de la borne, VPX, DMD et LED, VR et vision 3D, Télécommande du téléphone, Démarrage et accès, Santé et sauvegardes.
+- La Configuration de la borne tient en six lignes : Boutons, Écrans, Son, Langue / Language, Configurations de la borne, Assistant complet.
+- La Communauté du Menu système est désormais le même écran que le médaillon de la roue, avec Mon profil (niveau, badges, historique, pseudo, avatar, pays, confidentialité, compte) et les réglages de la communauté réunis.
+- Aide et infos réunit Commandes de la borne, Nouveautés, Mise à jour, Retours et propositions, Nous suivre, Conditions d'utilisation et Crédits (l'ancienne « La communauté »).
+- Quitter ou éteindre réunit le bureau Windows, quitter ou redémarrer Cyber Pinball, la veille, le redémarrage et l'extinction de la borne.
+- Le Menu système s'ouvre sur la dernière rubrique choisie à sa racine, même après un redémarrage.
+- Les Collections et la Migration passent dans Tables ; les réglages du Juke-box s'ouvrent depuis son écran.
 - Partie de Future Pinball, Pinball FX ou Pinball FX3 : l'image du chargement ne reste plus devant le fronton du jeu. Au passage du jeu en plein écran, Windows déplace des écrans ; décalée de quelques pixels, la fenêtre du front-end n'était plus reconnue comme cachant le jeu et restait devant toute la partie. Elle passe maintenant derrière dès qu'elle couvre la moitié de l'écran que le jeu occupe.
 - Pinball FX3 : avant chaque partie, la table reçoit son image de fronton si elle n'en a pas : son fronton dans Cyber Pinball, sinon celui du catalogue d'archive.org (avec l'image de l'accueil du jeu). La fenêtre du fronton de FX3 montre alors l'image de la table, au lieu du chemin du fichier qu'il cherchait. Une image déjà là n'est jamais remplacée. Une table sans fronton dans Cyber Pinball prend cette image, et la roue la montre.
 - Pinball FX et FX3 : une image rangée à côté d'une table, en largeur, compte comme son fronton (c'est là que FX3 l'affiche), et non plus comme une image du plateau.
@@ -56,7 +64,7 @@ son interface).
 - Son de la borne : quand une carte son (ou un ampli branché en HDMI) est réglée en stéréo dans Windows, l'assistant demande s'il y a des exciters ou des haut-parleurs sur le plateau (SSF, surround). Sur un oui, il ouvre le panneau Son de Windows, explique le réglage en 5.1 ou 7.1 et lance le test des haut-parleurs dès que la carte l'annonce. Auparavant, le SSF n'était jamais proposé sur une carte laissée en stéréo, sans un mot.
 - Son de la borne : deux exciters seulement sont reconnus. Le SSF en 5.1 leur envoie tout le son du plateau, et l'assistant conseille ce réglage plutôt que le 7.1, où une part de chaque son partait vers une prise muette. Le récapitulatif ne présente plus le SSF en 5.1 comme une erreur.
 - Son de la borne : rien entendu sur l'arrière ni sur les côtés d'une carte de carte mère : l'assistant explique le cas des cartes à trois prises (prise à réaffecter dans la console audio du fabricant, ou prise casque en façade).
-- Menu système > Borne > Configuration de la borne : l'entrée "Son de la borne" mentionne désormais le SSF et les exciters.
+- Menu système > Ma borne > Configuration de la borne : l'entrée "Son de la borne" mentionne désormais le SSF et les exciters.
 - Mon compte : la vérification du code de récupération ne propose plus que ses trois premiers mots, mélangés, à remettre dans l'ordre aux flippers (plus de mots pièges en plus).
 - Publication : la date de sortie et celle de la révision des manuels sont prises à l'heure du poste, et non plus en UTC : une version publiée juste après minuit n'est plus datée de la veille.
 - Pinball FX3 depuis un dossier du jeu choisi à la main : Menu système > Tables > Ajouter une table > « Tables de Pinball FX3 » > « Choisir le dossier du jeu… », pour des tables rangées hors de la bibliothèque de Steam. Le dossier est vérifié (« Pinball FX Classic.exe » ou « Pinball FX3.exe », tables dans data\steam), gardé, et les tables de l'écran viennent de lui ; « Oublier ce dossier » revient à Steam.

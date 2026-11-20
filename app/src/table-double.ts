@@ -235,7 +235,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           log(
             hook.ok
               ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}${ini ? `inspector de VPX sur 127.0.0.1:${offered!.port} pour ${[...hook.inspector.map((s) => s.name.replace(/^cyberpinball_/, '')), ...(offered?.dmd ? ['le DMD'] : [])].join(', ')}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
-              : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}${!inspector && /inspector/.test(hook.reason) ? ' ; règle du pare-feu de VPX absente : Menu système > Communauté > Partage et réseau' : ''}).`, // i18n-ignore : journal
+              : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}${!inspector && /inspector/.test(hook.reason) ? ' ; règle du pare-feu de VPX absente : Menu système > Communauté > Réglages de la communauté > Partage et réseau' : ''}).`, // i18n-ignore : journal
           );
         } catch (error) {
           log(`Partie entre amis (${table.id}) : relevé de l'état de jeu non posé (${(error as Error).message}).`); // i18n-ignore : journal

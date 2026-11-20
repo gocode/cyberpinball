@@ -28,7 +28,7 @@ export const messages: Catalog = {
   'Toutes vos tables, leurs scores sur cette borne, le Juke-box': 'All your tables, their scores on this cabinet, the Juke-box',
   'La mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions': 'Cyber Pinball updates, What’s new, Feedback and ideas',
   'Vos amis, vos XP et vos badges, gardés tels quels : tout revient si vous remettez la communauté': 'Your friends, XP and badges, kept as they are: everything comes back if you bring the community back',
-  'Retirée : la borne joue en local (Menu système › Communauté › Jouer en local).': 'Removed: this cabinet plays locally (System menu › Community › Local play).',
+  'Retirée : la borne joue en local (Menu système › Communauté › Réglages de la communauté › Jouer en local).': 'Removed: this cabinet plays locally (System menu › Community › Community settings › Local play).',
   'Indisponible : la borne joue en local (Communauté › Jouer en local)': 'Unavailable: this cabinet plays locally (Community › Local play)',
   'Flippers : période précédente ou suivante · Exit : retour à la fiche · souris': 'Flippers: previous or next period · Exit: back to the sheet · mouse',
 };

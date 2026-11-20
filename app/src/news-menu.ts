@@ -1,4 +1,4 @@
-// Menu système > Nouveautés (packages/core/src/news.ts) : les grandes nouveautés de Cyber Pinball,
+// Menu système > Aide et infos > Nouveautés (packages/core/src/news.ts) : les grandes nouveautés de Cyber Pinball,
 // choisies à la main (maquette validée le 17/11/2026).
 //
 // Une chronologie de lignes, la plus récente en haut : la date et la version dites une seule fois
@@ -8,8 +8,8 @@
 //
 // La pastille rouge (roue dentée, entrée du menu) dure tant qu'il reste une nouveauté pas vue, dès
 // la première installation ; ouvrir l'écran les marque toutes vues, le repère « Nouveau » restant
-// jusqu'à ce qu'on en sorte. L'entrée est en tête du menu système tant que les nouveautés sont
-// récentes ou pas vues (newsAtRoot), ensuite seulement dans la rubrique Cyber Pinball. Mode invité :
+// jusqu'à ce qu'on en sorte. L'entrée est dans Aide et infos, dont la ligne porte la
+// pastille (20/11/2026 : plus de place à la racine). Mode invité :
 // l'écran est fermé, comme tout le menu système (library.ts).
 //
 // Sans electron à l'exécution : les tests chargent ce module avec un hôte d'essai.
@@ -21,7 +21,6 @@ import {
   language,
   loadNewsState,
   markNewsSeen,
-  newsAtRoot,
   newsLongDate,
   newsReactionSummary,
   newsShortDate,
@@ -58,7 +57,6 @@ export interface NewsMenuHost {
   reach(target: NewsReach, back: () => void): { run?: () => void; gone?: string };
   /** L'état a changé (nouveautés vues) : la pastille de la roue dentée se redessine. */
   changed?(): void;
-  now?(): number;
   log?(line: string): void;
   /** Les nouveautés (essais) ; sans elles, NEWS. */
   items?: readonly NewsItem[];
@@ -78,7 +76,7 @@ export interface NewsMenuHost {
 }
 
 export interface NewsMenu {
-  /** L'entrée du menu système : pastille tant qu'il reste une nouveauté pas vue, en tête tant qu'elles sont récentes. */
+  /** L'entrée du menu système (Aide et infos) : pastille tant qu'il reste une nouveauté pas vue. */
   item: ProvidedSystemItem;
   /** L'écran ; `back` : son « Retour » (sans lui, le menu système). */
   open(back?: () => void): void;
@@ -93,7 +91,6 @@ const lastStep = (where: string) => where.split(' › ').at(-1) ?? where;
 
 export function createNewsMenu(host: NewsMenuHost): NewsMenu {
   const items = host.items ?? NEWS;
-  const now = () => host.now?.() ?? Date.now();
   const file = path.join(host.dataDir, NEWS_FILE);
   const loaded = loadNewsState(file, items);
   const state = loaded.state;
@@ -278,9 +275,6 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
       },
       get attention() {
         return unreadNews(state, items).length > 0;
-      },
-      get atRoot() {
-        return newsAtRoot(state, now(), items);
       },
       run: () => open(),
     },

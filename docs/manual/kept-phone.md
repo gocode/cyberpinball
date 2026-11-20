@@ -22,7 +22,7 @@ Nothing to install, no app store: the page is still the one the cabinet serves, 
   Cut at the cabinet (“Déconnecter”), after 20 minutes without a gesture, or replaced by another phone: **“Reprendre” (Resume)** comes back in one tap, without a QR code.
   Cyber Pinball closed: “Ce téléphone se reconnectera tout seul dès que Cyber Pinball sera relancé” (This phone will reconnect by itself as soon as Cyber Pinball is started again; one try every 5 s).
   Forgotten at the cabinet: “Ce téléphone n’est plus reconnu” (This phone is no longer recognised), its key is erased.
-- **At the cabinet**: System menu > Cabinet > Phone remote, “Téléphones gardés” (Kept phones) section: each phone, “Accepté le … · vu …” (Accepted on … · seen …), “Pilote maintenant” (In control now) for the one in control.
+- **At the cabinet**: System menu > My cabinet > Phone remote, “Téléphones gardés” (Kept phones) section: each phone, “Accepté le … · vu …” (Accepted on … · seen …), “Pilote maintenant” (In control now) for the one in control.
   Choosing it opens “Oublier ce téléphone ?” (Forget this phone?); forgotten, it will have to scan the QR code and be accepted again (disconnected if it was in control). “Déconnecter le téléphone” (Disconnect the phone) does not forget it.
 - **Full screen on Android**: Chrome opens the shortcut of an HTTP page in a tab, address bar included (only an installable HTTPS page opens without it).
   The page therefore asks for full screen (Fullscreen API, `navigationUI: 'hide'`) at the first tap, and again after an unwanted exit (another app, screen locked: the page goes to the background).
@@ -65,7 +65,7 @@ Nothing to install, no app store: the page is still the one the cabinet serves, 
   It only follows a private IPv4 address, even when properly encrypted.
   Service unreachable: the last known address, kept on the phone (the service's page stays available offline, service worker); none: "Borne introuvable" (cabinet not found).
   The service only redirects: an HTTPS page cannot open an HTTP WebSocket to the cabinet.
-  At the cabinet: System menu > Cabinet > Phone remote, "Couper l'adresse stable par Internet" (turn off the stable address over the Internet; on by default, its detail says whether the declaration went through).
+  At the cabinet: System menu > My cabinet > Phone remote, "Couper l'adresse stable par Internet" (turn off the stable address over the Internet; on by default, its detail says whether the declaration went through).
   Never during a test: `CYBERPINBALL_RELAIS` points to another service.
   Putting the service online: `node scripts/service-telephone.mjs kv` (once), then `deployer`, with the Cloudflare account of `npx wrangler login`, kept outside the repository.
   Tests: `telephone-domaine.test.ts` (nothing readable in the declaration, signature, replay, clock, deletion, public address refused, fallback, spaced retries, service headers).

@@ -2,7 +2,7 @@
 
 ## Guest mode
 
-For a party or the kids: System menu > Borne > Mode invité (Cabinet > Guest mode), then "Activer le mode invité" (Turn on guest mode).
+For a party or the kids: System menu > Ma borne > Démarrage et accès (Startup and access) > Mode invité (Guest mode), then "Activer le mode invité" (Turn on guest mode).
 The table menu opens locked, and stays so until unlocked, even after a restart (`mode-invite.json` in the data folder).
 
 - **What stays open**: choosing a table (flippers, arrow keys, wheel, click), opening its game page, playing, reading the flyer and the rules, the controls reminder (Help button, H, F1), stopping a stuck game (Ctrl+Shift+K).

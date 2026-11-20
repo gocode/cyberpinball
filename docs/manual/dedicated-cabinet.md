@@ -5,7 +5,7 @@
 An option, off by default: until it is turned on, Cyber Pinball writes nothing to Windows.
 When on, it makes Cyber Pinball the Windows *shell* for the cabinet account, instead of Explorer: at sign-in it opens instead of the desktop and the taskbar, and the desktop never shows again, not even during the 1 to 2 s of startup (see [Known limitations of the prototype](known-limitations-of-the-prototype.md#known-limitations-of-the-prototype)).
 Other accounts, the administrator included, keep Explorer.
-Entry: System menu > "Borne" (Cabinet) > "Borne dédiée" (Dedicated cabinet).
+Entry: System menu > "Ma borne" (My cabinet) > "Démarrage et accès" (Startup and access) > "Borne dédiée" (Dedicated cabinet).
 
 **Chosen means: Shell Launcher**, the Windows feature made for kiosks (optional features `Client-DeviceLockdown` and `Client-EmbeddedShellLauncher`, WMI class `WESL_UserSetting`): one shell per account (SID), and an action when the application exits, depending on its exit code (0 restart it, 1 restart the PC, 2 shut it down, 3 do nothing).
 It only exists in the Enterprise, Education and IoT Enterprise editions (Windows 11 IoT Enterprise LTSC 2024 included), not in Pro or Home: there, the screen uses the account's "Interface utilisateur personnalisée" (Custom User Interface) setting and a supervisor (see below, "Without Shell Launcher").
@@ -19,7 +19,7 @@ Tests: [dedicated.test.ts](../../packages/core/src/test/dedicated.test.ts) runs 
 1. First create another administrator account, with a password: it is the way back in, as a rescue.
    Without it, the screen refuses to turn on ("Blocking").
 2. Sign in with the cabinet account, with Cyber Pinball installed (`<root>\app\CyberPinball.exe`; from the sources, turning on is refused).
-3. System menu > "Borne" (Cabinet) > "Borne dédiée" (Dedicated cabinet): the screen says what changes and checks the Windows edition and the rescue account.
+3. System menu > "Ma borne" (My cabinet) > "Démarrage et accès" (Startup and access) > "Borne dédiée" (Dedicated cabinet): the screen says what changes and checks the Windows edition and the rescue account.
 4. "Turn on for this account": Windows asks for permission (UAC; an administrator's password if the cabinet account is a standard account).
    A single script, `<data>\borne-dediee\activer.ps1`, reads the state of Windows, enables the optional features, makes Explorer the shell of other accounts if it was not, gives this account the command `"<root>\app\CyberPinball.exe" --borne-dediee`, starts Shell Launcher, then reads the state again; the screen checks every point.
    If turning on fails midway, the script puts the previous state back by itself.
@@ -30,7 +30,7 @@ Kept in `<data>\borne-dediee`: `etat.json` (the previous state of Windows, refer
 
 ### Going back
 
-System menu > "Borne" (Cabinet) > "Borne dédiée" (Dedicated cabinet) > "Turn off and bring back the desktop" (Windows permission).
+System menu > "Ma borne" (My cabinet) > "Démarrage et accès" (Startup and access) > "Borne dédiée" (Dedicated cabinet) > "Turn off and bring back the desktop" (Windows permission).
 The script puts every point back in its previous state, reads it again, then disables the optional features if they were disabled; the screen compares point by point and marks each one "Checked".
 A difference stays on screen ("Blocking"), and the previous state is kept to try again.
 The desktop comes back at the next sign-in; the features are fully removed at the next restart.
@@ -76,7 +76,7 @@ It now offers, on every edition, two ways to choose from, always for the cabinet
 - **"Lancer au démarrage de Windows" (Launch at Windows startup)**: the `Cyber Pinball.lnk` shortcut in the account's Startup folder (the same as the installer checkbox), and the desktop hidden behind it: empty wallpaper (`Control Panel\Desktop\WallPaper`), black background color (`Control Panel\Colors\Background` = `0 0 0`), hidden icons (`Explorer\Advanced\HideIcons` = 1).
   No UAC.
   The black desktop shows for 1 to 2 s before Cyber Pinball covers the screens.
-  Also under System menu > "Borne" > "Lancement au démarrage" (Launch at startup), which opens the same page and says in its label whether Cyber Pinball already launches (installer shortcut included).
+  Also under System menu > "Ma borne" > "Démarrage et accès" (Startup and access) > "Lancement au démarrage" (Launch at startup), which opens the same page and says in its label whether Cyber Pinball already launches (installer shortcut included).
 
 **The supervisor.**
 Windows does not restart a shell that closes; Cyber Pinball does it itself, like Shell Launcher: `--borne-compte` starts a windowless process (`app/src/supervisor.ts`, called by `main.ts` before anything else) that launches `CyberPinball.exe --borne-dediee` and restarts it on every exit, crashes included.

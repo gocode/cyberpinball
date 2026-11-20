@@ -1,4 +1,4 @@
-// Menu système > Borne > Autres versions de VPX (autres-vpx.ts) : les VPX déjà installés sur le PC (10.8.0,
+// Menu système > Ma borne > VPX > Autres versions de VPX (autres-vpx.ts) : les VPX déjà installés sur le PC (10.8.0,
 // 10.7…) que des tables peuvent choisir. Ceux des autres installations (PinUP Popper, PinballX, dossier de VPX)
 // sont proposés d'un Start ; un autre se choisit par son exécutable. Tant que la liste est vide, ni la fiche ni
 // l'installation d'une table ne proposent de choix.

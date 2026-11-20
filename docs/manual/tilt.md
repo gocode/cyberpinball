@@ -3,7 +3,7 @@
 ## Tilt
 
 What makes the cabinet tilt is decided at the wizard's "Tilt" step ([app/src/tilt-step.ts](../../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../../packages/core/src/tilt.ts)).
-It follows the "Lanceur" (Plunger) step in the full wizard, which skips it without writing anything on a cabinet with no accelerometer set and no Pinscape plugged in (or whose accelerometer was turned off), no captured tilt bob and no saved tilt (VPX then keeps its simulated tilt bob); on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Tilt" (`npm run assistant -- --tilt`, `tilt` action of the launcher).
+It follows the "Lanceur" (Plunger) step in the full wizard, which skips it without writing anything on a cabinet with no accelerometer set and no Pinscape plugged in (or whose accelerometer was turned off), no captured tilt bob and no saved tilt (VPX then keeps its simulated tilt bob); on its own: system menu > "Ma borne" (My cabinet) > "Configuration de la borne" (Cabinet setup) > "Boutons" (Buttons) > "Tilt" (`npm run assistant -- --tilt`, `tilt` action of the launcher).
 
 **What VPX does with it** (VPX 10.8.1, commit `af26b2d93`):
 

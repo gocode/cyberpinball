@@ -50,7 +50,7 @@ export interface Vision3dMenuContext {
 
 export function createVision3dMenu(ctx: Vision3dMenuContext) {
   const { loc, library } = ctx;
-  // « Vision 3D » (Menu système > Borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
+  // « Vision 3D » (Menu système > Ma borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
   // par une webcam ou une Kinect pour Xbox 360. Sans capteur, l'entrée reste visible, grisée avec sa
   // raison ; une Kinect sans pilote propose de l'installer (chez Microsoft, avec l'accord de Windows).
   let vision3d = readVision3d(loc.dataDir);

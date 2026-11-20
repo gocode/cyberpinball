@@ -6,7 +6,7 @@
 //   l'accepter y écrit <données>\conditions.json ;
 // - le menu le montre au démarrage tant que la version en cours n'est pas acceptée (app/src/terms-menu.ts) :
 //   installation sans l'installeur, mise à jour vers une version qui change le texte ;
-// - il reste consultable dans Menu système > Cyber Pinball > Conditions d’utilisation.
+// - il reste consultable dans Menu système > Aide et infos > Conditions d’utilisation.
 //
 // Ces conditions ne restreignent pas la licence GPL du code : elles disent ce dont l'utilisateur
 // répond (contenus de tiers, partage, usage commercial, santé, matériel) et écartent la garantie.
@@ -66,7 +66,7 @@ export function termsDocument(): TermsDocument {
           t('Le réseau des bornes est activé d’office : vos amis voient votre pseudo, votre avatar, votre pays, votre présence en ligne et vos scores publiés, et peuvent parcourir votre bibliothèque de tables et de médias.'),
           t('Vous êtes seul responsable de ce que vous partagez et de ce que vous récupérez : messages, images, médias, tables. Ne partagez rien d’illicite ou d’offensant, ni aucun contenu dont vous n’avez pas le droit de faire profiter d’autres personnes.'),
           t('Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après votre attestation d’en avoir le droit : cette attestation vous engage.'),
-          t('Pour tout couper : Menu système > Communauté > Partage et réseau.'),
+          t('Pour tout couper : Menu système > Communauté > Réglages de la communauté > Partage et réseau.'),
         ],
       },
       {
@@ -110,7 +110,7 @@ export function termsDocument(): TermsDocument {
       {
         title: t('Évolution de ces conditions'),
         paragraphs: [
-          t('Ces conditions peuvent évoluer : une nouvelle version vous est présentée avant de continuer. Elles restent à lire dans Menu système > Cyber Pinball > Conditions d’utilisation.'),
+          t('Ces conditions peuvent évoluer : une nouvelle version vous est présentée avant de continuer. Elles restent à lire dans Menu système > Aide et infos > Conditions d’utilisation.'),
           t('Si vous ne les acceptez pas, n’installez pas Cyber Pinball, ou cessez de l’utiliser.'),
           t('Elles sont régies par le droit français, sans préjudice des règles impératives du pays où vous résidez.'),
         ],

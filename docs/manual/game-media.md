@@ -39,7 +39,7 @@ For each screen, the menu takes the first media found: `(Type) <nom du .vpx>` (t
 - **With the table**: an archive containing media laid out the PinUP Popper way (`POPMedia\…\Wheel\<jeu>.png`), the PinballX way or the VPinFE way is recognized when the table is added ("Ajouter une table" (Add a table)); the media are renamed `(Type) <dossier>` in `medias\`.
   A media pack on its own, without a `.vpx`, completes an installed table.
   See "Importing media".
-- **From a PinUP Popper or PinballX installation**: system menu > "Cyber Pinball" > "Migration" > "Reprendre les médias" (Import media, from PinUP Popper / PinballX).
+- **From a PinUP Popper or PinballX installation**: system menu > "Tables" > "Migration" > "Reprendre les médias" (Import media).
   Everything is copied; the original installation is not modified.
 - **By hand**: copy the file into `medias\` under the name `(Type) <nom du dossier>.ext`.
   The menu shows it immediately on every screen, without restarting (see "Live changes").
@@ -171,7 +171,7 @@ Outside the table menu, nothing of the last table on the wheel stays on screen o
 ### Menu sound
 
 The menu sound comes from a single window, the playfield one (`app/renderer/menu-audio.js`).
-The main process decides what to play at each moment (`menuSound`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)); everything is set in **System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode)** (`app/src/menu-settings.ts`), saved in `<données>\medias.json` and applied immediately.
+The main process decides what to play at each moment (`menuSound`, [packages/core/src/menumoments.ts](../../packages/core/src/menumoments.ts)); everything is set in **System menu > "Tables" > "Son et mode attente" (Sound and attract mode)** (`app/src/menu-settings.ts`), saved in `<données>\medias.json` and applied immediately.
 
 | Moment | You hear | Setting (default) |
 | --- | --- | --- |
@@ -228,7 +228,7 @@ The registry, what triggers each sound and the rule deciding whether it plays ar
 | Badge fanfare (`badge-rare`) | a rare, epic or legendary badge earned, back on the tables screen, timed to its animation | WebAudio synthesis (a rising breath, a deep impact as the badge arrives, an arpeggio, then F, G, C chords under the text; ticks while the XP count up; 5.6 s, with reverb); same licence |
 | Level up (`level-up`) | the level rises, during a badge moment or on its own; the table's music and the playfield video's sound go quiet for the length of the moment | WebAudio synthesis (a fanfare: a low impact and a C chord with a rising arpeggio, a G chord as a call, then the big held C chord, its bass and its bells; 4 s, with reverb); same licence |
 
-- **Settings**: **System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode)**: "Sons de l'interface" (Interface sounds; on by default; Start turns them off or back on, and plays the click) and "Volume des sons de l'interface" (Interface sound volume; 50% by default; choosing plays the coin).
+- **Settings**: **System menu > Tables > "Son et mode attente" (Sound and attract mode)**: "Sons de l'interface" (Interface sounds; on by default; Start turns them off or back on, and plays the click) and "Volume des sons de l'interface" (Interface sound volume; 50% by default; choosing plays the coin).
   Saved in `<données>\medias.json` (`uiSounds`, `uiSoundsVolume`).
 - **Never during a game**: the main process requests no sound during a game or in attract mode (`uiSoundCue`); the window, for its part, refuses any sound while the state says "game in progress", silences anything still ringing and closes its audio context: no stream is open on the output while VPX plays.
   The coin drops during loading, before VPX takes the screens.
@@ -287,7 +287,7 @@ What each screen shows from launch to the end of the game (`momentScreen`, [pack
 
 When Cyber Pinball opens, each screen of the cabinet plays its intro animation, once, then **holds its last frame** (the playfield keeps going in a very subtle loop); the first button (or a click) shows the wheel.
 A button during playback skips the intro.
-Setting **System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode) > "Ouverture au démarrage" (Startup intro)**: played by default, or off (the menu opens straight on the wheel).
+Setting **System menu > Tables > "Son et mode attente" (Sound and attract mode) > "Ouverture au démarrage" (Startup intro)**: played by default, or off (the menu opens straight on the wheel).
 Saved in `<données>\medias.json`, field `intro`.
 Code: [packages/core/src/intro.ts](../../packages/core/src/intro.ts) (settings, files, timing, views), [app/renderer/intro.js](../../app/renderer/intro.js) and `intro.css` (the animations), [app/src/intro-menu.ts](../../app/src/intro-menu.ts) (the settings screen).
 
@@ -324,7 +324,7 @@ Code: [packages/core/src/intro.ts](../../packages/core/src/intro.ts) (settings, 
 ### Cinematic launch
 
 On Start on "Jouer" (Play), the launch plays like the opening of a film, on every screen of the cabinet: the game logo lights up in the middle of the playfield and flies up to the backglass, a spot of light crosses the DMD, the logo lands on the backglass and waits there; when VPX takes over, a coil thumps and everything fades.
-Setting "Lancement en cinéma" (Cinematic launch) in **System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode)**: on by default; Start turns it off (loading goes back to what it was: no logo, no pass over the DMD, no coil thump) or back on (the coil thump plays).
+Setting "Lancement en cinéma" (Cinematic launch) in **System menu > Tables > "Son et mode attente" (Sound and attract mode)**: on by default; Start turns it off (loading goes back to what it was: no logo, no pass over the DMD, no coil thump) or back on (the coil thump plays).
 Saved in `<données>\medias.json`, field `cinema`.
 The in-game display adjustment (game page > "Régler l'affichage en partie") has no cinematic launch, just as it has no coin.
 
@@ -391,7 +391,7 @@ Each canvas overflows its element to give a `b`-pixel blur its 1.5 `b` reach, an
 ### Wheel: its settings
 
 Every setting of the tables wheel is on one screen, **Menu système > Tables > Roue** (System menu > Tables > Wheel), next to Collections (request of 12/11/2026).
-They were mixed with sound and attract mode in System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract mode), which keeps sound, attract mode, the DMD and media.
+They were mixed with sound and attract mode in System menu > Tables > "Son et mode attente" (Sound and attract mode), which keeps sound, attract mode, the DMD and media.
 Code: [app/src/wheel-settings.ts](../../app/src/wheel-settings.ts); everything is kept in `<data>\medias.json` and applies at once.
 
 - **"Présentation du menu"** (Menu layout; Start: the list): Medallions wheel (default), Banner, Minimal, Arch, or the list of titles (`menuLayout`).
@@ -414,7 +414,7 @@ Tests: [roue-reglages.test.ts](../../packages/core/src/test/roue-reglages.test.t
 
 ### Juke-box settings
 
-Every setting of the Juke-box is on one screen, **Menu système > Médias > Réglages du Juke-box** (System menu > Media > Juke-box settings), right after the Juke-box management, and also as the "Réglages du Juke-box" line at the top of that management, where Exit leads back (request of 13/11/2026: configuring the Juke-box, not managing its content).
+Every setting of the Juke-box is on one screen, **Menu système > Juke-box > Réglages du Juke-box** (System menu > Juke-box > Juke-box settings), right after the Juke-box management, and also as the "Réglages du Juke-box" line at the top of that management, where Exit leads back (request of 13/11/2026: configuring the Juke-box, not managing its content).
 Code: [app/src/jukebox-settings.ts](../../app/src/jukebox-settings.ts), [packages/core/src/jukebox-audio.ts](../../packages/core/src/jukebox-audio.ts); everything is kept in `<data>\medias.json` (`jukeboxAudio`, `jukeboxVisualizer`, `jukebox`) and applies at once, even to the song playing.
 
 - **"Sorties du son"** (Sound outputs; Start: the list): the Windows outputs (virtual ones such as the headset's left out, like in the "Son" step), the cabinet's first.
@@ -487,10 +487,10 @@ Code: [packages/core/src/collections.ts](../../packages/core/src/collections.ts)
 - **Changing collection**: **left or right MagnaSave** on the wheel, previous or next collection, applied at once, looping; an empty collection is skipped.
   Only the marker changes: no list shows over the wheel any more (removed on 11/13/2026, the Collections medallion replaces it).
   With the mouse: a click on the marker goes to the next one.
-  To see all the collections: the **Collections medallion** (below) or **Menu système > Collections** (System menu > Collections, at the top of the system menu, and in Tables), the same list with the flippers and Start.
+  To see all the collections: the **Collections medallion** (below) or **Menu système > Tables > Collections** (System menu > Tables > Collections, at the top of the system menu, and in Tables), the same list with the flippers and Start.
 - **The Collections medallion** (11/13/2026): on the wheel, after the Juke-box and Community, the last of the leading medallions, right before the first table.
   Its name in green, below it the number of collections and the one the wheel shows.
-  Start (or a click at the center of the wheel, or a tap on the phone) opens the **list of collections**, the same as System menu > Collections, with the cursor on the collection shown: Start on a collection shows it on the wheel, on the table it remembers; Exit goes back to the medallion.
+  Start (or a click at the center of the wheel, or a tap on the phone) opens the **list of collections**, the same as System menu > Tables > Collections, with the cursor on the collection shown: Start on a collection shows it on the wheel, on the table it remembers; Exit goes back to the medallion.
   It also holds "Nouvelle collection…" (New collection…), "Gérer mes collections…" (Manage my collections…) and "Boutons des collections" (Collection buttons).
   Selected on the wheel, it shows its **poster**, like Community: behind the wheel and on the backglass, the number of collections and tables, the collection shown, a few others, and "Start · Choisir une collection" (Choose a collection).
   It can be hidden in System menu > Tables > Wheel ("Collections dans la roue", Collections on the wheel); it disappears when guest mode imposes a collection or closes the choice of collections.
@@ -509,7 +509,7 @@ Code: [packages/core/src/collections.ts](../../packages/core/src/collections.ts)
   The active collection is kept from one start to the next (`<data>\collections.json`); "Table au démarrage" picks the table in it.
 - **Favourites**: "Ajouter aux favoris" (Add to favourites, or "Retirer des favoris") on a table's page; a filled white star sits before the title, on the wheel as on the page (never green; its place is kept outside favourites, the title doesn't move).
   It is the `User.Favorite` field of the `.info` (1 or 0), the one other frontends write: a table taken over from another installation keeps its favourite, even when the table here already has its statistics (`mergeFavorite`, tableimport.ts).
-- **Guest mode**: its screen (Menu système > Borne > Mode invité) offers "Tables proposées" (Tables offered): all (MagnaSave stays free), or a non-empty collection (Start: next choice).
+- **Guest mode**: its screen (Menu système > Ma borne > Démarrage et accès > Mode invité) offers "Tables proposées" (Tables offered): all (MagnaSave stays free), or a non-empty collection (Start: next choice).
   Restricted, the locked menu only shows that one: the padlock replaces the marker's icon, the help no longer mentions MagnaSave, and a MagnaSave press only shows the "Verrouillé" hint (door `menu.collection-locked`).
   The choice is kept with guest mode (`<data>\mode-invite.json`, field `collection`); on unlocking, the previous collection comes back.
   Adding or removing a favourite is closed to guests (`sheet.favorite`).
@@ -528,13 +528,13 @@ After a while with no button pressed on the table menu, the cabinet shows itself
 - **Sound**: "Son en attente" (Attract mode sound) is off by default; when set to reduced, the music of the table shown (or its video's sound) plays at 30% of its volume.
 - **Credits**: a discreet line at the bottom of the playfield, above the prompt, says who made the table shown: "Table TastyWasps, JPSalas et 12 autres · Fronton HauntFreaks · Couleurs Enthusiast" (the known ones, two lines at most; see [Community credits](community-credits.md#community-credits)).
   "Crédits de la table" (Table credits): shown by default, or hidden (`<data>\medias.json`, `attractCredits` field).
-- **Its settings, in one place**: System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > **"Mode attente"** (Attract mode) opens a screen of its own (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../../app/src/menu-settings.ts)): delay, next table, sound, table credits, cabinet schedule.
+- **Its settings, in one place**: System menu > "Tables" > "Son et mode attente" (Sound and attract mode) > **"Mode attente"** (Attract mode) opens a screen of its own (`ATTRACT_ROWS`, [app/src/menu-settings.ts](../../app/src/menu-settings.ts)): delay, next table, sound, table credits, cabinet schedule.
   The "Médias, son et attente" line sums them up ("une table toutes les 20 s · son coupé · crédits affichés").
 
 ### Cabinet schedule
 
 Like an arcade cabinet, the cabinet lives on its own when nobody is playing (attract mode, above), and a schedule rules its day (`ArcadeHours`, [packages/core/src/arcadehours.ts](../../packages/core/src/arcadehours.ts); in the menu, [app/src/frontend.ts](../../app/src/frontend.ts) and [app/src/arcade-hours.ts](../../app/src/arcade-hours.ts)).
-System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > "Mode attente" (Attract mode) > **"Horaire de la borne"** (Cabinet schedule); the settings go into `<data>\medias.json` (`hours` field).
+System menu > "Tables" > "Son et mode attente" (Sound and attract mode) > "Mode attente" (Attract mode) > **"Horaire de la borne"** (Cabinet schedule); the settings go into `<data>\medias.json` (`hours` field).
 
 - **Cabinet schedule: off** by default.
   While off, its settings stay visible and editable ("Settings kept; no effect while the schedule is off").
@@ -568,7 +568,7 @@ System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and at
 
 While you browse, Cyber Pinball draws the DMD display itself, like a machine in attract mode: a 128 × 32 dot grid that cycles through the selected table's title, the invitation to play, its high scores, the time and the credits, with a close-up of its wheel on arrival and a short gameplay scene every other cycle.
 The dots stay on screen at all times: the table's DMD media never replaces them, it shows around them (FullDMD frame, below).
-Setting "DMD du menu" (Menu DMD) in **System menu > "Borne" (Cabinet) > "DMD"** ( Start switches between the two, saved in `<data>\medias.json`, field `dmd`): **live** by default, or **classic** (the table's media alone, else the generated DMD that scrolls its title, as before).
+Setting "DMD du menu" (Menu DMD) in **System menu > "Ma borne" (My cabinet) > "DMD et LED" (DMD and LEDs)** ( Start switches between the two, saved in `<data>\medias.json`, field `dmd`): **live** by default, or **classic** (the table's media alone, else the generated DMD that scrolls its title, as before).
 That media is the DMD screen's (`roleMedia`, `resolveMedia`): on a FullDMD screen, the table's (FullDMD) media, and its (DMD) only if it has no FullDMD; on a DMD-only screen, the (DMD) first, the (FullDMD) failing that.
 When the table has both, the DMD screen takes the one whose proportions best fill its zone (`bestDmdMedia`, `dmdScreenAspect`: the role's zone in the cabinet model, otherwise 4:1 or 16:9), whatever its label: a 21:9 "(DMD)" taken over from PinUP Popper comes before a 16:9 "(FullDMD)" on a 4:1 DMD, instead of leaving half the screen empty.
 On a tie, or if one of the two cannot be measured, the order above decides.
@@ -668,7 +668,7 @@ Wherever Cyber Pinball writes its brand or draws a dot display, it follows the a
   Press Start 2P, the former font of small texts, is no longer shipped.
 - **The brand on a display**: stacked, 3 free rows at the top and bottom, 4 between the words.
   A display has only one colour: light carries the hierarchy the interface gives by colour, CYBER at shade 11, PINBALL at full brightness (15).
-- **DMD colour** (System menu > "Borne" (Cabinet) > "DMD" > **"Couleur du DMD" (DMD colour)**, kept in `<data>\medias.json`, field `dmdColor`): the colour of the dots of the menu DMD and of the fallback displays, not of VPX's DMD during play (the table's own).
+- **DMD colour** (System menu > "Ma borne" (My cabinet) > "DMD et LED" (DMD and LEDs) > "Couleur du DMD" (DMD colour)**, kept in `<data>\medias.json`, field `dmdColor`): the colour of the dots of the menu DMD and of the fallback displays, not of VPX's DMD during play (the table's own).
   **Signal green** `#8BE23A` by default (the design system's `dmd` token), or a preset: teal `#36C9B4`, light ink `#E6F0EC`, glacier blue `#5FB4CF`, soft amber `#F2B33D`, plasma orange `#FF8A1F` (the former colour); or **"Couleur libre…" (Custom colour…)**, typed in hexadecimal on the on-screen keyboard (`#8BE23A`, `8be23a` or `#8be`).
   A colour too dark (no component at 112 or more) is refused, with the reason; an unreadable value in `medias.json` falls back to signal green.
   The choice returns to its row; the DMD, which shows the brand in the system menu, changes at once (`setDmdColor`, [app/renderer/fallback.js](../../app/renderer/fallback.js), applied with every state; the minimal fallback follows the `--dmd` token).
@@ -827,7 +827,7 @@ Cyber Pinball downloads them **on request only**, never automatically.
   The source is credited in the plan, on the media item's details ("Source : VPinMediaDB (github.com/superhac/vpinmediadb), téléchargé le …" (Source: VPinMediaDB (github.com/superhac/vpinmediadb), downloaded on ...), followed by the file's address) and here.
 - **Two entry points**:
   - a table's details screen > "Médias du jeu" (Game media) > "Chercher les médias" (Search for media): everything VPinMediaDB has for that game;
-  - system menu > "Médias" (Media) > "Trouver les médias manquants" (Find missing media): whatever each table is missing, one table per folder.
+  - system menu > "Tables" > "Trouver les médias manquants" (Find missing media): whatever each table is missing, one table per folder.
     From here, an existing media file is never replaced, and a table matched by its title alone is not served automatically.
 - **Matching**: by the `VPSId` in the `.info`.
   Otherwise, by the table's name (title, initials, manufacturer, year) matched against the VPS database (section "VPS database"), which supplies the identifier.
@@ -848,7 +848,7 @@ Cyber Pinball downloads them **on request only**, never automatically.
   Not taken: `cab.png` (photo of the cabinet), `fss.png` (playfield and backglass for a single screen), `realdmd*.png` (physical DMD, which Cyber Pinball does not handle).
   VPinMediaDB never has a 4:1 display, a topper, a loading video, a launch sound or rules.
 - **1k or 4k**: only the playfield image exists in 4k.
-  The "Qualité téléchargée (VPinMediaDB)" (Download quality (VPinMediaDB)) setting is in system menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode):
+  The "Qualité téléchargée (VPinMediaDB)" (Download quality (VPinMediaDB)) setting is in system menu > "Tables" > "Son et mode attente" (Sound and attract mode):
   - automatic: 4k if the playfield zone, in the active configuration, is larger than 2,560 pixels on a side;
   - or 1k, or 4k, forced.
 

@@ -13,7 +13,7 @@ Cyber Pinball names their authors without cluttering the game ([packages/core/sr
   **Start opens it directly** in the built-in browser ("Récupérer" (Fetch) window, without a claim: a downloaded file goes to the waiting list as from a VPS page); the banner gives the table, the role and all its authors, and reminds you that a thank-you is welcome.
   Close (Esc) returns to the credits.
 - **A line without a page but with more than four authors**: Start opens all its authors and what they made elsewhere on the cabinet.
-- **The community**: System menu > Cyber Pinball > "La communauté" (The community) (also from the Credits page): the cabinet's authors, from most to least present ("HauntFreaks · 8 frontons · 4 tables"; 40 at most, then "… and N more"), each with their tables; then the software and sites without which nothing works (VPX, PinMAME, B2S, Serum, PinUP Player, DOF; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
+- **The community**: System menu > "Aide et infos" (Help and info) > "Crédits" (Credits) (also from the Credits page): the cabinet's authors, from most to least present ("HauntFreaks · 8 frontons · 4 tables"; 40 at most, then "… and N more"), each with their tables; then the software and sites without which nothing works (VPX, PinMAME, B2S, Serum, PinUP Player, DOF; VPS, VPinMediaDB, VPUniverse, VPForums, IPDB, The Pinball Primer).
   This ranking only reads the `.info` files (not the tables themselves), rebuilt at most every 30 s.
 - **Attract mode**: the discreet line described in [Attract mode](game-media.md#attract-mode).
 

@@ -1034,7 +1034,7 @@ function playfieldLandscape(): boolean {
 
 /** Touches des MagnaSave au menu des tables : collection précédente (gauche), suivante (droite) ; jamais un bouton de l'interface. */
 function collectionKeys(): { previous: string[]; next: string[] } {
-  // Boutons choisis dans Menu système > Collections : ils passent avant les MagnaSave.
+  // Boutons choisis dans Menu système > Tables > Collections : ils passent avant les MagnaSave.
   const nav = [...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit];
   const chosen = collections.keys();
   if (chosen?.previous && chosen.next && !nav.includes(chosen.previous) && !nav.includes(chosen.next)) return { previous: [chosen.previous], next: [chosen.next] };
@@ -1044,7 +1044,7 @@ function collectionKeys(): { previous: string[]; next: string[] } {
 }
 
 /**
- * « Boutons des collections » (Menu système > Collections) : l'écran attend deux appuis, la
+ * « Boutons des collections » (Menu système > Tables > Collections) : l'écran attend deux appuis, la
  * collection précédente puis la suivante ; n'importe quel bouton de la borne ou touche du clavier,
  * sauf les flippers, Start et Exit (ils restent à cet écran : choisir « Remettre les MagnaSave »,
  * revenir). Une borne dont les MagnaSave ne répondent pas y choisit les siens (PinCab, 10/11/2026).
@@ -1119,7 +1119,7 @@ function captureCollectionKey(input: Input): boolean {
 function logCollectionKeys(): void {
   const keys = collectionKeys();
   const name = (codes: string[]) => (codes.length ? codes.map(keyLabel).join(', ') : 'aucune'); // i18n-ignore : journal
-  console.log(`Touches des collections : MagnaSave gauche → ${name(keys.previous)}, droit → ${name(keys.next)} ; aussi Menu système > Collections.`); // i18n-ignore : journal
+  console.log(`Touches des collections : MagnaSave gauche → ${name(keys.previous)}, droit → ${name(keys.next)} ; aussi Menu système > Tables > Collections.`); // i18n-ignore : journal
 }
 
 /** MagnaSave ou clic sur le repère : la collection voisine (ou celle cliquée dans la liste). Mode invité restreint : le cadenas. */
@@ -1875,7 +1875,7 @@ function remotePickJukebox(): void {
 /** La Communauté au téléphone : conversations, fil ouvert, Joueurs et profil ouvert ; jamais en mode invité. */
 function remoteCommunity(open: string | undefined, profile: string | undefined, room: string | undefined, page: RemotePage | undefined): RemoteCommunity {
   if (guest.active) return { closed: t('Fermée en mode invité.'), unread: 0, rows: [] };
-  if (localPlay()) return { closed: t('Retirée : la borne joue en local (Menu système › Communauté › Jouer en local).'), unread: 0, rows: [] };
+  if (localPlay()) return { closed: t('Retirée : la borne joue en local (Menu système › Communauté › Réglages de la communauté › Jouer en local).'), unread: 0, rows: [] };
   // Mes groupes en tête des conversations ; leur fil s'ouvre par « g:<id> ».
   const groups = groupsMenu.remote(open);
   const chat = chatMenu.remoteCommunity(open?.startsWith('g:') ? undefined : open);
@@ -2038,9 +2038,12 @@ const configurations = createConfigurationsMenu({
   loc,
   displays: () => observedDisplays(),
   // Son « Retour » ramène au sous-menu « Configuration de la borne », d'où l'on vient.
-  library: { ...library, openSystem: () => openCabinetSetup() },
+  library: { ...library, openSystem: () => openCabinetSetup(4) },
   relaunch: (newConfiguration) => (newConfiguration ? relaunchWizard(undefined, true) : relaunchMenu()),
 });
+// Langue de l'interface : dans Ma borne > Configuration de la borne (cabinetSetupItems, 20/11/2026) ; le
+// choix relance le menu, comme un changement de configuration. Son « Retour » ramène à la configuration.
+const languageItem = createLanguageMenu({ library: { ...library, openSystem: () => openCabinetSetup(3) }, relaunch: () => relaunchMenu() });
 // Le menu système (Exit) donne aussi accès aux réglages de VPX et à la configuration de la borne ;
 // l'arbre des rubriques (systemmenu.ts, core) dit où va chaque entrée.
 // Les démonstrations désignent les entrées par leur libellé (data-label), pas par leur rang.
@@ -2055,7 +2058,7 @@ library.provideSystemItem('vpx-settings', {
 });
 library.provideSystemItem('cabinet', {
   get detail() {
-    return t('Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet');
+    return t('Boutons, écrans, son, langue, configurations, ou l’assistant complet');
   },
   // Le sous-menu porte la pastille de ses entrées.
   get attention() {
@@ -2064,23 +2067,21 @@ library.provideSystemItem('cabinet', {
   run: () => openCabinetSetup(),
 });
 
+/** Une étape de l'assistant, refaite seule ; elle revient au menu, enregistrée ou non. */
+function wizardStepItem(id: (typeof WIZARD_STEPS)[number]['id']): SystemItem {
+  const step = WIZARD_STEPS.find((s) => s.id === id)!;
+  return { label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) };
+}
+
 /**
- * Sous-menu « Configuration de la borne » : chaque étape de l'assistant se refait
- * seule (WIZARD_STEPS, core) et revient au menu, enregistrée ou non ; puis l'assistant
- * complet, les touches par défaut et les configurations de la borne.
+ * « Boutons » de la Configuration de la borne : chaque relevé de l'assistant, puis la remise aux
+ * touches par défaut, refusée sur une borne à joystick, confirmée ailleurs (buttons-reset.ts).
  */
-function cabinetSetupItems(): SystemItem[] {
-  const steps: SystemItem[] = WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) }));
-  // « Écran du DMD » après la disposition des écrans, quand la borne a un DMD (aussi dans Borne > DMD).
-  const dmd = dmdScreenItem();
-  if (dmd) steps.splice(WIZARD_STEPS.findIndex((s) => s.id === 'disposition') + 1, 0, dmd);
-  // Remise aux touches par défaut : en dernier, refusée sur une borne à joystick, confirmée ailleurs (buttons-reset.ts).
+function buttonSetupItems(): SystemItem[] {
   const check = resetCheck();
   const backup = buttonsBackup();
   return [
-    ...steps,
-    { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
-    configurations.systemItem,
+    ...(['boutons', 'interface', 'lanceur', 'tilt'] as const).map(wizardStepItem),
     ...(backup
       ? [{ label: t('Rétablir les boutons d’avant'), detail: t('Relevé remplacé le {date} par les touches par défaut des encodeurs', { date: formatDateTime(backup.at) }), icon: 'restore' as const, run: () => restoreButtonsFromMenu() }]
       : []),
@@ -2092,6 +2093,48 @@ function cabinetSetupItems(): SystemItem[] {
       run: () => openButtonsReset(),
     },
   ];
+}
+
+/** « Écrans » de la Configuration de la borne : écrans, playfield, disposition, et l'écran du DMD quand la borne en a un. */
+function screenSetupItems(): SystemItem[] {
+  const dmd = dmdScreenItem();
+  return [...(['ecrans', 'playfield', 'disposition'] as const).map(wizardStepItem), ...(dmd ? [dmd] : [])];
+}
+
+/**
+ * Sous-menu « Configuration de la borne » (20/11/2026 : six lignes au lieu de treize) : Boutons et
+ * Écrans regroupent leurs étapes, puis le son, la langue de la borne, les configurations et
+ * l'assistant complet. Une étape qui attend l'utilisateur met sa pastille sur son groupe.
+ */
+function cabinetSetupItems(): SystemItem[] {
+  const buttonsPart = buttonSetupItems();
+  const screensPart = screenSetupItems();
+  return [
+    { label: t('Boutons'), detail: t('Boutons du jeu et de l’interface, lanceur analogique, tilt, touches par défaut'), icon: 'button', attention: buttonsPart.some((i) => i.attention), run: () => openCabinetPart('buttons') },
+    { label: t('Écrans'), detail: t('Écrans, playfield, disposition, écran du DMD'), icon: 'screens', attention: screensPart.some((i) => i.attention), run: () => openCabinetPart('screens') },
+    wizardStepItem('son'),
+    { label: languageItem.label ?? t('Langue / Language'), detail: languageItem.detail, icon: 'language', run: () => languageItem.run() },
+    configurations.systemItem,
+    { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
+  ];
+}
+
+/** Boutons ou Écrans de la Configuration de la borne ; « Retour » ramène à la configuration, sur ce groupe. */
+function openCabinetPart(part: 'buttons' | 'screens'): void {
+  const items = () => (part === 'buttons' ? buttonSetupItems() : screenSetupItems());
+  const up = () => openCabinetSetup(part === 'buttons' ? 0 : 1);
+  library.openCustom(
+    () => ({
+      heading: part === 'buttons' ? t('Boutons') : t('Écrans'),
+      icon: part === 'buttons' ? 'button' : 'screens',
+      subheading: SYSTEM_ITEMS.cabinet.label,
+      lead: t('Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.'),
+      sections: [],
+      actions: [...items().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, ...(i.tone ? { tone: i.tone } : {}), run: i.run })), { label: t('Retour'), icon: 'back', run: up }],
+      back: up,
+    }),
+    Math.max(0, items().findIndex((i) => i.attention)),
+  );
 }
 
 /**
@@ -2132,7 +2175,7 @@ library.provideSystemItem('dmd-screen', {
  * leur schéma. Start enregistre le choix (zone ajustée seulement si elle n'a pas la bonne forme,
  * withDmdKind) et relance le menu : ses fenêtres, VPinballX.ini et les PuP-Packs suivent.
  */
-function openDmdScreen(back: () => void = () => openCabinetSetup()): void {
+function openDmdScreen(back: () => void = () => openCabinetPart('screens')): void {
   library.openCustom(() => {
     const cabinet = loadCabinet(loc.dataDir);
     if (!cabinet?.roles.dmd) return { heading: t('Écran du DMD'), icon: 'dmd', sections: [], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
@@ -2190,7 +2233,7 @@ function zoneAspect(cabinet: Cabinet, screen: { widthPx: number; heightPx: numbe
   return (zone.width * screen.widthPx) / (zone.height * screen.heightPx);
 }
 
-function openCabinetSetup(): void {
+function openCabinetSetup(at?: number): void {
   library.openCustom(() => ({
     heading: SYSTEM_ITEMS.cabinet.label,
     icon: SYSTEM_ITEMS.cabinet.icon,
@@ -2198,8 +2241,8 @@ function openCabinetSetup(): void {
     sections: [],
     actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, ...(i.tone ? { tone: i.tone } : {}), run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
-    // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge).
-  }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
+    // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge), sinon sur celle d'où l'on revient.
+  }), at ?? Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
 }
 /** Enregistre les réglages des médias et les applique (état renvoyé aux fenêtres). */
 function saveMediaSettings(next: MenuMediaSettings): void {
@@ -2282,7 +2325,7 @@ const jukeboxSettings = createJukeboxSettings({
     console.log(`Juke-box : extrait d'essai sur « ${route.output || 'sortie par défaut'} ».`); // i18n-ignore : journal
   },
 });
-library.provideSystemItem('jukebox-settings', jukeboxSettings.item);
+// Les réglages du Juke-box s'ouvrent depuis son écran (jukebox-menu.ts, openSettings) : plus d'entrée à part (20/11/2026).
 
 /** Ce que la borne fait d'une sortie audio (étape « Son ») : fronton, playfield, sortie par défaut de Windows. */
 function jukeboxOutputPlace(name: string): string | undefined {
@@ -2296,8 +2339,6 @@ function jukeboxOutputPlace(name: string): string | undefined {
   if (audioOutputs()?.find((o) => o.friendlyName === name)?.isDefault) places.push(t('sortie par défaut de Windows'));
   return places.length ? places.join(', ') : undefined;
 }
-// Langue de l'interface : le choix relance le menu, comme un changement de configuration.
-library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
 // VPX d'essai (vpx-essai.ts) : seulement avec la clé développeur de cette machine, sinon l'entrée n'existe pas.
 if (trialVpxAllowedHere()) {
   library.provideSystemItem('vpx-trial', createVpxTrialMenu({ library, root: () => loc.root, dataDir: () => loc.dataDir, relaunch: () => relaunchMenu() }).item);
@@ -2674,7 +2715,7 @@ const activityMenu = createActivityMenu({
 });
 library.provideSystemItem('activity', activityMenu.item);
 /**
- * Nouveautés (Menu système > Nouveautés, news-menu.ts) : les grandes nouveautés, choisies à la main,
+ * Nouveautés (Menu système > Aide et infos > Nouveautés, news-menu.ts) : les grandes nouveautés, choisies à la main,
  * en chronologie ; « Essayer » mène à chaque fonction, son « Retour » ramenant à la nouveauté.
  */
 const newsMenu = createNewsMenu({
@@ -2898,7 +2939,7 @@ const menuDmd = createMenuDmd({
   auto: (table) => autoDmdPlace(table),
   unseen: () =>
     mediaSettings.dmd !== 'live'
-      ? t('« DMD du front-end » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).')
+      ? t('« DMD du front-end » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Tables > « Son et mode attente »).')
       : undefined,
   keys: () => {
     // Les MagnaSave lus comme sur la roue : relevés, sinon Ctrl gauche et Ctrl droit.
@@ -3247,12 +3288,17 @@ const communityMenu = createCommunityMenu({
   },
   rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back), standing: () => rankingsMenu.standing() },
   openSharing: (back) => library.runSystemItem('sharing', back),
-  // La même entrée que Menu système > Cyber Pinball, tout en bas de l'accueil : son « Retour » ramène à la Communauté.
-  ...(library.hasSystemItem('feedback')
-    ? { feedback: { detail: () => library.systemItemDetail('feedback'), open: (back: () => void) => library.runSystemItem('feedback', back) } }
-    : {}),
 });
 library.provideSystemItem('online-players', communityMenu.item);
+// L'accueil du médaillon est la rubrique Communauté (systemmenu.ts) : ses entrées venues de community-menu.ts.
+{
+  const home = communityMenu.homeItems;
+  if (home['my-level']) library.provideSystemItem('my-level', home['my-level']);
+  if (home.instant) library.provideSystemItem('instant', home.instant);
+  if (home.groups) library.provideSystemItem('groups', home.groups);
+  if (home.rooms) library.provideSystemItem('rooms', home.rooms);
+  if (home.rankings) library.provideSystemItem('rankings', home.rankings);
+}
 
 /** Un message sur une ligne : ses retours à la ligne deviennent des espaces. */
 const oneLine = (text: string) => text.replace(/\s*\n\s*/g, ' ');
@@ -3322,10 +3368,21 @@ const inboxMenu = createInboxMenu({
   open: openThread,
   links: inboxLinks,
 });
-library.provideSystemItem('friends', friendsMenu.items.friends);
+// Mes amis : les demandes reçues et « Trouver un joueur » sont dans son écran ; une demande qui attend
+// met la pastille sur la ligne (20/11/2026 : plus d'entrées à part dans la rubrique).
+library.provideSystemItem('friends', {
+  get detail() {
+    return friendsMenu.items.friends.detail;
+  },
+  get attention() {
+    return Boolean(friendsMenu.items.friends.attention || friendsMenu.items['friend-requests'].attention);
+  },
+  get tone() {
+    return friendsMenu.items.friends.tone;
+  },
+  run: () => friendsMenu.items.friends.run(),
+});
 library.provideSystemItem('game-history', friendsMenu.items['game-history']);
-library.provideSystemItem('find-player', friendsMenu.items['find-player']);
-library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', levelMenu.badgesItem);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
 // « Jouer en local » (localplay.ts), au bout de la rubrique Communauté : activé, elle ne garde que lui.
@@ -3386,7 +3443,7 @@ const vrFront = createVrFrontend({
   },
 });
 
-// « Vision 3D » (Menu système > Borne, vision3d-menu.ts) : la perspective des tables suit la tête du joueur.
+// « Vision 3D » (Menu système > Ma borne, vision3d-menu.ts) : la perspective des tables suit la tête du joueur.
 const vision3dMenu = createVision3dMenu({
   loc,
   library,
@@ -3598,7 +3655,7 @@ function applyRelaunchWatcher(): void {
 }
 
 /**
- * Menu système > « Borne » > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
+ * Menu système > « Quitter ou éteindre » > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
  * se libèrent, le bureau et les barres des tâches reviennent. Le même raccourci (global tant
  * que dure le mode bureau), le bouton du playfield dans la barre des tâches ou Alt+Tab
  * ramènent le menu sur tous ses écrans (restoreFromDesktop).
@@ -3654,7 +3711,7 @@ function restoreFromDesktop(): void {
 }
 
 /**
- * Menu système > « Borne » > « Configuration de la borne » > « Touches par défaut des encodeurs » : ce
+ * Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Touches par défaut des encodeurs » : ce
  * qu'elle fait, puis Annuler (présélectionné) ou Remplacer. Sur une borne aux boutons de joystick, la
  * raison du refus et l'étape « Boutons » à la place : ses boutons ne répondraient plus.
  */
@@ -3697,7 +3754,7 @@ function resetButtonsFromMenu(): void {
   broadcast();
 }
 
-/** Menu système > « Borne » > « Configuration de la borne » > « Rétablir les boutons d’avant » : le relevé gardé par la dernière remise. */
+/** Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Rétablir les boutons d’avant » : le relevé gardé par la dernière remise. */
 function restoreButtonsFromMenu(): void {
   const reset = restoreButtons();
   if (!reset) return;
@@ -3760,10 +3817,8 @@ export function startFrontend(): void {
     // Pastille des téléchargements.
     else if (action.type === 'downloads') openFromCorner((back) => library.downloads.open(undefined, back));
     // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
-    else if (action.type === 'friends' || action.type === 'friend-requests') {
-      const id = action.type;
-      openFromCorner((back) => library.runSystemItem(id, back));
-    }
+    else if (action.type === 'friends') openFromCorner((back) => library.runSystemItem('friends', back));
+    else if (action.type === 'friend-requests') openFromCorner((back) => friendsMenu.openRequests(back));
     // Carte du joueur (coin d'état) : Mon niveau ; pastille des badges : Mes badges.
     else if (action.type === 'level') openFromCorner((back) => levelMenu.open(back));
     else if (action.type === 'badges') openFromCorner((back) => levelMenu.openBadges(back));
@@ -4058,7 +4113,7 @@ export function startFrontend(): void {
   const orientationProblems = takeOrientationProblems();
   if (orientationProblems.length) showBanner(orientationProblems, 'cabinet');
   const legacy = choose ? undefined : legacyDesktopTurned();
-  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(tLater('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'), 'cabinet');
+  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(tLater('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Ma borne > Configuration de la borne > Écrans > Écran du DMD.'), 'cabinet');
   if (selection?.previous && selection.configuration) showBanner(tLater('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }), 'cabinet');
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
@@ -5333,7 +5388,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           status: t('Partie dans le casque'),
           text: t('Mettez le casque : la table démarre quand il est sur la tête'),
           // Une consigne par ligne (essai.30 : les deux sur une ligne, coupée avant « : », illisible).
-          keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Borne > Réalité virtuelle')],
+          keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Ma borne > VR et vision 3D')],
         }
       : undefined;
   if (vrFront.vrWearHint) console.log(`Réalité virtuelle (${played.id}) : casque pas sur la tête au lancement ; la borne dit de le mettre.`); // i18n-ignore : journal
@@ -6204,7 +6259,7 @@ function vpxReady(done: string): void {
   const joysticks = retryJoysticks();
   const devices = joysticks.state === 'ready' ? joysticks.devices : [];
   const redo = joystickButtonsUnrecorded(loadCabinet(loc.dataDir)?.buttons, devices.length)
-    ? [t('Joystick lu : {names}. Relevez ses boutons dans Menu système > « Borne » > « Configuration de la borne » > « Boutons du jeu », puis « Lanceur analogique ».', { names: devices.map((d) => d.name || d.id).join(', ') })]
+    ? [t('Joystick lu : {names}. Relevez ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».', { names: devices.map((d) => d.name || d.id).join(', ') })]
     : [];
   if (tables.length) state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines: [done, ...redo, t('Start ou Exit : aller aux tables.')] } };
   // Pas encore de table : on enchaîne sur l'ajout.
@@ -6335,7 +6390,7 @@ async function checkFirewallAtStart(): Promise<void> {
   // En jeu local, rien à demander : le réseau des bornes est arrêté et « Partage et réseau » retiré.
   if (socialFirewall.simulated || !report.problems.length || localPlay()) return;
   if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
-  else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Communauté > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
+  else showBanner(tLater('Pare-feu de Windows : {reason}. Menu système > Communauté > Réglages de la communauté > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
 }
 
 /**

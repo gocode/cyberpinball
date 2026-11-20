@@ -56,7 +56,7 @@ export interface LevelMenu {
   open(back: () => void): void;
   /** « Mes badges », son « Retour » vers `back`. */
   openBadges(back: () => void): void;
-  /** Menu système > Mon compte > Mes badges. */
+  /** Menu système > Communauté > Mon profil > Mes badges. */
   badgesItem: ProvidedSystemItem;
   /** Ce que dit l'entrée « Mon niveau » (accueil Communauté) : palier, niveau, XP restants. */
   detail(): string;

@@ -13,6 +13,6 @@ Elles ne restreignent pas la licence GPL du code.
   « J'accepte » l'enregistre et reprend le démarrage ; « Je refuse » demande confirmation, puis ferme Cyber Pinball.
   Exit n'y fait que revenir à la page précédente.
   Pas en mode invité ni pendant un essai sans opérateur (sauf `CYBERPINBALL_CONDITIONS=1`).
-- **À relire** dans Menu système > Cyber Pinball > Conditions d’utilisation, avec la date de l'acceptation.
+- **À relire** dans Menu système > Aide et infos > Conditions d’utilisation, avec la date de l'acceptation.
 
 Garde-fou : [terms.test.ts](../../packages/core/src/test/terms.test.ts) vérifie le texte dans les deux langues, sa forme pour l'installeur, et que l'application relit le fichier écrit par l'installeur.

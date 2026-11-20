@@ -1,4 +1,4 @@
-// Menu système > Borne > Télécommande du téléphone (phone-remote.ts) : l'écran où le QR code vit
+// Menu système > Ma borne > Télécommande du téléphone (phone-remote.ts) : l'écran où le QR code vit
 // hors du navigateur intégré. En grand à gauche, le QR à scanner, puis le code à comparer (Start
 // accepte, Exit refuse), puis le téléphone connecté ; à droite, ce que fait le téléphone, l'envoi en
 // cours, Déconnecter. Indisponible (pare-feu, pas de réseau local) : le bloc reste, grisé avec la

@@ -2,7 +2,7 @@
 
 ## Cabinet health
 
-System menu > "Borne" (Cabinet) > "Santé de la borne" (Cabinet health) gathers on one page what other screens already know, to see at a glance what prevents playing or deserves a look.
+System menu > "Ma borne" (My cabinet) > "Santé et sauvegardes" (Health and backups) > "Santé de la borne" (Cabinet health) gathers on one page what other screens already know, to see at a glance what prevents playing or deserves a look.
 Each line has a state — **OK** (tick, green), **À vérifier** (To check: exclamation mark, amber), **Bloquant** (Blocking: cross, red), never colour alone — and opens, with Start or a click, the screen that repairs it; its "Retour" (Back) returns to the page.
 The summary at the top counts the lines in each state and says how old the check is.
 

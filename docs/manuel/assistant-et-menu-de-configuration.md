@@ -15,7 +15,7 @@ Les étapes « Lanceur » et « Tilt » ont « Revenir » en plus de leurs propr
 Un clic passe par le même traitement que l'appui du bouton de la borne, sous un code qu'aucun clavier ni joystick ne peut envoyer : il fait exactement la même chose.
 Toute la première configuration se fait ainsi depuis un PC, en bureau à distance compris ; seul le relevé des boutons demande d'appuyer sur les vrais boutons de la borne.
 
-**Menu système (Exit, Tab ou ⚙) > « Borne » > « Configuration de la borne »** regroupe tout ce qui règle la borne.
+**Menu système (Exit, Tab ou ⚙) > « Ma borne » > « Configuration de la borne »** regroupe tout ce qui règle la borne.
 Chaque étape s'y refait seule et revient à l'écran des tables, enregistrée ou non :
 
 | Entrée | Option | Ce qui est refait | Clés de `VPinballX.ini` écrites |

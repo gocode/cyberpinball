@@ -276,11 +276,16 @@ test('les écrans de l’assistant affichent toujours le bouton « Quitter sans 
 
 test('menu système : chaque étape seule dans « Configuration de la borne »', () => {
   const frontend = frontendSource();
-  // L'entrée vient de l'arbre du menu système (systemmenu.ts), rubrique Borne ; son sous-menu, de frontend.ts.
+  // L'entrée vient de l'arbre du menu système (systemmenu.ts), rubrique Ma borne ; son sous-menu, de frontend.ts.
   assert.equal(SYSTEM_ITEMS.cabinet.label, 'Configuration de la borne');
   assert.deepEqual(systemPathOf('cabinet'), ['borne']);
   assert.match(frontend, /library\.provideSystemItem\('cabinet'/);
-  assert.match(frontend, /WIZARD_STEPS\.map\(\(step\) => \(\{ label: step\.label, detail: step\.detail, icon: step\.icon, run: \(\) => relaunchWizard\(step\.flag\) \}\)\)/);
+  assert.match(frontend, /const step = WIZARD_STEPS\.find\(\(s\) => s\.id === id\)!;\s*return \{ label: step\.label, detail: step\.detail, icon: step\.icon, run: \(\) => relaunchWizard\(step\.flag\) \};/);
+  // Six lignes depuis le 20/11/2026 : chaque étape rangée sous Boutons, Écrans, ou seule (le son).
+  assert.match(frontend, /\(\['boutons', 'interface', 'lanceur', 'tilt'\] as const\)\.map\(wizardStepItem\)/);
+  assert.match(frontend, /\(\['ecrans', 'playfield', 'disposition'\] as const\)\.map\(wizardStepItem\)/);
+  assert.match(frontend, /wizardStepItem\('son'\)/);
+  assert.deepEqual(WIZARD_STEPS.map((s) => s.id).sort(), ['boutons', 'disposition', 'ecrans', 'interface', 'lanceur', 'playfield', 'son', 'tilt'], 'une étape ajoutée doit trouver sa place dans la Configuration de la borne');
   // Plus d'entrée d'étape directement dans le menu système.
   assert.doesNotMatch(frontend, /relaunchWizard\('(boutons|disposition)'\)/);
 });

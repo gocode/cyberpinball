@@ -1,4 +1,4 @@
-// Menu système > Mon compte > Mon avatar (packages/core/src/avatar.ts) : l'image que tous les joueurs
+// Menu système > Communauté > Mon profil > Modifier mon profil > Mon avatar (packages/core/src/avatar.ts) : l'image que tous les joueurs
 // voient à côté de votre nom, partout (Mes amis, Joueurs en ligne, salons, classements, profil
 // public, votre fiche, les demandes, l'historique des parties, la partie en direct, les
 // notifications ; avatar public, 15/11/2026). Pour l'instant, toujours une image à soi : une

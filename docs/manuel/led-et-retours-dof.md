@@ -50,7 +50,7 @@ Le numéro d'unité d'un Pinscape natif ou d'un DudesCab est réglé sur la cart
 
 Le dossier est **commun à tout VPX 10.8 du PC** (un autre front-end de borne compris) : c'est la même borne, les mêmes contrôleurs.
 
-**Menu système > « Borne » > « LED et retours (DOF) »** ([app/src/dof-menu.ts](../../app/src/dof-menu.ts)) :
+**Menu système > « Ma borne » > « DMD et LED » > « LED et retours (DOF) »** ([app/src/dof-menu.ts](../../app/src/dof-menu.ts)) :
 
 - **Contrôleurs** : ceux reconnus à l'USB (avec le numéro d'ini qu'ils lisent) et ceux seulement déclarés dans Cabinet.xml ;
 - **Configuration** : les ini trouvés et leur dossier, le nombre de ROM configurées, Cabinet.xml (écrit par Cyber Pinball ou à la main, nombre de bandes) ;

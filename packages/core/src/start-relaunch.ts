@@ -81,7 +81,7 @@ export function relaunchWatcherPidFile(dataDir: string): string {
   return path.join(relaunchDir(dataDir), 'veilleur.pid');
 }
 
-/** Choix de l'utilisateur (menu système > « Borne » > « Relance par Start »). */
+/** Choix de l'utilisateur (menu système > « Ma borne » > « Démarrage et accès » > « Relance par Start »). */
 export function relaunchSettingsFile(dataDir: string): string {
   return path.join(relaunchDir(dataDir), 'reglage.json');
 }
