@@ -638,6 +638,16 @@ const TRAPS: Trap[] = [
     },
     ctx: (folder) => ({ logsDir: logsOf(folder) }),
   },
+  // Écran qui bride (slowtable.ts) : backglass à 50 Hz, la partie visée à 120 s'est calée sur 50 (20/11/2026).
+  {
+    code: 'screenCap',
+    arm: (folder) => {
+      const vpx = fs.readdirSync(folder).find((f) => f.toLowerCase().endsWith('.vpx'))!;
+      const capped = parseVpxCadence('Cadence end: frames=20374 duration=408.0s fps=49.9 p50=17ms p95=27ms p99=42ms max=125ms late=12.9% stalls=34 worst10s=49.1fps')!;
+      recordGameCadence(logsOf(folder), path.join(folder, vpx), capped, 119.91, new Date(), false, [], { display: '32W_LCD_TV', hz: 50 });
+    },
+    ctx: (folder) => ({ logsDir: logsOf(folder) }),
+  },
   // Volume de la ROM (romvolume.ts) : réglé à 6 sur 31 hors de Cyber Pinball (mémoire réelle de Monster Bash, WPC).
   {
     code: 'lowRomVolume',

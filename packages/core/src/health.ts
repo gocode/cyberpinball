@@ -268,10 +268,11 @@ export function diskSpace(dir: string): { free: number; total: number } | undefi
 
 /**
  * Constats du médecin qui, sans empêcher de jouer, demandent un coup d'œil : la table a planté, son script est
- * illisible, sa ROM joue trop bas, elle rame, ses vidéos du DMD la figent, elle a été enregistrée par un VPX plus
- * récent que celui qui la joue (la partie est refusée avant de lancer VPX, avec le moyen d'en choisir un autre).
+ * illisible, sa ROM joue trop bas, elle rame, un écran annexe plus lent bride ses parties, ses vidéos du DMD la
+ * figent, elle a été enregistrée par un VPX plus récent que celui qui la joue (la partie est refusée avant de lancer
+ * VPX, avec le moyen d'en choisir un autre).
  */
-export const HEALTH_CHECK_FINDINGS = ['crashReport', 'scriptUnreadable', 'lowRomVolume', 'slowTable', 'dmdVideosHeavy', 'tableTooNew'] as const satisfies readonly Finding['code'][];
+export const HEALTH_CHECK_FINDINGS = ['crashReport', 'scriptUnreadable', 'lowRomVolume', 'slowTable', 'screenCap', 'dmdVideosHeavy', 'tableTooNew'] as const satisfies readonly Finding['code'][];
 
 /**
  * Tables à revoir d'après les constats du médecin (`findings` undefined : script jamais lu).

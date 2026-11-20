@@ -210,6 +210,7 @@ export const messages: Record<string, string> = {
   "{role} à {hz}": "{role} at {hz}",
   "{screen} à {hz}, Windows propose {max}": "{screen} at {hz}, Windows offers {max}",
   "La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).": "The ball is smoother at {max}: choose it in the Windows display settings (Advanced display).",
+  "Tant que VPX dessine aussi sur cet écran, toute la partie suit sa fréquence, playfield compris.": "As long as VPX also draws on this screen, the whole game follows its refresh rate, playfield included.",
   "{screen} à {hz}, il annonce jusqu’à {max}": "{screen} at {hz}, it advertises up to {max}",
   "Windows ne propose pas plus à cette définition : vérifiez le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.": "Windows offers nothing higher at this resolution: check the port and the cable. Over HDMI, some cables and cards cap 4K at 60 Hz; a DisplayPort cable often avoids it.",
   "Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.": "Windows offers nothing higher at this resolution: check the port, the cable and the screen setting.",

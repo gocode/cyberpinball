@@ -137,6 +137,67 @@ export function readVpxTargetFps(lines: readonly string[]): number | undefined {
   return target;
 }
 
+// --- Écran annexe qui bride la partie ------------------------------------------------------------------------------
+//
+// VPX 10.8.1 (BGFX) dessine toutes ses fenêtres (playfield, backglass du plugin B2S, ScoreView, topper) dans une seule
+// chaîne de rendu, présentées ensemble à chaque image : l'écran le plus lent impose sa fréquence au playfield.
+// Rapports du 20/11/2026 : playfield à 120 Hz, backglass à 50 Hz → 51 images/s sur toutes les tables à backglass, et
+// 119 sur les autres ; autre borne, écrans annexes à 60 Hz → exactement 60. Le médecin disait « la table rame » : la
+// table n'y était pour rien. VPX le corrige après la 10.8.1-5436 (commits d73557d et f832180 de novembre 2026 : chaque
+// fenêtre annexe suit son propre écran). VPX écrit chaque fenêtre au lancement :
+//   Window #1 (1920x1080) was created on display 32W_LCD_TV [1920x1080 50Hz SDL_PIXELFORMAT_XRGB8888]
+
+/** Une fenêtre que VPX a ouverte pour la partie, et la fréquence de son écran. */
+export interface VpxWindow {
+  display: string;
+  hz: number;
+  playfield: boolean;
+}
+
+const WINDOW = /Window #\d+ \(\d+x\d+\) was created on display (.+?) \[\d+x\d+ ([\d.]+)Hz/;
+
+/**
+ * Les fenêtres de la partie. Le playfield est celle que VPX crée juste avant de dire sa synchronisation (il la règle
+ * sur cet écran) ; sans cette ligne (casque), la première.
+ */
+export function readVpxWindows(lines: readonly string[]): VpxWindow[] {
+  const out: VpxWindow[] = [];
+  let found = false;
+  for (const line of lines) {
+    const w = WINDOW.exec(line);
+    if (w) out.push({ display: w[1]!, hz: Number(w[2]), playfield: false });
+    else if (!found && out.length && line.includes('Synchronization mode: ')) {
+      out[out.length - 1]!.playfield = true;
+      found = true;
+    }
+  }
+  if (out.length && !found) out[0]!.playfield = true;
+  return out;
+}
+
+/** L'écran annexe dont la fréquence a fixé celle de la partie. */
+export interface ScreenCap {
+  display: string;
+  hz: number;
+}
+
+/** La partie suit un écran annexe quand sa cadence moyenne tombe dans cette marge autour de la fréquence de l'écran. */
+export const CAP_LOW = 0.85;
+export const CAP_HIGH = 1.1;
+
+/**
+ * L'écran annexe (backglass, ScoreView, topper) plus lent que la cadence visée, sur lequel la partie s'est calée.
+ * undefined : aucun écran annexe plus lent, ou une cadence sans rapport avec sa fréquence (la table rame vraiment).
+ */
+export function readScreenCap(lines: readonly string[], c: VpxCadence | undefined, targetFps: number | undefined): ScreenCap | undefined {
+  if (!c || !targetFps || targetFps <= 0) return undefined;
+  const slower = readVpxWindows(lines)
+    .filter((w) => !w.playfield && w.hz > 0 && w.hz < targetFps * 0.95)
+    .sort((a, b) => a.hz - b.hz);
+  const w = slower.find((s) => c.fps >= s.hz * CAP_LOW && c.fps <= s.hz * CAP_HIGH);
+  return w ? { display: w.display, hz: w.hz } : undefined;
+}
+
 /** Ce que la cadence dit de la partie. */
 export interface CadenceVerdict {
   /** La partie n'a pas tenu la cadence visée (moyenne, pire moment ou images en retard). */
@@ -155,9 +216,14 @@ export const STALLS_SEEN = 3;
 /** Partie trop courte pour juger (premières secondes non comptées) : sous 20 s. */
 export const CADENCE_MIN_S = 20;
 
-export function cadenceVerdict(c: VpxCadence, targetFps = 60): CadenceVerdict | undefined {
+/**
+ * Partie bridée par un écran annexe : jugée sur la fréquence de cet écran, sans les images en retard (calées sur deux
+ * fréquences, les images alternent deux durées : la moitié paraît « en retard » sur la médiane sans l'être).
+ */
+export function cadenceVerdict(c: VpxCadence, targetFps = 60, cap?: ScreenCap): CadenceVerdict | undefined {
   if (c.durationS < CADENCE_MIN_S || targetFps <= 0) return undefined;
-  const slow = c.fps < targetFps * SLOW_AVERAGE || (c.worst10s !== undefined && c.worst10s < targetFps * SLOW_WORST) || c.late >= SLOW_LATE;
+  const goal = cap ? cap.hz : targetFps;
+  const slow = c.fps < goal * SLOW_AVERAGE || (c.worst10s !== undefined && c.worst10s < goal * SLOW_WORST) || (!cap && c.late >= SLOW_LATE);
   const stutters = c.stalls >= STALLS_SEEN && c.stalls / (c.durationS / 60) >= 1;
   return { slow, stutters };
 }
@@ -192,6 +258,8 @@ export interface TableCadenceEntry {
   vr?: boolean;
   /** Autres programmes de borne ouverts pendant la partie (programsDuringGame, coexistence.ts). */
   others?: string[];
+  /** Écran annexe sur lequel la partie s'est calée (readScreenCap) : slow et stutters sont jugés sur sa fréquence. */
+  cap?: ScreenCap;
 }
 
 interface CadenceLog {
@@ -218,8 +286,8 @@ export function tableCadence(logsDir: string, file: string): TableCadenceEntry[]
 }
 
 /** Range le bilan d'une partie ; undefined (rien d'écrit) quand la partie était trop courte pour juger. */
-export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, targetFps: number | undefined, at = new Date(), vr = false, others: string[] = []): TableCadenceEntry | undefined {
-  const verdict = cadenceVerdict(c, targetFps ?? 60);
+export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, targetFps: number | undefined, at = new Date(), vr = false, others: string[] = [], cap?: ScreenCap): TableCadenceEntry | undefined {
+  const verdict = cadenceVerdict(c, targetFps ?? 60, cap);
   if (!verdict) return undefined;
   const entry: TableCadenceEntry = {
     file,
@@ -236,6 +304,7 @@ export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, 
     stutters: verdict.stutters,
     ...(vr ? { vr: true } : {}),
     ...(others.length ? { others } : {}),
+    ...(cap ? { cap } : {}),
   };
   const rest = readCadenceLog(logsDir).filter((g) => !sameFile(g.file, file));
   const mine = [entry, ...tableCadence(logsDir, file)].slice(0, CADENCE_PER_TABLE);
@@ -251,9 +320,10 @@ export function recordGameCadence(logsDir: string, file: string, c: VpxCadence, 
 const fr = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 /** La ligne du journal de la borne (en français, pour le diagnostic à distance). */
-export function cadenceJournal(table: string, c: VpxCadence, targetFps: number | undefined, others: readonly string[] = []): string {
-  const verdict = cadenceVerdict(c, targetFps ?? 60);
-  const judged = !verdict ? 'trop courte pour juger' : verdict.slow ? (verdict.stutters ? 'RAME, avec des à-coups' : 'RAME') : verdict.stutters ? 'À-COUPS' : 'tenue'; // i18n-ignore : journal
+export function cadenceJournal(table: string, c: VpxCadence, targetFps: number | undefined, others: readonly string[] = [], cap?: ScreenCap): string {
+  const verdict = cadenceVerdict(c, targetFps ?? 60, cap);
+  const base = !verdict ? 'trop courte pour juger' : verdict.slow ? (verdict.stutters ? 'RAME, avec des à-coups' : 'RAME') : verdict.stutters ? 'À-COUPS' : 'tenue'; // i18n-ignore : journal
+  const judged = cap ? `BRIDÉE par l'écran « ${cap.display} » à ${fr(cap.hz)} Hz (${base})` : base; // i18n-ignore : journal
   const target = targetFps ? `${fr(targetFps)} visées` : 'une cible inconnue'; // i18n-ignore : journal
   const worst = c.worst10s !== undefined ? `, pire fenêtre de 10 s à ${fr(c.worst10s)} images/s` : ''; // i18n-ignore : journal
   const step = c.phase === 'running' ? ' (bilan d’étape : VPX arrêté avant la fin)' : ''; // i18n-ignore : journal

@@ -16,7 +16,10 @@ const num = (n: number) => formatNumber(n, { maximumFractionDigits: 1 });
 export function slowTableFinding(logsDir: string | undefined, tableFile: string): Finding | undefined {
   if (!logsDir) return undefined;
   const last: TableCadenceEntry | undefined = tableCadence(logsDir, tableFile)[0];
-  if (!last || (!last.slow && !last.stutters)) return undefined;
+  if (!last) return undefined;
+  // Calée sur un écran annexe plus lent (vpxcadence.ts, readScreenCap) : c'est l'écran qui bride, pas la table.
+  if (last.cap) return screenCapFinding(last, last.cap);
+  if (!last.slow && !last.stutters) return undefined;
   const target = last.targetFps ?? 60;
   const parts = [
     t('À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.', { date: formatDateTime(new Date(last.at)), fps: num(last.fps), target: num(target) }),
@@ -33,6 +36,25 @@ export function slowTableFinding(logsDir: string | undefined, tableFile: string)
     code: 'slowTable',
     severity: 'warning',
     title: last.slow ? t('La table rame sur cette borne') : t('La table saccade sur cette borne'),
+    detail: parts.join(' '),
+  };
+}
+
+/**
+ * La dernière partie s'est calée sur la fréquence d'un écran annexe (backglass, ScoreView, topper) : VPX 10.8.1 présente
+ * toutes ses fenêtres ensemble, le playfield attend l'écran le plus lent. Le remède est la fréquence de cet écran.
+ */
+function screenCapFinding(last: TableCadenceEntry, cap: NonNullable<TableCadenceEntry['cap']>): Finding {
+  const parts = [
+    t('À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.', { date: formatDateTime(new Date(last.at)), fps: num(last.fps), target: num(last.targetFps ?? 60) }),
+    t('La table n’y est pour rien : VPX dessine aussi sur l’écran « {screen} », réglé à {hz} Hz, et sa version 10.8.1 cale toute la partie sur l’écran le plus lent, playfield compris.', { screen: cap.display, hz: num(cap.hz) }),
+    t('Choisissez la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.'),
+  ];
+  if (last.stutters) parts.push(tn(last.stalls, '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', '{n} arrêts de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', { n: last.stalls, max: last.max }));
+  return {
+    code: 'screenCap',
+    severity: 'warning',
+    title: t('Partie limitée à {hz} images par seconde par l’écran « {screen} »', { hz: num(cap.hz), screen: cap.display }),
     detail: parts.join(' '),
   };
 }

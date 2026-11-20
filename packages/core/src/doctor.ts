@@ -183,6 +183,7 @@ export const FINDING_CODES = [
   'dofNoPinmame',
   'dofLocalIni',
   'slowTable',
+  'screenCap',
   'lowRomVolume',
   'tableAudioMuted',
   'musicMissing',

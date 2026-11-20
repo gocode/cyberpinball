@@ -129,6 +129,11 @@ export const messages: Record<string, string> = {
   'Ne compiler chaque texte qu’une fois (dans {file})': 'Compile each text only once (in {file})',
   'La table rame sur cette borne': 'The table is sluggish on this cabinet',
   'La table saccade sur cette borne': 'The table stutters on this cabinet',
+  'Partie limitée à {hz} images par seconde par l’écran « {screen} »': 'Game limited to {hz} frames per second by the “{screen}” screen',
+  'La table n’y est pour rien : VPX dessine aussi sur l’écran « {screen} », réglé à {hz} Hz, et sa version 10.8.1 cale toute la partie sur l’écran le plus lent, playfield compris.':
+    'The table is not to blame: VPX also draws on the “{screen}” screen, set to {hz} Hz, and its version 10.8.1 paces the whole game on the slowest screen, playfield included.',
+  'Choisissez la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.':
+    'Choose the highest refresh rate of this screen in the Windows display settings (Advanced display). An upcoming version of VPX removes this limit.',
   'À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.': 'In the last game ({date}), VPX held {fps} frames per second for a target of {target}.',
   'Au pire moment : {worst} images par seconde.': 'At its worst: {worst} frames per second.',
   '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).': '{n} freeze of the picture of at least a tenth of a second (longest: {max} ms).',

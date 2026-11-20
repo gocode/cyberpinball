@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- A game paced by a screen slower than the playfield (backglass at 50 or 60 Hz with a 120 Hz playfield) is no longer reported as "The table is sluggish": the diagnosis names the screen that limits the game and says how to raise its refresh rate. VPX 10.8.1 draws all its screens at the pace of the slowest one.
 - Future Pinball: an archive holding only libraries (.fpl), such as a table's sounds, voices and music shipped separately (Ghostbusters), is put into the game's Libraries folder. Before, it stayed unfiled and the table ran without them.
 - Future Pinball: a table's PuP-Pack ("PinEvent" tables, such as Retroflair BAM Edition) finally shows in its place. PinUP Player placed its windows from its own setting, written for another screen layout: its backglass covered 90% of the game's, shifted, and its DMD fell off every screen. During the game, Cyber Pinball puts each PuP-Pack window on its role's screen (backglass, FullDMD, topper) and goes behind it; PinUP's setting is left untouched.
 - Backglass: on the table screen, the backglass picture fills its whole screen, as during the game (Visual Pinball's B2S, Pinball FX3). A picture narrower than the screen (4:3 on a 16:9 screen) no longer has black bars around it.

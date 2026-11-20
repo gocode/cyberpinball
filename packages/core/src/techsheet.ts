@@ -453,7 +453,7 @@ function displaysBlock(f: TechFacts): TechBlock {
   const displays = [...(f.displays ?? [])].sort((a, b) => (a.role ? order.indexOf(a.role) : 9) - (b.role ? order.indexOf(b.role) : 9));
   const rows: TechRow[] = displays.map((d) => {
     const gap = refreshGap(d);
-    if (gap) notes.push(refreshNote(d, gap));
+    if (gap) notes.push(refreshNote(d, gap, playfieldHz(displays)));
     return {
       label: displayName(d),
       value: joined([d.role ? d.name : undefined, d.inches ? `${formatNumber(d.inches, { maximumFractionDigits: 1 })}″` : undefined, pixels(d.width, d.height), d.hz ? hz(d.hz) : undefined]),
@@ -481,23 +481,29 @@ function displaysBlock(f: TechFacts): TechBlock {
 }
 
 /** Pourquoi un écran est sous sa fréquence, et quoi faire, sans affirmer ce qui n'est pas établi. */
-export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max: number }): TechBlock['notes'][number] {
+export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max: number }, playfieldHz?: number): TechBlock['notes'][number] {
+  // Écran annexe plus lent que le playfield : VPX 10.8.1 présente toutes ses fenêtres ensemble, la partie entière suit
+  // l'écran le plus lent dès que VPX y dessine (backglass B2S, ScoreView ; vpxcadence.ts, readScreenCap).
+  const capping = d.role && d.role !== 'playfield' && d.hz && playfieldHz && playfieldHz > d.hz + 1 ? ' ' + t('Tant que VPX dessine aussi sur cet écran, toute la partie suit sa fréquence, playfield compris.') : '';
   if (gap.kind === 'windows') {
     return {
       state: 'check',
       title: t('{screen} à {hz}, Windows propose {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }),
-      detail: t('La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }),
+      detail: t('La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }) + capping,
     };
   }
   return {
     state: 'check',
     title: t('{screen} à {hz}, il annonce jusqu’à {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }),
     detail:
-      d.connection === 'hdmi'
+      (d.connection === 'hdmi'
         ? t('Windows ne propose pas plus à cette définition : vérifiez le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.')
-        : t('Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.'),
+        : t('Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.')) + capping,
   };
 }
+
+/** Fréquence de l'écran du playfield, pour dire qu'un écran annexe plus lent bride la partie. */
+const playfieldHz = (displays: readonly TechDisplay[]) => displays.find((d) => d.role === 'playfield')?.hz;
 
 function controllersBlock(f: TechFacts): TechBlock {
   const c = f.controllers;
@@ -598,7 +604,7 @@ export function pcLines(facts: PcHealthFacts, now = Date.now()): HealthLine[] {
   const go = (block: TechBlockId) => t('Fiche technique : {block}', { block: blockTitle(block) });
   const gaps = facts.displays.map((d) => ({ d, gap: refreshGap(d) })).filter((x) => x.gap);
   for (const { d, gap } of gaps) {
-    const note = refreshNote(d, gap!);
+    const note = refreshNote(d, gap!, playfieldHz(facts.displays));
     lines.push({ check: 'pc', state: 'check', title: note.title, detail: note.detail, go: go('displays'), target: SHEET('displays') });
   }
   if (!gaps.length && facts.displays.some((d) => d.hz)) lines.push({ check: 'pc', state: 'ok', title: t('Écrans à la fréquence la plus haute proposée'), go: go('displays'), target: SHEET('displays') });

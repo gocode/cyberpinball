@@ -3,7 +3,7 @@
 // qu'une table rame sur cette borne. Le plugin « CyberPinballDmd » écrit le bilan (cadence.h), dans toutes les parties.
 
 import * as fs from 'node:fs';
-import { cadenceJournal, flexAssetsJournal, readVpxCadence, readVpxTargetFps, recordGameCadence, scriptErrorsJournal, stallPlaceJournal, vpxAudioJournal } from '@cyberpinball/core';
+import { cadenceJournal, flexAssetsJournal, readScreenCap, readVpxCadence, readVpxTargetFps, recordGameCadence, scriptErrorsJournal, stallPlaceJournal, vpxAudioJournal } from '@cyberpinball/core';
 
 /** Taille du journal de VPX avant la partie : ce qu'il écrira de cette partie commence là. */
 export function vpxLogSize(file: string): number {
@@ -49,12 +49,14 @@ export function noteGameCadence(opts: { logsDir: string; tableFile: string; tabl
     return;
   }
   const target = readVpxTargetFps(lines);
-  console.log(cadenceJournal(opts.tableId, cadence, target, opts.others));
+  // Backglass ou autre écran annexe plus lent que le playfield : VPX 10.8.1 cale toute la partie dessus.
+  const cap = readScreenCap(lines, cadence, target);
+  console.log(cadenceJournal(opts.tableId, cadence, target, opts.others, cap));
   // Où VPX attendait pendant les à-coups (relevé du plugin du DMD) : la cause, lisible dans le rapport de la borne.
   const place = stallPlaceJournal(opts.tableId, lines);
   if (place) console.log(place);
   try {
-    recordGameCadence(opts.logsDir, opts.tableFile, cadence, target, new Date(), opts.vr, opts.others);
+    recordGameCadence(opts.logsDir, opts.tableFile, cadence, target, new Date(), opts.vr, opts.others, cap);
   } catch (error) {
     console.warn(`Cadence de la partie (${opts.tableId}) : relevé pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
   }
