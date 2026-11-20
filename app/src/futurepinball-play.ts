@@ -141,6 +141,25 @@ export function placeDmdMirror(pid: number | undefined, dmdScreen: Rect | undefi
   return setBounds(dmd, to) ? to : undefined;
 }
 
+/** Titre de la fenêtre du DMD virtuel de dmdext (son DmdDevice64.dll, chargé par Pinball FX, VPinMAME…). */
+export const DMDEXT_VIRTUAL_TITLE = 'Virtual DMD';
+
+/**
+ * DMD virtuel de dmdext chargé par le jeu lui-même (Pinball FX : DmdDevice64.dll de VPinMAME, avec sa
+ * colorisation et l'envoi aux PuP-Packs) posé sur l'écran DMD tel qu'il est, comme le DMD recopié de
+ * Future Pinball (dmdMirrorPlacement). Essai du 20/11/2026 : DmdDevice.ini le plaçait sur le fronton
+ * (5828, 322). Reconnu à son titre (le processus est celui du jeu, dont la plus grande fenêtre est le
+ * plateau). Rend la place donnée.
+ */
+export function placeVirtualDmd(dmdScreen: Rect | undefined, windows: () => WindowInfo[], setBounds: (w: WindowInfo, r: Rect) => boolean): Rect | undefined {
+  if (!dmdScreen) return undefined;
+  const dmd = windows().find((w) => w.visible && w.title === DMDEXT_VIRTUAL_TITLE && w.rect.width > 0 && w.rect.height > 0);
+  if (!dmd) return undefined;
+  const to = dmdMirrorPlacement(dmd.rect, dmdScreen);
+  if (!to) return undefined;
+  return setBounds(dmd, to) ? to : undefined;
+}
+
 /**
  * Boutons de joystick de la borne et les touches que Future Pinball attend pour leur rôle, d'après ses
  * préférences (registre de l'utilisateur ; ses réglages d'origine si elles manquent). Pour le relais

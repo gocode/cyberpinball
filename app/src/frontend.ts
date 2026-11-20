@@ -317,10 +317,11 @@ import {
   applyPinballFxRotation,
   applyPinballFxCabinet,
   pinballFxCabinetLayout,
+  mediaKind,
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
@@ -336,8 +337,8 @@ import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrit
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
-import { placePinballFxBackglass } from './pinballfx-backglass';
-import { preparePinballFx3Backglass } from './pinballfx3-backglass';
+import { placePinballFxBackglass, placePinballFxHomeBackglass } from './pinballfx-backglass';
+import { fetchAllPinballFx3Backglasses, preparePinballFx3Backglass } from './pinballfx3-backglass';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createFeedbackService } from './feedback-service';
@@ -4924,6 +4925,16 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
     if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
     else if (placed.result === 'failed') console.log(`${zenName} (${table.id}) : fronton pas déposé (${placed.reason}) ; la partie se lance quand même.`); // i18n-ignore : journal
+    // Et celui de ses menus (PFX.png) : le fronton par défaut de la borne, sinon du noir, jamais le chemin cherché.
+    let defaults: string[] = [];
+    try {
+      defaults = fs.readdirSync(layoutOf(loc.root).media).filter((f) => /^\(Backglass\)/i.test(f) && mediaKind(f) === 'image');
+    } catch {
+      defaults = [];
+    }
+    const home = placePinballFxHomeBackglass(fx, defaults[0] ? path.join(layoutOf(loc.root).media, defaults[0]) : undefined);
+    if (home.result === 'placed') console.log(`${zenName} : fronton des menus déposé, ${home.target}${defaults[0] ? ` (depuis ${defaults[0]})` : ' (image noire)'}.`); // i18n-ignore : journal
+    else if (home.result === 'failed') console.log(`${zenName} : fronton des menus pas déposé (${home.reason}).`); // i18n-ignore : journal
   }
   // Pinball FX3 : l'image de la table pour sa fenêtre du fronton (data\steam\<table>.*), si elle n'en a pas ;
   // sans elle, FX3 y écrit le chemin qu'il cherche (essai du 20/11/2026). Le fronton de la table dans
@@ -5002,6 +5013,16 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         if (placed) console.log(`${zenName} (${table.id}) : DMD recopié posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
       }, 1000)
     : undefined;
+  // Pinball FX : son DMD envoyé à dmdext (ExternalDevice, DmdDevice64.dll de VPinMAME : colorisation, PuP-Packs)
+  // s'ouvre là où DmdDevice.ini le place, sur le fronton chez un joueur (PinCab, 20/11/2026) : posé sur
+  // l'écran DMD, comme le DMD recopié de Future Pinball. Une place déjà sur l'écran DMD est gardée.
+  const virtualDmdWatch =
+    simulated === undefined && command && zenKey === 'pinballfx'
+      ? setInterval(() => {
+          const placed = placeVirtualDmd(roleRects.find((r) => r.role === 'dmd')?.rect, () => listWindows((w) => w.visible), setWindowBounds);
+          if (placed) console.log(`${zenName} (${table.id}) : DMD virtuel de dmdext posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
+        }, 1000)
+      : undefined;
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
@@ -5026,8 +5047,18 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
   if (dmdMirrorWatch) clearInterval(dmdMirrorWatch);
+  if (virtualDmdWatch) clearInterval(virtualDmdWatch);
   dmdMirror?.stop();
   if (windowsOrientation) orientationAfterGame(zenName);
+  // FX3 montre aussi les images d'autres tables pendant ses transitions (essai du 20/11/2026 : un chemin
+  // affiché en un éclair) : celles de toutes ses tables installées, en arrière-plan, une fois par
+  // démarrage, suivies dans les téléchargements. La partie est finie : rien ne la ralentit.
+  if (simulated === undefined && fx3) {
+    void fetchAllPinballFx3Backglasses(fx3, { workDir: path.join(loc.dataDir, 'pinballfx3-frontons'), downloads: library.downloads.manager })?.then(
+      (r) => console.log(`${zenName} : frontons des tables installées : ${r.placed.length} déposé(s), ${r.present.length} déjà là, ${r.missing.length} absent(s) du catalogue${r.failed.length ? `, ${r.failed.length} en échec (repris au prochain démarrage)` : ''}.`), // i18n-ignore : journal
+      (error: Error) => console.log(`${zenName} : frontons des tables installées pas reçus (${error.message}) ; repris au prochain démarrage.`), // i18n-ignore : journal
+    );
+  }
   stopZenKeys();
   stopNudgeKeys();
   stopJoystick();

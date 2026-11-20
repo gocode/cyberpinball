@@ -136,6 +136,20 @@ export async function preparePinballFx3Backglass(
   return image ? { image, from: 'catalog' } : { pending: !finished, ...(reason ? { reason } : {}) };
 }
 
+let allTables: Promise<BackglassReport> | undefined;
+
+/**
+ * Les images de toutes les tables installées (FX3 montre aussi celles d'autres tables pendant ses
+ * transitions), une fois par démarrage de Cyber Pinball : undefined si c'est déjà fait ou en cours.
+ * Un échec se reprend au démarrage suivant (les partiels restent dans `workDir`).
+ */
+export function fetchAllPinballFx3Backglasses(install: Pick<PinballFx3Install, 'tablesDir'>, opts: BackglassOptions): Promise<BackglassReport> | undefined {
+  if (allTables) return undefined;
+  const { only: _only, ...all } = opts;
+  allTables = installPinballFx3Backglasses(install, all);
+  return allTables;
+}
+
 /** Ce que le catalogue apporterait aux tables installées, ou à `only` (sans rien télécharger). */
 export function backglassPlanFor(install: Pick<PinballFx3Install, 'tablesDir'>, catalog: ReturnType<typeof parseBackglassMetadata>, only?: readonly string[]): BackglassPlan {
   return pinballFx3BackglassPlan(

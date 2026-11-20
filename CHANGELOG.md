@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.2
 
+- Pinball FX3 : après une partie, les images de fronton de toutes les tables installées arrivent en arrière-plan (catalogue d'archive.org, une fois par démarrage, suivies dans les Téléchargements). FX3 en montre aussi d'autres que celle de la table jouée pendant ses transitions : plus de chemin de fichier affiché à la place.
+- Pinball FX : quand le jeu envoie son DMD à dmdext (option « appareil externe » de son mode borne : colorisation, PuP-Packs), le DMD virtuel de dmdext est posé sur l'écran DMD de la borne pendant la partie, comme le DMD de Future Pinball. Avant, il s'ouvrait là où DmdDevice.ini le plaçait, parfois par-dessus le fronton.
+- Pinball FX : dans les menus du jeu, la fenêtre du fronton montre le fronton commun de la borne (ou du noir), au lieu du chemin de l'image que le jeu cherchait. Une image déjà mise par le joueur n'est jamais remplacée.
 - Pinball FX en mode borne, sur une borne aux boutons de joystick : les boutons agissent de nouveau en partie. Le jeu ouvre plusieurs fenêtres (table, fronton, DMD) et le clavier pouvait aller à celle du fronton ou du DMD, que la table n'écoute pas. Avant chaque appui, et deux fois par seconde, la fenêtre de la table reprend le premier plan quand une autre fenêtre du jeu l'a ; le journal nomme la fenêtre en cause.
 - Archives RAR que le tar de Windows ne sait pas lire (RAR5 à grand dictionnaire : « Declared dictionary size is not supported », par exemple la table Ghostbusters pour Future Pinball) : Cyber Pinball les lit maintenant avec le décompresseur officiel de RARLAB (node-unrar-js, en WebAssembly, rien à installer). Avant, la table restait « Rien à installer ».
 - Archive d'une table Future Pinball : une bibliothèque de script (.vbs) va dans le dossier Scripts du jeu, et les réglages de physique de BAM de la table (.xml du même nom) à côté d'elle ; ils la suivent quand elle est ajoutée au front-end.

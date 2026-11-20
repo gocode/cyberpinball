@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX3: after a game, the backglass pictures of all installed tables arrive in the background (archive.org catalog, once per start, shown in Downloads). FX3 also shows other tables' pictures during its transitions: no more file path shown instead.
+- Pinball FX: when the game sends its DMD to dmdext (the "external device" option of its cabinet mode: colorization, PuP-Packs), dmdext's virtual DMD is placed on the cabinet's DMD screen during the game, like Future Pinball's DMD. Before, it opened where DmdDevice.ini put it, sometimes over the backglass.
+- Pinball FX: in the game's menus, the backglass window shows the cabinet's shared backglass (or black) instead of the path of the picture the game was looking for. A picture the player already set is never replaced.
 - Pinball FX in cabinet mode, on a cabinet with joystick buttons: the buttons work again during play. The game opens several windows (table, backglass, DMD) and the keyboard could go to the backglass or DMD window, which the table doesn't listen to. Before every press, and twice a second, the table window takes the foreground back when another game window has it; the log names the window involved.
 - RAR archives that Windows' tar can't read (RAR5 with a large dictionary: "Declared dictionary size is not supported", for instance the Ghostbusters table for Future Pinball): Cyber Pinball now reads them with RARLAB's official decompressor (node-unrar-js, in WebAssembly, nothing to install). Before, the table stayed "Nothing to install".
 - Future Pinball table archive: a script library (.vbs) goes into the game's Scripts folder, and the table's BAM physics settings (.xml of the same name) next to it; they follow it when it is added to the front-end.
