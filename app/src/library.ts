@@ -148,6 +148,7 @@ import {
   tableGame,
   partWebQuery,
   tableSourceOf,
+  vpsGameImages,
   scanRomLibrary,
   sizeOf,
   trashDirFor,
@@ -586,7 +587,12 @@ export function createLibrary(host: LibraryHost) {
     task: (message, work) => task(message, work),
     vps: () => vpsForImport(),
     added: (file) => reloadTables(file),
-    fetchMedias: (file) => void mediaDownload.fillMissing([file], { quiet: true }).catch((error: Error) => console.log(`${FUTURE_PINBALL_NAME} : médias de ${file} pas reçus (${error.message}).`)), // i18n-ignore : journal
+    // VPinMediaDB, puis l'image du fronton et du plateau de la base VPS pour ce qu'il n'a pas.
+    fetchMedias: (file) =>
+      void mediaDownload
+        .fillMissing([file], { quiet: true })
+        .then(() => fillVpsImages([file]))
+        .catch((error: Error) => console.log(`${FUTURE_PINBALL_NAME} : médias de ${file} pas reçus (${error.message}).`)), // i18n-ignore : journal
     openSheet: (entry, back) => {
       sheetReturn = back;
       openSheet(entry);
@@ -643,6 +649,48 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Base pour un ajout : le cache tout de suite (mis à jour pour la fois suivante), sinon le premier téléchargement. */
+  /** Images de la base VPS déjà reçues : adresse → fichier. */
+  const vpsImageFiles = new Map<string, string>();
+
+  /**
+   * Ce que VPinMediaDB n'a pas pour ces tables : l'image du fronton (aperçu d'un .directb2s) et celle du
+   * plateau que donne la base VPS (vpsGameImages), rangées comme médias quand la table n'en a pas ; rien
+   * n'est remplacé, la source est notée. 20/11/2026 : Ghostbusters Limited Edition n'est pas sur
+   * VPinMediaDB, son fronton restait dessiné alors que VPS en connaît cinq. Rend le nombre d'images rangées.
+   */
+  async function fillVpsImages(files: string[]): Promise<number> {
+    const db = await vpsForImport().catch(() => undefined);
+    if (!db) return 0;
+    let placed = 0;
+    for (const file of files) {
+      const table = find(file);
+      if (!table) continue;
+      const source = tableSourceOf(table.info);
+      const vpsId = source?.vpsGameId ?? table.info.Info?.VPSId;
+      const game = vpsId ? db.games.find((g) => g.id === vpsId) : undefined;
+      if (!game) continue;
+      const version = source ? (game.tableFiles ?? []).find((f) => f.id === source.vpsFileId) : undefined;
+      const images = vpsGameImages(game, version);
+      const have = new Set(scanTableMedias(table).map((m) => m.type));
+      for (const [type, url] of [['Backglass', images.backglass], ['Playfield', images.playfield]] as const) {
+        if (!url || have.has(type)) continue;
+        try {
+          await mediaSearch.stagePreviews([{ url }], vpsImageFiles, t('Vignettes'), { quiet: true });
+        } catch {
+          continue;
+        }
+        const staged = vpsImageFiles.get(url);
+        if (!staged || !fs.existsSync(staged)) continue;
+        if (placeMissingMedia(table, infoFileFor(table, tablesDir()), type, staged, { origin: 'VPS', url, vpsId: game.id })) {
+          placed++;
+          console.log(`Médias : ${type} de « ${table.title} » pris de la base VPS (${url}), VPinMediaDB n'en a pas.`); // i18n-ignore : journal
+        }
+      }
+    }
+    if (placed) reloadTables(files[0]);
+    return placed;
+  }
+
   async function vpsForImport(): Promise<VpsDb | undefined> {
     const dir = layout()!.downloads;
     const load = () => {
@@ -5252,6 +5300,9 @@ export function createLibrary(host: LibraryHost) {
         const got = await mediaDownload.fillMissing(checked);
         if (got.installed) added.push({ text: tn(got.installed, '{n} média de VPinMediaDB rangé', '{n} médias de VPinMediaDB rangés'), detail: t('{size} · source notée dans le .info de la table', { size: formatSize(got.bytes) }), tone: 'ok' });
         if (got.failed.length) added.push({ text: t('Médias non téléchargés (rien n’a été laissé)'), detail: got.failed.join(' · '), tone: 'warning' });
+        // Ce que VPinMediaDB n'a pas pour la table : l'image du fronton et du plateau de la base VPS.
+        const fromVps = await fillVpsImages(checked);
+        if (fromVps) added.push({ text: tn(fromVps, '{n} image de la base VPS rangée', '{n} images de la base VPS rangées'), detail: t('Fronton ou plateau que VPinMediaDB n’a pas pour cette table'), tone: 'ok' });
       }
       // Depuis le parcours d'une table : on y revient, il revérifie la table.
       if (s.journey && find(s.journey)) return journeyUi.open(s.journey, { text: t('Installé. La table est revérifiée.'), tone: 'ok' });

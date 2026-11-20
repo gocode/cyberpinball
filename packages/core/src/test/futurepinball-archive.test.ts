@@ -18,6 +18,7 @@ import {
   gameSoftware,
   installFuturePinballArchive,
   versionSoftware,
+  vpsGameImages,
   isReceivable,
   partFiles,
   planFuturePinballArchive,
@@ -106,6 +107,22 @@ test('étiquettes de logiciel : VPX, FP, FX, FX3… sur chaque jeu et chaque ver
   const game = { id: 'g', name: 'Jeu', tableFiles: [{ id: '1', tableFormat: 'FX3' }, { id: '2', tableFormat: 'FP' }, { id: '3' }, { id: '4', tableFormat: 'FX' }, { id: '5', tableFormat: 'FP' }] } as VpsGame;
   assert.deepEqual(gameSoftware(game), ['VPX', 'FP', 'FX', 'FX3']);
   assert.deepEqual(gameSoftware(FP_ONLY), ['FP']);
+});
+
+test('images de la base VPS quand VPinMediaDB n’a rien : fronton du .directb2s le plus récent, plateau de la version', () => {
+  const img = (n: string) => `https://virtualpinballspreadsheet.github.io/vps-db/img/${n}.webp`;
+  // Ghostbusters Limited Edition (20/11/2026) : cinq frontons connus de VPS, aucun média sur VPinMediaDB.
+  const game = {
+    id: 'DY3wUlic',
+    name: 'Ghostbusters (Limited Edition)',
+    b2sFiles: [{ id: 'old', imgUrl: img('old'), updatedAt: 1 }, { id: 'new', imgUrl: img('new'), updatedAt: 9 }, { id: 'noimg', updatedAt: 99 }],
+    tableFiles: [{ id: 'v1', imgUrl: img('v1'), updatedAt: 1 }, { id: 'v2', imgUrl: img('v2'), updatedAt: 5 }, { id: 'v3', updatedAt: 9 }],
+  } as unknown as VpsGame;
+  assert.deepEqual(vpsGameImages(game), { backglass: img('new'), playfield: img('v2') });
+  assert.equal(vpsGameImages(game, game.tableFiles![0]).playfield, img('v1'), 'la version choisie d’abord');
+  // Une image hors de la base VPS (autre site) n'est jamais prise.
+  const elsewhere = { ...game, b2sFiles: [{ id: 'x', imgUrl: 'https://exemple.test/x.png' }], tableFiles: [] } as unknown as VpsGame;
+  assert.deepEqual(vpsGameImages(elsewhere), {});
 });
 
 test('conseil : VPX quand il y en a une ; sinon la version Future Pinball la plus récente, avec la raison', () => {

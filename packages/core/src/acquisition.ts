@@ -144,6 +144,23 @@ export function gameSoftware(game: VpsGame): string[] {
   return [...found].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
+/** Aperçu d'un fichier de la base VPS (image hébergée par la base elle-même, sans compte). */
+const vpsImage = (f: { imgUrl?: string } | undefined): string | undefined =>
+  f?.imgUrl && /^https:\/\/virtualpinballspreadsheet\.github\.io\/vps-db\/img\//.test(f.imgUrl) ? f.imgUrl : undefined;
+
+/**
+ * Images d'un jeu que donne la base VPS, pour les médias du front-end quand VPinMediaDB n'a rien pour
+ * lui (20/11/2026 : Ghostbusters Limited Edition, 5 frontons connus de VPS, aucun média sur
+ * VPinMediaDB, et l'écran ne proposait que l'habillage dessiné). Fronton : l'aperçu du plus récent
+ * .directb2s qui en a un. Plateau : celui de la version choisie, sinon de la plus récente qui en a un.
+ */
+export function vpsGameImages(game: VpsGame, version?: VpsTableFile): { backglass?: string; playfield?: string } {
+  const recent = <T extends { updatedAt?: number }>(list: T[] | undefined): T[] => [...(list ?? [])].filter(Boolean).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const backglass = recent(game.b2sFiles).map(vpsImage).find(Boolean);
+  const playfield = vpsImage(version) ?? recent(game.tableFiles).map(vpsImage).find(Boolean);
+  return { ...(backglass ? { backglass } : {}), ...(playfield ? { playfield } : {}) };
+}
+
 /** Versions Future Pinball d'un jeu, la plus récemment mise à jour d'abord. */
 export function futurePinballVersions(game: VpsGame): VpsTableFile[] {
   return (game.tableFiles ?? []).filter((f) => f && isFuturePinballVersion(f)).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));

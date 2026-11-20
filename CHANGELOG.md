@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Médias d'une table absente de VPinMediaDB (Ghostbusters Limited Edition, par exemple) : l'image du fronton (aperçu de son .directb2s le plus récent) et celle du plateau que donne la base VPS sont prévues dans « Ce qu'il faut », puis rangées à l'installation, au lieu du seul habillage dessiné. Rien n'est remplacé, la source est notée.
+- « Ce qu'il faut » d'une version Future Pinball : le fronton animé (.directb2s) n'est plus dit « inconnu de VPS » ; l'écran explique qu'il sert à VPX et que Future Pinball dessine son propre fronton.
 - Catalogue filtré « Jeux : pour Future Pinball » : la carte d'un jeu ne compte plus que ses versions Future Pinball (ni versions VPX, ni ROM) et dit la dernière d'entre elles ; sa fiche ne liste qu'elles.
 - Catalogue : chaque jeu porte les étiquettes des logiciels pour lesquels il existe (VPX, FP pour Future Pinball, FX, FX3…), même sans filtre ; dans sa fiche, chaque version porte celle de son logiciel.
 - Menu système refait pour être plus court : huit lignes au plus par écran (Borne en avait 17, Cyber Pinball 14), dans l'ordre de l'usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre.

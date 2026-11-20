@@ -506,6 +506,11 @@ export const messages: Record<string, string> = {
     'Every cabinet screen already has its planned media, no account needed: nothing else to approve. The other choices are extras.',
   'Cette table n’est pas sur VPinMediaDB : Cyber Pinball dessine chaque écran à son nom, en attendant mieux. Les autres choix sont en plus.':
     'This table is not on VPinMediaDB: Cyber Pinball draws each screen with its name until something better comes along. The other choices are extras.',
+  'Cette table n’est pas sur VPinMediaDB : les aperçus de la base VPS servent de fronton ou de plateau, Cyber Pinball dessine le reste. Les autres choix sont en plus.':
+    'This table is not on VPinMediaDB: the VPS database previews serve as backglass or playfield, Cyber Pinball draws the rest. The other choices are extras.',
+  'Base VPS · sans compte': 'VPS database · no account',
+  'VPinMediaDB n’a pas ce média pour la table : l’aperçu de la base VPS le remplace': 'VPinMediaDB has no such media for the table: the VPS database preview stands in',
+  'Fronton animé (.directb2s) : pour VPX ; Future Pinball dessine son propre fronton': 'Animated backglass (.directb2s): for VPX; Future Pinball draws its own backglass',
   'VPinMediaDB ne répond pas pour l’instant : Cyber Pinball dessine chaque écran en attendant. Les autres choix sont en plus.':
     'VPinMediaDB is not answering right now: Cyber Pinball draws each screen in the meantime. The other choices are extras.',
   'VPinMediaDB · sans compte': 'VPinMediaDB · no account',

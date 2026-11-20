@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Media for a table missing from VPinMediaDB (Ghostbusters Limited Edition, for instance): the backglass image (preview of its most recent .directb2s) and the playfield image from the VPS database are planned in "What it takes", then stored at installation, instead of only the drawn dressing. Nothing is replaced, the source is noted.
+- "What it takes" for a Future Pinball version: the animated backglass (.directb2s) is no longer said to be "unknown to VPS"; the screen explains it is for VPX and that Future Pinball draws its own backglass.
 - Catalog filtered "Games: for Future Pinball": a game's card only counts its Future Pinball versions (no VPX versions, no ROM) and names the latest of them; its sheet lists only those.
 - Catalog: each game shows tags for the software it exists for (VPX, FP for Future Pinball, FX, FX3…), even without a filter; in its sheet, each version shows its own software's tag.
 - System menu redone to be shorter: at most eight lines per screen (Cabinet had 17, Cyber Pinball 14), in order of use: Tables, My cabinet, Downloads, Recent activity, Community, Juke-box, Help and info, Quit or shut down.

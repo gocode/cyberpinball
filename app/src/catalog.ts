@@ -101,6 +101,7 @@ import {
   gameSoftware,
   isFuturePinballVersion,
   versionSoftware,
+  vpsGameImages,
   waitListProblems,
   CATALOG_DEFAULT,
   CATALOG_SORTS,
@@ -1163,6 +1164,8 @@ export function createCatalog(ctx: CatalogContext) {
       const others = (files: { imgUrl?: string }[] | undefined) => (files ?? []).slice(0, 5).map(imageOf);
       loadThumbs([
         imageOf(version),
+        // Les images de la base VPS prévues quand VPinMediaDB n'a rien (fronton, plateau).
+        ...Object.values(vpsGameImages(game, version)).map((url) => ({ url })),
         ...(needsMedia.get(game.id) ?? []).map((o) => o.preview),
         ...others(game.b2sFiles),
         ...others(game.pupPackFiles),
@@ -1231,7 +1234,9 @@ export function createCatalog(ctx: CatalogContext) {
       offers === null
         ? t('VPinMediaDB ne répond pas pour l’instant : Cyber Pinball dessine chaque écran en attendant. Les autres choix sont en plus.')
         : offers && !offers.length
-          ? t('Cette table n’est pas sur VPinMediaDB : Cyber Pinball dessine chaque écran à son nom, en attendant mieux. Les autres choix sont en plus.')
+          ? Object.keys(vpsGameImages(game)).length
+            ? t('Cette table n’est pas sur VPinMediaDB : les aperçus de la base VPS servent de fronton ou de plateau, Cyber Pinball dessine le reste. Les autres choix sont en plus.')
+            : t('Cette table n’est pas sur VPinMediaDB : Cyber Pinball dessine chaque écran à son nom, en attendant mieux. Les autres choix sont en plus.')
           : t('Chaque écran de la borne a déjà son média prévu, sans compte : rien d’autre à valider. Les autres choix sont en plus.');
     return { strong, text };
   }
@@ -1292,12 +1297,25 @@ export function createCatalog(ctx: CatalogContext) {
     };
     const used = new Set<NeedKind>();
 
-    // Ce qui est prévu pour un écran : déjà sur la borne, sinon VPinMediaDB, sinon dessiné.
+    // Images de la base VPS (aperçu d'un .directb2s, du plateau) : quand VPinMediaDB n'a rien pour le jeu.
+    const vpsImages = vpsGameImages(game, version);
+    // Ce qui est prévu pour un écran : déjà sur la borne, sinon VPinMediaDB, sinon l'image de la base VPS, sinon dessiné.
     const planned = (group: string, type: MediaType | undefined, drawn: DrawnPart | undefined, where: string, extra: string[] = []) => {
       const file = type && ownMedia(game, type);
       const offer = !file && type ? offers?.find((o) => o.type === type) : undefined;
+      const vpsUrl = !file && !offer ? (type === 'Backglass' ? vpsImages.backglass : type === 'Playfield' ? vpsImages.playfield : undefined) : undefined;
       let card: MediaCard;
-      if (file) {
+      if (vpsUrl) {
+        card = {
+          group,
+          title: t('Image fixe'),
+          source: { label: t('Base VPS · sans compte'), base: true },
+          state: { label: t('Prévu'), tone: 'ok' },
+          facts: where,
+          extra: [t('VPinMediaDB n’a pas ce média pour la table : l’aperçu de la base VPS le remplace'), ...extra],
+          thumb: thumbOf({ url: vpsUrl }, group),
+        };
+      } else if (file) {
         allowPreview(file);
         const video = /\.(mp4|webm|m4v|mov|avi|f4v|mkv)$/i.test(file);
         // Un son (musique de lancement) n'est ni une image ni une vidéo : sa vignette se lit comme celle d'un son proposé.
@@ -1396,7 +1414,14 @@ export function createCatalog(ctx: CatalogContext) {
       } else {
         planned(group, 'Backglass', 'backglass', t('Dans le front-end et pendant la partie'));
         used.add('b2s');
-        off(group, b2s?.need.state === 'included' ? t('Fronton animé fourni avec la table') : t('Aucun fronton animé connu de VPS'));
+        off(
+          group,
+          b2s?.need.state === 'included'
+            ? t('Fronton animé fourni avec la table')
+            : isFuturePinballVersion(version)
+              ? t('Fronton animé (.directb2s) : pour VPX ; Future Pinball dessine son propre fronton')
+              : t('Aucun fronton animé connu de VPS'),
+        );
       }
     }
 
