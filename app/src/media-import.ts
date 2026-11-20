@@ -11,6 +11,7 @@ import {
   formatSize,
   freeSpace,
   FRONTEND_LABELS,
+  installationGameFiles,
   installedTables,
   knownInstallations,
   MATCH_LABELS,
@@ -20,6 +21,7 @@ import {
   t,
   tn,
   trashDirFor,
+  type InstallationLayout,
   type InstallationPlan,
   type InstallationTablePlan,
   type TableEntry,
@@ -37,6 +39,10 @@ export interface MediaImportHost {
   /** Base VPS pour les noms qui ne ressemblent à aucune table (absente sans réseau). */
   vps(): Promise<VpsDb | undefined>;
   pickDirectory(): Promise<string | undefined>;
+  /** Installation de tables autour de ce dossier (Popper, PinballX…) : sa base dit quel .vpx porte chaque jeu. */
+  installation(dir: string): InstallationLayout | undefined;
+  /** « Depuis une autre installation… » avec ces tables déjà cochées. */
+  takeTables(layout: InstallationLayout, vpx: string[]): void;
   openCustom(build: () => Built, at?: number): void;
   openSystem(): void;
   openNotice(heading: string, lines: string[]): void;
@@ -90,15 +96,34 @@ export function createMediaImport(host: MediaImportHost) {
       const scan = scanInstallation(root);
       host.progress(t('Rapprochement avec les tables installées…'));
       const tables = installedTables(host.tables(), host.romsOf);
+      // Base du menu d'origine (Popper, PinballX) : le .vpx de chaque jeu, sous un autre nom que ses médias.
+      let layout: InstallationLayout | undefined;
+      let menu: Map<string, string[]> | undefined;
+      try {
+        layout = host.installation(root);
+        menu = layout ? installationGameFiles(layout) : undefined;
+      } catch (error) {
+        console.log(`Reprise des médias : installation de ${root} illisible (${(error as Error).message}).`); // i18n-ignore : journal
+      }
       // La base VPS ne sert qu'aux noms qui ne ressemblent à aucune table : chargée seulement alors.
-      const quick = planInstallationMedias(scan, tables);
-      const vps = quick.unmatched.length ? await host.vps() : undefined;
-      const plan = vps ? planInstallationMedias(scan, tables, { vps }) : quick;
-      showPlan(plan);
+      const quick = planInstallationMedias(scan, tables, { menu });
+      const vps = quick.unmatched.some((u) => !u.vpx) ? await host.vps() : undefined;
+      const plan = vps ? planInstallationMedias(scan, tables, { vps, menu }) : quick;
+      showPlan(plan, layout);
     });
   }
 
-  function showPlan(plan: InstallationPlan): void {
+  function showPlan(plan: InstallationPlan, layout?: InstallationLayout): void {
+    // Jeux dont la table est dans l'installation sans être encore dans Cyber Pinball : repris avec leurs médias.
+    const absent = layout ? plan.unmatched.filter((u) => u.vpx?.length) : [];
+    const take: Action | undefined = absent.length
+      ? {
+          label: t('Reprendre aussi ces tables'),
+          detail: tn(absent.length, '{n} table pas encore dans Cyber Pinball, avec son VPX et ses médias', '{n} tables pas encore dans Cyber Pinball, avec leur VPX et leurs médias'),
+          icon: 'table-add',
+          run: () => host.takeTables(layout!, [...new Set(absent.map((u) => u.vpx![0]!))]),
+        }
+      : undefined;
     const free = freeSpace(host.tablesDir()!);
     const tooBig = free !== undefined && plan.bytes > free;
     const replaces = plan.tables.some((t) => t.planned.some((m) => m.replaces));
@@ -124,13 +149,13 @@ export function createMediaImport(host: MediaImportHost) {
           ),
         );
       }
-      if (plan.unmatched.length) {
-        sections.push(
-          capped(
-            tn(plan.unmatched.length, 'Sans table : {n} jeu', 'Sans table : {n} jeux'),
-            plan.unmatched.map((u) => ({ text: u.game, detail: `${tn(u.sources.length, '{n} média', '{n} médias')} · ${u.reason}`, tone: 'quiet' })),
-          ),
-        );
+      const row = (u: InstallationPlan['unmatched'][number]): Row => ({ text: u.game, detail: `${tn(u.sources.length, '{n} média', '{n} médias')} · ${u.reason}`, tone: 'quiet' });
+      if (absent.length) {
+        sections.push(capped(tn(absent.length, 'Pas encore dans Cyber Pinball : {n} table', 'Pas encore dans Cyber Pinball : {n} tables'), absent.map((u) => ({ ...row(u), tone: undefined }))));
+      }
+      const without = plan.unmatched.filter((u) => !absent.includes(u));
+      if (without.length) {
+        sections.push(capped(tn(without.length, 'Sans table : {n} jeu', 'Sans table : {n} jeux'), without.map(row)));
       }
       if (plan.ignored.length) {
         sections.push({ title: t('Autres émulateurs'), rows: plan.ignored.map((i) => ({ text: i.source, detail: `${tn(i.count, '{n} fichier', '{n} fichiers')} · ${i.reason}`, tone: 'quiet' })) });
@@ -140,21 +165,25 @@ export function createMediaImport(host: MediaImportHost) {
         plan.count && !tooBig
           ? [
               { label: t('Copier'), detail: `${tn(plan.count, '{n} média', '{n} médias')} · ${formatSize(plan.bytes)}`, tone: 'ok', run: () => apply(plan) },
+              ...(take ? [take] : []),
               { label: t('Annuler'), run: back },
             ]
-          : [{ label: t('Retour'), run: back }];
+          : [...(take ? [{ ...take, tone: 'ok' as const }] : []), { label: t('Retour'), run: back }];
       const frontends = formatList(plan.frontends.map((f) => FRONTEND_LABELS[f]));
       return {
         heading: plan.count ? t('Plan de reprise des médias') : t('Aucun média à reprendre'),
         subheading: `${frontends || t('Aucun média de PinUP Popper ni de PinballX')} · ${plan.root}`,
         lead: plan.count
           ? t('Les fichiers sont copiés : l’installation d’origine n’est pas modifiée. Un média du même type déjà présent dans la table va à la corbeille.')
-          : t('Aucun média de ce dossier ne correspond à une table installée.'),
+          : absent.length
+            ? t('Aucun média de ce dossier ne correspond à une table de Cyber Pinball. Leurs tables sont dans l’installation : « Reprendre aussi ces tables » les ajoute avec leurs médias.')
+            : t('Aucun média de ce dossier ne correspond à une table installée.'),
         sections,
         actions,
         back,
       };
-    }, replaces && plan.count && !tooBig ? 1 : 0);
+      // Des médias seront remplacés : le curseur part sur « Annuler ».
+    }, replaces && plan.count && !tooBig ? (take ? 2 : 1) : 0);
   }
 
   /** Une ligne par table : les types reçus, la taille, comment elle a été reconnue. */

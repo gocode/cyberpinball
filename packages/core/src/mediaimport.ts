@@ -345,11 +345,14 @@ export function installedTables(entries: TableEntry[], romsOf: (t: TableEntry) =
 }
 
 /** Comment un média a été rattaché à sa table. */
-export type MediaMatchHow = 'name' | 'rom' | 'title' | 'vps';
+export type MediaMatchHow = 'name' | 'menu' | 'rom' | 'title' | 'vps';
 
 export const MATCH_LABELS: Record<MediaMatchHow, string> = {
   get name() {
     return t('nom de la table');
+  },
+  get menu() {
+    return t('base de l’installation');
   },
   rom: 'ROM',
   get title() {
@@ -366,16 +369,25 @@ export type MediaGameMatch = { table: InstalledTable; how: MediaMatchHow } | { a
  * Table d'un nom de jeu (nom du fichier chez Popper et PinballX) : nom exact du
  * .vpx ou du dossier, puis ROM, puis titre (fabricant et année départagent),
  * puis jeu reconnu par la base VPS. Plusieurs tables possibles : ambigu, rien
- * n'est rangé.
+ * n'est rangé. menuFiles : noms des .vpx que le menu d'origine donne à ce jeu
+ * (GameName et GameFileName de Popper, description et nom de PinballX) : une
+ * table reprise garde le nom de son .vpx, souvent autre que celui des médias
+ * (« AC-DC Premium » pour « AC-DC LUCI Premium (Stern 2013).vpx »).
  */
-export function matchMediaGame(game: string, tables: InstalledTable[], vps?: VpsDb): MediaGameMatch {
-  const names = mediaGameNames(game);
+export function matchMediaGame(game: string, tables: InstalledTable[], vps?: VpsDb, menuFiles: readonly string[] = []): MediaGameMatch {
+  const own = mediaGameNames(game);
+  const files = menuFiles.filter((f) => !own.some((n) => n.toLowerCase() === f.toLowerCase()));
+  const names = [...own, ...files];
   const one = (found: InstalledTable[], how: MediaMatchHow): MediaGameMatch =>
     found.length === 1 ? { table: found[0]!, how } : found.length > 1 ? { ambiguous: found } : undefined;
-  for (const n of names) {
-    const r = one(tables.filter((t) => t.dest.names.some((x) => x.toLowerCase() === n.toLowerCase())), 'name');
+  const byName = (n: string) => tables.filter((t) => t.dest.names.some((x) => x.toLowerCase() === n.toLowerCase()));
+  for (const n of own) {
+    const r = one(byName(n), 'name');
     if (r) return r;
   }
+  // Plusieurs versions du jeu dans l'installation : la table installée est celle de l'une d'elles.
+  const viaMenu = [...new Set(files.flatMap(byName))];
+  if (viaMenu.length) return one(viaMenu, 'menu');
   for (const n of names) {
     const r = one(tables.filter((t) => t.roms.some((x) => x.toLowerCase() === n.toLowerCase())), 'rom');
     if (r) return r;
@@ -481,23 +493,34 @@ export interface InstallationPlan {
   root: string;
   frontends: ('popper' | 'pinballx')[];
   tables: InstallationTablePlan[];
-  /** Jeux sans table installée, ou qui en désignent plusieurs : rien n'est copié. */
-  unmatched: { game: string; sources: string[]; reason: string }[];
+  /**
+   * Jeux sans table installée, ou qui en désignent plusieurs : rien n'est copié. vpx : la
+   * table de l'installation d'origine qui porte ce jeu, à reprendre avec ses médias.
+   */
+  unmatched: { game: string; sources: string[]; reason: string; vpx?: string[] }[];
   ignored: InstallationScan['ignored'];
   /** Médias copiés et leur taille totale. */
   count: number;
   bytes: number;
 }
 
-/** Plan de reprise : chaque média rapproché de sa table, rangé comme à l'import. */
-export function planInstallationMedias(scan: InstallationScan, tables: InstalledTable[], opts: { vps?: VpsDb } = {}): InstallationPlan {
+/**
+ * Plan de reprise : chaque média rapproché de sa table, rangé comme à l'import. menu : pour
+ * chaque nom de jeu de l'installation (en minuscules), ses .vpx d'après le menu d'origine
+ * (installationGameFiles) ; un jeu sans table installée dont le .vpx est là peut être repris.
+ */
+export function planInstallationMedias(scan: InstallationScan, tables: InstalledTable[], opts: { vps?: VpsDb; menu?: ReadonlyMap<string, readonly string[]> } = {}): InstallationPlan {
   const matches = new Map<string, MediaGameMatch>();
   const perTable = new Map<InstalledTable, { files: IncomingMedia[]; how: Set<MediaMatchHow> }>();
   const unmatched = new Map<string, InstallationPlan['unmatched'][number]>();
+  const vpxOf = (game: string) => [...new Set(mediaGameNames(game).flatMap((n) => opts.menu?.get(n.toLowerCase()) ?? []))];
   for (const file of scan.files) {
     const game = file.media.game ?? '';
     const key = game.toLowerCase();
-    if (!matches.has(key)) matches.set(key, game ? matchMediaGame(game, tables, opts.vps) : undefined);
+    if (!matches.has(key)) {
+      const stems = vpxOf(game).map((v) => path.basename(v, path.extname(v)));
+      matches.set(key, game ? matchMediaGame(game, tables, opts.vps, stems) : undefined);
+    }
     const match = matches.get(key);
     if (match && 'table' in match) {
       const entry = perTable.get(match.table) ?? { files: [], how: new Set<MediaMatchHow>() };
@@ -507,11 +530,16 @@ export function planInstallationMedias(scan: InstallationScan, tables: Installed
       continue;
     }
     const label = mediaGameNames(game).at(-1) ?? game;
+    const vpx = match ? [] : vpxOf(game);
     const reason =
       match && 'ambiguous' in match
         ? t('Plusieurs tables possibles ({tables}) : rien n’est copié.', { tables: match.ambiguous.map((a) => path.basename(a.folder)).join(', ') })
-        : t('Aucune table installée ne porte ce nom : rien n’est copié.');
-    const entry = unmatched.get(label.toLowerCase()) ?? { game: label, sources: [], reason };
+        : vpx.length
+          ? t('Table pas encore dans Cyber Pinball : « Reprendre aussi ces tables » l’ajoute avec ses médias.')
+          : opts.menu
+            ? t('Ni dans Cyber Pinball, ni parmi les tables de cette installation : rien n’est copié.')
+            : t('Pas encore dans Cyber Pinball : « Ajouter une table », « Depuis une autre installation… » la reprend avec ses médias.');
+    const entry = unmatched.get(label.toLowerCase()) ?? { game: label, sources: [], reason, ...(vpx.length ? { vpx } : {}) };
     entry.sources.push(file.source);
     unmatched.set(label.toLowerCase(), entry);
   }

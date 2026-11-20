@@ -177,6 +177,13 @@ export const messages: Record<string, string> = {
   'Les fichiers sont copiés : l’installation d’origine n’est pas modifiée. Un média du même type déjà présent dans la table va à la corbeille.':
     'Files are copied: the original installation is left untouched. Media of the same type already in the table goes to the trash.',
   'Aucun média de ce dossier ne correspond à une table installée.': 'No media in this folder matches an installed table.',
+  'Aucun média de ce dossier ne correspond à une table de Cyber Pinball. Leurs tables sont dans l’installation : « Reprendre aussi ces tables » les ajoute avec leurs médias.':
+    'No media in this folder matches a table in Cyber Pinball. Their tables are in the installation: “Bring in these tables too” adds them with their media.',
+  'Reprendre aussi ces tables': 'Bring in these tables too',
+  '{n} table pas encore dans Cyber Pinball, avec son VPX et ses médias': '{n} table not in Cyber Pinball yet, with its VPX and media',
+  '{n} tables pas encore dans Cyber Pinball, avec leur VPX et leurs médias': '{n} tables not in Cyber Pinball yet, with their VPX and media',
+  'Pas encore dans Cyber Pinball : {n} table': 'Not in Cyber Pinball yet: {n} table',
+  'Pas encore dans Cyber Pinball : {n} tables': 'Not in Cyber Pinball yet: {n} tables',
   '{type} ({n} pages)': '{type} ({n} pages)',
   'remplace {n} média': 'replaces {n} media file',
   'remplace {n} médias': 'replaces {n} media files',
@@ -262,7 +269,11 @@ export const messages: Record<string, string> = {
   'base VPS': 'VPS database',
   '{frontend} : autre émulateur que Visual Pinball, non repris.': '{frontend}: emulator other than Visual Pinball, not imported.',
   'Plusieurs tables possibles ({tables}) : rien n’est copié.': 'Several possible tables ({tables}): nothing is copied.',
-  'Aucune table installée ne porte ce nom : rien n’est copié.': 'No installed table has this name: nothing is copied.',
+  'base de l’installation': 'installation database',
+  'Table pas encore dans Cyber Pinball : « Reprendre aussi ces tables » l’ajoute avec ses médias.': 'Table not in Cyber Pinball yet: “Bring in these tables too” adds it with its media.',
+  'Ni dans Cyber Pinball, ni parmi les tables de cette installation : rien n’est copié.': 'Neither in Cyber Pinball nor among this installation’s tables: nothing is copied.',
+  'Pas encore dans Cyber Pinball : « Ajouter une table », « Depuis une autre installation… » la reprend avec ses médias.':
+    'Not in Cyber Pinball yet: “Add a table”, “From another installation…” brings it in with its media.',
   // Entonnoir « Ajouter une table », filtres du catalogue, installation rapide
   'index de VPinMediaDB indisponible': 'VPinMediaDB index unavailable',
   'Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}': 'VPinMediaDB media, table {i} of {total}, {title}: {step}',

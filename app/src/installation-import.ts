@@ -246,5 +246,19 @@ export function createInstallationImport(host: InstallationImportHost) {
       .join(' · ');
   }
 
-  return { open };
+  /**
+   * Ces tables de l'installation déjà cochées (reprise des médias : jeux qui n'ont pas encore leur
+   * table dans Cyber Pinball). Toutes les tables du disque sont montrées si l'une d'elles n'est dans
+   * aucune liste de lecture, pour qu'aucune table cochée ne soit cachée.
+   */
+  function openChecked(layout: InstallationLayout, vpx: string[]): void {
+    void host.task(t('Lecture de l’installation…'), () => {
+      const tables = listInstallationTables(layout, indexInstallationMedias(layout));
+      const chosen = tables.filter((tb) => vpx.some((v) => path.resolve(v).toLowerCase() === path.resolve(tb.vpx).toLowerCase()));
+      listing = { layout, tables, checked: new Set(chosen.map((c) => c.vpx)), all: chosen.some((c) => c.active === false) };
+      host.openCustom(() => buildTables(listing!));
+    });
+  }
+
+  return { open, openChecked };
 }

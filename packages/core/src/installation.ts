@@ -480,6 +480,32 @@ export function tableMediaNames(vpx: string, layout: InstallationLayout): string
 }
 
 /**
+ * The installation's .vpx files under each name its menus store media under (tableMediaNames), in
+ * lower case: what the media takeover (planInstallationMedias) uses to link "AC-DC Premium" (Popper's
+ * GameName) to the table brought in as "AC-DC LUCI Premium (Stern 2013).vpx", and to offer bringing in
+ * the table itself when it is not on the cabinet yet.
+ */
+export function installationGameFiles(layout: InstallationLayout): Map<string, string[]> {
+  return withDirCache(() => {
+    const map = new Map<string, string[]>();
+    const add = (name: string, vpx: string) => {
+      const key = name.trim().toLowerCase();
+      const list = map.get(key) ?? [];
+      if (key && !list.some((v) => samePath(v, vpx))) list.push(vpx);
+      map.set(key, list);
+    };
+    const tables = tablesOf(layout, new Map());
+    // The .vpx that bears the name itself first (its own name, its menu entry), then the other versions of its folder.
+    for (const { vpx } of tables) {
+      add(path.basename(vpx, path.extname(vpx)), vpx);
+      for (const e of catalogOf(vpx, layout)) e.names.forEach((n) => add(n, vpx));
+    }
+    for (const { vpx } of tables) for (const name of tableMediaNames(vpx, layout)) add(name, vpx);
+    return map;
+  });
+}
+
+/**
  * Menu entries for a .vpx: the one that gives its path; the one that gives only its name
  * (PinballX, PinballY); the one whose path no longer exists (table moved since), by its name.
  */
