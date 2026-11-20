@@ -148,7 +148,8 @@ export function playableWithoutRom(game: VpsGame): boolean {
   return tableVersions(game).some((f) => versionWithoutRom(game, f));
 }
 
-export type CatalogKind = 'all' | 'ss' | 'em' | 'original' | 'norom';
+/** « futurepinball » : les jeux qui ont une version pour Future Pinball, et seulement ces versions (20/11/2026). */
+export type CatalogKind = 'all' | 'ss' | 'em' | 'original' | 'norom' | 'futurepinball';
 export type CatalogState = 'all' | 'missing' | 'installed';
 /** « popular » : les jeux les plus suivis d'abord (popularity) ; « name » : par titre ; « recent » : nouveautés d'abord. */
 export type CatalogSort = 'popular' | 'name' | 'recent';
@@ -161,7 +162,7 @@ export type CatalogSupport = 'any' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altco
 /** Site où se télécharge la table (ou les fichiers du filtre « Fichiers ») ; « free » : sans compte. */
 export type CatalogSite = 'all' | 'vpuniverse' | 'vpforums' | 'pinballnirvana' | 'free';
 
-export const CATALOG_KINDS: readonly CatalogKind[] = ['all', 'norom', 'ss', 'em', 'original'];
+export const CATALOG_KINDS: readonly CatalogKind[] = ['all', 'norom', 'ss', 'em', 'original', 'futurepinball'];
 export const CATALOG_STATES: readonly CatalogState[] = ['missing', 'all', 'installed'];
 export const CATALOG_SUPPORTS: readonly CatalogSupport[] = ['any', 'b2s', 'rom', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov', 'vr', 'media'];
 export const CATALOG_SITES: readonly CatalogSite[] = ['all', 'vpuniverse', 'vpforums', 'pinballnirvana', 'free'];
@@ -229,6 +230,9 @@ export const CATALOG_KIND_LABELS: Record<CatalogKind, string> = {
   },
   get norom() {
     return t('sans ROM à trouver');
+  },
+  get futurepinball() {
+    return t('pour Future Pinball');
   },
 };
 
@@ -346,7 +350,8 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
   const support = filter.support ?? 'any';
   const site = filter.site ?? 'all';
   const keep = (g: VpsGame) => {
-    const versions = tableVersions(g);
+    // « pour Future Pinball » : ses versions seulement, pour les filtres « Site » et « Fichiers » aussi.
+    const versions = filter.kind === 'futurepinball' ? futurePinballVersions(g) : tableVersions(g);
     if (!versions.length) return false;
     switch (filter.kind ?? 'all') {
       case 'ss':
@@ -457,14 +462,15 @@ const isVpw = (f: VpsTableFile) => (f.authors ?? []).some((a) => vpsKey(a) === '
  * récemment mise à jour. Une version Future Pinball seulement si le jeu n'a aucune version VPX à
  * récupérer. undefined si aucune version n'a de lien vivant.
  */
-export function recommendVersion(game: VpsGame): VersionAdvice | undefined {
-  const vpx = vpxVersions(game).filter((f) => liveLinks(f).length);
+export function recommendVersion(game: VpsGame, opts: { futurePinball?: boolean } = {}): VersionAdvice | undefined {
+  // Catalogue filtré « pour Future Pinball » : la version conseillée est la sienne, jamais celle de VPX.
+  const vpx = opts.futurePinball ? [] : vpxVersions(game).filter((f) => liveLinks(f).length);
   const versions = vpx.length ? vpx : futurePinballVersions(game).filter((f) => liveLinks(f).length);
   if (!versions.length) return undefined;
   const score = (f: VpsTableFile) => (hasFeature(f, 'MOD') ? -2 : 0) + (isVpw(f) ? 1 : 0);
   const best = [...versions].sort((a, b) => score(b) - score(a) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]!;
   const reasons: string[] = [];
-  if (!vpx.length) reasons.push(t('table de Future Pinball : ce jeu n’a pas de version VPX à récupérer'));
+  if (!vpx.length && !opts.futurePinball) reasons.push(t('table de Future Pinball : ce jeu n’a pas de version VPX à récupérer'));
   if (isVpw(best)) reasons.push(t('table de VPW (VPin Workshop), refaite à fond'));
   if (!hasFeature(best, 'MOD')) reasons.push(t('version d’origine, pas un MOD'));
   if (best === versions[0]) reasons.push(t('la plus récemment mise à jour'));

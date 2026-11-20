@@ -214,7 +214,7 @@ for (const [name, exit] of Object.entries(EXITS)) {
 // pour la session ; ses réglages de mode borne, saisis à la main, ne valaient plus avec un autre front-end.
 test('Pinball FX3 démarre sur l’orientation de Windows, comme lancé par un autre front-end ; VPX garde celle de jeu', () => {
   assert.equal(playsOnWindowsOrientation('pinballfx3'), true);
-  assert.equal(playsOnWindowsOrientation('futurepinball'), true, 'Future Pinball : son plein écran exclusif remettait le playfield à 0° en partie');
+  assert.equal(playsOnWindowsOrientation('futurepinball'), false, 'Future Pinball : à 0°, sa table était à l’envers sur le PinCab (20/11/2026) ; il garde l’orientation de la session');
   assert.equal(playsOnWindowsOrientation('vpx'), false, 'VPX : l’orientation de jeu est faite pour lui');
   assert.equal(playsOnWindowsOrientation(undefined), false);
   for (const [fixtureName, b] of bornes()) {

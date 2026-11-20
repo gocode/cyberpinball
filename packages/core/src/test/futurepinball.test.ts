@@ -16,6 +16,7 @@ import {
   futurePinballCommand,
   futurePinballCommandLine,
   futurePinballDmdMirror,
+  dmdMirrorPlacement,
   futurePinballInstalledTables,
   futurePinballName,
   futurePinballPlacement,
@@ -126,6 +127,18 @@ test('DMD recopié : dmdext du dossier du jeu, avec son DmdDevice.ini, la ligne 
   fs.writeFileSync(path.join(other, 'dmdext', 'dmdext.exe'), '');
   fs.writeFileSync(path.join(other, 'dmdext', 'DmdDevice.ini'), '');
   assert.equal(futurePinballDmdMirror({ gameDir: other }, table)?.cwd, path.join(other, 'dmdext'));
+});
+
+test('DMD recopié : posé sur l’écran DMD tel qu’il est en partie ; déjà dessus, laissé où le joueur l’a mis', () => {
+  // PinCab, 20/11/2026 : en partie, l'écran DMD est en (3840, -979) ; DmdDevice.ini plaçait le DMD en (5889, 286).
+  const dmdScreen = { x: 3840, y: -979, width: 1920, height: 1080 };
+  assert.deepEqual(dmdMirrorPlacement({ x: 5889, y: 286, width: 1661, height: 415 }, dmdScreen), { x: 3840, y: -979 + 300, width: 1920, height: 480 });
+  // À cheval sur deux écrans : reposé aussi.
+  assert.ok(dmdMirrorPlacement({ x: 3800, y: -900, width: 800, height: 200 }, dmdScreen));
+  // Entier sur l'écran DMD : le réglage du joueur est gardé.
+  assert.equal(dmdMirrorPlacement({ x: 3900, y: -700, width: 1600, height: 400 }, dmdScreen), undefined);
+  // Pas d'écran DMD sur cette borne : rien.
+  assert.equal(dmdMirrorPlacement({ x: 5889, y: 286, width: 1661, height: 415 }, undefined), undefined);
 });
 
 test('BAM installé : la partie passe par BAM\\FPLoader.exe, avec la ligne des autres front-ends, depuis le dossier BAM', () => {

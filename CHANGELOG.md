@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.2
 
+- Future Pinball : la partie garde l'orientation du playfield de la session ; lancée sur celle de Windows (préversion précédente), la table s'affichait à l'envers.
+- Future Pinball : le DMD recopié par dmdext est posé par Cyber Pinball sur l'écran DMD tel qu'il est pendant la partie. Le plein écran du jeu fait déplacer des écrans par Windows, et la place écrite dans DmdDevice.ini tombait hors de tout écran. Un DMD que le joueur a déjà placé sur l'écran DMD reste où il est.
+- Catalogue : filtre « Jeux : pour Future Pinball », qui ne montre que les jeux ayant une version Future Pinball, ces versions en tête et conseillées. L'écran « Tables de Future Pinball » a son entrée « Trouver une table en ligne », qui ouvre le catalogue ainsi filtré.
 - Future Pinball : quand dmdext est installé avec le jeu et réglé (son DmdDevice.ini à côté de lui), le DMD que le jeu dessine dans son fronton est recopié sur l'écran DMD de la borne pendant la partie, comme avec PinUP Popper ; dmdext est fermé à la fin.
 - Future Pinball : les boutons d'une borne au Pinscape (ou à un encodeur en mode manette) répondent enfin en partie. Le jeu ne lit que le clavier ; Cyber Pinball lui rend chaque bouton sous la touche réglée dans ses préférences (flippers, lanceur, Start, crédit, secousses, MagnaSave), Exit quitte la table.
 - Future Pinball : comme Pinball FX3, la partie démarre sur l'orientation de Windows du playfield. Son plein écran remettait l'écran à 0° en pleine partie, ce qui décalait aussi le fronton et le DMD.

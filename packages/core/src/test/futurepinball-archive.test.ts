@@ -73,6 +73,18 @@ test('catalogue : un jeu qui n’existe qu’en Future Pinball y est, ses versio
   assert.deepEqual(partFiles(BOTH, 'table').map((f) => f.id), ['vpx1', 'fp1']);
 });
 
+test('filtre « Jeux : pour Future Pinball » : seulement les jeux qui en ont une version, et son site à elle', () => {
+  const vpxOnly = { id: 'vpxonly', name: 'Space Station', tableFiles: [{ id: 'v', tableFormat: 'VPX', urls: link(5) }] } as VpsGame;
+  const db = createVpsDb([BOTH, FP_ONLY, vpxOnly]);
+  assert.deepEqual(catalog(db, { kind: 'futurepinball' }, new Set()).map((g) => g.id).sort(), ['both', 'fponly']);
+  // Le site se juge sur la version Future Pinball : Medieval Madness a sa version VPX sur VPUniverse aussi.
+  const elsewhere = { ...BOTH, tableFiles: [BOTH.tableFiles![0]!, { ...BOTH.tableFiles![1]!, urls: [{ url: 'https://www.pinballnirvana.com/forums/resources/mm.12/' }] }] } as VpsGame;
+  assert.deepEqual(catalog(createVpsDb([elsewhere]), { kind: 'futurepinball', site: 'vpuniverse' }, new Set()).map((g) => g.id), []);
+  // Conseil dans ce catalogue : la version Future Pinball, même quand le jeu a une version VPX.
+  assert.equal(recommendVersion(BOTH, { futurePinball: true })?.file.id, 'fp1');
+  assert.equal(recommendVersion(BOTH)?.file.id, 'vpx1');
+});
+
 test('conseil : VPX quand il y en a une ; sinon la version Future Pinball la plus récente, avec la raison', () => {
   assert.equal(recommendVersion(BOTH)?.file.id, 'vpx1');
   const fp = recommendVersion(FP_ONLY);

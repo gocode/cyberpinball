@@ -192,6 +192,23 @@ export function futurePinballDmdMirror(install: Pick<FuturePinballInstall, 'game
   return undefined;
 }
 
+/**
+ * Place du DMD virtuel de dmdext pendant une partie de Future Pinball : sur l'écran DMD de la borne tel
+ * qu'il est à cet instant. Le passage du jeu en plein écran fait déplacer des écrans par Windows (PinCab,
+ * 20/11/2026 : DMD de y=90 à y=-979, fronton de x=5760 à x=3840), et la place écrite dans DmdDevice.ini
+ * (5889, 286) tombait hors de tout écran. Une fenêtre déjà entière sur l'écran DMD reste où elle est (le
+ * réglage du joueur) ; sinon, toute la largeur de l'écran, au format d'un DMD (4:1), au milieu.
+ * undefined : rien à faire (pas d'écran DMD, ou déjà dessus).
+ */
+export function dmdMirrorPlacement(window: Rect, dmdScreen: Rect | undefined): Rect | undefined {
+  if (!dmdScreen || window.width <= 0 || window.height <= 0) return undefined;
+  const inside = window.x >= dmdScreen.x && window.y >= dmdScreen.y && window.x + window.width <= dmdScreen.x + dmdScreen.width && window.y + window.height <= dmdScreen.y + dmdScreen.height;
+  if (inside) return undefined;
+  const width = dmdScreen.width;
+  const height = Math.min(dmdScreen.height, Math.round(width / 4));
+  return { x: dmdScreen.x, y: dmdScreen.y + Math.round((dmdScreen.height - height) / 2), width, height };
+}
+
 /** La ligne de commande telle que Windows la reçoit (journal, essais). */
 export function futurePinballCommandLine(command: Pick<FuturePinballCommand, 'file' | 'args'>): string {
   const quote = (a: string) => (/[\s"]/.test(a) ? `"${a}"` : a);

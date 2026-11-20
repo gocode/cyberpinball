@@ -97,6 +97,7 @@ import {
   vpsLabel,
   vpxVersions,
   tableVersions,
+  futurePinballVersions,
   isFuturePinballVersion,
   waitListProblems,
   CATALOG_DEFAULT,
@@ -1039,7 +1040,7 @@ export function createCatalog(ctx: CatalogContext) {
       const game = db?.games.find((g) => g.id === gameId);
       if (!game) return openCatalog();
       // Ce que l'installation rapide récupère pour la version conseillée (une fois : les ROM sont lues sur le disque).
-      const advice = recommendVersion(game);
+      const advice = advise(game);
       const fast = advice ? quickNeeds(needsOf(game, advice.file)) : undefined;
       ctx.show(() => buildGame(game, fast), at);
       loadThumbs(tableVersions(game).slice(0, 20).map(imageOf));
@@ -1055,14 +1056,20 @@ export function createCatalog(ctx: CatalogContext) {
     return {};
   }
 
+  /** Version conseillée ; catalogue filtré « pour Future Pinball » : la sienne, jamais celle de VPX. */
+  function advise(game: VpsGame): ReturnType<typeof recommendVersion> {
+    return recommendVersion(game, { futurePinball: filter.kind === 'futurepinball' });
+  }
+
   function buildGame(game: VpsGame, fast?: ReturnType<typeof quickNeeds>): Built {
-    const advice = recommendVersion(game);
+    const advice = advise(game);
     // La version que désigne la recherche par son édition (« Space Cadet Galaxy Edition »), puis la
     // conseillée, puis les autres, la plus récente d'abord.
     const wanted = filter.text ? versionForText(game, filter.text) : undefined;
     const rank = (v: { id: string }) => (v.id === wanted?.id ? 2 : 0) + (v.id === advice?.file.id ? 1 : 0);
-    // Les versions VPX d'abord, celles de Future Pinball ensuite (tableVersions), la conseillée en tête.
-    const all = tableVersions(game);
+    // Les versions VPX d'abord, celles de Future Pinball ensuite (tableVersions), la conseillée en tête ;
+    // catalogue filtré « pour Future Pinball » : les siennes d'abord.
+    const all = filter.kind === 'futurepinball' ? [...futurePinballVersions(game), ...vpxVersions(game)] : tableVersions(game);
     const versions = all
       .map((v, i) => ({ v, i }))
       .sort((x, y) => rank(y.v) - rank(x.v) || x.i - y.i)
@@ -1446,7 +1453,7 @@ export function createCatalog(ctx: CatalogContext) {
     } else {
       const fast = quickNeeds(needs);
       const installedHere = needs.some((n) => n.kind === 'table' && n.state === 'have');
-      if (!installedHere && fast.get.some((n) => !itemFor(game, n) || itemFor(game, n)!.state === 'waiting')) actions.push(quickAction(game, version, fast, recommendVersion(game)?.file.id === version.id));
+      if (!installedHere && fast.get.some((n) => !itemFor(game, n) || itemFor(game, n)!.state === 'waiting')) actions.push(quickAction(game, version, fast, advise(game)?.file.id === version.id));
     }
     // Chaque besoin donne sa carte et son action ; screenCards les range écran par écran, les actions dans l'ordre affiché.
     const views = new Map<NeedKind, NeedView>();
@@ -1776,7 +1783,7 @@ export function createCatalog(ctx: CatalogContext) {
       const db = await vpsDb();
       const game = db?.games.find((g) => g.id === gameId);
       if (!game) return openCatalog();
-      const version = versionId ? tableVersions(game).find((v) => v.id === versionId) : recommendVersion(game)?.file;
+      const version = versionId ? tableVersions(game).find((v) => v.id === versionId) : advise(game)?.file;
       if (!version) {
         notice = { text: t('Aucune version de ce jeu n’a de lien vivant : rien à récupérer.'), tone: 'warning' };
         return openGame(game.id);
@@ -2645,6 +2652,19 @@ export function createCatalog(ctx: CatalogContext) {
     open: (text?: string) => {
       if (!ctx.layout()) return open();
       withNotice(() => openCatalog(0, text));
+    },
+    /**
+     * Le catalogue filtré « Jeux : pour Future Pinball », depuis « Tables de Future Pinball » (20/11/2026 :
+     * ses tables y étaient, mais noyées parmi celles de VPX, et l'écran du jeu n'y menait pas). Le choix
+     * est gardé comme tout filtre : « Jeux » le change.
+     */
+    openFuturePinball: () => {
+      if (!ctx.layout()) return open();
+      loadChoice();
+      filter.kind = 'futurepinball';
+      filter.page = 0;
+      saveChoice();
+      withNotice(() => openCatalog(0));
     },
     /** Fiche d'un jeu de la base VPS : ses versions, l'installation rapide en tête. */
     openGame: (gameId: string) => withNotice(() => openGame(gameId)),

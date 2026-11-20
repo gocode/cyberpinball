@@ -37,11 +37,12 @@ import { vpxOrientationFix } from './vpx';
  * lancé par Cyber Pinball démarrait sur un playfield retourné à 180° pour la session, et son
  * passage en plein écran exclusif remettait l'écran à 0° en pleine partie. VPX garde l'orientation
  * de jeu : c'est pour lui qu'elle existe (vpxOrientationFix).
- * Future Pinball pareil (20/11/2026) : sa rotation (Préférences, RotateDegrees) se règle dans le jeu,
- * et son plein écran exclusif remettait le playfield à 0° en pleine partie, ce qui déplaçait aussi les
- * autres écrans de Windows (fronton et DMD décalés, fenêtres du front-end à recaler).
+ * Future Pinball n'y est PAS (essai sur un PinCab, 20/11/2026) : lancé sur l'orientation de Windows
+ * (0°), sa table s'affichait à l'envers ; sur celle de la session (180°), à l'endroit. Le déplacement
+ * des autres écrans en partie ne venait pas de l'orientation : il se produit aussi à 0°, au passage du
+ * jeu en plein écran (le DMD recopié est donc posé par Cyber Pinball, futurepinball-play.ts).
  */
-export const GAMES_ON_WINDOWS_ORIENTATION: readonly string[] = ['pinballfx3', 'futurepinball'];
+export const GAMES_ON_WINDOWS_ORIENTATION: readonly string[] = ['pinballfx3'];
 
 /** Vrai si le jeu `emulator` doit démarrer sur l'orientation de Windows (GAMES_ON_WINDOWS_ORIENTATION). */
 export function playsOnWindowsOrientation(emulator: string | undefined): boolean {

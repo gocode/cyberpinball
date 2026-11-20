@@ -64,6 +64,7 @@ export const messages: Record<string, string> = {
     'The VPS database has never been downloaded, and GitHub isn’t responding. Try again once the cabinet is online.',
   '{n} version VPX': '{n} VPX version',
   '{n} versions VPX': '{n} VPX versions',
+  'pour Future Pinball': 'for Future Pinball',
   '{n} version Future Pinball': '{n} Future Pinball version',
   '{n} versions Future Pinball': '{n} Future Pinball versions',
   '{n} version pour Future Pinball : la conseillée, puis la plus récente.': '{n} version for Future Pinball: the recommended one, then the most recent.',

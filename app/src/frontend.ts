@@ -314,7 +314,7 @@ import {
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4832,9 +4832,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     }
   }
 
-  // Pinball FX3 et Future Pinball : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec
-  // un autre front-end (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION) ; leurs réglages saisis à la
-  // main restent justes.
+  // Pinball FX3 : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec un autre front-end
+  // (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION) ; ses réglages saisis à la main restent justes.
+  // Future Pinball, non : il garde celle de la session (essai du 20/11/2026, table à l'envers à 0°).
   const windowsOrientation = simulated === undefined && playsOnWindowsOrientation(table.emulator);
   if (windowsOrientation) orientationForGame(zenName);
   closeTopmostWindows();
@@ -4878,6 +4878,14 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Future Pinball dessine son DMD dans son fronton : dmdext le recopie sur l'écran DMD (comme PinUP Popper),
   // quand il est installé avec le jeu ; lancé avant lui, fermé à la fin de la partie.
   const dmdMirror = simulated === undefined && command && fp?.dmdMirror ? startDmdMirror(fp.dmdMirror, (line) => console.log(line)) : undefined;
+  // Son DMD posé sur l'écran DMD tel qu'il est : le plein écran du jeu fait déplacer des écrans par Windows,
+  // la place écrite dans DmdDevice.ini tombait alors hors de tout écran (PinCab, 20/11/2026).
+  const dmdMirrorWatch = dmdMirror
+    ? setInterval(() => {
+        const placed = placeDmdMirror(dmdMirror.pid(), roleRects.find((r) => r.role === 'dmd')?.rect, () => listWindows((w) => w.visible), setWindowBounds);
+        if (placed) console.log(`${zenName} (${table.id}) : DMD recopié posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
+      }, 1000)
+    : undefined;
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
@@ -4897,6 +4905,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  if (dmdMirrorWatch) clearInterval(dmdMirrorWatch);
   dmdMirror?.stop();
   if (windowsOrientation) orientationAfterGame(zenName);
   stopZenKeys();

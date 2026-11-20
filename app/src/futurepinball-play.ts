@@ -6,7 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballJoystickKeys, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import { dmdMirrorPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballJoystickKeys, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
@@ -124,6 +124,21 @@ export function startDmdMirror(command: FuturePinballCommand, log: (line: string
       pid = undefined;
     },
   };
+}
+
+/**
+ * DMD recopié par dmdext (processus `pid`) posé sur l'écran DMD tel qu'il est maintenant (dmdMirrorPlacement) :
+ * appelé régulièrement pendant la partie, il suit les écrans que Windows déplace. Rend la place donnée.
+ */
+export function placeDmdMirror(pid: number | undefined, dmdScreen: Rect | undefined, windows: () => WindowInfo[], setBounds: (w: WindowInfo, r: Rect) => boolean): Rect | undefined {
+  if (pid === undefined || !dmdScreen) return undefined;
+  // Sa plus grande fenêtre visible : le DMD (pas une console ni une infobulle).
+  const own = windows().filter((w) => w.pid === pid && w.visible && w.rect.width > 0 && w.rect.height > 0);
+  const dmd = own.sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0];
+  if (!dmd) return undefined;
+  const to = dmdMirrorPlacement(dmd.rect, dmdScreen);
+  if (!to) return undefined;
+  return setBounds(dmd, to) ? to : undefined;
 }
 
 /**

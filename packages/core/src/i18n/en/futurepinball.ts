@@ -21,6 +21,7 @@ export const messages: Record<string, string> = {
   '{n} tables dans le front-end · ajouter celles de son dossier Tables': '{n} tables in the menu · add the ones from its Tables folder',
   'Ajouter les tables de son dossier Tables, ou des fichiers .fpt': 'Add the tables from its Tables folder, or .fpt files',
   'Choisir des fichiers .fpt…': 'Choose .fpt files…',
+  'Catalogue VPS, filtré sur les tables de {game} : téléchargée, rangée dans le jeu, ajoutée': 'VPS catalog, filtered on {game} tables: downloaded, put into the game, added',
   'Une table rangée ailleurs : clé USB, Téléchargements, autre disque': 'A table kept elsewhere: USB stick, Downloads, another drive',
   'Changer le dossier de {game}…': 'Change the {game} folder…',
   'Choisir le dossier de {game}…': 'Choose the {game} folder…',

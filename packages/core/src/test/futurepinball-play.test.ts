@@ -49,6 +49,7 @@ const play = require(path.join(REPO_ROOT, 'app', 'dist', 'futurepinball-play.js'
     log: (line: string) => void,
     system: { launch(file: string, args: string[], cwd: string): { pid?: number; on(event: 'error', cb: (error: Error) => void): void }; alive(pid: number): boolean; kill(pid: number): void },
   ): { pid(): number | undefined; stop(): void };
+  placeDmdMirror(pid: number | undefined, dmdScreen: FakeWindow['rect'] | undefined, windows: () => FakeWindow[], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
   placeFuturePinballWindow(w: FakeWindow, playfield: FakeWindow['rect'] | undefined, displays: FakeWindow['rect'][], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
 };
 
@@ -239,6 +240,23 @@ test('DMD recopié : dans le plan quand dmdext et son .ini sont là ; lancé pou
   const failed = play.startDmdMirror(plan.dmdMirror!, (l) => lines.push(l), { ...sys, launch: () => { throw new Error('ENOENT'); } });
   assert.equal(failed.pid(), undefined);
   assert.match(lines.join('\n'), /dmdext pas lancé \(ENOENT\)/);
+});
+
+test('DMD recopié : la plus grande fenêtre de dmdext posée sur l’écran DMD ; celles des autres processus jamais touchées', () => {
+  const dmdScreen = { x: 3840, y: -979, width: 1920, height: 1080 };
+  const moved: { pid: number; to: FakeWindow['rect'] }[] = [];
+  const set = (w: FakeWindow, r: FakeWindow['rect']) => (moved.push({ pid: w.pid, to: r }), true);
+  const virtualDmd = { ...win(321, 'Virtual DMD'), rect: { x: 5889, y: 286, width: 1661, height: 415 } };
+  const grip = { ...win(321, ''), rect: { x: 5889, y: 286, width: 12, height: 12 } };
+  const other = { ...win(55, 'Autre'), rect: { x: 5889, y: 286, width: 1661, height: 415 } };
+  assert.deepEqual(play.placeDmdMirror(321, dmdScreen, () => [grip, other, virtualDmd], set), { x: 3840, y: -679, width: 1920, height: 480 });
+  assert.deepEqual(moved.map((m) => m.pid), [321]);
+  // Déjà sur l'écran DMD, pas de DMD visible, pas d'écran DMD, pas de processus : rien.
+  assert.equal(play.placeDmdMirror(321, dmdScreen, () => [{ ...virtualDmd, rect: { x: 3900, y: -700, width: 1600, height: 400 } }], set), undefined);
+  assert.equal(play.placeDmdMirror(321, dmdScreen, () => [other], set), undefined);
+  assert.equal(play.placeDmdMirror(321, undefined, () => [virtualDmd], set), undefined);
+  assert.equal(play.placeDmdMirror(undefined, dmdScreen, () => [virtualDmd], set), undefined);
+  assert.equal(moved.length, 1);
 });
 
 test('placement : une fenêtre ouverte ailleurs est posée sur le playfield ; le plein écran n’est pas touché', () => {

@@ -33,6 +33,8 @@ export interface FuturePinballUiHost {
   pickFolder(): Promise<string | undefined>;
   /** Des fichiers .fpt, choisis où qu'ils soient. */
   pickTables(): Promise<string[] | undefined>;
+  /** Le catalogue de la base VPS, filtré sur les tables de Future Pinball. */
+  openCatalog(): void;
   openCustom(build: () => Built, at?: number): void;
   cursor(): number;
   task(message: string, work: () => Promise<void> | void): Promise<void>;
@@ -111,6 +113,14 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
         action,
         pick: true,
       };
+    });
+    // Ses tables au catalogue de la base VPS, déjà filtrées : téléchargées, rangées dans le jeu, ajoutées.
+    actions.push({
+      label: t('Trouver une table en ligne'),
+      detail: t('Catalogue VPS, filtré sur les tables de {game} : téléchargée, rangée dans le jeu, ajoutée', { game: FUTURE_PINBALL_NAME }),
+      icon: 'search',
+      key: 'fpt:catalog',
+      run: () => host.openCatalog(),
     });
     actions.push({
       label: t('Choisir des fichiers .fpt…'),

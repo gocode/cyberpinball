@@ -566,6 +566,8 @@ export function createLibrary(host: LibraryHost) {
     tablesDir: () => tablesDir(),
     tables: () => host.tables(),
     pickFolder: async () => (await pickPaths({ title: t('Dossier de {game}', { game: FUTURE_PINBALL_NAME }), icon: 'folder', purpose: tLater('Dossier de Future Pinball'), mode: 'folder', start: 'desktop' }))?.[0],
+    // Créé plus bas : lu au moment du choix.
+    openCatalog: () => catalogUi.openFuturePinball(),
     pickTables: () => pickPaths({ title: t('Tables de {game}', { game: FUTURE_PINBALL_NAME }), icon: 'import', purpose: tLater('Ajout d’une table de Future Pinball'), mode: 'files', filter: { label: t('Tables de {game}', { game: FUTURE_PINBALL_NAME }), extensions: ['fpt'] }, start: 'desktop' }),
     openCustom: (build, at) => openCustom(build, at),
     cursor: () => cursor,
