@@ -364,11 +364,20 @@ function setView(next) {
   if (next === 'jukebox' || next === 'player') renderJukebox();
 }
 
-/** Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique. */
+/**
+ * Une ligne de liste : icône, libellé (et sa pastille), détail ou raison, pastille rouge, chevron d'une rubrique.
+ * Une page hors de la borne (`item.link`, « Nous suivre ») : un lien que le téléphone ouvre lui-même,
+ * dans un onglet, sans rien envoyer à la borne (https seulement, vérifié par la borne et ici).
+ */
 function entryRow(item, opts) {
   const li = document.createElement('li');
-  const b = document.createElement('button');
-  b.type = 'button';
+  const link = typeof item.link === 'string' && /^https:\/\//.test(item.link) ? item.link : undefined;
+  const b = document.createElement(link ? 'a' : 'button');
+  if (link) {
+    b.href = link;
+    b.target = '_blank';
+    b.rel = 'noopener noreferrer';
+  } else b.type = 'button';
   b.className = 'entry';
   if (item.quiet) b.classList.add('quiet');
   if (item.back) b.classList.add('back');
@@ -411,13 +420,30 @@ function entryRow(item, opts) {
     b.append(dot);
   }
   if (opts.group) b.append(cyberIcon('chevron-right', 'entry-go'));
-  b.addEventListener('click', () => {
-    if (state !== 'paired') return;
-    if (navigator.vibrate) navigator.vibrate(12);
-    opts.run(b);
-  });
+  // Un lien s'ouvre de lui-même (le navigateur du téléphone) : rien ne part à la borne.
+  if (link) b.append(cyberIcon('link', 'entry-go'));
+  else
+    b.addEventListener('click', () => {
+      if (state !== 'paired') return;
+      if (navigator.vibrate) navigator.vibrate(12);
+      opts.run(b);
+    });
   li.append(b);
   return li;
+}
+
+/** Les réseaux de Cyber Pinball (« Nous suivre »), envoyés par la borne dans sa langue avec le catalogue. */
+function followLinks() {
+  const list = Array.isArray(window.cyberFollow) ? window.cyberFollow : [];
+  return list.filter((l) => l && typeof l.name === 'string' && typeof l.url === 'string' && /^https:\/\//.test(l.url));
+}
+
+/** « Nous suivre » au téléphone : la liste des réseaux, chacun un lien direct (pas de QR code, on est déjà sur le téléphone). */
+function openFollow(opener) {
+  const list = document.createElement('ul');
+  list.className = 'entry-list follow-list';
+  for (const l of followLinks()) list.append(entryRow({ label: l.name, detail: l.purpose, icon: l.icon, link: l.url }, { icons: true }));
+  openSheet(t('Nous suivre'), [], { text: t('Tutoriels vidéo, nouveautés, réponses à vos questions : retrouvez Cyber Pinball ici.'), top: [list], opener });
 }
 
 // ---------- Badges à choisir d'un appui (phrases préparées, réactions) ----------
@@ -1991,6 +2017,8 @@ $('top-more').addEventListener('click', () => {
     ...(mode === 'menu' && fieldShown ? [{ id: 'keys', label: t('Clavier : taper dans le champ ouvert à la borne'), run: () => openKeys(fieldShown, false, sameField(openedField, fieldShown)) }] : []),
     // Retours et propositions : le formulaire des retours, ouvert à la borne (on écrit au clavier du téléphone).
     ...(mode === 'menu' ? [{ id: 'feedback', label: t('Retours et propositions'), run: () => send({ t: 'open', id: 'feedback' }) }] : []),
+    // Nous suivre : Facebook, YouTube, GitHub, ouverts sur le téléphone même (la liste vient de la borne).
+    ...(followLinks().length ? [{ id: 'follow', label: t('Nous suivre'), run: () => openFollow($('top-more')) }] : []),
     ...(mode === 'menu' || sending ? [{ id: 'send', label: sending && upload.phase === 'sending' ? t('Envoi {pct} %', { pct: uploadPct() }) : t('Envoyer un fichier à la borne'), run: () => $('nav-send').click() }] : []),
     ...(kept && !standalone() && !relayShortcut() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : []),
     // Le raccourci qui suit la borne (adresse stable par Internet), toujours là quand la borne le donne.

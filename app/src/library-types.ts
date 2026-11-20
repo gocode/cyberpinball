@@ -466,6 +466,11 @@ export interface Action {
     caption?: string;
     hint?: string;
   };
+  /**
+   * Page web hors de la borne (« Nous suivre ») : à la télécommande, la ligne est un lien que le
+   * téléphone ouvre lui-même, au lieu d'envoyer Start à la borne. https seulement (remote-menus.ts).
+   */
+  link?: string;
   run: () => void | Promise<void>;
 }
 

@@ -17,6 +17,8 @@ import { app, BrowserWindow, ipcMain, screen, session, type Input } from 'electr
 import {
   AUDIO_ROLES,
   BUTTONS,
+  FOLLOW_URLS,
+  shortFollowUrl,
   PREVIOUS_KEY,
   buttonKeys,
   altGrPhantomControl,
@@ -157,6 +159,7 @@ import {
 } from '@cyberpinball/core';
 import { orientation } from './display-orientation';
 import { observedDisplays, orientationSimulated } from './displays';
+import { qrRows } from './remote-qr';
 import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { onKeyInput, sendableKey, sendableModifiers } from './key-input';
@@ -1033,6 +1036,18 @@ function quitGestures(): string[] {
   return gestures;
 }
 
+/** Matrice du QR code des tutoriels vidéo (core/follow.ts), calculée une fois. */
+let tutorialsQr: string[] | undefined;
+
+/**
+ * Qui veut quitter l'assistant est souvent bloqué : la question le dit, discrète, avec le QR code des
+ * tutoriels vidéo pas à pas (« Nous suivre », 20/11/2026), le temps de répondre.
+ */
+function quitHelp() {
+  tutorialsQr ??= qrRows(FOLLOW_URLS.youtube);
+  return { title: t('Bloqué ? Les tutoriels vidéo, pas à pas'), qr: tutorialsQr, url: shortFollowUrl(FOLLOW_URLS.youtube) };
+}
+
 /** Bouton, question et sortie : sur chaque écran, à chaque étape. */
 function quitView() {
   // Retour au menu qui attend la fin de l'installation de VPX : sa progression sous la destination.
@@ -1061,6 +1076,7 @@ function quitView() {
         exit: label([...exitKeys(), ...KEYS.back]),
         n: Math.max(0, Math.ceil((quit.deadline - Date.now()) / 1000)),
       }),
+      help: quitHelp(),
     },
   };
 }

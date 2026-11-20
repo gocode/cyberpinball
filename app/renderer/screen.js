@@ -414,6 +414,41 @@ function renderQuit(state) {
   hint.className = 'quit-hint';
   hint.textContent = q.dialog.hint;
   box.append(choices, hint);
+  if (q.dialog.help) box.append(quitHelp(q.dialog.help));
+}
+
+/** Bloqué ? Les tutoriels vidéo : un petit QR code à viser au téléphone, en bas de la question. */
+function quitHelp(help) {
+  const block = document.createElement('div');
+  block.className = 'quit-help';
+  const words = document.createElement('p');
+  const title = document.createElement('b');
+  title.textContent = help.title;
+  const url = document.createElement('span');
+  url.textContent = help.url;
+  words.append(title, url);
+  block.append(qrCanvas(help.qr), words);
+  return block;
+}
+
+/** Une matrice de QR code (lignes de « 0 » et « 1 ») dessinée net, avec sa marge blanche. */
+function qrCanvas(rows) {
+  const n = rows.length;
+  const quiet = 4;
+  const scale = 8;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'quit-help-qr';
+  canvas.width = canvas.height = (n + quiet * 2) * scale;
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', t('QR code des tutoriels vidéo'));
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#e6f0ec';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = '#030807';
+  rows.forEach((row, y) => {
+    for (let x = 0; x < n; x++) if (row[x] === '1') g.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+  });
+  return canvas;
 }
 
 function render(state) {

@@ -21,6 +21,8 @@ Windows 10 or 11, 64-bit. These links always fetch the latest version, straight 
 
 <p align="center"><sub><a href="https://www.youtube.com/watch?v=wXy39LGCA80">▶ The Cyber Pinball trailer, on YouTube</a></sub></p>
 
+<p align="center"><sub>Follow us: <a href="https://www.facebook.com/cyberpinball">news and your questions on Facebook</a> · <a href="https://www.youtube.com/@cyberpinball">step-by-step video tutorials on YouTube</a></sub></p>
+
 <p align="center"><img src="docs/images/en/cabinet.webp?v=509ed89f07" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper and the backglass of the same game, Neon Abyss, and the menu's animated DMD."></p>
 
 <p align="center"><sub>Tables shown are fictional.</sub></p>

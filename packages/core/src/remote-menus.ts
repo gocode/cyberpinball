@@ -59,6 +59,8 @@ export interface RemoteEntry {
   emoji?: string;
   /** Une ligne de chronologie (les Nouveautés) : le téléphone la dessine comme la borne, date, fil et bloc. */
   timeline?: RemoteTimeline;
+  /** Page web hors de la borne (« Nous suivre ») : le téléphone l'ouvre lui-même, dans un onglet. https seulement. */
+  link?: string;
 }
 
 /** Dessin d'une entrée au téléphone autre qu'une ligne de liste. */
@@ -241,6 +243,8 @@ export function toRemoteEntry(a: { label: string; detail?: string; icon?: string
 /** Une image pour le téléphone : un jeton de la borne, rien d'autre (ni chemin, ni autre adresse). */
 const REMOTE_IMAGE = /^images\/[A-Za-z0-9_-]{22}$/;
 const GROUP_MAX = 120;
+/** Un lien que le téléphone ouvre : https, sans espace ni guillemet, borné ; tout autre est retiré. */
+const REMOTE_LINK = /^https:\/\/[^\s"'<>\\]{1,300}$/;
 
 /** Liste bornée (REMOTE_ENTRIES_MAX) ; `current` ramené dans la liste ; les images, des jetons seulement. */
 export function remoteEntries(e: RemoteEntries): RemoteEntries {
@@ -248,9 +252,9 @@ export function remoteEntries(e: RemoteEntries): RemoteEntries {
     const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;
     const media = art?.media && REMOTE_IMAGE.test(art.media) ? art.media : undefined;
     const thumb = art?.thumb && REMOTE_IMAGE.test(art.thumb) ? art.thumb : undefined;
-    const { layout, count, emoji, timeline, ...rest } = item;
+    const { layout, count, emoji, timeline, link, ...rest } = item;
     const known = layout === 'chips' ? { layout, ...(count ? { count: remoteText(count, 12) } : {}), ...(emoji ? { emoji: remoteText(emoji, 16) } : {}) } : {};
-    const line = timeline ? { timeline: remoteTimeline(timeline) } : {};
+    const line = { ...(timeline ? { timeline: remoteTimeline(timeline) } : {}), ...(link && REMOTE_LINK.test(link) ? { link } : {}) };
     const bounded = rest.group ? { ...rest, ...known, ...line, group: remoteText(rest.group, GROUP_MAX) } : { ...rest, ...known, ...line };
     return wheel || media || thumb ? { ...bounded, art: { ...(wheel ? { wheel } : {}), ...(media ? { media } : {}), ...(thumb ? { thumb } : {}) } } : bounded;
   });

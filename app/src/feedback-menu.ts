@@ -129,6 +129,8 @@ export interface FeedbackMenuContext {
   shrinkImage?: ShrinkImage;
   /** Le contenu du rapport, page de la fiche technique, avec son retour. */
   openReportContents?(back: () => void): void;
+  /** La ligne discrète « Nous suivre » (follow-menu.ts), Retour revenant ici. */
+  follow?(back: () => void): Action;
   log(line: string): void;
 }
 
@@ -230,6 +232,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           self();
         },
       });
+      // Tutoriels et réponses ailleurs que sur la borne : une ligne discrète, avant Retour.
+      if (ctx.follow) actions.push(ctx.follow(self));
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       // Rapports en attente (le dossier d'envoi relu) : à l'ouverture de l'écran, gardé pour les touches.
       const queued = ctx.kept ? ctx.kept('rapports-en-attente', () => ctx.service.queuedCount()) : ctx.service.queuedCount();
@@ -569,7 +573,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     else if (report === 'queued') rows.push({ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] });
     else if (report === 'failed') rows.push({ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' });
     const home = () => open(back);
-    show(() => ({
+    const thanks = (): Built => ({
       heading: t('Merci !'),
       icon: 'check',
       subheading: t('Retours et propositions'),
@@ -577,10 +581,13 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       actions: [
         ...(id ? [{ label: t('Voir ma proposition'), icon: 'eye' as const, tone: 'ok' as const, run: () => openProposal(id, home) }] : []),
         { label: t('Toutes les propositions'), icon: 'inbox', ...(id ? {} : { tone: 'ok' as const }), run: home },
+        // En attendant la réponse : les tutoriels et les questions, ailleurs que sur la borne.
+        ...(ctx.follow ? [ctx.follow(() => show(thanks))] : []),
       ],
       // Le formulaire est derrière : Exit ramène au tableau, pas à un formulaire déjà envoyé.
       back: draft.context.signature ? back : home,
-    }));
+    });
+    show(thanks);
   }
 
   // ---------- Plantages ----------
@@ -654,8 +661,11 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       else if (result === 'failed') sections.push({ rows: [{ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' }] });
       else sections.push({ title: t('Ce qui part'), rows: what });
       const actions: Action[] = [];
-      if (result === 'sent' || result === 'queued') actions.push({ label: t('Retour'), icon: 'back', tone: 'ok', run: back });
-      else {
+      if (result === 'sent' || result === 'queued') {
+        actions.push({ label: t('Retour'), icon: 'back', tone: 'ok', run: back });
+        // En attendant la réponse : les tutoriels et les questions, ailleurs que sur la borne.
+        if (ctx.follow) actions.push(ctx.follow(() => show(build)));
+      } else {
         const ready = !sending && (!report.notified || Boolean(text) || box.files.length > 0);
         actions.push({
           label: !report.notified ? t('Envoyer le rapport') : text || !box.files.length ? t('Envoyer ma description') : t('Envoyer mes fichiers'),

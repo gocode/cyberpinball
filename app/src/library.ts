@@ -277,6 +277,7 @@ import {
   isFileLocked,
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
+import { createFollowMenu } from './follow-menu';
 import { prepareImport, unpackArchive } from './archives';
 import { importLinksRows } from './import-links-menu';
 import { importSpaceSection, importSpaceShort } from './import-space-menu';
@@ -1008,6 +1009,24 @@ export function createLibrary(host: LibraryHost) {
     },
   });
 
+  // « Nous suivre » (follow-menu.ts) : Facebook, YouTube, GitHub, ouverts depuis les écrans d'aide. La
+  // page dans le navigateur intégré, fermé à l'invité comme celui des crédits : il garde le QR code.
+  const follow = createFollowMenu({
+    library: { openCustom: (build, at) => openCustom(build, at), openSystem: () => openSystem() },
+    browse: (link) => {
+      if (!host.guest.allows('sheet.credits-web')) return false;
+      catalogUi.acquirer.show({
+        url: link.url,
+        game: 'Cyber Pinball', // i18n-ignore : nom du logiciel
+        expected: `${link.name} · ${link.purpose}`, // i18n-ignore : nom du réseau et texte déjà traduit
+        host: link.short,
+        status: t('{name} de Cyber Pinball. Fermer (Échap) revient au front-end.', { name: link.name }),
+        info: true,
+      });
+      return true;
+    },
+  });
+
   // ---------- Gestionnaire de téléchargements ----------
   // Tout ce qui arrive, d'un site ou d'un ami (packages/core/src/downloadmanager.ts) : la file
   // survit au redémarrage, chaque téléchargement repart seul quand sa source revient, et ramène à
@@ -1434,6 +1453,7 @@ export function createLibrary(host: LibraryHost) {
           return (image.getSize().width > 1920 ? image.resize({ width: 1920, quality: 'good' }) : image).toJPEG(82);
         },
         openReportContents: (back) => techSheet.openContents(back),
+        follow: (back) => follow.action(back),
         log: (line) => console.log(line),
       })
     : undefined;
@@ -3181,6 +3201,8 @@ export function createLibrary(host: LibraryHost) {
         run: () => feedback.openSendReport(doctorReport(table, findings, s.log), () => go(s)),
       });
     }
+    // Besoin d'aide pour un constat : les tutoriels vidéo et les questions, une ligne discrète.
+    if (s.findings && findings.length) actions.push(follow.action(() => go(s)));
     const ignoredRows: Row[] = [];
     for (const code of [...new Set((s.ignored ?? []).map((f) => f.code))]) {
       const same = (s.ignored ?? []).filter((f) => f.code === code);
@@ -5980,6 +6002,8 @@ export function createLibrary(host: LibraryHost) {
         return {
           ...entry,
           ...placed(index, back),
+          // Une page hors de la borne (« Nous suivre ») : le téléphone l'ouvre lui-même.
+          ...(a.link ? { link: a.link } : {}),
           // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
           pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
           focus: () => handleAction({ type: 'focus', index, id: ids[index] }),

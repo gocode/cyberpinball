@@ -718,6 +718,38 @@ body.pointer [data-act] {
   font-size: 2.2vmin;
 }
 
+/* Bloqué ? Les tutoriels vidéo : discret, sous la question, un petit QR code et son adresse. */
+.quit-help {
+  display: flex;
+  align-items: center;
+  gap: 2vmin;
+  margin-top: 2vmin;
+  padding-top: 2vmin;
+  border-top: 0.15vmin solid var(--tile-line);
+  text-align: left;
+  color: var(--quiet);
+  font-size: 2.2vmin;
+}
+
+.quit-help-qr {
+  width: 12vmin;
+  height: 12vmin;
+  border-radius: 0.5vmin;
+  image-rendering: pixelated;
+}
+
+.quit-help p {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vmin;
+  margin: 0;
+}
+
+.quit-help b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
 /* Numéro de l'écran, dans sa couleur propre : c'est ce qui distingue les écrans entre eux. */
 .number {
   font-size: 34vmin;

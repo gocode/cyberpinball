@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.2
 
+- « Nous suivre » : la page Facebook (francophone ou anglophone selon la langue de l'interface), les tutoriels vidéo sur YouTube et GitHub, en une liste. Le QR code de la ligne choisie s'ouvre sur le téléphone, Start ouvre la page dans le navigateur intégré. Une ligne discrète y mène depuis Retours et propositions, après l'envoi d'un retour ou d'un rapport, et depuis le diagnostic d'une table.
+- Télécommande : « Nous suivre » dans le menu ⋮ du téléphone, avec des liens qui s'ouvrent directement sur le téléphone, sans QR code.
+- Assistant : la question « Quitter sans enregistrer ? » montre aussi le QR code des tutoriels vidéo, pas à pas.
 - Préparation de VPX 10.9 : Cyber Pinball sait décrire la prochaine version de VPX à côté de la sienne (réglages, plugins renommés, écrans nommés avec leur position), et la faire essayer sur une borne de développement sans réinstaller ni toucher aux réglages de VPX 10.8.1. Les scores faits avec cette version d'essai restent sur la borne.
 - Future Pinball : la partie garde l'orientation du playfield de la session ; lancée sur celle de Windows (préversion précédente), la table s'affichait à l'envers.
 - Future Pinball : le DMD recopié par dmdext est posé par Cyber Pinball sur l'écran DMD tel qu'il est pendant la partie. Le plein écran du jeu fait déplacer des écrans par Windows, et la place écrite dans DmdDevice.ini tombait hors de tout écran. Un DMD que le joueur a déjà placé sur l'écran DMD reste où il est.

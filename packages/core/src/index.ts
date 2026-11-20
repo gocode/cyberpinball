@@ -245,6 +245,7 @@ export * from './terms';
 export * from './vr-sources';
 export * from './vr-ecrans';
 export * from './credits';
+export * from './follow';
 export * from './feedback';
 export * from './textedit';
 export * from './forget';

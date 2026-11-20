@@ -1605,6 +1605,11 @@ body:not([data-state='paired']) .menus {
   touch-action: pan-y;
 }
 
+/* Une page hors de la borne (« Nous suivre ») : un lien, dessiné comme les autres lignes. */
+a.entry {
+  text-decoration: none;
+}
+
 .entry:active,
 .entry.sent {
   border-color: var(--line-strong);

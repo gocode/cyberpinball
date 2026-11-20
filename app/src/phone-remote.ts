@@ -82,6 +82,7 @@ import {
   keptFingerprint,
   keptNameProof,
   REMOTE_NAME_PATH,
+  followLinks,
   language,
   localeOf,
   messagesOf,
@@ -864,7 +865,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     };
   }
 
-  /** Le catalogue de la langue, réduit aux textes de la page du téléphone. */
+  /**
+   * Le catalogue de la langue, réduit aux textes de la page du téléphone ; avec lui, les réseaux de
+   * « Nous suivre » (core/follow.ts) dans cette langue : le menu ⋮ du téléphone en fait des liens.
+   */
   function catalogue(): string {
     const lang = language();
     // Les pages du téléphone qu'il sert (PHONE_FILES) : un script ajouté a ses textes sans qu'on y pense.
@@ -873,7 +877,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8'))
       .join('\n');
     const messages = Object.fromEntries(Object.entries(messagesOf(lang)).filter(([k]) => page.includes(k)));
-    return `window.cyberI18n = ${JSON.stringify({ language: lang, locale: localeOf(lang), messages })};\n`;
+    const follow = followLinks(lang).map(({ network, icon, name, url, purpose }) => ({ network, icon, name, url, purpose }));
+    return `window.cyberI18n = ${JSON.stringify({ language: lang, locale: localeOf(lang), messages })};\nwindow.cyberFollow = ${JSON.stringify(follow)};\n`;
   }
 
   /**

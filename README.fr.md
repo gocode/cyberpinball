@@ -21,6 +21,8 @@ Windows 10 ou 11, 64 bits. Ces liens téléchargent toujours la dernière versio
 
 <p align="center"><sub><a href="https://www.youtube.com/watch?v=nXr4ikaEhh4">▶ Le trailer de Cyber Pinball, sur YouTube</a></sub></p>
 
+<p align="center"><sub>Nous suivre : <a href="https://www.facebook.com/cyberpinball.fr">les nouveautés et vos questions sur Facebook</a> · <a href="https://www.youtube.com/@cyberpinball">les tutoriels vidéo sur YouTube</a></sub></p>
+
 <p align="center"><img src="docs/images/fr/cabinet.webp?v=7cf14b1872" width="900" alt="L'écran des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper et le fronton du même jeu, Neon Abyss, et le DMD animé du menu."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>
