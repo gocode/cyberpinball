@@ -167,6 +167,31 @@ export function futurePinballCommand(install: Pick<FuturePinballInstall, 'exe' |
   return { file: install.exe, args: ['/open', table, '/play', '/exit'], cwd: install.gameDir };
 }
 
+/** DMD Extensions (dmdext, de freezy) : recopie un DMD dessiné par un jeu sur l'écran DMD de la borne. */
+export const DMDEXT_EXE = 'dmdext.exe';
+export const DMDEXT_INI = 'DmdDevice.ini';
+
+/**
+ * Le DMD que Future Pinball dessine dans sa fenêtre de fronton, recopié sur l'écran DMD de la borne
+ * (20/11/2026) : sans lui, l'écran DMD ne montrait que le front-end et le DMD restait dans le fronton.
+ * La ligne de PinUP Popper (option « FP_DMDExt ») : `dmdext mirror --source=futurepinball -q
+ * --virtual-stay-on-top --fps 60 -g "<table>" --use-ini="DmdDevice.ini"`, depuis le dossier de dmdext.
+ * Seulement quand dmdext est installé avec Future Pinball (son dossier, ou un sous-dossier dmdext) ET
+ * qu'il a son DmdDevice.ini à côté : c'est ce fichier qui place le DMD virtuel sur le bon écran ; sans
+ * lui, il s'ouvrirait n'importe où. undefined : rien à lancer.
+ */
+export function futurePinballDmdMirror(install: Pick<FuturePinballInstall, 'gameDir'>, table: string, exists: (p: string) => boolean = fs.existsSync): FuturePinballCommand | undefined {
+  if (/["\r\n\0]/.test(table)) return undefined;
+  for (const dir of [install.gameDir, path.join(install.gameDir, 'dmdext')]) {
+    const exe = path.join(dir, DMDEXT_EXE);
+    const ini = path.join(dir, DMDEXT_INI);
+    if (!exists(exe) || !exists(ini)) continue;
+    const game = path.basename(table, path.extname(table));
+    return { file: exe, args: ['mirror', '--source=futurepinball', '-q', '--virtual-stay-on-top', '--fps', '60', '-g', game, `--use-ini=${ini}`], cwd: dir };
+  }
+  return undefined;
+}
+
 /** La ligne de commande telle que Windows la reçoit (journal, essais). */
 export function futurePinballCommandLine(command: Pick<FuturePinballCommand, 'file' | 'args'>): string {
   const quote = (a: string) => (/[\s"]/.test(a) ? `"${a}"` : a);

@@ -314,7 +314,7 @@ import {
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4850,7 +4850,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     settleScreens('vpx');
     socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     // Écrans où le jeu dessine (mode borne, fenêtres annexes de Future Pinball) : laissés au jeu (game-screens.ts).
-    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)), simulated === undefined ? { name: zenName, pids: () => (game.pid === undefined ? [] : [game.pid]) } : undefined);
+    // Le DMD recopié par dmdext (Future Pinball) compte comme une fenêtre du jeu : l'écran DMD lui est laissé.
+    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)), simulated === undefined ? { name: zenName, pids: () => [game.pid, dmdMirror?.pid()].filter((p): p is number => p !== undefined) } : undefined);
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -4874,6 +4875,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         if (placed) console.log(`${zenName} (${table.id}) : fenêtre posée sur le playfield (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
       }
     : undefined;
+  // Future Pinball dessine son DMD dans son fronton : dmdext le recopie sur l'écran DMD (comme PinUP Popper),
+  // quand il est installé avec le jeu ; lancé avant lui, fermé à la fin de la partie.
+  const dmdMirror = simulated === undefined && command && fp?.dmdMirror ? startDmdMirror(fp.dmdMirror, (line) => console.log(line)) : undefined;
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
@@ -4893,6 +4897,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  dmdMirror?.stop();
   if (windowsOrientation) orientationAfterGame(zenName);
   stopZenKeys();
   stopJoystick();

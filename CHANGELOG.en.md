@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Future Pinball: when dmdext is installed with the game and set up (its DmdDevice.ini next to it), the DMD the game draws in its backglass is copied to the cabinet's DMD screen during the game, as with PinUP Popper; dmdext is closed at the end.
 - Future Pinball: the buttons of a Pinscape cabinet (or an encoder in gamepad mode) finally work in game. The game only reads the keyboard; Cyber Pinball hands it each button as the key set in its preferences (flippers, plunger, Start, credit, nudges, MagnaSave), Exit leaves the table.
 - Future Pinball: like Pinball FX3, the game starts on the playfield's Windows orientation. Its full screen used to reset the screen to 0° mid-game, which also shifted the backglass and the DMD.
 - Catalog: the Future Pinball versions from the VPS database (over 500, on Pinball Nirvana, VPUniverse and VPForums) are offered next to the VPX versions, marked as such; a game that only exists for Future Pinball is there too. Such a version needs only the table: no backglass, no ROM.

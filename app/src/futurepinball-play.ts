@@ -4,8 +4,9 @@
 // où est le jeu, la commande (`/open "<table>.fpt" /play /exit`, par FPLoader de BAM s'il est là ; le jeu
 // se ferme quand on quitte la table), ce qui empêche de jouer, et la place de sa fenêtre sur le playfield.
 
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballJoystickKeys, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import { findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballJoystickKeys, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
@@ -26,6 +27,8 @@ export interface FuturePinballPlan {
   name: string;
   why?: string;
   command?: FuturePinballCommand;
+  /** dmdext, qui recopie le DMD du jeu sur l'écran DMD (installé avec le jeu, et réglé) ; absent : rien. */
+  dmdMirror?: FuturePinballCommand;
   launchGame: ZenLaunchGame;
   /** Dernière ligne du message d'échec : ce qu'il faut vérifier. */
   failureHint: string;
@@ -56,14 +59,70 @@ export function futurePinballPlan(table: Pick<TableEntry, 'file'>, opts: FutureP
             : !command
               ? t('Ce chemin ne peut pas être donné à {game} : {file}.', { game: name, file: table.file })
               : undefined;
+  const dmdMirror = command && opts.install && opts.simulated === undefined && !why ? futurePinballDmdMirror(opts.install, table.file, exists) : undefined;
   return {
     name,
     ...(why ? { why } : {}),
     ...(command && opts.simulated === undefined ? { command } : {}),
+    ...(dmdMirror ? { dmdMirror } : {}),
     launchGame: command?.bam ? FUTURE_PINBALL_BAM_LAUNCH_GAME : FUTURE_PINBALL_LAUNCH_GAME,
     failureHint: command?.bam
       ? t('Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.')
       : t('Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
+  };
+}
+
+/** Ce que le DMD recopié demande au système : remplacé dans les essais. */
+export interface DmdMirrorSystem {
+  launch(file: string, args: string[], cwd: string): { pid?: number; on(event: 'error', cb: (error: Error) => void): void };
+  alive(pid: number): boolean;
+  kill(pid: number): void;
+}
+
+const realDmdMirrorSystem: DmdMirrorSystem = {
+  // Sa console cachée ; son DMD virtuel, une fenêtre à lui, reste visible.
+  launch: (file, args, cwd) => spawn(file, args, { cwd, detached: true, stdio: 'ignore', windowsHide: true }),
+  alive: (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EPERM';
+    }
+  },
+  kill: (pid) => {
+    try {
+      process.kill(pid);
+    } catch {
+      // Déjà parti.
+    }
+  },
+};
+
+/**
+ * Lance dmdext (futurePinballDmdMirror) pour la partie : son processus compte parmi ceux du jeu (l'écran DMD
+ * lui est laissé, game-screens.ts), et `stop` le ferme à la fin, par le numéro du processus lancé ici. Un
+ * échec de lancement ne gêne pas la partie : il est seulement noté.
+ */
+export function startDmdMirror(command: FuturePinballCommand, log: (line: string) => void, system: DmdMirrorSystem = realDmdMirrorSystem): { pid(): number | undefined; stop(): void } {
+  let pid: number | undefined;
+  try {
+    const child = system.launch(command.file, command.args, command.cwd);
+    pid = child.pid;
+    child.on('error', (error) => {
+      log(`${FUTURE_PINBALL_NAME} : dmdext pas lancé (${error.message}) ; la partie continue sans DMD recopié.`); // i18n-ignore : journal
+      pid = undefined;
+    });
+    log(`${FUTURE_PINBALL_NAME} : DMD recopié sur l'écran DMD par ${command.file} (processus ${pid ?? '?'}).`); // i18n-ignore : journal
+  } catch (error) {
+    log(`${FUTURE_PINBALL_NAME} : dmdext pas lancé (${(error as Error).message}) ; la partie continue sans DMD recopié.`); // i18n-ignore : journal
+  }
+  return {
+    pid: () => pid,
+    stop: () => {
+      if (pid !== undefined && system.alive(pid)) system.kill(pid);
+      pid = undefined;
+    },
   };
 }
 

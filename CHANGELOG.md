@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Future Pinball : quand dmdext est installé avec le jeu et réglé (son DmdDevice.ini à côté de lui), le DMD que le jeu dessine dans son fronton est recopié sur l'écran DMD de la borne pendant la partie, comme avec PinUP Popper ; dmdext est fermé à la fin.
 - Future Pinball : les boutons d'une borne au Pinscape (ou à un encodeur en mode manette) répondent enfin en partie. Le jeu ne lit que le clavier ; Cyber Pinball lui rend chaque bouton sous la touche réglée dans ses préférences (flippers, lanceur, Start, crédit, secousses, MagnaSave), Exit quitte la table.
 - Future Pinball : comme Pinball FX3, la partie démarre sur l'orientation de Windows du playfield. Son plein écran remettait l'écran à 0° en pleine partie, ce qui décalait aussi le fronton et le DMD.
 - Catalogue : les versions Future Pinball de la base VPS (plus de 500, sur Pinball Nirvana, VPUniverse et VPForums) sont proposées à côté des versions VPX, marquées comme telles ; un jeu qui n'existe qu'en Future Pinball y est aussi. Pour une telle version, il ne faut que la table : ni fronton, ni ROM.

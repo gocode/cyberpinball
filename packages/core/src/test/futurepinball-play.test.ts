@@ -43,7 +43,12 @@ const play = require(path.join(REPO_ROOT, 'app', 'dist', 'futurepinball-play.js'
   futurePinballPlan(
     table: { file: string },
     opts: { simulated?: string; mode?: 'display'; install?: { exe: string; gameDir: string; tablesDir: string; source: string; loader?: string }; exists?: (p: string) => boolean },
-  ): { name: string; why?: string; command?: { file: string; args: string[]; cwd: string; bam?: true }; launchGame: unknown; failureHint: string };
+  ): { name: string; why?: string; command?: { file: string; args: string[]; cwd: string; bam?: true }; dmdMirror?: { file: string; args: string[]; cwd: string }; launchGame: unknown; failureHint: string };
+  startDmdMirror(
+    command: { file: string; args: string[]; cwd: string },
+    log: (line: string) => void,
+    system: { launch(file: string, args: string[], cwd: string): { pid?: number; on(event: 'error', cb: (error: Error) => void): void }; alive(pid: number): boolean; kill(pid: number): void },
+  ): { pid(): number | undefined; stop(): void };
   placeFuturePinballWindow(w: FakeWindow, playfield: FakeWindow['rect'] | undefined, displays: FakeWindow['rect'][], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
 };
 
@@ -210,6 +215,30 @@ test('partie par BAM : le jeu fermé sans fenêtre, ou FPLoader arrêté sans ou
   const r2 = await second.done;
   assert.equal(r2.failure, 'crash');
   assert.match(r2.message ?? '', /lanceur \(BAM\)/);
+});
+
+test('DMD recopié : dans le plan quand dmdext et son .ini sont là ; lancé pour la partie, fermé à la fin par son numéro', () => {
+  const has = (p: string) => !/dmdext|DmdDevice/i.test(p) || p.startsWith(INSTALL.gameDir);
+  const plan = play.futurePinballPlan({ file: TABLE }, { install: INSTALL as never, exists: has });
+  assert.equal(plan.dmdMirror?.file, `${INSTALL.gameDir}\\dmdext.exe`);
+  assert.deepEqual(plan.dmdMirror?.args.slice(0, 2), ['mirror', '--source=futurepinball']);
+  assert.equal(play.futurePinballPlan({ file: TABLE }, { install: INSTALL as never, exists: (p) => !/dmdext|DmdDevice/i.test(p) }).dmdMirror, undefined, 'pas de dmdext : rien');
+  assert.equal(play.futurePinballPlan({ file: TABLE }, { simulated: '', exists: () => true }).dmdMirror, undefined, 'partie simulée : rien');
+
+  const living = new Set([321]);
+  const killed: number[] = [];
+  const lines: string[] = [];
+  const sys = { launch: () => ({ pid: 321, on: () => undefined }), alive: (p: number) => living.has(p), kill: (p: number) => (killed.push(p), living.delete(p)) };
+  const mirror = play.startDmdMirror(plan.dmdMirror!, (l) => lines.push(l), sys);
+  assert.equal(mirror.pid(), 321);
+  assert.match(lines.join('\n'), /DMD recopié/);
+  mirror.stop();
+  mirror.stop();
+  assert.deepEqual(killed, [321], 'fermé une seule fois, par le numéro du processus lancé');
+  // Lancement impossible : noté, la partie continue.
+  const failed = play.startDmdMirror(plan.dmdMirror!, (l) => lines.push(l), { ...sys, launch: () => { throw new Error('ENOENT'); } });
+  assert.equal(failed.pid(), undefined);
+  assert.match(lines.join('\n'), /dmdext pas lancé \(ENOENT\)/);
 });
 
 test('placement : une fenêtre ouverte ailleurs est posée sur le playfield ; le plein écran n’est pas touché', () => {

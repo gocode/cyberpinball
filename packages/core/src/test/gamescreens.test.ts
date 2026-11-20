@@ -130,9 +130,10 @@ test('branchement : les écrans changés reposent les fenêtres, et les jeux aut
   const frontend = frontendSource();
   // Écrans qui ont fini de changer : les fenêtres suivent leur écran avant toute reprise.
   assert.match(frontend, /onScreensSettled\(\(\) => \{\s*followMenuScreens\(\);\s*return playing \|\| launch \|\| recoverScreens\('displays'\);/);
-  // Partie de Zen ou de Future Pinball : relevé des écrans par les fenêtres du processus du jeu.
+  // Partie de Zen ou de Future Pinball : relevé des écrans par les fenêtres du processus du jeu, et de
+  // dmdext qui recopie le DMD de Future Pinball sur l'écran DMD (20/11/2026).
   const zen = frontend.slice(frontend.indexOf('async function playPinballFx('), frontend.indexOf('async function play(table'));
-  assert.match(zen, /watchOccupied\([^;]*\{ name: zenName, pids: \(\) => \(game\.pid === undefined \? \[\] : \[game\.pid\]\) \}/);
+  assert.match(zen, /watchOccupied\([^;]*\{ name: zenName, pids: \(\) => \[game\.pid, dmdMirror\?\.pid\(\)\]\.filter\(/);
   assert.match(zen, /stopWatchOccupied\(\)/);
   // VPX : le relevé de toujours (toute fenêtre d'un autre processus), sans jeu désigné.
   assert.match(frontend, /watchOccupied\(simulated\?\.split\(','\)\.filter\(\(r\): r is RoleId => ROLES\.some\(\(x\) => x\.id === r\)\)\);/);

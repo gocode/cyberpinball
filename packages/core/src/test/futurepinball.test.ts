@@ -15,6 +15,7 @@ import {
   futurePinballCandidates,
   futurePinballCommand,
   futurePinballCommandLine,
+  futurePinballDmdMirror,
   futurePinballInstalledTables,
   futurePinballName,
   futurePinballPlacement,
@@ -104,6 +105,27 @@ test('ligne de commande exacte : "Future Pinball.exe" /open "<table>.fpt" /play 
   // Un chemin que la ligne de commande ne saurait passer, ou pas une table : refusé, jamais lancé.
   assert.equal(futurePinballCommand(install, 'D:\\a"b.fpt'), undefined);
   assert.equal(futurePinballCommand(install, 'D:\\table.vpx'), undefined);
+});
+
+test('DMD recopié : dmdext du dossier du jeu, avec son DmdDevice.ini, la ligne de PinUP Popper ; sans .ini, rien', () => {
+  const root = tmp();
+  const game = fakeGame(root);
+  const table = 'D:\\Cyber Pinball\\Tables\\Retroflair (Original 2012)\\Retroflair - BAM Edition.fpt';
+  assert.equal(futurePinballDmdMirror({ gameDir: game }, table), undefined, 'pas de dmdext');
+  fs.writeFileSync(path.join(game, 'dmdext.exe'), '');
+  assert.equal(futurePinballDmdMirror({ gameDir: game }, table), undefined, 'dmdext sans son DmdDevice.ini : son DMD virtuel s’ouvrirait n’importe où');
+  fs.writeFileSync(path.join(game, 'DmdDevice.ini'), '[virtualdmd]\nenabled = true\n');
+  assert.deepEqual(futurePinballDmdMirror({ gameDir: game }, table), {
+    file: path.join(game, 'dmdext.exe'),
+    args: ['mirror', '--source=futurepinball', '-q', '--virtual-stay-on-top', '--fps', '60', '-g', 'Retroflair - BAM Edition', `--use-ini=${path.join(game, 'DmdDevice.ini')}`],
+    cwd: game,
+  });
+  // Rangé dans un sous-dossier dmdext du jeu : trouvé aussi.
+  const other = fakeGame(path.join(root, 'autre'));
+  fs.mkdirSync(path.join(other, 'dmdext'));
+  fs.writeFileSync(path.join(other, 'dmdext', 'dmdext.exe'), '');
+  fs.writeFileSync(path.join(other, 'dmdext', 'DmdDevice.ini'), '');
+  assert.equal(futurePinballDmdMirror({ gameDir: other }, table)?.cwd, path.join(other, 'dmdext'));
 });
 
 test('BAM installé : la partie passe par BAM\\FPLoader.exe, avec la ligne des autres front-ends, depuis le dossier BAM', () => {
