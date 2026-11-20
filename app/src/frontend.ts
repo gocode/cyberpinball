@@ -314,7 +314,7 @@ import {
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeFuturePinballWindow } from './futurepinball-play';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4832,9 +4832,10 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     }
   }
 
-  // Pinball FX3 : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec un autre front-end
-  // (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION) ; ses réglages saisis à la main restent justes.
-  const windowsOrientation = simulated === undefined && playsOnWindowsOrientation(zenKey);
+  // Pinball FX3 et Future Pinball : le playfield retrouve l'orientation de Windows, le bureau qu'il a avec
+  // un autre front-end (sessionorientation.ts, GAMES_ON_WINDOWS_ORIENTATION) ; leurs réglages saisis à la
+  // main restent justes.
+  const windowsOrientation = simulated === undefined && playsOnWindowsOrientation(table.emulator);
   if (windowsOrientation) orientationForGame(zenName);
   closeTopmostWindows();
   playing = table;
@@ -4878,7 +4879,13 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       ? simulateVpx({ onPlaying, onForeground })
       : launchPinballFx({ command, game: fx3?.store === 'folder' ? { ...launchGame, direct: true } : launchGame, exitHeld: vrFront.exitHeldNow, onPlaying, onForeground, ...(onWindow ? { onWindow } : {}) });
   // Pinscape et encodeurs en mode manette : leurs boutons rendus au jeu de Zen comme des touches (zen-keys.ts).
-  const stopZenKeys = simulated === undefined && command && zenKey ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, zenKey) : () => undefined;
+  // Future Pinball ne lit que le clavier, lui aussi : ses touches viennent de ses préférences (futurepinball-play.ts).
+  const stopZenKeys =
+    simulated === undefined && command && zenKey
+      ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, zenKey)
+      : simulated === undefined && command && fp
+        ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, undefined, { name: zenName, keys: futurePinballButtonKeys({ buttons, navigation }) })
+        : () => undefined;
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');

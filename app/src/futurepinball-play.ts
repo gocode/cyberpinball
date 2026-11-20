@@ -5,8 +5,8 @@
 // se ferme quand on quitte la table), ce qui empêche de jouer, et la place de sa fenêtre sur le playfield.
 
 import * as fs from 'node:fs';
-import { findFuturePinball, FUTURE_PINBALL_NAME, futurePinballCommand, futurePinballPlacement, t, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
-import type { WindowInfo } from '@cyberpinball/win-displays';
+import { findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballJoystickKeys, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
 /** Hors écran, les démonstrations donnent un faux Future Pinball (dossier contenant « Future Pinball.exe »). */
@@ -65,6 +65,15 @@ export function futurePinballPlan(table: Pick<TableEntry, 'file'>, opts: FutureP
       ? t('Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.')
       : t('Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
   };
+}
+
+/**
+ * Boutons de joystick de la borne et les touches que Future Pinball attend pour leur rôle, d'après ses
+ * préférences (registre de l'utilisateur ; ses réglages d'origine si elles manquent). Pour le relais
+ * des boutons (zen-keys.ts) : sans lui, une borne au Pinscape ne pouvait rien faire en partie.
+ */
+export function futurePinballButtonKeys(source: ButtonsSource, read: (value: string) => unknown = (value) => hkcuValue(FUTURE_PINBALL_PLAYER_KEY, value)): Map<string, string[]> {
+  return futurePinballJoystickKeys(source, read);
 }
 
 /**

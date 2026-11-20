@@ -252,3 +252,4 @@ export * from './autres-vpx';
 export * from './vpx-format';
 export * from './futurepinball';
 export * from './futurepinball-archive';
+export * from './futurepinball-keys';

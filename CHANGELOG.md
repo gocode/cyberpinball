@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Future Pinball : les boutons d'une borne au Pinscape (ou à un encodeur en mode manette) répondent enfin en partie. Le jeu ne lit que le clavier ; Cyber Pinball lui rend chaque bouton sous la touche réglée dans ses préférences (flippers, lanceur, Start, crédit, secousses, MagnaSave), Exit quitte la table.
+- Future Pinball : comme Pinball FX3, la partie démarre sur l'orientation de Windows du playfield. Son plein écran remettait l'écran à 0° en pleine partie, ce qui décalait aussi le fronton et le DMD.
 - Catalogue : les versions Future Pinball de la base VPS (plus de 500, sur Pinball Nirvana, VPUniverse et VPForums) sont proposées à côté des versions VPX, marquées comme telles ; un jeu qui n'existe qu'en Future Pinball y est aussi. Pour une telle version, il ne faut que la table : ni fronton, ni ROM.
 - Une archive de table Future Pinball reçue (catalogue ou Téléchargements) est rangée dans le jeu : le .fpt dans Tables, les bibliothèques (.fpl) dans Libraries, la musique, les scripts et les réglages de BAM à leur place, sans rien écraser ; la table arrive sur la roue avec le nom du jeu choisi et sa version notée. Avant, elle restait « non rangée », ou ses fichiers allaient dans le dossier d'une table VPX du même jeu.
 - Future Pinball : quand BAM est installé (dossier BAM du jeu avec FPLoader.exe), la partie passe par lui, comme avec les autres front-ends ; les tables récentes (physique FizX) se jouent enfin comme prévu. La fiche de la table dit si BAM est là.

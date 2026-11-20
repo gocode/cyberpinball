@@ -156,9 +156,17 @@ function isJoystickCode(code: string | undefined): code is string {
  * incohérent : touches par défaut, rien à rejouer). Un bouton du clavier n'y est pas (il arrive déjà au jeu).
  */
 export function zenJoystickKeys(source: ButtonsSource, zenGame?: ZenGameKey): Map<string, string[]> {
+  return joystickKeysFor(source, zenGameKeys(zenGame));
+}
+
+/**
+ * Pour chaque bouton de joystick de la borne, les touches de son rôle d'après `table` (touches d'un jeu
+ * qui ne lit que le clavier : jeux de Zen, Future Pinball). Un bouton du clavier n'y est pas.
+ */
+export function joystickKeysFor(source: ButtonsSource, table: Partial<Record<ButtonId, string[]>>): Map<string, string[]> {
   const map = new Map<string, string[]>();
   const game = buttonKeys(source?.buttons);
-  for (const [id, keys] of Object.entries(zenGameKeys(zenGame)) as [ButtonId, string[]][]) {
+  for (const [id, keys] of Object.entries(table) as [ButtonId, string[]][]) {
     const code = game[id];
     if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
   }

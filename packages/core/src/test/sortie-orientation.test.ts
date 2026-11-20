@@ -214,6 +214,7 @@ for (const [name, exit] of Object.entries(EXITS)) {
 // pour la session ; ses réglages de mode borne, saisis à la main, ne valaient plus avec un autre front-end.
 test('Pinball FX3 démarre sur l’orientation de Windows, comme lancé par un autre front-end ; VPX garde celle de jeu', () => {
   assert.equal(playsOnWindowsOrientation('pinballfx3'), true);
+  assert.equal(playsOnWindowsOrientation('futurepinball'), true, 'Future Pinball : son plein écran exclusif remettait le playfield à 0° en partie');
   assert.equal(playsOnWindowsOrientation('vpx'), false, 'VPX : l’orientation de jeu est faite pour lui');
   assert.equal(playsOnWindowsOrientation(undefined), false);
   for (const [fixtureName, b] of bornes()) {
@@ -234,7 +235,7 @@ test('Pinball FX3 démarre sur l’orientation de Windows, comme lancé par un a
   }
 });
 
-test('frontend.ts : la partie d’un jeu de Zen rend l’orientation de Windows avant le lancement et la reprend après', () => {
+test('frontend.ts : la partie d’un jeu de Zen ou de Future Pinball rend l’orientation de Windows avant le lancement et la reprend après', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   const body = src.slice(src.indexOf('async function playPinballFx('));
   const forGame = body.indexOf('orientationForGame(');
@@ -243,7 +244,8 @@ test('frontend.ts : la partie d’un jeu de Zen rend l’orientation de Windows 
   const after = body.indexOf('orientationAfterGame(');
   assert.ok(forGame > 0 && forGame < launch, 'orientation de Windows rendue avant de lancer le jeu');
   assert.ok(after > done, 'orientation de jeu reprise une fois la partie finie');
-  assert.match(body.slice(0, forGame), /playsOnWindowsOrientation\(zenKey\)/);
+  // Le logiciel de la table, pas seulement la clé des jeux de Zen : Future Pinball en est aussi.
+  assert.match(body.slice(0, forGame), /playsOnWindowsOrientation\(table\.emulator\)/);
 });
 
 test('orientation : l’origine est notée dans le fichier avant de tourner l’écran', () => {

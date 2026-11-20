@@ -1,3 +1,6 @@
+// Future Pinball aussi (20/11/2026) : il ne lit que le clavier, les touches de ses préférences
+// (packages/core/src/futurepinball-keys.ts).
+//
 // Boutons de joystick de la borne rendus aux jeux de Zen (Pinball FX, Pinball FX3) comme des
 // touches du clavier, pendant la partie : ces jeux ne lisent pas un joystick DirectInput (Pinscape,
 // encodeur en mode manette), seulement le clavier et les manettes XInput. Correspondance et raisons
@@ -51,9 +54,17 @@ const realSystem: ZenKeysSystem = {
  * aucun bouton n'est à rejouer. À l'arrêt, le journal compte les appuis envoyés au jeu et ceux
  * gardés (jeu pas au premier plan).
  */
-export function bridgeZenKeys(source: ButtonsSource, gamePid: () => number | undefined, system: ZenKeysSystem = realSystem, game?: ZenGameKey): () => void {
-  const keys = zenJoystickKeys(source, game);
-  const echoes = system.keysDown && system.every ? zenKeyboardEchoes(source, game) : new Map<string, string[]>();
+export function bridgeZenKeys(
+  source: ButtonsSource,
+  gamePid: () => number | undefined,
+  system: ZenKeysSystem = realSystem,
+  game?: ZenGameKey,
+  /** Autre jeu qui ne lit que le clavier (Future Pinball, 20/11/2026) : son nom et ses touches par bouton de joystick. */
+  other?: { name: string; keys: Map<string, string[]> },
+): () => void {
+  const keys = other ? other.keys : zenJoystickKeys(source, game);
+  const echoes = !other && system.keysDown && system.every ? zenKeyboardEchoes(source, game) : new Map<string, string[]>();
+  const label = other ? other.name : 'Jeu de Zen'; // i18n-ignore : journal
   if (keys.size === 0 && echoes.size === 0) return () => undefined;
   const presser = new ZenKeyPresser(new Map([...keys, ...echoes]));
   let sent = 0;
@@ -94,12 +105,12 @@ export function bridgeZenKeys(source: ButtonsSource, gamePid: () => number | und
         }
       })
     : () => undefined;
-  if (keys.size) console.log(`Jeu de Zen : ${keys.size} bouton(s) du joystick rendus au jeu comme des touches du clavier.`); // i18n-ignore : journal
-  if (polled.length) console.log(`Jeu de Zen : ${polled.length} flipper(s) au clavier (${polled.map((p) => p.code).join(', ')}) doublés des flèches des menus.`); // i18n-ignore : journal
+  if (keys.size) console.log(`${label} : ${keys.size} bouton(s) du joystick rendus au jeu comme des touches du clavier.`); // i18n-ignore : journal
+  if (polled.length) console.log(`${label} : ${polled.length} flipper(s) au clavier (${polled.map((p) => p.code).join(', ')}) doublés des flèches des menus.`); // i18n-ignore : journal
   return () => {
     stopWatch();
     stopPoll();
     for (const key of presser.releaseAll()) send(key, false);
-    console.log(`Jeu de Zen : ${sent} appui(s) de bouton envoyé(s) au jeu, ${held} gardé(s) (jeu pas au premier plan).`); // i18n-ignore : journal
+    console.log(`${label} : ${sent} appui(s) de bouton envoyé(s) au jeu, ${held} gardé(s) (jeu pas au premier plan).`); // i18n-ignore : journal
   };
 }

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Future Pinball: the buttons of a Pinscape cabinet (or an encoder in gamepad mode) finally work in game. The game only reads the keyboard; Cyber Pinball hands it each button as the key set in its preferences (flippers, plunger, Start, credit, nudges, MagnaSave), Exit leaves the table.
+- Future Pinball: like Pinball FX3, the game starts on the playfield's Windows orientation. Its full screen used to reset the screen to 0° mid-game, which also shifted the backglass and the DMD.
 - Catalog: the Future Pinball versions from the VPS database (over 500, on Pinball Nirvana, VPUniverse and VPForums) are offered next to the VPX versions, marked as such; a game that only exists for Future Pinball is there too. Such a version needs only the table: no backglass, no ROM.
 - A received Future Pinball table archive (catalog or Downloads) is put into the game: the .fpt in Tables, the libraries (.fpl) in Libraries, music, scripts and BAM settings in their place, without overwriting anything; the table reaches the wheel with the chosen game's name and its version noted. Before, it stayed "not filed", or its files went into the folder of a VPX table of the same game.
 - Future Pinball: when BAM is installed (the game's BAM folder with FPLoader.exe), the game starts through it, as with other front-ends; recent tables (FizX physics) finally play as intended. The table's sheet says whether BAM is there.
