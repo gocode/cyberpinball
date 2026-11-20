@@ -49,11 +49,16 @@ function walk(dir: string, found: string[], depth = 0): void {
   }
 }
 
-/** Ce dossier (archive extraite) contient-il une table de Future Pinball (.fpt), à n'importe quelle profondeur ? */
+/**
+ * Ce dossier (archive extraite) est-il pour Future Pinball : une table (.fpt), ou des bibliothèques (.fpl)
+ * seules, à n'importe quelle profondeur ? Une table est souvent livrée en deux archives, la table et ses
+ * bibliothèques de sons (Ghostbusters, 20/11/2026 : « ghostbusters_table_sounds-libs-v1.3.rar », quatre .fpl
+ * de musique, voix et sons, restées non rangées : la partie tournait sans elles).
+ */
 export function containsFuturePinballTable(dir: string): boolean {
   const all: string[] = [];
   walk(dir, all);
-  return all.some((f) => isFuturePinballTable(f));
+  return all.some((f) => isFuturePinballTable(f) || path.extname(f).toLowerCase() === '.fpl');
 }
 
 /**

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Future Pinball: an archive holding only libraries (.fpl), such as a table's sounds, voices and music shipped separately (Ghostbusters), is put into the game's Libraries folder. Before, it stayed unfiled and the table ran without them.
 - Future Pinball: a table's PuP-Pack ("PinEvent" tables, such as Retroflair BAM Edition) finally shows in its place. PinUP Player placed its windows from its own setting, written for another screen layout: its backglass covered 90% of the game's, shifted, and its DMD fell off every screen. During the game, Cyber Pinball puts each PuP-Pack window on its role's screen (backglass, FullDMD, topper) and goes behind it; PinUP's setting is left untouched.
 - Backglass: on the table screen, the backglass picture fills its whole screen, as during the game (Visual Pinball's B2S, Pinball FX3). A picture narrower than the screen (4:3 on a 16:9 screen) no longer has black bars around it.
 - Pinball FX: Cyber Pinball no longer places backglass pictures in the game's cabinet-mode folder (Table_<number>.png, PFX.png): the cabinet's backglass stays Cyber Pinball's, the table's media.

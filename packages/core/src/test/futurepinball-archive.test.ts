@@ -208,6 +208,21 @@ test('archive de Ghostbusters (RAR, 20/11/2026) : script .vbs dans Scripts, rég
   assert.ok(fs.existsSync(path.join(path.dirname(added.entry.file), 'ghostbusters.XML')));
 });
 
+test('archive de bibliothèques seules (Ghostbusters, sons livrés à part) : reconnue pour Future Pinball, rangée dans Libraries', async () => {
+  const root = tmp();
+  const archive = path.join(root, 'extrait');
+  const game = path.join(root, 'Future Pinball');
+  for (const n of ['musics', 'narrator', 'sounds', 'voices']) write(path.join(archive, 'ghostbusters', `ghostbuster_${n}.fpl`), n);
+  assert.equal(containsFuturePinballTable(archive), true, 'des .fpl seuls suffisent');
+  const r = await installFuturePinballArchive(archive, game);
+  assert.deepEqual(r.tables, []);
+  assert.deepEqual(fs.readdirSync(path.join(game, 'Libraries')).sort(), ['ghostbuster_musics.fpl', 'ghostbuster_narrator.fpl', 'ghostbuster_sounds.fpl', 'ghostbuster_voices.fpl']);
+  // Une archive sans rien pour Future Pinball, non.
+  const other = path.join(root, 'autre');
+  write(path.join(other, 'lisez-moi.txt'), 'x');
+  assert.equal(containsFuturePinballTable(other), false);
+});
+
 test('rangement : rien d’écrasé ; une table du même nom mais différente prend un autre nom, l’identique compte comme présente', async () => {
   const root = tmp();
   const archive = path.join(root, 'extrait');

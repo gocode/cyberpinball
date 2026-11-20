@@ -55,6 +55,7 @@ export const messages: Record<string, string> = {
   '{n} déjà dans le jeu, gardé tel quel.': '{n} already in the game, kept as is.',
   '{n} déjà dans le jeu, gardés tels quels.': '{n} already in the game, kept as is.',
   'Aucune table de {game} dans ce fichier.': 'No {game} table in this file.',
+  'Les tables qui se servent de ces bibliothèques les trouveront dans le jeu.': 'The tables that use these libraries will find them in the game.',
   // app/src/library.ts
   'Dossier de {game}': '{game} folder',
   'Dossier de Future Pinball': 'Future Pinball folder',

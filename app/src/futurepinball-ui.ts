@@ -277,7 +277,8 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       kept ? tn(kept, '{n} déjà dans le jeu, gardé tel quel.', '{n} déjà dans le jeu, gardés tels quels.') : undefined,
     ].filter((x): x is string => Boolean(x));
     if (!tables.length) {
-      notice = [...lead, t('Aucune table de {game} dans ce fichier.', { game: FUTURE_PINBALL_NAME })].join(' ');
+      // Archive de bibliothèques seules (sons, musique d'une table livrée en deux archives) : rangées, c'est tout.
+      notice = [...lead, copied || kept ? t('Les tables qui se servent de ces bibliothèques les trouveront dans le jeu.') : t('Aucune table de {game} dans ce fichier.', { game: FUTURE_PINBALL_NAME })].join(' ');
       if (opts.show !== false) open(host.cursor());
       return [];
     }
