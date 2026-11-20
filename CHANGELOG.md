@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Son de la borne : une prise n'est plus dite "branchée" que si elle sait détecter un câble (Windows le dit prise par prise). Une carte dont les prises ne détectent rien reste proposée en SSF, mais "à vérifier par le son", après les propositions en stéréo.
+- Son de la borne : un câble est détecté dans la prise des exciters mais rien n'a vibré pendant la vérification : le récapitulatif conseille de regarder l'ampli des exciters (allumé, volume), au lieu d'évoquer une carte à trois prises.
 - Pinball FX3 : depuis la version 0.2.2-essai.10, le jeu démarre sur l'écran du playfield tel que Windows l'oriente. Sur une borne où Cyber Pinball tourne cet écran pour Visual Pinball, l'orientation réglée auparavant dans le mode borne de FX3 donne une image à l'envers. Avant la prochaine partie de FX3, Cyber Pinball le dit une fois, avec l'ancienne et la nouvelle valeur à saisir (par exemple « passez Orientation de 270° à 90° ») ; Start ouvre le jeu pour la changer, Exit revient au front-end. Le message ne paraît que si FX3 a déjà été lancé par Cyber Pinball sur cette borne et si la valeur change vraiment.
 - Reprise des médias de PinUP Popper ou PinballX : la base du menu d'origine relie maintenant chaque jeu à son fichier .vpx. Les médias d'une table reprise sous un autre nom ("AC-DC Premium" pour "AC-DC LUCI Premium (Stern 2013).vpx") trouvent leur table.
 - Reprise des médias : un jeu dont la table est dans l'installation mais pas encore dans Cyber Pinball est signalé comme tel, et "Reprendre aussi ces tables" ouvre "Depuis une autre installation..." avec ces tables déjà cochées, pour les ajouter avec leur VPX et leurs médias.

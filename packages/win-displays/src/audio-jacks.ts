@@ -18,6 +18,9 @@ const IID_IMMDEVICE_ENUMERATOR = 'A95664D2-9614-4F35-A746-DE8DB63617E6';
 const IID_IDEVICE_TOPOLOGY = '2A07407E-6497-4A18-9787-32F79BD0D98F';
 const IID_IPART = 'AE2DE0E4-5BCA-4F2D-AA46-5D13F8FDB3A9';
 const IID_IKS_JACK_DESCRIPTION = '4509F757-2D46-4637-8E62-CE7DB944F57B';
+const IID_IKS_JACK_DESCRIPTION2 = '478F3A9B-E0C9-4827-9228-6F5505FFE76A';
+/** KSJACK_DESCRIPTION2.JackCapabilities : la prise sait détecter un câble. */
+const JACKDESC2_PRESENCE_DETECT_CAPABILITY = 0x1;
 
 // Indices (IUnknown : 0 QueryInterface, 1 AddRef, 2 Release).
 const QUERY_INTERFACE = 0;
@@ -29,11 +32,12 @@ const CONNECTOR_GET_CONNECTED_TO = 8;
 const PART_ACTIVATE = 13;
 const JACK_GET_COUNT = 3;
 const JACK_GET_DESCRIPTION = 4;
+const JACK_GET_DESCRIPTION2 = 4;
 
 interface Api {
   CoInitializeEx: (reserved: null, flags: number) => number;
   CoCreateInstance: (clsid: unknown, outer: null, ctx: number, iid: unknown, out: unknown[]) => number;
-  proto: Record<'release' | 'queryInterface' | 'getDevice' | 'activate' | 'getConnector' | 'getConnectedTo' | 'partActivate' | 'jackCount' | 'jackDescription', koffi.TypeObject>;
+  proto: Record<'release' | 'queryInterface' | 'getDevice' | 'activate' | 'getConnector' | 'getConnectedTo' | 'partActivate' | 'jackCount' | 'jackDescription' | 'jackDescription2', koffi.TypeObject>;
 }
 
 let api: Api | undefined;
@@ -51,6 +55,7 @@ function loadApi(): Api {
     PortConnection: 'int32_t',
     IsConnected: 'int32_t',
   });
+  koffi.struct('JK_DESCRIPTION2', { DeviceStateInfo: 'uint32_t', JackCapabilities: 'uint32_t' });
   api = {
     CoInitializeEx: ole32.func('int32_t __stdcall CoInitializeEx(void *reserved, uint32_t flags)'),
     CoCreateInstance: ole32.func('int32_t __stdcall CoCreateInstance(JK_GUID *clsid, void *outer, uint32_t ctx, JK_GUID *iid, _Out_ void **out)'),
@@ -64,6 +69,7 @@ function loadApi(): Api {
       partActivate: koffi.proto('int32_t __stdcall JK_PartActivate(void *self, uint32_t ctx, JK_GUID *iid, _Out_ void **out)'),
       jackCount: koffi.proto('int32_t __stdcall JK_GetJackCount(void *self, _Out_ uint32_t *count)'),
       jackDescription: koffi.proto('int32_t __stdcall JK_GetJackDescription(void *self, uint32_t index, _Out_ JK_DESCRIPTION *description)'),
+      jackDescription2: koffi.proto('int32_t __stdcall JK_GetJackDescription2(void *self, uint32_t index, _Out_ JK_DESCRIPTION2 *description)'),
     },
   };
   // Déjà initialisé par Electron sur ce fil (S_FALSE, RPC_E_CHANGED_MODE) : rien à refaire.
@@ -117,13 +123,17 @@ function jacksOf(w: Api, enumerator: unknown, id: string): ObservedAudioJack[] |
     // Le pilote ne décrit pas ses prises (E_NOINTERFACE) : rien à dire, sans erreur.
     const description = held.take((out) => call(part, PART_ACTIVATE, w.proto.partActivate, CLSCTX_INPROC_SERVER, guid(IID_IKS_JACK_DESCRIPTION), out));
     if (!description) return undefined;
+    // Capacité de détection (Windows 7 et plus) : sans elle, « branchée » ne dit rien.
+    const description2 = held.take((out) => call(part, PART_ACTIVATE, w.proto.partActivate, CLSCTX_INPROC_SERVER, guid(IID_IKS_JACK_DESCRIPTION2), out));
     const count = [0];
     if (call(description, JACK_GET_COUNT, w.proto.jackCount, count) < 0) return undefined;
     const jacks: ObservedAudioJack[] = [];
     for (let i = 0; i < count[0]!; i++) {
       const d: Record<string, number> = {};
       if (call(description, JACK_GET_DESCRIPTION, w.proto.jackDescription, i, d) < 0) continue;
-      jacks.push({ channelMapping: d.ChannelMapping! >>> 0, color: rgb(d.Color! >>> 0), geoLocation: d.GeoLocation!, connected: d.IsConnected !== 0 });
+      const d2: Record<string, number> = {};
+      const sensed = description2 && call(description2, JACK_GET_DESCRIPTION2, w.proto.jackDescription2, i, d2) >= 0 ? (d2.JackCapabilities! & JACKDESC2_PRESENCE_DETECT_CAPABILITY) !== 0 : undefined;
+      jacks.push({ channelMapping: d.ChannelMapping! >>> 0, color: rgb(d.Color! >>> 0), geoLocation: d.GeoLocation!, connected: d.IsConnected !== 0, ...(sensed !== undefined && { presenceDetect: sensed }) });
     }
     return jacks;
   } finally {

@@ -44,11 +44,17 @@ export interface AudioSetup {
   sure: boolean;
 }
 
-/** Prises d'une carte de carte mère : chaque paire, branchée ou non. Undefined : rien de sûr. */
+/**
+ * Une paire de prises : un câble détecté (true), aucun (false), ou une prise qui ne sait pas
+ * détecter les câbles ('unknown', « branchée » ne voulant alors rien dire). Absente : pas de prise.
+ */
+export type JackState = boolean | 'unknown';
+
+/** Prises d'une carte de carte mère, paire par paire. Undefined : rien à en tirer pour le SSF. */
 export interface CardJacks {
-  front?: boolean;
-  rear?: boolean;
-  side?: boolean;
+  front?: JackState;
+  rear?: JackState;
+  side?: JackState;
 }
 
 /** Ce que disent les prises d'une sortie, seulement pour une carte de carte mère qui les décrit. */
@@ -60,7 +66,12 @@ export function cardJacks(output: Pick<ObservedAudioOutput, 'bus' | 'formFactor'
   const result: CardJacks = {};
   for (const pair of ['front', 'rear', 'side'] as const) {
     const found = jacks.filter((j) => carries(j, pair));
-    if (found.length) result[pair] = found.some((j) => j.connected);
+    if (!found.length) continue;
+    // « Branchée » ne vaut que pour une prise qui sait détecter un câble (une borne d'essai, le
+    // 20/11/2026, disait toutes ses prises branchées, enceintes vibrantes coupées : un câble dans la
+    // prise n'est pas un exciter qui marche, d'où la vérification par le son).
+    const sensing = found.filter((j) => j.presenceDetect !== false);
+    result[pair] = sensing.length ? sensing.some((j) => j.connected) : 'unknown';
   }
   // Une seule prise stéréo (portable, prise combinée) : rien à en tirer pour le SSF.
   return result.rear === undefined && result.side === undefined ? undefined : result;
@@ -124,28 +135,34 @@ export function proposeAudioSetups(input: SetupInputs): AudioSetup[] {
   // côtés sont branchées, sinon une sortie déjà en 5.1 ou 7.1, sinon un ampli HDMI.
   const cards = outputs.filter((o) => isAnalogOutput(o) || isHdmiAmplifier(o, displays));
   const withJacks = cards.map((o) => ({ o, jacks: cardJacks(o) }));
-  const plugged = withJacks.find((c) => c.jacks && (c.jacks.rear || c.jacks.side));
+  const plugged = withJacks.find((c) => c.jacks && (c.jacks.rear === true || c.jacks.side === true));
   const multichannel = withJacks.find((c) => c.o.channels >= 6);
-  const card = plugged ?? multichannel;
+  // Prises arrière ou des côtés qui ne savent pas détecter les câbles : le SSF reste possible, à vérifier.
+  const unsensed = withJacks.find((c) => c.jacks && (c.jacks.rear === 'unknown' || c.jacks.side === 'unknown'));
+  const card = plugged ?? multichannel ?? unsensed;
+  let ssf: AudioSetup | undefined;
   if (card) {
     const { o, jacks } = card;
-    const known = Boolean(jacks);
-    const rear = known ? Boolean(jacks!.rear) : o.channels >= 6;
-    const side = known ? Boolean(jacks!.side) : o.channels >= 8;
-    const front = known ? jacks!.front !== false : true;
-    const jackLabel = (pair: SpeakerPair) => (known ? JACK_COLOR[pair]() : PAIR_NAME[pair]());
+    // Une paire compte si un câble y est détecté, ou si sa prise ne sait pas le dire ; sans description, les canaux.
+    const pairOn = (state: JackState | undefined, fallback: boolean) => (jacks ? state !== undefined && state !== false : fallback);
+    const rear = pairOn(jacks?.rear, o.channels >= 6);
+    const side = pairOn(jacks?.side, o.channels >= 8);
+    const front = jacks ? jacks.front !== false : true;
+    const known = Boolean(jacks) && jacks!.rear !== 'unknown' && jacks!.side !== 'unknown';
+    const jackLabel = (pair: SpeakerPair) => (jacks ? JACK_COLOR[pair]() : PAIR_NAME[pair]());
     const exciters = (rear ? 2 : 0) + (side ? 2 : 0);
     // Le fronton sur l'avant de la carte s'il y est branché, sinon sur le haut-parleur de son écran.
     const bgOnScreen = !front && screenBg;
     const needs = exciters === 2 ? 6 : 8;
     const badges: AudioSetup['badges'] = [];
     if (known) badges.push({ text: exciters === 4 ? t('À essayer en premier : prises arrière et des côtés branchées') : t('À essayer en premier : une paire d’exciters branchée'), tone: 'ok' });
+    else if (jacks) badges.push({ text: t('La carte ne détecte pas les câbles de ses prises : à vérifier par le son'), tone: 'info' });
     else badges.push({ text: t('La carte annonce {channels} canaux : à vérifier par le son', { channels: o.channels }), tone: 'info' });
     if (o.channels < needs) badges.push({ text: needs === 8 ? t('Réglage Windows nécessaire avant le test : stéréo → 7.1, l’essai ouvre le panneau') : t('Réglage Windows nécessaire avant le test : stéréo → 5.1, l’essai ouvre le panneau'), tone: 'warn' });
     if (exciters === 2 && o.channels >= 8) badges.push({ text: t('Deux exciters : réglez la carte en 5.1, ils recevront tout le son du plateau'), tone: 'info' });
     if (exciters === 2 && !rear) badges.push({ text: t('Branchez plutôt ces exciters sur la sortie arrière'), tone: 'warn' });
     const where = bgOnScreen ? t('le fronton sur les haut-parleurs de {screen}', { screen: shortName(screenBg) }) : t('le fronton sur la {jack}', { jack: jackLabel('front') });
-    setups.push({
+    ssf = {
       id: bgOnScreen ? 'ssf-screen' : 'ssf',
       title: bgOnScreen ? t('SSF : {screen} + {card}', { screen: shortName(screenBg), card: shortName(o) }) : exciters === 4 ? t('SSF sur la carte son') : t('SSF avec deux exciters'),
       detail: t('Les bruits du jeu font vibrer la caisse : {where}, {n} exciters (haut-parleurs vibrants) sur la carte', { where, n: exciters }),
@@ -160,7 +177,11 @@ export function proposeAudioSetups(input: SetupInputs): AudioSetup[] {
         bas: rear ? { source: jackLabel('rear') } : { source: jackLabel('rear'), state: 'absent' },
       },
       sure: known,
-    });
+    };
+    // Câbles détectés, ou carte déjà réglée en 5.1/7.1 dans Windows : en place. Sinon (prises qui ne
+    // détectent rien, carte en stéréo), après les propositions stéréo : une carte de bureau a presque
+    // toujours des prises arrière, rarement des exciters.
+    if (known || o.channels >= 6) setups.push(ssf);
   }
 
   // Stéréo : ce qui est sûr (les haut-parleurs des écrans), puis la carte de la carte mère.
@@ -213,8 +234,23 @@ export function proposeAudioSetups(input: SetupInputs): AudioSetup[] {
     });
   }
 
+  // SSF à vérifier (prises sans détection, carte en stéréo) : troisième au plus, jamais coupé.
+  if (ssf && !setups.includes(ssf)) setups.splice(Math.min(2, setups.length), 0, ssf);
+
   // La plus sûre en tête (réglages gardés, prises détectées), dans l'ordre de construction sinon.
   return rank(setups);
+}
+
+/**
+ * Câble détecté dans la prise arrière ou des côtés, mais rien entendu au test : c'est l'ampli des
+ * exciters (éteint, volume au plus bas, débranché plus loin) qu'il faut voir, pas la carte.
+ */
+export function pluggedButSilentNotices(output: Pick<ObservedAudioOutput, 'bus' | 'formFactor' | 'jacks'>, places: Partial<Record<SpeakerPair, SpeakerPlace>>): string[] {
+  const jacks = cardJacks(output);
+  if (!jacks) return [];
+  const silent = (['rear', 'side'] as const).filter((p) => places[p] === 'none' && jacks[p] === true);
+  if (!silent.length) return [];
+  return [t('Un câble est bien branché sur la {jacks}, mais rien n’a vibré : l’ampli des exciters est-il allumé, son volume monté ?', { jacks: silent.map((p) => JACK_COLOR[p]()).join(t(' et la ')) })];
 }
 
 /**
@@ -235,8 +271,11 @@ export function describeDetected(input: SetupInputs): string {
     const jacks = cardJacks(o);
     const name = shortName(o) === 'Haut-parleurs' ? o.interfaceName.replace(/ High Definition Audio| Audio$/i, '').trim() || o.friendlyName : shortName(o);
     const setting = o.channels >= 8 ? '7.1' : o.channels === 6 ? '5.1' : o.channels === 2 ? t('stéréo') : undefined;
-    if (jacks) {
-      const on = (['front', 'rear', 'side'] as const).filter((p) => jacks[p]).map((p) => JACK_COLOR[p]());
+    if (jacks && (jacks.rear === 'unknown' || jacks.side === 'unknown')) {
+      // Prises qui ne détectent pas les câbles : rien à dire de ce qui y est branché.
+      parts.push(setting ? t('{name}, réglée en {setting}, branchements non détectables', { name, setting }) : t('{name}, branchements non détectables', { name }));
+    } else if (jacks) {
+      const on = (['front', 'rear', 'side'] as const).filter((p) => jacks[p] === true).map((p) => JACK_COLOR[p]());
       parts.push(t('{name}, {jacks} branchées, réglée en {setting} dans Windows', { name, jacks: on.join(', ') || t('aucune prise'), setting: setting ?? t('{n} canaux', { n: o.channels }) }));
     } else if (isHdmiAmplifier(o, displays)) parts.push(t('ampli HDMI {name}', { name }));
     else parts.push(setting ? t('{name}, réglée en {setting}, branchements non détectables', { name, setting }) : t('{name}, branchements non détectables', { name }));

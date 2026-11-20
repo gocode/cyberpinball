@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { audioFriendlyName } from '../audio';
-import { cardJacks, proposeAudioSetups } from '../audio-setups';
+import { cardJacks, pluggedButSilentNotices, proposeAudioSetups } from '../audio-setups';
 import type { ObservedAudioJack, ObservedAudioOutput } from '../model';
 import { devPcDisplays } from './fixtures';
 
 // Configurations proposées avant toute question (rapport du 20/11/2026 : SSF introuvable).
 
-const jack = (channelMapping: number, connected: boolean, geoLocation = 1): ObservedAudioJack => ({ channelMapping, color: 0, geoLocation, connected });
+const jack = (channelMapping: number, connected: boolean, geoLocation = 1, presenceDetect?: boolean): ObservedAudioJack => ({ channelMapping, color: 0, geoLocation, connected, ...(presenceDetect !== undefined && { presenceDetect }) });
 
 function output(id: string, deviceDesc: string, interfaceName: string, extra: Partial<ObservedAudioOutput> = {}): ObservedAudioOutput {
   return {
@@ -109,4 +109,36 @@ test('réglages enregistrés retrouvés : les garder vient en premier', () => {
   });
   assert.deepEqual(setups.map((s) => s.id).slice(0, 2), ['keep', 'ssf']);
   assert.ok(setups.length <= 3);
+});
+
+// Borne d'essai (20/11/2026, sonde par ssh) : carte 5.1 au pilote générique, détection déclarée sur
+// chaque prise, toutes « branchées » alors que ses enceintes vibrantes sont coupées.
+const PINCAB = [jack(0x3, true, 1, true), jack(0xc, true, 1, true), jack(0x30, true, 1, true), jack(0x3, true, 2, true)];
+
+test('borne d’essai : un câble dans la prise arrière fait proposer deux exciters, vérifiés par le son', () => {
+  assert.deepEqual(cardJacks(realtek(PINCAB)), { front: true, rear: true });
+  const [ssf] = proposeAudioSetups({ outputs: [realtek(PINCAB)], displays: displays() });
+  assert.equal(ssf!.title, 'SSF avec deux exciters');
+  assert.deepEqual(ssf!.expected, { front: 'backglass', rear: 'lockbar', side: 'none' });
+});
+
+test('prises qui ne détectent pas les câbles : SSF possible, à vérifier, après les propositions stéréo', () => {
+  const blind = realtek([jack(0x3, true, 1, false), jack(0x30, true, 1, false), jack(0x600, true, 1, false)]);
+  assert.deepEqual(cardJacks(blind), { front: 'unknown', rear: 'unknown', side: 'unknown' });
+  const setups = proposeAudioSetups({ outputs: [bgSpeaker, pfSpeaker, blind], displays: displays(), backglassDisplay: BG, playfieldDisplay: PF });
+  assert.deepEqual(setups.map((s) => s.id), ['screens', 'card-and-screen', 'ssf']);
+  const ssf = setups[2]!;
+  assert.equal(ssf.sure, false);
+  assert.ok(ssf.badges.some((b) => b.text.includes('ne détecte pas les câbles')));
+  assert.ok(!ssf.badges.some((b) => b.text.startsWith('À essayer en premier')));
+  // Rien de plus sur une carte sans prise arrière ni des côtés (portable, prise combinée).
+  assert.ok(!proposeAudioSetups({ outputs: [realtek([jack(0x3, true, 14, false)])], displays: displays() }).some((s) => s.playfieldMode === 'ssf'));
+});
+
+test('câble détecté mais rien entendu : l’ampli des exciters, pas la carte', () => {
+  const [notice] = pluggedButSilentNotices(realtek(PINCAB), { front: 'backglass', rear: 'none' });
+  assert.ok(notice!.includes('prise noire') && notice!.includes('ampli'));
+  assert.deepEqual(pluggedButSilentNotices(realtek(PINCAB), { front: 'backglass', rear: 'lockbar' }), []);
+  const blind = realtek([jack(0x3, true, 1, false), jack(0x30, true, 1, false)]);
+  assert.deepEqual(pluggedButSilentNotices(blind, { rear: 'none' }), [], 'une prise qui ne détecte rien ne dit pas qu’un câble y est');
 });

@@ -196,6 +196,10 @@ export const messages: Record<string, string> = {
   '{name}, branchements non détectables': '{name}, wiring not detectable',
   'Détecté : {list}.': 'Detected: {list}.',
   'Aucune sortie audio détectée.': 'No audio output detected.',
+  'La carte ne détecte pas les câbles de ses prises : à vérifier par le son': 'The card does not sense the cables in its jacks: to be checked by ear',
+  'Un câble est bien branché sur la {jacks}, mais rien n’a vibré : l’ampli des exciters est-il allumé, son volume monté ?':
+    'A cable is plugged into the {jacks}, but nothing vibrated: is the exciters’ amplifier on, its volume up?',
+  ' et la ': ' and the ',
   'Exciters ou haut-parleurs sur le plateau (SSF, surround) ? Cette carte est réglée en {channels} dans Windows : pour les piloter, elle doit passer en 7.1.':
     'Exciters or speakers on the playfield (SSF, surround)? This card is set to {channels} in Windows: to drive them, it must switch to 7.1.',
   'Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.':

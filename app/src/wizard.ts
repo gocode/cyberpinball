@@ -92,6 +92,7 @@ import {
   needsChannelTest,
   stereoSurroundCandidate,
   silentPairNotices,
+  pluggedButSilentNotices,
   proposeAudioSetups,
   describeDetected,
   type AudioSetup,
@@ -2688,7 +2689,9 @@ function channelTest(): ChannelTestResult | undefined {
 function channelNotices(): SyncFinding[] {
   const test = channelTest();
   const output = playfieldAudio();
-  const silent = test && output ? silentPairNotices(output, wizard.sound!.places) : [];
+  // Câble détecté mais rien entendu : l'ampli des exciters ; sinon, le cas des cartes à trois prises.
+  const amp = test && output ? pluggedButSilentNotices(output, wizard.sound!.places) : [];
+  const silent = amp.length ? amp : test && output ? silentPairNotices(output, wizard.sound!.places) : [];
   return [...(test?.notices ?? []), ...silent].map((message) => ({ severity: 'warning', message }));
 }
 

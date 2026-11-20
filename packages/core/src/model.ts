@@ -362,6 +362,12 @@ export interface ObservedAudioJack {
   geoLocation: number;
   /** Something plugged in (jack sensing); a jack without sensing reports true. */
   connected: boolean;
+  /**
+   * The jack can sense a plug (IKsJackDescription2, JACKDESC2_PRESENCE_DETECT_CAPABILITY): without
+   * it, `connected` says nothing. Undefined when the driver does not tell. A plug sensed is a cable
+   * in the jack, not working exciters (amplifier off, unplugged further on).
+   */
+  presenceDetect?: boolean;
 }
 
 /** The two outputs of VPX: SoundDeviceBG (backglass: ROM, AltSound, PuP, music) and SoundDevice (playfield). */
