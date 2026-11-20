@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Pinball FX in cabinet mode, on a cabinet with joystick buttons: the buttons work again during play. The game opens several windows (table, backglass, DMD) and the keyboard could go to the backglass or DMD window, which the table doesn't listen to. Before every press, and twice a second, the table window takes the foreground back when another game window has it; the log names the window involved.
 - RAR archives that Windows' tar can't read (RAR5 with a large dictionary: "Declared dictionary size is not supported", for instance the Ghostbusters table for Future Pinball): Cyber Pinball now reads them with RARLAB's official decompressor (node-unrar-js, in WebAssembly, nothing to install). Before, the table stayed "Nothing to install".
 - Future Pinball table archive: a script library (.vbs) goes into the game's Scripts folder, and the table's BAM physics settings (.xml of the same name) next to it; they follow it when it is added to the front-end.
 - System menu > My cabinet: the section is called "Virtual reality and 3D vision"; its line no longer shows the VR state or the BETA badge, which are read on each entry once inside.

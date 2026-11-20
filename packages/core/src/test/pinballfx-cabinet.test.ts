@@ -173,10 +173,57 @@ interface ZenKeysModule {
       watch(l: (code: string, down: boolean) => void): () => void;
       keysDown?(vks: readonly number[]): number[];
       every?(ms: number, tick: () => void): () => void;
+      focusTable?(pid: number): string | undefined;
     },
     game?: string,
+    other?: { name: string; keys: Map<string, string[]> },
   ): () => void;
+  tableWindow<W extends { visible: boolean; minimized: boolean; rect: { x: number; y: number; width: number; height: number } }>(windows: readonly W[]): W | undefined;
 }
+
+test('mode borne : la fenêtre de la table est la plus grande fenêtre visible du jeu', () => {
+  const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;
+  const win = (name: string, width: number, height: number, extra: Partial<{ visible: boolean; minimized: boolean }> = {}) => ({ name, visible: true, minimized: false, rect: { x: 0, y: 0, width, height }, ...extra });
+  const windows = [win('dmd', 1920, 480), win('table', 3840, 2160), win('fronton', 1920, 1080), win('cachée', 7680, 4320, { visible: false }), win('réduite', 7680, 4320, { minimized: true })];
+  assert.equal(zen.tableWindow(windows)?.name, 'table');
+  assert.equal(zen.tableWindow([]), undefined);
+});
+
+test('pont, mode borne : la table reprend le clavier avant l’appui et au contrôle régulier ; jamais pour Future Pinball', (t) => {
+  const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;
+  const logs: string[] = [];
+  t.mock.method(console, 'log', (line: string) => logs.push(line));
+  let listener: ((code: string, down: boolean) => void) | undefined;
+  let check: (() => void) | undefined;
+  const order: string[] = [];
+  let stolen = true;
+  const system = {
+    foregroundPid: () => 42,
+    key: (vk: number, down: boolean) => order.push(`touche ${vk} ${down}`),
+    watch: (l: (code: string, down: boolean) => void) => ((listener = l), () => undefined),
+    every: (_ms: number, tick: () => void) => ((check = tick), () => undefined),
+    focusTable: () => {
+      if (!stolen) return undefined;
+      stolen = false;
+      order.push('table au premier plan');
+      return '« PinballFX » (fronton)';
+    },
+  };
+  const stop = zen.bridgeZenKeys({ buttons: { leftFlipper: JOY(1), rightFlipper: JOY(2), start: 'Digit1', exit: 'Escape', credit: 'Digit5', plunger: 'Enter' } }, () => 42, system, 'pinballfx');
+  listener!(JOY(1), true);
+  assert.deepEqual(order, ['table au premier plan', 'touche 160 true'], 'la table d’abord, puis Maj gauche');
+  stolen = true;
+  check!();
+  assert.equal(order.at(-1), 'table au premier plan', 'contrôle régulier');
+  stop();
+  assert.equal(logs.filter((l) => l.includes('autre fenêtre du jeu')).length, 1, 'la fenêtre fautive nommée une fois');
+  assert.match(logs.at(-1)!, /table remise au premier plan 2 fois/);
+
+  let focused = false;
+  zen.bridgeZenKeys(undefined, () => 42, { ...system, focusTable: () => ((focused = true), 'x') }, undefined, { name: 'Future Pinball', keys: new Map([[JOY(1), ['KeyZ']]]) });
+  listener!(JOY(1), true);
+  assert.equal(focused, false, 'Future Pinball garde sa fenêtre');
+});
 
 test('pont, borne au clavier dans FX3 : Maj lue par sondage, flèche envoyée en plus, jamais Maj ni en double', () => {
   const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;

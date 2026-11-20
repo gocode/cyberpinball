@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Pinball FX en mode borne, sur une borne aux boutons de joystick : les boutons agissent de nouveau en partie. Le jeu ouvre plusieurs fenêtres (table, fronton, DMD) et le clavier pouvait aller à celle du fronton ou du DMD, que la table n'écoute pas. Avant chaque appui, et deux fois par seconde, la fenêtre de la table reprend le premier plan quand une autre fenêtre du jeu l'a ; le journal nomme la fenêtre en cause.
 - Archives RAR que le tar de Windows ne sait pas lire (RAR5 à grand dictionnaire : « Declared dictionary size is not supported », par exemple la table Ghostbusters pour Future Pinball) : Cyber Pinball les lit maintenant avec le décompresseur officiel de RARLAB (node-unrar-js, en WebAssembly, rien à installer). Avant, la table restait « Rien à installer ».
 - Archive d'une table Future Pinball : une bibliothèque de script (.vbs) va dans le dossier Scripts du jeu, et les réglages de physique de BAM de la table (.xml du même nom) à côté d'elle ; ils la suivent quand elle est ajoutée au front-end.
 - Menu système > Ma borne : la rubrique s'appelle « Réalité virtuelle et vision 3D » ; sa ligne ne montre plus l'état de la VR ni le badge BÊTA, qui se lisent en entrant, sur chaque entrée.
