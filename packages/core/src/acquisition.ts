@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import type { Cabinet } from './model';
 import { formatDate, formatList, recognizeText, registerTextRef, t, tn } from './i18n';
+import { FUTURE_PINBALL_VPS_FORMAT } from './futurepinball';
 import { dmdMediaType } from './medias';
 import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
@@ -114,16 +115,37 @@ export function vpxVersions(game: VpsGame): VpsTableFile[] {
   return [...list];
 }
 
-const hasFeature = (file: { features?: string[] }, feature: string) => (file.features ?? []).some((f) => f.toLowerCase() === feature.toLowerCase());
-
-/** Cette version se joue sans ROM : jeu électromécanique ou mécanique, ou version marquée « no ROM ». */
-export function versionWithoutRom(game: VpsGame, file: VpsTableFile): boolean {
-  return /^(EM|PM)$/i.test(game.type ?? '') || hasFeature(file, 'no ROM');
+/**
+ * Version de Future Pinball (format « FP » de VPS, un .fpt) : au catalogue à côté des versions VPX
+ * depuis le 20/11/2026 (527 versions, 404 jeux, sur les mêmes sites que les tables VPX).
+ */
+export function isFuturePinballVersion(file: { tableFormat?: string }): boolean {
+  return (file.tableFormat ?? '').toUpperCase() === FUTURE_PINBALL_VPS_FORMAT;
 }
 
-/** Au moins une version VPX se joue sans ROM (960 jeux sur 2 366 le 22/10/2026). */
+/** Versions Future Pinball d'un jeu, la plus récemment mise à jour d'abord. */
+export function futurePinballVersions(game: VpsGame): VpsTableFile[] {
+  return (game.tableFiles ?? []).filter((f) => f && isFuturePinballVersion(f)).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+}
+
+/** Versions que propose le catalogue : celles pour VPX, puis celles pour Future Pinball. */
+export function tableVersions(game: VpsGame): VpsTableFile[] {
+  return [...vpxVersions(game), ...futurePinballVersions(game)];
+}
+
+const hasFeature = (file: { features?: string[] }, feature: string) => (file.features ?? []).some((f) => f.toLowerCase() === feature.toLowerCase());
+
+/**
+ * Cette version se joue sans ROM : jeu électromécanique ou mécanique, version marquée « no ROM », ou
+ * table de Future Pinball (son script fait tout le jeu).
+ */
+export function versionWithoutRom(game: VpsGame, file: VpsTableFile): boolean {
+  return /^(EM|PM)$/i.test(game.type ?? '') || hasFeature(file, 'no ROM') || isFuturePinballVersion(file);
+}
+
+/** Au moins une version se joue sans ROM (960 jeux VPX sur 2 366 le 22/10/2026 ; toute version Future Pinball). */
 export function playableWithoutRom(game: VpsGame): boolean {
-  return vpxVersions(game).some((f) => versionWithoutRom(game, f));
+  return tableVersions(game).some((f) => versionWithoutRom(game, f));
 }
 
 export type CatalogKind = 'all' | 'ss' | 'em' | 'original' | 'norom';
@@ -289,7 +311,7 @@ export function linkOnSite(url: string, site: CatalogSite): boolean {
 export function supportFiles(game: VpsGame, support: CatalogSupport): VpsTableFile[] | undefined {
   switch (support) {
     case 'any':
-      return vpxVersions(game);
+      return tableVersions(game);
     case 'b2s':
       return game.b2sFiles ?? [];
     case 'rom':
@@ -324,7 +346,7 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
   const support = filter.support ?? 'any';
   const site = filter.site ?? 'all';
   const keep = (g: VpsGame) => {
-    const versions = vpxVersions(g);
+    const versions = tableVersions(g);
     if (!versions.length) return false;
     switch (filter.kind ?? 'all') {
       case 'ss':
@@ -400,9 +422,9 @@ export function popularity(game: VpsGame): number {
   return score;
 }
 
-/** Dernière nouveauté d'un jeu : la plus récente de ses versions VPX. */
+/** Dernière nouveauté d'un jeu : la plus récente de ses versions (VPX ou Future Pinball). */
 export function lastUpdate(game: VpsGame): number {
-  return Math.max(0, ...vpxVersions(game).map((f) => f.updatedAt ?? 0));
+  return Math.max(0, ...tableVersions(game).map((f) => f.updatedAt ?? 0));
 }
 
 /** Jeux VPS des tables installées : identifiant du .info, ou provenance notée. */
@@ -432,14 +454,17 @@ const isVpw = (f: VpsTableFile) => (f.authors ?? []).some((a) => vpsKey(a) === '
 /**
  * Version conseillée d'un jeu : parmi celles qui ont encore un lien, pas un MOD (une
  * reprise personnelle d'une autre version) si l'on peut, VPW de préférence, la plus
- * récemment mise à jour. undefined si aucune version n'a de lien vivant.
+ * récemment mise à jour. Une version Future Pinball seulement si le jeu n'a aucune version VPX à
+ * récupérer. undefined si aucune version n'a de lien vivant.
  */
 export function recommendVersion(game: VpsGame): VersionAdvice | undefined {
-  const versions = vpxVersions(game).filter((f) => liveLinks(f).length);
+  const vpx = vpxVersions(game).filter((f) => liveLinks(f).length);
+  const versions = vpx.length ? vpx : futurePinballVersions(game).filter((f) => liveLinks(f).length);
   if (!versions.length) return undefined;
   const score = (f: VpsTableFile) => (hasFeature(f, 'MOD') ? -2 : 0) + (isVpw(f) ? 1 : 0);
   const best = [...versions].sort((a, b) => score(b) - score(a) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]!;
   const reasons: string[] = [];
+  if (!vpx.length) reasons.push(t('table de Future Pinball : ce jeu n’a pas de version VPX à récupérer'));
   if (isVpw(best)) reasons.push(t('table de VPW (VPin Workshop), refaite à fond'));
   if (!hasFeature(best, 'MOD')) reasons.push(t('version d’origine, pas un MOD'));
   if (best === versions[0]) reasons.push(t('la plus récemment mise à jour'));
@@ -471,7 +496,7 @@ export function versionLabel(file: { authors?: string[]; version?: string; editi
 export function versionForText(game: VpsGame, text: string): VpsTableFile | undefined {
   const typed = new Set(vpsWords(text));
   const title = new Set(vpsWords(game.name));
-  return vpxVersions(game).find((f) => {
+  return tableVersions(game).find((f) => {
     const words = vpsWords(f.edition ?? '').filter((w) => !title.has(w) && w.length >= 3 && w !== 'edition');
     return words.length > 0 && words.every((w) => typed.has(w));
   });
@@ -576,6 +601,9 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
         : t('aucun lien vivant pour cette version : choisissez-en une autre'),
     files: [version],
   });
+  // Table de Future Pinball : son .fpt (et les bibliothèques de son archive) suffit ; ni fronton
+  // .directb2s, ni ROM, ni compléments de VPX.
+  if (isFuturePinballVersion(version)) return needs;
 
   // Fronton : celui qui convient aux écrans de la borne d'abord.
   const b2s = withLinks(game.b2sFiles).map((f) => f as VpsTableFile);
@@ -806,7 +834,7 @@ export function isPartialDownload(name: string): boolean {
 }
 
 /** Extensions de ce qu'on récupère pour une table : ses fichiers, ses archives, ses vidéos et images (topper, médias du menu). */
-const RECEIVABLE = /\.(vpx|directb2s|zip|7z|rar|mp3|ogg|wav|flac|pov|pac|vni|pal|crz|cromc|mp4|f4v|avi|mkv|webm|mov|png|jpe?g|gif|apng|webp)$/i;
+const RECEIVABLE = /\.(vpx|fpt|directb2s|zip|7z|rar|mp3|ogg|wav|flac|pov|pac|vni|pal|crz|cromc|mp4|f4v|avi|mkv|webm|mov|png|jpe?g|gif|apng|webp)$/i;
 
 /** Ce fichier peut-il être une partie d'un jeu (table, fronton, archive, son, vidéo…) ? */
 export function isReceivable(name: string): boolean {
@@ -913,7 +941,7 @@ const ARCHIVES = /\.(zip|7z|rar)$/i;
 export function classifyContent(name: string, entries?: string[]): ContentKind {
   const lower = name.toLowerCase();
   if (!ARCHIVES.test(lower) || !entries) {
-    if (lower.endsWith('.vpx')) return 'table';
+    if (lower.endsWith('.vpx') || lower.endsWith('.fpt')) return 'table';
     if (lower.endsWith('.directb2s')) return 'b2s';
     if (lower.endsWith('.pov')) return 'pov';
     if (AUDIO.test(lower)) return 'music';
@@ -924,7 +952,8 @@ export function classifyContent(name: string, entries?: string[]): ContentKind {
   const files = entries.map((e) => e.replace(/\\/g, '/')).filter((e) => !e.endsWith('/'));
   const base = (e: string) => e.slice(e.lastIndexOf('/') + 1).toLowerCase();
   const has = (test: (e: string) => boolean) => files.some((e) => test(e.toLowerCase()));
-  if (has((e) => e.endsWith('.vpx'))) return 'table';
+  // Une table de Future Pinball (.fpt) aussi : ses bibliothèques (.fpl) et sa musique la suivent.
+  if (has((e) => e.endsWith('.vpx') || e.endsWith('.fpt'))) return 'table';
   if (has((e) => e.endsWith('.directb2s'))) return 'b2s';
   if (has((e) => e.endsWith('.pup') || e.includes('pupvideos/'))) return 'pup';
   if (files.some((e) => ['altsound.csv', 'g-sound.csv'].includes(base(e)))) return 'altsound';
@@ -950,6 +979,8 @@ export interface ContentCounts {
   images: number;
   videos: number;
   sounds: number;
+  /** Tables de Future Pinball (.fpt) ; absent : aucune (résumés d'avant le 20/11/2026). */
+  fpt?: number;
 }
 
 /** Ce que contient une archive, pour qu'on juge soi-même ; undefined si ce n'en est pas une, ou illisible. */
@@ -957,8 +988,8 @@ export function contentSummary(name: string, entries?: string[]): ContentCounts 
   if (!ARCHIVES.test(name) || !entries) return undefined;
   const files = entries.map((e) => e.replace(/\\/g, '/')).filter((e) => !e.endsWith('/'));
   const count = (re: RegExp) => files.filter((e) => re.test(e)).length;
-  const [vpx, b2s, pup, images, videos, sounds] = [/\.vpx$/i, /\.directb2s$/i, /\.pup$/i, IMAGES, VIDEOS, AUDIO].map(count) as [number, number, number, number, number, number];
-  return { files: files.length, vpx, b2s, pup, images, videos, sounds };
+  const [vpx, b2s, pup, images, videos, sounds, fpt] = [/\.vpx$/i, /\.directb2s$/i, /\.pup$/i, IMAGES, VIDEOS, AUDIO, /\.fpt$/i].map(count) as [number, number, number, number, number, number, number];
+  return { files: files.length, vpx, b2s, pup, images, videos, sounds, ...(fpt ? { fpt } : {}) };
 }
 
 /** « 14 images, 9 vidéos, aucun .vpx » */
@@ -966,6 +997,7 @@ export function contentSummaryText(c: ContentCounts | undefined): string | undef
   if (!c) return undefined;
   const shown = [
     c.vpx ? tn(c.vpx, '{n} .vpx', '{n} .vpx') : '',
+    c.fpt ? tn(c.fpt, '{n} table Future Pinball (.fpt)', '{n} tables Future Pinball (.fpt)') : '',
     c.b2s ? tn(c.b2s, '{n} .directb2s', '{n} .directb2s') : '',
     c.pup ? tn(c.pup, '{n} fichier .pup', '{n} fichiers .pup') : '',
     c.images ? tn(c.images, '{n} image', '{n} images') : '',
@@ -973,7 +1005,7 @@ export function contentSummaryText(c: ContentCounts | undefined): string | undef
     c.sounds ? tn(c.sounds, '{n} son', '{n} sons') : '',
   ].filter(Boolean);
   if (!shown.length) shown.push(tn(c.files, '{n} fichier', '{n} fichiers'));
-  if (!c.vpx) shown.push(t('aucun .vpx'));
+  if (!c.vpx && !c.fpt) shown.push(t('aucun .vpx'));
   return shown.join(', ');
 }
 
@@ -1006,6 +1038,8 @@ export function readContentCounts(value: unknown): ContentCounts | undefined {
       const v = (value as Record<string, unknown>)[k];
       if (typeof v === 'number' && Number.isInteger(v) && v >= 0) c[k] = v;
     }
+    const fpt = (value as Record<string, unknown>).fpt;
+    if (typeof fpt === 'number' && Number.isInteger(fpt) && fpt > 0) c.fpt = fpt;
     return c;
   }
   if (typeof value !== 'string') return undefined;
@@ -1039,7 +1073,7 @@ export function contentParts(name: string, entries?: string[]): NeedKind[] {
   const has = (test: (e: string) => boolean) => files.some(test);
   const base = (e: string) => e.slice(e.lastIndexOf('/') + 1);
   const found: [NeedKind, boolean][] = [
-    ['table', has((e) => e.endsWith('.vpx'))],
+    ['table', has((e) => e.endsWith('.vpx') || e.endsWith('.fpt'))],
     ['b2s', has((e) => e.endsWith('.directb2s'))],
     ['rom', has((e) => e.endsWith('.zip') && /(^|\/)roms\//.test(e))],
     ['pup', has((e) => e.endsWith('.pup') || e.includes('pupvideos/'))],
@@ -1168,7 +1202,7 @@ function gameOfPages(list: WaitList, keys: Set<string>): string | undefined {
 export function partFiles(game: VpsGame, kind: NeedKind): VpsTableFile[] {
   switch (kind) {
     case 'table':
-      return vpxVersions(game);
+      return tableVersions(game);
     case 'rom':
       return supportFiles(game, 'rom') ?? [];
     case 'b2s':

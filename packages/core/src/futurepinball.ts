@@ -231,6 +231,8 @@ export function futurePinballTableInMenu(tables: readonly TableEntry[], source: 
 
 export interface AddFuturePinballOptions {
   db?: VpsDb;
+  /** Jeu de la base VPS déjà connu (table récupérée au catalogue) : son nom, sans le deviner du fichier. */
+  vpsGameId?: string;
   /** Lien physique quand le disque le permet (par défaut) ; false : toujours une copie. */
   link?: boolean;
 }
@@ -260,7 +262,10 @@ export async function addFuturePinballTable(tablesDir: string, source: string, o
   const existing = futurePinballTableInMenu(scanTables(tablesDir), source);
   if (existing) return { entry: existing, already: true, linked: false };
 
-  const name = futurePinballName(source, opts.db);
+  const known = opts.vpsGameId ? opts.db?.games.find((g) => g.id === opts.vpsGameId) : undefined;
+  const name: FuturePinballName = known
+    ? { title: known.name, ...(known.manufacturer ? { manufacturer: known.manufacturer } : {}), ...(known.year ? { year: known.year } : {}), vps: known.id }
+    : { ...futurePinballName(source, opts.db), ...(opts.vpsGameId ? { vps: opts.vpsGameId } : {}) };
   const base = futurePinballFolderName(name);
   const fileName = path.basename(source);
   let folder = path.join(tablesDir, base);

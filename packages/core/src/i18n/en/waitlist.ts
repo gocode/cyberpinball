@@ -34,6 +34,8 @@ export const messages: Record<string, string> = {
   '{n} son': '{n} sound',
   '{n} sons': '{n} sounds',
   'aucun .vpx': 'no .vpx',
+  '{n} table Future Pinball (.fpt)': '{n} Future Pinball table (.fpt)',
+  '{n} tables Future Pinball (.fpt)': '{n} Future Pinball tables (.fpt)',
 
   // app/src/catalog.ts : réception
   'Contenu non vérifié (archive illisible) : regardez le plan avant d’installer.': 'Content not checked (unreadable archive): look at the plan before installing.',

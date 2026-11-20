@@ -78,8 +78,9 @@ export const NEWS: readonly NewsItem[] = [
     get detail() { return t('Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.'); },
     get more() {
       return [
-        t('Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.'),
-        t('La partie se lance dans Future Pinball, par BAM s’il est installé, et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. Les scores du jeu viendront ensuite.'),
+        t('Cyber Pinball trouve Future Pinball sur ce PC et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias.'),
+        t('La partie passe par BAM s’il est installé et revient à la roue quand vous quittez la table ; un appui long sur Exit la ferme.'),
+        t('« Trouver une table en ligne » propose aussi ses tables : l’archive reçue est rangée dans le jeu, sans rien écraser.'),
       ];
     },
     get where() { return t('Menu système › Tables › Ajouter une table › Tables de Future Pinball'); },

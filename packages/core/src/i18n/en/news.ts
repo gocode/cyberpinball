@@ -17,10 +17,12 @@ export const messages: Record<string, string> = {
   'Menu système › Borne › Configuration de la borne › Son de la borne': 'System menu › Cabinet › Cabinet setup › Cabinet sound',
   'Future Pinball sur la roue': 'Future Pinball on the wheel',
   'Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.': 'Your Future Pinball tables (.fpt) next to your VPX tables, started with one press.',
-  'Cyber Pinball trouve Future Pinball sur ce PC (ou dans le dossier que vous lui montrez) et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias. Un fichier .fpt choisi ailleurs marche aussi.':
-    'Cyber Pinball finds Future Pinball on this PC (or in the folder you show it) and lists the tables in its Tables folder; Start adds one, with its name and media. A .fpt file chosen elsewhere works too.',
-  'La partie se lance dans Future Pinball, par BAM s’il est installé, et revient à la roue quand vous quittez la table ; un appui long sur Exit le ferme. Les scores du jeu viendront ensuite.':
-    'The game runs in Future Pinball, through BAM when it’s installed, and comes back to the wheel when you leave the table; holding Exit closes it. The game’s scores will come later.',
+  'Cyber Pinball trouve Future Pinball sur ce PC et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias.':
+    'Cyber Pinball finds Future Pinball on this PC and lists the tables in its Tables folder; Start adds one, with its name and media.',
+  'La partie passe par BAM s’il est installé et revient à la roue quand vous quittez la table ; un appui long sur Exit la ferme.':
+    'The game goes through BAM when it’s installed and comes back to the wheel when you leave the table; holding Exit closes it.',
+  '« Trouver une table en ligne » propose aussi ses tables : l’archive reçue est rangée dans le jeu, sans rien écraser.':
+    '"Find a table online" offers its tables too: the received archive is put into the game, without overwriting anything.',
   'Menu système › Tables › Ajouter une table › Tables de Future Pinball': 'System menu › Tables › Add a table › Future Pinball tables',
   'Reprendre vos tables sans les dupliquer': 'Bring your tables over without duplicating them',
   'Les tables de PinUP Popper, PinballX ou PinballY rejoignent la roue sans être dupliquées sur le disque.':

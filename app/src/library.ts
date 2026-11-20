@@ -58,6 +58,7 @@ import {
   addZenTable,
   isZenEmulator,
   isFuturePinballTable,
+  containsFuturePinballTable,
   FUTURE_PINBALL_NAME,
   TABLE_ENGINES,
   knownTableInstallations,
@@ -4419,10 +4420,13 @@ export function createLibrary(host: LibraryHost) {
     if (!layout()) return openAdd();
     // Tables de Future Pinball (.fpt) choisies ou glissées : leur propre ajout (futurepinball-ui.ts), le
     // plan d'ajout ne range que des tables VPX. Seules : l'écran de Future Pinball dit ce qui est fait.
+    // Récupérées au catalogue : le jeu choisi, la version notée, l'élément de la liste d'attente installé.
     const fpt = paths.filter((p) => isFuturePinballTable(p) && fs.statSync(p, { throwIfNoEntry: false })?.isFile());
     if (fpt.length) {
       paths = paths.filter((p) => !fpt.includes(p));
-      void futurePinballUi.add(fpt, { show: !paths.length });
+      void futurePinballUi.add(fpt, { show: !paths.length, ...(acquisition ? { vpsGameId: acquisition.gameId } : {}) }).then((added) => {
+        if (acquisition && added.length) noteSource(acquisition, added.map((e) => e.file));
+      });
       if (!paths.length) return;
     }
     // Le dossier de Pinball FX3 (ou ses fichiers) choisi ici : gardé comme dossier du jeu, son écran
@@ -4438,6 +4442,24 @@ export function createLibrary(host: LibraryHost) {
     go(s);
     void task(t('Analyse des fichiers…'), async () => {
       s.prepared = await prepareImport(paths, mode, path.join(host.dataDir, 'staging'));
+      // Archive d'une table de Future Pinball (catalogue, Téléchargements) : un .fpt et pas de .vpx. Ses
+      // fichiers vont dans le jeu (futurepinball-archive.ts), la table au front-end ; le plan d'ajout ne
+      // garde que le reste. Sans elle, l'archive restait « non rangée », ou ses fichiers allaient dans le
+      // dossier d'une table VPX du même jeu (20/11/2026).
+      const fpSources = s.prepared.sources.filter((src) => src.unpacked && containsFuturePinballTable(src.path) && !listVpx(src.path).length);
+      if (fpSources.length) {
+        s.prepared.sources = s.prepared.sources.filter((src) => !fpSources.includes(src));
+        const alone = !s.prepared.sources.length;
+        const added = await futurePinballUi.addArchives(
+          fpSources.map((src) => src.path),
+          { show: alone, ...(acquisition ? { vpsGameId: acquisition.gameId } : {}) },
+        );
+        if (acquisition && added.length) noteSource(acquisition, added.map((e) => e.file));
+        if (alone) {
+          fs.rmSync(s.prepared.staging, { recursive: true, force: true });
+          return;
+        }
+      }
       // Le script de chaque table dit quelle ROM lui revient. Sans VPX installé, celui écrit dans
       // le .vpx (ou le .vbs posé à côté) se lit quand même : sans lui, une table reprise d'une autre
       // installation n'emportait que la ROM que son menu nommait, souvent aucune.

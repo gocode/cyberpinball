@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Catalogue : les versions Future Pinball de la base VPS (plus de 500, sur Pinball Nirvana, VPUniverse et VPForums) sont proposées à côté des versions VPX, marquées comme telles ; un jeu qui n'existe qu'en Future Pinball y est aussi. Pour une telle version, il ne faut que la table : ni fronton, ni ROM.
+- Une archive de table Future Pinball reçue (catalogue ou Téléchargements) est rangée dans le jeu : le .fpt dans Tables, les bibliothèques (.fpl) dans Libraries, la musique, les scripts et les réglages de BAM à leur place, sans rien écraser ; la table arrive sur la roue avec le nom du jeu choisi et sa version notée. Avant, elle restait « non rangée », ou ses fichiers allaient dans le dossier d'une table VPX du même jeu.
 - Future Pinball : quand BAM est installé (dossier BAM du jeu avec FPLoader.exe), la partie passe par lui, comme avec les autres front-ends ; les tables récentes (physique FizX) se jouent enfin comme prévu. La fiche de la table dit si BAM est là.
 - Future Pinball par BAM : le jeu est reconnu même si FPLoader le lance à part, un Future Pinball déjà ouvert n'est pas pris pour la partie, et FPLoader est refermé à la fin.
 - Messages entre amis et groupes : choisir un message puis répondre (d'une phrase prête ou au clavier) le cite. La citation, avec son auteur et ses deux premières lignes, s'affiche au-dessus de la réponse, au front-end comme au téléphone ; aux flippers ou à la souris, la choisir ramène au message cité. Un message cité puis supprimé garde son extrait, avec la mention « message supprimé ».

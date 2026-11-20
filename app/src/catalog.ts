@@ -96,6 +96,8 @@ import {
   vpsKey,
   vpsLabel,
   vpxVersions,
+  tableVersions,
+  isFuturePinballVersion,
   waitListProblems,
   CATALOG_DEFAULT,
   CATALOG_SORTS,
@@ -693,7 +695,7 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   function gameImage(game: VpsGame): MediaDbFile | undefined {
-    return imageOf(game) ?? vpxVersions(game).map(imageOf).find(Boolean) ?? (game.b2sFiles ?? []).map(imageOf).find(Boolean);
+    return imageOf(game) ?? tableVersions(game).map(imageOf).find(Boolean) ?? (game.b2sFiles ?? []).map(imageOf).find(Boolean);
   }
 
   function thumbOf(file: MediaDbFile | undefined, text: string): MediaThumb {
@@ -817,9 +819,15 @@ export function createCatalog(ctx: CatalogContext) {
     const shown = found.slice(filter.page * PAGE, (filter.page + 1) * PAGE);
     const actions: Action[] = shown.map((g) => ({ label: vpsLabel(g), key: `game:${g.id}`, run: () => openGame(g.id) }));
     const cards: MediaCard[] = shown.map((g, i) => {
-      const versions = vpxVersions(g);
+      const versions = tableVersions(g);
+      const vpx = versions.filter((v) => !isFuturePinballVersion(v)).length;
+      const fp = versions.length - vpx;
       const roms = [...new Set((g.romFiles ?? []).map((r) => r.version).filter(Boolean))];
-      const facts = [gameKind(g), tn(versions.length, '{n} version VPX', '{n} versions VPX'), roms.length ? `ROM ${roms.slice(0, 2).join(', ')}` : versions.some((v) => versionWithoutRom(g, v)) ? t('sans ROM') : undefined].filter(Boolean).join(' · ');
+      const facts = [
+        gameKind(g),
+        vpx ? tn(vpx, '{n} version VPX', '{n} versions VPX') : undefined,
+        fp ? tn(fp, '{n} version Future Pinball', '{n} versions Future Pinball') : undefined,
+        roms.length ? `ROM ${roms.slice(0, 2).join(', ')}` : versions.some((v) => versionWithoutRom(g, v)) ? t('sans ROM') : undefined].filter(Boolean).join(' · ');
       return {
         action: i,
         title: vpsLabel(g),
@@ -1034,7 +1042,7 @@ export function createCatalog(ctx: CatalogContext) {
       const advice = recommendVersion(game);
       const fast = advice ? quickNeeds(needsOf(game, advice.file)) : undefined;
       ctx.show(() => buildGame(game, fast), at);
-      loadThumbs(vpxVersions(game).slice(0, 20).map(imageOf));
+      loadThumbs(tableVersions(game).slice(0, 20).map(imageOf));
     });
   }
 
@@ -1053,11 +1061,16 @@ export function createCatalog(ctx: CatalogContext) {
     // conseillée, puis les autres, la plus récente d'abord.
     const wanted = filter.text ? versionForText(game, filter.text) : undefined;
     const rank = (v: { id: string }) => (v.id === wanted?.id ? 2 : 0) + (v.id === advice?.file.id ? 1 : 0);
-    const versions = vpxVersions(game)
-      .sort((x, y) => rank(y) - rank(x))
+    // Les versions VPX d'abord, celles de Future Pinball ensuite (tableVersions), la conseillée en tête.
+    const all = tableVersions(game);
+    const versions = all
+      .map((v, i) => ({ v, i }))
+      .sort((x, y) => rank(y.v) - rank(x.v) || x.i - y.i)
+      .map((x) => x.v)
       .slice(0, 20);
     const mine = installedVersion(game);
-    const count = vpxVersions(game).length;
+    const count = all.length;
+    const fpCount = all.filter(isFuturePinballVersion).length;
     const more = count - versions.length;
     return fileGallery.build({
       kind: 'table',
@@ -1072,11 +1085,16 @@ export function createCatalog(ctx: CatalogContext) {
         .filter(Boolean)
         .join(' · '),
       lead: [
-        more > 0
-          ? t('{n} versions pour VPX : la conseillée, puis la plus récente (les {shown} plus récentes montrées).', { n: count, shown: versions.length })
-          : tn(count, '{n} version pour VPX : la conseillée, puis la plus récente.', '{n} versions pour VPX : la conseillée, puis la plus récente.'),
+        fpCount === count
+          ? tn(count, '{n} version pour Future Pinball : la conseillée, puis la plus récente.', '{n} versions pour Future Pinball : la conseillée, puis la plus récente.')
+          : more > 0
+            ? t('{n} versions pour VPX : la conseillée, puis la plus récente (les {shown} plus récentes montrées).', { n: count - fpCount, shown: versions.length })
+            : tn(count - fpCount, '{n} version pour VPX : la conseillée, puis la plus récente.', '{n} versions pour VPX : la conseillée, puis la plus récente.'),
+        fpCount && fpCount < count ? tn(fpCount, 'Puis {n} version pour Future Pinball, marquée comme telle.', 'Puis {n} versions pour Future Pinball, marquées comme telles.') : undefined,
         t('Choisissez-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.'),
-      ].join(' '),
+      ]
+        .filter(Boolean)
+        .join(' '),
       advised: t('conseillée d’abord'),
       // Installation rapide en tête : la version conseillée, d'un coup. Déjà installée (provenance
       // notée) : plus rien d'indispensable à récupérer d'un coup.
@@ -1090,6 +1108,8 @@ export function createCatalog(ctx: CatalogContext) {
         // Commentaire de VPS (« This table uses PuPDMD. Pup Pack installation is REQUIRED. ») : ce que la version exige.
         const comment = v.comment?.trim();
         return [
+          // Une table de Future Pinball se joue dans Future Pinball (BAM s'il est là), jamais dans VPX.
+          isFuturePinballVersion(v) ? t('Pour Future Pinball : se joue dans Future Pinball, pas dans VPX.') : undefined,
           advice?.file.id === v.id ? t('Conseillée : {reasons}.', { reasons: advice.reasons.join(', ') }) : undefined,
           included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined,
           comment ? t('Note de VPS : « {comment} »', { comment: comment.length > 160 ? `${comment.slice(0, 159)}…` : comment }) : undefined,
@@ -1106,7 +1126,7 @@ export function createCatalog(ctx: CatalogContext) {
     void ctx.task(t('Ce qu’il faut…'), async () => {
       const db = await vpsDb();
       const game = db?.games.find((g) => g.id === gameId);
-      const version = game && vpxVersions(game).find((v) => v.id === versionId);
+      const version = game && tableVersions(game).find((v) => v.id === versionId);
       if (!game || !version) return openCatalog();
       await noteContents(waitList().items.filter((i) => i.gameId === game.id));
       // Ce que VPinMediaDB a pour ce jeu : le média prévu de chaque écran (null : index injoignable).
@@ -1756,7 +1776,7 @@ export function createCatalog(ctx: CatalogContext) {
       const db = await vpsDb();
       const game = db?.games.find((g) => g.id === gameId);
       if (!game) return openCatalog();
-      const version = versionId ? vpxVersions(game).find((v) => v.id === versionId) : recommendVersion(game)?.file;
+      const version = versionId ? tableVersions(game).find((v) => v.id === versionId) : recommendVersion(game)?.file;
       if (!version) {
         notice = { text: t('Aucune version de ce jeu n’a de lien vivant : rien à récupérer.'), tone: 'warning' };
         return openGame(game.id);
@@ -1784,7 +1804,7 @@ export function createCatalog(ctx: CatalogContext) {
   function quickStep(): void {
     if (!quick) return;
     const game = vpsCache?.games.find((g) => g.id === quick!.gameId);
-    const version = game && vpxVersions(game).find((v) => v.id === quick!.versionId);
+    const version = game && tableVersions(game).find((v) => v.id === quick!.versionId);
     if (!game || !version) {
       quick = undefined;
       return openCatalog();

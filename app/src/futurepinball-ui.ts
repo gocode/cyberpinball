@@ -13,6 +13,7 @@ import {
   futurePinballAt,
   futurePinballInstalledTables,
   futurePinballTableInMenu,
+  installFuturePinballArchive,
   t,
   tn,
   writeFuturePinballConfig,
@@ -193,8 +194,11 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     open();
   }
 
-  /** Ajoute ces .fpt au front-end (déjà présentes : rien), puis leurs médias en arrière-plan. */
-  async function add(files: string[], opts: { show?: boolean } = {}): Promise<TableEntry[]> {
+  /**
+   * Ajoute ces .fpt au front-end (déjà présentes : rien), puis leurs médias en arrière-plan.
+   * `vpsGameId` : le jeu choisi au catalogue ; `lead` : ce qui a été fait avant (archive rangée dans le jeu).
+   */
+  async function add(files: string[], opts: { show?: boolean; vpsGameId?: string; lead?: string[] } = {}): Promise<TableEntry[]> {
     const tablesDir = host.tablesDir();
     const added: TableEntry[] = [];
     const failed: string[] = [];
@@ -203,7 +207,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       const db = await host.vps().catch(() => undefined);
       for (const file of files) {
         try {
-          const r = await addFuturePinballTable(tablesDir, file, { db });
+          const r = await addFuturePinballTable(tablesDir, file, { db, ...(opts.vpsGameId ? { vpsGameId: opts.vpsGameId } : {}) });
           if (r.already) already++;
           else {
             added.push(r.entry);
@@ -219,6 +223,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     if (last) host.added(last.file);
     for (const entry of added) if (entry.info.Info?.VPSId) host.fetchMedias(entry.file);
     notice = [
+      ...(opts.lead ?? []),
       added.length === 1 ? t('« {title} » ajoutée au front-end.', { title: added[0]!.title }) : added.length ? tn(added.length, '{n} table ajoutée au front-end.', '{n} tables ajoutées au front-end.') : undefined,
       added.some((e) => e.info.Info?.VPSId) ? (added.length > 1 ? t('Leurs médias arrivent (Téléchargements).') : t('Ses médias arrivent (Téléchargements).')) : undefined,
       already ? tn(already, '{n} déjà dans le front-end.', '{n} déjà dans le front-end.') : undefined,
@@ -230,5 +235,44 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     return added;
   }
 
-  return { action, open, refresh, add };
+  /**
+   * Archives extraites de tables de Future Pinball (catalogue, Téléchargements) : leurs fichiers rangés
+   * dans le jeu (Tables, Libraries, Music, Scripts, BAM ; rien d'écrasé), puis leurs tables ajoutées au
+   * front-end. Jeu introuvable : rien n'est fait, l'écran dit de choisir son dossier (le fichier reçu reste
+   * dans les téléchargements).
+   */
+  async function addArchives(dirs: string[], opts: { show?: boolean; vpsGameId?: string } = {}): Promise<TableEntry[]> {
+    const game = refresh();
+    if (!game) {
+      notice = t('{game} est introuvable sur ce PC : choisissez son dossier, puis installez de nouveau la table (le fichier reçu est gardé).', { game: FUTURE_PINBALL_NAME });
+      console.log(`${FUTURE_PINBALL_NAME} : archive pas rangée, jeu introuvable (${dirs.join(', ')}).`); // i18n-ignore : journal
+      if (opts.show !== false) open(host.cursor());
+      return [];
+    }
+    const tables: string[] = [];
+    let copied = 0;
+    let kept = 0;
+    await host.task(t('Rangement dans {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
+      for (const dir of dirs) {
+        const r = await installFuturePinballArchive(dir, game.gameDir);
+        tables.push(...r.tables);
+        const others = r.copied.filter((f) => !r.tables.includes(f));
+        copied += others.length;
+        kept += r.kept.filter((f) => !r.tables.includes(f)).length;
+        console.log(`${FUTURE_PINBALL_NAME} : archive rangée dans ${game.gameDir} : ${r.tables.length} table(s), ${others.length} fichier(s) copié(s), ${r.kept.length} déjà là, ${r.ignored.length} ignoré(s).`); // i18n-ignore : journal
+      }
+    });
+    const lead = [
+      copied ? tn(copied, '{n} fichier rangé dans {game} (bibliothèques, musique…).', '{n} fichiers rangés dans {game} (bibliothèques, musique…).', { game: FUTURE_PINBALL_NAME }) : undefined,
+      kept ? tn(kept, '{n} déjà dans le jeu, gardé tel quel.', '{n} déjà dans le jeu, gardés tels quels.') : undefined,
+    ].filter((x): x is string => Boolean(x));
+    if (!tables.length) {
+      notice = [...lead, t('Aucune table de {game} dans ce fichier.', { game: FUTURE_PINBALL_NAME })].join(' ');
+      if (opts.show !== false) open(host.cursor());
+      return [];
+    }
+    return add(tables, { ...opts, lead });
+  }
+
+  return { action, open, refresh, add, addArchives };
 }

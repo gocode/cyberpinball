@@ -46,6 +46,14 @@ export const messages: Record<string, string> = {
   'Ses médias arrivent (Téléchargements).': 'Its media are on the way (Downloads).',
   '{n} déjà dans le front-end.': '{n} already in the menu.',
   'Pas ajoutées : {list}': 'Not added: {list}',
+  '{game} est introuvable sur ce PC : choisissez son dossier, puis installez de nouveau la table (le fichier reçu est gardé).':
+    '{game} can’t be found on this PC: choose its folder, then install the table again (the received file is kept).',
+  'Rangement dans {game}…': 'Putting files into {game}…',
+  '{n} fichier rangé dans {game} (bibliothèques, musique…).': '{n} file put into {game} (libraries, music…).',
+  '{n} fichiers rangés dans {game} (bibliothèques, musique…).': '{n} files put into {game} (libraries, music…).',
+  '{n} déjà dans le jeu, gardé tel quel.': '{n} already in the game, kept as is.',
+  '{n} déjà dans le jeu, gardés tels quels.': '{n} already in the game, kept as is.',
+  'Aucune table de {game} dans ce fichier.': 'No {game} table in this file.',
   // app/src/library.ts
   'Dossier de {game}': '{game} folder',
   'Dossier de Future Pinball': 'Future Pinball folder',
