@@ -39,6 +39,8 @@ export interface FileChoice {
   state?(file: VpsTableFile): MediaCard['state'];
   /** Lignes du détail propres à l'écran (pourquoi une version est conseillée), avant celles de la fiche. */
   extra?(file: VpsTableFile): string[];
+  /** Étiquettes propres à l'écran, avant celles du fichier (le logiciel d'une version : VPX, FP…). */
+  tags?(file: VpsTableFile): string[];
   /** Actions avant les fichiers (« Installation rapide ») et après (« Retour »). */
   before?: Action[];
   after?: Action[];
@@ -96,7 +98,7 @@ export function createFileGallery(ctx: FileGalleryContext) {
         popularity: tile.rating,
         facts: tile.facts,
         meta: tile.popularity ? tile.facts : undefined,
-        tags: (f.features ?? []).filter((x) => !/^incl\./i.test(x)).slice(0, 2),
+        tags: [...(c.tags?.(f) ?? []), ...(f.features ?? []).filter((x) => !/^incl\./i.test(x)).slice(0, 2)],
         extra: [...(c.extra?.(f) ?? []), ...tile.detail],
         thumb: thumbOf(tile, states[c.files.indexOf(f)] === 'loading'),
       };

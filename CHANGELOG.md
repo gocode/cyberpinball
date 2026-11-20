@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.2
 
+- Catalogue filtré « Jeux : pour Future Pinball » : la carte d'un jeu ne compte plus que ses versions Future Pinball (ni versions VPX, ni ROM) et dit la dernière d'entre elles ; sa fiche ne liste qu'elles.
+- Catalogue : chaque jeu porte les étiquettes des logiciels pour lesquels il existe (VPX, FP pour Future Pinball, FX, FX3…), même sans filtre ; dans sa fiche, chaque version porte celle de son logiciel.
 - Menu système refait pour être plus court : huit lignes au plus par écran (Borne en avait 17, Cyber Pinball 14), dans l'ordre de l'usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre.
 - Ma borne regroupe ce qui dépend de la borne : Configuration de la borne, VPX, DMD et LED, VR et vision 3D, Télécommande du téléphone, Démarrage et accès, Santé et sauvegardes.
 - La Configuration de la borne tient en six lignes : Boutons, Écrans, Son, Langue / Language, Configurations de la borne, Assistant complet.

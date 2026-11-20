@@ -98,7 +98,9 @@ import {
   vpxVersions,
   tableVersions,
   futurePinballVersions,
+  gameSoftware,
   isFuturePinballVersion,
+  versionSoftware,
   waitListProblems,
   CATALOG_DEFAULT,
   CATALOG_SORTS,
@@ -820,19 +822,23 @@ export function createCatalog(ctx: CatalogContext) {
     const shown = found.slice(filter.page * PAGE, (filter.page + 1) * PAGE);
     const actions: Action[] = shown.map((g) => ({ label: vpsLabel(g), key: `game:${g.id}`, run: () => openGame(g.id) }));
     const cards: MediaCard[] = shown.map((g, i) => {
-      const versions = tableVersions(g);
+      // Filtré « pour Future Pinball » : ses versions seulement, et ni ROM ni version VPX (PinCab, 20/11/2026).
+      const fpOnly = filter.kind === 'futurepinball';
+      const versions = shownVersions(g);
       const vpx = versions.filter((v) => !isFuturePinballVersion(v)).length;
       const fp = versions.length - vpx;
-      const roms = [...new Set((g.romFiles ?? []).map((r) => r.version).filter(Boolean))];
+      const roms = fpOnly ? [] : [...new Set((g.romFiles ?? []).map((r) => r.version).filter(Boolean))];
       const facts = [
         gameKind(g),
         vpx ? tn(vpx, '{n} version VPX', '{n} versions VPX') : undefined,
         fp ? tn(fp, '{n} version Future Pinball', '{n} versions Future Pinball') : undefined,
-        roms.length ? `ROM ${roms.slice(0, 2).join(', ')}` : versions.some((v) => versionWithoutRom(g, v)) ? t('sans ROM') : undefined].filter(Boolean).join(' · ');
+        fpOnly ? undefined : roms.length ? `ROM ${roms.slice(0, 2).join(', ')}` : versions.some((v) => versionWithoutRom(g, v)) ? t('sans ROM') : undefined].filter(Boolean).join(' · ');
       return {
         action: i,
         title: vpsLabel(g),
         state: here.has(g.id) ? { label: t('Installé'), tone: 'ok' } : undefined,
+        // Les logiciels pour lesquels le jeu existe (VPX, FP, FX, FX3…), même hors du filtre.
+        tags: gameSoftware(g),
         facts,
         extra: [
           versions[0]!.updatedAt
@@ -1043,7 +1049,7 @@ export function createCatalog(ctx: CatalogContext) {
       const advice = advise(game);
       const fast = advice ? quickNeeds(needsOf(game, advice.file)) : undefined;
       ctx.show(() => buildGame(game, fast), at);
-      loadThumbs(tableVersions(game).slice(0, 20).map(imageOf));
+      loadThumbs(shownVersions(game).slice(0, 20).map(imageOf));
     });
   }
 
@@ -1054,6 +1060,14 @@ export function createCatalog(ctx: CatalogContext) {
       if (t.info.Info?.VPSId === game.id) return { version: t.version };
     }
     return {};
+  }
+
+  /**
+   * Versions d'un jeu que montrent le catalogue et la fiche : celles pour VPX puis pour Future Pinball ;
+   * filtré « pour Future Pinball », les siennes seulement, la plus récente d'abord.
+   */
+  function shownVersions(game: VpsGame): VpsTableFile[] {
+    return filter.kind === 'futurepinball' ? futurePinballVersions(game) : tableVersions(game);
   }
 
   /** Version conseillée ; catalogue filtré « pour Future Pinball » : la sienne, jamais celle de VPX. */
@@ -1068,8 +1082,8 @@ export function createCatalog(ctx: CatalogContext) {
     const wanted = filter.text ? versionForText(game, filter.text) : undefined;
     const rank = (v: { id: string }) => (v.id === wanted?.id ? 2 : 0) + (v.id === advice?.file.id ? 1 : 0);
     // Les versions VPX d'abord, celles de Future Pinball ensuite (tableVersions), la conseillée en tête ;
-    // catalogue filtré « pour Future Pinball » : les siennes d'abord.
-    const all = filter.kind === 'futurepinball' ? [...futurePinballVersions(game), ...vpxVersions(game)] : tableVersions(game);
+    // catalogue filtré « pour Future Pinball » : les siennes seulement (shownVersions).
+    const all = shownVersions(game);
     const versions = all
       .map((v, i) => ({ v, i }))
       .sort((x, y) => rank(y.v) - rank(x.v) || x.i - y.i)
@@ -1122,6 +1136,8 @@ export function createCatalog(ctx: CatalogContext) {
           comment ? t('Note de VPS : « {comment} »', { comment: comment.length > 160 ? `${comment.slice(0, 159)}…` : comment }) : undefined,
         ].filter((x): x is string => Boolean(x));
       },
+      // Le logiciel de chaque version en tête de ses étiquettes : VPX, FP…
+      tags: (v) => [versionSoftware(v)],
       pick: (v) => openNeeds(game.id, v.id),
       back: () => openCatalog(),
     });

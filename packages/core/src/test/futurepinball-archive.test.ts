@@ -15,7 +15,9 @@ import {
   contentSummary,
   contentSummaryText,
   createVpsDb,
+  gameSoftware,
   installFuturePinballArchive,
+  versionSoftware,
   isReceivable,
   partFiles,
   planFuturePinballArchive,
@@ -83,6 +85,27 @@ test('filtre « Jeux : pour Future Pinball » : seulement les jeux qui en ont un
   // Conseil dans ce catalogue : la version Future Pinball, même quand le jeu a une version VPX.
   assert.equal(recommendVersion(BOTH, { futurePinball: true })?.file.id, 'fp1');
   assert.equal(recommendVersion(BOTH)?.file.id, 'vpx1');
+});
+
+test('catalogue filtré « pour Future Pinball » : la carte et la fiche d’un jeu ne montrent que ses versions Future Pinball', () => {
+  // PinCab, 20/11/2026 : filtre actif, la carte disait « 10 versions VPX · ROM taf_l7 » et la fiche listait tout.
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'catalog.ts'), 'utf8');
+  const shown = src.slice(src.indexOf('function shownVersions('), src.indexOf('function shownVersions(') + 400);
+  assert.match(shown, /filter\.kind === 'futurepinball' \? futurePinballVersions\(game\) : tableVersions\(game\)/);
+  const card = src.slice(src.indexOf('function buildCatalog('), src.indexOf('function buildCatalog(') + 1500);
+  assert.match(card, /const versions = shownVersions\(g\)/, 'la carte : ses versions seulement');
+  assert.match(card, /const roms = fpOnly \? \[\]/, 'la carte : pas de ROM');
+  const sheet = src.slice(src.indexOf('function buildGame('), src.indexOf('function buildGame(') + 1200);
+  assert.match(sheet, /const all = shownVersions\(game\)/, 'la fiche : ses versions seulement');
+});
+
+test('étiquettes de logiciel : VPX, FP, FX, FX3… sur chaque jeu et chaque version, dans un ordre fixe', () => {
+  assert.equal(versionSoftware({ tableFormat: 'FP' }), 'FP');
+  assert.equal(versionSoftware({}), 'VPX', 'sans format : VPX');
+  assert.equal(versionSoftware({ tableFormat: 'fx3' }), 'FX3');
+  const game = { id: 'g', name: 'Jeu', tableFiles: [{ id: '1', tableFormat: 'FX3' }, { id: '2', tableFormat: 'FP' }, { id: '3' }, { id: '4', tableFormat: 'FX' }, { id: '5', tableFormat: 'FP' }] } as VpsGame;
+  assert.deepEqual(gameSoftware(game), ['VPX', 'FP', 'FX', 'FX3']);
+  assert.deepEqual(gameSoftware(FP_ONLY), ['FP']);
 });
 
 test('conseil : VPX quand il y en a une ; sinon la version Future Pinball la plus récente, avec la raison', () => {

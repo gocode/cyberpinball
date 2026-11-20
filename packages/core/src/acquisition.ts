@@ -123,6 +123,27 @@ export function isFuturePinballVersion(file: { tableFormat?: string }): boolean 
   return (file.tableFormat ?? '').toUpperCase() === FUTURE_PINBALL_VPS_FORMAT;
 }
 
+/**
+ * Logiciel d'une version, en étiquette courte (catalogue, 20/11/2026) : le format de la base VPS tel
+ * quel, VPX par défaut. VPX (Visual Pinball X), FP (Future Pinball), FX et FX3 (Pinball FX, Pinball FX3),
+ * FX2, VP9 (ancien Visual Pinball), PC (jeu PC d'origine).
+ */
+export function versionSoftware(file: { tableFormat?: string }): string {
+  return (file.tableFormat ?? 'VPX').trim().toUpperCase() || 'VPX';
+}
+
+const SOFTWARE_ORDER = ['VPX', 'FP', 'FX', 'FX3', 'FX2', 'VP9', 'PC'];
+
+/**
+ * Logiciels pour lesquels un jeu a une version, en étiquettes courtes, dans un ordre fixe (VPX, FP, FX,
+ * FX3, puis les autres) : sur chaque carte du catalogue, on voit d'un coup d'œil ce qui existe.
+ */
+export function gameSoftware(game: VpsGame): string[] {
+  const found = new Set((game.tableFiles ?? []).filter(Boolean).map(versionSoftware));
+  const rank = (s: string) => (SOFTWARE_ORDER.includes(s) ? SOFTWARE_ORDER.indexOf(s) : SOFTWARE_ORDER.length);
+  return [...found].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
 /** Versions Future Pinball d'un jeu, la plus récemment mise à jour d'abord. */
 export function futurePinballVersions(game: VpsGame): VpsTableFile[] {
   return (game.tableFiles ?? []).filter((f) => f && isFuturePinballVersion(f)).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));

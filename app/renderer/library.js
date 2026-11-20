@@ -1344,6 +1344,8 @@ function renderMediaCards(m, cursor) {
     if (c.code) top.append(libEl('span', 'badge', c.code));
     if (c.source) top.append(libEl('span', `badge media-source-badge${c.source.base ? ' base' : ''}`, c.source.label));
     if (c.state) top.append(libEl('span', `badge media-state tone-${c.state.tone}`, c.state.label));
+    // Étiquettes neutres (logiciels d'un jeu du catalogue : VPX, FP, FX, FX3…).
+    for (const tag of c.tags ?? []) top.append(libEl('span', 'badge media-tag', tag));
     text.append(top);
     const line = (className, label, value) => {
       const div = libEl('div', className);

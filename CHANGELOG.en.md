@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Catalog filtered "Games: for Future Pinball": a game's card only counts its Future Pinball versions (no VPX versions, no ROM) and names the latest of them; its sheet lists only those.
+- Catalog: each game shows tags for the software it exists for (VPX, FP for Future Pinball, FX, FX3…), even without a filter; in its sheet, each version shows its own software's tag.
 - System menu redone to be shorter: at most eight lines per screen (Cabinet had 17, Cyber Pinball 14), in order of use: Tables, My cabinet, Downloads, Recent activity, Community, Juke-box, Help and info, Quit or shut down.
 - My cabinet gathers what depends on the cabinet: Cabinet setup, VPX, DMD and LEDs, VR and 3D vision, Phone remote, Startup and access, Health and backups.
 - Cabinet setup fits in six lines: Buttons, Screens, Sound, Language / Langue, Cabinet configurations, Full wizard.
