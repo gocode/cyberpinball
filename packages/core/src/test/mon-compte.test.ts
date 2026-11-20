@@ -80,23 +80,24 @@ test('le texte du QR, une liste numérotée recopiée, des majuscules et des acc
   assert.deepEqual(suggestRecoveryWords('h'), []);
 });
 
-test('vérification du code : ses trois premiers mots et trois autres de ses mots, mélangés, tous différents', () => {
-  for (let i = 0; i < 50; i++) {
-    const words = recoveryWords(playerSeed(createPlayerKey()));
-    const choices = recoveryCheckChoices(words);
-    assert.equal(choices.length, 6);
-    const rest = [...choices];
-    for (const w of words.slice(0, RECOVERY_CHECK_COUNT)) rest.splice(rest.indexOf(w), 1);
-    assert.equal(rest.length, 3, 'les trois premiers mots sont proposés');
-    assert.equal(new Set(rest).size, 3, 'trois autres mots, différents');
-    assert.ok(rest.every((w) => !words.slice(0, RECOVERY_CHECK_COUNT).includes(w) && words.includes(w)), 'pris plus loin dans le code');
+test('vérification du code : ses trois premiers mots seulement, mélangés, jamais dans le bon ordre', () => {
+  const words = recoveryWords(playerSeed(createPlayerKey()));
+  const first = words.slice(0, RECOVERY_CHECK_COUNT);
+  // Chaque tirage possible du mélange, y compris celui qui retomberait dans l'ordre.
+  for (const r of [0, 0.2, 0.4, 0.6, 0.8, 0.99]) {
+    for (const s of [0, 0.5, 0.99]) {
+      const draws = [r, s];
+      const choices = recoveryCheckChoices(words, () => draws.shift() ?? 0);
+      assert.equal(choices.length, RECOVERY_CHECK_COUNT, 'trois mots, aucun en plus');
+      assert.deepEqual([...choices].sort(), [...first].sort(), 'les trois premiers du code');
+      if (new Set(first).size > 1) assert.notDeepEqual(choices, first, 'jamais déjà dans l’ordre');
+    }
   }
-  // Un mot répété parmi les trois premiers est proposé deux fois ; un code sans assez d'autres mots se complète de la liste.
-  const odd = ['orage', 'orage', 'pivot', ...Array(21).fill('orage')];
-  const choices = recoveryCheckChoices(odd);
-  assert.equal(choices.length, 6);
-  assert.equal(choices.filter((w) => w === 'orage').length, 2);
-  assert.equal(new Set(choices).size, 5);
+  // Un mot répété parmi les trois premiers est proposé deux fois, et l'ordre reste à refaire.
+  const odd = ['orage', 'orage', 'pivot', ...Array(21).fill('lampe')];
+  const choices = recoveryCheckChoices(odd, () => 0.99);
+  assert.deepEqual([...choices].sort(), ['orage', 'orage', 'pivot']);
+  assert.notDeepEqual(choices, ['orage', 'orage', 'pivot']);
 });
 
 // ---------------------------------------------------------------------------
@@ -344,7 +345,7 @@ test('écran : le code se vérifie par ses trois premiers mots choisis dans l’
   assert.equal(code.sections[0]!.rows.length, 6, '24 mots en six lignes');
   assert.equal(code.actions[0]!.qr?.url, svc.words().join(' '), 'le QR : les mots en texte');
   await act('Je l’ai noté').run();
-  // Aux flippers, sans clavier : les trois premiers mots choisis dans l'ordre parmi six.
+  // Aux flippers, sans clavier : les trois premiers mots, mélangés, à remettre dans l'ordre.
   assert.equal(prompts.length, 0, 'aucune saisie au clavier');
   const words = svc.words();
   const offered = () => screen!.build().sections.find((s) => s.title === 'Mots proposés')!.rows;
@@ -352,7 +353,7 @@ test('écran : le code se vérifie par ses trois premiers mots choisis dans l’
     const row = offered().find((r) => r.text === words[n] && r.check === 'off')!;
     return screen!.build().actions[row.action!]!.run();
   };
-  assert.equal(offered().length, 6);
+  assert.equal(offered().length, 3, 'les trois premiers mots, aucun en plus');
   assert.ok(offered().every((r) => r.check === 'off' && r.checkRank === 1), 'cases vides, chacune prête à prendre le n° 1');
   await choose(0);
   const first = offered().find((r) => r.check === 'on')!;
@@ -362,13 +363,15 @@ test('écran : le code se vérifie par ses trois premiers mots choisis dans l’
   // Le dernier mot choisi se rechoisit pour l'enlever.
   await screen!.build().actions[first.action!]!.run();
   assert.ok(offered().every((r) => r.check === 'off'));
-  // Un mot faux en n° 3 : rien n'est noté, tout est décoché, l'erreur est dite sans dire quel mot.
-  await choose(0);
-  await choose(1);
-  const decoy = offered().find((r) => !words.slice(0, 3).includes(r.text))!;
-  await screen!.build().actions[decoy.action!]!.run();
-  assert.equal(svc.protection().codeNotedAt, undefined, 'mot faux : pas noté');
-  assert.ok(offered().every((r) => r.check === 'off'), 'mot faux : on recommence');
+  // Mauvais ordre (un autre mot que le n° 1 en premier) : rien n'est noté, tout est décoché, l'erreur est dite sans dire quel mot.
+  const wrong = offered().find((r) => r.text !== words[0])!;
+  await screen!.build().actions[wrong.action!]!.run();
+  for (let n = 1; n < RECOVERY_CHECK_COUNT; n++) {
+    const next = offered().find((r) => r.check === 'off')!;
+    await screen!.build().actions[next.action!]!.run();
+  }
+  assert.equal(svc.protection().codeNotedAt, undefined, 'mauvais ordre : pas noté');
+  assert.ok(offered().every((r) => r.check === 'off'), 'mauvais ordre : on recommence');
   assert.match(screen!.build().sections[0]!.rows[0]!.text, /pas les trois premiers mots/);
   assert.ok(act('Recommencer') && act('Quitter'), 'Recommencer et Quitter');
   for (const n of [0, 1, 2]) await choose(n);

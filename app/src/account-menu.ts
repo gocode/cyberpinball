@@ -210,7 +210,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
   }
 
   /**
-   * Les trois premiers mots, choisis aux flippers dans l'ordre parmi six (19/11/2026 : deux mots au
+   * Les trois premiers mots, mélangés, remis dans l'ordre aux flippers (19/11/2026 : deux mots au
    * hasard à taper demandaient le clavier). Chaque mot choisi prend son numéro dans sa case ; le
    * troisième choisi, tout est jugé d'un coup : juste, le code est noté et le coffre part ; faux, on
    * recommence, sans dire quel mot était faux (sinon on trouverait l'ordre à tâtons).

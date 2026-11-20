@@ -98,27 +98,18 @@ export const recoveryQrText = (words: readonly string[]): string => words.join('
 
 /** Mots à retrouver pour vérifier qu'un code est bien noté : les premiers, dans l'ordre. */
 export const RECOVERY_CHECK_COUNT = 3;
-/** Mots proposés en plus, pris plus loin dans le code : il faut lire les numéros notés, pas seulement les mots. */
-const RECOVERY_CHECK_DECOYS = 3;
 
 /**
- * Les mots proposés pour vérifier le code (19/11/2026) : ses trois premiers et trois autres de ses
- * mots, mélangés. Le joueur les choisit aux flippers dans l'ordre, sans clavier : taper deux mots
- * tirés au hasard demandait le clavier à l'écran. Un mot présent deux fois parmi les trois premiers
- * est proposé deux fois ; les autres sont tous différents de ceux-là.
+ * Les mots proposés pour vérifier le code (19/11/2026) : ses trois premiers seulement, mélangés,
+ * jamais dans le bon ordre. Le joueur les remet dans l'ordre aux flippers, sans clavier : taper deux
+ * mots tirés au hasard demandait le clavier à l'écran. Pas de mot en plus (20/11/2026 : six mots,
+ * dont trois pièges, ce n'était pas ce qui était demandé).
  */
 export function recoveryCheckChoices(words: readonly string[], random: () => number = Math.random): string[] {
   const targets = words.slice(0, RECOVERY_CHECK_COUNT);
-  const taken = new Set(targets);
-  const decoys: string[] = [];
-  // Le reste du code d'abord, dans le désordre ; la liste complète seulement s'il n'y a pas assez de mots différents.
-  for (const word of [...shuffle(words.slice(RECOVERY_CHECK_COUNT), random), ...RECOVERY_WORDS]) {
-    if (decoys.length >= RECOVERY_CHECK_DECOYS) break;
-    if (taken.has(word)) continue;
-    taken.add(word);
-    decoys.push(word);
-  }
-  return shuffle([...targets, ...decoys], random);
+  const out = shuffle(targets, random);
+  // Tombés dans le bon ordre, il suffirait de les prendre de haut en bas : décalés d'un rang.
+  return out.every((w, i) => w === targets[i]) ? [...out.slice(1), out[0]!] : out;
 }
 
 /** Mélange de Fisher-Yates, sur une copie. */
