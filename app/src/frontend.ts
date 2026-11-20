@@ -314,7 +314,8 @@ import {
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
+import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, startDmdMirror } from './futurepinball-play';
+import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
@@ -4903,6 +4904,10 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       : simulated === undefined && command && fp
         ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, undefined, { name: zenName, keys: futurePinballButtonKeys({ buttons, navigation }) })
         : () => undefined;
+  // Secousses de la borne (accéléromètre de l'étape « Tilt ») : Future Pinball ne le lit pas, ses touches
+  // de secousse lui sont frappées à chaque à-coup (nudge-keys.ts).
+  const fpNudge = simulated === undefined && command && fp ? loadCabinet(loc.dataDir)?.analog : undefined;
+  const stopNudgeKeys = fpNudge?.nudge && !fpNudge.nudgeOff ? bridgeNudgeKeys(fpNudge.nudge, futurePinballNudgeKeys(), () => game.pid, zenName) : () => undefined;
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -4914,6 +4919,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   dmdMirror?.stop();
   if (windowsOrientation) orientationAfterGame(zenName);
   stopZenKeys();
+  stopNudgeKeys();
   stopJoystick();
   const stoppedLoading = launch?.stopped === true;
   endLaunch();
