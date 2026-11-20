@@ -94,6 +94,15 @@ function overlapArea(a: CoverRect, b: CoverRect): number {
   return w > 0 && h > 0 ? w * h : 0;
 }
 
+/**
+ * Part de la zone d'un rôle qu'une fenêtre du front-end doit couvrir, devant une fenêtre du jeu, pour être
+ * passée derrière lui. Plus 0,99 (20/11/2026) : au passage du jeu en plein écran, Windows déplace des
+ * écrans, et une fenêtre du front-end décalée de 11 pixels (98,98 % du fronton) restait devant le fronton
+ * de Future Pinball toute la partie, l'image du chargement à la place de celle du jeu. La moitié suffit :
+ * une notification, petite, reste devant.
+ */
+export const HIDING_SHARE = 0.5;
+
 /** Une fenêtre du front-end posée devant une fenêtre du jeu qui dessine sur la zone d'un rôle. */
 export interface HiddenGameWindow<W extends StackedWindow = StackedWindow> {
   role: RoleId;
@@ -110,8 +119,9 @@ export interface HiddenGameWindow<W extends StackedWindow = StackedWindow> {
  * de définition, elles couvrent l'écran voisin) ni d'un autre programme.
  * - `occupied` : rôles dont la zone est couverte, pour au moins OCCUPIED_SHARE, par une fenêtre visible
  *   du jeu, devant ou derrière celles du front-end ; leur fond de partie reste figé (momentScreen).
- * - `hidden` : celles de ces fenêtres que le front-end cache (une de ses fenêtres couvre toute la zone
- *   au-dessus d'elle) ; elles sont à repasser devant (app/src/game-screens.ts), sans premier plan.
+ * - `hidden` : celles de ces fenêtres que le front-end cache (une de ses fenêtres couvre au moins
+ *   HIDING_SHARE de la zone au-dessus d'elle) ; elles sont à repasser devant (app/src/game-screens.ts),
+ *   sans premier plan.
  */
 export function gameScreens<W extends StackedWindow>(zones: readonly RoleRect[], stack: readonly W[], ownPid: number, gamePids: readonly number[]): { occupied: RoleId[]; hidden: HiddenGameWindow<W>[] } {
   const occupied: RoleId[] = [];
@@ -124,7 +134,7 @@ export function gameScreens<W extends StackedWindow>(zones: readonly RoleRect[],
     const index = stack.findIndex((w) => counts(w) && gamePids.includes(w.pid) && share(w) >= OCCUPIED_SHARE);
     if (index < 0) continue;
     occupied.push(zone.role);
-    const ours = stack.slice(0, index).filter((w) => counts(w) && w.pid === ownPid && share(w) >= 0.99);
+    const ours = stack.slice(0, index).filter((w) => counts(w) && w.pid === ownPid && share(w) >= HIDING_SHARE);
     if (ours.length) hidden.push({ role: zone.role, game: stack[index]!, ours: ours.reverse() });
   }
   return { occupied, hidden };

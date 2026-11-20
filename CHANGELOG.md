@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Partie de Future Pinball, Pinball FX ou Pinball FX3 : l'image du chargement ne reste plus devant le fronton du jeu. Au passage du jeu en plein écran, Windows déplace des écrans ; décalée de quelques pixels, la fenêtre du front-end n'était plus reconnue comme cachant le jeu et restait devant toute la partie. Elle passe maintenant derrière dès qu'elle couvre la moitié de l'écran que le jeu occupe.
 - Pinball FX3 : avant chaque partie, la table reçoit son image de fronton si elle n'en a pas : son fronton dans Cyber Pinball, sinon celui du catalogue d'archive.org (avec l'image de l'accueil du jeu). La fenêtre du fronton de FX3 montre alors l'image de la table, au lieu du chemin du fichier qu'il cherchait. Une image déjà là n'est jamais remplacée. Une table sans fronton dans Cyber Pinball prend cette image, et la roue la montre.
 - Pinball FX et FX3 : une image rangée à côté d'une table, en largeur, compte comme son fronton (c'est là que FX3 l'affiche), et non plus comme une image du plateau.
 - Ajout d'une table de Pinball FX ou de Pinball FX3 : un média qui a plusieurs choix le dit sur sa carte, et Start les montre tous (chaque version de VPinMediaDB, image ou vidéo, l'image du dossier du jeu, la capture de VPS, chaque fiche de VPForums ou de VPUniverse). Celui que vous prenez remplace celui proposé, et c'est lui qui arrive après l'ajout. « Laisser ce média » l'écarte.

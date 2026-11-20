@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { followDisplays, gameScreens, misplacedWindows, surfaceRoleRects, type RoleDisplays } from '../gamescreens';
+import { followDisplays, gameScreens, HIDING_SHARE, misplacedWindows, surfaceRoleRects, type RoleDisplays } from '../gamescreens';
 import { occupiedRoles, type RoleRect } from '../menumoments';
 import type { ObservedDisplay, RoleId } from '../model';
 import type { StackedWindow } from '../screencover';
@@ -124,6 +124,20 @@ test('mode borne d’un jeu : sa fenêtre de fronton cachée par le front-end es
   // Devant le front-end, ou réduite : rien à faire.
   assert.deepEqual(gameScreens(zonesDuring, [backglassGame, ours], ME, [FX3]).hidden, []);
   assert.deepEqual(gameScreens(zonesDuring, [ours, { ...backglassGame, minimized: true }], ME, [FX3]).occupied, []);
+});
+
+test('fenêtres du front-end décalées par le réarrangement des écrans : passées derrière le fronton du jeu quand même', () => {
+  // PinCab, 20/11/2026 : au passage de Future Pinball en plein écran, Windows déplace le fronton ; le voile et
+  // l'image du chargement, restés à 11 pixels près (98,98 % de la zone), restaient devant toute la partie.
+  const FP = 6000;
+  const backbox = win(FP, 3840, 101, 1920, 1080, { title: 'Future Pinball - Backbox' });
+  const veil = win(ME, 3840, 90, 1920, 1080, { title: 'Cyber Pinball — Fond' });
+  const loading = win(ME, 3840, 90, 1920, 1080, { title: 'Cyber Pinball — Backglass' });
+  const notice = win(ME, 4200, 200, 600, 120, { title: 'Cyber Pinball — Notification' });
+  const { hidden } = gameScreens(zonesDuring, [notice, loading, veil, backbox], ME, [FP]);
+  assert.equal(hidden.length, 1);
+  assert.deepEqual(hidden[0]!.ours, [veil, loading], 'les deux passent derrière, la notification reste devant');
+  assert.ok(HIDING_SHARE <= 0.9, 'quelques pixels de décalage ne suffisent plus à cacher le jeu');
 });
 
 test('branchement : les écrans changés reposent les fenêtres, et les jeux autres que VPX ont leur relevé', () => {
