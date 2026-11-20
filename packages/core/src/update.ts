@@ -40,6 +40,7 @@ import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { copyTree } from './copytree';
 import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
+import { fetchTextPatiently, type Patience, type PatientResponse } from './patientfetch';
 import { fetchResumable, ResumableError } from './resumable';
 
 /** GitHub repository of the releases; the same as "repository" in the root package.json (checked by the tests). */
@@ -345,9 +346,48 @@ export function effectiveUpdateSource(source: UpdateSource, channel: PrivateChan
 
 const GITHUB_API = 'https://api.github.com';
 
+/**
+ * Releases listed for the public repository: the most recent one is among the first (GitHub lists
+ * them newest first). Each listed release weighs some 30 KB with its attached files: 30 of them
+ * made about 1 MB, too much for a slow connection (20/11/2026).
+ */
+export const PUBLIC_RELEASES_LISTED = 10;
+/**
+ * Releases listed for the private test channel: more of them, as the API address of an installer
+ * of an older release (quick publication) is looked for in the list.
+ */
+export const PRIVATE_RELEASES_LISTED = 30;
+
 /** List of the repository's releases, pre-releases included (GitHub API, without token: 60 requests per hour). */
-export function releasesApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API): string {
-  return `${api}/repos/${repository}/releases?per_page=30`;
+export function releasesApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API, perPage = PUBLIC_RELEASES_LISTED): string {
+  return `${api}/repos/${repository}/releases?per_page=${perPage}`;
+}
+
+/**
+ * Patience of the searches (patientfetch.ts): the delay bounds the absence of progress, not the
+ * length of the transfer, and a passing network error is tried again. Tests: shorter.
+ */
+export type UpdatePatience = Partial<Patience>;
+
+/** Reads an address of the update site; no answer at all becomes the usual message. */
+async function readUpdateSite(url: string, get: typeof fetch, signal: AbortSignal | undefined, patience: UpdatePatience | undefined, init: Omit<RequestInit, 'signal'>): Promise<PatientResponse> {
+  try {
+    return await fetchTextPatiently(url, { ...patience, fetch: get, init, ...(signal ? { signal } : {}) });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error(t('Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? ({message})', { message: (error as Error).message }));
+  }
+}
+
+/**
+ * Reads and checks a published feed (signature, then content). Used by the cabinets and by the
+ * publication (scripts/publier.mjs), which reads the feed of the last full publication.
+ */
+export async function readFeed(url: string, opts: { publicKey?: string; fetch?: typeof fetch; signal?: AbortSignal; patience?: UpdatePatience } = {}): Promise<UpdateManifest> {
+  const response = await readUpdateSite(url, opts.fetch ?? fetch, opts.signal, opts.patience, { redirect: 'follow', headers: { 'cache-control': 'no-cache' } });
+  if (response.status === 404) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
+  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
+  return openEnvelope(response.text, opts.publicKey ?? updatePublicKey());
 }
 
 /**
@@ -387,14 +427,13 @@ interface NewestRelease {
   apiUrls: Map<string, string>;
 }
 
-async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSignal | undefined, viaApi: boolean): Promise<NewestRelease | undefined> {
-  const response = await get(listUrl, {
-    signal: signal ?? AbortSignal.timeout(20_000),
+async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSignal | undefined, viaApi: boolean, patience: UpdatePatience | undefined): Promise<NewestRelease | undefined> {
+  const response = await readUpdateSite(listUrl, get, signal, patience, {
     headers: { accept: 'application/vnd.github+json', 'cache-control': 'no-cache' },
   });
   if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
   type Listed = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string; url?: string }[] };
-  const listed = (await response.json()) as Listed[];
+  const listed = JSON.parse(response.text) as Listed[];
   let best: NewestRelease | undefined;
   const apiUrls = new Map<string, string>();
   for (const r of Array.isArray(listed) ? listed : []) {
@@ -414,8 +453,8 @@ async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSi
  * that has one (drafts are not listed without a token). The feed is still checked by its
  * signature: the list only says where to look for it.
  */
-export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal } = {}): Promise<string> {
-  const best = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), opts.fetch ?? fetch, opts.signal, false);
+export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal; patience?: UpdatePatience } = {}): Promise<string> {
+  const best = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), opts.fetch ?? fetch, opts.signal, false, opts.patience);
   if (!best) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
   return best.feed;
 }
@@ -435,6 +474,7 @@ export async function checkForUpdate(opts: {
   publicKey?: string;
   fetch?: typeof fetch;
   signal?: AbortSignal;
+  patience?: UpdatePatience;
 }): Promise<UpdateCheck> {
   let url = opts.feedUrl ?? updateFeedUrl();
   const plain = opts.fetch ?? fetch;
@@ -443,31 +483,25 @@ export async function checkForUpdate(opts: {
   const listed = !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL;
   if ((opts.prereleases || opts.channel) && listed) {
     // Unreadable list (API limit reached...): the feed of the releases, always readable.
-    const pub = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), plain, opts.signal, false).catch(() => undefined);
+    const pub = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), plain, opts.signal, false, opts.patience).catch((error) => {
+      if (opts.signal?.aborted) throw error;
+      return undefined;
+    });
     if (pub) url = pub.feed;
     if (opts.channel) {
       const channel = opts.channel;
       get = channelFetch(channel, plain);
       try {
-        privateRelease = await newestRelease(releasesApiUrl(channel.repository, channel.api), get, opts.signal, true);
+        privateRelease = await newestRelease(releasesApiUrl(channel.repository, channel.api, PRIVATE_RELEASES_LISTED), get, opts.signal, true, opts.patience);
       } catch (error) {
-        if ((error as Error).name === 'AbortError' && opts.signal?.aborted) throw error;
+        if (opts.signal?.aborted) throw error;
         throw new Error(t('Canal d’essai {repository} illisible : {message} Vérifiez le jeton de canal-essai.json, ou revenez aux versions publiques.', { repository: channel.repository, message: (error as Error).message }));
       }
       if (privateRelease && (!pub || compareAppVersions(privateRelease.version, pub.version) > 0)) url = privateRelease.feed;
       else privateRelease = undefined;
     }
   }
-  let response: Response;
-  try {
-    response = await get(url, { redirect: 'follow', signal: opts.signal ?? AbortSignal.timeout(20_000), headers: { 'cache-control': 'no-cache' } });
-  } catch (error) {
-    if ((error as Error).name === 'AbortError' && opts.signal?.aborted) throw error;
-    throw new Error(t('Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? ({message})', { message: (error as Error).message }));
-  }
-  if (response.status === 404) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
-  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
-  const latest = openEnvelope(await response.text(), opts.publicKey ?? updatePublicKey());
+  const latest = await readFeed(url, { fetch: get, publicKey: opts.publicKey ?? updatePublicKey(), ...(opts.signal ? { signal: opts.signal } : {}), ...(opts.patience ? { patience: opts.patience } : {}) });
   // Private repository: its files can only be downloaded through the API, with the token (channelFetch).
   // Only the address changes: size and hash stay those of the signed feed.
   if (privateRelease) {

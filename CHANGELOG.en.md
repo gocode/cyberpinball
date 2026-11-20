@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.2
 
+- Updates on a slow connection: the cabinet now finds its updates even at a low speed. The check no longer stops after 20 seconds of transfer, only when the site stays completely silent for 20 seconds; a passing network drop is retried twice, with a growing wait, and the list of releases it reads is three times lighter. Same fix for the table database (VPS), the media index, the table rules and the pages of the download sites.
 - Cabinet sound: when a sound card (or an amplifier connected over HDMI) is set to stereo in Windows, the wizard asks whether there are exciters or speakers on the playfield (SSF, surround). On a yes, it opens the Windows Sound panel, explains the 5.1 or 7.1 setting and starts the speaker test as soon as the card reports it. Before, SSF was never offered on a card left in stereo, without a word.
 - Cabinet sound: setups with only two exciters are recognized. SSF in 5.1 sends them the whole playfield sound, and the wizard recommends this setting over 7.1, where part of each sound went to a silent jack. The summary no longer reports SSF in 5.1 as an error.
 - Cabinet sound: nothing heard on the rear or sides of a motherboard card: the wizard explains the case of three-jack cards (jack to reassign in the maker's audio console, or the front headphone jack).

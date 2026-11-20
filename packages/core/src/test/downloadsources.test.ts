@@ -40,6 +40,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
   'packages/core/src/backup.ts': { count: 1, how: 'copie de fichiers locaux vers une clé ou un disque (Sauvegardes), et retour : rien ne vient du réseau' },
   'packages/core/src/friendlibrary.ts': { count: 2, how: 'définition et lecture du message file-get' },
   'packages/core/src/mediapack.ts': { count: 1, how: 'extraction d’un paquet de médias local' },
+  'packages/core/src/patientfetch.ts': { count: 1, how: 'texte lu en mémoire (liste des publications, flux de mise à jour, index, page), morceau par morceau pour le délai sans progrès : rien n’est écrit sur le disque, pas un téléchargement de fichier' },
   'packages/core/src/resumable.ts': { count: 1, how: 'la reprise HTTP elle-même : seul code qui écrit le corps d’une réponse' },
 };
 
@@ -96,7 +97,9 @@ test('le corps d’une réponse HTTP n’est écrit sur le disque que par la rep
     .filter(({ text }) => /\.getReader\(\)|createWriteStream\(/.test(text))
     .map((s) => s.file)
     // Fichiers locaux seulement : extraction d'un paquet de médias, copie d'une sauvegarde.
-    .filter((f) => f !== 'packages/core/src/mediapack.ts' && f !== 'packages/core/src/backup.ts');
+    .filter((f) => f !== 'packages/core/src/mediapack.ts' && f !== 'packages/core/src/backup.ts')
+    // Texte lu en mémoire, jamais écrit sur le disque par ce module (délai sans progrès).
+    .filter((f) => f !== 'packages/core/src/patientfetch.ts' || /createWriteStream\(|fs\./.test(fs.readFileSync(path.join(REPO_ROOT, f), 'utf8')));
   assert.deepEqual(writers, ['packages/core/src/resumable.ts'], 'un téléchargement HTTP écrit à la main ne reprendrait pas après une coupure : passer par fetchResumable');
   // Les modules qui téléchargent une adresse directe passent tous par elle.
   for (const file of ['packages/core/src/mediadb.ts', 'packages/core/src/update.ts', 'packages/installer/src/download.ts', 'app/src/ytdlp-tool.ts']) {

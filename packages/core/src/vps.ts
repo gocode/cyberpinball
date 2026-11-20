@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
+import { fetchTextPatiently } from './patientfetch';
 import { parseTableName } from './tables';
 
 export const VPS_DB_URL = 'https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json';
@@ -264,7 +265,7 @@ export interface VpsRefreshOptions {
   now?: Date;
   /** Vérifie même si la dernière vérification est récente. */
   force?: boolean;
-  /** Délai pour joindre GitHub (la base pèse environ 8 Mo). */
+  /** Délai sans un octet reçu de GitHub (la base pèse environ 8 Mo : jamais une durée totale). */
   timeoutMs?: number;
 }
 
@@ -288,9 +289,10 @@ export async function refreshVpsDb(downloadsDir: string, opts: VpsRefreshOptions
   const cached = fs.existsSync(file);
   if (cached && !opts.force && meta.checkedAt && now.getTime() - Date.parse(meta.checkedAt) < CHECK_EVERY_MS) return { status: 'fresh' };
   const get = async (url: string) => {
-    const response = await doFetch(url, { redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000) });
+    // Délai sans progrès, pas de durée totale : la base passe aussi sur une connexion lente (patientfetch.ts).
+    const response = await fetchTextPatiently(url, { fetch: doFetch, init: { redirect: 'follow' }, idleMs: opts.timeoutMs ?? 60_000 });
     if (!response.ok) throw new Error(t('HTTP {status} pour {url}', { status: response.status, url }));
-    return response.text();
+    return response.text;
   };
   try {
     const remote = Number((await get(VPS_UPDATED_URL)).trim());

@@ -146,6 +146,7 @@ export * from './downloads';
 export * from './downloadqueue';
 export * from './downloadmanager';
 export * from './resumable';
+export * from './patientfetch';
 export * from './filepicker';
 export * from './journey';
 export * from './sitesessions';

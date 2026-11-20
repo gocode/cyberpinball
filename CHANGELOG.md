@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.2
 
+- Mises à jour sur une connexion lente : la borne trouve désormais ses mises à jour même à faible débit. La recherche ne s'arrête plus au bout de 20 secondes de transfert, mais seulement quand le site ne répond plus du tout pendant 20 secondes ; une coupure passagère est réessayée deux fois, avec une attente croissante, et la liste des publications lue est trois fois plus légère. Même correction pour la base des tables (VPS), l'index des médias, les règles des tables et les fiches des sites de téléchargement.
 - Son de la borne : quand une carte son (ou un ampli branché en HDMI) est réglée en stéréo dans Windows, l'assistant demande s'il y a des exciters ou des haut-parleurs sur le plateau (SSF, surround). Sur un oui, il ouvre le panneau Son de Windows, explique le réglage en 5.1 ou 7.1 et lance le test des haut-parleurs dès que la carte l'annonce. Auparavant, le SSF n'était jamais proposé sur une carte laissée en stéréo, sans un mot.
 - Son de la borne : deux exciters seulement sont reconnus. Le SSF en 5.1 leur envoie tout le son du plateau, et l'assistant conseille ce réglage plutôt que le 7.1, où une part de chaque son partait vers une prise muette. Le récapitulatif ne présente plus le SSF en 5.1 comme une erreur.
 - Son de la borne : rien entendu sur l'arrière ni sur les côtés d'une carte de carte mère : l'assistant explique le cas des cartes à trois prises (prise à réaffecter dans la console audio du fabricant, ou prise casque en façade).

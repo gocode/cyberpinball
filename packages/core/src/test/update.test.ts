@@ -25,6 +25,7 @@ import {
   recordPendingUpdate,
   relaunchArguments,
   releaseAssetUrl,
+  releasesApiUrl,
   savePrereleaseSetting,
   signManifest,
   stagedAppDir,
@@ -124,7 +125,87 @@ test('recherche : disponible si plus récente, à jour sinon ; erreurs lisibles'
   } finally {
     await site.close();
   }
-  await assert.rejects(checkForUpdate({ current: '0.1.0', feedUrl: 'http://127.0.0.1:9/maj.json', publicKey: k.pub }), /connectée à Internet/);
+  await assert.rejects(checkForUpdate({ current: '0.1.0', feedUrl: 'http://127.0.0.1:9/maj.json', publicKey: k.pub, patience: { retryDelayMs: 10 } }), /connectée à Internet/);
+});
+
+/** Site dont chaque réponse arrive par petits morceaux (connexion lente), ou jamais (site muet). */
+async function slowSite(files: Record<string, string>, pace: { pieces: number; everyMs: number } | 'muet') {
+  const sockets = new Set<import('node:net').Socket>();
+  const hits: string[] = [];
+  const server = http.createServer((req, res) => {
+    hits.push(req.url ?? '');
+    if (pace === 'muet') return;
+    const body = files[req.url ?? ''];
+    if (body === undefined) return void res.writeHead(404).end();
+    const data = Buffer.from(body);
+    const size = Math.ceil(data.length / pace.pieces);
+    res.writeHead(200, { 'content-length': data.length });
+    let at = 0;
+    const timer = setInterval(() => {
+      res.write(data.subarray(at, (at += size)));
+      if (at >= data.length) {
+        clearInterval(timer);
+        res.end();
+      }
+    }, pace.everyMs);
+    res.on('close', () => clearInterval(timer));
+  });
+  server.on('connection', (s) => {
+    sockets.add(s);
+    s.on('close', () => sockets.delete(s));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return { url, hits, close: () => new Promise<void>((resolve) => (sockets.forEach((s) => s.destroy()), server.close(() => resolve()))) };
+}
+
+test('connexion lente : le flux livré en plus de 20 s, sans long silence, est lu (réglages par défaut)', async () => {
+  // Le cas du 20/11/2026 : un délai total de 20 s coupait la lecture à 4 Ko/s, à chaque essai.
+  const k = keys();
+  const feed = JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), 'https://example.org/x.exe'), k.priv));
+  const site = await slowSite({ '/maj.json': feed }, { pieces: 44, everyMs: 500 });
+  try {
+    const start = Date.now();
+    const check = await checkForUpdate({ current: '0.1.0', feedUrl: `${site.url}/maj.json`, publicKey: k.pub });
+    assert.ok(Date.now() - start > 20_000, 'le transfert a bien duré plus que l’ancien délai total');
+    assert.equal(check.status, 'available');
+    assert.deepEqual(site.hits, ['/maj.json'], 'lu d’une traite, sans réessai');
+  } finally {
+    await site.close();
+  }
+});
+
+test('connexion lente : la liste des publications et le flux aboutissent ; site muet : message habituel', async () => {
+  const k = keys();
+  const patience = { idleMs: 300, attempts: 2, retryDelayMs: 10 };
+  const files: Record<string, string> = {};
+  const site = await slowSite(files, { pieces: 10, everyMs: 120 });
+  try {
+    files['/maj.json'] = JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), 'https://example.org/x.exe', '0.3.0-essai.1'), k.priv));
+    files['/releases'] = JSON.stringify([{ tag_name: 'v0.3.0-essai.1', draft: false, assets: [{ name: 'cyberpinball-maj.json', browser_download_url: `${site.url}/maj.json` }] }]);
+    const releasesUrl = `${site.url}/releases`;
+    assert.equal(await prereleaseFeedUrl({ releasesUrl, patience }), `${site.url}/maj.json`);
+    const check = await checkForUpdate({ current: '0.2.0', prereleases: true, releasesUrl, publicKey: k.pub, patience });
+    assert.equal(check.latest.version, '0.3.0-essai.1');
+  } finally {
+    await site.close();
+  }
+
+  const mute = await slowSite({}, 'muet');
+  try {
+    const noAnswer = /Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet \?.*plus rien ne vient du site/;
+    await assert.rejects(checkForUpdate({ current: '0.1.0', feedUrl: `${mute.url}/maj.json`, publicKey: k.pub, patience }), noAnswer);
+    await assert.rejects(prereleaseFeedUrl({ releasesUrl: `${mute.url}/releases`, patience }), noAnswer);
+    // Réessayé une fois, puis abandonné : pas d'attente sans fin.
+    assert.deepEqual(mute.hits, ['/maj.json', '/maj.json', '/releases', '/releases']);
+  } finally {
+    await mute.close();
+  }
+});
+
+test('liste des publications publiques réduite : dix au lieu de trente (environ 1 Mo sur une connexion lente)', () => {
+  assert.equal(releasesApiUrl(), `https://api.github.com/repos/${UPDATE_REPOSITORY}/releases?per_page=10`);
+  assert.equal(releasesApiUrl('o/essais', 'http://x', 30), 'http://x/repos/o/essais/releases?per_page=30');
 });
 
 test('téléchargement : vérifié, repris s’il est intact, supprimé s’il est faux ; anciens installeurs retirés', async () => {

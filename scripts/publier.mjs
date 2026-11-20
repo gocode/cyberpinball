@@ -293,10 +293,12 @@ if (rapid) {
     // Le plus récent des deux dépôts, lu comme une borne qui a ce canal d'essai.
     reference = (await update.checkForUpdate({ current: '0.0.0', prereleases: true, channel: { repository: privateRepo, token } }).catch((error) => fail(`flux publié illisible : ${error.message}`))).latest;
   } else {
-    const source = option('--reference') ?? (local ? undefined : prerelease ? await update.prereleaseFeedUrl() : update.updateFeedUrl({}));
+    const source = option('--reference') ?? (local ? undefined : prerelease ? await update.prereleaseFeedUrl().catch((error) => fail(`liste des publications illisible : ${error.message}`)) : update.updateFeedUrl({}));
     if (!source) fail('--rapide avec --local demande --reference <fichier ou adresse du flux publié>.');
-    const text = /^https?:\/\//.test(source) ? await fetch(source, { redirect: 'follow' }).then((r) => (r.ok ? r.text() : fail(`flux publié illisible (HTTP ${r.status}) : ${source}`))) : fs.readFileSync(source, 'utf8');
-    reference = update.openEnvelope(text, update.updatePublicKey({}));
+    // Lu comme une borne le lit : patient sur une connexion lente, réessayé sur une coupure (patientfetch.ts).
+    reference = /^https?:\/\//.test(source)
+      ? await update.readFeed(source, { publicKey: update.updatePublicKey({}) }).catch((error) => fail(`flux publié illisible : ${error.message} (${source})`))
+      : update.openEnvelope(fs.readFileSync(source, 'utf8'), update.updatePublicKey({}));
   }
   const installs = reference.installer.version ?? reference.version;
   if (!reference.app) fail(`le flux publié (${reference.version}) n'a pas de paquet léger : faites d'abord une publication complète (sans --rapide).`);

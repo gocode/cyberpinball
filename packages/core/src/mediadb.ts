@@ -28,6 +28,7 @@ import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { fileDigest } from './boundedread';
 import { applyOps, samePath, type FileOp } from './fileops';
 import { formatDate, formatNumber, t } from './i18n';
+import { fetchTextPatiently } from './patientfetch';
 import { fetchResumable, partSize, ResumableError } from './resumable';
 import type { Cabinet } from './model';
 import { mediaCompetitors, ownMediaPages } from './mediaedit';
@@ -235,13 +236,14 @@ export async function refreshMediaDb(downloadsDir: string, opts: MediaDbRefreshO
   try {
     const headers: Record<string, string> = {};
     if (cached && meta.etag) headers['If-None-Match'] = meta.etag;
-    const response = await doFetch(source.indexUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000) });
+    // Délai sans progrès, pas de durée totale : l'index passe aussi sur une connexion lente (patientfetch.ts).
+    const response = await fetchTextPatiently(source.indexUrl, { fetch: doFetch, init: { headers, redirect: 'follow' }, idleMs: opts.timeoutMs ?? 60_000 });
     if (response.status === 304 && cached) {
       writeJsonAtomic(path.join(downloadsDir, META_FILE), { ...meta, checkedAt: now.toISOString() });
       return { status: 'unchanged' };
     }
     if (!response.ok) throw new Error(t('HTTP {status} pour {url}', { status: response.status, url: source.indexUrl }));
-    const text = await response.text();
+    const text = response.text;
     if (!parseMediaDbIndex(JSON.parse(text), source)) throw new Error(t('l’index téléchargé n’a pas le format attendu'));
     fs.mkdirSync(downloadsDir, { recursive: true });
     writeFileAtomic(file, text);

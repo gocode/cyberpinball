@@ -11,6 +11,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { fetchTextPatiently } from './patientfetch';
 import { vpsKey, type VpsGame, type VpsTutorial } from './vps';
 
 export type RuleSite = 'primer' | 'rulesheets';
@@ -402,14 +403,16 @@ export async function fetchCachedText(dir: string, url: string, opts: RuleFetchO
   }
   if (cached && now.getTime() - Date.parse(cached.fetchedAt) < (opts.maxAgeMs ?? RULES_MAX_AGE_MS)) return cached.html ? { status: 'ok', html: cached.html } : { status: 'missing' };
   try {
-    const response = await (opts.fetch ?? fetch)(url, { redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000) });
+    // Délai sans progrès, pas de durée totale (patientfetch.ts). Un seul essai : sans réseau, la
+    // copie gardée sert tout de suite, et la page est redemandée à la prochaine lecture.
+    const response = await fetchTextPatiently(url, { fetch: opts.fetch ?? fetch, init: { redirect: 'follow' }, idleMs: opts.timeoutMs ?? 20_000, attempts: 1 });
     if (response.status === 404 || response.status === 410) {
       fs.mkdirSync(dir, { recursive: true });
       writeFileAtomic(file, JSON.stringify({ url, fetchedAt: now.toISOString() } satisfies CachedText));
       return { status: 'missing' };
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
+    const html = response.text;
     fs.mkdirSync(dir, { recursive: true });
     writeFileAtomic(file, JSON.stringify({ url, fetchedAt: now.toISOString(), html } satisfies CachedText));
     return { status: 'ok', html };

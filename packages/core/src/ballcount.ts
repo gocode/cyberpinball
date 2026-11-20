@@ -19,6 +19,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { fetchTextPatiently } from './patientfetch';
 
 /** Un nombre de billes plausible. */
 export const isBallCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 10;
@@ -194,10 +195,12 @@ async function cachedJson<T>(cacheDir: string, remote: string, local: string, ev
     cached = undefined;
   }
   try {
-    const response = await (opts.fetch ?? fetch)(MEMORY_MAPS_BASE + remote, { redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000) });
+    // Délai sans progrès, pas de durée totale (patientfetch.ts). Un seul essai : sans réseau, le
+    // cache sert tout de suite, et le fichier est redemandé à la prochaine lecture.
+    const response = await fetchTextPatiently(MEMORY_MAPS_BASE + remote, { fetch: opts.fetch ?? fetch, init: { redirect: 'follow' }, idleMs: opts.timeoutMs ?? 20_000, attempts: 1 });
     if (response.status === 404) return undefined;
     if (!response.ok) return cached;
-    const text = await response.text();
+    const text = response.text;
     const value = JSON.parse(text) as T;
     if (!value || typeof value !== 'object') return cached;
     fs.mkdirSync(cacheDir, { recursive: true });

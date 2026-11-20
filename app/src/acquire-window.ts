@@ -85,6 +85,7 @@ import {
   type DownloadTransport,
   type TrackedDownload,
   type TransportResult,
+  fetchTextPatiently,
 } from '@cyberpinball/core';
 import { setCursorPosition } from '@cyberpinball/win-displays';
 import type { AdBlocker } from './ad-blocker';
@@ -1514,12 +1515,14 @@ export function createAcquirer(events: AcquireEvents) {
   /**
    * Texte d'une page du site (fiche d'un fichier), avec les cookies de la session, sans
    * l'afficher ni exécuter ses scripts ; `status` dit une fiche disparue (404). undefined
-   * sans réseau ou si la page n'arrive pas à temps.
+   * sans réseau ou si le site se tait pendant `idleMs` (délai sans progrès, pas de durée
+   * totale : une connexion lente lit quand même la page, patientfetch.ts).
    */
-  async function fetchText(url: string, timeoutMs = 20_000): Promise<{ status: number; text: string } | undefined> {
+  async function fetchText(url: string, idleMs = 20_000): Promise<{ status: number; text: string } | undefined> {
     try {
-      const response = await acquireSession().fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-      return { status: response.status, text: response.ok ? await response.text() : '' };
+      const get = ((input: string | Request, init?: RequestInit) => acquireSession().fetch(input, init)) as typeof fetch;
+      const response = await fetchTextPatiently(url, { fetch: get, idleMs });
+      return { status: response.status, text: response.ok ? response.text : '' };
     } catch {
       return undefined;
     }
