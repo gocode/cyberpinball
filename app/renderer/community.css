@@ -304,27 +304,12 @@
   color: var(--ink-faint);
 }
 
-/* La fenêtre montre trois lignes ; la liste, répétée, monte d'une ligne toutes les quatre secondes. */
+/* Trois lignes à la fois (community.js les fait tourner) : la fenêtre garde sa hauteur. */
 .co-room-view {
   --line-h: max(calc(34 * var(--a)), 1.4em);
-  height: calc(3 * var(--line-h));
-  overflow: hidden;
-}
-
-.co-room-track.co-scrolling {
-  animation: co-room-scroll calc(var(--lines) * 4s) steps(var(--lines)) infinite;
-}
-
-@keyframes co-room-scroll {
-  to {
-    transform: translateY(calc(-1 * var(--lines) * var(--line-h)));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .co-room-track.co-scrolling {
-    animation: none;
-  }
+  display: grid;
+  min-height: calc(3 * var(--line-h));
+  align-content: start;
 }
 
 .co-line {

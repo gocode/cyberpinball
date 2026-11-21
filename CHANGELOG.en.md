@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Community: the screen opens with the cursor in the tab bar; the flippers move from tab to tab and show its content right away, Start enters it, Exit goes back up to the bar.
+- The Community home sums up each tab (Messages, Players, Groups, Rooms, Profile): Start on a summary opens the tab on the same strip, Exit brings you back.
+- Online players are shown in wider cards, two per row: the nickname fits on one line, "Add" no longer moves when the cursor passes, and "All players" opens the full list.
 - 3D glasses (beta): tables are played in 3D with simple colour filter glasses (red / cyan, green / magenta or amber / blue), in System menu > My cabinet > Virtual reality and 3D vision > 3D glasses. They combine with 3D vision: the depth then follows your head too.
 - Glasses calibration with the cabinet buttons, in front of the playfield screen: six settings, one eye closed each time, for less ghosting and truer colours. Depth and colours are set in the same place.
 - The 3D effect goes through a copy of the table's settings, given to VPX for the game: neither the cabinet's VPinballX.ini nor the table's own file is changed. SMAA anti-aliasing, which VPX does not apply in 3D, is replaced by quality FXAA for the game.

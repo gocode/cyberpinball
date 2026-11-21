@@ -6,7 +6,10 @@
 // - peu de monde en ligne : les suggestions remplacent les amis, jamais une section vide ;
 // - « Niv. N » sur chaque joueur, et l'anneau de son palier (pastille avec son niveau) ;
 // - pas de bouton « Regarder » (regarder un ami en direct n'existe pas encore) ;
-// - l'invitation : sur l'accueil au bureau, dans l'onglet Joueurs en borne ;
+// - l'invitation : dans l'onglet Joueurs ;
+// - le menu d'abord : l'écran s'ouvre dans la barre d'onglets, les flippers y montrent chaque onglet ;
+//   l'accueil récapitule chaque onglet, Start sur un récapitulatif ouvre l'onglet sur la même bande,
+//   Exit ramène au récapitulatif (21/11/2026) ;
 // - un joueur n'a qu'un écran : Start sur lui ouvre son profil ;
 // - les réglages de la communauté restent au Menu système (aucun onglet ni carte ici).
 
@@ -43,7 +46,7 @@ interface Built {
 
 type Player = { key: string; name: string; country?: string; status: 'online' | 'playing' | 'offline'; friend: boolean; commonTables?: number };
 
-function hub(opts: { online?: Player[]; everyone?: Player[]; desk?: boolean; incoming?: boolean } = {}) {
+function hub(opts: { online?: Player[]; everyone?: Player[]; incoming?: boolean } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createCommunityHub } = require(path.join(REPO_ROOT, 'app', 'dist', 'community-hub.js')) as { createCommunityHub(host: unknown): { openHome(back: () => void): void } };
   let opened: (() => Built) | undefined;
@@ -95,27 +98,32 @@ function hub(opts: { online?: Player[]; everyone?: Player[]; desk?: boolean; inc
       openRoom: () => events.push('autre-salon'),
     },
     invite: { count: () => 1 },
-    desk: () => Boolean(opts.desk),
+    navKeys: () => ({ previous: ['FlipperLeft'], next: ['FlipperRight'] }),
     now: () => NOW,
   });
   const built = () => opened!();
   const run = (k: string) => built().actions.find((a) => a.key === k)!.run();
+  const inTabs = () => built().actions.some((a) => a.key!.startsWith('tab:'));
+  const atBlocks = () => built().actions.some((a) => a.key!.startsWith('block:'));
+  const current = () => TAB_IDS[built().hub.tabs.find((x) => x.current)!.label]!;
+  /** Un onglet : remonter jusqu'à la barre d'onglets, puis Start sur lui (son contenu, au choix des blocs). */
   const tab = (id: string) => {
-    if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
-    run('block:tabs');
+    for (let i = 0; i < 4 && !inTabs(); i++) atBlocks() && built().actions.some((a) => a.key === 'block:tabs') ? run('block:tabs') : built().back();
     run(`tab:${id}`);
   };
-  /** Entrer dans le bloc de la section qui porte ce titre. */
+  /** Start sur le bloc de la section qui porte ce titre (depuis la barre : on entre d'abord dans le contenu). */
   const enter = (title: string) => {
-    if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
+    if (inTabs()) run(`tab:${current()}`);
     const i = built().hub.sections.findIndex((s) => s.title === title);
     assert.ok(i >= 0, `section « ${title} »`);
     built().actions.find((a) => a.key === `block:section:${i}`)!.run();
   };
-  return { menu, events, sent, built, at: () => at, run, tab, enter };
+  return { menu, events, sent, built, at: () => at, run, tab, enter, inTabs, atBlocks, current };
 }
 
-test('Communauté à onglets : six onglets, la barre puis les blocs, MagnaSave et Exit', () => {
+const TAB_IDS: Record<string, string> = { Accueil: 'home', Messages: 'messages', Joueurs: 'players', Groupes: 'groups', Salons: 'rooms', Profil: 'profile' };
+
+test('Communauté à onglets : le curseur dans la barre d’onglets, les flippers y montrent chaque onglet', () => {
   const h = hub({ incoming: true });
   h.menu.openHome(() => h.events.push('roue'));
   const b = h.built();
@@ -123,82 +131,109 @@ test('Communauté à onglets : six onglets, la barre puis les blocs, MagnaSave e
   assert.deepEqual(b.hub.tabs.map((t) => t.label), ['Accueil', 'Messages', 'Joueurs', 'Groupes', 'Salons', 'Profil']);
   assert.equal(b.hub.tabs.find((t) => t.label === 'Messages')!.attention, true, 'un message attend');
   assert.equal(b.hub.tabs.find((t) => t.label === 'Joueurs')!.attention, true, 'une demande d’ami attend');
-  // Navigation par blocs, comme l'Arène : la barre d'onglets d'abord, le curseur sur le premier bloc du contenu.
-  assert.ok(b.actions.every((a) => a.key!.startsWith('block:')));
-  assert.equal(b.actions[0]!.key, 'block:tabs');
+  // À l'ouverture : dans la barre d'onglets, sur Accueil (le menu d'abord).
+  assert.ok(h.inTabs(), b.actions.map((a) => a.key).join(', '));
+  assert.equal(h.at(), 0);
+  // Un flipper : l'onglet suivant et son contenu tout de suite, le curseur reste dans la barre.
+  assert.equal(b.keys!({ code: 'FlipperRight' }), true);
+  assert.equal(h.current(), 'messages');
+  assert.ok(h.inTabs());
   assert.equal(h.at(), 1);
-  b.keys!({ code: 'MagnaRight' });
-  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Messages');
+  assert.equal(h.built().hub.sections[0]!.title, 'Ils vous attendent', 'le contenu de l’onglet est déjà là');
+  h.built().keys!({ code: 'FlipperLeft' });
+  h.built().keys!({ code: 'FlipperLeft' });
+  assert.equal(h.current(), 'profile', 'la barre boucle');
+  // Start : dans le contenu, le curseur sur son premier bloc ; Exit remonte à la barre, puis à la roue.
+  h.run('tab:profile');
+  assert.ok(h.atBlocks());
+  assert.equal(h.at(), 1);
+  h.built().back();
+  assert.ok(h.inTabs(), 'Exit remonte à la barre d’onglets');
+  assert.deepEqual(h.events, []);
   h.built().back();
   assert.deepEqual(h.events, ['roue']);
+});
+
+test('Accueil : un récapitulatif par onglet ; Start ouvre l’onglet sur la même bande, Exit y ramène', () => {
+  const h = hub({ incoming: true });
+  h.menu.openHome(() => h.events.push('roue'));
+  h.run('tab:home');
+  const titles = h.built().hub.sections.map((s) => s.title);
+  // Dans l'ordre des onglets : Messages, Joueurs, Groupes, Salons, Profil ; « Ça bouge » à part.
+  assert.deepEqual(titles.slice(0, 5), ['Ils vous attendent', 'En ligne', 'Mes groupes', 'Salon France', 'Mon profil']);
+  assert.ok(!titles.includes('Faites découvrir Cyber Pinball'), 'l’invitation est dans l’onglet Joueurs');
+  // Start sur « En ligne » : l'onglet Joueurs, le curseur dans sa première bande, la même.
+  h.enter('En ligne');
+  assert.equal(h.current(), 'players');
+  assert.equal(h.built().hub.sections[0]!.title, 'En ligne');
+  assert.ok(!h.atBlocks() && !h.inTabs(), 'dans la bande');
+  assert.ok(h.built().actions.some((a) => a.label === 'Ajouter'), 'on y ajoute un joueur d’un appui');
+  // Exit : retour à l'accueil, le curseur sur ce récapitulatif (la barre d'onglets, puis Messages, puis En ligne).
+  h.built().back();
+  assert.equal(h.current(), 'home');
+  assert.ok(h.atBlocks());
+  assert.equal(h.at(), 2);
+  // Un récapitulatif sans action (aucun groupe) s'ouvre aussi.
+  h.enter('Mes groupes');
+  assert.equal(h.current(), 'groups');
 });
 
 test('Accueil : le message qui attend, trois réponses toutes prêtes ; une réponse part d’un appui', () => {
   const h = hub();
   h.menu.openHome(() => undefined);
-  const titles = h.built().hub.sections.map((s) => s.title);
-  assert.deepEqual(titles, ['Ils vous attendent', 'En ligne', 'Salon France', 'Ça bouge'].filter((x) => titles.includes(x)));
-  assert.equal(titles[0], 'Ils vous attendent');
+  h.run('tab:home');
   const nina = h.built().hub.sections[0]!.cards[0]!;
   assert.equal(nina.bubble?.text, 'On fait une partie ce soir ?');
   assert.deepEqual(nina.buttons!.filter((x) => x.quick).map((x) => x.label), ['Partant !', 'Quelle table ?', 'Plus tard']);
   h.enter('Ils vous attendent');
+  assert.equal(h.current(), 'messages');
   h.built().actions.find((a) => a.label === 'Partant !')!.run();
   assert.deepEqual(h.sent, ['nina:Partant !']);
   assert.equal(h.built().hub.sections[0]!.note, 'Envoyé à Nina', 'le constat en note du titre');
 });
 
-test('Accueil : « En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui, +25 XP par nouvel ami ; niveau sur chacun', () => {
+test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui, +25 XP par nouvel ami ; niveau sur chacun ; « Tous les joueurs »', () => {
   const h = hub();
   h.menu.openHome(() => undefined);
+  h.run('tab:home');
   const sec = h.built().hub.sections.find((s) => s.title === 'En ligne')!;
   assert.equal(sec.layout, 'people');
   assert.equal(sec.note, `+${XP.friend} XP par nouvel ami`);
-  assert.deepEqual(sec.cards.map((c) => [c.title, c.ring]), [['Alto', 'playing'], ['Inès', 'suggested']]);
-  for (const c of sec.cards) {
+  // Les joueurs, puis « Tous les joueurs » : la liste complète d'un appui.
+  assert.deepEqual(sec.cards.map((c) => [c.title, c.ring]), [['Alto', 'playing'], ['Inès', 'suggested'], ['Tous les joueurs', undefined]]);
+  for (const c of sec.cards.filter((x) => x.ring)) {
     assert.match(c.level?.text ?? '', /^Niv\. \d+$/, `« Niv. N » sur ${c.title}`);
     assert.ok(c.avatar?.level, `l’anneau du palier sur ${c.title}`);
   }
   // Pas de « Regarder » : regarder un ami en direct n'existe pas encore.
   const labels = h.built().hub.sections.flatMap((s) => s.cards.flatMap((c) => (c.buttons ?? []).map((x) => x.label)));
   assert.ok(!labels.some((l) => /Regarder/i.test(l)), labels.join(', '));
-  // Un ami : Start ouvre son profil (un seul écran par joueur).
+  // Dans la bande : un ami ouvre son profil (un seul écran par joueur), « Ajouter », « Tous les joueurs ».
   h.enter('En ligne');
   h.built().actions.find((a) => a.label === 'Alto')!.run();
-  assert.deepEqual(h.events, ['profil:alto']);
-  h.enter('En ligne');
   h.built().actions.find((a) => a.label === 'Ajouter')!.run();
+  h.built().actions.find((a) => a.label === 'Tous les joueurs')!.run();
   assert.deepEqual(h.sent, ['demande:Inès']);
+  assert.deepEqual(h.events, ['profil:alto', 'joueurs:all']);
 });
 
 test('Peu de monde en ligne : les suggestions remplacent les amis, jamais une section vide', () => {
   const nobody = hub({ online: [], everyone: [{ key: 'ines', name: 'Inès', country: 'FR', status: 'offline', friend: false, commonTables: 2 }, { key: 'theo', name: 'Théo', status: 'offline', friend: false, commonTables: 1 }] });
   nobody.menu.openHome(() => undefined);
+  nobody.run('tab:home');
   const sec = nobody.built().hub.sections.find((s) => s.title === 'En ligne')!;
-  assert.ok(sec.cards.length >= 2);
-  assert.ok(sec.cards.every((c) => c.ring === 'suggested'));
+  const people = sec.cards.filter((c) => c.title !== 'Tous les joueurs');
+  assert.ok(people.length >= 2);
+  assert.ok(people.every((c) => c.ring === 'suggested'));
   for (const s of nobody.built().hub.sections) assert.ok(s.cards.length, `« ${s.title} » n’est jamais vide`);
 });
 
-test('Invitation : sur l’accueil au bureau, dans l’onglet Joueurs en borne', () => {
-  const desk = hub({ desk: true });
-  desk.menu.openHome(() => undefined);
-  assert.ok(desk.built().hub.sections.some((s) => s.title === 'Faites découvrir Cyber Pinball'));
-  desk.tab('players');
-  assert.ok(!desk.built().hub.sections.some((s) => s.title === 'Faites découvrir Cyber Pinball'));
-  const cab = hub({ desk: false });
-  cab.menu.openHome(() => undefined);
-  assert.ok(!cab.built().hub.sections.some((s) => s.title === 'Faites découvrir Cyber Pinball'));
-  cab.tab('players');
-  assert.ok(cab.built().hub.sections.some((s) => s.title === 'Faites découvrir Cyber Pinball'));
-});
-
-test('Joueurs : les demandes reçues en tête, accepter d’un appui ; les écrans complets', () => {
+test('Joueurs : la bande « En ligne » d’abord, puis les demandes reçues, l’invitation et les écrans complets', () => {
   const h = hub({ incoming: true });
   h.menu.openHome(() => undefined);
   h.tab('players');
   const titles = h.built().hub.sections.map((s) => s.title);
-  assert.equal(titles[0], 'Demandes d’ami');
+  assert.deepEqual(titles, ['En ligne', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
   h.enter('Tout voir');
   h.built().actions.find((a) => a.label === 'Mes amis')!.run();
   assert.deepEqual(h.events, ['joueurs:friends']);

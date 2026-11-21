@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Communauté : l'écran s'ouvre le curseur dans la barre d'onglets ; les flippers passent d'un onglet à l'autre et montrent son contenu tout de suite, Start y entre, Exit remonte à la barre.
+- L'accueil de la Communauté récapitule chaque onglet (Messages, Joueurs, Groupes, Salons, Profil) : Start sur un récapitulatif ouvre l'onglet sur la même bande, Exit y ramène.
+- Les joueurs en ligne s'affichent en cartouches plus larges, deux par rangée : le pseudo tient sur une ligne, « Ajouter » ne bouge plus au passage du curseur, et « Tous les joueurs » ouvre la liste complète.
 - Lunettes 3D (bêta) : les tables se jouent en relief avec de simples lunettes à filtres colorés (rouge / cyan, vert / magenta ou ambre / bleu), dans Menu système > Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D. Elles se cumulent avec la Vision 3D : le relief suit alors aussi la tête.
 - Calibrage des lunettes aux boutons de la borne, devant l'écran du plateau : six réglages, un œil fermé à chaque fois, pour moins d'images fantômes et des couleurs plus justes. Profondeur et couleurs se règlent au même endroit.
 - Le relief passe par une copie des réglages de la table, donnée à VPX pour la partie : ni le VPinballX.ini de la borne ni le fichier de la table ne sont modifiés. L'anticrénelage SMAA, que VPX n'applique pas en relief, est remplacé par FXAA qualité pour la partie.

@@ -844,22 +844,24 @@
   color: var(--signal);
 }
 
-/* Les joueurs en tuiles : la pastille, le nom et son niveau, ce qu'il fait, son bouton. */
+/*
+ * Les joueurs en cartouches couchés, deux par rangée (retour du 21/11/2026 sur la borne : les tuiles
+ * étroites débordaient au choix d'un bouton et se décalaient sous un pseudo sur deux lignes) : la
+ * pastille à gauche, le pseudo sur une ligne avec son niveau, ce qu'il fait dessous, le bouton à droite.
+ * Toutes les cartouches ont la même hauteur ; rien ne bouge quand le curseur passe.
+ */
 .hub-cards.hub-layout-people {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: calc(14 * var(--u));
 }
 
 .hub-card.hub-layout-people {
-  grid-template-columns: minmax(0, 1fr);
-  /* La pastille, le texte qui prend la place restante, les boutons : « Ajouter » au même niveau dans toute la rangée. */
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-items: start;
-  justify-items: center;
-  align-content: stretch;
-  text-align: center;
-  gap: calc(10 * var(--u));
-  padding: calc(20 * var(--u)) calc(8 * var(--u)) calc(14 * var(--u));
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(8 * var(--u)) calc(18 * var(--u));
+  min-height: calc(112 * var(--u));
+  box-sizing: border-box;
+  padding: calc(14 * var(--u)) calc(18 * var(--u));
   border-color: var(--line-soft);
   background: color-mix(in oklab, var(--surface) 82%, transparent);
 }
@@ -868,49 +870,68 @@
   border-color: var(--signal);
 }
 
-.hub-card.hub-layout-people .hub-card-face {
-  width: calc(84 * var(--u));
-  height: calc(84 * var(--u));
-  font-size: calc(32 * var(--u));
+.hub-card.hub-layout-people .hub-card-face,
+.hub-card.hub-layout-people .hub-card-ic {
+  width: calc(72 * var(--u));
+  height: calc(72 * var(--u));
+  font-size: calc(28 * var(--u));
+  /* L'anneau de présence déborde de la pastille : une marge pour qu'il ne touche pas le bord de la cartouche. */
+  margin: calc(6 * var(--u));
 }
 
 .hub-card.hub-layout-people .hub-card-main {
-  justify-items: center;
-  gap: calc(6 * var(--u));
-  width: 100%;
+  gap: calc(4 * var(--u));
 }
 
+/* Le pseudo sur une seule ligne, coupé s'il est trop long, et son niveau à côté. */
 .hub-card.hub-layout-people .hub-card-title {
-  display: grid;
-  justify-items: center;
-  gap: calc(6 * var(--u));
-  max-width: 100%;
-  font-size: calc(23 * var(--u));
-  overflow-wrap: anywhere;
+  display: flex;
+  /* Trop étroit (une colonne du bureau) : le niveau passe sous le pseudo plutôt que de le réduire à une lettre. */
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(4 * var(--u)) calc(10 * var(--u));
+  min-width: 0;
+  font-size: calc(24 * var(--u));
+  white-space: nowrap;
+}
+
+.hub-card.hub-layout-people .hub-card-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hub-card.hub-layout-people .hub-lv {
+  flex: none;
   margin: 0;
 }
 
 .hub-card.hub-layout-people .hub-card-detail {
   font-size: calc(20 * var(--u));
   line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hub-card.hub-layout-people.hub-tone-signal .hub-card-detail {
   color: var(--signal);
 }
 
+/* Le bouton à droite, à sa place que le curseur y soit ou non : la touche Start n'y est pas cerclée (pas de saut de largeur). */
 .hub-card.hub-layout-people .hub-buttons {
-  align-self: end;
-  justify-content: center;
+  grid-column: 3;
+  grid-row: 1;
   padding-top: 0;
 }
 
 .hub-card.hub-layout-people .hub-button {
-  padding: calc(6 * var(--u)) calc(14 * var(--u));
-  font-size: calc(20 * var(--u));
+  padding: calc(8 * var(--u)) calc(18 * var(--u));
+  font-size: calc(21 * var(--u));
+}
+
+.hub-card.hub-layout-people .hub-button-key {
+  display: none;
 }
 
 /*
@@ -1020,9 +1041,4 @@
 
 .lib-hub.hub-desk .hub-body {
   gap: calc(26 * var(--u));
-}
-
-/* Au bureau, la colonne est moitié moins large : quatre joueurs par rangée. */
-.lib-hub.hub-desk .hub-cards.hub-layout-people {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
 }

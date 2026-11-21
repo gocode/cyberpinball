@@ -125,7 +125,7 @@ test('Affiche Communauté : personne en ligne, des joueurs suggérés à la plac
   const p = poster({ friendOnline: false, waiting: false });
   assert.ok(p.people.length > 0, 'des joueurs suggérés');
   assert.ok(p.people.every((x) => x.ring === 'suggested'));
-  assert.deepEqual(p.people.map((x) => [x.name, x.status]), [['Zoé', 'Même pays que vous']]);
+  assert.deepEqual(p.people.map((x) => [x.name, x.status]), [['Zoé', 'Même pays']]);
   assert.equal(p.said, undefined);
   // Sans message, le fronton dit la dernière ligne du salon.
   assert.equal(p.heading, '<J4> Bonne nuit');

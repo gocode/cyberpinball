@@ -162,7 +162,10 @@
       else title.append(document.createTextNode(' '));
       title.append(document.createTextNode(c.title));
     } else {
-      title.append(document.createTextNode(c.title));
+      // Le titre dans son élément : une cartouche de joueur le coupe sur une ligne (hub.css, hub-layout-people).
+      const text = el('span', 'hub-card-title-text', c.title);
+      text.title = c.title;
+      title.append(text);
       if (c.level) title.append(levelChip(c.level));
     }
     if (c.count) title.append(el('em', 'hub-count', String(c.count)));

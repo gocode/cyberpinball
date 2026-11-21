@@ -165,6 +165,28 @@
     return box;
   }
 
+  /** Lignes du salon montrées à la fois, et le rythme auquel elles tournent. */
+  const ROOM_SHOWN = 3;
+  const ROOM_TURN_MS = 4000;
+  const tickers = new Set();
+  let tickerTimer;
+  function showTicker(t) {
+    // Trois lignes qui se suivent, dans l'ordre : jamais la plus ancienne juste après la plus récente.
+    t.view.replaceChildren(...t.rows.slice(t.at, t.at + ROOM_SHOWN));
+  }
+  function turnTickers() {
+    for (const t of tickers) if (!t.view.isConnected) tickers.delete(t);
+    if (!tickers.size) {
+      clearInterval(tickerTimer);
+      tickerTimer = undefined;
+      return;
+    }
+    if (document.hidden) return;
+    for (const t of tickers) {
+      t.at = (t.at + 1) % (t.rows.length - ROOM_SHOWN + 1);
+      showTicker(t);
+    }
+  }
   /** Le salon : son nom (et le drapeau), ses présents, ses lignes qui défilent vers le haut, en boucle. */
   function room(r) {
     const box = el('div', 'co-room');
@@ -180,7 +202,6 @@
       return box;
     }
     const view = el('div', 'co-room-view');
-    const track = el('div', 'co-room-track');
     const line = (l) => {
       const row = el('div', 'co-line');
       const nick = el('span', 'co-nick', `<${l.nick}>`);
@@ -188,15 +209,14 @@
       row.append(el('time', '', l.time), nick, el('span', 'co-line-text', l.text));
       return row;
     };
-    for (const l of r.lines) track.append(line(l));
-    // Plus de lignes que la fenêtre n'en montre : elles défilent, la liste répétée pour boucler sans saut.
-    if (r.lines.length > 2) {
-      for (const l of r.lines) track.append(line(l));
-      track.classList.add('co-scrolling');
-      track.style.setProperty('--lines', String(r.lines.length));
-    }
-    view.append(track);
-    box.append(view);
+    // Trois lignes à la fois ; au-delà, elles tournent d'une ligne toutes les quatre secondes (rien de rogné).
+    const ticker = { view, rows: r.lines.map(line), at: Math.max(0, r.lines.length - ROOM_SHOWN) };
+    showTicker(ticker);
+    if (r.lines.length > ROOM_SHOWN) {
+      box.coTicker = ticker;
+      tickers.add(ticker);
+      if (!tickerTimer) tickerTimer = setInterval(turnTickers, ROOM_TURN_MS);
+    }    box.append(view);
     return box;
   }
 
@@ -221,6 +241,12 @@
     const known = wheelPosters.get(key);
     if (known) {
       window.CyberMedaillons?.revive(known);
+      // L'affiche reprise : son salon se remet à tourner.
+      const ticker = known.querySelector('.co-room')?.coTicker;
+      if (ticker) {
+        tickers.add(ticker);
+        if (!tickerTimer) tickerTimer = setInterval(turnTickers, ROOM_TURN_MS);
+      }
       return known;
     }
     const box = el('section', `jb-poster co-poster ${className}`);

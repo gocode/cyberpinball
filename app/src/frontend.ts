@@ -3590,7 +3590,7 @@ const communityHub = createCommunityHub({
       return card ? invitedOf(key, card.invited, card.invitedTotal).count : 0;
     },
   },
-  desk: () => playfieldLandscape(),
+  navKeys: () => KEYS,
 });
 
 // Arène (arena-menu.ts, 21/11/2026) : le médaillon de ce qui se joue contre les autres. Son affiche et

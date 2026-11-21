@@ -10,7 +10,10 @@
 // - peu de monde en ligne : les joueurs suggérés remplacent les amis, jamais une section vide ;
 // - « Regarder » un ami en direct n'existe pas encore : aucun bouton ne le promet ;
 // - les réglages de la communauté restent au Menu système (Communauté > Réglages de la communauté) ;
-// - l'invitation à faire découvrir Cyber Pinball : sur l'accueil au bureau, dans l'onglet Joueurs en borne.
+// - l'invitation à faire découvrir Cyber Pinball : dans l'onglet Joueurs ;
+// - le menu d'abord (21/11/2026) : l'écran s'ouvre dans la barre d'onglets, les flippers y montrent le
+//   contenu de chaque onglet tout de suite ; l'accueil récapitule chaque onglet par sa première bande, et
+//   Start sur un récapitulatif ouvre l'onglet sur cette bande (Exit y ramène).
 //
 // Sans electron à l'exécution : les tests chargent ce module avec des services d'essai.
 
@@ -94,8 +97,8 @@ export interface CommunityHubHost {
   room: { peek(): CommunityRoomPeek; write(text: string): string | undefined; open(back: () => void): void; openRoom(id: string, back: () => void): void; problem(): string | undefined };
   /** Faire découvrir Cyber Pinball : combien de personnes invitées (le QR du téléchargement est ici). */
   invite: { count(): number };
-  /** Bureau (le plateau en largeur) : l'invitation va sur l'accueil ; en borne, dans l'onglet Joueurs. */
-  desk(): boolean;
+  /** Les flippers (Précédent, Suivant) : dans la barre d'onglets, ils changent d'onglet. */
+  navKeys(): { previous: readonly string[]; next: readonly string[] };
   now?(): Date;
 }
 
@@ -148,13 +151,13 @@ export function suggestReasonText(reason: SuggestReason, commonTables: number): 
     case 'newcomer':
       return t('Nouveau venu');
     case 'nearby':
-      return t('Sur votre réseau local');
+      return t('Réseau local');
     case 'tables':
       return tn(commonTables, '{n} table en commun', '{n} tables en commun');
     case 'country':
-      return t('Même pays que vous');
+      return t('Même pays');
     case 'level':
-      return t('Niveau proche du vôtre');
+      return t('Niveau proche');
     case 'online':
       return t('En ligne');
   }
@@ -162,8 +165,10 @@ export function suggestReasonText(reason: SuggestReason, commonTables: number): 
 
 /** Conversations en cartes sur l'accueil (deux côte à côte), et dans l'onglet Messages. */
 const HOME_THREADS = 2;
+/** Groupes sur l'accueil. */
+const HOME_GROUPS = 2;
 const TAB_THREADS = 4;
-/** Joueurs en tuiles : une rangée sur l'accueil, deux dans l'onglet Joueurs. */
+/** Joueurs en cartouches, deux par rangée : cinq et « Tous les joueurs » sur l'accueil, dix dans l'onglet Joueurs. */
 const HOME_PEOPLE = 5;
 const TAB_PEOPLE = 10;
 /** Lignes du salon : quatre sur l'accueil, six dans l'onglet Salons. */
@@ -248,8 +253,22 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     return communityPeople({ net, players: host.players, levelOf, myLevel: host.myLevel() }, max).map((x) => (x.reason ? suggestedTile(x.player, x.reason, here, section) : friendTile(x.player, here)));
   }
 
-  function peopleSection(max: number, here: () => void): HubSectionSpec | undefined {
+  /**
+   * « En ligne » : `max` joueurs ; `everyone`, une dernière cartouche « Tous les joueurs » qui ouvre la
+   * liste complète (retour du 21/11/2026 : on voyait cinq joueurs sans pouvoir aller voir les autres).
+   */
+  function peopleSection(max: number, here: () => void, everyone = false): HubSectionSpec | undefined {
     const cards = peopleCards(max, here, 'people');
+    if (everyone) {
+      const crowd = shownCrowd(host.players.online().length);
+      cards.push({
+        key: 'everyone',
+        icon: 'friends',
+        title: t('Tous les joueurs'),
+        detail: crowd ? tn(crowd, '{n} joueur en ligne', '{n} joueurs en ligne') : t('La liste complète'),
+        run: () => host.players.open(here, 'all'),
+      });
+    }
     if (!cards.length) return undefined;
     const note = said?.section === 'people' ? said.text : t('{xp} par nouvel ami', { xp: xpText(XP.friend) });
     return { title: t('En ligne'), note, layout: 'people', column: 'left', cards };
@@ -448,52 +467,89 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   }
 
   // ---------- Onglets ----------
+  // Chaque onglet commence par sa « bande » ; l'accueil montre la bande de chaque onglet, dans leur ordre,
+  // en récapitulatif : Start sur l'une ouvre son onglet, le curseur dans la même bande (l'œil n'est pas
+  // perdu), Exit ramène à l'accueil sur ce récapitulatif (demande du mainteneur, 21/11/2026).
 
+  /** Messages : les conversations qui attendent ; sinon les plus récentes ; sinon de quoi écrire. */
+  function messagesBand(max: number, here: () => void): HubSectionSpec {
+    const waiting = waitingSection(max, here);
+    if (waiting) return waiting;
+    const recent = host.messages.recent(max);
+    if (recent.length) return { title: t('Conversations récentes'), layout: 'list', column: 'left', cards: recent.map((x) => recentCard(x, here)) };
+    return { title: t('Messages'), layout: 'list', column: 'left', cards: [{ key: 'messages:none', icon: 'message', title: t('Aucun message en attente'), detail: host.messages.detail(), run: () => host.messages.open(here) }] };
+  }
+
+  function recentCard(x: CommunityThread, here: () => void): HubCardSpec {
+    const lv = x.key ? levelChip(levelOf(x.key)) : undefined;
+    return {
+      key: `recent:${x.kind}:${x.id}`,
+      ...(x.key ? { avatar: face(x.key, x.name) } : { icon: 'group' as const }),
+      title: x.name,
+      ...(lv ? { level: lv } : {}),
+      ...(x.last ? { detail: `${x.last.who ? `<${x.last.who}> ` : ''}${x.last.text}` } : {}),
+      ...(x.last ? { aside: socialAgo(new Date(x.last.at).toISOString(), now()) } : {}),
+      run: () => x.open(here),
+    };
+  }
+
+  /** Groupes : les miens, le dernier message de chacun ; aucun : de quoi en créer ou en rejoindre un. */
+  function groupsBand(max: number, here: () => void): HubSectionSpec {
+    const mine = host.groups.mine();
+    const door = host.groups.door();
+    if (!mine.length) return { title: t('Mes groupes'), layout: 'list', column: 'left', cards: [{ key: 'groups:none', icon: 'group', title: t('Aucun groupe pour l’instant'), detail: door.detail, ...(door.quiet ? { quiet: true } : {}), run: () => host.groups.open(here) }] };
+    return {
+      title: t('Mes groupes'),
+      layout: 'cards',
+      column: 'left',
+      cards: mine.slice(0, max).map((x) => ({
+        key: `group:${x.id}`,
+        icon: 'group' as const,
+        title: x.name,
+        ...(x.unread ? { count: x.unread } : {}),
+        ...(x.last ? { bubble: { text: x.last.text, ...(x.last.who ? { who: x.last.who } : {}), group: true } } : {}),
+        ...(x.detail ? { detail: x.detail } : {}),
+        run: () => x.open(here),
+      })),
+    };
+  }
+
+  /** Profil : ma carte, mon niveau ; Start ouvre mon profil public. */
+  function profileBand(here: () => void): HubSectionSpec {
+    const s = net.state();
+    const lv = levelChip(host.myLevel());
+    return { title: t('Mon profil'), layout: 'cards', column: 'right', cards: [{ key: 'mine', avatar: face(me(), s.name), title: s.name, ...(lv ? { level: lv } : {}), detail: t('Ce que voient les autres joueurs, et qui a aimé votre activité'), run: () => host.profile.openMine(here) }] };
+  }
+
+  /** L'accueil : la bande de chaque onglet en récapitulatif, puis ce qui bouge. */
   function homeSections(here: () => void): HubSectionSpec[] {
-    const out: HubSectionSpec[] = [];
-    const waiting = waitingSection(HOME_THREADS, here);
-    if (waiting) out.push(waiting);
-    const people = peopleSection(HOME_PEOPLE, here);
-    if (people) out.push(people);
-    out.push(roomSection(HOME_LINES, here));
+    const recap = (s: HubSectionSpec | undefined, opens: CommunityTab, column: 'left' | 'right'): HubSectionSpec[] => (s ? [{ ...s, opens, column }] : []);
     const news = newsSection(here);
-    if (news) out.push(news);
-    if (host.desk()) out.push(inviteSection(here, 'right'));
-    return out;
+    return [
+      ...recap(messagesBand(HOME_THREADS, here), 'messages', 'left'),
+      ...recap(peopleSection(HOME_PEOPLE, here, true), 'players', 'left'),
+      ...recap(groupsBand(HOME_GROUPS, here), 'groups', 'left'),
+      ...recap(roomSection(HOME_LINES, here), 'rooms', 'right'),
+      ...recap(profileBand(here), 'profile', 'right'),
+      ...(news ? [news] : []),
+    ];
   }
 
   function messagesSections(here: () => void): HubSectionSpec[] {
-    const out: HubSectionSpec[] = [];
-    const waiting = waitingSection(TAB_THREADS, here);
-    if (waiting) out.push(waiting);
-    const waitingIds = new Set(host.messages.waiting().map((x) => `${x.kind}:${x.id}`));
-    const recent = host.messages.recent(6).filter((x) => !waitingIds.has(`${x.kind}:${x.id}`));
-    if (recent.length)
-      out.push({
-        title: t('Conversations récentes'),
-        layout: 'list',
-        column: 'right',
-        cards: recent.map((x) => {
-          const lv = x.key ? levelChip(levelOf(x.key)) : undefined;
-          return {
-            key: `recent:${x.kind}:${x.id}`,
-            ...(x.key ? { avatar: face(x.key, x.name) } : { icon: 'group' as const }),
-            title: x.name,
-            ...(lv ? { level: lv } : {}),
-            ...(x.last ? { detail: `${x.last.who ? `<${x.last.who}> ` : ''}${x.last.text}` } : {}),
-            ...(x.last ? { aside: socialAgo(new Date(x.last.at).toISOString(), now()) } : {}),
-            run: () => x.open(here),
-          };
-        }),
-      });
+    const out: HubSectionSpec[] = [messagesBand(TAB_THREADS, here)];
+    const shown = new Set(out[0]!.cards.map((c) => c.key.replace(/^(thread|recent):/, '')));
+    const recent = host.messages.recent(6).filter((x) => !shown.has(`${x.kind}:${x.id}`));
+    if (recent.length) out.push({ title: t('Conversations récentes'), layout: 'list', column: 'right', cards: recent.map((x) => recentCard(x, here)) });
     out.push({ title: t('Tout voir'), layout: 'list', column: 'right', cards: [{ key: 'all', icon: 'message', title: t('Toutes les conversations'), detail: host.messages.detail(), run: () => host.messages.open(here) }] });
     return out;
   }
 
   function playersSections(here: () => void): HubSectionSpec[] {
     const s = net.state();
+    // La bande d'abord, la même que sur l'accueil (+25 XP par nouvel ami, « Tous les joueurs ») ; puis les demandes reçues.
     const out: HubSectionSpec[] = [];
-    // Les demandes reçues en tête : accepter d'un appui, ou ouvrir son profil.
+    const people = peopleSection(TAB_PEOPLE, here, true);
+    if (people) out.push(people);
     if (s.incoming.length)
       out.push({
         title: t('Demandes d’ami'),
@@ -516,16 +572,13 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
           };
         }),
       });
-    const people = peopleSection(TAB_PEOPLE, here);
-    if (people) out.push(people);
-    if (!host.desk()) out.push(inviteSection(here, 'right'));
+    out.push(inviteSection(here, 'right'));
     out.push({
       title: t('Tout voir'),
       layout: 'list',
       column: 'right',
       cards: [
         { key: 'friends', icon: 'friend-list', title: t('Mes amis'), detail: tn(s.friends.length, '{n} ami', '{n} amis'), run: () => host.players.open(here, 'friends') },
-        { key: 'everyone', icon: 'globe', title: t('Tous les joueurs'), detail: host.players.detail(), run: () => host.players.open(here, 'all') },
         { key: 'find', icon: 'search', title: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), run: () => host.friends.find() },
         { key: 'requests', icon: 'friend-request', title: t('Demandes d’amis'), detail: t('Reçues et envoyées'), run: () => host.friends.requests(here) },
       ],
@@ -534,26 +587,11 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   }
 
   function groupsSections(here: () => void): HubSectionSpec[] {
-    const out: HubSectionSpec[] = [];
-    const mine = host.groups.mine();
-    if (mine.length)
-      out.push({
-        title: t('Mes groupes'),
-        layout: 'cards',
-        column: 'left',
-        cards: mine.slice(0, 6).map((x) => ({
-          key: `group:${x.id}`,
-          icon: 'group' as const,
-          title: x.name,
-          ...(x.unread ? { count: x.unread } : {}),
-          ...(x.last ? { bubble: { text: x.last.text, ...(x.last.who ? { who: x.last.who } : {}), group: true } } : {}),
-          ...(x.detail ? { detail: x.detail } : {}),
-          run: () => x.open(here),
-        })),
-      });
     const door = host.groups.door();
-    out.push({ title: t('Tout voir'), layout: 'list', column: 'right', cards: [{ key: 'all', icon: 'group', title: t('Groupes'), detail: door.detail, ...(door.quiet ? { quiet: true } : {}), run: () => host.groups.open(here) }] });
-    return out;
+    return [
+      groupsBand(6, here),
+      { title: t('Tout voir'), layout: 'list', column: 'right', cards: [{ key: 'all', icon: 'group', title: t('Groupes'), detail: door.detail, ...(door.quiet ? { quiet: true } : {}), run: () => host.groups.open(here) }] },
+    ];
   }
 
   function roomsSections(here: () => void): HubSectionSpec[] {
@@ -570,15 +608,8 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   }
 
   function profileSections(here: () => void): HubSectionSpec[] {
-    const s = net.state();
-    const lv = levelChip(host.myLevel());
     return [
-      {
-        title: t('Mon profil'),
-        layout: 'cards',
-        column: 'left',
-        cards: [{ key: 'mine', avatar: face(me(), s.name), title: s.name, ...(lv ? { level: lv } : {}), detail: t('Ce que voient les autres joueurs, et qui a aimé votre activité'), run: () => host.profile.openMine(here) }],
-      },
+      { ...profileBand(here), column: 'left' },
       {
         title: t('Pseudo, confidentialité, compte'),
         layout: 'list',
@@ -620,7 +651,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
 
   let back: () => void = () => undefined;
   let last = '';
-  const hub = createHubScreen({ library: host.library, zoneKeys: host.zoneKeys }, (tab, reopen): HubSpec => {
+  const hub = createHubScreen({ library: host.library, zoneKeys: host.zoneKeys, navKeys: host.navKeys }, (tab, reopen): HubSpec => {
     // Un constat ne survit pas au changement d'onglet.
     if (tab !== last) said = undefined;
     last = tab;
@@ -641,7 +672,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
       default:
         return { ...spec, sections: homeSections(reopen) };
     }
-  });
+  }, { menuFirst: true });
 
   return {
     openHome(to) {
