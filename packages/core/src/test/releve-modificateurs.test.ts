@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { BUTTONS } from '../buttons';
 import { loadCabinet } from '../store';
 import { cabinetIn, keyboard, recorded, repeat, runWizard, skip } from './clavier-reel-outils';
+import { removeTempDir } from './temp-dir';
 
 // Touches modificatrices au relevé des boutons : Maj et Ctrl sont les flippers et les MagnaSave de
 // la plupart des encodeurs en mode clavier (CSD PinOne, KL25Z, Zero Delay), et aucun essai ne les
@@ -17,7 +18,7 @@ import { cabinetIn, keyboard, recorded, repeat, runWizard, skip } from './clavie
 /** Boutons d'une PinOne en mode clavier (touches de VPX), dans l'ordre du relevé. */
 const PINONE = ['Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Digit1', 'Clavier:Escape', 'Clavier:Digit5', 'Clavier:Enter', 'Clavier:ControlLeft', 'ControlRight'];
 
-test('boutons du jeu d’une PinOne en mode clavier : Maj, Ctrl, Échap et Alt relevés et enregistrés', { skip, timeout: 200_000 }, () => {
+test('boutons du jeu d’une PinOne en mode clavier : Maj, Ctrl, Échap et Alt relevés et enregistrés', { skip, timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-modificateurs-'));
   try {
     const home = path.join(dir, 'home');
@@ -55,11 +56,11 @@ test('boutons du jeu d’une PinOne en mode clavier : Maj, Ctrl, Échap et Alt r
     assert.match(ini, /^Mapping\.RightMagna = Key;228\b/m, 'Ctrl droit dans [Input]');
     assert.match(ini, /^Mapping\.LeftFlipper = Key;225\b/m, 'Maj gauche dans [Input]');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    removeTempDir(dir);
   }
 });
 
-test('assistant complet d’une PinOne : les MagnaSave mis sur l’aide-mémoire et les réglages gardent Ctrl dans le jeu', { skip, timeout: 200_000 }, () => {
+test('assistant complet d’une PinOne : les MagnaSave mis sur l’aide-mémoire et les réglages gardent Ctrl dans le jeu', { skip, timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-modificateurs-complet-'));
   try {
     const home = path.join(dir, 'home');
@@ -83,6 +84,6 @@ test('assistant complet d’une PinOne : les MagnaSave mis sur l’aide-mémoire
     // Les MagnaSave du jeu gardent leur touche : le même bouton physique sert au menu et en partie.
     assert.match(output, /Assistant : touches validées \(game\) : .*leftMagna=ControlLeft rightMagna=ControlRight /, output);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    removeTempDir(dir);
   }
 });

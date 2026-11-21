@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { APP, menuRenderer, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -83,7 +84,7 @@ app.whenReady().then(async () => {
 });
 `;
 
-test('garde-fou : deux zones du menu qui se recouvrent, ou un cadre hors de la zone du playfield, sont signalés', { skip: electron ? false : 'Electron sous Windows requis', timeout: 180_000 }, () => {
+test('garde-fou : deux zones du menu qui se recouvrent, ou un cadre hors de la zone du playfield, sont signalés', { skip: electron ? false : 'Electron sous Windows requis', timeout: 420_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cadres-'));
   try {
     const script = path.join(dir, 'banc.cjs');
@@ -91,7 +92,7 @@ test('garde-fou : deux zones du menu qui se recouvrent, ou un cadre hors de la z
     fs.writeFileSync(path.join(dir, 'cas.json'), JSON.stringify(CASES));
     const env: NodeJS.ProcessEnv = { ...process.env, CP_LAYOUT_CHECK: path.join(APP, 'dist', 'layout-check.js'), CP_CASES: path.join(dir, 'cas.json'), CP_OUT: path.join(dir, 'out.json') };
     delete env.ELECTRON_RUN_AS_NODE;
-    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 170_000 });
+    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 400_000 });
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
     const found = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as Record<string, string[]>;
     assert.deepEqual(found.window, [1920, 1080]);
@@ -102,6 +103,6 @@ test('garde-fou : deux zones du menu qui se recouvrent, ou un cadre hors de la z
     assert.deepEqual(found['hors-zone'], ['cadre hors de la zone du playfield : menu div [1500, 76, 2100, 476]']);
     assert.deepEqual(found.cache, [], 'un cadre caché ne recouvre rien');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

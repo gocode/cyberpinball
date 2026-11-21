@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { until } from './reseau-essai';
 import { encodePng } from '../png';
 import { scanTables, type TableEntry } from '../tables';
 import { layoutOf } from '../locations';
@@ -55,14 +56,6 @@ const contentModule = require(path.join(APP_DIST, 'friend-content.js')) as { cre
 const gamesModule = require(path.join(APP_DIST, 'live-game.js')) as { createLiveGames(o: object): Games };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-async function until(what: string, check: () => boolean, ms = 15_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
 
 /** Une borne : son dossier de données, une racine avec une table (même .vpx partout), et ses médias. */
 function cabinet(name: string, bootstrap: { host: string; port: number }[], medias: boolean) {

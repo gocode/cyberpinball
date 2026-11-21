@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -188,6 +189,6 @@ test('moment des badges, vrai Chromium, borne et bureau : rien ne se chevauche, 
       `sans voile, le garde-fou voit la file sur la roue dentée : ${JSON.stringify(borne.unveiled)}`,
     );
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

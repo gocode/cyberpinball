@@ -14,6 +14,7 @@ import { pathToFileURL } from 'node:url';
 import { INTRO_TIMELINE } from '../intro';
 import { runElectron } from './electron-run';
 import { APP } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -143,6 +144,6 @@ test('marque de l’ouverture, vrai Chromium : le col de la tornade passe dans l
       assert.ok(m.cStart >= m.left && m.lEnd <= m.right, `${where} : la marque déborde (${m.cStart.toFixed(0)} à ${m.lEnd.toFixed(0)}, écran ${m.left.toFixed(0)} à ${m.right.toFixed(0)})`);
     }
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

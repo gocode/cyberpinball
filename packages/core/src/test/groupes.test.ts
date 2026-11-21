@@ -41,6 +41,7 @@ import {
 } from '../groups';
 import { newSocialState, setName, type SocialState } from '../social';
 import { frontendSource } from './frontend-source';
+import { until } from './reseau-essai';
 
 const T0 = new Date('2026-11-17T18:00:00Z');
 const at = (min: number) => new Date(T0.getTime() + min * 60_000);
@@ -251,14 +252,6 @@ const netModule = require(path.join(APP_DIST, 'social-net.js')) as { createSocia
 const groupModule = require(path.join(APP_DIST, 'group-service.js')) as { createGroupService(o: object): Groups };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-async function until(what: string, check: () => boolean, ms = 30_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
 
 function cabinet(name: string, bootstrap: { host: string; port: number }[]) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), `cp-groupes-${name}-`));

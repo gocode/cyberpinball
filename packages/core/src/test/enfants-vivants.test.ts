@@ -93,15 +93,19 @@ test('commandes du pare-feu : entrée fermée, fin du processus, délai qui tue 
   assert.equal(src.match(/\bspawn\(/g)?.length, 1);
 });
 
-test('commandes du pare-feu : un processus qui ne finit pas est arrêté au délai, arbre compris', { skip: windows ? false : 'Windows requis', timeout: 30_000 }, async () => {
+test('commandes du pare-feu : un processus qui ne finit pas est arrêté au délai, arbre compris', { skip: windows ? false : 'Windows requis', timeout: 120_000 }, async () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const rule = require(path.join(REPO_ROOT, 'app', 'dist', 'firewall-rule.js')) as { spawnRun(file: string, args: string[], ms?: number): Promise<{ status: number | null; stderr: string }> };
   const marker = `pare-feu-delai-${process.pid}-${Date.now()}`;
   // Un node qui lance un petit-enfant (même marque), puis attend : le délai doit tuer les deux.
-  const script = `require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)', '${marker}'], { stdio: 'inherit' }); setTimeout(() => {}, 60000);`;
+  // Le petit-enfant vit 5 min : rendu au délai (1,5 s, plus le lancement de node et de taskkill, qui
+  // prennent jusqu'à 20 s sur une machine saturée par d'autres suites) se distingue sans ambiguïté
+  // d'un rendu à sa fin. Jusqu'au 21/11/2026, la frontière était à 6 s et tombait sous charge.
+  const script = `require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 300000)', '${marker}'], { stdio: 'inherit' }); setTimeout(() => {}, 300000);`;
   const started = Date.now();
   const r = await rule.spawnRun(process.execPath, ['-e', script, marker], 1500);
-  assert.ok(Date.now() - started < 6000, 'rendu au délai, pas à la fin du petit-enfant');
+  const took = Date.now() - started;
+  assert.ok(took < 90_000, `rendu au délai, pas à la fin du petit-enfant (${took} ms)`);
   assert.equal(r.status, null);
   assert.match(r.stderr, /sans réponse après 2 s, arrêté/);
   let left = processesWith(marker);
@@ -132,7 +136,7 @@ test('tests : tout Electron passe par runElectron (tué au délai, aucun process
   const helper = read('packages/core/src/test/electron-run.ts');
   assert.match(helper, /stdio: \['ignore', fdOut, fdErr\]/, 'sortie dans des fichiers : rien à attendre que la fin du processus');
   assert.match(helper, /killAll\(left\)/);
-  assert.match(helper, /for \(const deadline = Date\.now\(\) \+ GRACE_MS; left\.length && Date\.now\(\) < deadline; \)[\s\S]*?left = processesWith\(userData, started\);[\s\S]*?killAll\(left\)/, 'délai de grâce en temps avant de déclarer un processus survivant (Chromium ferme les siens un à un)');
+  assert.match(helper, /for \(const deadline = Date\.now\(\) \+ GRACE_MS; left\.length && Date\.now\(\) < deadline; \)[\s\S]*?left = processesWith\(markers, started\);[\s\S]*?killAll\(left\)/, 'délai de grâce en temps avant de déclarer un processus survivant (Chromium ferme les siens un à un)');
   // Les processus d'un essai : reconnus à leur marque, jamais à la parenté (un numéro de processus fini est vite redonné).
   assert.doesNotMatch(helper, /th32ParentProcessID|OFFSET_PARENT/);
   // Lecture native : PowerShell et sa requête CIM coûtaient le tiers des tests lents sous charge (17/11/2026).

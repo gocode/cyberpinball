@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { until as waitUntil } from './reseau-essai';
 import {
   forgetInChat,
   forgetInProfiles,
@@ -112,26 +113,24 @@ interface Net {
   roomOpen(room: string | undefined): void;
   setRooms(change: Partial<RoomsState>): void;
   forgetMe(): Promise<{ reached: number }>;
+  status(): object;
 }
 /* eslint-disable @typescript-eslint/no-require-imports */
 const netModule = require(path.join(REPO_ROOT, 'app', 'dist', 'social-net.js')) as { createSocialNet(o: object): Net };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-async function until(what: string, check: () => boolean, ms = 20_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
-
 test('entre deux bornes : une ligne retirée disparaît chez l’autre, puis l’avis d’oubli efface le joueur et ses lignes', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
   const dirs = [0, 1].map((i) => fs.mkdtempSync(path.join(os.tmpdir(), `cp-oubli-${i}-`)));
   const forgottenSeen: string[][] = [];
-  const a = netModule.createSocialNet({ dataDir: dirs[0], mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, forgetFlushMs: 300 });
-  const b = netModule.createSocialNet({ dataDir: dirs[1], mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, onForget: (keys: Set<string>) => forgottenSeen.push([...keys]) });
+  // Le journal des deux bornes, rendu avec un échec d'attente.
+  const t0 = Date.now();
+  const journal: string[] = [];
+  const logAs = (who: string) => (line: string) => journal.push(`${((Date.now() - t0) / 1000).toFixed(1)} s ${who} : ${line}`);
+  const until = (what: string, check: () => boolean) => waitUntil(what, check, undefined, () => [`Kiko ${JSON.stringify(a.status())}`, `Sillage ${JSON.stringify(b.status())}`, ...journal].join('\n'));
+  const a = netModule.createSocialNet({ dataDir: dirs[0], mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, forgetFlushMs: 300, log: logAs('Kiko') });
+  const b = netModule.createSocialNet({ dataDir: dirs[1], mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, onForget: (keys: Set<string>) => forgottenSeen.push([...keys]), log: logAs('Sillage') });
   const FR = roomOfCountry('FR');
   try {
     a.rename('Kiko');

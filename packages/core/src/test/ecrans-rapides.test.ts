@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
 import { DEMOS, withoutInternal } from './interne';
+import { removeTempDir } from './temp-dir';
 
 const APP_SRC = path.join(REPO_ROOT, 'app', 'src');
 const code = (file: string) => fs.readFileSync(path.join(APP_SRC, file), 'utf8').replace(/\/\/.*$/gm, '');
@@ -63,7 +64,7 @@ test('le guet compte les lectures du disque faites pendant une construction, et 
     fs.readdirSync(dir);
     assert.equal(none.count, 0);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
@@ -110,6 +111,6 @@ test('borne chargée : aucun écran du parcours ne lit le disque en se reconstru
       assert.match(result, new RegExp(`« ${heading}`), `${heading} absent du parcours\n${result}`);
     }
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

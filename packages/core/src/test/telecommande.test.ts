@@ -18,6 +18,7 @@ import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
 import { DEMOS, withoutInternal } from './interne';
+import { removeTempDir } from './temp-dir';
 
 function electronPath(): string | undefined {
   try {
@@ -29,13 +30,13 @@ function electronPath(): string | undefined {
 }
 const electron = process.platform === 'win32' ? electronPath() : undefined;
 
-test('télécommande du téléphone : appairage, injection et refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('télécommande du téléphone : appairage, injection et refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telecommande-'));
   try {
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);
@@ -43,11 +44,11 @@ test('télécommande du téléphone : appairage, injection et refus, de bout en 
     assert.ok((result.match(/^OK /gm) ?? []).length >= 40, result);
     for (const step of ['même code sur la borne et sur le téléphone', 'Start accepte le téléphone', 'accents et émoji arrivent tels quels', 'le mot de passe tapé au téléphone arrive dans le champ', 'Entrée envoie le formulaire de la page', 'appui long, « Ouvrir le lien »', 'deux doigts : la page défile', 'Exit refuse le téléphone qui attend', 'une trame rejouée coupe la liaison', 'plus rien n’écoute après la fermeture']) assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });
 
-test('télécommande du téléphone dans tout le menu : boutons, clavier à l’écran, envoi d’un fichier, refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('télécommande du téléphone dans tout le menu : boutons, clavier à l’écran, envoi d’un fichier, refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   // interne/demos/demo-telecommande-menu.cjs : la vraie gestion des tables (library.ts) hors écran, la vraie
   // page du téléphone ; le QR lu sur la capture de l'écran, Start, les boutons tenus, la saisie,
   // l'envoi octet pour octet ; puis les refus, une partie, le navigateur intégré, l'inactivité,
@@ -57,7 +58,7 @@ test('télécommande du téléphone dans tout le menu : boutons, clavier à l’
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande-menu.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande-menu.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);
@@ -87,11 +88,11 @@ test('télécommande du téléphone dans tout le menu : boutons, clavier à l’
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });
 
-test('téléphone gardé : revient sans QR, Reprendre, prise de main, Oublier, retour après relance, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('téléphone gardé : revient sans QR, Reprendre, prise de main, Oublier, retour après relance, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   // interne/demos/demo-telephone-garde.cjs : deux vraies pages du téléphone (chacune son stockage), la
   // vraie gestion des tables hors écran ; accepté une fois, gardé (data	elephones.json) ; la borne
   // écoute l'écran quitté ; Reprendre ; page rouverte sans adresse ; prise de main ; Oublier ; Cyber
@@ -101,7 +102,7 @@ test('téléphone gardé : revient sans QR, Reprendre, prise de main, Oublier, r
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-garde.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-garde.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}
 ${run.stderr}`;
     assert.equal(run.status, 0, result);
@@ -123,11 +124,11 @@ ${run.stderr}`;
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });
 
-test('accès direct aux menus depuis le téléphone : l’écran de la borne à toucher, tous les menus, la roue, le mode invité, une partie, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('accès direct aux menus depuis le téléphone : l’écran de la borne à toucher, tous les menus, la roue, le mode invité, une partie, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   // interne/demos/demo-telephone-menus.cjs : la vraie gestion des tables hors écran, la vraie page du
   // téléphone ; la vue Écran (entrées touchées, repère qui suit les flippers), la vue Menus (une
   // rubrique sur le téléphone, une entrée ouverte à la borne), les refus (rang dépassé, menu inconnu,
@@ -138,7 +139,7 @@ test('accès direct aux menus depuis le téléphone : l’écran de la borne à 
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-menus.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-menus.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);
@@ -169,11 +170,11 @@ test('accès direct aux menus depuis le téléphone : l’écran de la borne à 
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });
 
-test('classements au téléphone : la table de la borne, les portées et les périodes comme à la borne, les indisponibles grisés, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('classements au téléphone : la table de la borne, les portées et les périodes comme à la borne, les indisponibles grisés, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   // interne/demos/demo-telephone-scores.cjs : le vrai tableau des scores (table-scores.ts,
   // table-rankings.ts, scoreboard-menu.ts) sur un réseau simulé, la vraie page du téléphone ; la
   // table choisie ou lancée à la borne, une autre de la liste, les portées et les périodes, les
@@ -184,7 +185,7 @@ test('classements au téléphone : la table de la borne, les portées et les pé
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-scores.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-scores.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);
@@ -214,7 +215,7 @@ test('classements au téléphone : la table de la borne, les portées et les pé
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });
 

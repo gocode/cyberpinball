@@ -480,7 +480,8 @@ test('service : l’hôte prêt attend son invité ; « partez » arrive aux deu
     // Compte à rebours (5 s), puis Alexis prêt tout de suite : il attend Bruno, et l'écran dit pourquoi.
     await until('Alexis prêt', () => timeline.includes('Alexis prêt'));
     await until('Alexis prêt chez l’hôte', () => host.current()!.players[0]!.ready === true);
-    assert.equal(host.waitView()?.lead, 'En attente : Bruno — Chargement de la table…');
+    // L'étape de Bruno avance pendant qu'on regarde (sous charge, déjà au lancement de VPX) : l'écran nomme qui et où il en est.
+    assert.match(host.waitView()?.lead ?? '', /^En attente : Bruno — (Chargement de la table|Lancement de VPX)…$/);
     await until('les deux partis', () => timeline.includes('Alexis part') && timeline.includes('Bruno part'));
     assert.ok(timeline.indexOf('Bruno prêt') < timeline.indexOf('Alexis part'), `personne ne part avant que tous soient prêts : ${timeline.join(', ')}`);
     assert.equal(host.current()!.goWhy, 'all-ready');

@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -60,10 +61,16 @@ app.whenReady().then(async () => {
       ringOnTop: getComputedStyle(cv).gridArea === getComputedStyle(ring).gridArea && cv.compareDocumentPosition(ring) === Node.DOCUMENT_POSITION_FOLLOWING,
     };
   })${'`'});
-  await new Promise((r) => setTimeout(r, 1500));
-  const first = await look();
-  await new Promise((r) => setTimeout(r, 900));
-  const second = await look();
+  // Sous la charge d'autres suites, le premier dessin d'un médaillon tarde (21/11/2026) : on attend que
+  // les trois soient dessinés, puis que le centre ait changé d'image, vingt secondes au plus chacun.
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  await wait(1500);
+  let first = await look();
+  for (const end = Date.now() + 20000; Date.now() < end && !(first.length === 3 && first.every((m) => m.lit > 100)); first = await look()) await wait(250);
+  await wait(900);
+  let second = await look();
+  const centerPrint = (list) => list.find((m) => m.center)?.print;
+  for (const end = Date.now() + 20000; Date.now() < end && centerPrint(second) === centerPrint(first); second = await look()) await wait(250);
   fs.writeFileSync(path.join(dir, 'out.json'), JSON.stringify({ first, second, console }));
   app.exit(0);
 });
@@ -110,7 +117,7 @@ function wheelState(center: Kind) {
 }
 
 for (const center of ['communaute', 'juke-box', 'collections'] as const) {
-  test(`roue, vrai Chromium : médaillons vivants, ${center} au centre s'anime, son voisin reste sur sa première image`, { skip: electron ? false : 'Electron sous Windows requis', timeout: 120_000 }, () => {
+  test(`roue, vrai Chromium : médaillons vivants, ${center} au centre s'anime, son voisin reste sur sa première image`, { skip: electron ? false : 'Electron sous Windows requis', timeout: 300_000 }, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-medaillons-'));
     try {
       fs.writeFileSync(path.join(dir, 'etat.json'), JSON.stringify(wheelState(center)));
@@ -119,7 +126,7 @@ for (const center of ['communaute', 'juke-box', 'collections'] as const) {
       fs.writeFileSync(script, BENCH);
       const env: NodeJS.ProcessEnv = { ...process.env, CP_DIR: dir, CP_PAGE: path.join(APP, 'renderer', 'frontend.html') };
       delete env.ELECTRON_RUN_AS_NODE;
-      const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 110_000 });
+      const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 280_000 });
       assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
       const out = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as { first: Look[]; second: Look[]; console: string[] };
       assert.deepEqual(out.console.filter((m) => /Content Security Policy|Uncaught|TypeError|ReferenceError/.test(m)), [], 'aucune erreur ni refus de la page');
@@ -137,7 +144,7 @@ for (const center of ['communaute', 'juke-box', 'collections'] as const) {
       assert.notEqual(at(out.first, true).print, at(out.second, true).print, 'le médaillon du centre s’anime');
       for (const m of out.first.filter((x) => !x.center)) assert.equal(m.print, out.second.find((x) => x.kind === m.kind)!.print, `${m.kind}, voisin : reste sur sa première image`);
     } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
+      removeTempDir(dir);
     }
   });
 }
@@ -220,7 +227,7 @@ test('Juke-box, vrai Chromium : les lueurs des fils et de la barre de progressio
       for (const side of sides) assert.ok(e[side] <= 2, `${e.kind} : lueur coupée au bord ${side} (alpha ${e[side]}, canevas ${e.w} × ${e.h})`);
     }
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

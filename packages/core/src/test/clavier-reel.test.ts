@@ -7,6 +7,7 @@ import { BUTTONS, INTERFACE_KEYS } from '../buttons';
 import type { CabinetButtons } from '../model';
 import { loadCabinet } from '../store';
 import { cabinetIn, electron, GAME_BY_KEYBOARD, keyboard, recorded, repeat, runWizard, sdlLibrary, skip } from './clavier-reel-outils';
+import { removeTempDir } from './temp-dir';
 
 // Relevé des boutons par le vrai chemin d'une touche du clavier : l'assistant, rendu hors
 // écran sur un bureau Windows caché, reçoit chaque touche par webContents.sendInputEvent
@@ -19,7 +20,7 @@ import { cabinetIn, electron, GAME_BY_KEYBOARD, keyboard, recorded, repeat, runW
 // Outils communs : clavier-reel-outils.ts ; les cas du premier écran d’une borne neuve sont dans
 // clavier-premier-ecran-*.test.ts, répartis pour tourner en parallèle.
 
-test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise reprise, Retour arrière et Échap', { skip, timeout: 200_000 }, () => {
+test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise reprise, Retour arrière et Échap', { skip, timeout: 290_000 }, () => {
   assert.deepEqual(Object.keys(GAME_BY_KEYBOARD), BUTTONS.map((b) => b.id), 'un relevé pour chaque bouton du jeu');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-clavier-'));
   try {
@@ -68,11 +69,11 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
     assert.match(ini, /^Mapping\.Credit1 = Key;32\b/m, 'crédit sur 3 dans [Input]');
     assert.match(ini, /^Mapping\.LaunchBall = Key;26\b/m, 'lanceur sur W dans [Input]');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
-test('assistant complet au clavier : boutons de l’interface puis du jeu relevés, « Précédent » revient à l’étape d’avant, l’assistant passe à la suite', { skip, timeout: 200_000 }, () => {
+test('assistant complet au clavier : boutons de l’interface puis du jeu relevés, « Précédent » revient à l’étape d’avant, l’assistant passe à la suite', { skip, timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-clavier-complet-'));
   try {
     const home = path.join(dir, 'home');
@@ -110,11 +111,11 @@ test('assistant complet au clavier : boutons de l’interface puis du jeu relev�
     assert.ok(quit, output);
     assert.ok(!['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'].includes(quit[1]!), `encore au relevé : ${quit[1]}`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
-test('premier écran d’une borne neuve : sans réponse, le délai garde les touches et l’assistant continue', { skip, timeout: 200_000 }, () => {
+test('premier écran d’une borne neuve : sans réponse, le délai garde les touches et l’assistant continue', { skip, timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-delai-'));
   try {
     const home = path.join(dir, 'home');
@@ -122,13 +123,13 @@ test('premier écran d’une borne neuve : sans réponse, le délai garde les to
     assert.doesNotMatch(output, /Assistant : relevé game/, output);
     assert.match(output, /Assistant : « Quitter sans enregistrer \? » \(assign\)/, output);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
 const dll = electron ? sdlLibrary() : undefined;
 
-test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier mélangés : relevés et enregistrés', { skip: skip || (dll ? false : 'aucune bibliothèque SDL de VPX sur ce poste'), timeout: 200_000 }, () => {
+test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier mélangés : relevés et enregistrés', { skip: skip || (dll ? false : 'aucune bibliothèque SDL de VPX sur ce poste'), timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-joystick-'));
   try {
     const home = path.join(dir, 'home');
@@ -153,6 +154,6 @@ test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier
       assert.match(buttons[id]!, new RegExp(`^SDLJoy_[0-9a-f]{32}_\\d+;${n}$`), `${id} : ${buttons[id]}`);
     assert.ok(output.includes(recorded('game', 'credit', 'Digit5')), output);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

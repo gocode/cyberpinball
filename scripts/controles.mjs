@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { coordinationDir, currentBranch, recordFlaky } from './coordination.mjs';
 import { failedFiles, failureDetails, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
+import { NODE_TEST_ARGS } from './tests-node.mjs';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -76,7 +77,7 @@ export async function rerunAlone(files, { cwd, say = console.log, prefix = 'rela
   // Tous ensemble, en une passe, hors de la grande suite : relancés un par un, six fichiers lents
   // prenaient 5 à 10 minutes de plus (21/11/2026).
   say(`Relance des ${files.length} fichier(s) en échec, à part : ${files.map((f) => path.basename(f)).join(', ')}…`);
-  const again = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...files], { cwd, log: path.join(cwd, 'tmp', `${prefix}.txt`), timeoutMs: TEST_TIMEOUT_MS + 60_000 });
+  const again = await run(process.execPath, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...files], { cwd, log: path.join(cwd, 'tmp', `${prefix}.txt`), timeoutMs: TEST_TIMEOUT_MS + 60_000 });
   const still = new Set([...failedFiles(again.out), ...again.hung].map((f) => path.basename(f)));
   if (again.code !== 0 && !still.size) for (const f of files) still.add(path.basename(f));
   const details = failureDetails(again.out);
@@ -149,7 +150,7 @@ export async function runControles({ cwd = here, tests = true, say = console.log
   if (tests && compiled) {
     const fast = collectTests(cwd).filter((t) => !t.slow);
     say(`Contrôles : ${fast.length} fichiers de tests rapides…`);
-    const { code, out, hung } = await run(node, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
+    const { code, out, hung } = await run(node, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
     if (code !== 0) {
       const files = [...new Set([...failedFiles(out), ...hung])];
       if (!files.length) {

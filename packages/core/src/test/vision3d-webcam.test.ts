@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO } from './interne';
+import { removeTempDir } from './temp-dir';
 
 const PORTRAIT = path.join(REPO, 'interne', 'vision3d', 'visage-essai.png');
 
@@ -102,6 +103,6 @@ app.whenReady().then(async () => {
     assert.equal(setting.neutral.essai?.source, 'webcam');
     assert.ok(setting.neutral.essai!.z > 20 && setting.neutral.essai!.z < 300, `distance ${setting.neutral.essai!.z} cm`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

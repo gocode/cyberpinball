@@ -53,14 +53,17 @@ function trickle(res: http.ServerResponse, body: string, pieces: number, everyMs
 
 test('site lent mais vivant : la lecture aboutit, bien au-delà du délai sans progrès', async () => {
   const body = JSON.stringify({ liste: 'é'.repeat(5_000) });
-  const site = await serve((_req, res) => trickle(res, body, 12, 150));
+  // Un morceau toutes les 250 ms, délai sans progrès de 2 s : huit fois l'écart, que le retard de la
+  // boucle d'évènements (site et lecteur dans le même processus) ne comble pas sous la charge
+  // d'autres suites. Jusqu'au 21/11/2026 : 150 ms pour 400 ms, et la lecture tombait parfois.
+  const site = await serve((_req, res) => trickle(res, body, 30, 250));
   try {
     const start = Date.now();
-    const response = await fetchTextPatiently(site.url, { idleMs: 400, attempts: 1 });
+    const response = await fetchTextPatiently(site.url, { idleMs: 2000, attempts: 1 });
     const took = Date.now() - start;
     assert.equal(response.status, 200);
     assert.equal(response.text, body, 'les caractères coupés entre deux morceaux sont recollés');
-    assert.ok(took > 3 * 400, `transfert de ${took} ms : plus long que le délai, il aboutit quand même`);
+    assert.ok(took > 3 * 2000, `transfert de ${took} ms : plus long que le délai, il aboutit quand même`);
     assert.equal(site.hits(), 1);
   } finally {
     await site.close();

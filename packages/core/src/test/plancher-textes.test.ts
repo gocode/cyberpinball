@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import * as vm from 'node:vm';
 import { APP, menuRenderer, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const RENDERER = path.join(APP, 'renderer');
 const REPO = path.join(APP, '..');
@@ -235,7 +236,7 @@ test('garde-fou : un texte réduit par un transform ou une pulsation est signal�
     assert.deepEqual(found.repli, [], 'repli d’un média (.cp-fb) : un média dessiné, à la taille de sa zone');
     assert.deepEqual(found.clip, [], 'ce que coupe un clip-path: inset() ne sort pas de la fenêtre');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

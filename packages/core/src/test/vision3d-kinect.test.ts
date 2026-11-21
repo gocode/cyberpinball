@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO } from './interne';
+import { removeTempDir } from './temp-dir';
 
 const FAKE_DLL = path.join(REPO, 'build', 'vision3d', 'Release', 'kinect-factice.dll');
 
@@ -135,7 +136,7 @@ app.whenReady().then(async () => {
     const half = (seen as unknown as { half: number[] }).half;
     assert.ok(Math.abs(half[0]! - 5) < 0.6, `x à 50 % : ${half[0]} cm (5 attendus)`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
@@ -237,6 +238,6 @@ app.whenReady().then(async () => {
     assert.equal(seen.runningAfterIdle, false, `capteur pas éteint après le délai${trace}`);
     assert.ok(seen.log.some((l) => /tête repérée .* après l’allumage/.test(l)), trace);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

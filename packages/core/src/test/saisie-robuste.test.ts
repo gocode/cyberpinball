@@ -20,6 +20,7 @@ import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
 import { DEMOS, withoutInternal } from './interne';
+import { removeTempDir } from './temp-dir';
 
 const APP_SRC = path.join(REPO_ROOT, 'app', 'src');
 
@@ -62,14 +63,14 @@ test('navigateur intégré : WebAuthn retiré de toutes ses pages, autorisations
     assert.ok(source.includes(guard), `${guard} manque dans acquire-window.ts`);
 });
 
-test('saisie du téléphone, clés d’accès, autorisations, page de Google refusée : rien ne tombe, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('saisie du téléphone, clés d’accès, autorisations, page de Google refusée : rien ne tombe, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-saisie-'));
   try {
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_SAISIE_OUT: dir, CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
     delete env.CP_SAISIE_PAS;
-    const run = runElectron(electron!, [path.join(DEMOS, 'demo-saisie-robuste.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-saisie-robuste.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 270_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     const progress = fs.existsSync(path.join(dir, 'progression.txt')) ? fs.readFileSync(path.join(dir, 'progression.txt'), 'utf8').split('\n').slice(-8).join('\n') : '';
     assert.equal(run.status, 0, `${result}\nDerniers pas :\n${progress}`);
@@ -103,6 +104,6 @@ test('saisie du téléphone, clés d’accès, autorisations, page de Google ref
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeTempDir(dir);
   }
 });

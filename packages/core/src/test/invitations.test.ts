@@ -36,6 +36,7 @@ import { CARDS_BYTES, emptyProfiles, makeCard, verifyCard, withinBytes, type Pub
 import { createPlayerKey, type PlayerKey } from '../sharing';
 import { newSocialState, setName } from '../social';
 import { REPO_ROOT } from './i18n-scan';
+import { until } from './reseau-essai';
 
 const T0 = new Date('2026-11-17T20:00:00Z');
 const later = (min: number) => new Date(T0.getTime() + min * 60_000);
@@ -218,14 +219,6 @@ interface Net {
 const netModule = require(path.join(REPO_ROOT, 'app', 'dist', 'social-net.js')) as { createSocialNet(o: object): Net };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-async function until(what: string, check: () => boolean, ms = 20_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
 
 test('entre deux bornes qui ne sont pas amies : l’attestation signée hors ligne arrive à l’inviteur, sa carte compte la personne invitée', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });

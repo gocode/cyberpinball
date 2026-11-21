@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
+import { removeTempDir } from './temp-dir';
 import { mediaPathFromUrl, mediaUrl } from '../mediaview';
 
 interface Thumbs {
@@ -29,6 +30,10 @@ const { WheelThumbs, WHEEL_THUMB_SIDE } = require(path.join(REPO_ROOT, 'app', 'd
 };
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Le fait attendu, au plus `ms` : sous la charge d'autres suites, la tâche de fond prend plus que quelques dizaines de ms (21/11/2026). */
+const until = async (ok: () => boolean, ms = 15_000) => {
+  for (const end = Date.now() + ms; !ok() && Date.now() < end; ) await wait(20);
+};
 
 test('miniatures de la roue : l’original d’abord, puis la miniature ; animé ou petit, l’original pour de bon ; refaite quand le logo change', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-roue-miniatures-'));
@@ -63,7 +68,7 @@ test('miniatures de la roue : l’original d’abord, puis la miniature ; animé
     });
     // Première demande : l'original, la miniature est lancée.
     assert.equal(thumbs.url(big), big);
-    await wait(60);
+    await until(() => thumbs.url(big) !== big);
     const small = thumbs.url(big)!;
     assert.notEqual(small, big, 'miniature prise dès qu’elle existe');
     const file = mediaPathFromUrl(small)!;
@@ -72,6 +77,7 @@ test('miniatures de la roue : l’original d’abord, puis la miniature ; animé
     // Animé, petit : l'original, une seule conversion chacun, même dans une autre session (marque sur disque).
     assert.equal(thumbs.url(anim), anim);
     assert.equal(thumbs.url(tiny), tiny);
+    await until(() => calls.includes('anime.png') && calls.includes('petit.png'));
     await wait(80);
     assert.equal(thumbs.url(anim), anim);
     assert.equal(thumbs.url(tiny), tiny);
@@ -84,7 +90,7 @@ test('miniatures de la roue : l’original d’abord, puis la miniature ; animé
     fs.utimesSync(path.join(logos, 'grand.png'), new Date(), new Date(Date.now() + 5000));
     const replaced = mediaUrl(path.join(logos, 'grand.png'));
     assert.equal(thumbs.url(replaced), replaced);
-    await wait(60);
+    await until(() => thumbs.url(replaced) !== replaced);
     assert.notEqual(thumbs.url(replaced), small);
     assert.notEqual(thumbs.url(replaced), replaced);
     // Pendant une partie, rien n'est converti ; la roue passe avant la tâche de fond.
@@ -98,13 +104,13 @@ test('miniatures de la roue : l’original d’abord, puis la miniature ; animé
     assert.deepEqual(calls, [], 'aucune conversion pendant une partie');
     idle = true;
     // Trois logos de fond, une courte pause (150 ms) entre deux.
-    await wait(1000);
+    await until(() => calls.length >= 4);
     assert.equal(calls[0], 'montree.png', 'la table montrée d’abord');
     assert.deepEqual(calls.slice(1).sort(), ['b1.png', 'b2.png', 'b3.png'], 'puis la collection, en tâche de fond');
     thumbs.dispose();
     other.dispose();
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
@@ -191,6 +197,6 @@ test('miniatures de la roue, vrai Chromium : réduite, transparence gardée ; GI
     assert.equal(out.anime.kept, 'animated');
     assert.equal(out.lu.petitEcrit || out.lu.animeEcrit, false, 'rien d’écrit pour un logo gardé tel quel');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

@@ -26,6 +26,7 @@ import {
 import { TEST_TIMEOUT_MS, printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
+import { NODE_TEST_ARGS } from './tests-node.mjs';
 
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const iso = (ms) => new Date(ms).toISOString();
@@ -92,7 +93,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
     say(`Tests lents : ${slow.length} fichiers…`);
     const log = path.join(tmp, 'avant-fusion.txt');
     // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond.
-    const first = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...slow.map((t) => path.relative(cwd, t.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
+    const first = await run(process.execPath, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...slow.map((t) => path.relative(cwd, t.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
     if (first.timedOut) say(`Suite lente arrêtée au plafond${first.hung.length ? ` ; figés : ${first.hung.map((f) => path.basename(f)).join(', ')}` : ''}.`);
     else recordDuration(Date.now() - started, dir);
     const t = totals(first.out);

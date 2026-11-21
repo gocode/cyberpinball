@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -98,7 +99,7 @@ app.whenReady().then(async () => {
 });
 `;
 
-test('garde-fou : un calque qui coupe un texte, un texte écrit par la feuille de style, une icône seule sur sa ligne', { skip: electron ? false : 'Electron sous Windows requis', timeout: 180_000 }, () => {
+test('garde-fou : un calque qui coupe un texte, un texte écrit par la feuille de style, une icône seule sur sa ligne', { skip: electron ? false : 'Electron sous Windows requis', timeout: 420_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-recouvrements-'));
   try {
     const script = path.join(dir, 'banc.cjs');
@@ -106,7 +107,7 @@ test('garde-fou : un calque qui coupe un texte, un texte écrit par la feuille d
     fs.writeFileSync(path.join(dir, 'cas.json'), JSON.stringify(CASES));
     const env: NodeJS.ProcessEnv = { ...process.env, CP_LAYOUT_CHECK: path.join(APP, 'dist', 'layout-check.js'), CP_CASES: path.join(dir, 'cas.json'), CP_OUT: path.join(dir, 'out.json') };
     delete env.ELECTRON_RUN_AS_NODE;
-    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 170_000 });
+    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 400_000 });
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
     const found = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as Record<string, string[]>;
     const only = (name: string, pattern: RegExp) => {
@@ -125,7 +126,7 @@ test('garde-fou : un calque qui coupe un texte, un texte écrit par la feuille d
     assert.deepEqual(found['icone-pivotee-devant'], []);
     assert.deepEqual(found.colonne, [], 'une colonne pose l’icône au-dessus exprès');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

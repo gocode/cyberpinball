@@ -21,6 +21,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { NODE_TEST_ARGS } from './tests-node.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_DIR = path.join(repo, 'packages', 'core', 'dist', 'test');
@@ -154,7 +155,7 @@ function main() {
   }
   const slow = chosen.filter((t) => t.slow).length;
   console.log(`${chosen.length} fichier(s) de test${slow ? `, dont ${slow} lent(s) (Electron, Chromium ou processus)` : ''}.`);
-  const args = ['--test', ...(opts.name ? ['--test-name-pattern', opts.name] : []), ...chosen.map((t) => path.relative(repo, t.file))];
+  const args = [...NODE_TEST_ARGS, ...(opts.name ? ['--test-name-pattern', opts.name] : []), ...chosen.map((t) => path.relative(repo, t.file))];
   const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit' });
   process.exit(run.status ?? 1);
 }

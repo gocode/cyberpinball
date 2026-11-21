@@ -16,6 +16,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as koffi from 'koffi';
 
@@ -100,20 +101,46 @@ function describe(pid: number, wantLine: (created: number) => boolean): { create
   }
 }
 
+/** Processus d'un essai : `type` est le --type= d'un processus enfant de Chromium (gpu-process, utility…), absent pour le principal. */
+export interface TestProcess {
+  pid: number;
+  name: string;
+  type?: string;
+}
+
 /**
- * Processus vivants dont la ligne de commande contient `marker`, hors celui qui cherche. `since`
- * (ms depuis 1970) : seuls ceux créés depuis sont lus, les autres sont écartés sans lire leur ligne.
+ * Processus vivants dont la ligne de commande contient l'un des `markers`, hors celui qui cherche.
+ * `since` (ms depuis 1970) : seuls ceux créés depuis sont lus, les autres sont écartés sans lire leur ligne.
  */
-export function processesWith(marker: string, since = 0): { pid: number; name: string }[] {
+export function processesWith(markers: string | readonly string[], since = 0): TestProcess[] {
   if (process.platform !== 'win32') return [];
-  const found: { pid: number; name: string }[] = [];
+  const wanted = (typeof markers === 'string' ? [markers] : markers).filter((m) => m.length > 0);
+  if (!wanted.length) return [];
+  const found: TestProcess[] = [];
   for (const p of snapshotProcesses()) {
     if (p.pid === process.pid || p.pid === 0 || p.pid === 4) continue;
     // Une seconde de marge : l'horloge des processus n'a pas la précision de Date.now().
-    const seen = describe(p.pid, (created) => created >= since - 1000);
-    if (seen?.line?.includes(marker)) found.push(p);
+    const line = describe(p.pid, (created) => created >= since - 1000)?.line;
+    if (!line || !wanted.some((m) => line.includes(m))) continue;
+    const type = /--type=("?)([\w-]+)\1/.exec(line)?.[2];
+    found.push(type ? { ...p, type } : p);
   }
   return found;
+}
+
+/**
+ * Ce qui reconnaît les processus d'un lancement d'Electron : son --user-data-dir, et le profil que
+ * l'application se donne dans le bac à sable (app/src/sandbox-profile.ts : CYBERPINBALL_HOME\electron).
+ * Chromium passe ce second dossier, pas le premier, à ses processus GPU et réseau : jusqu'au
+ * 21/11/2026, ils n'étaient pas attendus, et la suppression du dossier d'essai butait sous charge sur
+ * leurs fichiers encore ouverts (EBUSY sur « Network\Trust Tokens », EPERM sur « DawnGraphiteCache »).
+ */
+export function electronMarkers(args: readonly string[], env: NodeJS.ProcessEnv | undefined): string[] {
+  const userData = args.find((a) => a.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
+  const home = env?.CYBERPINBALL_HOME;
+  // Un CYBERPINBALL_HOME hérité du poste (hors du dossier temporaire) désignerait le vrai Cyber Pinball : jamais attendu ni tué.
+  const sandboxed = home && path.resolve(home).toLowerCase().startsWith(path.resolve(os.tmpdir()).toLowerCase() + path.sep);
+  return [userData, sandboxed ? path.join(home, 'electron') : undefined].filter((m): m is string => !!m);
 }
 
 /** Tue chacun, arbre compris ; rend ce qui a été trouvé. */
@@ -128,6 +155,7 @@ export function killAll(found: { pid: number; name: string }[]): void {
 export function runElectron(electron: string, args: string[], opts: { dir: string; timeout: number; env?: NodeJS.ProcessEnv; cwd?: string }): ElectronRun {
   const userData = args.find((a) => a.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length);
   assert.ok(userData, 'runElectron : --user-data-dir propre à l’essai requis (il sert à retrouver ses processus)');
+  const markers = electronMarkers(args, opts.env);
   const out = path.join(opts.dir, `electron-${process.pid}-${Date.now()}.out.txt`);
   const err = `${out.slice(0, -'.out.txt'.length)}.err.txt`;
   const fdOut = fs.openSync(out, 'w');
@@ -146,17 +174,26 @@ export function runElectron(electron: string, args: string[], opts: { dir: strin
   // sous charge (plusieurs suites en parallèle), ils ne sont pas tous partis à l'instant où
   // spawnSync rend (échecs du 06/11/2026, jamais reproduits seuls). Délai de grâce en temps, relevés
   // rapprochés ; un relais qui tient vraiment reste attrapé.
-  let left = processesWith(userData, started);
+  let left = processesWith(markers, started);
   for (const deadline = Date.now() + GRACE_MS; left.length && Date.now() < deadline; ) {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, GRACE_STEP_MS);
-    left = processesWith(userData, started);
+    left = processesWith(markers, started);
   }
   killAll(left);
   const result: ElectronRun = { status: run.status, signal: run.signal, stdout: fs.readFileSync(out, 'utf8'), stderr: fs.readFileSync(err, 'utf8') };
   fs.rmSync(out, { force: true });
   fs.rmSync(err, { force: true });
-  const timedOut = run.error && /ETIMEDOUT/.test(String(run.error)) ? `Electron sans réponse après ${Math.round(opts.timeout / 1000)} s, tué.\n` : '';
-  assert.deepEqual(left, [], `${timedOut}processus de l’essai restés vivants ${GRACE_MS / 1000} s après sa fin (tués) : ${left.map((p) => `${p.name} ${p.pid}`).join(', ')}\n${result.stdout}\n${result.stderr}`);
+  // Electron qui n'a pas pu démarrer (binaire absent d'un worktree neuf, chemin faux) : dit tel quel,
+  // pas « null !== 0 » plus loin.
+  if (run.error && !/ETIMEDOUT/.test(String(run.error))) assert.fail(`Electron n’a pas pu être lancé (${electron}) : ${run.error.message}`);
+  const timedOut = run.error ? `Electron sans réponse après ${Math.round(opts.timeout / 1000)} s, tué.\n` : '';
+  // Un processus de Chromium (GPU, réseau, utilitaire) encore là après le délai de grâce : machine
+  // saturée, il est tué et noté. Le principal ou un processus de l'application (relais du bureau
+  // caché…) encore vivant est un vrai défaut : l'essai échoue en le nommant.
+  const named = (list: TestProcess[]) => list.map((p) => `${p.name} ${p.pid}${p.type ? ` (${p.type})` : ''}`).join(', ');
+  const ours = left.filter((p) => !p.type);
+  assert.deepEqual(ours, [], `${timedOut}processus de l’essai restés vivants ${GRACE_MS / 1000} s après sa fin (tués) : ${named(left)}\n${result.stdout}\n${result.stderr}`);
+  if (left.length) result.stderr = `Processus de Chromium encore là ${GRACE_MS / 1000} s après la fin d’Electron, tués : ${named(left)}\n${result.stderr}`;
   if (timedOut) result.stderr = `${timedOut}${result.stderr}`;
   return result;
 }

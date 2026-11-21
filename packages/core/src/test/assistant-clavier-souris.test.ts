@@ -15,6 +15,7 @@ import { test } from 'node:test';
 import { buttonKeys, BUTTONS, keyProblems, GAME_KEYS } from '../buttons';
 import { loadCabinet } from '../store';
 import { cabinetIn, keyboard, recorded, runWizard, skip } from './clavier-reel-outils';
+import { removeTempDir } from './temp-dir';
 
 /** Clic sur une commande d'étape (wizard-controls.ts) : son rôle. */
 const control = (role: 'back' | 'previous' | 'next' | 'confirm' | 'exit') => `click:[data-act*=control][data-act*=${role}]`;
@@ -31,11 +32,11 @@ function inSandbox(name: string, run: (home: string) => void): void {
   try {
     run(path.join(dir, 'home'));
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    removeTempDir(dir);
   }
 }
 
-test('assistant complet à la souris : seul le relevé des boutons se fait sur la borne, chaque autre étape au clic, jusqu’à l’enregistrement', { skip, timeout: 200_000 }, () => {
+test('assistant complet à la souris : seul le relevé des boutons se fait sur la borne, chaque autre étape au clic, jusqu’à l’enregistrement', { skip, timeout: 290_000 }, () => {
   inSandbox('souris', (home) => {
     const output = runWizard(
       home,
@@ -83,7 +84,7 @@ test('assistant complet à la souris : seul le relevé des boutons se fait sur l
   });
 });
 
-test('relevé des boutons du jeu : « Terminer le relevé » garde la touche affichée des boutons restants, jamais une touche déjà prise', { skip, timeout: 200_000 }, () => {
+test('relevé des boutons du jeu : « Terminer le relevé » garde la touche affichée des boutons restants, jamais une touche déjà prise', { skip, timeout: 290_000 }, () => {
   inSandbox('terminer', (home) => {
     cabinetIn(home);
     // Les obligatoires sur des touches qu'aucun bouton facultatif n'a par défaut ; MagnaSave gauche sur P,
@@ -118,7 +119,7 @@ test('relevé des boutons du jeu : « Terminer le relevé » garde la touche aff
   });
 });
 
-test('assistant complet au clavier : flèches, Entrée et Échap à chaque étape, jusqu’à l’enregistrement', { skip, timeout: 200_000 }, () => {
+test('assistant complet au clavier : flèches, Entrée et Échap à chaque étape, jusqu’à l’enregistrement', { skip, timeout: 290_000 }, () => {
   inSandbox('clavier', (home) => {
     const output = runWizard(
       home,

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { CURSOR_IDLE_MS, CURSOR_POLL_MS, HIDDEN_CURSOR_ATTRIBUTE, HIDDEN_CURSOR_CSS, idleCursorStart, idleCursorStep } from '../idlecursor';
 import { runElectron } from './electron-run';
+import { removeTempDir } from './temp-dir';
 
 // Pointeur de la souris masqué quand on ne s'en sert plus, sur toutes les pages de l'application.
 const REPO = path.join(__dirname, '..', '..', '..', '..');
@@ -123,7 +124,7 @@ app.whenReady().then(async () => {
       reloadedShown: 'pointer/move',
     });
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

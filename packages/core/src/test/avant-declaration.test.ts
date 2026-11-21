@@ -79,7 +79,16 @@ test('frontend.ts : aucune nouvelle fermeture ne lit une constante déclarée pl
   assert.ok(!found.some((r) => r.name === 'socialFirewall'), 'socialFirewall déclaré avant la télécommande');
 });
 
-test('télécommande : réveil différé au démarrage, écoute en échec retentée, message clair', { timeout: 20_000 }, async () => {
+// Sous la charge de plusieurs suites, le chargement de phone-remote.js et les minuteries prenaient
+// plus que les 20 s et les attentes fixes d'origine (21/11/2026) : on attend chaque fait, largement.
+const waitFor = async (what: string, ok: () => boolean, ms = 60_000) => {
+  for (const end = Date.now() + ms; !ok(); ) {
+    if (Date.now() > end) throw new Error(`attendu : ${what}`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+};
+
+test('télécommande : réveil différé au démarrage, écoute en échec retentée, message clair', { timeout: 180_000 }, async () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createPhoneRemote } = require(path.join(REPO_ROOT, 'app', 'dist', 'phone-remote.js')) as {
     createPhoneRemote(opts: Record<string, unknown>): { setMenu(menu: Record<string, unknown>): void; show(surface: string, on: boolean): void; bar(): { phase: string; line: string } | undefined; close(): void };
@@ -107,16 +116,18 @@ test('télécommande : réveil différé au démarrage, écoute en échec retent
   }));
   try {
     assert.equal(calls, 0, 'setMenu ne lit rien pendant l’initialisation de l’appelant : le réveil attend');
-    await new Promise((r) => setTimeout(r, 300));
-    assert.equal(calls, 1, 'le réveil a lieu juste après');
+    await waitFor('le réveil, juste après', () => calls >= 1);
+    const firstAt = Date.now();
+    assert.equal(calls, 1, 'un seul réveil');
     // L'écran Menu système > Ma borne > Télécommande du téléphone : ce qu'il dit.
     remote.show('menu', true);
+    await waitFor('l’échec du réveil affiché', () => remote.bar()?.phase === 'off' && /nouvel essai/.test(remote.bar()?.line ?? ''), 10_000).catch(() => undefined);
     const shown = remote.bar();
     assert.equal(shown?.phase, 'off');
     assert.ok(!/Cannot read|undefined|TypeError/.test(shown?.line ?? ''), `une phrase claire, jamais l’erreur brute : « ${shown?.line} »`);
     assert.match(shown?.line ?? '', /nouvel essai/);
-    await new Promise((r) => setTimeout(r, 5_500));
-    assert.equal(calls, 2, 'l’écoute en échec est retentée seule (5 s), sans attendre un redémarrage');
+    await waitFor('l’écoute en échec retentée seule (5 s), sans attendre un redémarrage', () => calls >= 2);
+    assert.ok(Date.now() - firstAt >= 4_000, `retentée après son délai, pas aussitôt (${Date.now() - firstAt} ms)`);
     assert.ok(lines.some((l) => l.includes('nouvel essai d')), 'le journal le dit');
   } finally {
     remote.close();

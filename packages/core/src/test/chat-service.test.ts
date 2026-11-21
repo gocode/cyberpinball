@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { until } from './reseau-essai';
 import type { ChatLine, ChatState } from '../chat';
 import type { SocialState } from '../social';
 
@@ -37,14 +38,6 @@ const netModule = require(path.join(APP_DIST, 'social-net.js')) as { createSocia
 const chatModule = require(path.join(APP_DIST, 'chat-service.js')) as { createChatService(o: object): Chat };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-async function until(what: string, check: () => boolean, ms = 20_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
 
 function cabinet(name: string, bootstrap: { host: string; port: number }[]) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), `cp-chat-${name}-`));

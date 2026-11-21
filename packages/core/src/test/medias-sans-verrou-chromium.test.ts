@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -143,6 +144,6 @@ test('médias, vrai Chromium : une vidéo de table se lit par morceaux, et son d
     assert.ok(out.before.t >= 1.5, `la vidéo avance (${out.before.t} s)`);
     assert.equal(out.renamed, true, `dossier de la table refusé pendant la lecture : ${out.renameError}`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

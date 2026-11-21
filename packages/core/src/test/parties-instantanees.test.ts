@@ -32,6 +32,7 @@ import { liveNotices, liveSnapshot } from '../livenotices';
 import { newSocialState, setName, type SocialState } from '../social';
 import type { TableEntry } from '../tables';
 import { fakeSocialNet } from './doublures';
+import { until } from './reseau-essai';
 
 const T0 = new Date('2026-11-16T20:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms);
@@ -138,14 +139,7 @@ type Games = {
 const { createLiveGames } = require(path.join(REPO_ROOT, 'app', 'dist', 'live-game.js')) as { createLiveGames(o: object): Games };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-const until = async (what: string, ok: () => boolean, ms = 30_000) => {
-  for (const end = Date.now() + ms; !ok(); ) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 20));
-  }
-};
-
-test('trois bornes qui ne sont pas amies : chacun rejoint, complète elle part pour tous, la quatrième est refusée', { timeout: 90_000 }, async () => {
+test('trois bornes qui ne sont pas amies : chacun rejoint, complète elle part pour tous, la quatrième est refusée', { timeout: 300_000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-instant-'));
   const vpx = path.join(dir, 'Glass Lagoon.vpx');
   fs.writeFileSync(vpx, 'table');
@@ -207,7 +201,7 @@ test('trois bornes qui ne sont pas amies : chacun rejoint, complète elle part p
   }
 });
 
-test('un joueur qui quitte le salon libère sa place, l’annonce le dit', { timeout: 30_000 }, async () => {
+test('un joueur qui quitte le salon libère sa place, l’annonce le dit', { timeout: 300_000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-instant-quit-'));
   const vpx = path.join(dir, 'Glass Lagoon.vpx');
   fs.writeFileSync(vpx, 'table');
@@ -267,7 +261,7 @@ const netModule = require(path.join(REPO_ROOT, 'app', 'dist', 'social-net.js')) 
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-test('réseau des bornes, entre inconnus : l’annonce arrive, la partie passe entre ses joueurs, rien d’autre', { timeout: 60_000 }, async () => {
+test('réseau des bornes, entre inconnus : l’annonce arrive, la partie passe entre ses joueurs, rien d’autre', { timeout: 300_000 }, async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
   const dirs = [0, 1, 2].map((i) => fs.mkdtempSync(path.join(os.tmpdir(), `cp-instant-net-${i}-`)));
   const [a, b, c] = dirs.map((d) => netModule.createSocialNet({ dataDir: d, mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap })) as [Net, Net, Net];

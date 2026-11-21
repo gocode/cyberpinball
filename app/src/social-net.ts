@@ -279,6 +279,8 @@ export const NO_INTERFACE = 'no-interface';
  * minutes, et deux bornes démarrées ensemble se manqueraient jusque-là.
  */
 const DIRECTORY_REFRESH_MS = 3 * 60_000;
+/** Nouvelle recherche dans l'annuaire pendant la recherche des amis (REDIAL_FAST_FOR_MS), tirée au hasard autour de ce rythme. */
+const DIRECTORY_SEARCH_MS = 8_000;
 /** Taille au-delà de laquelle un message reçu est ignoré sans être lu. */
 const MESSAGE_MAX = 256 * 1024;
 /** Évènements envoyés à un ami à la connexion (les plus récents). */
@@ -761,7 +763,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   const nameOf = (key: string) => peers.get(key)?.profile?.name ?? knownName(state, key) ?? key.slice(0, 8);
   /** Amis et demandes suivis : leurs liaisons vont au journal ; celles des inconnus de l'annuaire, non. */
   const followed = new Set<string>();
-  const traced = (key: string) => followed.has(key) || relationOf(state, key) === 'friend';
+  // Réseau simulé (essais) : toutes les liaisons au journal, celles entre inconnus comprises ; un essai
+  // qui échoue sur « attendu : … chez … » dit ainsi si les bornes se sont reliées (21/11/2026).
+  const traced = (key: string) => followed.has(key) || relationOf(state, key) === 'friend' || opts.mode === 'simulated';
   const said = new Map<string, number>();
   /** Une même ligne au plus une fois par période (un appel local qui échoue à chaque balise). */
   function logEvery(id: string, everyMs: number, line: string): void {
@@ -2034,12 +2038,20 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       testnet = await createTestnet(3, { host: '127.0.0.1' });
       bootstrap = testnet!.bootstrap;
     }
-    const node = new DHT({ ...(bootstrap ? { bootstrap } : {}), ...(host ? { host } : {}) });
+    // Réseau simulé : toutes les bornes sur 127.0.0.1, joignables sans pare-feu à percer. Déclaré tel
+    // (comme les nœuds du testnet), un appel va droit à la borne au lieu d'un perçage UDP aux délais
+    // serrés qui, sur une machine saturée, échouait encore au bout de 90 s (21/11/2026).
+    const node = new DHT({ ...(bootstrap ? { bootstrap } : {}), ...(host ? { host } : {}), ...(opts.mode === 'simulated' ? { firewalled: false } : {}) });
     dht = node;
     // Réseau changé (câble, Wi-Fi, mise en veille) : les liaisons se refont, la liste redevient incertaine.
     node.on?.('network-change', () => {
       log('Réseau des bornes : changement de réseau, recherche des amis relancée.'); // i18n-ignore : journal
       beginSearch();
+      // L'annuaire aussi se recherche de près, sans attendre la recherche lointaine déjà programmée.
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        nextRefresh();
+      }
       changed();
     });
     swarm = new Hyperswarm({ keyPair: DHT.keyPair(playerSeed(state.key)), dht: node, maxPeers: 32, firewall: (key: Buffer) => shunned(hex(key)) }) as Swarm;
@@ -2048,8 +2060,18 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const refresh = () => discovery.refresh({ server: true, client: true }).catch(() => undefined);
     // Annoncée, la borne cherche une fois de plus : celles qui ont démarré en même temps qu'elle.
     void discovery.flushed().then(refresh, () => undefined);
-    refreshTimer = setInterval(refresh, DIRECTORY_REFRESH_MS);
-    refreshTimer.unref?.();
+    // Puis de près pendant la recherche (démarrage, changement de réseau), de loin ensuite. Une seule
+    // recherche ratée (réponses du DHT perdues ou en retard, machine chargée) laissait jusque-là deux
+    // bornes démarrées ensemble sans se voir pendant trois minutes (21/11/2026).
+    const nextRefresh = () => {
+      const searching = startedAt === undefined || ms() - startedAt < REDIAL_FAST_FOR_MS;
+      refreshTimer = setTimeout(() => {
+        void refresh();
+        nextRefresh();
+      }, searching ? jittered(DIRECTORY_SEARCH_MS) : DIRECTORY_REFRESH_MS);
+      refreshTimer.unref?.();
+    };
+    nextRefresh();
     followPeers();
     status = { ...status, internet: true };
   }
@@ -2126,7 +2148,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Tout ce que start a pu ouvrir, refermé (arrêt, ou démarrage raté à mi-chemin). */
   async function teardown(): Promise<void> {
     await stopLan();
-    if (refreshTimer) clearInterval(refreshTimer);
+    if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = undefined;
     if (liveTimer) clearInterval(liveTimer);
     liveTimer = undefined;

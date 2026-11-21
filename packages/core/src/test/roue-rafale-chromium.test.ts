@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import * as zlib from 'node:zlib';
 import { runElectron } from './electron-run';
 import { APP, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -177,7 +178,7 @@ test('roue, vrai Chromium : en rafale, un médaillon n’est jamais dessiné deu
     assert.equal(out.steps, 230, 'relevé à chaque pas');
     assert.deepEqual(out.bad.slice(0, 8), [], `${out.bad.length} pas où un logo est dessiné à deux endroits`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

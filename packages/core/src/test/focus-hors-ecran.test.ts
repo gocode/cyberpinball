@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
 import { DEMOS, withoutInternal } from './interne';
+import { removeTempDir } from './temp-dir';
 
 const APP_SRC = path.join(REPO_ROOT, 'app', 'src');
 const read = (file: string) => fs.readFileSync(path.join(APP_SRC, file), 'utf8');
@@ -71,7 +72,7 @@ test('avatar pris sur le web, convertisseur ouvert : le clic du menu ne fait plu
     assert.equal((result.match(/^processus principal vivant après le clic$/gm) ?? []).length, 2, result);
     assert.equal((result.match(/^image de travail : /gm) ?? []).length, 2, result);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 
@@ -83,6 +84,6 @@ test('le banc voit le plantage sans le correctif (il prouve quelque chose)', { s
     assert.match(result, /clic sur « Télécharger cette image »/, result);
     assert.doesNotMatch(result, /processus principal vivant après le clic/, result);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

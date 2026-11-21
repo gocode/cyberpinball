@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import * as zlib from 'node:zlib';
 import { runElectron } from './electron-run';
 import { APP, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -169,7 +170,7 @@ test('roue, vrai Chromium : hors du centre, un logo APNG animé montre sa premi�
     // Tous : chaque logo animé est dessiné, aucune première image.
     for (const item of out.all) assert.deepEqual({ animated: item.animated, still: item.still }, { animated: true, still: false }, `${item.logo} : animé au réglage « tous »`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

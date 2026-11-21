@@ -8,6 +8,7 @@ import { fingerprintOf } from '../fingerprint';
 import { offscreenMode, parseSimulatedDisplays, realScreensRefusal } from '../offscreen';
 import { devPcDisplays } from './fixtures';
 import { DEMOS, internalFiles } from './interne';
+import { removeTempDir } from './temp-dir';
 
 // Mode hors écran des essais sans opérateur : les fenêtres ne doivent jamais apparaître
 // sur les écrans du poste, et les écrans de la borne peuvent être simulés (packages\core\ecrans-simules).
@@ -308,7 +309,7 @@ test('démo hors écran : aucune fenêtre visible ni au premier plan, captures �
     assert.deepEqual(sizes, ['3840×2160', '1920×1080', '1920×480', '1920×540']);
     assert.equal(fs.readdirSync(captures).filter((f) => f.endsWith('.png')).length, 3 * 4);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

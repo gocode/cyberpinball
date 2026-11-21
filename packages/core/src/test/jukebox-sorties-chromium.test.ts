@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -48,6 +49,9 @@ app.whenReady().then(async () => {
    const step = { at: 'début' };
    try {
     const wait =(ms) => new Promise((r) => setTimeout(r, ms));
+    // Sous la charge d'autres suites, le fil du son prend du retard : on attend le fait, jusqu'à ce délai (21/11/2026).
+    const until = async (ok, ms) => { const end = performance.now() + ms; while (!ok() && performance.now() < end) await wait(100); };
+    const sounding = () => R.status().branches.every((b) => (b.niveau ?? 0) > 100);
     // Un la à 440 Hz, 8 s, en WAV fabriqué ici.
     const rate = 44100, n = rate * 8, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
@@ -65,6 +69,7 @@ app.whenReady().then(async () => {
     const h = R.attach(audio, routes);
     await audio.play();
     await wait(2500);
+    await until(sounding, 10000);
     const two = R.status();
     audio.pause();
     await wait(450);
@@ -77,6 +82,7 @@ app.whenReady().then(async () => {
     const one = R.status();
     const t1 = audio.currentTime;
     await wait(300);
+    await until(() => !audio.paused && audio.currentTime > t1, 10000);
     const playing = !audio.paused && audio.currentTime > t1;
     h.close();
     // Page YouTube : une seule vidéo, les autres sorties par son flux.
@@ -84,6 +90,7 @@ app.whenReady().then(async () => {
     const hv = R.attach(video, routes, { flux: true });
     await video.play();
     await wait(1500);
+    await until(sounding, 10000);
     const flux = R.status();
     hv.close();
     const tested = R.test({ output: '', gain: 0, filters: [], delay: 0 });
@@ -138,7 +145,7 @@ test('sorties du son, vrai Chromium : une horloge par sortie, copies alignées s
     assert.ok(r.tested && r.essai === '', 'l’extrait d’essai démarre');
     assert.equal(r.closed, 0, 'tout fermé : plus rien dans le graphe');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });
 

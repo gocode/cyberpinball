@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -208,6 +209,6 @@ test('disposition des écrans : sur chaque fenêtre de l’éditeur, de la borne
     assert.equal(found['en borne ouverture écran 2 (1920 × 1080)']!.hint, 'Drag an area to move it, even onto another screen · drag a corner to resize it');
     assert.equal(found['fr borne ouverture écran 1 (3840 × 2160)']!.hint, '', 'l’écran du panneau dit le geste dans le panneau');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

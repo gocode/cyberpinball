@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { APP, menuState } from './menu-renderer';
+import { removeTempDir } from './temp-dir';
 
 const REPO = path.join(APP, '..');
 
@@ -95,6 +96,6 @@ test('titre de la roue, vrai Chromium : sa lueur reste là pendant tout l’effe
     assert.match(out.filtre, /blur\(/, `à mi-effet, le flou s’y ajoute : ${out.filtre}`);
     assert.ok(out.opacite > 0 && out.opacite < 1, `à mi-effet, le titre apparaît en fondu (opacité ${out.opacite})`);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
   }
 });

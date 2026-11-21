@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { until } from './reseau-essai';
 import {
   activeActs,
   bundledCharter,
@@ -158,14 +159,6 @@ interface Net {
 const netModule = require(path.join(REPO_ROOT, 'app', 'dist', 'social-net.js')) as { createSocialNet(o: object): Net };
 const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
-
-async function until(what: string, check: () => boolean, ms = 20_000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
 
 test('entre trois bornes : le signalement n’arrive qu’au modérateur, sa décision s’applique partout', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });

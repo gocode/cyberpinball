@@ -23,6 +23,7 @@ import type { Cabinet, CabinetButtons } from '../model';
 import { saveCabinet } from '../store';
 import { runElectron } from './electron-run';
 import { devPcDisplays, emptyCabinet } from './fixtures';
+import { removeTempDir } from './temp-dir';
 
 export const REPO = path.join(__dirname, '..', '..', '..', '..');
 export const SCREENS = path.join(REPO, 'packages', 'core', 'ecrans-simules', 'pc-dev.json');
@@ -76,7 +77,7 @@ export function runWizard(home: string, codes: string[], args: string[], extra: 
   };
   delete env.CYBERPINBALL_A_L_ECRAN;
   delete env.CYBERPINBALL_CAPTURE;
-  const run = runElectron(electron!, ['app', '--assistant', ...args, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, cwd: REPO, env, timeout: 170_000 });
+  const run = runElectron(electron!, ['app', '--assistant', ...args, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, cwd: REPO, env, timeout: 270_000 });
   const output = `${run.stdout}\n${run.stderr}`;
   assert.equal(run.status, 0, output);
   assert.doesNotMatch(output, /Autopilote : .* n’est pas arrivée|sans joystick lisible/, output);
@@ -129,7 +130,7 @@ export type FirstScreenCase = [keys: string[], phase: string, why: string];
 /** Un test par cas : chacun lance son propre assistant, dans son bac à sable. */
 export function firstScreenTests(cases: FirstScreenCase[]): void {
   for (const [keys, phase, why] of cases) {
-    test(`premier écran d’une borne neuve : ${why} (${keys.join(', ')} → ${phase}), rien n’est relevé`, { skip, timeout: 200_000 }, () => {
+    test(`premier écran d’une borne neuve : ${why} (${keys.join(', ')} → ${phase}), rien n’est relevé`, { skip, timeout: 290_000 }, () => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-ecran-'));
       try {
         const home = path.join(dir, 'home');
@@ -138,7 +139,7 @@ export function firstScreenTests(cases: FirstScreenCase[]): void {
         // Garder : boutons de l'interface ; modifier : relevé ; flippers et flèches seuls : toujours le premier écran.
         assert.ok(output.includes(`Assistant : « Quitter sans enregistrer ? » (${phase})`), `${keys} : ${phase} attendu\n${output}`);
       } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        removeTempDir(dir);
       }
     });
   }

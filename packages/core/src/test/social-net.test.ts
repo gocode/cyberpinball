@@ -13,6 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { until } from './reseau-essai';
 import { readAvatarImage, type AvatarImage } from '../avatar';
 import { DMDSERVER_ADDR } from '../dmdserver';
 import { loadSocial, nearbyPlayers, newSocialState, searchDirectory, type Presence, type SocialEvent, type SocialNetMode, type SocialState } from '../social';
@@ -63,14 +64,6 @@ const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: s
 
 
 /** `detail` : ce qu'on sait au moment de l'échec (liaisons, journal), pour qu'un délai dépassé s'explique. */
-async function until(what: string, check: () => boolean, ms = 15_000, detail?: () => string): Promise<void> {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}${detail ? `\n${detail()}` : ''}`);
-    await new Promise((r) => setTimeout(r, 25));
-  }
-}
-
 function cabinet(name: string, opts: { bootstrap?: { host: string; port: number }[]; bus?: Set<unknown>; mode?: SocialNetMode; lan?: boolean }): { net: Net; dir: string } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cp-social-${name}-`));
   if (opts.lan === false) fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...fresh(), lan: false }));
