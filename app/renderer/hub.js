@@ -148,7 +148,7 @@
         if (b.action === cursor && start) btn.append(el('kbd', 'hub-button-key', start));
         btn.append(el('span', '', b.label));
         if (b.xp) btn.append(el('span', 'hub-button-xp', b.xp));
-        act(btn, b.action);
+        if (b.action !== undefined) act(btn, b.action);
         row.append(btn);
       }
       node.append(row);
@@ -156,8 +156,23 @@
     return node;
   }
 
+  /**
+   * Un bloc (navigation par blocs, hub-screen.ts) : son liseré ; au premier niveau, il se choisit
+   * (vert, et un clic y entre) ; quand on y est, son liseré reste marqué et les autres s'éteignent.
+   */
+  function blockify(node, block, cursor) {
+    if (!block) return node;
+    node.classList.add('hub-block');
+    if (block.action !== undefined) {
+      act(node, block.action);
+      if (block.action === cursor) node.classList.add('hub-block-focus', 'selected');
+    }
+    if (block.entered) node.classList.add('hub-block-in');
+    return node;
+  }
+
   function section(s, cursor, start) {
-    const box = el('section', `hub-sec hub-layout-${s.layout}`);
+    const box = blockify(el('section', `hub-sec hub-layout-${s.layout}`), s.block, cursor);
     if (s.title) {
       const head = el('div', 'hub-eyebrow');
       head.append(el('span', '', s.title));
@@ -187,7 +202,7 @@
   function render(v) {
     const h = v.hub;
     const desk = document.documentElement.classList.contains('menu-desktop');
-    const o = el('section', `lib lib-hub${desk ? ' hub-desk' : ''}`);
+    const o = el('section', `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}`);
     o.dataset.navOrder = (v.order ?? []).join(',');
     const head = el('header', 'hub-head');
     const titles = el('div', 'hub-titles');
@@ -199,7 +214,7 @@
     }
     head.append(medal(h.medallion), titles);
     if (h.band) head.append(band(h.band));
-    o.append(head, tabs(h.tabs, v.cursor));
+    o.append(head, blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
     const body = el('div', 'hub-body');
     if (h.empty) {
       const empty = el('div', 'hub-empty');

@@ -21,6 +21,8 @@ import {
   arenaXpRules,
   avatarView,
   countryName,
+  flagView,
+  type FlagView,
   dayKey,
   formatNumber,
   badgeLabel,
@@ -78,16 +80,23 @@ export interface ArenaMenuHost {
   now?(): Date;
 }
 
-/** L'affiche du médaillon (app/renderer/arena.js), textes déjà traduits. */
+/**
+ * L'affiche du médaillon (app/renderer/arena.js), textes déjà traduits. Dessin retenu par le mainteneur
+ * le 21/11/2026 (« Le B, c'est parfait ») : le podium de la table qui pique, puis trois cases (niveau,
+ * Monde, pays), puis qui joue en ce moment. Le tableau à points est sur le vrai DMD (boardPages).
+ */
 export interface ArenaPosterView {
   title: string;
   tagline: string;
   /** « Niv. 12 · Flippeur », la barre (et en hachures ce qu'une partie peut rapporter), « 380 XP avant le niveau 13 ». */
   level: { chip: string; tier: TierId; progress: number; reach: number; after: string };
-  /** Le tableau à points : ses pages, la plus pressante d'abord ; aucune : pas de tableau. */
-  pages: ArenaBoardPage[];
+  /** Le podium autour de moi sur la table du rival le plus pressant ; absent : personne devant moi. */
+  podium?: { table: string; eyebrow: string; warn: boolean; rows: PodiumRow[]; climb: { label: string; gap: string } };
+  /** Les cases : le niveau (sa barre), puis ma place au monde et dans mon pays, quand elles existent. */
+  tiles: { label: string; value: string; detail: string; flag?: FlagView; level?: { tier: TierId; progress: number; reach: number } }[];
   /** Qui joue en ce moment. */
   live?: { avatars: AvatarView[]; text: string };
+  /** Les parties ouvertes sur mes tables, en puce ; vide : rien. */
   chips: { icon: IconName; text: string; hot?: boolean }[];
   /** Au fronton, en une phrase : la page la plus pressante (son intitulé, sa phrase), sinon qui joue. */
   headline: { eyebrow: string; heading: string };
@@ -95,10 +104,23 @@ export interface ArenaPosterView {
   open: string;
 }
 
+/** Une ligne du podium : la place, le joueur et son niveau, le score ; le rival en ambre, moi en vert. */
+export interface PodiumRow {
+  rank: string;
+  name: string;
+  avatar: AvatarView;
+  level?: HubLevel;
+  score: string;
+  me?: true;
+  rival?: true;
+}
+
 export interface ArenaMenu {
   /** L'écran de l'Arène (Start sur le médaillon), sur l'Accueil ; Exit vers `back` (la roue). */
   openHome(back: () => void): void;
   poster(): ArenaPosterView;
+  /** Les pages du tableau des records, la plus pressante d'abord : sur le DMD quand le médaillon est choisi. */
+  boardPages(): ArenaBoardPage[];
   /** Ce que dit le médaillon sous son titre dans la roue. */
   card(): { title: string; subtitle: string };
 }
@@ -187,11 +209,11 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
 
   // ---------- L'affiche ----------
 
-  function poster(): ArenaPosterView {
-    const b = band();
+  /** Les pages du tableau des records : ce qui existe vraiment, la plus pressante d'abord (arena.ts). */
+  function boardPages(): ArenaBoardPage[] {
     const games = host.instant.arena(() => undefined);
     const { rivals, records } = published();
-    const pages = arenaBoardPages({
+    return arenaBoardPages({
       open: games.open.map((o) => toOpenGame(o.game, o.joinable)),
       ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}),
       rivals,
@@ -200,14 +222,36 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       ago,
       now: now(),
     });
+  }
+
+  function poster(): ArenaPosterView {
+    const b = band();
+    const games = host.instant.arena(() => undefined);
+    const pages = boardPages();
     const chips: ArenaPosterView['chips'] = [];
     const joinable = games.open.filter((o) => o.joinable).length;
     if (joinable) chips.push({ icon: 'rocket', text: tn(joinable, '{n} partie ouverte', '{n} parties ouvertes'), hot: true });
-    const week = weekXp(host.levels.state(), now());
-    if (week > 0) chips.push({ icon: 'calendar', text: t('Cette semaine : {xp}', { xp: xpText(week) }) });
-    const near = nearestBadges(net.state().badges, facts(), 1)[0];
-    if (near) chips.push({ icon: 'medal', text: t('{badge} · {value} / {target}', { badge: badgeLabel(near.badge.id), value: fmt(near.value), target: fmt(near.badge.target) }) });
     const live = playing();
+    // Le podium : la table du rival le plus pressant, ceux qui m'entourent au classement.
+    const rival = published().rivals[0];
+    const podium: ArenaPosterView['podium'] = rival
+      ? {
+          table: rival.table.title,
+          eyebrow: rival.passed ? t('Votre place est prise') : t('À battre'),
+          warn: rival.passed,
+          rows: rival.ladder.map((r) => {
+            const level = levelChip(levelOfPlayer(r.key, r.xp));
+            return { rank: String(r.rank), name: r.me ? t('Vous') : r.name, avatar: face(r.key, r.name, r.xp), ...(level ? { level } : {}), score: fmt(r.score), ...(r.me ? { me: true as const } : {}), ...(r.rival ? { rival: true as const } : {}) };
+          }),
+          climb: { label: t('Pour la {n}ᵉ place', { n: rival.mine.rank - 1 }), gap: t('+{n}', { n: fmt(rival.gap) }) },
+        }
+      : undefined;
+    // Les cases : mon niveau, puis mes places quand elles existent.
+    const st = standing();
+    const tiles: ArenaPosterView['tiles'] = [{ label: t('Niveau'), value: String(b.level), detail: t('{n} XP avant le niveau {next}', { n: fmt(b.missing), next: b.level + 1 }), level: { tier: b.tier, progress: b.progress, reach: b.reachShare } }];
+    if (st?.world) tiles.push({ label: t('Monde'), value: t('{n}ᵉ', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }) });
+    const code = host.rankings.standing()?.country?.code;
+    if (st?.country && code) tiles.push({ label: st.country.name, value: t('{n}ᵉ', { n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), flag: flagView(code, locale()) });
     const first = pages[0];
     const headline = first
       ? { eyebrow: first.lines.slice(0, 2).map((l) => l.cells.map((c) => c.text).join(' ')).join(' · '), heading: first.foot }
@@ -217,7 +261,8 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       title: t('ARÈNE'),
       tagline: t('Battre les autres, battre son record'),
       level: { chip: t('Niv. {n} · {tier}', { n: b.level, tier: b.tierLabel }), tier: b.tier, progress: b.progress, reach: b.reachShare, after: t('{n} XP avant le niveau {next}', { n: fmt(b.missing), next: b.level + 1 }) },
-      pages,
+      ...(podium ? { podium } : {}),
+      tiles,
       ...(live ? { live } : {}),
       chips,
       start: t('Start'),
@@ -457,6 +502,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       hub.open(back, 'home');
     },
     poster,
+    boardPages,
     card,
   };
 }

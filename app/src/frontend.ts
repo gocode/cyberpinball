@@ -7181,6 +7181,11 @@ function jukeboxDmd(): boolean {
   return state.phase === 'jukebox' || (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging();
 }
 
+/** Le DMD montre le tableau des records de l'Arène : son médaillon choisi dans la roue. */
+function arenaDmd(): boolean {
+  return state.phase === 'menu' && !state.help && onArena();
+}
+
 function tableRecords(table: TableEntry): TableRecords | undefined {
   const file = vpRegFile(table);
   let stamp = 'absent';
@@ -7239,8 +7244,8 @@ function autoDmdPlace(table: TableEntry | undefined): { zone: ReturnType<typeof 
  */
 function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean; hidden?: boolean; editing?: string } | undefined {
   if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
-  // Juke-box : la bande 4:1 à sa place automatique, sur du noir (le spectre, JUKE-BOX).
-  if (jukeboxDmd()) {
+  // Juke-box : la bande 4:1 à sa place automatique, sur du noir (le spectre, JUKE-BOX) ; l'Arène de même (son tableau des records).
+  if (jukeboxDmd() || arenaDmd()) {
     const auto = autoDmdPlace(undefined);
     return auto ? { area: auto.zone, framed: false } : undefined;
   }
@@ -7281,7 +7286,12 @@ function syncLiveDmd(): void {
     loadingDmd = undefined;
   }
   const table = screensSubject();
-  if (!table) {
+  // Médaillon Arène choisi : son tableau des records sur le DMD (21/11/2026), à la place de la marque seule.
+  const board = arenaDmd() ? arenaMenu.boardPages() : [];
+  if (!table && board.length) {
+    dmdShown = undefined;
+    liveDmd.show(`arene:${JSON.stringify(board)}`, { arena: board });
+  } else if (!table) {
     dmdShown = undefined;
     liveDmd.show('', undefined);
   } else {

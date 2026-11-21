@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { arenaBoardPages, arenaLevelBand, arenaMoment, arenaRecords, arenaRivals, dmdNumber, gameReach, levelBandLines } from '../arena';
 import { setLanguage } from '../i18n';
+import { arenaDmdPages, DMD_HEIGHT, DMD_WIDTH, liveDmdPages } from '../livedmd';
 import { dayKey, emptyLevels, levelStart, XP } from '../levels';
 import { medallionWheel, type Medallion } from '../jukebox-screens';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
@@ -135,6 +136,24 @@ test('tableau à points : une page par donnée réelle, la plus pressante d’ab
   assert.equal(dmdNumber(9_450_000), '9.450.000');
 });
 
+test('DMD : le tableau sur le vrai DMD, des écrans de trois lignes, l’intitulé repris, rien dans les marges, puis la marque', () => {
+  const pages = arenaBoardPages({ open: [], rivals: arenaRivals(store(), ME), records: arenaRecords(store(), ME), ago: () => 'il y a 20 min', now: NOW });
+  const screens = arenaDmdPages(pages);
+  // Rival (5 lignes) : 2 écrans ; records (4 lignes) : 2 écrans.
+  assert.equal(screens.length, 4);
+  for (const s of screens) {
+    assert.equal(s.id, 'arena');
+    const dots = s.dots(0);
+    assert.ok(dots.some((d) => d > 0), 'un écran allumé');
+    for (let y = 0; y < DMD_HEIGHT; y++)
+      for (const x of [0, 1, 2, DMD_WIDTH - 3, DMD_WIDTH - 2, DMD_WIDTH - 1]) assert.equal(dots[y * DMD_WIDTH + x], 0, `marge allumée en ${x}, ${y}`);
+  }
+  const program = liveDmdPages({ arena: pages });
+  assert.equal(program[0]!.id, 'arena');
+  assert.equal(program.at(-1)!.id, 'brand', 'la marque ferme le cycle');
+  assert.equal(liveDmdPages({ arena: [] })[0]!.id, 'brand', 'aucune donnée : la marque, comme avant');
+});
+
 // ---------- La roue et le réglage ----------
 
 test('roue : Juke-box · Communauté · Arène · Collections, puis les tables', () => {
@@ -177,7 +196,28 @@ function arena(overrides: Record<string, unknown> = {}) {
     now: () => NOW,
     ...overrides,
   });
-  return { menu, events, built: () => opened!.build(), at: () => opened!.at };
+  const built = () => opened!.build();
+  /** Start sur l'action de cette clé (un bloc au premier niveau, un élément dans un bloc). */
+  const run = (key: string) => built().actions.find((a) => a.key === key)!.run();
+  /** Un onglet : sortir du bloc où l'on est, entrer dans la barre d'onglets, Start sur lui. */
+  const tab = (id: string) => {
+    if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
+    run('block:tabs');
+    run(`tab:${id}`);
+  };
+  /** Un élément nommé, où qu'il soit : chaque bloc à tour de rôle, on y entre, on le cherche, on ressort. */
+  const item = (label: string) => {
+    // Resté dans un bloc (l'écran ouvert de là n'est pas revenu) : on en ressort d'abord.
+    if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
+    for (const key of built().actions.map((a) => a.key!).filter((k) => k.startsWith('block:section:'))) {
+      run(key);
+      const found = built().actions.find((a) => a.label === label);
+      if (found) return found.run();
+      built().back();
+    }
+    throw new Error(`« ${label} » introuvable`);
+  };
+  return { menu, events, built, at: () => opened!.at, run, tab, item };
 }
 
 test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encore grisés avec leur raison et sautés', () => {
@@ -186,15 +226,15 @@ test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encor
   const b = h.built();
   // Les six onglets de la planche validée ; les classements vivent dans Progression.
   assert.deepEqual(b.hub.tabs.map((t) => t.label), ['Accueil', 'Parties', 'Défis', 'Du jour', 'Ligue', 'Progression']);
-  for (const id of ['Défis', 'Du jour', 'Ligue']) {
-    const tab = b.hub.tabs.find((t) => t.label === id)!;
-    assert.equal(tab.disabled, 'Bientôt', `${id} : grisé avec sa raison`);
-    assert.equal(tab.action, undefined, `${id} : ni flipper ni clic ne l’ouvrent`);
-  }
+  for (const id of ['Défis', 'Du jour', 'Ligue']) assert.equal(b.hub.tabs.find((t) => t.label === id)!.disabled, 'Bientôt', `${id} : grisé avec sa raison`);
   assert.equal(b.hub.tabs[0]!.current, true);
-  // Les actions suivent l'affichage : les onglets qui s'ouvrent, puis les cartes.
-  assert.deepEqual(b.actions.slice(0, 3).map((a) => a.key), ['tab:home', 'tab:games', 'tab:progress']);
-  assert.equal(h.at(), 3, 'le curseur sur la première carte, après les onglets');
+  // Dans la barre d'onglets : seulement ceux qui s'ouvrent, le curseur sur l'onglet ouvert.
+  h.run('block:tabs');
+  assert.deepEqual(h.built().actions.map((a) => a.key), ['tab:home', 'tab:games', 'tab:progress'], 'Défis, Du jour et Ligue : ni flipper ni clic ne les ouvrent');
+  assert.equal(h.at(), 0);
+  h.built().back();
+  assert.equal(h.at(), 0, 'Exit ressort de la barre, le curseur sur elle');
+  assert.deepEqual(h.events, [], 'sortir d’un bloc ne quitte pas l’écran');
   // Aucune section de ce qui n'existe pas encore (ligue, missions, rendez-vous, défis, série).
   const titles = b.hub.sections.map((s) => s.title ?? '');
   for (const absent of ['Ligue', 'Missions', 'Défi', 'Série', 'Vendredi']) assert.ok(!titles.some((t) => t.includes(absent)), `pas de section « ${absent} »`);
@@ -211,37 +251,88 @@ test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encor
   assert.deepEqual(h.events, ['roue']);
 });
 
-test('écran de l’Arène : l’onglet « Du jour » s’ouvre dès que les tables du jour existent', () => {
+test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exit ressort, puis revient à la roue', () => {
+  // Léa vient de me passer devant sur Attack from Mars : la carte du moment a deux boutons.
+  const h = arena({ net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }), rankings: () => store() }), table: { has: () => true, go: () => h.events.push('table') } });
+  h.menu.openHome(() => h.events.push('roue'));
+  const b = h.built();
+  // Premier niveau : une action par bloc, la barre d'onglets d'abord, puis chaque section qui a de quoi agir.
+  assert.ok(b.actions.every((a) => a.key!.startsWith('block:')), b.actions.map((a) => a.key).join(', '));
+  assert.equal(b.actions[0]!.key, 'block:tabs');
+  assert.equal(h.at(), 1, 'à l’ouverture, le curseur sur le premier bloc du contenu');
+  // Le barème des XP se lit seulement : ce n'est pas un bloc (aucun arrêt pour rien).
+  assert.equal(b.actions.length, 2, 'la barre d’onglets et la carte du moment ; le barème n’est qu’à lire');
+  // Start sur un bloc à plusieurs actions : on y entre ; seules ses actions se choisissent.
+  h.run('block:section:0');
+  const inside = h.built();
+  assert.deepEqual(inside.actions.map((a) => a.label), ['Aller à la table', 'Classements']);
+  assert.equal(h.at(), 0, 'le curseur sur la première action du bloc');
+  // Exit dans le bloc : on en ressort, le curseur sur lui ; Exit au premier niveau : la roue.
+  inside.back();
+  assert.equal(h.at(), 1);
+  assert.deepEqual(h.events, []);
+  h.built().back();
+  assert.deepEqual(h.events, ['roue']);
+});
+
+test('navigation par blocs : Start sur un onglet montre son contenu, le curseur sur son premier bloc ; MagnaSave change d’onglet', () => {
+  const h = arena();
+  h.menu.openHome(() => undefined);
+  h.tab('progress');
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression');
+  assert.equal(h.at(), 1, 'le premier bloc du contenu, prêt à y entrer');
+  assert.ok(h.built().actions.every((a) => a.key!.startsWith('block:')), 'revenu au choix des blocs');
+  // MagnaSave : l'onglet suivant qui s'ouvre, en boucle (Défis, Du jour et Ligue sautés).
+  assert.equal(h.built().keys!({ code: 'MagnaRight' }), true);
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Accueil');
+  h.built().keys!({ code: 'MagnaLeft' });
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression', 'le MagnaSave gauche revient en arrière');
+});
+
+test('écran de l’Arène : l’onglet « Du jour » s’ouvre dès que les tables du jour existent ; un bloc d’une seule action la fait tout de suite', () => {
   const h = arena({ daily: { detail: () => '3 tables jouées aujourd’hui', open: () => h.events.push('du jour') } });
   h.menu.openHome(() => undefined);
-  const tab = h.built().hub.tabs.find((t) => t.label === 'Du jour')!;
-  assert.equal(tab.disabled, undefined);
-  h.built().actions.find((a) => a.key === 'tab:daily')!.run();
-  h.built().actions.find((a) => a.label === 'Les plus jouées aujourd’hui')!.run();
-  assert.equal(h.events.at(-1), 'du jour');
+  assert.equal(h.built().hub.tabs.find((t) => t.label === 'Du jour')!.disabled, undefined);
+  h.tab('daily');
+  h.run('block:section:0');
+  assert.equal(h.events.at(-1), 'du jour', 'Start sur le bloc : sa seule action, sans y entrer');
 });
 
 test('écran de l’Arène : les cartes mènent aux écrans complets (parties, classements, progression)', () => {
   const h = arena();
   h.menu.openHome(() => undefined);
-  h.built().actions.find((a) => a.key === 'tab:progress')!.run();
-  const progress = h.built();
+  h.tab('progress');
   for (const [title, event] of [['Mon niveau', 'niveau'], ['Tous les classements', 'classements'], ['Mes badges', 'badges'], ['Historique des parties', 'historique'], ['Comment gagner des XP', 'barème']] as const) {
-    progress.actions.find((a) => a.label === title)!.run();
+    h.item(title);
     assert.equal(h.events.at(-1), event, title);
   }
-  h.built().actions.find((a) => a.key === 'tab:games')!.run();
-  h.built().actions.find((a) => a.label === 'Ouvrir une partie instantanée')!.run();
+  h.tab('games');
+  h.item('Ouvrir une partie instantanée');
   assert.equal(h.events.at(-1), 'ouvrir');
 });
 
 test('affiche de l’Arène : sans donnée réelle, ni tableau, ni joueurs, ni puces inventés', () => {
   // Un joueur qui débute : aucune partie, aucun badge entamé, rien de publié, personne en ligne.
   const none = new Proxy({}, { get: () => 0 });
-  const p = arena({ levels: { state: () => ({ ...emptyLevels(), days: {} }), facts: () => none } }).menu.poster();
-  assert.deepEqual(p.pages, []);
+  const p = arena({ levels: { state: () => ({ ...emptyLevels(), days: {} }), facts: () => none } }).menu.poster() as unknown as { podium?: unknown; tiles: { label: string }[]; live?: unknown; chips: unknown[] };
+  assert.equal(p.podium, undefined, 'personne devant moi : pas de podium');
+  assert.deepEqual(p.tiles.map((t) => t.label), ['Niveau'], 'pas encore classé : ni Monde ni pays');
   assert.equal(p.live, undefined);
-  assert.deepEqual(p.chips, [], 'pas de partie ouverte, pas d’XP cette semaine, aucun badge entamé');
+  assert.deepEqual(p.chips, [], 'pas de partie ouverte');
+});
+
+test('affiche de l’Arène : le podium de la table qui pique, le rival en ambre, moi en vert, ce qu’il manque pour monter', () => {
+  const p = arena({ net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }), rankings: () => store() }) }).menu.poster() as unknown as { podium: { table: string; eyebrow: string; warn: boolean; rows: { rank: string; name: string; me?: true; rival?: true }[]; climb: { label: string; gap: string } } };
+  assert.equal(p.podium.table, 'Attack from Mars');
+  assert.equal(p.podium.eyebrow, 'Votre place est prise');
+  assert.equal(p.podium.warn, true);
+  assert.deepEqual(p.podium.rows.map((r) => [r.rank, r.name, Boolean(r.rival), Boolean(r.me)]), [
+    ['1', 'Paul', false, false],
+    ['2', 'Léa', true, false],
+    ['3', 'Vous', false, true],
+  ]);
+  assert.equal(p.podium.climb.label, 'Pour la 2ᵉ place');
+  assert.match(p.podium.climb.gap, /^\+537.660$/);
 });
 
 // ---------- Câblage ----------

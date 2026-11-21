@@ -89,8 +89,11 @@ export const DMD_USABLE = DMD_WIDTH - 2 * DMD_MARGIN;
 // ---------------------------------------------------------------------------
 // Pages
 
-/** Pages de l'alternance ; « wheel » : le détail de la wheel à l'arrivée sur une table, « interlude » : une scène de jeu (dmdscenes.ts). */
-export type DmdPageId = 'title' | 'records' | 'press-start' | 'clock' | 'credits' | 'brand' | 'wheel' | 'interlude';
+/**
+ * Pages de l'alternance ; « wheel » : le détail de la wheel à l'arrivée sur une table, « interlude » : une scène de jeu (dmdscenes.ts) ;
+ * « arena » : le tableau des records de l'Arène (arena.ts), quand son médaillon est choisi dans la roue.
+ */
+export type DmdPageId = 'title' | 'records' | 'press-start' | 'clock' | 'credits' | 'brand' | 'wheel' | 'interlude' | 'arena';
 
 export interface DmdPage {
   id: DmdPageId;
@@ -113,6 +116,11 @@ export interface LiveDmdInput {
   now?: () => Date;
   /** Wheel de la table en points (dmdscenes.ts, wheelDetail) : son détail joue une fois à l'arrivée. */
   wheel?: WheelDetail;
+  /**
+   * Médaillon Arène choisi (21/11/2026) : les pages de son tableau des records (arena.ts,
+   * arenaBoardPages), la plus pressante d'abord, à la place du titre d'une table.
+   */
+  arena?: readonly { lines: readonly { cells: readonly { text: string; align?: 'left' | 'center' | 'right' }[]; dim?: boolean; head?: boolean }[] }[];
 }
 
 /**
@@ -259,12 +267,75 @@ export function brandPage(): DmdPage {
   });
 }
 
+/** Un écran du tableau de l'Arène : trois lignes de la petite police au plus (128 × 32). */
+export const ARENA_DMD_LINES = 3;
+/** Durée d'un écran du tableau de l'Arène. */
+export const ARENA_DMD_HOLD = 3200;
+/**
+ * Nuances du tableau de l'Arène (21/11/2026, « du contraste pour bien détacher les informations ») :
+ * l'intitulé nettement en retrait, le contenu au plein éclat, une ligne secondaire (la mienne sous
+ * celle du rival) entre les deux. Un DMD n'a qu'une graisse : la lumière fait la hiérarchie.
+ */
+export const ARENA_DMD_LEVEL = { head: 6, dim: 10, main: 15 };
+
+/** Un texte raccourci jusqu'à tenir dans `max` points ; un point final dit qu'il est coupé. */
+function fitText(font: DmdFont, text: string, max: number): string {
+  if (textWidth(font, text) <= max) return text;
+  let cut = text;
+  while (cut.length > 1 && textWidth(font, `${cut}.`) > max) cut = cut.slice(0, -1).trimEnd();
+  return `${cut}.`;
+}
+
+/**
+ * Le tableau des records de l'Arène sur le vrai DMD (demande du 21/11/2026 : « le DMD ferait mieux
+ * d'afficher ça, il n'y a rien d'écrit dessus »). Chaque page du tableau (arena.ts) devient un ou
+ * plusieurs écrans de trois lignes : une page plus longue se poursuit sur l'écran suivant, son
+ * intitulé repris en tête. Le nom cède la place au score sur une ligne à deux cellules ; l'intitulé
+ * et ma ligne un ton en dessous.
+ */
+export function arenaDmdPages(pages: NonNullable<LiveDmdInput['arena']>): DmdPage[] {
+  const out: DmdPage[] = [];
+  const font = DMD_FONT_SMALL;
+  const lineHeight = font.height + 3;
+  for (const page of pages) {
+    const [head, ...rest] = page.lines;
+    if (!head) continue;
+    const screens: (typeof page.lines)[] = [];
+    if (page.lines.length <= ARENA_DMD_LINES) screens.push(page.lines);
+    else for (let i = 0; i < rest.length; i += ARENA_DMD_LINES - 1) screens.push([head, ...rest.slice(i, i + ARENA_DMD_LINES - 1)]);
+    for (const lines of screens)
+      out.push(
+        still('arena', ARENA_DMD_HOLD, (dots) => {
+          const top = Math.floor((DMD_HEIGHT - (lines.length * lineHeight - 3)) / 2);
+          lines.forEach((line, i) => {
+            const y = top + i * lineHeight;
+            const level = line.head ? ARENA_DMD_LEVEL.head : line.dim ? ARENA_DMD_LEVEL.dim : ARENA_DMD_LEVEL.main;
+            const right = line.cells.find((c) => c.align === 'right');
+            const rightText = right ? dmdText(right.text) : '';
+            for (const cell of line.cells) {
+              const room = cell === right || cell.align === 'center' || !right ? DMD_USABLE : DMD_USABLE - textWidth(font, rightText) - 6;
+              const text = cell === right ? rightText : fitText(font, dmdText(cell.text), room);
+              const x = cell.align === 'right' ? DMD_WIDTH - DMD_MARGIN - textWidth(font, text) : cell.align === 'center' ? Math.floor((DMD_WIDTH - textWidth(font, text)) / 2) : DMD_MARGIN;
+              drawText(dots, font, text, x, y, level);
+            }
+          });
+        }),
+      );
+  }
+  return out;
+}
+
 /**
  * L'alternance d'une table : titre, PRESS START, records, horloge, crédits ; sans records, leur
- * page est sautée. Sans table : la marque, PRESS START, l'horloge. Jamais de page du média DMD :
- * les points restent affichés (le média se voit autour, ou seul en DMD « classique »).
+ * page est sautée. Sans table : la marque, PRESS START, l'horloge ; le médaillon Arène choisi : les
+ * écrans de son tableau, puis la marque. Jamais de page du média DMD : les points restent affichés
+ * (le média se voit autour, ou seul en DMD « classique »).
  */
 export function liveDmdPages(input: LiveDmdInput | undefined): DmdPage[] {
+  if (input?.arena?.length && !input.title) {
+    const board = arenaDmdPages(input.arena);
+    if (board.length) return [...board, brandPage()];
+  }
   if (!input?.title) return [brandPage(), pressStartPage(), clockPage(input?.now)];
   return [
     titlePage(input),

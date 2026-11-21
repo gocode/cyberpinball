@@ -25,7 +25,7 @@ export const messages: Record<string, string> = {
   'À reprendre : {n}': 'To win back: {n}',
   '{name} vous a dépassé {ago}': '{name} passed you {ago}',
   '{name} est juste devant vous': '{name} is just ahead of you',
-  'Classement des joueurs': 'Player ranking',
+  'Votre classement': 'Your ranking',
   'Votre place selon vos XP, de tout temps': 'Your place by XP, all time',
   'Vos records': 'Your records',
   'Votre dernier record publié': 'Your latest published record',
@@ -87,6 +87,8 @@ export const messages: Record<string, string> = {
   'Selon vos XP, de tout temps': 'By your XP, all time',
   'Le joueur juste devant vous, table par table': 'The player just ahead of you, table by table',
   '−{n}': '−{n}',
+  '+{n}': '+{n}',
+  'Pour la {n}ᵉ place': 'For place #{n}',
   'Tous les classements': 'All leaderboards',
   'Chaque table, par portée et par période': 'Every table, by scope and period',
   Badge: 'Badge',
@@ -95,7 +97,9 @@ export const messages: Record<string, string> = {
   'Barre, gains de la semaine, classements à venir': 'Bar, gains of the week, upcoming leaderboards',
   'Vos parties en ligne et leurs résultats': 'Your online games and their results',
   // app/src/hub-screen.ts
-  'Flippers : choisir · Start : valider · MagnaSave : onglet suivant · Exit : retour à la roue': 'Flippers: choose · Start: confirm · MagnaSave: next tab · Exit: back to the wheel',
+  Onglets: 'Tabs',
+  'Flippers : choisir · Start : valider · Exit : sortir du bloc': 'Flippers: choose · Start: confirm · Exit: leave the block',
+  'Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue': 'Flippers: choose a block · Start: enter it · Exit: back to the wheel',
   // app/src/wheel-settings.ts
   'Arène dans la roue : affichée': 'Arena on the wheel: shown',
   'Arène dans la roue : masquée': 'Arena on the wheel: hidden',

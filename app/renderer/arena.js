@@ -1,10 +1,11 @@
-// Affiche du médaillon Arène (21/11/2026, planche « Engagement » validée) : quand le médaillon est
-// choisi dans la roue, derrière la roue sur le playfield (tout le plateau en borne, le cadre 9:16 au
-// bureau) et à la place du média du fronton, comme celles du Juke-box et de la Communauté. De haut en
-// bas : le médaillon vivant « Coupe » (medaillons-vivants.js), le titre, la jauge du niveau (et en
-// hachures ce qu'une partie peut encore rapporter), un tableau des records à points dans la police du
-// DMD (police-points.js) dont les pages tournent toutes les six secondes, la plus pressante d'abord,
-// puis qui joue en ce moment et quelques puces. Le processus principal choisit et traduit tout
+// Affiche du médaillon Arène : quand le médaillon est choisi dans la roue, derrière la roue sur le
+// playfield (tout le plateau en borne, le cadre 9:16 au bureau) et à la place du média du fronton,
+// comme celles du Juke-box et de la Communauté. Dessin retenu par le mainteneur le 21/11/2026 parmi
+// trois propositions (« Le B, c'est parfait ») : en tête, le médaillon vivant « Coupe »
+// (medaillons-vivants.js) et le titre ; puis le podium de la table qui pique (le joueur au-dessus du
+// rival, le rival en ambre, moi en vert, le joueur en dessous) et ce qu'il manque pour monter ; puis
+// trois cases (niveau et sa barre, Monde, pays) ; puis qui joue en ce moment. Le tableau des records à
+// points est sur le vrai DMD (livedmd.ts, arenaDmdPages). Le processus principal choisit et traduit tout
 // (arena-menu.ts, poster) ; ici, on dessine. Styles : arena.css (classes ar-*).
 'use strict';
 
@@ -15,132 +16,12 @@
     if (text !== undefined) node.textContent = text;
     return node;
   };
+  const face = (a, className) => (typeof avatarNode === 'function' ? avatarNode(a, className) : el('span', `avatar ${className}`));
 
-  /** Une page tourne toutes les six secondes (arena.ts, ARENA_PAGE_MS). */
-  const PAGE_MS = 6000;
-
-  // ---------- Le tableau à points ----------
-
-  /** Colonnes et lignes de points : cinq lignes de la petite police, une marge de deux points tout autour (la lueur n'est jamais coupée). */
-  const COLS = 128;
-  const ROWS = 48;
-  const PITCH = 8;
-
-  const plain = (s) => String(s).normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
-  const glyphOf = (font, ch) => font.glyphs[ch] ?? font.glyphs[ch.toUpperCase()] ?? font.glyphs[' '];
-  function widthOf(font, s) {
-    let w = 0;
-    for (const ch of s) w += glyphOf(font, ch)[0].length + font.spacing;
-    return Math.max(0, w - font.spacing);
+  /** « Niv. 18 » à la teinte du palier, à côté d'un nom. */
+  function levelChip(level) {
+    return el('span', `ar-lv tier-tint-${level.tier}`, level.text);
   }
-  /** Le texte raccourci jusqu'à tenir dans `max` points (un point final dit qu'il est coupé). */
-  function fit(font, s, max) {
-    if (widthOf(font, s) <= max) return s;
-    let cut = s;
-    while (cut.length > 1 && widthOf(font, `${cut}.`) > max) cut = cut.slice(0, -1).trimEnd();
-    return `${cut}.`;
-  }
-
-  /** Les points allumés d'une page : 2 plein, 1 à moitié (l'intitulé, ma ligne), 0 éteint. */
-  function dotsOf(page) {
-    const font = typeof CYBER_POINTS !== 'undefined' ? CYBER_POINTS.petit : undefined;
-    const grid = Array.from({ length: ROWS }, () => new Uint8Array(COLS));
-    if (!font) return grid;
-    const lh = font.height + 2;
-    const lines = page.lines.slice(0, 5);
-    const top = Math.max(2, Math.floor((ROWS - lines.length * lh + 2) / 2));
-    lines.forEach((line, li) => {
-      const y0 = top + li * lh;
-      // Deux cellules (le nom à gauche, le score à droite) : le nom cède la place au score.
-      const right = line.cells.find((c) => c.align === 'right');
-      const rightText = right ? plain(right.text) : '';
-      const rightWidth = right ? widthOf(font, rightText) : 0;
-      for (const cell of line.cells) {
-        const room = cell.align === 'right' || cell.align === 'center' || !right ? COLS - 4 : COLS - 4 - rightWidth - 6;
-        const s = cell === right ? rightText : fit(font, plain(cell.text), room);
-        const w = widthOf(font, s);
-        let x = cell.align === 'right' ? COLS - 2 - w : cell.align === 'center' ? Math.floor((COLS - w) / 2) : 2;
-        for (const ch of s) {
-          const g = glyphOf(font, ch);
-          g.forEach((r, gy) => {
-            for (let gx = 0; gx < r.length; gx++) if (r[gx] === '#' && grid[y0 + gy] && x + gx >= 0 && x + gx < COLS) grid[y0 + gy][x + gx] = line.dim ? 1 : 2;
-          });
-          x += g[0].length + font.spacing;
-        }
-      }
-    });
-    return grid;
-  }
-
-  function paintBoard(cv, page) {
-    const c = cv.getContext?.('2d');
-    if (!c) return;
-    const grid = dotsOf(page);
-    c.fillStyle = '#010302';
-    c.fillRect(0, 0, cv.width, cv.height);
-    for (let y = 0; y < ROWS; y++)
-      for (let x = 0; x < COLS; x++) {
-        const v = grid[y][x];
-        c.beginPath();
-        c.arc(x * PITCH + PITCH / 2, y * PITCH + PITCH / 2, PITCH * 0.38, 0, Math.PI * 2);
-        c.shadowBlur = v === 2 ? 6 : 0;
-        c.shadowColor = 'rgba(139,226,58,.8)';
-        c.fillStyle = v === 2 ? '#9cf04a' : v === 1 ? '#3f6e1c' : '#0b1a0c';
-        c.fill();
-      }
-  }
-
-  /** Les tableaux affichés : tous tournent ensemble, au même rythme (une affiche refaite garde la page). */
-  const boards = new Set();
-  let turn = 0;
-  let timer;
-
-  function showPage(b) {
-    const at = b.pages.length ? turn % b.pages.length : 0;
-    if (b.shown === at && b.drawn) return;
-    b.shown = at;
-    b.drawn = true;
-    const page = b.pages[at];
-    paintBoard(b.canvas, page);
-    b.foot.textContent = page.foot;
-    b.dots.forEach((d, i) => d.classList.toggle('ar-on', i === at));
-  }
-
-  function tick() {
-    for (const b of boards) if (!b.canvas.isConnected) boards.delete(b);
-    if (!boards.size) {
-      clearInterval(timer);
-      timer = undefined;
-      return;
-    }
-    if (document.hidden) return;
-    turn++;
-    for (const b of boards) showPage(b);
-  }
-
-  function board(pages) {
-    const box = el('div', 'ar-dmd');
-    const frame = el('div', 'ar-dmd-frame');
-    const canvas = el('canvas', 'ar-dmd-dots');
-    canvas.width = COLS * PITCH;
-    canvas.height = ROWS * PITCH;
-    canvas.setAttribute('aria-hidden', 'true');
-    frame.append(canvas);
-    const foot = el('div', 'ar-dmd-foot');
-    const text = el('span', 'ar-dmd-text');
-    const dotsBox = el('span', 'ar-dots');
-    const dots = pages.map(() => dotsBox.appendChild(el('i')));
-    foot.append(text, dotsBox);
-    box.append(frame, foot);
-    const b = { canvas, foot: text, dots, pages, shown: -1, drawn: false };
-    boards.add(b);
-    showPage(b);
-    if (!timer) timer = setInterval(tick, PAGE_MS);
-    box.arBoard = b;
-    return box;
-  }
-
-  // ---------- L'affiche ----------
 
   /** La barre du niveau : l'acquis, et en hachures ce qu'une partie peut encore rapporter. */
   function xpBar(progress, reach) {
@@ -171,38 +52,68 @@
     return box;
   }
 
+  /** Le podium : la table, l'intitulé (ambre quand ma place vient d'être prise), les lignes, ce qu'il manque. */
+  function podium(p) {
+    const box = el('div', 'ar-board');
+    const head = el('div', 'ar-board-head');
+    head.append(el('span', 'ar-board-table', p.table), el('em', p.warn ? 'ar-board-why ar-warn' : 'ar-board-why', p.eyebrow));
+    box.append(head);
+    // Une grille commune : rang, pastille, nom et niveau, score alignés d'une ligne à l'autre.
+    const rows = el('div', 'ar-rows');
+    for (const r of p.rows) {
+      const row = el('div', `ar-row${r.me ? ' ar-me' : ''}${r.rival ? ' ar-rival' : ''}`);
+      const who = el('span', 'ar-who');
+      who.append(el('span', 'ar-who-name', r.name));
+      if (r.level) who.append(levelChip(r.level));
+      row.append(el('span', 'ar-rank', r.rank), face(r.avatar, 'ar-row-face'), who, el('span', 'ar-score', r.score));
+      rows.append(row);
+    }
+    box.append(rows);
+    const climb = el('div', 'ar-climb');
+    climb.append(el('span', '', p.climb.label), el('strong', '', p.climb.gap));
+    box.append(climb);
+    return box;
+  }
+
+  /** Les cases : le niveau (sa barre), Monde, pays ; une grille commune, intitulé, valeur et détail alignés. */
+  function tiles(list) {
+    const box = el('div', 'ar-tiles');
+    box.style.setProperty('--tiles', String(list.length));
+    for (const t of list) {
+      const tile = el('div', `ar-tile${t.level ? ` ar-tile-level tier-tint-${t.level.tier}` : ''}`);
+      const label = el('small', 'ar-tile-label');
+      if (t.flag && typeof flagNode === 'function') label.append(flagNode(t.flag.code, t.flag.src, t.flag.name, 'ar-tile-flag'));
+      label.append(el('span', '', t.label));
+      tile.append(label, el('strong', 'ar-tile-value', t.value));
+      if (t.level) tile.append(xpBar(t.level.progress, t.level.reach));
+      tile.append(el('span', 'ar-tile-detail', t.detail));
+      box.append(tile);
+    }
+    return box;
+  }
+
   const posters = new Map();
 
-  function poster(p, className, foot) {
-    const key = JSON.stringify([className, foot, p]);
+  function poster(p, className) {
+    const key = JSON.stringify([className, p]);
     const known = posters.get(key);
     if (known) {
       window.CyberMedaillons?.revive(known);
-      for (const b of known.arBoards ?? []) {
-        boards.add(b);
-        b.drawn = false;
-        showPage(b);
-      }
-      if (known.arBoards?.length && !timer) timer = setInterval(tick, PAGE_MS);
       return known;
     }
     const box = el('section', `jb-poster ar-poster ${className}`.trim());
     const stage = el('div', 'ar-stage');
+    const head = el('header', 'ar-head');
     const titles = el('div', 'ar-titles');
     titles.append(el('h1', 'ar-title', p.title), el('p', 'ar-tag', p.tagline));
-    const level = el('div', `ar-level tier-tint-${p.level.tier}`);
-    level.append(el('span', 'ar-level-chip', p.level.chip), xpBar(p.level.progress, p.level.reach), el('span', 'ar-level-after', p.level.after));
-    stage.append(emblem(), titles, level);
-    const made = [];
-    if (p.pages.length) {
-      const b = board(p.pages);
-      stage.append(b);
-      made.push(b.arBoard);
-    }
+    head.append(emblem(), titles);
+    stage.append(head);
+    if (p.podium) stage.append(podium(p.podium));
+    stage.append(tiles(p.tiles));
     if (p.live) {
       const live = el('div', 'ar-live');
       const stack = el('span', 'ar-stack');
-      for (const a of p.live.avatars) stack.append(typeof avatarNode === 'function' ? avatarNode(a, 'ar-face') : el('span', 'avatar ar-face'));
+      for (const a of p.live.avatars) stack.append(face(a, 'ar-face'));
       live.append(el('span', 'ar-pulse'), stack, el('span', 'ar-live-text', p.live.text));
       stage.append(live);
     }
@@ -216,7 +127,6 @@
       stage.append(chips);
     }
     box.append(stage);
-    box.arBoards = made;
     posters.set(key, box);
     if (posters.size > 8) posters.delete(posters.keys().next().value);
     return box;
@@ -260,16 +170,16 @@
     heading.title = p.headline.heading;
     const level = `jb-label ar-fronton-level tier-tint-${p.level.tier}`; // i18n-ignore : classes CSS
     copy.append(el('p', level, p.level.chip), el('h1', 'jb-poster-title', p.title), statsLine(p.level.after), el('div', 'jb-poster-rule'), el('p', 'jb-eyebrow', p.headline.eyebrow), heading);
-    const emblem = el('div', 'jb-emblem cm-emblem');
-    emblem.setAttribute('aria-hidden', 'true');
-    if (window.CyberMedaillons) emblem.append(el('div', 'jb-emblem-halo'), CyberMedaillons.medallion('arene', 'jb-logo'));
+    const mark = el('div', 'jb-emblem cm-emblem');
+    mark.setAttribute('aria-hidden', 'true');
+    if (window.CyberMedaillons) mark.append(el('div', 'jb-emblem-halo'), CyberMedaillons.medallion('arene', 'jb-logo'));
     else {
       const img = el('img', 'jb-logo');
       img.src = 'medaillons/arene.png';
       img.alt = '';
-      emblem.append(el('div', 'jb-emblem-halo'), img);
+      mark.append(el('div', 'jb-emblem-halo'), img);
     }
-    stage.append(head, copy, emblem);
+    stage.append(head, copy, mark);
     if (foot) {
       const end = el('footer', 'jb-poster-foot');
       const go = el('span', 'jb-poster-go');
@@ -287,7 +197,7 @@
 
   /** Derrière la roue (borne) ou dans le cadre du plateau (bureau). */
   function wheelPoster(s, isDesk) {
-    return poster(of(s).poster, isDesk ? 'jb-wheel-poster ar-wheel ar-desk desk' : 'jb-wheel-poster ar-wheel', false);
+    return poster(of(s).poster, isDesk ? 'jb-wheel-poster ar-wheel ar-desk desk' : 'jb-wheel-poster ar-wheel');
   }
 
   /** Dans le cadre du fronton du menu au bureau. */
@@ -317,5 +227,5 @@
     return true;
   }
 
-  window.CyberArena = { wheelPoster, backglassPoster, zone, PAGE_MS };
+  window.CyberArena = { wheelPoster, backglassPoster, zone };
 })();

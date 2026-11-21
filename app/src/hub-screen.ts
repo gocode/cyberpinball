@@ -131,7 +131,8 @@ export interface HubCardView {
   quiet?: boolean;
   /** La carte elle-même se choisit (absent : elle a des boutons, ou se lit seulement). */
   action?: number;
-  buttons?: { label: string; xp?: string; primary?: boolean; action: number }[];
+  /** Les boutons ; `action` seulement quand on est entré dans le bloc de la carte. */
+  buttons?: { label: string; xp?: string; primary?: boolean; action?: number }[];
 }
 
 export interface HubView {
@@ -141,9 +142,20 @@ export interface HubView {
   title: string;
   facts: string[];
   band?: HubBand;
+  /** Les onglets ; `action` seulement quand on est entré dans leur barre. */
   tabs: { label: string; icon: IconName; current: boolean; attention?: boolean; disabled?: string; action?: number }[];
-  sections: { title?: string; note?: string; layout: HubLayout; cards: HubCardView[] }[];
+  /** La barre d'onglets en bloc : `action` au premier niveau (se choisit comme un bloc), `entered` quand on y est. */
+  tabsBlock?: HubBlockView;
+  /** On est entré dans un bloc : les autres s'éteignent un peu. */
+  inside?: true;
+  sections: { title?: string; note?: string; layout: HubLayout; block?: HubBlockView; cards: HubCardView[] }[];
   empty?: { title: string; detail: string };
+}
+
+/** Une section en bloc (son liseré) : `action` au premier niveau, `entered` quand on y est ; vide : un bloc où l'on n'est pas. */
+export interface HubBlockView {
+  action?: number;
+  entered?: true;
 }
 
 export interface HubScreenHost {
@@ -159,10 +171,36 @@ export interface HubScreen {
   current(): string;
 }
 
-/** Un écran à onglets : `describe` dit ce que montre l'onglet demandé ; `reopen` revient sur l'onglet courant. */
+/** Ce qui se choisit dans un bloc : un onglet, une carte, un bouton d'une carte. */
+interface BlockItem {
+  label: string;
+  key: string;
+  tone?: 'quiet';
+  run: () => void;
+}
+
+/** Un bloc de l'écran : la barre d'onglets, ou une section qui a quelque chose à faire. */
+interface Block {
+  key: string;
+  label: string;
+  items: BlockItem[];
+}
+
+/**
+ * Un écran à onglets : `describe` dit ce que montre l'onglet demandé ; `reopen` revient sur l'onglet courant.
+ *
+ * Navigation par blocs (demandée par le mainteneur le 21/11/2026 : « naviguer de bloc en bloc, rentrer
+ * dans ce bloc en validant et ressortir du bloc ») : chaque section porte un liseré ; au premier niveau,
+ * les flippers vont d'un bloc à l'autre (la barre d'onglets en est un), Start entre dans le bloc (ou fait
+ * tout de suite sa seule action), puis les flippers vont d'un élément à l'autre et Exit ressort du bloc,
+ * le curseur sur lui. Au premier niveau, Exit revient d'où l'on vient (la roue). Le menu du dessus n'est
+ * ainsi jamais qu'à un Exit : plus besoin de remonter toute une liste pour l'atteindre.
+ */
 export function createHubScreen(host: HubScreenHost, describe: (tab: string, reopen: () => void) => HubSpec): HubScreen {
   let current = '';
   let back: () => void = () => undefined;
+  /** Le bloc où l'on est entré (sa clé) ; absent : on choisit un bloc. */
+  let inside: string | undefined;
 
   /** Les onglets qui s'ouvrent, dans l'ordre. */
   const usable = (spec: HubSpec) => spec.tabs.filter((tab) => !tab.disabled);
@@ -171,38 +209,84 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     host.library.openCustom(build);
   }
 
+  /** Les blocs de l'onglet ouvert, dans l'ordre de l'écran : la barre d'onglets, puis chaque section qui a de quoi agir. */
+  function blocksOf(spec: HubSpec): Block[] {
+    const tabs = usable(spec);
+    const out: Block[] = [];
+    if (tabs.length > 1) out.push({ key: 'tabs', label: t('Onglets'), items: tabs.map((tab) => ({ label: tab.label, key: `tab:${tab.id}`, run: () => go(tab.id) })) });
+    spec.sections.forEach((s, i) => {
+      const items: BlockItem[] = [];
+      for (const c of s.cards) {
+        if (c.buttons?.length) for (const b of c.buttons) items.push({ label: b.label, key: `${c.key}:${b.key}`, run: b.run });
+        else if (c.run) items.push({ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run });
+      }
+      if (items.length) out.push({ key: `section:${i}`, label: s.title ?? s.cards[0]?.title ?? '', items });
+    });
+    return out;
+  }
+
+  /** Onglet choisi : son contenu, le curseur sur son premier bloc (après la barre d'onglets). */
   function go(tab: string): void {
     current = tab;
+    inside = undefined;
     const spec = describe(tab, reopen);
-    // Le curseur sur la première carte : juste après les onglets qui s'ouvrent.
-    host.library.openCustom(build, usable(spec).length);
+    const blocks = blocksOf(spec);
+    host.library.openCustom(build, blocks[0]?.key === 'tabs' && blocks.length > 1 ? 1 : 0);
+  }
+
+  /** Start sur un bloc : sa seule action tout de suite, sinon on y entre, le curseur sur son premier élément (l'onglet ouvert pour la barre). */
+  function enter(block: Block, spec: HubSpec): void {
+    if (block.items.length === 1) return void block.items[0]!.run();
+    inside = block.key;
+    const at = block.key === 'tabs' ? Math.max(0, usable(spec).findIndex((tab) => tab.id === current)) : 0;
+    host.library.openCustom(build, at);
+  }
+
+  /** Exit dans un bloc : on en ressort, le curseur sur lui. */
+  function leave(blockIndex: number): void {
+    inside = undefined;
+    host.library.openCustom(build, Math.max(0, blockIndex));
   }
 
   function build(): Built {
     const spec = describe(current, reopen);
     if (!spec.tabs.some((tab) => tab.id === current && !tab.disabled)) current = usable(spec)[0]?.id ?? current;
+    const blocks = blocksOf(spec);
+    // Le bloc où l'on était a disparu (onglet changé, partie fermée) : retour au choix des blocs.
+    const enteredAt = inside ? blocks.findIndex((b) => b.key === inside) : -1;
+    if (enteredAt < 0) inside = undefined;
     const actions: Action[] = [];
+    // Premier niveau : une action par bloc ; dans un bloc, seulement ses éléments.
+    const blockAction = new Map<string, number>();
+    const itemAction = new Map<string, number>();
+    if (enteredAt >= 0) for (const item of blocks[enteredAt]!.items) itemAction.set(item.key, actions.push({ label: item.label, key: item.key, ...(item.tone ? { tone: item.tone } : {}), run: item.run }) - 1);
+    else for (const block of blocks) blockAction.set(block.key, actions.push({ label: block.label, key: `block:${block.key}`, run: () => enter(block, spec) }) - 1);
+    const blockView = (key: string): HubBlockView | undefined => (blockAction.has(key) ? { action: blockAction.get(key)! } : inside === key ? { entered: true } : blocks.some((b) => b.key === key) ? {} : undefined);
     const tabs = spec.tabs.map((tab) => {
       const view = { label: tab.label, icon: tab.icon, current: tab.id === current, ...(tab.attention ? { attention: true } : {}), ...(tab.disabled ? { disabled: tab.disabled } : {}) };
-      if (tab.disabled) return view;
-      const action = actions.push({ label: tab.label, key: `tab:${tab.id}`, icon: tab.icon, ...(tab.attention ? { attention: true } : {}), run: () => go(tab.id) }) - 1;
-      return { ...view, action };
+      const action = itemAction.get(`tab:${tab.id}`);
+      return action === undefined ? view : { ...view, action };
     });
-    const sections = spec.sections
-      .filter((s) => s.cards.length)
-      .map((s) => ({
-        ...(s.title ? { title: s.title } : {}),
-        ...(s.note ? { note: s.note } : {}),
-        layout: s.layout,
-        cards: s.cards.map((c): HubCardView => {
-          const { key, run, buttons, ...shown } = c;
-          const out: HubCardView = { ...shown };
-          if (buttons?.length)
-            out.buttons = buttons.map((b) => ({ label: b.label, ...(b.xp ? { xp: b.xp } : {}), ...(b.primary ? { primary: true } : {}), action: actions.push({ label: b.label, key: `${key}:${b.key}`, run: b.run }) - 1 }));
-          else if (run) out.action = actions.push({ label: c.title, key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run }) - 1;
-          return out;
-        }),
-      }));
+    const sections = spec.sections.flatMap((s, i) => {
+      if (!s.cards.length) return [];
+      const block = blockView(`section:${i}`);
+      return [
+        {
+          ...(s.title ? { title: s.title } : {}),
+          ...(s.note ? { note: s.note } : {}),
+          layout: s.layout,
+          ...(block ? { block } : {}),
+          cards: s.cards.map((c): HubCardView => {
+            const { key, run: _run, buttons, ...shown } = c;
+            const out: HubCardView = { ...shown };
+            if (buttons?.length) out.buttons = buttons.map((b) => ({ label: b.label, ...(b.xp ? { xp: b.xp } : {}), ...(b.primary ? { primary: true } : {}), ...(itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}) }));
+            else if (itemAction.has(key)) out.action = itemAction.get(key)!;
+            return out;
+          }),
+        },
+      ];
+    });
+    const tabsBlock = blockView('tabs');
     const hub: HubView = {
       medallion: spec.medallion,
       start: t('Start'),
@@ -210,6 +294,8 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       facts: spec.facts,
       ...(spec.band ? { band: spec.band } : {}),
       tabs,
+      ...(tabsBlock ? { tabsBlock } : {}),
+      ...(inside ? { inside: true } : {}),
       sections,
       ...(spec.empty && !sections.length ? { empty: spec.empty } : {}),
     };
@@ -218,9 +304,9 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       icon: spec.icon,
       sections: [],
       actions,
-      back,
+      back: enteredAt >= 0 ? () => leave(enteredAt) : back,
       hub,
-      hint: t('Flippers : choisir · Start : valider · MagnaSave : onglet suivant · Exit : retour à la roue'),
+      hint: enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue'),
       keys: (input) => {
         const magna = host.zoneKeys();
         if (!magna.includes(input.code)) return false;

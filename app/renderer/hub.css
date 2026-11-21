@@ -650,6 +650,55 @@
   font-size: calc(28 * var(--u));
 }
 
+/*
+ * ---------- Navigation par blocs (hub-screen.ts) ----------
+ * Chaque bloc porte un liseré fin ; au premier niveau, le bloc choisi s'allume en vert signal (un clic
+ * y entre) ; quand on est dans un bloc, son liseré reste vert, plus calme, et les autres s'éteignent
+ * un peu : on voit où l'on est, et qu'Exit en ressort.
+ */
+.hub-block {
+  border: calc(1.5 * var(--u)) solid color-mix(in oklab, var(--teal, #35c8bd) 30%, var(--line-soft));
+  border-radius: calc(22 * var(--u));
+  padding: calc(16 * var(--u)) calc(18 * var(--u));
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.hub-block.hub-block-focus {
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal);
+}
+
+.hub-block.hub-block-in {
+  border-color: color-mix(in oklab, var(--signal) 55%, var(--line-strong));
+  background: color-mix(in oklab, var(--signal) 4%, transparent);
+}
+
+.lib-hub.hub-inside .hub-block:not(.hub-block-in) {
+  opacity: 0.5;
+}
+
+/* La barre d'onglets en bloc : son liseré autour des onglets. */
+.hub-tabs.hub-block {
+  padding: calc(10 * var(--u));
+}
+
+/* La carte du moment est son propre bloc : son contour fait le liseré, pas de second cadre autour. */
+.hub-sec.hub-layout-hero.hub-block {
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.hub-sec.hub-layout-hero.hub-block:not(.hub-block-focus):not(.hub-block-in) .hub-card.hub-layout-hero {
+  border-color: color-mix(in oklab, var(--signal) 35%, var(--line-strong));
+  box-shadow: none;
+}
+
+.hub-sec.hub-layout-hero.hub-block-focus .hub-card.hub-layout-hero {
+  box-shadow: var(--glow-signal), inset 0 0 0 calc(1 * var(--u)) var(--signal);
+}
+
 /* ---------- Pied : les commandes ---------- */
 
 .hub-foot {

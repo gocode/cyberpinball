@@ -1783,7 +1783,7 @@ document.addEventListener('drop', (event) => {
 });
 
 /** Défilement du menu (scroll-keeper.js) : capture avant chaque rendu, revealSelection après. */
-const menuScroll = CyberScroll.keeper([['.lib-row.selected, .chat-line.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected, .hub-card.selected, .hub-button.selected', 'nearest']]);
+const menuScroll = CyberScroll.keeper([['.lib-row.selected, .chat-line.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected, .hub-card.selected, .hub-button.selected, .hub-block-focus', 'nearest']]);
 
 /**
  * Remet chaque liste où elle était, et garde visible l'élément choisi quand la liste dépasse

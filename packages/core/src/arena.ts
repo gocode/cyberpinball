@@ -142,6 +142,21 @@ export interface ArenaRival {
   passed: boolean;
   /** Joueurs classés sur cette version. */
   players: number;
+  /**
+   * Le podium autour de moi (affiche de l'Arène, 21/11/2026) : le joueur au-dessus du rival, le
+   * rival, moi, le joueur en dessous ; ceux qui existent, dans l'ordre du classement.
+   */
+  ladder: ArenaLadderRow[];
+}
+
+export interface ArenaLadderRow {
+  rank: number;
+  key: string;
+  name: string;
+  score: number;
+  xp?: number;
+  me?: true;
+  rival?: true;
 }
 
 /** Le meilleur score de chaque joueur sur chaque version de table, masqués exclus. */
@@ -179,6 +194,10 @@ export function arenaRivals(store: RankingStore, me: string, max = 3): ArenaRiva
       gap: ahead.score - mine.score,
       passed: Date.parse(ahead.at) > Date.parse(mine.at),
       players: ranked.length,
+      ladder: ranked.slice(Math.max(0, rank - 3), rank + 1).map((s, i, all) => {
+        const at = ranked.indexOf(all[i]!) + 1;
+        return { rank: at, key: s.key, name: s.name, score: s.score, ...(s.xp !== undefined ? { xp: s.xp } : {}), ...(s === mine ? { me: true as const } : {}), ...(s === ahead ? { rival: true as const } : {}) };
+      }),
     });
   }
   const share = (r: ArenaRival) => r.gap / Math.max(1, r.rival.score);
@@ -264,8 +283,13 @@ export interface ArenaBoardCell {
 
 export interface ArenaBoardLine {
   cells: ArenaBoardCell[];
-  /** Ligne éteinte à moitié (l'intitulé, ma ligne sous celle du rival). */
+  /** Ligne un ton en dessous (ma ligne sous celle du rival). */
   dim?: boolean;
+  /**
+   * L'intitulé de la page (« VOTRE PLACE EST PRISE ») : nettement plus sombre que le contenu, qui
+   * ressort au plein éclat (demande du 21/11/2026 : « du contraste pour bien détacher les informations »).
+   */
+  head?: boolean;
 }
 
 export interface ArenaBoardPage {
@@ -282,6 +306,8 @@ export const dmdNumber = (n: number): string => Math.max(0, Math.round(n)).toStr
 const dmdPlace = (n: number) => (n === 1 ? t('1er') : t('{n}e', { n }));
 
 const centered = (text: string, dim?: boolean): ArenaBoardLine => ({ cells: [{ text, align: 'center' }], ...(dim ? { dim } : {}) });
+/** L'intitulé d'une page : centré, éteint à côté du contenu. */
+const heading = (text: string): ArenaBoardLine => ({ cells: [{ text, align: 'center' }], head: true });
 const pair = (left: string, right: string, dim?: boolean): ArenaBoardLine => ({ cells: [{ text: left }, { text: right, align: 'right' }], ...(dim ? { dim } : {}) });
 
 export interface ArenaBoardInput {
@@ -308,7 +334,7 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
     rival && {
       id: 'rival',
       lines: [
-        centered(rival.passed ? t('Votre place est prise') : t('À battre'), true),
+        heading(rival.passed ? t('Votre place est prise') : t('À battre')),
         centered(rival.table.title),
         pair(`${rival.mine.rank - 1} ${rival.rival.name}`, dmdNumber(rival.rival.score)),
         pair(`${rival.mine.rank} ${t('Vous')}`, dmdNumber(rival.mine.score), true),
@@ -320,7 +346,7 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
   if (d.mine)
     pages.push({
       id: 'my-game',
-      lines: [centered(t('Votre partie attend'), true), centered(d.mine.title), centered(t('{n} sur {max} joueurs', { n: d.mine.seated, max: d.mine.max })), centered(t('Départ dès qu’elle est complète'), true)],
+      lines: [heading(t('Votre partie attend')), centered(d.mine.title), centered(t('{n} sur {max} joueurs', { n: d.mine.seated, max: d.mine.max })), centered(t('Départ dès qu’elle est complète'), true)],
       foot: t('Votre partie instantanée part dès qu’elle est complète'),
     });
   if (freshPassed) pages.push(rivalPage()!);
@@ -328,13 +354,14 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
   if (open && !d.mine)
     pages.push({
       id: 'open-game',
-      lines: [centered(t('Partie ouverte'), true), centered(open.title), centered(t('Avec {name}', { name: open.host.name })), centered(tn(open.max - open.seats.length, '{n} place libre', '{n} places libres'))],
+      lines: [heading(t('Partie ouverte')), centered(open.title), centered(t('Avec {name}', { name: open.host.name })), centered(tn(open.max - open.seats.length, '{n} place libre', '{n} places libres'))],
       foot: d.open.length > 1 ? tn(d.open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') : t('{name} attend des joueurs', { name: open.host.name }),
     });
   if (rival && !freshPassed) pages.push(rivalPage()!);
   const st = d.standing;
   if (st?.world || st?.country) {
-    const lines: ArenaBoardLine[] = [centered(t('Classement des joueurs'), true)];
+    // Court : l'intitulé tient sur une ligne du vrai DMD (128 points).
+    const lines: ArenaBoardLine[] = [heading(t('Votre classement'))];
     if (st.world) lines.push(pair(t('Monde'), `${dmdPlace(st.world.rank)} / ${dmdNumber(st.world.players)}`));
     if (st.country) lines.push(pair(st.country.name, `${dmdPlace(st.country.rank)} / ${dmdNumber(st.country.players)}`));
     pages.push({ id: 'standing', lines, foot: t('Votre place selon vos XP, de tout temps') });
@@ -342,7 +369,7 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
   if (d.records.length)
     pages.push({
       id: 'records',
-      lines: [centered(t('Vos records'), true), ...d.records.slice(0, 3).map((r) => pair(r.table.title, dmdNumber(r.score)))],
+      lines: [heading(t('Vos records')), ...d.records.slice(0, 3).map((r) => pair(r.table.title, dmdNumber(r.score)))],
       foot: tn(d.records.length, 'Votre dernier record publié', 'Vos derniers records publiés'),
     });
   return pages;
