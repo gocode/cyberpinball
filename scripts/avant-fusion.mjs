@@ -26,7 +26,7 @@ import {
 import { TEST_TIMEOUT_MS, printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
-import { NODE_TEST_ARGS } from './tests-node.mjs';
+import { NODE_TEST_ARGS, ensureElectron } from './tests-node.mjs';
 
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const iso = (ms) => new Date(ms).toISOString();
@@ -37,14 +37,6 @@ export const SUITES_SIMULTANEES = Math.max(1, Number(process.env.CYBERPINBALL_SU
 /** Les verrous des places de vérification (suite-1.lock, suite-2.lock…). */
 export function suiteSlots(dir, n = SUITES_SIMULTANEES) {
   return Array.from({ length: n }, (_, i) => path.join(dir, `suite-${i + 1}.lock`));
-}
-
-/** Electron téléchargé ? (Premier lancement d'un worktree neuf : les tests Electron tombaient en 5 s.) */
-async function ensureElectron(cwd, say) {
-  const exe = path.join(cwd, 'node_modules', 'electron', 'dist', 'electron.exe');
-  if (fs.existsSync(exe)) return;
-  say('Electron pas encore téléchargé dans ce worktree : installation…');
-  await run(process.execPath, [path.join(cwd, 'node_modules', 'electron', 'install.js')], { cwd });
 }
 
 /**
@@ -88,7 +80,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
       withdraw(branche, dir);
       return { ok: false, failures: controles.problems.map((p) => p.etape), flaky: [] };
     }
-    await ensureElectron(cwd, say);
+    ensureElectron(cwd, say);
     const slow = collectTests(cwd).filter((t) => t.slow);
     say(`Tests lents : ${slow.length} fichiers…`);
     const log = path.join(tmp, 'avant-fusion.txt');
