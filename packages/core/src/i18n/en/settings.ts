@@ -281,13 +281,25 @@ export const messages: Record<string, string> = {
   Borne: 'Cabinet',
   'Plein écran unique (FSS)': 'Full single screen (FSS)',
   'Cadrage automatique': 'Cabinet autofit mode',
-  'En mode borne, VPX peut cadrer la table tout seul. « Ajuster la table » garde ses proportions, « Remplir l’écran » l’étire pour occuper tout l’écran.':
-    'In cabinet mode, VPX can fit the table by itself. “Fit table” keeps its proportions, “Fit screen” stretches it to fill the whole screen.',
+  'En mode borne, VPX peut cadrer la table tout seul. « Ajuster la table » agrandit la table sans la déformer ; « Remplir l’écran » l’étire pour montrer toute sa longueur.':
+    'In cabinet mode, VPX can fit the table by itself. “Fit table” enlarges the table without distorting it; “Fit screen” stretches it to show its whole length.',
   Manuel: 'Manual',
   'Ajuster la table': 'Fit table',
   'Remplir l’écran': 'Fit screen',
+  'Garder le haut de la table': 'Keep the top of the table',
+  'Avec « Ajuster la table » : la table est agrandie tant que le fond du plateau reste à l’écran, avec un peu de place pour le décor du fond. C’est le bas décoratif, sous les flippers, et le vide au-dessus de la table qui sortent de l’écran ; le reste de la largeur est comblé par un léger étirement. Sans ce réglage, VPX agrandit jusqu’à remplir la largeur, quitte à couper le fond du plateau.':
+    'With “Fit table”: the table is enlarged as long as the back of the playfield stays on screen, with a little room for the back wall. The decorative bottom, below the flippers, and the empty space above the table are what leave the screen; the rest of the width is filled by a slight stretch. Without this setting, VPX enlarges the table to fill the width, even if that cuts off the back of the playfield.',
+  'Étirement maximal en largeur': 'Maximum width stretch',
+  'Quand le haut de la table est gardé : étirement autorisé pour remplir la largeur de l’écran. 0 % garde les proportions exactes, avec des bandes sur les côtés.':
+    'When the top of the table is kept: stretch allowed to fill the width of the screen. 0% keeps the exact proportions, with bands on the sides.',
   'Hauteur des flippers à l’écran': 'Autofit flipper position',
-  'Avec le cadrage automatique : position des flippers du bas, 0 % étant le bas de l’écran.': 'With autofit: position of the lower flippers, 0% being the bottom of the screen.',
+  'Avec le cadrage automatique : position des flippers du bas, 0 % étant le bas de l’écran. Quand le haut de la table est gardé, plus les flippers sont bas, plus la table est grande.':
+    'With autofit: position of the lower flippers, 0% being the bottom of the screen. When the top of the table is kept, the lower the flippers, the larger the table.',
+  'Hauteur des yeux': 'Eye height',
+  'Hauteur des yeux du joueur au-dessus du bas de l’écran du plateau. VPX dessine la table comme vue de là : plus bas, la perspective est plus marquée.':
+    'Height of the player’s eyes above the bottom of the playfield screen. VPX draws the table as seen from there: lower, the perspective is stronger.',
+  'Recul des yeux': 'Eye distance',
+  'Distance des yeux du joueur par rapport au bas de l’écran du plateau (négatif : devant la borne).': 'Distance of the player’s eyes from the bottom of the playfield screen (negative: in front of the cabinet).',
   'Largeur de l’écran du plateau': 'Playfield screen width',
   'Largeur réelle de l’image (le côté le plus long), lue dans l’écran ou déduite de la diagonale indiquée dans l’assistant. Sert à montrer la table à la bonne échelle.':
     'Physical width of the picture (the longer side), read from the screen or worked out from the screen size entered in the wizard. Used to show the table at the right scale.',

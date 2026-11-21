@@ -35,7 +35,7 @@ import {
 } from '@cyberpinball/core';
 import { loadManifest, MANIFEST_FILE, type Component } from './manifest';
 import { serializeVpxSettingsSchema, vpxSettingsSchemaFile } from './vpx-settings-schema';
-import { ownPluginSettings } from './vpx-own-plugins';
+import { ownPluginSettings, patchedSettingsSource, VPX_CORRIGE_SCHEMA_VERSION } from './vpx-own-plugins';
 
 const REPOSITORY = 'vpinball/vpinball';
 const SETTINGS_FILE = 'src/core/Settings_properties.inl';
@@ -233,7 +233,9 @@ async function buildSchema(component: Component, commit: string): Promise<VpxSet
   const [source, ...headers] = await Promise.all([SETTINGS_FILE, ...CONSTANT_HEADERS].map((f) => fetchSource(commit, f)));
   const defines = ['_WIN32', '_WIN64', '_MSC_VER'];
   if (component.variant === 'BGFX') defines.push('ENABLE_BGFX');
-  const settings = parseSettingsProperties(source!, {
+  // La 5436 de Cyber Pinball est le VPX corrigé : ses réglages ajoutés par correctif (vpx-own-plugins.ts) en font partie.
+  const patched = component.version === VPX_CORRIGE_SCHEMA_VERSION ? `\n${patchedSettingsSource(path.join(__dirname, '..', '..'))}\n` : '';
+  const settings = parseSettingsProperties(source! + patched, {
     defines,
     constants: extractConstants(headers, DESKTOP_FLAGS),
     strings: { VP_VERSION_STRING_DIGITS: versionDigits(component.version) },

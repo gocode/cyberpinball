@@ -57,6 +57,11 @@ export interface VpxProfile {
    * never written, not even to turn them off (VPX_PLUGIN_CONFLICTS).
    */
   retiredPlugins?: string[];
+  /**
+   * VPX corrigé de Cyber Pinball (patched Cyber Pinball 2 et suivants) : « Ajuster la table » sait garder le haut de la
+   * table ([Player] CabinetAutofitKeepTop, CabinetAutofitMaxStretch ; VPX_KEEP_TOP_FRAMING).
+   */
+  keepTopFraming?: boolean;
 }
 
 export const DEFAULT_VPX_PROFILE: VpxProfile = { displayIdFormat: 'name-position', enabledPlugins: [] };
@@ -249,6 +254,19 @@ export function iniBool(raw: string | undefined): boolean | undefined {
 const VIEW_DESKTOP = '0';
 const VIEW_CABINET = '1';
 const AUTOFIT_FIT_TABLE = '1';
+
+/**
+ * Cadrage des tables par défaut avec le VPX corrigé (21/11/2026) : sur un écran 16:9, une table est
+ * 17 à 29 % trop étroite. « Ajuster la table » de VPX comble par un zoom qui peut couper le fond du plateau (Attack from Mars : la soucoupe),
+ * « Remplir l'écran » en l'étirant d'autant. Avec CabinetAutofitKeepTop, le zoom s'arrête quand le fond du plateau
+ * arrive près du haut de l'écran, les flippers à CabinetAutofitPos (l'apron, sous les flippers, et le vide sous la vitre sortent de l'écran),
+ * et le reste de la largeur est comblé par un étirement plafonné à CabinetAutofitMaxStretch (bandes au-delà).
+ * Valeurs proposées (écrites seulement quand la clé est vide) : le choix de l'utilisateur est gardé.
+ */
+export const VPX_KEEP_TOP_FRAMING: readonly VpxSetting[] = [
+  { section: 'Player', key: 'CabinetAutofitKeepTop', value: '1' },
+  { section: 'Player', key: 'CabinetAutofitMaxStretch', value: '0.15' },
+];
 
 /** Framing keys owned by Cyber Pinball: they follow from the playfield. */
 export const VPX_LAYOUT_KEYS = ['BGSet', 'ScreenWidth', 'ScreenHeight'];

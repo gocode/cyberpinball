@@ -76,6 +76,7 @@ import { onJoystickInput } from './joystick-input';
 import { createWindow, primaryRect, readyToShow, whenReadyToShow } from './offscreen';
 import { LayoutReport } from './layout-check';
 import { click } from './library';
+import { menuBadgeLabel } from './library-types';
 import { relaunchCovered } from './screen-guard';
 import { createRomVolumes, type RomVolumeView } from './rom-volume';
 import { cachedScript } from './vbs';
@@ -950,7 +951,7 @@ function label(row: Row): string {
 
 interface Badge {
   text: string;
-  tone: 'owned' | 'table' | 'modified' | 'locked' | 'warning';
+  tone: 'owned' | 'table' | 'modified' | 'locked' | 'warning' | 'beta';
 }
 
 function badgesOf(def: VpxSettingDef, state: SettingState): Badge[] {
@@ -1092,7 +1093,8 @@ function rowView(row: Row) {
         label: label(row),
         sub: row.essential ? undefined : row.def.key,
         value: format(row.def, state.effective, row.essential),
-        badges: badgesOf(row.def, state),
+        // Fonction en phase de test (EssentialSetting.beta) : même badge « BÊTA » que les menus.
+        badges: [...(row.essential?.beta ? [{ text: menuBadgeLabel('beta'), tone: 'beta' as const }] : []), ...badgesOf(row.def, state)],
       };
     }
   }

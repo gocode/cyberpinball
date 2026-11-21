@@ -193,6 +193,11 @@ export function companion(folder: string, tableBase: string, ownFolder: boolean,
   return undefined;
 }
 
+/** Un .ini de POV porte « pov » dans son nom (« <table> POV.ini ») ; le .ini de la table, nommé comme elle, n'en est jamais un. */
+export function isPovIniName(name: string): boolean {
+  return /\.ini$/i.test(name) && /(^|[^a-z])pov([^a-z]|$)/i.test(name.replace(/\.ini$/i, ''));
+}
+
 /** Sorte d'un fichier isolé, d'après son nom et le dossier qui le contient. */
 export function classifyFile(name: string, parents: string[] = []): FileKind {
   const lower = name.toLowerCase();
@@ -208,7 +213,8 @@ export function classifyFile(name: string, parents: string[] = []): FileKind {
   if (SERUM_EXT.has(ext)) return 'serum';
   if (VNI_EXT.has(ext)) return 'vni';
   if (ext === '.vbs') return 'script';
-  if (ext === '.ini') return 'tableIni';
+  // « <table> POV.ini » (POV de la communauté, VPX 10.8) : un point de vue, pas les réglages de la table (povview.ts).
+  if (ext === '.ini') return isPovIniName(name) ? 'pov' : 'tableIni';
   if (ext === '.pov') return 'pov';
   if (ext === '.info') return 'info';
   if (inside('medias')) return 'media';

@@ -12,6 +12,7 @@ import { matchScreens } from './match';
 import { ROLES, type AncillaryRoleId, type AudioRole, type Cabinet, type FlipperEdge, type ObservedAudioOutput, type ObservedDisplay, type ObservedUsbDevice, type RoleId, type ScreenZone } from './model';
 import {
   applyVpxDefaults,
+  VPX_KEEP_TOP_FRAMING,
   applyVpxSettings,
   DEFAULT_VPX_PROFILE,
   disabledPlugins,
@@ -254,7 +255,11 @@ export function planVpxSync(
     const size = screenSize && zoneSizeCm(screenSize, assignments.playfield, zones.playfield);
     const settings = vpxLayoutSettings(playfield, edge, size);
     applyOwned(settings.settings);
-    if (settings.autofit && !outside(settings.autofit)) findings.push(...requireAutofit(doc, settings.autofit, kept, changes));
+    if (settings.autofit && !outside(settings.autofit)) {
+      findings.push(...requireAutofit(doc, settings.autofit, kept, changes));
+      // VPX corrigé : « Ajuster la table » garde le haut de la table (valeurs proposées, VPX_KEEP_TOP_FRAMING).
+      if (profile.keepTopFraming) changes.push(...applyVpxDefaults(doc, [...VPX_KEEP_TOP_FRAMING]));
+    }
     if (!size) {
       findings.push({
         severity: 'warning',

@@ -962,7 +962,10 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
         break;
       case 'tableIni':
       case 'pov': {
-        if (vpxBases.includes(stem.toLowerCase())) add(item, name);
+        // Un POV en .ini (« <table> POV.ini ») garde un nom de POV : il ne prend jamais la place du .ini de la table,
+        // dont le médecin reprend seulement la vue (povview.ts).
+        if (item.kind === 'pov' && /\.ini$/i.test(name)) add(item, game.vpx.length === 1 ? `${path.basename(game.vpx[0]!.path, '.vpx')} POV.ini` : name);
+        else if (vpxBases.includes(stem.toLowerCase())) add(item, name);
         else if (game.vpx.length === 1 && nameKey(parseTableName(stem).title).startsWith(game.key.slice(0, 4))) {
           add(item, `${path.basename(game.vpx[0]!.path, '.vpx')}${path.extname(name)}`);
         } else add(item, name);

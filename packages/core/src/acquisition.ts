@@ -18,6 +18,7 @@ import { FUTURE_PINBALL_VPS_FORMAT } from './futurepinball';
 import { dmdMediaType } from './medias';
 import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
+import { isPovIniName } from './tablefiles';
 import type { TableInfoFile } from './tables';
 import { editionMatch, matchVps, searchVps, vpsKey, vpsWords, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
 
@@ -1069,7 +1070,7 @@ export const EXPECTED_LABELS: Record<NeedKind, string> = {
     return t('une vidéo ou une image de topper');
   },
   get pov() {
-    return t('un fichier .pov');
+    return t('un fichier de point de vue (.pov, ou .ini de POV)');
   },
   get media() {
     return t('des images ou des vidéos pour le front-end');
@@ -1092,7 +1093,7 @@ export function classifyContent(name: string, entries?: string[]): ContentKind {
   if (!ARCHIVES.test(lower) || !entries) {
     if (lower.endsWith('.vpx') || lower.endsWith('.fpt')) return 'table';
     if (lower.endsWith('.directb2s')) return 'b2s';
-    if (lower.endsWith('.pov')) return 'pov';
+    if (lower.endsWith('.pov') || isPovIniName(lower)) return 'pov';
     if (AUDIO.test(lower)) return 'music';
     if (COLORS.test(lower)) return 'altcolor';
     if (IMAGES.test(lower) || VIDEOS.test(lower)) return /topper/i.test(name) ? 'topper' : 'media';
@@ -1109,7 +1110,8 @@ export function classifyContent(name: string, entries?: string[]): ContentKind {
   if (has((e) => COLORS.test(e))) return 'altcolor';
   // Une ROM : des puces, toutes dans un même dossier, quel que soit le format (romzip.ts).
   if (romContent(entries)) return 'rom';
-  if (has((e) => e.endsWith('.pov'))) return 'pov';
+  // Un POV : .pov (VPX 10.7), ou .ini de POV (VPX 10.8, « <table> POV.ini », ou archive qui n'a que des .ini).
+  if (has((e) => e.endsWith('.pov') || isPovIniName(base(e))) || (files.length > 0 && files.every((e) => /\.(ini|txt)$/i.test(e)) && files.some((e) => /\.ini$/i.test(e)))) return 'pov';
   const media = files.filter((e) => IMAGES.test(e) || VIDEOS.test(e)).length;
   if (!media && has((e) => AUDIO.test(e))) return 'music';
   if (media) return /topper/i.test(name) && !/media.?pack/i.test(name) ? 'topper' : 'media';
@@ -1229,7 +1231,7 @@ export function contentParts(name: string, entries?: string[]): NeedKind[] {
     ['altcolor', has((e) => COLORS.test(e))],
     ['altsound', files.some((e) => ['altsound.csv', 'g-sound.csv'].includes(base(e)))],
     ['music', has((e) => /(^|\/)music\//.test(e) && AUDIO.test(e))],
-    ['pov', has((e) => e.endsWith('.pov'))],
+    ['pov', has((e) => e.endsWith('.pov') || isPovIniName(base(e)))],
   ];
   for (const [kind, present] of found) if (present && !parts.includes(kind)) parts.push(kind);
   return parts;
@@ -1277,7 +1279,7 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
   const kinds: NeedKind[] =
     content !== 'unknown'
       ? PART_KINDS.filter((k) => contentFits(k, content) === 'yes')
-      : ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : PART_KINDS.filter((k) => k !== 'rom' && k !== 'media');
+      : ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' || isPovIniName(d.filename) ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : PART_KINDS.filter((k) => k !== 'rom' && k !== 'media');
   const candidates = (byPage.length ? byPage : waiting).filter((i) => kinds.includes(i.kind));
   if (candidates.length === 1 && (byPage.length || candidates[0]!.kind !== 'table' || ext === '.vpx' || ext === '.directb2s' || content === 'table')) {
     // Un seul attendu de cette sorte : encore faut-il que le nom ne désigne pas un autre jeu.

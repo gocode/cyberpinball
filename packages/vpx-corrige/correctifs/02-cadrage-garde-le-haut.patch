@@ -1,0 +1,203 @@
+diff --git a/src/core/Settings_properties.inl b/src/core/Settings_properties.inl
+index 036e0acc..2c43f870 100644
+--- a/src/core/Settings_properties.inl
++++ b/src/core/Settings_properties.inl
+@@ -166,6 +166,9 @@ PropEnum(Player, BGSet, "View Mode"s, "Select between desktop, cabinet or 'full
+ PropEnum(Player, CabinetAutofitMode, "Cabinet Autofit Mode"s, "Select between manual setup, automatic fitting without visual stretch or automatic fitting with table stretching"s, int, 0,
+    "Manual"s, "Fit Table"s, "Fit Screen"s);
+ PropFloat(Player, CabinetAutofitPos, "Cabinet Autofit Pos"s, "Relative lower flipper bat position when using automatic view fitting (0% for bottom of screen, 100% for top)"s, 0.f, 0.2f, 0.05f);
++// Added by Cyber Pinball, 2026-11-21 (patched Cyber Pinball 2): 'Fit Table' without hiding the top of the table.
++PropBool(Player, CabinetAutofitKeepTop, "Cabinet Autofit Keep Top"s, "With 'Fit Table': never hide the top of the table. The table is zoomed only until its top reaches the top of the screen with the lower flipper bats at the selected position (hiding the apron), the remaining width is filled by a limited horizontal stretch"s, false);
++PropFloat(Player, CabinetAutofitMaxStretch, "Cabinet Autofit Max Stretch"s, "With 'Fit Table' and 'Keep Top': maximum horizontal stretch used to fill the screen width (0% keeps the table proportions, leaving side bands)"s, 0.f, 0.5f, 0.f);
+ 
+ // Aliasing & sharpening
+ PropFloat(Player, AAFactor, "Full Scene Anti Aliasing"s,
+diff --git a/src/renderer/ViewSetup.cpp b/src/renderer/ViewSetup.cpp
+index af6bdb29..37a48a9d 100644
+--- a/src/renderer/ViewSetup.cpp
++++ b/src/renderer/ViewSetup.cpp
+@@ -117,40 +117,89 @@ void ViewSetup::SetWindowAutofit(const PinTable* const table, const vec3& player
+       }
+ 
+       // Compute the right vertical offset by doing a simple dichotomy search
+-      ModelViewProj mvp;
+-      float posMin = -100.f;
+-      float posMax = +100.f;
++      // Modified by Cyber Pinball, 2026-11-21 (patched Cyber Pinball 2): the search is a lambda, also used without rules 1 & 2
++      // to find the zoom that keeps the top of the table visible (CabinetAutofitKeepTop). Without that option, unchanged.
+       const float targetPos = -1.f + 2.f * flipperPos; // target position of the bottom of the flipper bat in clip space coordinate (-1 at bottom of screen, 1 at top of screen)
+-      for (int i = 0; i < 20; i++)
++      struct FitPoints { float bottomFlipperY, backTopY, bottomDownY, playfieldTopY; };
++      auto placeVertically = [&](const bool edgeRules)
+       {
+-         mViewVOfs = 0.5f * (posMin + posMax);
+-         ComputeMVP(table, aspect, false, mvp);
+-         Vertex3Ds bottomFlipper(table->m_right * 0.5f, bottomY, 0.f);
+-         mvp.GetModelViewProj(0).MultiplyVector(bottomFlipper);
+-         Vertex3Ds backTop(table->m_right * 0.5f, table->m_top, mWindowTopZOfs);
+-         mvp.GetModelViewProj(0).MultiplyVector(backTop);
+-         Vertex3Ds bottomDown(table->m_right * 0.5f, table->m_bottom, mWindowBottomZOfs);
+-         mvp.GetModelViewProj(0).MultiplyVector(bottomDown);
+-         const float bottomFlipperY = aspect < 1.f ? bottomFlipper.y : - bottomFlipper.x;
+-         const float bottomDownY = aspect < 1.f ? bottomDown.y : -bottomDown.x;
+-         const float backTopY = aspect < 1.f ? backTop.y : -backTop.x;
+-         const float delta = bottomFlipperY - targetPos;
+-         //PLOGD << std::format("Vertical offset fitting: [{:6.3f} - {:6.3f}] {:6.3f} => Flipper: {:6.3f} / {:6.3f}, BackTop: {:6.3f}, BottomDown: {:6.3f}", posMin, posMax, mViewVOfs,
+-         //   bottomFlipperY, targetPos, backTopY, bottomDownY).c_str();
+-         // Rule 1: limit the bottom gap to 5% of screen height
+-         if (bottomDownY > -1.0f + 0.05f / 2.f)
+-            posMin = mViewVOfs;
+-         // Rule 2: don't create a gap at the top
+-         else if (backTopY < 1.0f)
+-            posMax = mViewVOfs;
+-         // Rule 3: place flipper bat bottom at the user selected relative height position
+-         else if (fabs(delta) < 0.001f)
+-            break;
+-         else if (delta > 0.f)
+-            posMin = mViewVOfs;
+-         else
+-            posMax = mViewVOfs;
++         ModelViewProj mvp;
++         FitPoints fit { 0.f, 0.f, 0.f, 0.f };
++         float posMin = -100.f;
++         float posMax = +100.f;
++         for (int i = 0; i < 20; i++)
++         {
++            mViewVOfs = 0.5f * (posMin + posMax);
++            ComputeMVP(table, aspect, false, mvp);
++            Vertex3Ds bottomFlipper(table->m_right * 0.5f, bottomY, 0.f);
++            mvp.GetModelViewProj(0).MultiplyVector(bottomFlipper);
++            Vertex3Ds backTop(table->m_right * 0.5f, table->m_top, mWindowTopZOfs);
++            mvp.GetModelViewProj(0).MultiplyVector(backTop);
++            Vertex3Ds bottomDown(table->m_right * 0.5f, table->m_bottom, mWindowBottomZOfs);
++            mvp.GetModelViewProj(0).MultiplyVector(bottomDown);
++            Vertex3Ds playfieldTop(table->m_right * 0.5f, table->m_top, 0.f);
++            mvp.GetModelViewProj(0).MultiplyVector(playfieldTop);
++            fit.playfieldTopY = aspect < 1.f ? playfieldTop.y : -playfieldTop.x;
++            fit.bottomFlipperY = aspect < 1.f ? bottomFlipper.y : - bottomFlipper.x;
++            fit.bottomDownY = aspect < 1.f ? bottomDown.y : -bottomDown.x;
++            fit.backTopY = aspect < 1.f ? backTop.y : -backTop.x;
++            const float delta = fit.bottomFlipperY - targetPos;
++            //PLOGD << std::format("Vertical offset fitting: [{:6.3f} - {:6.3f}] {:6.3f} => Flipper: {:6.3f} / {:6.3f}, BackTop: {:6.3f}, BottomDown: {:6.3f}", posMin, posMax, mViewVOfs,
++            //   fit.bottomFlipperY, targetPos, fit.backTopY, fit.bottomDownY).c_str();
++            // Rule 1: limit the bottom gap to 5% of screen height
++            if (edgeRules && fit.bottomDownY > -1.0f + 0.05f / 2.f)
++               posMin = mViewVOfs;
++            // Rule 2: don't create a gap at the top
++            else if (edgeRules && fit.backTopY < 1.0f)
++               posMax = mViewVOfs;
++            // Rule 3: place flipper bat bottom at the user selected relative height position
++            else if (fabs(delta) < 0.001f)
++               break;
++            else if (delta > 0.f)
++               posMin = mViewVOfs;
++            else
++               posMax = mViewVOfs;
++         }
++         return fit;
++      };
++
++      // Keep Top: the uniform zoom is limited so that, with the lower flipper bats at the selected position, the back edge of
++      // the playfield stays on screen, below the top by a margin left for the back wall (what is hidden is the apron, below the
++      // flippers, and the empty space under the top glass), never beyond the zoom that fills the width, never below 1 (the
++      // whole table). The top glass point used by the standard fit lies in the air above the back wall: aiming at it leaves an
++      // empty band at the top of the screen. The remaining width is filled by a horizontal stretch, limited to
++      // CabinetAutofitMaxStretch (side bands beyond). The projected span from the flippers to the back edge grows with the zoom:
++      // a few proportional corrections converge.
++      // A table wider than the screen (fill zoom below 1) keeps the standard fit.
++      if (const float fillScale = mSceneScaleX; settings.GetPlayer_CabinetAutofitKeepTop() && fillScale > 1.f) // fillScale: uniform zoom that fills the screen width
++      {
++         const float maxStretch = clamp(settings.GetPlayer_CabinetAutofitMaxStretch(), 0.f, 0.5f);
++         auto setZoom = [&](const float zoom)
++         {
++            mSceneScaleY = zoom;
++            mSceneScaleX = clamp(fillScale, zoom, zoom * (1.f + maxStretch));
++            SetViewPosFromPlayerPosition(table, playerPos, settings.GetPlayer_ScreenInclination());
++         };
++         constexpr float backWallMargin = 0.06f; // Share of the screen height kept above the back edge of the playfield
++         const float topTarget = 1.f - 2.f * backWallMargin;
++         float zoom = 1.f;
++         for (int i = 0; i < 6; i++)
++         {
++            setZoom(zoom);
++            const FitPoints fit = placeVertically(false);
++            const float span = fit.playfieldTopY - targetPos;
++            if (span <= 0.01f || topTarget <= targetPos)
++               break;
++            const float next = clamp(zoom * (topTarget - targetPos) / span, 1.f, fillScale);
++            const bool converged = fabs(next - zoom) < 0.0005f;
++            zoom = next;
++            if (converged)
++               break;
++         }
++         // A hair beyond, so that rule 2 never pulls the flippers up for a sub-pixel gap at the top
++         setZoom(zoom > 1.001f ? min(zoom * 1.002f, fillScale) : 1.f);
+       }
++      placeVertically(true);
+    }
+ }
+ 
+diff --git a/src/ui/live/ingameui/GraphicSettingsPage.cpp b/src/ui/live/ingameui/GraphicSettingsPage.cpp
+index b5f02477..3a2dd76b 100644
+--- a/src/ui/live/ingameui/GraphicSettingsPage.cpp
++++ b/src/ui/live/ingameui/GraphicSettingsPage.cpp
+@@ -84,6 +84,27 @@ void GraphicSettingsPage::BuildPage()
+                m_player->SetCabinetAutoFitPos(v);
+                OnStaticRenderDirty();
+             }));
++         // Added by Cyber Pinball, 2026-11-21 (patched Cyber Pinball 2): fit without hiding the top of the table.
++         AddItem(std::make_unique<InGameUIItem>(
++            Settings::m_propPlayer_CabinetAutofitKeepTop, //
++            [this]() { return m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitKeepTop(); },
++            [this](bool v)
++            {
++               m_player->m_ptable->m_settings.SetPlayer_CabinetAutofitKeepTop(v, false);
++               m_player->SetCabinetAutoFitPos(m_player->GetCabinetAutoFitPos());
++               OnStaticRenderDirty();
++               RequestRebuild();
++            }));
++         if (m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitKeepTop())
++            AddItem(std::make_unique<InGameUIItem>(
++               Settings::m_propPlayer_CabinetAutofitMaxStretch, 100.f, "%4.1f %%"s, //
++               [this]() { return m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitMaxStretch(); },
++               [this](float, float v)
++               {
++                  m_player->m_ptable->m_settings.SetPlayer_CabinetAutofitMaxStretch(v, false);
++                  m_player->SetCabinetAutoFitPos(m_player->GetCabinetAutoFitPos());
++                  OnStaticRenderDirty();
++               }));
+       }
+    }
+ 
+diff --git a/src/ui/live/ingameui/PointOfViewSettingsPage.cpp b/src/ui/live/ingameui/PointOfViewSettingsPage.cpp
+index bcb520f7..4bd62bb2 100644
+--- a/src/ui/live/ingameui/PointOfViewSettingsPage.cpp
++++ b/src/ui/live/ingameui/PointOfViewSettingsPage.cpp
+@@ -470,6 +470,27 @@ void PointOfViewSettingsPage::BuildPage()
+                m_player->SetCabinetAutoFitPos(v);
+                OnPointOfViewChanged();
+             }));
++         // Added by Cyber Pinball, 2026-11-21 (patched Cyber Pinball 2): fit without hiding the top of the table.
++         AddItem(std::make_unique<InGameUIItem>(
++            Settings::m_propPlayer_CabinetAutofitKeepTop, //
++            [this]() { return m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitKeepTop(); },
++            [this](bool v)
++            {
++               m_player->m_ptable->m_settings.SetPlayer_CabinetAutofitKeepTop(v, false);
++               m_player->SetCabinetAutoFitPos(m_player->GetCabinetAutoFitPos());
++               OnPointOfViewChanged();
++               RequestRebuild();
++            }));
++         if (m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitKeepTop())
++            AddItem(std::make_unique<InGameUIItem>(
++               Settings::m_propPlayer_CabinetAutofitMaxStretch, 100.f, "%4.1f %%"s, //
++               [this]() { return m_player->m_ptable->m_settings.GetPlayer_CabinetAutofitMaxStretch(); },
++               [this](float, float v)
++               {
++                  m_player->m_ptable->m_settings.SetPlayer_CabinetAutofitMaxStretch(v, false);
++                  m_player->SetCabinetAutoFitPos(m_player->GetCabinetAutoFitPos());
++                  OnPointOfViewChanged();
++               }));
+       }
+       break;
+    }

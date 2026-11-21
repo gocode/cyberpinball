@@ -206,14 +206,15 @@ test('schéma de VPX 10.8.1-5436 : nombre de réglages et cas particuliers', () 
   // 1148 macros de réglage moins les 9 de la branche #else (non BGFX), puis 101 réglages
   // déclarés par les plugins ; vérifié par `npm run vpx-schema -- --ini` contre un
   // VPinballX.ini écrit par cette version. Plus les 3 du plugin Vision3D de Cyber Pinball
-  // (Enable, Port, Gain) et les 5 de CyberPinballDmd (Enable, LogFile, Probe, Follow, ShutdownWait : vpx-own-plugins.ts).
-  assert.equal(schema.count, 1248);
-  assert.equal(schema.settings.length, 1248);
+  // (Enable, Port, Gain) et les 5 de CyberPinballDmd (Enable, LogFile, Probe, Follow, ShutdownWait : vpx-own-plugins.ts). Plus les 2 du VPX corrigé de Cyber Pinball
+  // (CabinetAutofitKeepTop, CabinetAutofitMaxStretch : correctif 02, patchedSettingsSource).
+  assert.equal(schema.count, 1250);
+  assert.equal(schema.settings.length, 1250);
   assert.deepEqual(schema.settings.filter((s) => s.plugin === 'Vision3D').map((s) => s.key), ['Enable', 'Port', 'Gain']);
   assert.deepEqual(schema.settings.filter((s) => s.plugin === 'CyberPinballDmd').map((s) => s.key), ['Enable', 'LogFile', 'Probe', 'Follow', 'ShutdownWait']);
   // La pause dans le casque (activée dans l'INI des parties dans le casque seulement) reste hors du schéma.
   assert.equal(schema.settings.filter((s) => s.plugin === 'CyberPinball').length, 0);
-  assert.equal(schema.settings.filter((s) => !s.plugin).length, 1139);
+  assert.equal(schema.settings.filter((s) => !s.plugin).length, 1141);
   assert.equal(schema.sourceCommit, 'af26b2d93');
   const get = (section: string, key: string) => schema.settings.find((s) => s.section === section && s.key === key);
   assert.deepEqual(get('Player', 'BGSet')?.values, ['Desktop / Full Single Screen', 'Cabinet', 'Full Single Screen']);

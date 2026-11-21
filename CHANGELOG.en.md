@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Table framing (beta): on a 16:9 screen, a table is 17 to 29% too narrow, and VPX's "Fit table" framing filled the width with a zoom that could cut off the back of the playfield (on Attack from Mars, the saucer left the screen). With Cyber Pinball's patched VPX (patched Cyber Pinball 2), the table is enlarged as long as the back of the playfield stays on screen: the decorative bottom, below the flippers, and the empty space above the table are what leave the screen, and the rest of the width is filled by a slight stretch (15% at most). "Keep the top of the table" and "Maximum width stretch" settings in VPX settings > Table view and fitting, also in the VPX menu in game, with eye height and distance for the perspective.
+- POV files (beta): the point of view prepared by the community for a table (.pov, or "<table> POV.ini") is now applied to that table only, if the flippers stay on your side of the cabinet; a POV made for another screen is set aside. When a framing was already chosen for the table, the POV is offered in the diagnosis.
+- Diagnosis: a table switched to manual view in the VPX menu without a view set is no longer shown as "Framing set for this table"; a repair gives it back the cabinet's framing.
 - Community: the screen opens with the cursor in the tab bar; the flippers move from tab to tab and show its content right away, Start enters it, Exit goes back up to the bar.
 - The Community home sums up each tab (Messages, Players, Groups, Rooms, Profile): Start on a summary opens the tab on the same strip, Exit brings you back.
 - Online players are shown in wider cards, two per row: the nickname fits on one line, "Add" no longer moves when the cursor passes, and "All players" opens the full list.

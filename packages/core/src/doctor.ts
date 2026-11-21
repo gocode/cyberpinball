@@ -92,7 +92,8 @@ import { dofRomNumbers, tableDofIni, tableIniMasksGlobal, type DofSetup } from '
 import { playBlockers, playSeverity } from './playable';
 import { isVpxTable, parseTableName, readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
-import { hasOwnCabinetView, importedViewFinding } from './tableview';
+import { hasOwnCabinetView, importedViewFinding, touchesCabinetView } from './tableview';
+import { povViewFinding } from './povview';
 import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
@@ -169,6 +170,9 @@ export const FINDING_CODES = [
   'pupPackDisabledScript',
   'manualView',
   'importedView',
+  'povView',
+  'povOffered',
+  'povWrongWay',
   'tableOrientation',
   'tableWindows',
   'fullDmdHidden',
@@ -852,6 +856,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const orientation = ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
   const manual = orientation || manualViewFinding(entry.file) || importedViewFinding(entry.file, ctx.orientation);
   if (manual) findings.push(manual);
+  // Point de vue fourni avec la table (fichier POV, povview.ts), sauf si son .ini la met déjà de travers.
+  const pov = orientation ? undefined : povViewFinding(entry.file, ctx.orientation);
+  if (pov) findings.push(pov);
 
   // 7 bis. Screens placed for this table only (VPX menu, "Save as Table Override"),
   // including the DMD that would cover the FullDMD dressing: that finding keeps the DMD window. The DMD
@@ -911,15 +918,23 @@ function manualViewFinding(tableFile: string): Finding | undefined {
       fix: { label: t('Passer cette table au cadrage automatique'), ops: [{ op: 'write', path: ini.path, content: doc.toString() }] },
     };
   }
+  // Passée en cadrage manuel dans le menu de VPX sans vue réglée (hauteurs de vitre, mode, rotation seuls) : la vue de
+  // l'auteur, enregistrée dans le .vpx pour son écran, pas un cadrage fait pour cette borne.
+  const fromMenu = touchesCabinetView(doc);
   doc.remove('Player', 'CabinetAutofitMode');
   return {
     code: 'manualView',
     severity: 'warning',
-    title: t('Cadrage manuel imposé par la table'),
-    detail: t(
-      '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.',
-      { name },
-    ),
+    title: fromMenu ? t('Cadrage manuel sans vue réglée') : t('Cadrage manuel imposé par la table'),
+    detail: fromMenu
+      ? t(
+          '{name} passe cette table en cadrage manuel, sans échelle ni décalage réglés pour elle (ce que le menu de VPX enregistre quand on quitte le cadrage automatique) : VPX reprend la vue enregistrée par l’auteur de la table, pour son écran. Le cadrage de la borne la remet à la bonne taille ; « Régler l’affichage en partie » permet ensuite de la retoucher.',
+          { name },
+        )
+      : t(
+          '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.',
+          { name },
+        ),
     fix: {
       label: t('Rendre le cadrage automatique à la table'),
       ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
@@ -1649,7 +1664,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 October 2026: game played without the .vbs that switches the pack on), and a table that the core.vbs
  * stops does not start (Back to the Future, 30 October 2026: vpmInit called twice).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames', 'dmdColorsMisnamed'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'povView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames', 'dmdColorsMisnamed'];
 
 /**
  * Repairable findings of PUP_PLAY_REPAIRS for this table. Without a known script (outdated
@@ -1683,6 +1698,9 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   // Framing set for the table in its old installation (tableview.ts): only when the direction of the game is checked.
   const view = ctx.orientation && !manualViewFinding(entry.file) ? importedViewFinding(entry.file, ctx.orientation) : undefined;
   if (view) found.push(view);
+  // Point de vue fourni avec la table (povview.ts) : seulement quand rien n'est choisi pour elle et le sens est vérifié.
+  const pov = ctx.orientation && !view ? povViewFinding(entry.file, ctx.orientation) : undefined;
+  if (pov) found.push(pov);
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }
 

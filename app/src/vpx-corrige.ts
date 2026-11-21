@@ -95,8 +95,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 1 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 1;
+/** Série de correctifs livrée (« patched Cyber Pinball 2 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 2;
 
 /** Le VPX corrigé livré est-il l'exécutable en place ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

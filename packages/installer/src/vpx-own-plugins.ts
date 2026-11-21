@@ -29,6 +29,27 @@ export const OWN_PLUGINS: OwnPlugin[] = [
   { dir: 'vpx-vision3d', cfg: 'cyberpinball-dmd.cfg', sources: ['src/dmd-suivi.cpp', 'src/suivi-dmd.h', 'src/cadence.h', 'src/arrets.h'] },
 ];
 
+/** La version de VPX que remplace le VPX corrigé de Cyber Pinball (app/src/vpx-corrige.ts, VPX_CORRIGE_VERSION). */
+export const VPX_CORRIGE_SCHEMA_VERSION = '10.8.1-5436';
+
+/**
+ * Réglages ajoutés à Settings_properties.inl par les correctifs du VPX corrigé (packages/vpx-corrige/correctifs) :
+ * les lignes ajoutées à ce fichier, dans l'ordre des correctifs, à lire à la suite du fichier d'origine. Le VPX corrigé
+ * est posé sur la 5436 seulement : ces réglages n'entrent que dans son schéma.
+ */
+export function patchedSettingsSource(packagesDir: string): string {
+  const dir = path.join(packagesDir, 'vpx-corrige', 'correctifs');
+  const lines: string[] = [];
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort()) {
+    let inSettings = false;
+    for (const line of fs.readFileSync(path.join(dir, file), 'utf8').split(/\r?\n/)) {
+      if (line.startsWith('diff --git ')) inSettings = line.endsWith('/src/core/Settings_properties.inl');
+      else if (inSettings && line.startsWith('+') && !line.startsWith('+++')) lines.push(line.slice(1));
+    }
+  }
+  return lines.join('\n');
+}
+
 /** Enable et réglages déclarés de chaque plugin de Cyber Pinball. `packagesDir` : le dossier packages/ du dépôt. */
 export function ownPluginSettings(packagesDir: string): VpxSettingDef[] {
   const settings: VpxSettingDef[] = [];

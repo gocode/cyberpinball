@@ -372,7 +372,7 @@ for (const entry of VPX_ENTRIES) test(`chaque clé écrite pour VPX ${entry.vers
   for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()) || (action(e) ?? '') in VPX_INPUT_DEFAULTS, `[${e.section}] ${e.key}`);
   // Et l'écran des réglages les montre toutes comme gérées, sauf les valeurs proposées.
   const owned = vpxOwnedKeys(profile, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade', 'DMDServer'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
-  const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'LayoutFolder', 'Cheat'];
+  const proposed = ['CabinetAutofitMode', 'CabinetAutofitKeepTop', 'CabinetAutofitMaxStretch', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath', 'LayoutFolder', 'Cheat'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
 });
 

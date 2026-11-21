@@ -47,6 +47,8 @@ const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM
 const NOT_DRIVEN_SCRIPT = `${NO_PUP_SCRIPT}Sub Kicker1_Hit\r\n  DOF 105, DOFPulse\r\nEnd Sub\r\n`;
 /** Table de JP : FlexDMD lancé, noms d'images assemblés par « "VPX." & … » (flexprewarm.ts). */
 const FLEX_JP_SCRIPT = `Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nFlexDMD.Run = True\r\nChars(65) = "d_a"\r\nSub Show(c) : FlexDMD.NewImage "", "VPX." & Chars(c) & "&dmd=2" : End Sub\r\n`;
+/** Fichier POV (VPX 10.7, XML) d'une vue borne en mode « Window » (povview.ts). */
+const POV_WINDOW = '<?xml version="1.0" encoding="UTF-8"?>\r\n<POV>\r\n  <fullscreen>\r\n    <LayoutMode>2</LayoutMode>\r\n    <rotation>0</rotation>\r\n    <xscale>1.15</xscale>\r\n    <yscale>1.08</yscale>\r\n    <ViewVOfs>-4.5</ViewVOfs>\r\n  </fullscreen>\r\n</POV>\r\n';
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
 const CABINET: PupCabinet = {
   backglass: true,
@@ -535,6 +537,18 @@ const TRAPS: Trap[] = [
   },
   // Vue de borne réglée pour la table sous un VPX d'avant 10.8.1 (reprise d'une installation PinUP Popper, 17/11/2026).
   { code: 'importedView', arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[TableOverride]\r\nViewCabHOfs = 1.5\r\nViewCabVOfs = 8\r\nViewCabScaleY = 1.04\r\n') },
+  // Fichier POV de la communauté posé avec la table (povview.ts) : rien de choisi pour elle, il est repris.
+  { code: 'povView', arm: (folder) => write(path.join(folder, `${TABLE}.pov`), POV_WINDOW) },
+  // Le même, quand un cadrage a été choisi pour la table : seulement proposé.
+  {
+    code: 'povOffered',
+    arm: (folder) => {
+      write(path.join(folder, `${TABLE}.pov`), POV_WINDOW);
+      write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 1\r\n');
+    },
+  },
+  // POV d'une vue « Legacy » tournée de 270° : de travers sur un playfield en portrait, écarté.
+  { code: 'povWrongWay', arm: (folder) => write(path.join(folder, `${TABLE}.pov`), POV_WINDOW.replace('<LayoutMode>2</LayoutMode>', '<LayoutMode>0</LayoutMode>').replace('<rotation>0</rotation>', '<rotation>270</rotation>')), ctx: () => ({ orientation: portraitOrientation() }) },
   // Windows en portrait, joueur en bas : cadrage manuel imposé par la table, sa vue garde la rotation de l'auteur.
   {
     code: 'tableOrientation',

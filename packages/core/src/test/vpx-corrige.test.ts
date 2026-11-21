@@ -62,7 +62,7 @@ test('fiche technique : « patched Cyber Pinball 1 » quand le corrigé est en p
     const inPlace = (corrige as unknown as { vpxCorrigeInPlace(d: string, v: string | undefined, a: string): number | undefined }).vpxCorrigeInPlace;
     assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), undefined, 'officiel en place');
     corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app);
-    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), 1);
+    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
     assert.equal(inPlace(vpx, '10.9.0-6948', app), undefined);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -133,4 +133,24 @@ test('le correctif livré bride bien chaque fenêtre annexe à son écran, et la
   assert.match(patch === undefined ? '' : fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '01-cadence-fenetres-annexes.patch'), 'utf8'), /Cyber Pinball, \d{4}-\d{2}-\d{2}/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
   const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /installVpxCorrige\(path\.dirname\(install\.exe\), install\.version/, 'posé avant chaque partie, avec la version du VPX lancé');
+});
+
+test('correctif 02 : « Fit Table » garde le haut de la table, réglages connus du schéma de la 5436 seulement', () => {
+  // 21/11/2026 : sur un 16:9, « Fit Table » pouvait couper le fond du plateau (Attack from Mars : la soucoupe ; ViewSetup::SetWindowAutofit).
+  const diff = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '02-cadrage-garde-le-haut.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Cyber Pinball, \d{4}-\d{2}-\d{2}/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
+  assert.match(diff, /\+PropBool\(Player, CabinetAutofitKeepTop,[^\n]*, false\);/, 'désactivé par défaut : sans la clé, VPX cadre comme la 5436');
+  assert.match(diff, /\+PropFloat\(Player, CabinetAutofitMaxStretch,[^\n]*0\.f, 0\.5f, 0\.f\);/);
+  assert.match(diff, /\+\s+if \(const float fillScale = mSceneScaleX; settings\.GetPlayer_CabinetAutofitKeepTop\(\) && fillScale > 1\.f\)/, 'seulement dans « Fit Table » (sans étirement)');
+  assert.match(diff, /mSceneScaleX = clamp\(fillScale, zoom, zoom \* \(1\.f \+ maxStretch\)\)/, 'étirement plafonné, jamais une table rétrécie en largeur');
+  assert.match(diff, /placeVertically\(true\);/, 'les règles de VPX (pas de vide en haut, 5 % en bas au plus) gardent le dernier mot');
+  assert.doesNotMatch(diff, /mViewportRotation =/, 'la rotation reste celle du cadrage automatique : le sens des tables est inchangé');
+  // Le schéma de la 5436 (celle que remplace le VPX corrigé) connaît ces réglages ; celui de la 10.9 non.
+  const schema = (v: string) => JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'installer', 'vpx-settings', `${v}.json`), 'utf8')) as { settings: { section: string; key: string }[] };
+  const has = (v: string, key: string) => schema(v).settings.some((s) => s.section === 'Player' && s.key === key);
+  assert.ok(has('10.8.1-5436', 'CabinetAutofitKeepTop') && has('10.8.1-5436', 'CabinetAutofitMaxStretch'));
+  assert.ok(!has('10.9.0-6948', 'CabinetAutofitKeepTop'));
+  const own = require(path.join(REPO_ROOT, 'packages', 'installer', 'dist', 'vpx-own-plugins.js')) as { patchedSettingsSource(dir: string): string };
+  assert.match(own.patchedSettingsSource(path.join(REPO_ROOT, 'packages')), /^PropBool\(Player, CabinetAutofitKeepTop/m, 'le schéma lit les réglages dans les correctifs eux-mêmes');
 });

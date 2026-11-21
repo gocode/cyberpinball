@@ -8,7 +8,8 @@ import { IniDocument } from '../ini';
 import { rotatedDisplay } from '../layout';
 import { writeWithBackup } from '../store';
 import { keepManualEdits, planVpxSync } from '../sync';
-import { vpxDisplayId, vpxSettingsFor } from '../vpx';
+import { DEFAULT_VPX_PROFILE, vpxDisplayId, vpxSettingsFor } from '../vpx';
+import { VPX_ESSENTIALS } from '../vpx-essentials';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 
 function cabinetForDevPc() {
@@ -149,6 +150,32 @@ test('vue borne : le mode de cadrage choisi est gardé, le cadrage manuel est re
   const kept = planVpxSync({ ...cabinet, vpxManual: ['Player.CabinetAutofitMode'] }, devPcDisplays(), '[Player]\nCabinetAutofitMode = 0\n');
   assert.equal(IniDocument.parse(kept.nextIni!).get('Player', 'CabinetAutofitMode'), '0');
   assert.ok(kept.findings.some((f) => f.severity === 'warning' && f.message.includes('la rotation réglée par son auteur')));
+});
+
+test('VPX corrigé : « Ajuster la table » garde le haut de la table, valeurs proposées sans écraser un choix', () => {
+  // 21/11/2026 : sur un 16:9, « Ajuster » pouvait couper le fond du plateau (Attack from Mars : la soucoupe ; ViewSetup::SetWindowAutofit).
+  const cabinet = { ...cabinetForDevPc(), playfield: { flipperEdge: 'right' as const } };
+  const patched = { ...DEFAULT_VPX_PROFILE, keepTopFraming: true };
+  const fresh = IniDocument.parse(planVpxSync(cabinet, devPcDisplays(), '', patched).nextIni!);
+  assert.equal(fresh.get('Player', 'CabinetAutofitKeepTop'), '1');
+  assert.equal(fresh.get('Player', 'CabinetAutofitMaxStretch'), '0.15');
+  // Choix de l'utilisateur gardé.
+  const chosen = IniDocument.parse(planVpxSync(cabinet, devPcDisplays(), '[Player]\nCabinetAutofitKeepTop = 0\nCabinetAutofitMaxStretch = 0\n', patched).nextIni!);
+  assert.equal(chosen.get('Player', 'CabinetAutofitKeepTop'), '0');
+  assert.equal(chosen.get('Player', 'CabinetAutofitMaxStretch'), '0');
+  // VPX officiel (ou une autre version) : ces clés lui sont inconnues, rien n'est écrit.
+  assert.equal(IniDocument.parse(planVpxSync(cabinet, devPcDisplays(), '').nextIni!).get('Player', 'CabinetAutofitKeepTop'), undefined);
+  // Vue bureau (joueur en bas d'un écran paysage) : pas de cadrage automatique, pas de clés.
+  const desktop = planVpxSync({ ...cabinetForDevPc(), playfield: { flipperEdge: 'bottom' as const } }, devPcDisplays(), '', patched);
+  assert.equal(IniDocument.parse(desktop.nextIni!).get('Player', 'CabinetAutofitKeepTop'), undefined);
+  // La 5436 livrée est le VPX corrigé : son profil le dit (components.json).
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'installer', 'components.json'), 'utf8')) as { components: { id: string; version: string; adapterSettings?: { keepTopFraming?: boolean } }[] };
+  const vpx = manifest.components.filter((c) => c.id === 'vpx');
+  assert.equal(vpx.find((c) => c.version === '10.8.1-5436')?.adapterSettings?.keepTopFraming, true);
+  assert.ok(vpx.filter((c) => c.version !== '10.8.1-5436').every((c) => !c.adapterSettings?.keepTopFraming), 'seule la 5436 est corrigée');
+  // Fonction en phase de test : badge « BÊTA » dans l'écran des réglages (demande du 21/11/2026).
+  const essentials = VPX_ESSENTIALS.flatMap((g) => g.settings);
+  for (const key of ['CabinetAutofitKeepTop', 'CabinetAutofitMaxStretch']) assert.equal(essentials.find((e) => e.key === key)?.beta, true, key);
 });
 
 test('joueur à gauche : VPX tournerait la table à l’envers, on le signale', () => {

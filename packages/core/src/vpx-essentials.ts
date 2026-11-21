@@ -16,6 +16,8 @@ export interface EssentialSetting {
   unit?: string;
   /** Multiplicateur d'affichage : 100 pour montrer 0.05 comme 5 %. */
   scale?: number;
+  /** Fonction en phase de test : badge « BÊTA » dans l'écran des réglages. */
+  beta?: boolean;
 }
 
 export interface EssentialGroup {
@@ -52,11 +54,38 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
           return t('Cadrage automatique');
         },
         get help() {
-          return t('En mode borne, VPX peut cadrer la table tout seul. « Ajuster la table » garde ses proportions, « Remplir l’écran » l’étire pour occuper tout l’écran.');
+          return t('En mode borne, VPX peut cadrer la table tout seul. « Ajuster la table » agrandit la table sans la déformer ; « Remplir l’écran » l’étire pour montrer toute sa longueur.');
         },
         get values() {
           return [t('Manuel'), t('Ajuster la table'), t('Remplir l’écran')];
         },
+      },
+      {
+        section: 'Player',
+        key: 'CabinetAutofitKeepTop',
+        beta: true,
+        get label() {
+          return t('Garder le haut de la table');
+        },
+        get help() {
+          return t('Avec « Ajuster la table » : la table est agrandie tant que le fond du plateau reste à l’écran, avec un peu de place pour le décor du fond. C’est le bas décoratif, sous les flippers, et le vide au-dessus de la table qui sortent de l’écran ; le reste de la largeur est comblé par un léger étirement. Sans ce réglage, VPX agrandit jusqu’à remplir la largeur, quitte à couper le fond du plateau.');
+        },
+        get values() {
+          return [t('Non'), t('Oui')];
+        },
+      },
+      {
+        section: 'Player',
+        key: 'CabinetAutofitMaxStretch',
+        beta: true,
+        get label() {
+          return t('Étirement maximal en largeur');
+        },
+        get help() {
+          return t('Quand le haut de la table est gardé : étirement autorisé pour remplir la largeur de l’écran. 0 % garde les proportions exactes, avec des bandes sur les côtés.');
+        },
+        unit: '%',
+        scale: 100,
       },
       {
         section: 'Player',
@@ -65,10 +94,32 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
           return t('Hauteur des flippers à l’écran');
         },
         get help() {
-          return t('Avec le cadrage automatique : position des flippers du bas, 0 % étant le bas de l’écran.');
+          return t('Avec le cadrage automatique : position des flippers du bas, 0 % étant le bas de l’écran. Quand le haut de la table est gardé, plus les flippers sont bas, plus la table est grande.');
         },
         unit: '%',
         scale: 100,
+      },
+      {
+        section: 'Player',
+        key: 'ScreenPlayerZ',
+        get label() {
+          return t('Hauteur des yeux');
+        },
+        get help() {
+          return t('Hauteur des yeux du joueur au-dessus du bas de l’écran du plateau. VPX dessine la table comme vue de là : plus bas, la perspective est plus marquée.');
+        },
+        unit: 'cm',
+      },
+      {
+        section: 'Player',
+        key: 'ScreenPlayerY',
+        get label() {
+          return t('Recul des yeux');
+        },
+        get help() {
+          return t('Distance des yeux du joueur par rapport au bas de l’écran du plateau (négatif : devant la borne).');
+        },
+        unit: 'cm',
       },
       {
         section: 'Player',

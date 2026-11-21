@@ -392,6 +392,13 @@ h1 {
   color: var(--quiet);
 }
 
+/* Fonction en phase de test : mêmes couleurs que le badge BÊTA des Nouveautés et des menus. */
+.badge.beta {
+  border-color: var(--meta);
+  background: var(--meta);
+  color: var(--void);
+}
+
 .badge.warning {
   border-color: rgba(242, 179, 61, 0.45);
   background: rgba(242, 179, 61, 0.1);

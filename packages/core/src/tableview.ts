@@ -19,12 +19,22 @@ import type { PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { findTableIni } from './vpx-settings';
 
-/** Valeurs de la vue en mode fenêtre (borne) que le cadrage automatique remplace. */
-const OWN_VIEW = /^ViewCab(HOfs|VOfs|ScaleX|ScaleY|ScaleZ|WindowTop|WindowBot)$/i;
+/**
+ * Valeurs qui cadrent la table en vue borne : échelle, décalages, position de la caméra. Les hauteurs de vitre
+ * (ViewCabWindowTop/Bot), le mode et la rotation seuls n'en font pas une vue : le menu de VPX les écrit dès qu'on passe
+ * la table en cadrage manuel et qu'on enregistre (The Matrix sur le PinCab, 21/11/2026), et l'échelle et les décalages
+ * restent alors ceux que l'auteur a enregistrés dans le .vpx, pour son écran.
+ */
+const OWN_VIEW = /^ViewCab(HOfs|VOfs|ScaleX|ScaleY|ScaleZ|PlayerX|PlayerY|PlayerZ|LookAt|FOV|Layback)$/i;
 
-/** Le .ini de la table a sa propre vue de borne (réglée en partie, ou reprise d'une autre installation). */
+/** Le .ini de la table a sa propre vue de borne (réglée en partie, POV, ou reprise d'une autre installation). */
 export function hasOwnCabinetView(doc: IniDocument): boolean {
   return doc.entries().some((e) => e.section.toLowerCase() === 'tableoverride' && OWN_VIEW.test(e.key) && e.value.trim() !== '');
+}
+
+/** Le .ini de la table touche à la vue borne (ViewCab…), même sans la cadrer (hauteurs de vitre, mode, rotation). */
+export function touchesCabinetView(doc: IniDocument): boolean {
+  return doc.entries().some((e) => e.section.toLowerCase() === 'tableoverride' && /^ViewCab/i.test(e.key) && e.value.trim() !== '');
 }
 
 /**

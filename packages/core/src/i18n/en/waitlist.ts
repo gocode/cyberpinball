@@ -22,7 +22,7 @@ export const messages: Record<string, string> = {
   'un fichier Serum (.cRZ) ou VNI (.vni, .pal, .pac)': 'a Serum (.cRZ) or VNI (.vni, .pal, .pac) file',
   'des fichiers audio (.mp3, .ogg, .wav)': 'audio files (.mp3, .ogg, .wav)',
   'une vidéo ou une image de topper': 'a topper video or image',
-  'un fichier .pov': 'a .pov file',
+  'un fichier de point de vue (.pov, ou .ini de POV)': 'a point of view file (.pov, or POV .ini)',
   '{n} .vpx': '{n} .vpx',
   '{n} .directb2s': '{n} .directb2s',
   '{n} fichier .pup': '{n} .pup file',

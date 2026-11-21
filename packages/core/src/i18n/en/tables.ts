@@ -152,6 +152,20 @@ export const messages: Record<string, string> = {
   'Le titre, le fabricant et l’année sont devinés d’après le nom des fichiers. Le fichier .info les fixe et les partage avec les autres frontends.': 'Title, manufacturer and year are guessed from the file names. The .info file sets them and shares them with other frontends.',
   'Créer « {name} »': 'Create “{name}”',
   'Cadrage manuel imposé par la table': 'Manual view forced by the table',
+  'Cadrage manuel sans vue réglée': 'Manual view with no view set',
+  'Point de vue fourni pour un autre écran (bêta)': 'Point of view made for another screen (beta)',
+  '{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que vous êtes {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.':
+    '{file} is the point of view prepared for this table, but VPX would draw it with the flippers {played}, while you are {edge} of the screen: it is not applied, the table keeps the cabinet’s framing.',
+  '{file} est le point de vue préparé pour cette table, mais il ne dit pas dans quel sens la tourner : il n’est pas appliqué, la table garde le cadrage de la borne.':
+    '{file} is the point of view prepared for this table, but it does not say which way to turn it: it is not applied, the table keeps the cabinet’s framing.',
+  'Appliquer le point de vue « {file} »': 'Apply the point of view “{file}”',
+  'Point de vue fourni avec la table (bêta)': 'Point of view supplied with the table (beta)',
+  '{file} est le point de vue préparé pour cette table (fichier POV). Il n’est pas appliqué : un cadrage a été choisi pour elle. Appliqué, il la cadre pour elle seule, en cadrage manuel.':
+    '{file} is the point of view prepared for this table (POV file). It is not applied: a framing was chosen for it. Once applied, it frames this table only, in manual view.',
+  '{file} est le point de vue préparé pour cette table (fichier POV), que VPX n’applique pas tel quel. Il est repris pour cette table seule, en cadrage manuel ; « Passer cette table au cadrage automatique » rend ensuite le cadrage de la borne.':
+    '{file} is the point of view prepared for this table (POV file), which VPX does not apply as is. It is taken over for this table only, in manual view; “Switch this table to automatic framing” then gives back the cabinet’s framing.',
+  '{name} passe cette table en cadrage manuel, sans échelle ni décalage réglés pour elle (ce que le menu de VPX enregistre quand on quitte le cadrage automatique) : VPX reprend la vue enregistrée par l’auteur de la table, pour son écran. Le cadrage de la borne la remet à la bonne taille ; « Régler l’affichage en partie » permet ensuite de la retoucher.':
+    '{name} switches this table to manual view, with no scale or offset set for it (what the VPX menu saves when you leave autofit): VPX goes back to the view saved by the table’s author, for their screen. The cabinet’s framing gives it the right size again; “Adjust display in game” then lets you fine-tune it.',
   'Rendre le cadrage automatique à la table': 'Give the table back automatic fitting',
   'PuP-Pack rangé un dossier trop bas': 'PuP-Pack one folder too deep',
   'Le plugin PUP lit screens.pup à la racine de pupvideos\\{pack} ; le pack est dans « {where} ».': 'The PUP plugin reads screens.pup at the root of pupvideos\\{pack}; the pack is in “{where}”.',
