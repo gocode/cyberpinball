@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Ouverture : « CYBER » et « PINBALL » s'écartent de part et d'autre du centre de la tornade, le P de PINBALL ne se confond plus avec ses fils verts.
 - Les parties ne sont plus limitées par un backglass plus lent que le playfield : Cyber Pinball livre VPX 10.8.1-5436 avec le correctif de VPX qui fait suivre à chaque écran annexe sa propre fréquence (backglass à 50 ou 60 Hz, playfield à 120 Hz : la partie tourne à 120 images par seconde). Seul l'exécutable de VPX change ; ses plugins restent les mêmes.
 - Santé de la borne et fiche technique : la fréquence d'un écran n'est signalée que si elle change quelque chose à la partie. Un fronton, un DMD ou un topper réglé sous sa fréquence possible n'est plus « À vérifier » : la fiche le mentionne sur la ligne de l'écran, « sans effet sur la bille ». Le playfield sous sa fréquence possible reste à vérifier, et un écran annexe plus lent que le playfield aussi, avec la raison : VPX 10.8.1 cale alors toute la partie sur lui (sauf avec le VPX corrigé de Cyber Pinball).
 - Souris : un clic n'importe où passe l'ouverture de Cyber Pinball, comme un bouton ; il réveille aussi le mode attente, le voile de nuit et le préavis d'arrêt.

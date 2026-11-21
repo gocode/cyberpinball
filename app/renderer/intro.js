@@ -775,7 +775,8 @@ void main() {
         const st = title.style;
         st.opacity = tp.toFixed(3);
         st.letterSpacing = `${ls.toFixed(3)}em`;
-        st.paddingLeft = `${ls.toFixed(3)}em`;
+        // Retrait du P égal à l'espacement qui suit le R : le blanc reste centré sur le col (intro.css).
+        st.setProperty('--cp-in-ls', `${ls.toFixed(3)}em`);
         st.filter = blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : 'none';
       };
       const grainOn = () => {

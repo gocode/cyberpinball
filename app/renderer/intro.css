@@ -22,24 +22,37 @@
   height: 100%;
 }
 
+/* La marque de part et d'autre du col de la tornade (au centre de l'écran) : CYBER finit à gauche,
+   PINBALL commence à droite, et le col passe dans le blanc entre les deux. Centrée d'un bloc, le P
+   tombait sur le col et se confondait avec ses fils verts (21/11/2026). Blanc visible : l'écart des
+   colonnes plus, de chaque côté, l'espacement des lettres (après le R, et en retrait du P : intro.js
+   pose --cp-in-ls, qui suit l'écartement de la marque). Une grille de deux colonnes égales, pas un
+   flex : le retrait du P aurait élargi sa moitié et décalé le blanc vers la droite. */
 .cp-in-title {
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  text-align: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 1.2em;
   line-height: 1;
   font-weight: 600;
   font-stretch: 125%;
   letter-spacing: 0.4em;
-  padding-left: 0.4em;
   white-space: nowrap;
   color: var(--cp-ink);
   opacity: 0;
 }
 
+.cp-in-title .cp-ink {
+  text-align: right;
+}
+
 .cp-in-title .cp-pin {
+  text-align: left;
+  padding-left: var(--cp-in-ls, 0.4em);
   color: var(--cp-signal);
 }
 

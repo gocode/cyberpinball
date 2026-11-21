@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Startup animation: "CYBER" and "PINBALL" now sit on either side of the tornado's centre, so the P of PINBALL no longer blends into its green threads.
 - Games are no longer limited by a backglass slower than the playfield: Cyber Pinball ships VPX 10.8.1-5436 with the VPX fix that makes each ancillary screen follow its own refresh rate (backglass at 50 or 60 Hz, playfield at 120 Hz: the game runs at 120 frames per second). Only the VPX executable changes; its plugins stay the same.
 - Cabinet health and tech sheet: a screen's refresh rate is only flagged when it changes something in the game. A backglass, DMD or topper set below its possible refresh rate is no longer "To check": the sheet mentions it on the screen's line, "no effect on the ball". The playfield below its possible refresh rate is still flagged, and so is a secondary screen slower than the playfield, with the reason: VPX 10.8.1 then locks the whole game to it (except with Cyber Pinball's patched VPX).
 - Mouse: a click anywhere skips the Cyber Pinball intro, like a button; it also wakes the attract mode, the night veil and the shutdown notice.
