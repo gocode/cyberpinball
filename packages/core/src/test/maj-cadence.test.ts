@@ -28,6 +28,19 @@ test('mises à jour : une recherche au moins toutes les heures, et sans rafale v
   assert.ok(soon >= 60_000 && soon < every, 'réveil ou retour de partie : une recherche, au plus une toutes les quelques minutes');
 });
 
+test('mises à jour : la recherche part dès l’ouverture de l’entrée, sans attendre « Rechercher à nouveau »', () => {
+  const updates = read('updates-menu.ts');
+  // Jusqu'à la 0.2.3, un résultat de moins de 10 min s'affichait tel quel : une version publiée
+  // entre-temps restait cachée derrière « Cyber Pinball est à jour ».
+  assert.match(updates, /run: \(\) => open\(\),/, 'l’entrée du Menu système ouvre l’écran par open()');
+  const open = updates.match(/function open\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(open, 'function open() introuvable');
+  assert.match(open[1]!, /if \(state\.kind !== 'downloading' && state\.kind !== 'installing' && state\.kind !== 'checking'\) void check\(\);/, 'seule une opération en cours dispense de la recherche');
+  assert.doesNotMatch(updates, /FRESH_MS|checkedAt/, 'aucun résultat gardé ne remplace la recherche à l’ouverture');
+  // Une version déjà trouvée reste proposée si la recherche de l'ouverture n'obtient pas de réponse.
+  assert.match(updates, /state = known \?\? \{ kind: 'error'/);
+});
+
 test('mises à jour : une recherche au réveil du PC et au retour d’une partie', () => {
   const frontend = read('frontend.ts');
   assert.match(frontend, /powerMonitor\.on\('resume', \(\) => updates\.checkSoon\(\)\);/, 'réveil du PC');

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Mise à jour de Cyber Pinball : la recherche d'une nouvelle version part dès l'ouverture de l'entrée, sans avoir à choisir « Rechercher à nouveau ». Une version publiée quelques minutes plus tôt n'est plus cachée derrière « Cyber Pinball est à jour ».
 - Faire défiler vite la roue ne lance plus la vidéo de chaque table survolée sur chaque écran (plateau, fronton, DMD, topper) : les médias de la table attendent que la roue s'arrête (un cinquième de seconde) ; un appui isolé les change toujours tout de suite.
 - Le titre de la table « s'écarte en se précisant » sur un appui isolé ; pendant un défilement rapide, il change sans effet, puis l'effet se joue une fois sur la table où la roue s'arrête.
 - Échanges avec l'équipe : tant qu'une conversation est en cours (moins de deux heures depuis le dernier message), la borne relève les réponses chaque minute au lieu de toutes les 20 minutes ; la notification arrive presque tout de suite.

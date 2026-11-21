@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, expectedSuiteMs, imminent, liveEntries, readJson, tryLock, writeJson } from './coordination.mjs';
-import { worthWaiting } from './publication-groupee.mjs';
+import { ATTENTE_MAX_MS, worthWaiting } from './publication-groupee.mjs';
 import { failedFiles, failureDetails, totals } from './sortie-tests.mjs';
 import { problemLines } from './controles.mjs';
 
@@ -24,18 +24,20 @@ test('file : une branche compte tant que son processus vit ; une suite verte, ju
   assert.deepEqual(kept.map((e) => e.branche), ['a', 'c']);
 });
 
-test('publication groupée : elle attend les fusions prévues dans les 10 minutes, pas les autres', () => {
+test('publication groupée : elle n’attend que les fusions prévues dans les 2 minutes, jamais plus de 2 minutes', () => {
   assert.equal(IMMINENT_MS, 10 * 60_000);
+  assert.equal(ATTENTE_MAX_MS, 2 * 60_000, 'deux minutes d’attente au plus pour grouper');
   const entries = [
     { branche: 'moi', etape: 'integration', finPrevue: at(1) },
-    { branche: 'bientot', etape: 'tests', finPrevue: at(8) },
+    { branche: 'bientot', etape: 'tests', finPrevue: at(1.5) },
+    { branche: 'plus-tard', etape: 'tests', finPrevue: at(8) },
     { branche: 'loin', etape: 'attente-suite', finPrevue: at(25) },
     { branche: 'faite', etape: 'fusionnee', finPrevue: at(0) },
-    { branche: 'en-retard', etape: 'tests', finPrevue: at(-9) },
-    { branche: 'un-peu-en-retard', etape: 'tests', finPrevue: at(-2) },
+    { branche: 'en-retard', etape: 'tests', finPrevue: at(-3) },
+    { branche: 'un-peu-en-retard', etape: 'tests', finPrevue: at(-0.5) },
   ];
-  assert.deepEqual(imminent(entries, { now: T0, except: 'moi' }).map((e) => e.branche), ['bientot', 'en-retard', 'un-peu-en-retard']);
-  // Une branche très en retard sur sa fin prévue n'est plus attendue : la publication ne reste pas bloquée.
+  assert.deepEqual(imminent(entries, { now: T0, except: 'moi' }).map((e) => e.branche), ['bientot', 'plus-tard', 'en-retard', 'un-peu-en-retard']);
+  // Une fusion prévue au-delà du plafond, ou déjà en retard, n'est pas attendue : la publication part.
   assert.deepEqual(worthWaiting(entries, { now: T0, except: 'moi' }).map((e) => e.branche), ['bientot', 'un-peu-en-retard']);
 });
 

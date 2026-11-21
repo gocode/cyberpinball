@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Cyber Pinball update: the search for a new version starts as soon as the entry opens, with no need to choose "Check again". A version published a few minutes earlier is no longer hidden behind "Cyber Pinball is up to date".
 - Scrolling the wheel fast no longer starts the video of every table passed on every screen (playfield, backglass, DMD, topper): the table's media wait until the wheel stops (a fifth of a second); a single press still changes them at once.
 - The table title still "spreads out and sharpens" on a single press; during fast scrolling it changes without the effect, which then plays once on the table where the wheel stops.
 - Conversations with the team: while a conversation is active (less than two hours since the last message), the cabinet checks for replies every minute instead of every 20 minutes; the notification arrives almost right away.

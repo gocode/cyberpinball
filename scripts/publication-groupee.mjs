@@ -6,9 +6,11 @@
 // - Une seule publication groupée à la fois (chef-publication.lock du dossier de coordination). Une
 //   fusion qui arrive pendant qu'elle attend est emportée par elle : la session n'a rien d'autre à faire.
 // - Avant de publier, elle attend chaque branche annoncée dans la file (scripts/coordination.mjs) dont
-//   la fusion est prévue dans les 10 minutes (suite de tests en cours, suite verte en attente de
-//   fusion, intégration…). Une branche en retard de plus de 5 minutes sur sa fin prévue n'est plus
-//   attendue ; l'attente totale ne dépasse pas 20 minutes.
+//   la fusion est prévue dans les 2 minutes (suite de tests en cours, suite verte en attente de
+//   fusion, intégration…). Une branche en retard de plus d'une minute sur sa fin prévue n'est plus
+//   attendue ; l'attente des branches ne dépasse pas 2 minutes en tout (décision du
+//   21/11/2026 : 15 minutes d'attente pour grouper deux fusions, c'était trop). Seule une fabrication déjà en cours
+//   est attendue jusqu'au bout : on ne publie pas pendant qu'elle tient le verrou.
 // - Rien de neuf sur proto/ecrans depuis le dernier commit « Version … » : rien à publier.
 // - `node scripts/publier.mjs --rapide --essai` depuis le dossier principal ; si le socle a changé
 //   (Electron, exécutable), elle reprend d'elle-même avec `--leger --essai`.
@@ -24,8 +26,8 @@ import {
   BASE, IMMINENT_MS, coordinationDir, currentBranch, git, imminent, lockHolder, mainDir, readJson, readQueue, sleep, tryLock, writeJson,
 } from './coordination.mjs';
 
-export const ATTENTE_MAX_MS = 20 * 60_000;
-export const RETARD_MAX_MS = 5 * 60_000;
+export const ATTENTE_MAX_MS = 2 * 60_000;
+export const RETARD_MAX_MS = 60_000;
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 /** Commits de proto/ecrans pas encore publiés (depuis le dernier « Version … »). */
@@ -35,9 +37,9 @@ export function pendingCommits(cwd) {
   return Number(git(['rev-list', '--count', `${last}..${BASE}`], cwd));
 }
 
-/** Les branches à attendre : fusion prévue dans l'horizon, pas en retard de plus de RETARD_MAX_MS. */
+/** Les branches à attendre : fusion prévue dans ATTENTE_MAX_MS, pas en retard de plus de RETARD_MAX_MS. */
 export function worthWaiting(entries, { now = Date.now(), except } = {}) {
-  return imminent(entries, { now, horizon: IMMINENT_MS, except }).filter((e) => Date.parse(e.finPrevue) >= now - RETARD_MAX_MS);
+  return imminent(entries, { now, horizon: Math.min(IMMINENT_MS, ATTENTE_MAX_MS), except }).filter((e) => Date.parse(e.finPrevue) >= now - RETARD_MAX_MS);
 }
 
 function legerFile(dir) {
@@ -94,14 +96,16 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, b
       setState('attente');
       const start = Date.now();
       let last = '';
+      let capped = false;
       for (;;) {
-        const waiting = worthWaiting(readQueue(dir), { except: me });
+        // Passé le plafond, plus aucune branche n'est attendue ; une fabrication en cours, si.
+        const over = Date.now() - start > ATTENTE_MAX_MS;
+        const queued = worthWaiting(readQueue(dir), { except: me });
+        if (over && queued.length && !capped) say(`Attente plafonnée à ${ATTENTE_MAX_MS / 60_000} min : publication sans ${queued.map((e) => e.branche).join(', ')}.`);
+        capped ||= over;
+        const waiting = capped ? [] : queued;
         const fabrication = lockHolder(path.join(main, 'release', '.fabrication.lock'));
         if (!waiting.length && !fabrication) break;
-        if (Date.now() - start > ATTENTE_MAX_MS) {
-          say(`Attente plafonnée à ${ATTENTE_MAX_MS / 60_000} min : publication sans ${waiting.map((e) => e.branche).join(', ')}.`);
-          break;
-        }
         const what = fabrication ? `une fabrication en cours (processus ${fabrication.pid})` : waiting.map((e) => `${e.branche} (${e.etape}, fusion prévue vers ${hhmm(e.finPrevue)})`).join(', ');
         if (what !== last) say(`Publication groupée : j'attends ${what}.`);
         last = what;

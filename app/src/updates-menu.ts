@@ -1,5 +1,5 @@
 // Menu système > « Aide et infos » > « Mise à jour de Cyber Pinball » : recherche de la dernière version
-// publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
+// publiée (lancée dès l'ouverture de l'entrée), ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
 // installation (packages/core/src/update.ts).
 //
 // Une recherche discrète part aussi en arrière-plan : dès le démarrage, puis toutes les 30 min
@@ -109,13 +109,9 @@ export const CHECK_EVERY_MS = 30 * 60_000;
 const RETRY_MS = 5 * 60_000;
 /** Au réveil du PC ou au retour d'une partie : une recherche, si la dernière a plus de 5 min. */
 export const SOON_AFTER_MS = 5 * 60_000;
-/** Un résultat plus récent que cela s'affiche tel quel à l'ouverture de l'entrée. */
-const FRESH_MS = 10 * 60_000;
 
 export function createUpdatesMenu(host: UpdatesHost) {
   let state: State = { kind: 'idle' };
-  /** Heure du dernier résultat (à jour ou disponible). */
-  let checkedAt = 0;
   /** La mise à jour lancée avant la fermeture n'a pas abouti (startupNotice) : pastille rouge ici, jusqu'à ce qu'on ouvre l'entrée. */
   let failed: { to: string } | undefined;
   const date = (iso: string) => formatDate(iso);
@@ -221,7 +217,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
       if (state.kind === 'up-to-date') return t('{installed}, la dernière', { installed });
       return t('{installed} · chercher une version plus récente', { installed });
     },
-    run: () => open(true),
+    run: () => open(),
   };
 
   function show(at = 0): void {
@@ -229,14 +225,14 @@ export function createUpdatesMenu(host: UpdatesHost) {
   }
 
   /**
-   * Ouvre l'écran. Un résultat récent (recherche en arrière-plan) s'affiche aussitôt : une
-   * version disponible montre ses nouveautés et « Mettre à jour maintenant », à un bouton.
-   * Sinon, une recherche part.
+   * Ouvre l'écran : la recherche part aussitôt, sans attendre « Rechercher à nouveau ».
+   * Jusqu'à la 0.2.3, un résultat de moins de 10 min (recherche en arrière-plan) s'affichait
+   * tel quel : une version publiée entre-temps restait cachée derrière « Cyber Pinball est à jour ».
+   * Seule exception : une opération en cours (recherche, téléchargement, installation) s'affiche telle quelle.
    */
-  function open(search: boolean): void {
+  function open(): void {
     failed = undefined;
-    const fresh = (state.kind === 'available' || state.kind === 'up-to-date') && Date.now() - checkedAt < FRESH_MS;
-    if (search && !fresh && state.kind !== 'downloading' && state.kind !== 'installing' && state.kind !== 'checking') void check();
+    if (state.kind !== 'downloading' && state.kind !== 'installing' && state.kind !== 'checking') void check();
     else show();
   }
 
@@ -256,7 +252,6 @@ export function createUpdatesMenu(host: UpdatesHost) {
       // L'utilisateur a pu lancer une opération entre-temps : son état prime.
       if (!quietAllowed()) return true;
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
-      checkedAt = Date.now();
       if (state.kind === 'available') host.available?.(state.latest.version, host.version);
       console.log(`Mise à jour (arrière-plan) : ${describe()}`);
       host.broadcast();
@@ -296,14 +291,15 @@ export function createUpdatesMenu(host: UpdatesHost) {
   }
 
   async function check(): Promise<void> {
+    // Une version déjà trouvée reste proposée si cette recherche n'obtient pas de réponse (réseau coupé).
+    const known = state.kind === 'available' ? state : undefined;
     state = { kind: 'checking' };
     show();
     try {
       const result = await checkForUpdate({ current: host.version, ...sourceOptions() });
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
-      checkedAt = Date.now();
     } catch (error) {
-      state = { kind: 'error', message: (error as Error).message };
+      state = known ?? { kind: 'error', message: (error as Error).message };
     }
     console.log(`Mise à jour : ${describe()}`);
     show();
