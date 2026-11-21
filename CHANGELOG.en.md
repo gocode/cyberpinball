@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- What's new: the System menu entry now counts its nine sections, the Arena included.
 - What's new: every entry now has its picture, a screen of the feature or an illustration, in English and French (twelve had none: the Arena, today's tables, conversations with the team, the System menu, sound, Future Pinball, Pinball FX, importing without duplicating, other VPX versions, DOF, credits, 3D vision).
 - Install plan from another installation: it now says large files are linked and the others copied, instead of saying everything is copied.
 - English: texts that mention a screen or a button use its English name (backups, DOF, friends, DMD, headset controllers), instead of the French one.

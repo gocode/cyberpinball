@@ -17,9 +17,9 @@ export const messages: Record<string, string> = {
     'Your reports go with your nickname, or anonymously if you choose: the team can reply either way. Everything stays encrypted between the cabinet and the team.',
   'Menu système › Aide et infos › Retours et propositions › Mes échanges avec l’équipe': 'System menu › Help and info › Feedback and ideas › My conversations with the team',
   'Le Menu système, plus court': 'A shorter System menu',
-  'Huit lignes au plus par écran, rangées dans l’ordre où l’on s’en sert.': 'Eight lines at most per screen, in the order you use them.',
-  'Huit rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre. Aucun écran n’a plus de huit lignes.':
-    'Eight sections in the order you use them: Tables, My cabinet, Downloads, Recent activity, Community, Jukebox, Help and info, Quit or shut down. No screen has more than eight lines.',
+  'Huit lignes au plus par écran, neuf à l’ouverture, rangées dans l’ordre où l’on s’en sert.': 'Eight lines at most per screen, nine when it opens, in the order you use them.',
+  'Neuf rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Arène, Juke-box, Aide et infos, Quitter ou éteindre. Les autres écrans n’ont pas plus de huit lignes.':
+    'Nine sections in the order you use them: Tables, My cabinet, Downloads, Recent activity, Community, Arena, Jukebox, Help and info, Quit or shut down. The other screens have no more than eight lines.',
   'Ma borne réunit ce qui dépend de la borne : écrans, boutons, son, VPX, DMD et LED, VR. La Communauté est celle de la roue, et le Menu système rouvre la dernière rubrique choisie.':
     'My cabinet gathers what depends on the cabinet: screens, buttons, sound, VPX, DMD and LEDs, VR. Community is the same as on the wheel, and the System menu reopens the last section you chose.',
   'Le son de la borne se règle presque seul': 'Cabinet sound almost sets itself up',

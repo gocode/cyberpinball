@@ -135,10 +135,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-20',
     version: '0.2.2',
     get title() { return t('Le Menu système, plus court'); },
-    get detail() { return t('Huit lignes au plus par écran, rangées dans l’ordre où l’on s’en sert.'); },
+    // La racine énumérée ici suit SYSTEM_ROOT_ENTRIES (news.test.ts) : l'Arène y est entrée le 21/11/2026.
+    get detail() { return t('Huit lignes au plus par écran, neuf à l’ouverture, rangées dans l’ordre où l’on s’en sert.'); },
     get more() {
       return [
-        t('Huit rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre. Aucun écran n’a plus de huit lignes.'),
+        t('Neuf rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Arène, Juke-box, Aide et infos, Quitter ou éteindre. Les autres écrans n’ont pas plus de huit lignes.'),
         t('Ma borne réunit ce qui dépend de la borne : écrans, boutons, son, VPX, DMD et LED, VR. La Communauté est celle de la roue, et le Menu système rouvre la dernière rubrique choisie.'),
       ];
     },

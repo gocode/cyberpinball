@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Nouveautés : la ligne du Menu système compte maintenant ses neuf rubriques, Arène comprise.
 - Nouveautés : chaque nouveauté a maintenant son image, un écran de la fonction ou une illustration, en français et en anglais (douze en étaient privées : l'Arène, les tables du jour, les échanges avec l'équipe, le Menu système, le son, Future Pinball, Pinball FX, la reprise sans duplication, les autres versions de VPX, DOF, les crédits, la vision 3D).
 - Plan d'installation d'une autre installation : il dit maintenant que les gros fichiers sont liés et les autres copiés, au lieu d'annoncer que tout est copié.
 - Anglais : les textes qui citent un écran ou un bouton le citent sous son nom anglais (sauvegardes, DOF, amis, DMD, manettes du casque), au lieu du nom français.

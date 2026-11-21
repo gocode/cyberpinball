@@ -67,6 +67,20 @@ test('nouveautés : chaque texte existe en anglais, en entier', () => {
   }
 });
 
+// La nouveauté du Menu système énumère sa racine : l'Arène y est entrée sans que le texte suive
+// (« Huit rubriques » pour neuf, 21/11/2026). L'énumération suit SYSTEM_ROOT_ENTRIES, rubriques comprises.
+test('nouveautés : la racine du Menu système décrite est la vraie', () => {
+  setLanguage('fr');
+  const n = NEWS.find((x) => x.id === 'menu-systeme');
+  if (!n) return;
+  const listed = /: ([^.]+)\./.exec(n.more[0]!)?.[1]?.split(', ') ?? [];
+  assert.equal(listed.length, SYSTEM_ROOT_ENTRIES.length, `menu-systeme : ${listed.length} rubriques citées, la racine en a ${SYSTEM_ROOT_ENTRIES.length}`);
+  for (const id of SYSTEM_ROOT_ENTRIES) {
+    const group = (SYSTEM_GROUPS as Record<string, { label: string } | undefined>)[id];
+    if (group) assert.ok(listed.includes(group.label), `menu-systeme : « ${group.label} » manque à l'énumération`);
+  }
+});
+
 test('nouveautés : « Essayer » mène à une fonction qui existe', () => {
   const entries = new Set<string>([...SYSTEM_ITEM_IDS, ...SYSTEM_GROUP_IDS]);
   const ok = (r: NewsReach) => (r.kind === 'system' ? entries.has(r.id) : true);
