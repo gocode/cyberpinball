@@ -67,10 +67,11 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   // Entre le Start et le lancement, les seules attentes sont celles d'avant le cinéma : l'écran de
   // chargement (délai réglé), sa capture pour les essais, les vidéos du DMD trop grandes ramenées à sa taille (une fois par
   // vidéo, dmd-video-shrink.ts), l'habillage FullDMD, pour une partie entre amis la règle du pare-feu de VPX, lue pendant
-  // le chargement (inspector), et l'arrêt du serveur du DMD quand VPX ouvre le DMD lui-même (dmd-server.ts, handDmdToVpx).
+  // le chargement (inspector), l'arrêt du serveur du DMD quand VPX ouvre le DMD lui-même (dmd-server.ts, handDmdToVpx),
+  // et, une fois pour toutes, la mise en route d'une ROM qui n'a pas encore de mémoire (rom-first-boot.ts).
   // Aucune ne dépend de lui.
   const awaits = [...play.slice(start, launch).matchAll(/await ([^;]+);/g)].map((m) => m[1]!.replace(/\s+/g, ' ').slice(0, 40));
-  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'shrinkTableDmdVideos(table)', 'prepareDressing(table, { root: loc.root,', 'inspectorReady', 'handDmdToVpx()']);
+  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'shrinkTableDmdVideos(table)', 'romFirstBoot.beforeGame(table, { startin', 'prepareDressing(table, { root: loc.root,', 'inspectorReady', 'handDmdToVpx()']);
   assert.ok(play.indexOf('const inspectorReady = ') < start, 'la lecture part avant le chargement, sans le retarder');
   assert.match(play, /const loadingMs = Number\(process\.env\.CYBERPINBALL_LOADING_MS \?\? 2500\);/, 'délai du chargement indépendant du cinéma');
   // Nulle part dans le menu on n'attend une animation (DMD, chorégraphie) : seule la partie s'attend.

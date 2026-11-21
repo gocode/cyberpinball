@@ -14,9 +14,13 @@
 // bloquait les deux (vu sur The Addams Family).
 //
 // Écrit le son brut (PCM 16 bits) et un résultat JSON, puis sort.
+//
+// Mode « boot » (rom-first-boot.ts, romfirstboot.ts) : la première mise en route d'une ROM sans
+// mémoire. Échap seul (ni pièce ni Start), puis arrêt propre : PinMAME écrit nvram\<rom>.nv en
+// s'arrêtant, et le processus attend qu'il ait fini avant de sortir. Le son n'est pas gardé.
 
 import * as fs from 'node:fs';
-import { PINMAME_KEYS, ROM_AUDIO_PLAN, romKeyboardWanted, romKeyPressed } from '@cyberpinball/core';
+import { PINMAME_KEYS, ROM_AUDIO_PLAN, romBootKeyboardWanted, romBootKeyPressed, romKeyboardWanted, romKeyPressed } from '@cyberpinball/core';
 
 export interface RomRecordJob {
   dll: string;
@@ -28,6 +32,8 @@ export interface RomRecordJob {
   seconds: number;
   pcm: string;
   result: string;
+  /** « music » (défaut) : la musique de la ROM ; « boot » : sa première mise en route, pour sa mémoire. */
+  mode?: 'music' | 'boot';
 }
 
 export interface RomRecordResult {
@@ -52,6 +58,9 @@ const koffi = require('koffi') as typeof import('koffi');
 const jobFile = process.argv[2];
 if (!jobFile) throw new Error('Usage : CyberPinball.exe enregistreur-rom.js <tâche.json> (ELECTRON_RUN_AS_NODE=1)'); // i18n-ignore : usage
 const job = JSON.parse(fs.readFileSync(jobFile, 'utf8')) as RomRecordJob;
+const boot = job.mode === 'boot';
+const keyPressed = boot ? romBootKeyPressed : romKeyPressed;
+const keyboardWanted = boot ? romBootKeyboardWanted : romKeyboardWanted;
 
 const lib = koffi.load(job.dll);
 const AudioInfo = koffi.struct('CpPinmameAudioInfo', { format: 'int', channels: 'int', sampleRate: 'double', framesPerSecond: 'double', samplesPerFrame: 'int', bufferSize: 'int' });
@@ -94,6 +103,14 @@ let started = 0;
 /** Temps émulé : le son reçu fait l'horloge. */
 const emulated = () => bytes / 2 / channels / rate;
 const wall = () => (started ? (performance.now() - started) / 1000 : 0);
+/**
+ * Mise en route d'une ROM qui ne rend aucun son (ses ROM de son absentes : afm_113b seul, sans
+ * son parent, 21/11/2026) : l'horloge du son ne bouge jamais, la ROM suit alors l'heure réelle.
+ */
+let wallClock = false;
+const now = () => (wallClock ? wall() : emulated());
+/** Mise en route : passé ce temps réel, arrêtée quoi qu'il arrive (une partie l'attend peut-être). */
+const BOOT_WALL_LIMIT = job.seconds * 2 + 15;
 let display: { width: number; height: number; pixels: Buffer } | undefined;
 
 /**
@@ -116,7 +133,11 @@ const onAvailable = koffi.register((info: unknown) => {
 }, koffi.pointer(AudioAvailableCb));
 const onAudio = koffi.register((buffer: unknown, samples: number) => {
   const n = samples * channels * 2;
-  chunks.push(copyBytes(buffer, n));
+  // Paquet vide (ROM sans ses ROM de son) : rien à copier ; koffi refuse un tableau de longueur
+  // nulle, et l'exception tuait l'enregistreur (afm_113b, 21/11/2026).
+  if (n <= 0 || !buffer) return samples;
+  // Mise en route : le son ne fait que l'horloge, il n'est pas gardé.
+  if (!boot) chunks.push(copyBytes(buffer, n));
   bytes += n;
   return samples;
 }, koffi.pointer(AudioUpdatedCb));
@@ -127,7 +148,7 @@ const onDisplay = koffi.register((index: number, data: unknown, layout: unknown)
     display = { width: l.width, height: l.height, pixels: copyBytes(data, l.width * l.height) };
   }
 }, koffi.pointer(DisplayUpdatedCb));
-const onKey = koffi.register((key: number) => (romKeyPressed(key, emulated()) ? 1 : 0), koffi.pointer(KeyCb));
+const onKey = koffi.register((key: number) => (keyPressed(key, now()) ? 1 : 0), koffi.pointer(KeyCb));
 void PINMAME_KEYS;
 
 function displayText(): string | undefined {
@@ -148,11 +169,16 @@ function finish(error?: RomRecordResult['error']): void {
   clearInterval(timer);
   const pcm = Buffer.concat(chunks);
   fs.writeFileSync(job.pcm, pcm);
-  const result: RomRecordResult = { ok: !error, error, channels, rate, seconds: emulated(), wall: wall(), display: displayText() };
-  fs.writeFileSync(job.result, JSON.stringify(result, null, 1));
+  const result: RomRecordResult = { ok: !error, error, channels, rate, seconds: now(), wall: wall(), display: displayText() };
+  const save = () => fs.writeFileSync(job.result, JSON.stringify(result, null, 1));
+  // Mise en route : le résultat n'est écrit qu'une fois PinMAME arrêté, donc sa mémoire écrite.
+  if (!boot) save();
   // PinMAME arrêté sans attendre (son fil peut attendre un rappel) ; le processus sort de toute façon.
-  Stop.async(() => process.exit(0));
-  setTimeout(() => process.exit(0), 5000).unref();
+  Stop.async(() => {
+    if (boot) save();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), boot ? 15_000 : 5000).unref();
 }
 
 SetConfig({
@@ -184,8 +210,9 @@ let running = 1;
 let lastBytes = 0;
 let lastSound = 0;
 const timer = setInterval(() => {
-  const t = emulated();
-  const want = romKeyboardWanted(t);
+  if (boot && !wallClock && !bytes && wall() > 3) wallClock = true;
+  const t = now();
+  const want = keyboardWanted(t);
   if (want !== keyboard) {
     keyboard = want;
     SetHandleKeyboard.async(want ? 1 : 0, () => {});
@@ -207,7 +234,9 @@ const timer = setInterval(() => {
   }
   if (t >= job.seconds) finish();
   else if (!running) finish('stopped');
-  else if (wall() - lastSound > 15) finish('no-sound');
+  else if (!boot && wall() - lastSound > 15) finish('no-sound');
+  // Mise en route trop lente (machine saturée) : arrêtée proprement, sa mémoire écrite quand même.
+  else if (boot && wall() > BOOT_WALL_LIMIT) finish();
 }, 50);
 if (status !== 0) {
   clearInterval(timer);

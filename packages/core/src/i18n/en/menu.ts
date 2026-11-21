@@ -16,6 +16,7 @@ export const messages: Record<string, string> = {
   'Start : fiche': 'Start: game page',
   // Chargement qui tarde (packages/core/src/loadingprogress.ts, app/renderer/frontend.js)
   'Cyber Pinball prépare la partie': 'Cyber Pinball is preparing the game',
+  'Première mise en route de la ROM : une fois pour toutes, ses réglages d’usine sont posés': 'First start-up of the ROM: once and for all, its factory settings are laid down',
   'VPX est lancé : il charge la table': 'VPX is running: it is loading the table',
   'VPX a ouvert ses fenêtres : la table finit de charger': 'VPX has opened its windows: the table is finishing loading',
   'Arrêt demandé : VPX se ferme': 'Stop requested: VPX is closing',

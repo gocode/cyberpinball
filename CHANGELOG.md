@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Tables à ROM : la première partie ne s'arrête plus sur l'écran « réglages d'usine rétablis » (FACTORY SETTINGS RESTORED), où les pièces sonnaient sans donner de crédit et où il fallait quitter puis relancer. Sans mémoire, une ROM démarre comme une machine dont la pile est morte et attend le bouton de la porte du monnayeur. Cyber Pinball fait désormais lui-même cette première mise en route, sans écran ni son : en tâche de fond dès qu'une table à ROM n'a pas encore de mémoire (une table qu'on vient d'installer), et pendant le chargement de la partie si elle manque encore. Une mémoire déjà là n'est jamais remplacée.
+- Chargement : quand cette mise en route a lieu avant une partie, l'écran de chargement le dit tout de suite ; Exit l'arrête comme il arrête le chargement.
+- Volume de la ROM : la mémoire étant là dès la première partie, le volume conseillé est posé dès celle-ci, au lieu de la suivante.
+- Musique de la ROM : une ROM livrée sans ses ROM de son (Attack from Mars afm_113b seule, sans son jeu parent) ne fait plus tomber l'enregistreur ; sans son à enregistrer, elle est simplement notée sans musique.
 - Catalogue : un PuP-Pack, un fronton ou une ROM que la base VPS annonce « avec la table » n'est plus cru sur parole. Tant que la table n'est pas arrivée, « Ce qu'il faut » dit qu'il sera vérifié à sa réception ; si l'archive reçue ne le contient pas, il redevient à récupérer, à part. La Galaxy Edition de JP's Space Cadet, annoncée avec son PuP-Pack, arrivait sans lui : il était dit fourni, jamais récupéré, et la table, dont tout l'afficheur est ce pack, paraissait figée.
 - Installation rapide : ce que la table reçue révèle (un PuP-Pack annoncé avec elle et absent de son archive) entre dans l'installation et se récupère à la suite, au lieu d'être découvert en jouant.
 - « Ce qu'il manque pour jouer » propose les fichiers du PuP-Pack à part d'une table installée annoncée avec son pack ; la liste restait vide.

@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- ROM tables: the first game no longer stops on the "FACTORY SETTINGS RESTORED" screen, where coins made a sound without giving credits and you had to quit and relaunch. Without a memory, a ROM starts like a machine with a dead battery and waits for the coin door button. Cyber Pinball now does this first start-up itself, with no screen and no sound: in the background as soon as a ROM table has no memory yet (a table just installed), and while the game loads if it is still missing. A memory already there is never replaced.
+- Loading: when this start-up happens before a game, the loading screen says so right away; Exit stops it as it stops the loading.
+- ROM volume: since the memory exists from the first game, the recommended volume is set from that game on, instead of the next one.
+- ROM music: a ROM shipped without its sound ROMs (Attack from Mars afm_113b alone, without its parent set) no longer crashes the recorder; with no sound to record, it is simply noted as having no music.
 - Catalog: a PuP-Pack, backglass or ROM that the VPS database announces "with the table" is no longer taken at its word. Until the table has arrived, "What it takes" says it will be checked on arrival; if the received archive does not contain it, it becomes something to get separately again. The Galaxy Edition of JP's Space Cadet, announced with its PuP-Pack, arrived without it: it was shown as included, never fetched, and the table, whose whole display is that pack, looked frozen.
 - Quick install: what the received table reveals (a PuP-Pack announced with it and missing from its archive) joins the install and is fetched next, instead of being discovered while playing.
 - "What's missing to play" offers the separate PuP-Pack files of an installed table announced with its pack; the list used to be empty.

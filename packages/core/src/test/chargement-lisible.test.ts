@@ -15,7 +15,7 @@ const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...par
 
 test('chargement lisible : le cartouche attend 8 s, chaque étape a sa phrase, une étape vue ne se défait pas', () => {
   assert.equal(LOADING_SLOW_MS, 8000);
-  assert.deepEqual([...LOADING_STEPS], ['prepare', 'launched', 'windows']);
+  assert.deepEqual([...LOADING_STEPS], ['prepare', 'rom', 'launched', 'windows']);
   for (const step of LOADING_STEPS) assert.ok(loadingStepLabel(step).length > 10);
   assert.equal(advanceLoadingStep('prepare', 'launched'), 'launched');
   assert.equal(advanceLoadingStep('windows', 'launched'), 'windows');

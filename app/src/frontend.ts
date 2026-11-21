@@ -352,6 +352,7 @@ import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { applyMenuDmdServer, handDmdToVpx, menuDmdServer } from './dmd-server';
 import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
+import { RomFirstBoot } from './rom-first-boot';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
 import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
@@ -786,6 +787,12 @@ let medias: MenuMedias | undefined;
  * ont pas, enregistrée en tâche de fond ; s'arrête dès qu'une partie se prépare.
  */
 let romMusic: RomMusic | undefined;
+/**
+ * Mise en route des ROM sans mémoire (rom-first-boot.ts) : sans elle, la première partie d'une table
+ * à ROM s'arrêtait sur « réglages d'usine rétablis », pièces refusées. D'office en tâche de fond, et
+ * avant la partie si la mémoire manque encore.
+ */
+let romFirstBoot: RomFirstBoot | undefined;
 /**
  * Médias du menu dessiné pour le casque (casque-vues.ts) : le playfield y est en portrait
  * (headsetTurn), son fond s'oriente donc d'après ce bord des flippers, pas celui de l'écran du PC.
@@ -3973,11 +3980,21 @@ export function startFrontend(): void {
     captureDir: process.env.CYBERPINBALL_CAPTURE,
     log: (line) => console.log(line),
   });
-  romMusic ??= new RomMusic({
+  romFirstBoot ??= new RomFirstBoot({
     dataDir: loc.dataDir,
     root: () => loc.root,
     tables: () => tables,
     busy: () => state.phase === 'loading' || state.phase === 'playing' || desktop.active,
+    // Hors écran (essais sans opérateur), rien d'office : seulement avant une partie.
+    automatic: !OFFSCREEN,
+    log: (line) => console.log(line),
+  });
+  romMusic ??= new RomMusic({
+    dataDir: loc.dataDir,
+    root: () => loc.root,
+    tables: () => tables,
+    // Une mise en route de ROM passe d'abord : la musique attend qu'elle ait fini.
+    busy: () => state.phase === 'loading' || state.phase === 'playing' || desktop.active || romFirstBoot?.active() === true,
     converter: () => (converter ??= createConverter()),
     onChange: (recorded) => {
       // Une musique de plus : la musique des jeux est recherchée de nouveau, tout de suite.
@@ -4319,6 +4336,7 @@ function reloadTables(selectFile?: string): void {
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
   medias?.invalidate();
   romMusic?.tablesChanged();
+  romFirstBoot?.tablesChanged();
   headsetMedias?.invalidate();
   // Dossier des tables ou des médias créé depuis le démarrage (première table) : guetté aussi.
   mediaWatch?.rearm();
@@ -5344,6 +5362,24 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // dans le double d'une partie entre amis : son volume est celui de cette borne, déjà dans la mémoire.
   // Ni avec un autre VPX : VPinMAME y garde ses propres réglages.
   const romVolumeWatched = !hooks.double && !displayMode && !otherVpx;
+  // Mémoire de la ROM absente (rom-first-boot.ts) : la ROM est mise en route maintenant, une fois pour
+  // toutes, sans écran ni son ; sinon elle s'arrêterait sur « réglages d'usine rétablis », pièces
+  // refusées. Avant le volume : il s'écrit dans cette mémoire. Ni avec un autre VPX (VPinMAME y a la sienne).
+  if (!otherVpx && !displayMode && simulated === undefined && romFirstBoot) {
+    await romFirstBoot.beforeGame(table, {
+      starting: () => {
+        launchStep('rom');
+        // Une attente attendue : le chargement la dit tout de suite, sans attendre ses 8 s.
+        if (launch && !launch.slow) {
+          launch.slow = true;
+          broadcast();
+        }
+      },
+      stopper: (stop) => {
+        if (launch) launch.stop = stop;
+      },
+    });
+  }
   if (romVolumeWatched) romVolumes.beforeGame(table);
   closeTopmostWindows();
   // Habillage FullDMD : le DMD de VPX posé dans le cadre du média FullDMD, que le fond de partie montre autour.

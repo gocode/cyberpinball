@@ -73,6 +73,7 @@ export * from './romlibrary';
 export * from './romzip';
 export * from './romalias';
 export * from './romaudio';
+export * from './romfirstboot';
 export * from './vpmalias';
 export * from './sandbox';
 export * from './zones';

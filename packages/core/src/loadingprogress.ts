@@ -12,10 +12,11 @@ export const LOADING_SLOW_MS = 8000;
 
 /**
  * Étapes observées du lancement : `prepare`, Cyber Pinball prépare la partie (écrans, PuP-Pack,
- * habillage) ; `launched`, le processus de VPX tourne, aucune de ses fenêtres n'est encore
- * visible ; `windows`, VPX a ouvert une fenêtre (fronton, DMD), pas encore celle du jeu.
+ * habillage) ; `rom`, il met en route une ROM qui n'a pas encore de mémoire (romfirstboot.ts,
+ * une fois pour toutes) ; `launched`, le processus de VPX tourne, aucune de ses fenêtres n'est
+ * encore visible ; `windows`, VPX a ouvert une fenêtre (fronton, DMD), pas encore celle du jeu.
  */
-export const LOADING_STEPS = ['prepare', 'launched', 'windows'] as const;
+export const LOADING_STEPS = ['prepare', 'rom', 'launched', 'windows'] as const;
 export type LoadingStep = (typeof LOADING_STEPS)[number];
 
 /** Ce que dit le cartouche de l'étape observée. */
@@ -23,6 +24,8 @@ export function loadingStepLabel(step: LoadingStep): string {
   switch (step) {
     case 'prepare':
       return t('Cyber Pinball prépare la partie');
+    case 'rom':
+      return t('Première mise en route de la ROM : une fois pour toutes, ses réglages d’usine sont posés');
     case 'launched':
       return t('VPX est lancé : il charge la table');
     case 'windows':
