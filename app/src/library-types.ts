@@ -300,6 +300,8 @@ export type UiAction =
   /** Repère de la collection (collection suivante) ou ligne de la liste des collections (celle-ci). */
   | { type: 'collections'; step?: number; id?: string }
   | { type: 'wheel'; offset: number }
+  /** Clic hors de tout élément cliquable (ou molette) sur un écran qu'un bouton quelconque quitte : ouverture, attente, nuit, préavis (souris-roue.js). */
+  | { type: 'wake' }
   /** Juke-box (jukebox-player.ts) : une ligne de la liste, Start, une playlist voisine, Exit. */
   | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage' | 'up' | 'shuffle' | 'repeat' | 'pause' | 'seek-to' | 'wheel' | 'page'; key?: string; dir?: number; fraction?: number };
 

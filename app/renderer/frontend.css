@@ -984,6 +984,16 @@ html[data-menu-band='arche'] #root {
   z-index: 1;
 }
 
+/* Zones cliquables des flèches dessinées sur le bandeau (souris-roue.js) : invisibles, au-dessus de tout. */
+.wheel-arrow {
+  position: absolute;
+  z-index: 2;
+}
+
+body.mouse .wheel-arrow {
+  cursor: pointer;
+}
+
 /* Au bureau, les bords du bandeau, qui débordent du fronton, se fondent en dégradé. */
 html.menu-desktop .menu-band .wheel-stage {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);

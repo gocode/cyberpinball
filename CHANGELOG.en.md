@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Cabinet health and tech sheet: a screen's refresh rate is only flagged when it changes something in the game. A backglass, DMD or topper set below its possible refresh rate is no longer "To check": the sheet mentions it on the screen's line, "no effect on the ball". The playfield below its possible refresh rate is still flagged, and so is a secondary screen slower than the playfield, with the reason: VPX 10.8.1 then locks the whole game to it (except with Cyber Pinball's patched VPX).
+- Mouse: a click anywhere skips the Cyber Pinball intro, like a button; it also wakes the attract mode, the night veil and the shutdown notice.
+- Mouse: the wheel arrows (Medallions and Minimal wheels) can be clicked to go to the previous or next table.
+- Mouse: the scroll wheel turns the table wheel, one table per notch.
 - Conversation with the team: every report (written, sent to the developers or an automatic crash report) opens a conversation. The team's reply arrives on the cabinet with a notification and in your waiting messages, and you can reply back; everything stays encrypted between the cabinet and the team (System menu > Help and info > Feedback and ideas > My conversations with the team).
 - A reply from the team on one of your public ideas is also announced to you, and you can answer it privately.
 - Your reports now go with your nickname, so the team knows who it is replying to; you can choose to send them anonymously (the choice is kept), and the team can still reply to you.

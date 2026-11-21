@@ -88,7 +88,8 @@ export interface TechFacts {
   };
   software?: {
     /** changedFiles : fichiers modifiés hors de Cyber Pinball (« SDL364.dll 3.2.18.0 »), absents s'ils sont d'origine. */
-    vpx?: { version?: string; known?: string; changedFiles?: string[] };
+    /** `patch` : série de correctifs du VPX corrigé de Cyber Pinball en place (« patched Cyber Pinball 1 »). */
+    vpx?: { version?: string; known?: string; patch?: number; changedFiles?: string[] };
     /** Plugins de VPX trouvés et leur état dans VPinballX.ini. */
     plugins: { id: string; name: string; enabled: boolean }[];
     pupPacks?: number;
@@ -319,6 +320,24 @@ export function refreshGap(d: TechDisplay): { kind: 'windows' | 'link'; max: num
   return undefined;
 }
 
+/**
+ * Effet réel d'un écran réglé sous sa fréquence possible. `ball` : le playfield, la bille y gagnerait. `cap` : écran
+ * annexe plus lent que le playfield avec un VPX non corrigé ; VPX 10.8.1 présente toutes ses fenêtres ensemble et la
+ * partie entière suit l'écran le plus lent (rapports du 20/11/2026 ; vpxcadence.ts, readScreenCap). `none` : écran
+ * annexe sans effet sur la partie (DMD de PinMAME à 60 images/s au plus, fronton surtout fixe), ou écran hors de la
+ * configuration. Sans aucun rôle connu, un écran peut être le playfield : il est traité comme tel.
+ */
+export type RefreshImpact = 'ball' | 'cap' | 'none';
+
+export function refreshImpact(d: TechDisplay, displays: readonly TechDisplay[], vpxPatched = false): RefreshImpact {
+  if (d.role === 'playfield' || (!d.role && !displays.some((x) => x.role))) return 'ball';
+  const playfield = playfieldHz(displays);
+  return d.role && !vpxPatched && d.hz && playfield && playfield > d.hz + 1 ? 'cap' : 'none';
+}
+
+/** Fréquence de l'écran du playfield, pour dire qu'un écran annexe plus lent bride la partie. */
+const playfieldHz = (displays: readonly TechDisplay[]) => displays.find((d) => d.role === 'playfield')?.hz;
+
 const displayName = (d: TechDisplay) => (d.role ? roleLabel(d.role) : d.name);
 
 /** Les blocs de la fiche, dans l'ordre de la page. */
@@ -451,20 +470,28 @@ function displaysBlock(f: TechFacts): TechBlock {
   const notes: TechBlock['notes'] = [];
   const order: RoleId[] = ['playfield', 'backglass', 'dmd', 'topper'];
   const displays = [...(f.displays ?? [])].sort((a, b) => (a.role ? order.indexOf(a.role) : 9) - (b.role ? order.indexOf(b.role) : 9));
+  const patched = Boolean(f.software?.vpx?.patch);
   const rows: TechRow[] = displays.map((d) => {
     const gap = refreshGap(d);
-    if (gap) notes.push(refreshNote(d, gap, playfieldHz(displays)));
+    const impact = gap && refreshImpact(d, displays, patched);
+    // Sans effet sur la partie : dit sur la ligne de l'écran, sans note ni « À vérifier ».
+    if (gap && impact && impact !== 'none') notes.push(refreshNote(d, gap, impact));
     return {
       label: displayName(d),
       value: joined([d.role ? d.name : undefined, d.inches ? `${formatNumber(d.inches, { maximumFractionDigits: 1 })}″` : undefined, pixels(d.width, d.height), d.hz ? hz(d.hz) : undefined]),
       detail: joined([
         d.connection && connectionLabel(d.connection),
-        gap && t('jusqu’à {max} annoncés', { max: hz(gap.max) }),
+        gap &&
+          (impact !== 'none'
+            ? t('jusqu’à {max} annoncés', { max: hz(gap.max) })
+            : gap.kind === 'windows'
+              ? t('Windows propose {max}, sans effet sur la bille', { max: hz(gap.max) })
+              : t('jusqu’à {max} annoncés, sans effet sur la bille', { max: hz(gap.max) })),
         d.scale ? t('échelle {n} %', { n: Math.round(d.scale * 100) }) : undefined,
         d.rotation ? t('tourné de {n}°', { n: d.rotation }) : undefined,
         d.primary && t('écran principal'),
       ]) || undefined,
-      state: gap ? 'check' : 'ok',
+      state: gap && impact !== 'none' ? 'check' : 'ok',
     };
   });
   if (!rows.length) rows.push({ label: t('Écrans'), value: NOT_READ(), state: 'quiet' });
@@ -480,30 +507,37 @@ function displaysBlock(f: TechFacts): TechBlock {
   return block('displays', t('Écrans'), 'screens', sections, notes, essentials);
 }
 
-/** Pourquoi un écran est sous sa fréquence, et quoi faire, sans affirmer ce qui n'est pas établi. */
-export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max: number }, playfieldHz?: number): TechBlock['notes'][number] {
-  // Écran annexe plus lent que le playfield : VPX 10.8.1 présente toutes ses fenêtres ensemble, la partie entière suit
-  // l'écran le plus lent dès que VPX y dessine (backglass B2S, ScoreView ; vpxcadence.ts, readScreenCap).
-  const capping = d.role && d.role !== 'playfield' && d.hz && playfieldHz && playfieldHz > d.hz + 1 ? ' ' + t('Tant que VPX dessine aussi sur cet écran, toute la partie suit sa fréquence, playfield compris.') : '';
+/**
+ * Pourquoi un écran est sous sa fréquence, et quoi faire, sans affirmer ce qui n'est pas établi. Seulement quand
+ * l'écran a un effet sur la partie (refreshImpact) : la bille sur le playfield, ou toute la partie calée sur un écran
+ * annexe plus lent. Un écran annexe sans effet n'a pas de note, sa ligne le dit.
+ */
+export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max: number }, impact: Exclude<RefreshImpact, 'none'>): TechBlock['notes'][number] {
+  const link = () =>
+    d.connection === 'hdmi'
+      ? t('Windows ne propose pas plus à cette définition : vérifiez le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.')
+      : t('Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.');
+  if (impact === 'cap') {
+    return {
+      state: 'check',
+      title: t('{screen} à {hz} : toute la partie suit cet écran', { screen: displayName(d), hz: hz(d.hz!) }),
+      detail: [
+        t('Tant que VPX dessine aussi sur cet écran, toute la partie suit sa fréquence, playfield compris.'),
+        ...(gap.kind === 'windows'
+          ? [t('Windows propose {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) })]
+          : [t('Il annonce jusqu’à {max}.', { max: hz(gap.max) }), link()]),
+      ].join(' '),
+    };
+  }
   if (gap.kind === 'windows') {
     return {
       state: 'check',
       title: t('{screen} à {hz}, Windows propose {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }),
-      detail: t('La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }) + capping,
+      detail: t('La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }),
     };
   }
-  return {
-    state: 'check',
-    title: t('{screen} à {hz}, il annonce jusqu’à {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }),
-    detail:
-      (d.connection === 'hdmi'
-        ? t('Windows ne propose pas plus à cette définition : vérifiez le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.')
-        : t('Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.')) + capping,
-  };
+  return { state: 'check', title: t('{screen} à {hz}, il annonce jusqu’à {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }), detail: link() };
 }
-
-/** Fréquence de l'écran du playfield, pour dire qu'un écran annexe plus lent bride la partie. */
-const playfieldHz = (displays: readonly TechDisplay[]) => displays.find((d) => d.role === 'playfield')?.hz;
 
 function controllersBlock(f: TechFacts): TechBlock {
   const c = f.controllers;
@@ -584,11 +618,14 @@ export interface PcHealthFacts {
   power?: NonNullable<NonNullable<TechFacts['windows']>['power']>;
   gpus: { name: string; driverDate?: string }[];
   memory?: number;
+  /** VPX corrigé de Cyber Pinball en place : un écran annexe plus lent ne cale plus la partie (refreshImpact). */
+  vpxPatched?: boolean;
 }
 
 export function pcHealthFacts(f: TechFacts): PcHealthFacts {
   return {
     displays: f.displays ?? [],
+    ...(f.software?.vpx?.patch ? { vpxPatched: true } : {}),
     rebootPending: f.windows?.rebootPending,
     power: f.windows?.power,
     gpus: (f.pc?.gpus ?? []).map((g) => ({ name: g.name, driverDate: g.driverDate })),
@@ -602,12 +639,21 @@ const SHEET = (block: TechBlockId): HealthTarget => ({ kind: 'sheet', block });
 export function pcLines(facts: PcHealthFacts, now = Date.now()): HealthLine[] {
   const lines: HealthLine[] = [];
   const go = (block: TechBlockId) => t('Fiche technique : {block}', { block: blockTitle(block) });
-  const gaps = facts.displays.map((d) => ({ d, gap: refreshGap(d) })).filter((x) => x.gap);
-  for (const { d, gap } of gaps) {
-    const note = refreshNote(d, gap!, playfieldHz(facts.displays));
+  const gaps = facts.displays.flatMap((d) => {
+    const gap = refreshGap(d);
+    return gap ? [{ d, gap, impact: refreshImpact(d, facts.displays, facts.vpxPatched) }] : [];
+  });
+  // Seuls les écrans qui changent quelque chose à la partie ; un DMD ou un fronton sous son maximum n'en a pas.
+  let flagged = 0;
+  for (const { d, gap, impact } of gaps) {
+    if (impact === 'none') continue;
+    const note = refreshNote(d, gap, impact);
     lines.push({ check: 'pc', state: 'check', title: note.title, detail: note.detail, go: go('displays'), target: SHEET('displays') });
+    flagged++;
   }
-  if (!gaps.length && facts.displays.some((d) => d.hz)) lines.push({ check: 'pc', state: 'ok', title: t('Écrans à la fréquence la plus haute proposée'), go: go('displays'), target: SHEET('displays') });
+  // « Écrans au plus haut » seulement s'ils le sont tous ; sinon le playfield, le seul qui compte pour la bille.
+  const fine = !gaps.length ? t('Écrans à la fréquence la plus haute proposée') : facts.displays.some((d) => d.role === 'playfield' && d.hz) ? t('Playfield à la fréquence la plus haute proposée') : undefined;
+  if (!flagged && fine && facts.displays.some((d) => d.hz)) lines.push({ check: 'pc', state: 'ok', title: fine, go: go('displays'), target: SHEET('displays') });
   if (facts.rebootPending) lines.push({ check: 'pc', state: 'check', title: t('Redémarrage de Windows en attente'), detail: t('Windows peut redémarrer seul pendant une partie : redémarrez la borne quand elle est libre.'), go: go('windows'), target: SHEET('windows') });
   if (facts.power) {
     const saver = facts.power.scheme === 'saver';

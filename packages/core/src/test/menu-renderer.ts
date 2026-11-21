@@ -48,7 +48,7 @@ export function menuRenderer(extra: Record<string, unknown> = {}, opts: { menuAu
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  for (const name of ['i18n.js', 'icons.js', 'media.js', ...(opts.menuAudio ? ['menu-audio.js'] : []), 'scroll-keeper.js', 'library.js', 'frontend.js']) {
+  for (const name of ['i18n.js', 'icons.js', 'media.js', ...(opts.menuAudio ? ['menu-audio.js'] : []), 'scroll-keeper.js', 'library.js', 'souris-roue.js', 'frontend.js']) {
     vm.runInContext(fs.readFileSync(path.join(APP, 'renderer', name), 'utf8'), ctx, { filename: name });
   }
   const send = (s: unknown) => onState!(s);

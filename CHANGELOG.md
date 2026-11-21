@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Santé de la borne et fiche technique : la fréquence d'un écran n'est signalée que si elle change quelque chose à la partie. Un fronton, un DMD ou un topper réglé sous sa fréquence possible n'est plus « À vérifier » : la fiche le mentionne sur la ligne de l'écran, « sans effet sur la bille ». Le playfield sous sa fréquence possible reste à vérifier, et un écran annexe plus lent que le playfield aussi, avec la raison : VPX 10.8.1 cale alors toute la partie sur lui (sauf avec le VPX corrigé de Cyber Pinball).
+- Souris : un clic n'importe où passe l'ouverture de Cyber Pinball, comme un bouton ; il réveille aussi le mode attente, le voile de nuit et le préavis d'arrêt.
+- Souris : les flèches de la roue (roues Médaillons et Minimaliste) se cliquent pour passer à la table précédente ou suivante.
+- Souris : la molette fait tourner la roue de l'écran des tables, une table par cran.
 - Échange avec l'équipe : chaque rapport (écrit, envoyé aux développeurs ou plantage automatique) ouvre un échange. La réponse de l'équipe arrive sur la borne avec une notification et dans les messages en attente, et le joueur peut y répondre ; tout reste chiffré entre la borne et l'équipe (Menu système > Aide et infos > Retours et propositions > Mes échanges avec l'équipe).
 - Une réponse de l'équipe sur l'une de vos propositions publiques vous est aussi annoncée, et vous pouvez lui répondre en privé.
 - Vos rapports partent désormais avec votre pseudo, pour que l'équipe sache à qui elle répond ; vous pouvez choisir de les envoyer anonymement (réglage retenu), l'équipe peut alors quand même vous répondre.

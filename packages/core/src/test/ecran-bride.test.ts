@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { HEALTH_CHECK_FINDINGS } from '../health';
 import { slowTableFinding } from '../slowtable';
-import { refreshNote, type TechDisplay } from '../techsheet';
+import { refreshImpact, refreshNote, type TechDisplay } from '../techsheet';
 import { cadenceJournal, cadenceVerdict, parseVpxCadence, readScreenCap, readVpxTargetFps, readVpxWindows, recordGameCadence } from '../vpxcadence';
 
 const at = (s: string) => `2026-11-20 20:28:${s} INFO  [Main] `;
@@ -102,7 +102,11 @@ test('table qui rame vraiment, ou sans écran annexe plus lent : toujours « La 
 
 test('fiche technique : un écran annexe plus lent que le playfield dit qu’il bride toute la partie', () => {
   const backglass: TechDisplay = { role: 'backglass', name: '32W_LCD_TV', width: 1920, height: 1080, hz: 50, offeredMaxHz: 60, connection: 'hdmi', rotation: 0, primary: false };
-  assert.match(refreshNote(backglass, { kind: 'windows', max: 60 }, 119.91).detail!, /toute la partie suit sa fréquence, playfield compris/);
-  assert.doesNotMatch(refreshNote(backglass, { kind: 'windows', max: 60 }, 50).detail!, /playfield compris/);
-  assert.doesNotMatch(refreshNote({ ...backglass, role: 'playfield' }, { kind: 'windows', max: 60 }, 119.91).detail!, /playfield compris/);
+  const playfield = (hz: number): TechDisplay => ({ role: 'playfield', name: 'PL4380UH', width: 3840, height: 2160, hz, offeredMaxHz: hz, rotation: 0, primary: true });
+  assert.equal(refreshImpact(backglass, [playfield(119.91), backglass]), 'cap');
+  assert.match(refreshNote(backglass, { kind: 'windows', max: 60 }, 'cap').detail!, /toute la partie suit sa fréquence, playfield compris/);
+  // Playfield aussi lent, ou VPX corrigé : sans effet sur la partie.
+  assert.equal(refreshImpact(backglass, [playfield(50), backglass]), 'none');
+  assert.equal(refreshImpact(backglass, [playfield(119.91), backglass], true), 'none');
+  assert.doesNotMatch(refreshNote({ ...backglass, role: 'playfield' }, { kind: 'windows', max: 60 }, 'ball').detail!, /playfield compris/);
 });

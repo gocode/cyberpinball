@@ -394,6 +394,8 @@ function wheelStage(s, style) {
   // état reçu, et l'anneau, l'étincelle et l'éclat disparaissaient en cours de route (12/11/2026).
   for (const c of [...v.stage.classList]) if (c.startsWith('roue-') && c !== `roue-${style}`) v.stage.classList.remove(c);
   v.stage.classList.add(`roue-${style}`);
+  // Flèches dessinées sur le bandeau : cliquables (souris-roue.js).
+  window.CyberSouris?.arrows(v.stage, style);
   // Logos animés : la table choisie seule (par défaut), ou tous (« all »).
   v.stage.classList.toggle('logos-fixes', s.wheelMotion !== 'all');
   // Roue remise à l'écran (retour du Juke-box, d'une partie) : les médaillons vivants reprennent.
@@ -2187,5 +2189,12 @@ window.cyber.onState((s) => {
   } else root.replaceChildren();
   renderZones(s);
   pauseUnderVeil();
+});
+
+// La souris (souris-roue.js) : un clic réveille ce qu'un bouton quelconque quitte, la molette
+// fait tourner la roue de l'écran des tables.
+window.CyberSouris?.install({
+  waking: () => Boolean(lastState && !lastState.game && (lastState.intro || lastState.attract || (lastState.night ?? 0) > 0 || lastState.stop)),
+  wheelArea: () => (lastState?.phase === 'menu' && !lastState.game && menuView?.node.isConnected ? menuView.node : undefined),
 });
 window.cyber.ready();

@@ -3852,6 +3852,8 @@ export function startFrontend(): void {
     if (attract.activity() || noticed) return void leaveAttract();
     // Un clic pendant l'ouverture affiche la roue, comme un bouton.
     if (state.phase === 'intro') return void leaveIntro();
+    // Réveil d'un clic dans le vide (souris-roue.js) : rien d'autre à faire quand l'écran ne dormait plus.
+    if (action.type === 'wake') return;
     // Clic sur « Start : jouer » de la roue : un clic n'a pas de durée, il joue tout de suite.
     if (action.type === 'key' && state.phase === 'menu' && !state.help && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index] && !onMedallion()) wheelConfirm(tables[state.index]!, false), broadcast();
     else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
