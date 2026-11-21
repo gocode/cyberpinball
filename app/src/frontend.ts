@@ -435,7 +435,7 @@ import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, probeVr, rememberVrSettings, restoreVrTableIni, writeIniSettings,  } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace } from './casque';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
-import { installVpxCorrige } from './vpx-corrige';
+import { installVpxCorrige, installVpxCorrigeAtStartup } from './vpx-corrige';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
@@ -1638,6 +1638,8 @@ function diagnosePlayfield(label: string): void {
 /** Le Juke-box se rouvre depuis sa gestion : broadcast ne ferme pas le lecteur gardé en fond. */
 let reopeningJukebox = false;
 
+// VPX corrigé posé dès le démarrage (vpx-corrige.ts), avant le premier relevé de la fiche et de la santé.
+installVpxCorrigeAtStartup(vpxInstall(loc), path.join(__dirname, '..'));
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
 library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing');
@@ -5688,6 +5690,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // VPX corrigé (vpx-corrige.ts) : l'exécutable de la 5436 avec les correctifs de VPX venus après elle.
     const corrige = installVpxCorrige(path.dirname(install.exe), install.version, path.join(__dirname, '..'));
     if (corrige === 'installed' || corrige === 'busy' || corrige === 'restored') console.log(`VPX corrigé : ${corrige === 'installed' ? 'exécutable posé' : corrige === 'restored' ? 'plus livré, exécutable officiel remis' : 'VPX ouvert, à la partie suivante'}.`); // i18n-ignore : journal
+    // L'exécutable a changé : la fiche technique (et la santé) seront relevées de nouveau après la partie.
+    if (corrige === 'installed' || corrige === 'restored') library.techFactsChanged();
   }
   // Vision 3D (vision3d.ts) : le capteur, allumé dès le Start, suit la tête pour VPX quand la table est à l'écran.
   const vision3dSource = simulated === undefined && !displayMode && !otherVpx ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;

@@ -73,6 +73,26 @@ test('fiche technique : « patched Cyber Pinball 1 » quand le corrigé est en p
   assert.ok(!JSON.stringify(official).includes('patched'));
 });
 
+test('posé dès le démarrage, avant le premier relevé de la fiche ; fiche relevée de nouveau après une partie qui l’a posé', () => {
+  // Rapport du 21/11/2026 : fiche relevée au démarrage (13:01), corrigé posé au premier lancement (13:02) ; la fiche du
+  // rapport disait VPX officiel et gardait l'alerte du fronton.
+  const { root, app, vpx } = setup();
+  try {
+    const atStartup = (corrige as unknown as { installVpxCorrigeAtStartup(v: { exe: string; version: string } | undefined, a: string): string | undefined }).installVpxCorrigeAtStartup;
+    assert.equal(atStartup(undefined, app), undefined, 'VPX pas installé : rien');
+    assert.equal(atStartup({ exe: path.join(vpx, 'VPinballX_BGFX64.exe'), version: corrige.VPX_CORRIGE_VERSION }, app), 'installed');
+    assert.equal(atStartup({ exe: path.join(vpx, 'VPinballX_BGFX64.exe'), version: corrige.VPX_CORRIGE_VERSION }, app), 'up-to-date');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
+  const startup = frontend.indexOf('installVpxCorrigeAtStartup(vpxInstall(loc)');
+  assert.ok(startup > 0 && startup < frontend.indexOf('library.watchHealth('), 'posé avant le premier relevé (25 s après le démarrage)');
+  assert.match(frontend, /if \(corrige === 'installed' \|\| corrige === 'restored'\) library\.techFactsChanged\(\);/);
+  const sheet = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'tech-sheet.ts'), 'utf8');
+  assert.match(sheet, /function stalled\(\)[\s\S]*?if \(isQuiet\(\)\) return;[\s\S]*?void refresh\(\);/, 'nouveau relevé dès la fin de la partie, jamais pendant');
+});
+
 test('vérification des fichiers de VPX : le corrigé est admis, un autre exécutable reste signalé', () => {
   const { root, app, vpx } = setup();
   try {

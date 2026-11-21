@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- After the update that brings it, the patched VPX is installed as soon as Cyber Pinball starts: the technical sheet shows "patched Cyber Pinball 1" right away, and the cabinet health no longer keeps the backglass refresh rate warning.
 - Table search: clearing the "Search for a title" field and confirming now clears the search, as stated; before, it stayed until Cyber Pinball was restarted. "Clear the filters" also removes the searched title.
 - All text fields: a field cleared and confirmed is now taken into account (room topic removed, ZeDMD Wi-Fi turned off, Art-Net address on the whole network, Juke-box correction back to the original information, Rankings search cleared). Exit still cancels.
 - New "Arena" medallion on the wheel, between Community and Collections: everything played against others. Its live medallion shows a cup and confetti; hide it in System menu › Tables › Wheel ("Arena on the wheel").

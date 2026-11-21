@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Après la mise à jour qui l'apporte, le VPX corrigé est posé dès le démarrage de Cyber Pinball : la fiche technique affiche tout de suite « patched Cyber Pinball 1 », et la Santé de la borne ne garde plus l'alerte sur la fréquence du fronton.
 - Recherche d'une table : vider le champ « Chercher un titre » puis valider efface la recherche, comme annoncé ; avant, elle restait jusqu'au redémarrage de Cyber Pinball. « Effacer les filtres » retire aussi le titre cherché.
 - Toutes les saisies : un champ vidé puis validé est pris en compte (sujet d'un salon retiré, ZeDMD en wifi coupé, adresse Art-Net sur tout le réseau, correction du Juke-box rendue à l'information d'origine, recherche des Classements effacée). Exit annule toujours.
 - Nouveau médaillon « Arène » dans la roue, entre la Communauté et les Collections : tout ce qui se joue contre les autres. Son médaillon vivant montre une coupe et des confettis ; il se masque dans Menu système › Tables › Roue (« Arène dans la roue »).

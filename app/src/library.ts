@@ -6626,6 +6626,8 @@ export function createLibrary(host: LibraryHost) {
       health.watch(quiet);
       techSheet.watch(quiet);
     },
+    /** La fiche technique (et la santé qui en dépend) à relever de nouveau après la partie : l'exécutable de VPX a changé. */
+    techFactsChanged: () => techSheet.stalled(),
     /** Santé de la borne : relevé, page (essais). */
     health,
     openSystem,

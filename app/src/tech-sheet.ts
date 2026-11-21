@@ -423,6 +423,7 @@ export function createTechSheet(ctx: TechSheetContext) {
    * groupe « PC et Windows » de la santé suit sans qu'on ouvre la fiche. Jamais pendant une partie.
    */
   function watch(quiet: () => boolean = () => false): void {
+    isQuiet = quiet;
     const tick = () => {
       if (!quiet()) void refresh();
     };
@@ -430,11 +431,29 @@ export function createTechSheet(ctx: TechSheetContext) {
     setInterval(tick, 30 * 60_000).unref?.();
   }
 
+  let isQuiet: () => boolean = () => false;
+  let stale: ReturnType<typeof setInterval> | undefined;
+  /**
+   * Quelque chose que le relevé décrit vient de changer (l'exécutable de VPX posé au lancement d'une partie,
+   * vpx-corrige.ts) : nouveau relevé dès que la partie est finie, sans attendre les 30 minutes.
+   */
+  function stalled(): void {
+    if (stale) return;
+    stale = setInterval(() => {
+      if (isQuiet()) return;
+      clearInterval(stale);
+      stale = undefined;
+      void refresh();
+    }, 10_000);
+    stale.unref?.();
+  }
+
   return {
     open,
     openBlock,
     refresh,
     watch,
+    stalled,
     summary,
     facts: () => facts,
     running: () => Boolean(running),

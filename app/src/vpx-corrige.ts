@@ -83,6 +83,18 @@ export function installVpxCorrige(vpxDir: string, version: string | undefined, a
   }
 }
 
+/**
+ * Au démarrage de Cyber Pinball, avant le premier relevé de la fiche technique et de la vérification des fichiers :
+ * sinon, après une mise à jour qui apporte le corrigé, la fiche relevée avant la première partie le disait absent
+ * (rapport du 21/11/2026 : fiche de 13:01, corrigé posé à 13:02 au premier lancement, alerte du fronton restée).
+ */
+export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string } | undefined, appDir: string): VpxCorrigeInstall | undefined {
+  if (!vpx) return undefined;
+  const r = installVpxCorrige(path.dirname(vpx.exe), vpx.version, appDir);
+  if (r === 'installed' || r === 'restored' || r === 'busy') console.log(`VPX corrigé (démarrage) : ${r === 'installed' ? 'exécutable posé' : r === 'restored' ? 'plus livré, exécutable officiel remis' : 'VPX ouvert, à la partie suivante'}.`); // i18n-ignore : journal
+  return r;
+}
+
 /** Série de correctifs livrée (« patched Cyber Pinball 1 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
 export const VPX_CORRIGE_PATCH = 1;
 
