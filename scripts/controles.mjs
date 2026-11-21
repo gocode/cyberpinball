@@ -72,12 +72,18 @@ export function run(cmd, args, { cwd, log, shell = false, timeoutMs } = {}) {
 export async function rerunAlone(files, { cwd, say = console.log, prefix = 'relance' }) {
   const flaky = [];
   const failures = [];
+  if (!files.length) return { flaky, failures };
+  // Tous ensemble, en une passe, hors de la grande suite : relancés un par un, six fichiers lents
+  // prenaient 5 à 10 minutes de plus (21/11/2026).
+  say(`Relance des ${files.length} fichier(s) en échec, à part : ${files.map((f) => path.basename(f)).join(', ')}…`);
+  const again = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...files], { cwd, log: path.join(cwd, 'tmp', `${prefix}.txt`), timeoutMs: TEST_TIMEOUT_MS + 60_000 });
+  const still = new Set([...failedFiles(again.out), ...again.hung].map((f) => path.basename(f)));
+  if (again.code !== 0 && !still.size) for (const f of files) still.add(path.basename(f));
+  const details = failureDetails(again.out);
   for (const file of files) {
     const name = path.basename(file);
-    say(`Relance seule : ${name}…`);
-    const again = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, file], { cwd, log: path.join(cwd, 'tmp', `${prefix}-${name}.txt`), timeoutMs: TEST_TIMEOUT_MS + 60_000 });
-    if (again.code === 0) flaky.push(name);
-    else failures.push({ file: name, details: again.timedOut ? [{ name: 'figé : ne finit pas, même seul', file: name }] : failureDetails(again.out) });
+    if (!still.has(name)) flaky.push(name);
+    else failures.push({ file: name, details: again.hung.some((h) => path.basename(h) === name) ? [{ name: 'figé : ne finit pas, même à part', file: name }] : details.filter((d) => d.file === name) });
   }
   if (flaky.length) {
     let reg = {};

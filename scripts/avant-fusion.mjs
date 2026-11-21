@@ -30,6 +30,14 @@ import { collectTests } from './verifier.mjs';
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const iso = (ms) => new Date(ms).toISOString();
 
+/** Nombre de vérifications complètes simultanées sur la machine. */
+export const SUITES_SIMULTANEES = Math.max(1, Number(process.env.CYBERPINBALL_SUITES) || 3);
+
+/** Les verrous des places de vérification (suite-1.lock, suite-2.lock…). */
+export function suiteSlots(dir, n = SUITES_SIMULTANEES) {
+  return Array.from({ length: n }, (_, i) => path.join(dir, `suite-${i + 1}.lock`));
+}
+
 /** Electron téléchargé ? (Premier lancement d'un worktree neuf : les tests Electron tombaient en 5 s.) */
 async function ensureElectron(cwd, say) {
   const exe = path.join(cwd, 'node_modules', 'electron', 'dist', 'electron.exe');
@@ -50,18 +58,23 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
   fs.mkdirSync(tmp, { recursive: true });
 
   say(`Avant-fusion de ${branche}.`);
-  // Une vérification complète à la fois sur la machine, contrôles express compris : trois suites
-  // menées ensemble mettaient le processeur à 100 % et chacune durait trois fois plus (21/11/2026).
-  const lockFile = path.join(dir, 'suite.lock');
+  // Au plus SUITES_SIMULTANEES vérifications complètes à la fois sur la machine, contrôles express
+  // compris : trois ou quatre suites menées ensemble mettaient le processeur à 100 % et chacune durait
+  // trois fois plus ; une seule à la fois faisait attendre dès deux sessions (21/11/2026). Trois par
+  // défaut (une ou deux sessions n'attendent jamais), CYBERPINBALL_SUITES pour un autre nombre.
+  const slots = suiteSlots(dir);
   let release;
   let told;
-  while (!(release = tryLock(lockFile, { branche, finPrevue: iso(Date.now() + expected) }))) {
-    const holder = lockHolder(lockFile);
-    const holderEnd = holder?.finPrevue ? Date.parse(holder.finPrevue) : Date.now() + expected;
-    announce({ branche, etape: 'attente-suite', finPrevue: iso(Math.max(holderEnd, Date.now()) + expected + DUREE_FUSION_MS) }, dir);
-    if (holder && told !== holder.pid) {
-      say(`Une autre suite tourne (${holder.branche ?? 'branche inconnue'}, fin prévue ${hhmm(holderEnd)}) : attente de son tour.`);
-      told = holder.pid;
+  for (;;) {
+    for (const file of slots) if ((release = tryLock(file, { branche, finPrevue: iso(Date.now() + expected) }))) break;
+    if (release) break;
+    const holders = slots.map((f) => lockHolder(f)).filter(Boolean);
+    const firstEnd = Math.min(...holders.map((h) => (h.finPrevue ? Date.parse(h.finPrevue) : Date.now() + expected)));
+    announce({ branche, etape: 'attente-suite', finPrevue: iso(Math.max(firstEnd, Date.now()) + expected + DUREE_FUSION_MS) }, dir);
+    const key = holders.map((h) => h.pid).join(',');
+    if (told !== key) {
+      say(`${holders.length} vérifications complètes tournent déjà (${holders.map((h) => h.branche ?? '?').join(', ')}) : attente d'une place, vers ${hhmm(firstEnd)}.`);
+      told = key;
     }
     await sleep(10_000);
   }
@@ -86,6 +99,8 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
     let failing = first.code === 0 ? [] : [...new Set([...failedFiles(first.out), ...first.hung])];
     if (first.code !== 0 && !failing.length) failing = ['(sortie illisible : voir tmp/avant-fusion.txt)'];
     const unreadable = failing.filter((f) => !f.endsWith('js'));
+    // La place est rendue avant la relance : une autre session peut lancer sa vérification.
+    release();
     const { flaky, failures } = await rerunAlone(failing.filter((f) => f.endsWith('js')), { cwd, say, prefix: 'avant-fusion-relance' });
     for (const file of unreadable) failures.push({ file, details: [] });
     if (failures.length) {

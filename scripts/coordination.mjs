@@ -8,7 +8,7 @@
 //   durees.json      : durées mesurées des suites complètes, pour prévoir la fin des suivantes
 //   instables.json   : tests tombés dans la suite complète puis passés seuls (scripts/avant-fusion.mjs)
 //   certificats\     : dernière suite complète verte de chaque branche (scripts/fusionner.mjs)
-//   suite.lock       : une seule suite complète à la fois sur la machine
+//   suite-<n>.lock   : places des vérifications complètes (deux à la fois par défaut, avant-fusion.mjs)
 //   chef-publication.lock : une seule publication groupée à la fois
 //
 // Pourquoi (relevé du 21/11/2026, 30 sessions, 3 jours) : 69 suites complètes, 58 en échec, souvent

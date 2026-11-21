@@ -66,6 +66,33 @@ test('verrou : exclusif tant que son processus vit, repris quand il a disparu', 
   }
 });
 
+test('places de vérification : trois par défaut ; quand toutes sont prises, la suivante attend', async () => {
+  const { suiteSlots, SUITES_SIMULTANEES } = await import('./avant-fusion.mjs');
+  assert.equal(SUITES_SIMULTANEES, Math.max(1, Number(process.env.CYBERPINBALL_SUITES) || 3));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-places-'));
+  try {
+    const slots = suiteSlots(dir, 2);
+    const take = () => {
+      for (const f of slots) {
+        const r = tryLock(f);
+        if (r) return r;
+      }
+      return undefined;
+    };
+    const a = take();
+    const b = take();
+    assert.ok(a && b, 'deux places');
+    assert.equal(take(), undefined, 'la troisième attend');
+    a();
+    const c = take();
+    assert.ok(c, 'une place libérée est reprise');
+    b();
+    c();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 const TAP = `TAP version 13
 # Subtest: packages\\core\\dist\\test\\groupes.test.js
     # Subtest: réseau
