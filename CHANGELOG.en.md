@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Updates: the cabinet looks for a new version every 30 minutes (instead of 6 hours), and also when the PC wakes up and after a game. The red dot shows up soon after a release, without opening "Cyber Pinball update".
+- "Cyber Pinball update" screen: when the search finds a version, its back button now leads to the screen you came from (Recent activity, for example), no longer to "Help and info".
 - Table diagnosis: a backglass whose proportions differ from its screen is no longer described with "black bars" and a partly unused screen. It is stretched to the whole screen, as during the game, and the diagnosis says how much the image is distorted. The DMD and topper keep their black bars.
 
 ## 0.2.2

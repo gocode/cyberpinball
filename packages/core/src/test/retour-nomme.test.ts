@@ -91,3 +91,22 @@ test('retour nommé : chaque façon de revenir est vérifiée, et le bouton nomm
   const renderer = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'library.js'), 'utf8');
   assert.match(renderer, /v\.backTag \? \{ type: 'zone' \} : \{ type: 'back' \}/, 'un clic sur « Exit : actions » fait ce que fait Exit');
 });
+
+test('retour nommé : un écran fourni redessiné avec un rang reste le même écran, il ne s’empile pas sous son ancien titre', () => {
+  // 20/11/2026 : « Mise à jour de Cyber Pinball », redessiné en « 0.2.3-essai.1 est disponible » par
+  // openCustom(build, 0), devenait un nouvel écran ; son retour annonçait « Mise à jour de Cyber
+  // Pinball » et menait à « Aide et infos ». Le même écran garde son objet : le parcours le reconnaît.
+  const trail = new BackTrail<object>(() => HOME);
+  open(trail, place('Aide et infos', 'system'));
+  const screen = {};
+  trail.arrive(place('Mise à jour de Cyber Pinball'), screen);
+  trail.arrive(place('Cyber Pinball 0.2.3-essai.1 est disponible'), screen);
+  assert.equal(trail.destination().heading, 'Aide et infos');
+  // Dans library.ts : le même écran avec un rang déplace le curseur, sans go() ni nouvel objet.
+  const library = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'library.ts'), 'utf8');
+  const same = library.match(/function openCustom\([\s\S]*?if \(same\) \{([\s\S]*?)\r?\n    \}\r?\n/);
+  assert.ok(same, 'openCustom : branche du même écran');
+  assert.match(same[1]!, /cursor = at;/);
+  assert.match(same[1]!, /return;/);
+  assert.doesNotMatch(same[1]!, /go\(/);
+});

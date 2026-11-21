@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
   otherVpxFor,
   otherVpxLabel,
@@ -743,6 +743,8 @@ let rotation: Rotation = 0;
 /** Écran de chaque rôle de la borne, au démarrage du menu (écran du navigateur intégré). */
 let menuAssignments: Partial<Record<RoleId, ObservedDisplay>> = {};
 let state: State = { phase: 'menu', index: 0, help: false };
+/** La phase de la dernière diffusion : un passage de « playing » à autre chose est un retour de partie (broadcast). */
+let broadcastPhase: State['phase'] = state.phase;
 /** Rôles dessinés par chaque fenêtre : le sien (playfield) et ceux de ses zones. */
 let windowRoles = new Map<RoleId, RoleId[]>();
 /** Zone de chaque rôle à l'écran, en pixels physiques : pour savoir lesquels VPX occupe pendant la partie. */
@@ -4122,6 +4124,8 @@ export function startFrontend(): void {
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
   updates.startBackgroundChecks();
+  // Réveil du PC : les minuteries n'ont pas compté la veille, une recherche tout de suite.
+  powerMonitor.on('resume', () => updates.checkSoon());
   if (updateNotice) showBanner(updateNotice);
   if (guest.active) console.log('Mode invité : actif (réglage gardé) ; le menu système et les réglages sont fermés.');
   if (choose) configurations.openChooser();
@@ -7021,6 +7025,10 @@ function followTint(): void {
 }
 
 function broadcast(): void {
+  // Retour d'une partie, de quelque jeu que ce soit : une recherche de mise à jour, pour que la
+  // pastille soit là quand on revient à la roue (updates-menu.ts, au plus une toutes les 5 min).
+  if (broadcastPhase === 'playing' && state.phase !== 'playing') updates.checkSoon();
+  broadcastPhase = state.phase;
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
   // (Exit, partie lancée du téléphone, extinction…) ; sauf vers sa gestion : au bureau la musique y
   // continue, en fond ; en borne elle s'y met en pause et reprend au retour au lecteur.

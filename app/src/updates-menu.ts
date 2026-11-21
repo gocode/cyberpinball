@@ -2,9 +2,10 @@
 // publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
 // installation (packages/core/src/update.ts).
 //
-// Une recherche discrète part aussi en arrière-plan : dès le démarrage, puis toutes les 6 h
+// Une recherche discrète part aussi en arrière-plan : dès le démarrage, puis toutes les 30 min
 // tant que Cyber Pinball tourne (toutes les 5 min tant qu'elle échoue : réseau pas encore prêt
-// au démarrage de la borne). Elle ne télécharge rien, elle signale seulement une version
+// au démarrage de la borne), et au réveil du PC ou au retour d'une partie si la dernière date
+// de plus de 5 min. Elle ne télécharge rien, elle signale seulement une version
 // disponible par une pastille rouge sur la roue dentée et sur cette entrée (attention), sans
 // qu'il faille ouvrir le menu. Sans réseau, rien ne s'affiche.
 //
@@ -98,9 +99,16 @@ const leadLight = () =>
 const QUIT_DELAY_MS = 2500;
 /** Première recherche en arrière-plan : dès que le menu est affiché. */
 const FIRST_CHECK_MS = 2_000;
-/** Puis toutes les 6 h tant que l'application tourne ; toutes les 5 min tant qu'elle échoue. */
-const CHECK_EVERY_MS = 6 * 3600_000;
+/**
+ * Puis toutes les 30 min tant que l'application tourne ; toutes les 5 min tant qu'elle échoue.
+ * Toutes les 6 h jusqu'à la 0.2.3 : une version sortie juste après une recherche restait sans
+ * pastille jusqu'à 6 h (20/11/2026, la 0.2.2 sortie à 23 h 58, recherche suivante à 4 h 14).
+ * Une recherche coûte une requête à GitHub (60 par heure permises sans compte).
+ */
+export const CHECK_EVERY_MS = 30 * 60_000;
 const RETRY_MS = 5 * 60_000;
+/** Au réveil du PC ou au retour d'une partie : une recherche, si la dernière a plus de 5 min. */
+export const SOON_AFTER_MS = 5 * 60_000;
 /** Un résultat plus récent que cela s'affiche tel quel à l'ouverture de l'entrée. */
 const FRESH_MS = 10 * 60_000;
 
@@ -242,6 +250,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
    */
   async function checkQuietly(): Promise<boolean> {
     if (!quietAllowed()) return true;
+    quietAt = Date.now();
     try {
       const result = await checkForUpdate({ current: host.version, ...sourceOptions() });
       // L'utilisateur a pu lancer une opération entre-temps : son état prime.
@@ -256,6 +265,24 @@ export function createUpdatesMenu(host: UpdatesHost) {
       console.log(`Mise à jour (arrière-plan) : pas de réponse (${(error as Error).message}) ; nouvel essai dans 5 min`); // i18n-ignore : journal
       return false;
     }
+  }
+
+  /** Heure de la dernière recherche discrète lancée (réussie ou non). */
+  let quietAt = 0;
+
+  /**
+   * Réveil du PC, retour d'une partie : une recherche discrète tout de suite, si la dernière a
+   * plus de 5 min. Les minuteries ne comptent pas le temps de veille : sans elle, un PC réveillé
+   * attendait la fin de l'intervalle commencé avant la veille.
+   */
+  function checkSoon(): void {
+    if (!host.background || Date.now() - quietAt < SOON_AFTER_MS) return;
+    // Au réveil, le réseau revient parfois quelques secondes après : un second essai dans 5 min.
+    void checkQuietly().then((ok) => {
+      if (ok) return;
+      const timer = setTimeout(() => void checkQuietly(), RETRY_MS);
+      timer.unref?.();
+    });
   }
 
   /** Recherches en arrière-plan, du démarrage à la fermeture : chacune programme la suivante. */
@@ -591,5 +618,5 @@ export function createUpdatesMenu(host: UpdatesHost) {
     return text;
   }
 
-  return { systemItem, startupNotice, justInstalled: () => installed, startBackgroundChecks };
+  return { systemItem, startupNotice, justInstalled: () => installed, startBackgroundChecks, checkSoon };
 }

@@ -889,7 +889,17 @@ export function createLibrary(host: LibraryHost) {
     // jusqu'à ce qu'on en sorte. Un nouvel écran obligeait à revenir sur « Période » après chaque
     // appui (13/11/2026). Un rang donné (`at`) est obéi.
     const same = screen?.kind === 'custom' && (screen as Extract<Screen, { kind: 'custom' }>).build === build && (screen as Extract<Screen, { kind: 'custom' }>).table === table;
-    if (same && at === undefined) {
+    if (same) {
+      // Un rang donné sur le même écran (son état a changé : recherche finie, version trouvée) : le
+      // curseur y va, mais l'écran reste le même pour le retour nommé. Rouvert comme un nouvel écran,
+      // il s'empilait sous son ancien titre et son retour annonçait cet écran-là (« Mise à jour de
+      // Cyber Pinball » depuis « 0.2.3-essai.1 est disponible », 20/11/2026).
+      if (at !== undefined) {
+        cursor = at;
+        anchor = undefined;
+        // Ce qu'il montre a changé : relu comme à une ouverture (kept).
+        reads.fresh = false;
+      }
       host.enter();
       host.broadcast();
       return;

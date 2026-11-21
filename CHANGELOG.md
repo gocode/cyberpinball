@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Mises à jour : la borne cherche une nouvelle version toutes les 30 minutes (au lieu de 6 heures), et aussi au réveil du PC et au retour d'une partie. La pastille rouge paraît peu après une publication, sans ouvrir « Mise à jour de Cyber Pinball ».
+- Écran « Mise à jour de Cyber Pinball » : quand la recherche trouve une version, son retour mène bien à l'écran d'où l'on venait (Activité récente, par exemple), et non plus à « Aide et infos ».
 - Diagnostic d'une table : un fronton aux proportions différentes de son écran n'est plus décrit avec des « bandes noires » et un écran en partie inutilisé. Il est étiré à tout l'écran, comme pendant la partie, et le diagnostic dit de combien l'image est déformée. Le DMD et le topper, eux, gardent leurs bandes noires.
 
 ## 0.2.2
