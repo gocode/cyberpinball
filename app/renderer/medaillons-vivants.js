@@ -561,14 +561,22 @@
     }
   }
 
+  /**
+   * Une image de chaque canevas suivi. La boucle ne tourne que tant qu'il y a quelque chose à faire
+   * (un médaillon vivant, une première image à poser, un canevas sorti à oublier) : figée, elle
+   * réveillait la page à chaque image pour rien. Elle repart par wake (revive à chaque état de la
+   * roue, track, taille ou visibilité changées).
+   */
   function tick(now) {
     frame = undefined;
     const still = quiet() || document.hidden;
+    let busy = false;
     for (const e of entries) {
       // Hors de la page : oublié au bout de 10 s (l'affiche ou l'écran gardés en mémoire le réveillent, revive).
       if (!e.canvas.isConnected) {
         e.goneSince ??= now;
         if (now - e.goneSince > 10_000) entries.delete(e);
+        else busy = true;
         e.drawnAt = undefined;
         continue;
       }
@@ -579,19 +587,26 @@
         if (e.drawnAt !== 'live') e.since = now;
         render(e, (e.t0 ?? 0) + (now - e.since) / 1000);
         e.drawnAt = 'live';
+        busy = true;
       } else if (e.drawnAt !== 'still') {
         // Première image, dessinée une fois (et à nouveau si la taille change).
         render(e, e.t0 ?? 0);
         if (e.canvas.width) e.drawnAt = 'still';
+        else busy = true;
       }
     }
-    if (entries.size) frame = requestAnimationFrame(tick);
+    if (busy) frame = requestAnimationFrame(tick);
+  }
+
+  /** Relance la boucle si elle est arrêtée et qu'il reste des canevas suivis. */
+  function wake() {
+    if (!frame && entries.size && typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(tick);
   }
 
   function track(e) {
     e.canvas.medaillon = e;
     entries.add(e);
-    if (!frame && typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(tick);
+    wake();
     return e.canvas;
   }
 
@@ -694,18 +709,16 @@
    */
   function revive(root) {
     if (!root?.querySelectorAll) return;
-    let added = false;
     for (const cv of root.querySelectorAll('canvas')) {
       const e = cv.medaillon;
       if (!e) continue;
       e.goneSince = undefined;
       e.geo = undefined;
-      if (!entries.has(e)) {
-        entries.add(e);
-        added = true;
-      }
+      entries.add(e);
     }
-    if (added && !frame && typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(tick);
+    // Rappelé à chaque état de la roue : un médaillon arrivé au centre (ou qui l'a quitté) est revu
+    // à l'image suivante, même si la boucle s'était arrêtée faute de mouvement.
+    wake();
   }
 
   // Taille changée (écran pivoté, fenêtre redimensionnée) : les positions des fils sont remesurées.
@@ -714,10 +727,11 @@
       e.geo = undefined;
       e.drawnAt = undefined;
     }
+    wake();
   });
   document.addEventListener?.('visibilitychange', () => {
     for (const e of entries) e.drawnAt = undefined;
-    if (!frame && entries.size && typeof requestAnimationFrame === 'function') frame = requestAnimationFrame(tick);
+    wake();
   });
 
   window.CyberMedaillons = { wheelNodes, medallion, waves, track: trackBar, revive, paint, HOLE, kinds: Object.keys(KINDS) };

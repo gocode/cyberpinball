@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- La roue de l'écran des tables est plus fluide : passer d'une table à l'autre ne fait plus recalculer toute la page pendant le fondu de la couleur de la table (sur un playfield 4K, de 40 à 60 images par seconde aux appuis isolés). Le fondu de couleur reste le même.
+- Le halo vert de la table choisie baisse pendant le glissement et souffle à l'arrêt comme avant, mais sans faire repeindre ses lueurs à chaque image : la roue garde ses 60 images par seconde à chaque arrêt.
+- L'éclat qui traverse le médaillon choisi et le reflet du filet des écrans de menu glissent sans recalculer la mise en page ; les médaillons vivants (Juke-box, Communauté, Collections) ne réveillent plus la page quand rien ne bouge.
 - Ouverture : « CYBER » et « PINBALL » s'écartent de part et d'autre du centre de la tornade, le P de PINBALL ne se confond plus avec ses fils verts.
 - Les parties ne sont plus limitées par un backglass plus lent que le playfield : Cyber Pinball livre VPX 10.8.1-5436 avec le correctif de VPX qui fait suivre à chaque écran annexe sa propre fréquence (backglass à 50 ou 60 Hz, playfield à 120 Hz : la partie tourne à 120 images par seconde). Seul l'exécutable de VPX change ; ses plugins restent les mêmes.
 - Santé de la borne et fiche technique : la fréquence d'un écran n'est signalée que si elle change quelque chose à la partie. Un fronton, un DMD ou un topper réglé sous sa fréquence possible n'est plus « À vérifier » : la fiche le mentionne sur la ligne de l'écran, « sans effet sur la bille ». Le playfield sous sa fréquence possible reste à vérifier, et un écran annexe plus lent que le playfield aussi, avec la raison : VPX 10.8.1 cale alors toute la partie sur lui (sauf avec le VPX corrigé de Cyber Pinball).

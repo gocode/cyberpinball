@@ -205,18 +205,24 @@ function wheelItem(n) {
  * boîte, posé sous toute la roue (z 1). Il reçoit les mêmes places au même moment que son médaillon
  * (placeWheelItem) : mêmes transitions, partis du même point, ils glissent toujours ensemble.
  * Vide hors du centre : rien n'y est dessiné.
+ *
+ * Trois calques superposés reçoivent la même copie, chacun à son intensité de lueur (frontend.css) :
+ * au repos, pendant le glissement, au sommet du souffle. Le halo passe de l'un à l'autre par
+ * l'opacité, sans filtre animé (21/11/2026, fluidité de la roue).
  */
+const HALO_LAYERS = ['halo-dos', 'halo-bas', 'halo-souffle'];
+
 function wheelHalo() {
   const node = el('div', 'wheel-halo');
   const face = el('div', 'wheel-logo');
   const hit = el('div', 'wheel-hit');
-  const tilt = el('div', 'wheel-tilt');
-  hit.append(tilt);
+  const tilts = HALO_LAYERS.map((k) => el('div', `wheel-tilt ${k}`));
+  hit.append(...tilts);
   face.append(hit);
   node.append(face);
   node.style.zIndex = '1';
   node.setAttribute('aria-hidden', 'true');
-  return { node, tilt, look: '' };
+  return { node, tilts, look: '' };
 }
 
 /** Médaillon et jumeau entrent dans la roue ensemble ; le jumeau sous l'anneau, comme avant. */
@@ -539,7 +545,7 @@ function haloSync(item, center) {
   const halo = item.halo;
   if (!center) {
     if (halo.look) {
-      halo.tilt.replaceChildren();
+      for (const t of halo.tilts) t.replaceChildren();
       halo.node.className = 'wheel-halo';
       halo.look = '';
     }
@@ -553,9 +559,11 @@ function haloSync(item, center) {
   halo.node.className = item.node.className.replace(/\b(wheel-item|center|jump)\b/g, ' ').replace(/\s+/g, ' ').trim();
   halo.node.classList.add('wheel-halo');
   if (jump) halo.node.classList.add('jump');
-  const copy = [...item.tilt.childNodes].map((n) => n.cloneNode(true));
-  for (const n of copy) for (const a of n.querySelectorAll?.('[data-act]') ?? []) delete a.dataset.act;
-  halo.tilt.replaceChildren(...copy);
+  for (const t of halo.tilts) {
+    const copy = [...item.tilt.childNodes].map((n) => n.cloneNode(true));
+    for (const n of copy) for (const a of n.querySelectorAll?.('[data-act]') ?? []) delete a.dataset.act;
+    t.replaceChildren(...copy);
+  }
 }
 
 /** Les mouvements Soie de la roue sont coupés quand le système demande moins d'animations. */

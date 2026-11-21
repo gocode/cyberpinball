@@ -16,12 +16,25 @@
  * Couleur de la table choisie (packages/core/src/tabletint.ts, réglage « Couleur de chaque table
  * au menu ») : posée sur html par frontend.js, sarcelle de la marque sans table ou sans teinte.
  * Elle n'habille que l'ambiance (lueur derrière la roue, halo des cadres et des panneaux, verre
- * fumé des replis) ; le vert signal reste seul sur le choix courant. Déclarée comme couleur, elle
- * passe d'une table à l'autre en fondu, au pas du fondu des médias (280 ms, media.js).
+ * fumé des replis) ; le vert signal reste seul sur le choix courant.
+ *
+ * Fondu d'une table à l'autre (au pas du fondu des médias, 280 ms, media.js) : jamais sur html.
+ * Une couleur héritée qui glisse sur la racine fait recalculer les styles de toute la page à chaque
+ * image : 30 à 50 ms de travail par changement de table, pendant le glissement de la roue (mesuré le
+ * 21/11/2026 en 2160 × 3840 : 40 images par seconde au lieu de 60). La racine change donc d'un coup,
+ * et chaque surface teintée visible au changement de table porte sa propre copie, --teinte, non
+ * héritée, qui glisse seule (frontend.css : fond, lueurs de la roue, cadres). Test : animations-legeres.test.ts.
  */
 @property --table-tint {
   syntax: '<color>';
   inherits: true;
+  initial-value: #36c9b4;
+}
+
+/* Copie locale de la teinte, en fondu, sur une surface teintée : non héritée, ses enfants ne sont pas recalculés. */
+@property --teinte {
+  syntax: '<color>';
+  inherits: false;
   initial-value: #36c9b4;
 }
 
@@ -30,7 +43,6 @@
   /* Ses tons sombres : #1c8f80 et #143d35 de la marque quand elle vaut la sarcelle. */
   --table-halo: color-mix(in oklab, var(--table-tint) 76%, #000);
   --table-deep: color-mix(in oklab, var(--table-tint) 44%, #000);
-  transition: --table-tint 280ms ease-out;
   --void: #030807;
   --surface: #07110f;
   --surface-raised: #0c1a17;

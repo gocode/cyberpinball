@@ -10,11 +10,37 @@
   box-sizing: border-box;
 }
 
+/*
+ * Surfaces teintées visibles quand la table change : chacune porte sa copie de la teinte (--teinte,
+ * theme.css), qui glisse seule ; la racine, elle, change d'un coup. Leurs règles lisent var(--teinte).
+ */
+html,
+body,
+.menu-nav::before,
+.menu-band .wheel-stage::before,
+.menu-band .wheel-aura,
+.wheel-pulse,
+html.menu-desktop .menu-band .menu-frame {
+  --teinte: var(--table-tint);
+  transition: --teinte 280ms ease-out;
+}
+
+/* En borne, le média du plateau couvre tout l'écran : le fond, invisible, change d'un coup (sa
+   repeinte en 4K pendant le fondu coûtait des images à la roue, pour rien). Au bureau, il se voit autour du cadre. */
+html.has-backdrop:is(html.menu-cab),
+html.has-backdrop:is(html.menu-cab) body {
+  transition: none;
+}
+
+/* Fond « verre fumé » (--fond-ambiance, theme.css), recalculé sur --teinte pour suivre le fondu. */
 html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--fond-ambiance);
+  background:
+    linear-gradient(115deg, transparent 48%, color-mix(in oklab, color-mix(in oklab, var(--teinte) 44%, #000) 23%, transparent) 48.15%, transparent 66%),
+    radial-gradient(ellipse at 92% 15%, color-mix(in oklab, var(--teinte) 44%, #000) 0%, transparent 58%),
+    linear-gradient(150deg, var(--surface-raised), var(--void) 65%);
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
@@ -216,7 +242,7 @@ html[data-rotation='270'] #level-moment {
   bottom: -15%;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse 48% 52% at 50% 46%, color-mix(in oklab, var(--table-tint) 25%, transparent), color-mix(in oklab, var(--table-tint) 9%, transparent) 55%, transparent 78%);
+  background: radial-gradient(ellipse 48% 52% at 50% 46%, color-mix(in oklab, var(--teinte) 25%, transparent), color-mix(in oklab, var(--teinte) 9%, transparent) 55%, transparent 78%);
 }
 
 /* Libellé et compteur : au bureau seulement. */
@@ -970,7 +996,7 @@ html[data-menu-band='arche'] #root {
 }
 
 .menu-band .wheel-stage::before {
-  background: var(--table-tint);
+  background: var(--teinte);
   -webkit-mask: var(--roue-lumiere) center / 100% 100% no-repeat;
   mask: var(--roue-lumiere) center / 100% 100% no-repeat;
 }
@@ -1046,29 +1072,86 @@ html.menu-desktop .menu.menu-band .menu-nav {
   visibility: hidden;
 }
 
-.menu-band .wheel-halo .wheel-tilt {
-  transition: filter 220ms linear;
+/*
+ * Trois calques superposés de la même copie (frontend.js, wheelHalo), chacun à son intensité, filtre
+ * posé une fois : au repos (dos), pendant le glissement (bas), au sommet du souffle (souffle). On passe
+ * de l'un à l'autre par l'opacité, que la carte graphique compose sans rien repeindre. Un filtre animé
+ * refaisait à chaque image ses trois ombres floues (jusqu'à 64 unités, 128 px sur un playfield 4K) :
+ * mesuré le 21/11/2026 en 2160 × 3840, 48 images par seconde aux appuis isolés au lieu de 58.
+ * Mêmes temps que le filtre animé : 220 ms vers le halo bas au glissement, souffle de 900 ms à l'arrêt
+ * (bas, sommet à 30 %, puis repos). Test : animations-legeres.test.ts (aucun filtre animé dans la roue).
+ */
+.menu-band .wheel-halo .halo-dos {
   filter: var(--halo-dos);
 }
 
-.menu-band .wheel-stage.moving .wheel-halo .wheel-tilt {
+.menu-band .wheel-halo .halo-bas {
   filter: var(--halo-bas);
 }
 
-/* Seul le jumeau du centre a un contenu : les autres, vides, ne soufflent pas pour rien. */
-.menu-band .wheel-stage.landed .wheel-halo .wheel-tilt:not(:empty) {
-  animation: halo-souffle 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+.menu-band .wheel-halo .halo-souffle {
+  filter: var(--halo-souffle);
 }
 
-@keyframes halo-souffle {
-  0% {
-    filter: var(--halo-bas);
-  }
+.wheel-halo .halo-bas,
+.wheel-halo .halo-souffle {
+  opacity: 0;
+}
+
+/* Au glissement, le halo baisse en 220 ms ; à l'arrêt, le souffle repart du halo bas, sans fondu en sens inverse. */
+.menu-band .wheel-stage.moving .wheel-halo .halo-dos,
+.menu-band .wheel-stage.moving .wheel-halo .halo-bas {
+  transition: opacity 220ms linear;
+}
+
+.menu-band .wheel-stage.moving .wheel-halo .halo-dos {
+  opacity: 0;
+}
+
+.menu-band .wheel-stage.moving .wheel-halo .halo-bas {
+  opacity: 1;
+}
+
+/* Seul le jumeau du centre a un contenu : les autres, vides, ne soufflent pas pour rien. */
+.menu-band .wheel-stage.landed .wheel-halo .halo-dos:not(:empty) {
+  animation: halo-souffle-dos 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.menu-band .wheel-stage.landed .wheel-halo .halo-bas:not(:empty) {
+  animation: halo-souffle-bas 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.menu-band .wheel-stage.landed .wheel-halo .halo-souffle:not(:empty) {
+  animation: halo-souffle-sommet 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes halo-souffle-dos {
+  0%,
   30% {
-    filter: var(--halo-souffle);
+    opacity: 0;
   }
   100% {
-    filter: var(--halo-dos);
+    opacity: 1;
+  }
+}
+
+@keyframes halo-souffle-bas {
+  0% {
+    opacity: 1;
+  }
+  30%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes halo-souffle-sommet {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
   }
 }
 
@@ -1088,7 +1171,7 @@ html.menu-desktop .menu.menu-band .menu-nav {
   height: calc(520 * var(--w));
   z-index: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in oklab, var(--table-tint) 34%, transparent) 0%, color-mix(in oklab, var(--table-tint) 12%, transparent) 30%, transparent 62%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--teinte) 34%, transparent) 0%, color-mix(in oklab, var(--teinte) 12%, transparent) 30%, transparent 62%);
   pointer-events: none;
 }
 
@@ -1274,9 +1357,11 @@ html.menu-desktop .menu.menu-band .menu-nav {
   animation: wheel-bloom 1200ms ease-out 200ms forwards;
 }
 
+/* De left -70 % à 120 % du médaillon, par translation (la bande fait 60 % : 190 / 60 = 316,67 % d'elle-même) :
+   un déplacement par left refaisait la mise en page à chaque image. La pente reste la même (rotation après). */
 @keyframes wheel-glint {
   to {
-    left: 120%;
+    transform: translateX(316.6667%) rotate(20deg);
   }
 }
 
@@ -1302,7 +1387,7 @@ html.menu-desktop .menu.menu-band .menu-nav {
   height: calc(150 * var(--w));
   z-index: 2;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(232, 255, 248, 0.9) 0%, color-mix(in oklab, var(--table-tint) 70%, transparent) 18%, transparent 62%);
+  background: radial-gradient(circle, rgba(232, 255, 248, 0.9) 0%, color-mix(in oklab, var(--teinte) 70%, transparent) 18%, transparent 62%);
   opacity: 0;
   pointer-events: none;
 }
@@ -1550,7 +1635,7 @@ html.menu-desktop .menu-band .menu-frame {
   box-sizing: border-box;
   border: calc(32 * var(--u)) solid transparent;
   border-image: url('roues/cadre.svg') 32 / calc(32 * var(--u)) stretch;
-  filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(139, 226, 58, 0.45)) drop-shadow(0 0 calc(14 * var(--u)) color-mix(in oklab, var(--table-tint) 40%, transparent));
+  filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(139, 226, 58, 0.45)) drop-shadow(0 0 calc(14 * var(--u)) color-mix(in oklab, var(--teinte) 40%, transparent));
   pointer-events: none;
 }
 

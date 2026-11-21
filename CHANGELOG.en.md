@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- The table wheel is smoother: moving from one table to the next no longer recomputes the whole page during the table color fade (on a 4K playfield, from 40 to 60 frames per second on single presses). The color fade looks the same.
+- The green halo of the selected table still dims while sliding and breathes when the wheel stops, but without repainting its glow on every frame: the wheel keeps 60 frames per second at each stop.
+- The glint across the selected medallion and the shine along the menu screens' rule slide without recomputing the layout; the live medallions (Juke-box, Community, Collections) no longer wake the page when nothing moves.
 - Startup animation: "CYBER" and "PINBALL" now sit on either side of the tornado's centre, so the P of PINBALL no longer blends into its green threads.
 - Games are no longer limited by a backglass slower than the playfield: Cyber Pinball ships VPX 10.8.1-5436 with the VPX fix that makes each ancillary screen follow its own refresh rate (backglass at 50 or 60 Hz, playfield at 120 Hz: the game runs at 120 frames per second). Only the VPX executable changes; its plugins stay the same.
 - Cabinet health and tech sheet: a screen's refresh rate is only flagged when it changes something in the game. A backglass, DMD or topper set below its possible refresh rate is no longer "To check": the sheet mentions it on the screen's line, "no effect on the ball". The playfield below its possible refresh rate is still flagged, and so is a secondary screen slower than the playfield, with the reason: VPX 10.8.1 then locks the whole game to it (except with Cyber Pinball's patched VPX).

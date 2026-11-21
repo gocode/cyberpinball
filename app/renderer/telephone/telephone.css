@@ -3168,6 +3168,8 @@ body:not([data-state='paired']) .jb-player {
   height: 14px;
   border-radius: 1px;
   background: currentColor;
+  /* Les barres montent depuis le bas : animées par échelle (de 4 à 16 px pour 14 px), jamais par hauteur. */
+  transform-origin: 50% 100%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -3186,11 +3188,11 @@ body:not([data-state='paired']) .jb-player {
 
 @keyframes jb-eq {
   from {
-    height: 4px;
+    transform: scaleY(0.2857);
   }
 
   to {
-    height: 16px;
+    transform: scaleY(1.1429);
   }
 }
 

@@ -5055,36 +5055,45 @@ body.mouse button.lib-command:hover .lib-command-text {
   box-shadow: 0 0 1.1cqmin rgba(54, 201, 180, 0.45);
 }
 
+/*
+ * Reflet et tête du filet : une bande de toute la largeur, la lumière peinte à sa gauche, déplacée
+ * par translation (100 % = la largeur du filet). Un déplacement par left refaisait la mise en page à
+ * chaque image, sans fin pour le reflet. Même trajet qu'avant : de juste avant le filet à juste après.
+ */
 .lib-rule > i,
 .lib-rule > b {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
+  width: 100%;
+  background-repeat: no-repeat;
+  background-position: 0 0;
 }
 
 .lib-rule > i {
-  left: -20cqmin;
-  width: 20cqmin;
-  background: linear-gradient(90deg, rgba(232, 255, 248, 0), #e8fff8, rgba(232, 255, 248, 0));
+  background-image: linear-gradient(90deg, rgba(232, 255, 248, 0), #e8fff8, rgba(232, 255, 248, 0));
+  background-size: 20cqmin 100%;
+  transform: translateX(-20cqmin);
   animation: lib-filet 5s cubic-bezier(0.45, 0, 0.55, 1) 1.2s infinite;
 }
 
 @keyframes lib-filet {
   0% {
-    left: -20cqmin;
+    transform: translateX(-20cqmin);
   }
   40%,
   100% {
-    left: 100%;
+    transform: translateX(100%);
   }
 }
 
 /* Tête du tracé, à l'arrivée : un bout clair au front du trait qui se dessine. */
 .lib-rule > b {
-  left: -13cqmin;
-  width: 13cqmin;
   opacity: 0;
-  background: linear-gradient(90deg, rgba(232, 255, 248, 0), #ffffff);
+  background-image: linear-gradient(90deg, rgba(232, 255, 248, 0), #ffffff);
+  background-size: 13cqmin 100%;
+  transform: translateX(-13cqmin);
 }
 
 /*
@@ -5136,11 +5145,11 @@ body.mouse button.lib-command:hover .lib-command-text {
 
 @keyframes lib-tete {
   from {
-    left: -13cqmin;
+    transform: translateX(-13cqmin);
     opacity: 1;
   }
   to {
-    left: calc(100% - 13cqmin);
+    transform: translateX(calc(100% - 13cqmin));
     opacity: 1;
   }
 }
