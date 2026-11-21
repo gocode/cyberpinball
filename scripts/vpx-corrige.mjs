@@ -1,7 +1,7 @@
-// Construit le VPX corrigé de Cyber Pinball : VPinballX_BGFX64.exe de VPX 10.8.1-5436, avec les correctifs de
-// packages/vpx-corrige/correctifs (voir son LISEZMOI). Seul l'exécutable change : Cyber Pinball le pose à la place de
-// celui de l'archive officielle (app/src/vpx-corrige.ts), les plugins et bibliothèques restent ceux de la 5436.
-//   node scripts/vpx-corrige.mjs            -> build\vpx-corrige\VPinballX_BGFX64.exe (et .pdb)
+// Construit le VPX corrigé de Cyber Pinball : VPinballX_BGFX64.exe et le plugin PuP de VPX 10.8.1-5436, avec les
+// correctifs de packages/vpx-corrige/correctifs (voir son LISEZMOI). Cyber Pinball les pose à la place de ceux de
+// l'archive officielle (app/src/vpx-corrige.ts) ; les autres plugins et les bibliothèques restent ceux de la 5436.
+//   node scripts/vpx-corrige.mjs            -> build\vpx-corrige\VPinballX_BGFX64.exe (et .pdb), plugins\pup\plugin-pup64.dll
 //   node scripts/vpx-corrige.mjs --propre   -> repart de zéro (sources, dépendances et compilation)
 // Demande CMake, les outils C++ de Visual Studio (Build Tools 2022), curl et tar (fournis par Windows). Les sources
 // sont téléchargées une fois, au commit exact de la 5436 (et les dépendances à ceux de son platforms/config.sh) ;
@@ -22,17 +22,19 @@ const { copyTree } = createRequire(import.meta.url)(path.join(repo, 'packages', 
 export const VPX_CORRIGE_SOURCE = path.join(repo, 'packages', 'vpx-corrige');
 const out = path.join(repo, 'build', 'vpx-corrige');
 export const VPX_CORRIGE_EXE = path.join(out, 'VPinballX_BGFX64.exe');
+/** Le plugin PuP corrigé, posé dans <VPX>\plugins\pup (build\vpx-corrige\plugins\pup, natif\vpx-corrige\plugins\pup). */
+export const VPX_CORRIGE_PUP = 'plugin-pup64.dll';
 
 /**
  * La version corrigée : commit de la 5436, révision gardée (le format des tables, les plugins et les réglages en
  * dépendent). `patch` : numéro de la série de correctifs, nommée en anglais partout où elle se voit (« patched Cyber
  * Pinball 1 ») : version produit de l'exécutable, journal de VPX, release des sources, fiche technique.
  */
-export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 2 };
+export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 3 };
 VPX_BASE.sha = `af26b2d93-patched-cyberpinball-${VPX_BASE.patch}`;
 
 const work = process.env.CYBERPINBALL_VPX_BUILD ?? path.join(process.env.LOCALAPPDATA ?? os.tmpdir(), 'cpvpx');
-/** Le dossier de travail (téléchargements dans dl\, sources dans src\) : l'archive des sources le relit. */
+/** Le dossier de travail (téléchargements dans dl\, sources dans src-<série>\) : l'archive des sources le relit. */
 export const vpxCorrigeWorkDir = () => work;
 const GENERATOR = ['-G', 'Visual Studio 17 2022', '-A', 'x64'];
 
@@ -49,7 +51,7 @@ function run(cmd, args, cwd, label) {
 }
 
 /** Télécharge `url` dans dl\ (une fois) et l'extrait dans `dest` ; renvoie le dossier extrait (unique sous-dossier). */
-function fetchTarball(url, name, dest) {
+function fetchTarball(url, name, dest, exclude = []) {
   const dl = path.join(work, 'dl');
   fs.mkdirSync(dl, { recursive: true });
   const archive = path.join(dl, name);
@@ -59,7 +61,7 @@ function fetchTarball(url, name, dest) {
   }
   fs.rmSync(dest, { recursive: true, force: true });
   fs.mkdirSync(dest, { recursive: true });
-  run('tar.exe', ['-xzf', archive, '-C', dest], dest, `extraction de ${name}`);
+  run('tar.exe', ['-xzf', archive, '-C', dest, ...exclude.flatMap((e) => ['--exclude', e])], dest, `extraction de ${name}`);
   const [inner] = fs.readdirSync(dest);
   return path.join(dest, inner);
 }
@@ -79,7 +81,111 @@ function readConfig(src) {
     if (!m) throw new Error(`platforms/config.sh : ${k} absent`);
     return m[1];
   };
-  return { sdl: get('SDL_SHA'), freeimage: get('FREEIMAGE_SHA'), bgfxCmake: get('BGFX_CMAKE_VERSION'), bgfx: get('BGFX_PATCH_SHA'), openxr: get('OPENXR_SHA') };
+  return {
+    sdl: get('SDL_SHA'),
+    sdlImage: get('SDL_IMAGE_SHA'),
+    sdlTtf: get('SDL_TTF_SHA'),
+    freeimage: get('FREEIMAGE_SHA'),
+    bgfxCmake: get('BGFX_CMAKE_VERSION'),
+    bgfx: get('BGFX_PATCH_SHA'),
+    openxr: get('OPENXR_SHA'),
+    ffmpeg: get('FFMPEG_SHA'),
+    dmdutil: get('LIBDMDUTIL_SHA'),
+    pinmame: get('PINMAME_SHA'),
+  };
+}
+
+/** L'archive officielle de la 5436 (packages/installer/components.json) : ses DLL donnent les bibliothèques d'import. */
+function officialArchiveUrl() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'packages', 'installer', 'components.json'), 'utf8'));
+  const found = JSON.stringify(manifest).match(/https:\/\/github\.com\/vpinball\/vpinball\/releases\/download\/v10\.8\.1-5436-[^"]+\.zip/);
+  if (!found) throw new Error('components.json : archive officielle de VPX 10.8.1-5436 introuvable');
+  return found[0];
+}
+
+/** dumpbin et lib des Build Tools (vswhere). */
+function msvcTool(name) {
+  const vswhere = path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
+  const r = spawnSync(vswhere, ['-latest', '-products', '*', '-property', 'installationPath'], { encoding: 'utf8', windowsHide: true });
+  const vs = r.stdout?.trim();
+  if (!vs) throw new Error('Build Tools 2022 introuvables (vswhere)');
+  const tools = path.join(vs, 'VC', 'Tools', 'MSVC');
+  for (const version of fs.readdirSync(tools).sort().reverse()) {
+    const exe = path.join(tools, version, 'bin', 'Hostx64', 'x64', name);
+    if (fs.existsSync(exe)) return exe;
+  }
+  throw new Error(`${name} introuvable dans ${tools}`);
+}
+
+/** Bibliothèque d'import d'une DLL (ses exportations, relevées par dumpbin), pour lier sans reconstruire la DLL. */
+function importLibrary(dll, outLib) {
+  const r = spawnSync(msvcTool('dumpbin.exe'), ['/exports', dll], { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error(`dumpbin ${path.basename(dll)} : échec`);
+  const names = [];
+  for (const line of r.stdout.split(/\r?\n/)) {
+    const m = /^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]{8}\s+(\S+)/.exec(line);
+    if (m) names.push(m[1]);
+  }
+  if (!names.length) throw new Error(`${path.basename(dll)} : aucune exportation`);
+  const def = outLib.replace(/\.lib$/i, '.def');
+  fs.writeFileSync(def, `LIBRARY ${path.basename(dll)}\r\nEXPORTS\r\n${names.map((n) => `  ${n}`).join('\r\n')}\r\n`);
+  run(msvcTool('lib.exe'), ['/nologo', `/def:${def}`, '/machine:x64', `/out:${outLib}`], path.dirname(outLib), `bibliothèque d'import de ${path.basename(dll)}`);
+}
+
+/**
+ * Ce que demande le plugin PuP (plugins\pup\plugin-pup64.dll, reconstruit pour 03-pup-label-sans-verrou.patch).
+ * Ses bibliothèques restent celles de l'archive officielle : seuls leurs en-têtes sont téléchargés (SDL_image,
+ * SDL_ttf, FFmpeg aux commits de platforms/config.sh, pupdmd.h au commit de libdmdutil), et les bibliothèques
+ * d'import sont tirées des DLL de l'archive officielle.
+ */
+/** Le projet Xcode de SDL_image et SDL_ttf : liens symboliques que Windows refuse d'extraire (exclus aussi par VPX). */
+const XCODE = ['*/Xcode/*'];
+
+function pupPluginDependencies(src, deps, lib, inc) {
+  const official = dependency('vpx-officiel', officialArchiveUrl(), (dir) => {
+    const dl = path.join(work, 'dl');
+    fs.mkdirSync(dl, { recursive: true });
+    const zip = path.join(dl, path.basename(new URL(officialArchiveUrl()).pathname));
+    if (!fs.existsSync(zip)) {
+      run('curl.exe', ['-sSfL', officialArchiveUrl(), '-o', `${zip}.part`], dl, 'téléchargement de VPX 10.8.1-5436 officiel');
+      fs.renameSync(`${zip}.part`, zip);
+    }
+    fs.mkdirSync(path.join(dir, 'x'), { recursive: true });
+    run('tar.exe', ['-xf', zip, '-C', path.join(dir, 'x')], dir, 'extraction de VPX 10.8.1-5436 officiel');
+  });
+  const pupDir = (function find(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const p = path.join(dir, e.name);
+      if (e.name.toLowerCase() === 'pup' && fs.existsSync(path.join(p, 'plugin-pup64.dll'))) return p;
+      const deeper = find(p);
+      if (deeper) return deeper;
+    }
+    return undefined;
+  })(path.join(official, 'x'));
+  if (!pupDir) throw new Error('archive officielle : plugins\\pup introuvable');
+  for (const name of ['SDL3_image64', 'SDL3_ttf64', 'pupdmd64']) importLibrary(path.join(pupDir, `${name}.dll`), path.join(lib, `${name}.lib`));
+
+  const headers = dependency('pup-entetes', `${deps.sdlImage}-${deps.sdlTtf}-${deps.ffmpeg}-${deps.dmdutil}-${deps.pinmame}`, (dir) => {
+    const image = fetchTarball(`https://github.com/libsdl-org/SDL_image/archive/${deps.sdlImage}.tar.gz`, `SDL_image-${deps.sdlImage}.tar.gz`, path.join(dir, 'image'), XCODE);
+    copy(path.join(image, 'include', 'SDL3_image'), path.join(dir, 'include', 'SDL3_image'));
+    const ttf = fetchTarball(`https://github.com/libsdl-org/SDL_ttf/archive/${deps.sdlTtf}.tar.gz`, `SDL_ttf-${deps.sdlTtf}.tar.gz`, path.join(dir, 'ttf'), XCODE);
+    copy(path.join(ttf, 'include', 'SDL3_ttf'), path.join(dir, 'include', 'SDL3_ttf'));
+    const ffmpeg = fetchTarball(`https://github.com/FFmpeg/FFmpeg/archive/${deps.ffmpeg}.tar.gz`, `FFmpeg-${deps.ffmpeg}.tar.gz`, path.join(dir, 'ffmpeg'));
+    for (const part of ['libavcodec', 'libavformat', 'libavutil', 'libswresample', 'libswscale']) copy(path.join(ffmpeg, part), path.join(dir, 'include', part));
+    // Écrit par le configure de FFmpeg : x64 petit-boutiste, accès non alignés rapides.
+    fs.writeFileSync(path.join(dir, 'include', 'libavutil', 'avconfig.h'), '#ifndef AVUTIL_AVCONFIG_H\n#define AVUTIL_AVCONFIG_H\n#define AV_HAVE_BIGENDIAN 0\n#define AV_HAVE_FAST_UNALIGNED 1\n#endif\n');
+    const dmdutil = fetchTarball(`https://github.com/vpinball/libdmdutil/archive/${deps.dmdutil}.tar.gz`, `libdmdutil-${deps.dmdutil}.tar.gz`, path.join(dir, 'dmdutil'));
+    const pupdmdSha = /^LIBPUPDMD_SHA=(\S+)/m.exec(fs.readFileSync(path.join(dmdutil, 'platforms', 'config.sh'), 'utf8'))?.[1];
+    if (!pupdmdSha) throw new Error('libdmdutil : LIBPUPDMD_SHA absent');
+    const pupdmd = fetchTarball(`https://github.com/ppuc/libpupdmd/archive/${pupdmdSha}.tar.gz`, `libpupdmd-${pupdmdSha}.tar.gz`, path.join(dir, 'pupdmd'));
+    copy(path.join(pupdmd, 'src', 'pupdmd.h'), path.join(dir, 'include', 'pupdmd.h'));
+    // PinMAMEPlugin.h (messages du plugin PinMAME, que le plugin PuP écoute), copié comme le fait platforms/windows-x64/external.sh.
+    const pinmame = fetchTarball(`https://github.com/vbousquet/pinmame/archive/${deps.pinmame}.tar.gz`, `pinmame-${deps.pinmame}.tar.gz`, path.join(dir, 'pinmame'));
+    for (const h of ['libpinmame.h', 'PinMAMEPlugin.h']) copy(path.join(pinmame, 'src', 'libpinmame', h), path.join(dir, 'include', 'pinmame', h));
+    for (const sub of ['image', 'ttf', 'ffmpeg', 'dmdutil', 'pupdmd', 'pinmame']) fs.rmSync(path.join(dir, sub), { recursive: true, force: true });
+  });
+  for (const e of fs.readdirSync(path.join(headers, 'include'))) copy(path.join(headers, 'include', e), path.join(inc, e));
 }
 
 /** Construit une dépendance si son repère (cache.txt) ne correspond pas. */
@@ -101,30 +207,88 @@ function copy(from, to) {
   else fs.copyFileSync(from, to);
 }
 
+/**
+ * Sources et compilation de VPX : un dossier par série de correctifs (src-2, vpx-build-2). Le 21/11/2026, une
+ * publication groupée (série 1, depuis le dossier principal) et une branche (série 2) construisaient dans le même
+ * src : chacune effaçait les sources de l'autre au milieu de sa compilation. Les téléchargements (dl) et les
+ * dépendances (ext) restent communs, sous le verrou de construction.
+ */
+export const vpxCorrigeSrcDir = () => path.join(work, `src-${VPX_BASE.patch}`);
+const vpxBuildDir = () => path.join(work, `vpx-build-${VPX_BASE.patch}`);
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+};
+
+/**
+ * Une construction à la fois dans le dossier de travail (commun aux worktrees et au dossier principal) : la suivante
+ * attend (fabrication d'une publication, branche qui construit). Le verrou d'un processus disparu est repris.
+ */
+function withBuildLock(fn) {
+  fs.mkdirSync(work, { recursive: true });
+  const lock = path.join(work, 'construction.verrou');
+  let announced = false;
+  for (;;) {
+    try {
+      fs.writeFileSync(lock, String(process.pid), { flag: 'wx' });
+      break;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const holder = Number(fs.readFileSync(lock, 'utf8').trim());
+      if (!holder || !alive(holder)) {
+        fs.rmSync(lock, { force: true });
+        continue;
+      }
+      if (!announced) console.log(`VPX corrigé : une autre construction est en cours (processus ${holder}), attente de sa fin…`);
+      announced = true;
+      sleep(5000);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    fs.rmSync(lock, { force: true });
+  }
+}
+
 export function buildVpxCorrige({ clean = false, quiet = false } = {}) {
   quietOutput = quiet;
   const cmake = cmakePath();
   if (!cmake) throw new Error('CMake absent (winget install Kitware.CMake).');
-  if (clean) fs.rmSync(work, { recursive: true, force: true });
-  fs.mkdirSync(work, { recursive: true });
+  if (clean) {
+    fs.rmSync(vpxCorrigeSrcDir(), { recursive: true, force: true });
+    fs.rmSync(vpxBuildDir(), { recursive: true, force: true });
+  }
+  return withBuildLock(() => buildLocked(cmake, clean));
+}
+
+function buildLocked(cmake, clean) {
+  if (clean) for (const shared of ['dl', 'ext']) fs.rmSync(path.join(work, shared), { recursive: true, force: true });
 
   // Sources de la 5436, puis les correctifs, puis la version (comme le workflow de VPX : 9999 et « unknown »).
   const patches = fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs')).filter((f) => f.endsWith('.patch')).sort();
   const patchKey = crypto.createHash('sha256');
   for (const p of patches) patchKey.update(fs.readFileSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs', p)));
   const srcKey = `${VPX_BASE.commit}-${VPX_BASE.sha}-${patchKey.digest('hex').slice(0, 16)}`;
-  const srcStamp = path.join(work, 'src.txt');
-  const src = path.join(work, 'src');
+  const src = vpxCorrigeSrcDir();
+  const srcStamp = `${src}.txt`;
   if (!fs.existsSync(srcStamp) || fs.readFileSync(srcStamp, 'utf8').trim() !== srcKey) {
-    const extracted = fetchTarball(`https://github.com/vpinball/vpinball/archive/${VPX_BASE.commit}.tar.gz`, `vpinball-${VPX_BASE.commit}.tar.gz`, path.join(work, 'src-x'));
+    const scratch = `${src}-x`;
+    const extracted = fetchTarball(`https://github.com/vpinball/vpinball/archive/${VPX_BASE.commit}.tar.gz`, `vpinball-${VPX_BASE.commit}.tar.gz`, scratch);
     fs.rmSync(src, { recursive: true, force: true });
     fs.renameSync(extracted, src);
-    fs.rmSync(path.join(work, 'src-x'), { recursive: true, force: true });
+    fs.rmSync(scratch, { recursive: true, force: true });
     for (const p of patches) run('git', ['apply', '--whitespace=nowarn', path.join(VPX_CORRIGE_SOURCE, 'correctifs', p)], src, `correctif ${p}`);
     const version = path.join(src, 'src', 'core', 'git_version.h');
     replaceIn(version, '9999', VPX_BASE.revision);
     replaceIn(version, '"unknown"', `"${VPX_BASE.sha}"`);
-    fs.rmSync(path.join(work, 'vpx-build'), { recursive: true, force: true });
+    fs.rmSync(vpxBuildDir(), { recursive: true, force: true });
     fs.writeFileSync(srcStamp, srcKey);
   }
   const deps = readConfig(src);
@@ -195,16 +359,23 @@ export function buildVpxCorrige({ clean = false, quiet = false } = {}) {
   copy(path.join(xrDir, 'build', 'src', 'loader', 'Release', 'openxr_loader64.lib'), path.join(lib, 'openxr_loader64.lib'));
   copy(path.join(xrDir, 'include', 'openxr'), path.join(inc, 'openxr'));
 
-  // VPX : la cible de l'exécutable seule (les plugins restent ceux de l'archive officielle).
-  const vpxBuild = path.join(work, 'vpx-build');
+  pupPluginDependencies(src, deps, lib, inc);
+
+  // VPX : l'exécutable et le plugin PuP (les autres plugins et les bibliothèques restent ceux de l'archive officielle).
+  const vpxBuild = vpxBuildDir();
   run(cmake, ['-S', src, '-B', vpxBuild, ...GENERATOR, '-DRENDERER=BGFX', '-DPLATFORM=windows', '-DARCH=x64', '-DPOST_BUILD_COPY_EXT_LIBS=OFF'], src, 'VPX : configuration');
-  run(cmake, ['--build', vpxBuild, '--config', 'Release', '--target', 'vpinball', '--parallel'], src, 'VPX : compilation');
+  run(cmake, ['--build', vpxBuild, '--config', 'Release', '--target', 'vpinball', 'PUPPlugin', '--parallel'], src, 'VPX : compilation');
   const exe = fs.readdirSync(path.join(vpxBuild, 'Release')).find((f) => /^VPinballX.*64\.exe$/i.test(f));
   if (!exe) throw new Error('VPX : exécutable introuvable après la compilation');
   fs.mkdirSync(out, { recursive: true });
   fs.copyFileSync(path.join(vpxBuild, 'Release', exe), VPX_CORRIGE_EXE);
   const pdb = path.join(vpxBuild, 'Release', exe.replace(/\.exe$/i, '.pdb'));
   if (fs.existsSync(pdb)) fs.copyFileSync(pdb, VPX_CORRIGE_EXE.replace(/\.exe$/i, '.pdb'));
+  // Le plugin PuP : copié par sa cible dans <sortie>\plugins\pup.
+  const pup = path.join(vpxBuild, 'Release', 'plugins', 'pup', VPX_CORRIGE_PUP);
+  if (!fs.existsSync(pup)) throw new Error(`plugin PuP introuvable après la compilation (${pup})`);
+  fs.mkdirSync(path.join(out, 'plugins', 'pup'), { recursive: true });
+  fs.copyFileSync(pup, path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP));
   // La licence de VPX (GPLv3+ et licence héritée de MAME) voyage avec le binaire.
   fs.copyFileSync(path.join(src, 'LICENSE'), path.join(out, 'LICENSE'));
   return VPX_CORRIGE_EXE;

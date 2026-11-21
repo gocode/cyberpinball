@@ -79,6 +79,7 @@ unsigned int getVpxApiId = 0, onGameStartId = 0, onGameEndId = 0, onPrepareFrame
 MSGPI_STRING_VAL_SETTING(fichierJournal, "LogFile", "Log file", "Where the plugin writes what it does, empty for none", true, "", 1024);
 MSGPI_INT_VAL_SETTING(sondeActive, "Probe", "Probe", "1: measures how much of the Score View window the DMD fills (test bench)", true, 0, 1, 0);
 MSGPI_INT_VAL_SETTING(suiviActif, "Follow", "Follow", "1: gives SDL the size set from outside and tells ScoreView (default); 0: neither; 2: SDL only (test bench, to compare)", true, 0, 2, 1);
+MSGPI_INT_VAL_SETTING(tousLesFils, "StallThreads", "Stall threads", "1: during each stall, also samples every other thread and names the busiest (test bench; suspends them all)", true, 0, 1, 0);
 MSGPI_INT_VAL_SETTING(attenteFermeture, "ShutdownWait", "Shutdown wait", "Milliseconds left to DMDUtil to finish looking for the real DMD when the DMD sources changed after the game (0: no wait)", true, 0, 10000, 0);
 
 constexpr wchar_t TITRE[] = L"Visual Pinball Score View";
@@ -296,7 +297,7 @@ bool releveDemarre = false;
 void compterImage(double t)
 {
    const bool aCoup = cadence.image(t);
-   char ou[900];
+   char ou[2048];
    if (releveDemarre)
       releve.image(aCoup && aCoupsDits < A_COUPS_DITS_MAX, ou, sizeof(ou));
    else
@@ -305,7 +306,7 @@ void compterImage(double t)
    {
       // Au moment même : l'heure de la ligne le rapproche de ce que VPX et les plugins écrivaient alors.
       aCoupsDits++;
-      char quoi[960];
+      char quoi[2112];
       std::snprintf(quoi, sizeof(quoi), "%s%s%s", ou[0] ? "; main thread " : "", ou, aCoupsDits == A_COUPS_DITS_MAX ? " (no more stalls logged)" : "");
       LPI_LOGW("Cadence: stall of %d ms at %.1fs%s", static_cast<int>(cadence.dernierEcart() * 1000.0 + 0.5), cadence.tempsDePartie(t), quoi);
    }
@@ -324,6 +325,7 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    {
       // Le fil du rendu de VPX (BGFX), relevé avec la boucle de jeu pendant chaque à-coup (arrets.h).
       releve.suivreAussi(L"RenderThread");
+      releve.suivreTous(tousLesFils_Val != 0);
       releveDemarre = releve.demarrer();
    }
    const double t = maintenant();
@@ -554,6 +556,7 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballDmdPluginLoad(const uint32_t sessionId, c
    msgApi->RegisterSetting(endpointId, &sondeActive);
    msgApi->RegisterSetting(endpointId, &suiviActif);
    msgApi->RegisterSetting(endpointId, &attenteFermeture);
+   msgApi->RegisterSetting(endpointId, &tousLesFils);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    displaysChangedId = msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_ON_SRC_CHG_MSG);
    msgApi->SubscribeMsg(endpointId, displaysChangedId, onSourcesChanged, nullptr);

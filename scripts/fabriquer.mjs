@@ -183,17 +183,19 @@ for (const name of fs.readdirSync(installerDir)) {
     console.log(`Serveur du DMD : ${path.join('natif', 'dmdserver', path.basename(exe))}`);
   }
 }
-// VPX corrigé (app/src/vpx-corrige.ts) : l'exécutable de VPX 10.8.1-5436 avec les correctifs de packages/vpx-corrige,
-// posé à la place de l'officiel avant chaque partie. Construit avec les mêmes outils ; sans eux, ou en cas d'échec,
-// l'application part sans lui et les parties gardent l'exécutable officiel. Le correctif et sa recette vont avec
-// (licence GPL de VPX : les sources des changements accompagnent le binaire).
+// VPX corrigé (app/src/vpx-corrige.ts) : l'exécutable et le plugin PuP de VPX 10.8.1-5436 avec les correctifs de
+// packages/vpx-corrige, posés à la place des officiels avant chaque partie. Construit avec les mêmes outils ; sans eux,
+// ou en cas d'échec, l'application part sans lui et les parties gardent les fichiers officiels. Les correctifs et leur
+// recette vont avec (licence GPL de VPX : les sources des changements accompagnent le binaire).
 {
-  const { buildVpxCorrige, VPX_CORRIGE_SOURCE } = await import('./vpx-corrige.mjs');
+  const { buildVpxCorrige, VPX_CORRIGE_SOURCE, VPX_CORRIGE_PUP } = await import('./vpx-corrige.mjs');
   try {
     const exe = buildVpxCorrige({ quiet: true });
     const dir = path.join(stage, 'natif', 'vpx-corrige');
     fs.mkdirSync(path.join(dir, 'correctifs'), { recursive: true });
     fs.copyFileSync(exe, path.join(dir, path.basename(exe)));
+    fs.mkdirSync(path.join(dir, 'plugins', 'pup'), { recursive: true });
+    fs.copyFileSync(path.join(path.dirname(exe), 'plugins', 'pup', VPX_CORRIGE_PUP), path.join(dir, 'plugins', 'pup', VPX_CORRIGE_PUP));
     for (const f of fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs'))) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs', f), path.join(dir, 'correctifs', f));
     for (const doc of ['LISEZMOI.md', 'README.md']) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, doc), path.join(dir, doc));
     fs.copyFileSync(path.join(path.dirname(exe), 'LICENSE'), path.join(dir, 'LICENSE'));

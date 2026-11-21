@@ -5,6 +5,7 @@
 // côté et remis dès qu'une version ne livre plus le corrigé (retour arrière sans téléchargement) ; la vérification des
 // fichiers de VPX ne le prend pas pour une modification, mais voit toujours un autre exécutable ; la fabrication le
 // livre avec son correctif et son LISEZMOI (GPL) ; le correctif reste celui qui bride les fenêtres annexes.
+// Série 3 (21/11/2026, The Matrix) : le plugin PuP corrigé est posé de même, et son correctif décode sans le verrou.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -23,15 +24,22 @@ const installer = require(path.join(REPO_ROOT, 'packages', 'installer', 'dist', 
   checkComponentFiles(dir: string, c: { files?: Record<string, number>; executable?: string; executablePattern: string }, accepted?: Record<string, number>): { changed: { file: string }[] } | undefined;
 };
 
-/** Un dossier d'application avec son VPX corrigé (natif\vpx-corrige), et un dossier de VPX à l'exécutable officiel. */
-function setup(): { root: string; app: string; vpx: string } {
+const PUP = path.join('plugins', 'pup', 'plugin-pup64.dll');
+
+/**
+ * Un dossier d'application avec son VPX corrigé (natif\vpx-corrige : exécutable, et plugin PuP sauf `exeOnly`, comme
+ * une version de la série 1), et un dossier de VPX aux fichiers officiels.
+ */
+function setup(exeOnly = false): { root: string; app: string; vpx: string } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-vpx-corrige-'));
   const app = path.join(root, 'app');
-  fs.mkdirSync(path.join(app, 'natif', 'vpx-corrige'), { recursive: true });
+  fs.mkdirSync(path.join(app, 'natif', 'vpx-corrige', 'plugins', 'pup'), { recursive: true });
   fs.writeFileSync(path.join(app, 'natif', 'vpx-corrige', 'VPinballX_BGFX64.exe'), Buffer.alloc(50, 2));
+  if (!exeOnly) fs.writeFileSync(path.join(app, 'natif', 'vpx-corrige', PUP), Buffer.alloc(30, 4));
   const vpx = path.join(root, 'vpx');
-  fs.mkdirSync(vpx);
+  fs.mkdirSync(path.join(vpx, 'plugins', 'pup'), { recursive: true });
   fs.writeFileSync(path.join(vpx, 'VPinballX_BGFX64.exe'), Buffer.alloc(40, 1));
+  fs.writeFileSync(path.join(vpx, PUP), Buffer.alloc(20, 5));
   return { root, app, vpx };
 }
 
@@ -44,26 +52,56 @@ test('posé sur la 5436 une fois, jamais sur un autre VPX', () => {
     assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'installed');
     assert.deepEqual(fs.readFileSync(path.join(vpx, 'VPinballX_BGFX64.exe')), Buffer.alloc(50, 2));
     assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'up-to-date');
-    assert.deepEqual(fs.readdirSync(vpx).sort(), ['VPinballX_BGFX64.exe', 'VPinballX_BGFX64.exe.officiel'], 'l’officiel gardé à côté, aucun fichier de passage laissé');
+    assert.deepEqual(fs.readdirSync(vpx).sort(), ['VPinballX_BGFX64.exe', 'VPinballX_BGFX64.exe.officiel', 'plugins'], 'l’officiel gardé à côté, aucun fichier de passage laissé');
     assert.deepEqual(fs.readFileSync(path.join(vpx, 'VPinballX_BGFX64.exe.officiel')), Buffer.alloc(40, 1));
-    // Retour arrière : une version de Cyber Pinball sans corrigé remet l'officiel, sans téléchargement.
+    // Le plugin PuP corrigé (série 3) : posé de même, l'officiel gardé à côté.
+    assert.deepEqual(fs.readFileSync(path.join(vpx, PUP)), Buffer.alloc(30, 4));
+    assert.deepEqual(fs.readdirSync(path.join(vpx, 'plugins', 'pup')).sort(), ['plugin-pup64.dll', 'plugin-pup64.dll.officiel']);
+    // Retour arrière : une version de Cyber Pinball sans corrigé remet les officiels, sans téléchargement.
     assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, path.join(root, 'sans')), 'restored');
     assert.deepEqual(fs.readFileSync(path.join(vpx, 'VPinballX_BGFX64.exe')), Buffer.alloc(40, 1));
-    assert.deepEqual(fs.readdirSync(vpx), ['VPinballX_BGFX64.exe']);
+    assert.deepEqual(fs.readFileSync(path.join(vpx, PUP)), Buffer.alloc(20, 5));
+    assert.deepEqual(fs.readdirSync(vpx).sort(), ['VPinballX_BGFX64.exe', 'plugins']);
+    assert.deepEqual(fs.readdirSync(path.join(vpx, 'plugins', 'pup')), ['plugin-pup64.dll']);
     assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, path.join(root, 'sans')), 'missing', 'ensuite, plus rien à faire');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('fiche technique : « patched Cyber Pinball 1 » quand le corrigé est en place, en anglais dans toutes les langues', () => {
+test('une version qui ne livre plus le plugin PuP corrigé remet l’officiel, et garde l’exécutable corrigé', () => {
+  const { root, app, vpx } = setup();
+  try {
+    assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'installed');
+    fs.rmSync(path.join(app, 'natif', 'vpx-corrige', PUP));
+    assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'restored');
+    assert.deepEqual(fs.readFileSync(path.join(vpx, PUP)), Buffer.alloc(20, 5));
+    assert.deepEqual(fs.readFileSync(path.join(vpx, 'VPinballX_BGFX64.exe')), Buffer.alloc(50, 2));
+    assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'up-to-date');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  // Corrigé de la série 1 (exécutable seul) : le plugin PuP officiel n'est pas touché.
+  const old = setup(true);
+  try {
+    assert.equal(corrige.installVpxCorrige(old.vpx, corrige.VPX_CORRIGE_VERSION, old.app), 'installed');
+    assert.deepEqual(fs.readdirSync(path.join(old.vpx, 'plugins', 'pup')), ['plugin-pup64.dll']);
+  } finally {
+    fs.rmSync(old.root, { recursive: true, force: true });
+  }
+});
+
+test('fiche technique : « patched Cyber Pinball N » quand tout le corrigé est en place, en anglais dans toutes les langues', () => {
   const { root, app, vpx } = setup();
   try {
     const inPlace = (corrige as unknown as { vpxCorrigeInPlace(d: string, v: string | undefined, a: string): number | undefined }).vpxCorrigeInPlace;
+    const patch = (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH;
     assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), undefined, 'officiel en place');
     corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app);
-    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
+    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), patch);
     assert.equal(inPlace(vpx, '10.9.0-6948', app), undefined);
+    fs.writeFileSync(path.join(vpx, PUP), Buffer.alloc(20, 5));
+    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), undefined, 'plugin PuP officiel remis : la série n’est pas en place');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -96,11 +134,11 @@ test('posé dès le démarrage, avant le premier relevé de la fiche ; fiche rel
 test('vérification des fichiers de VPX : le corrigé est admis, un autre exécutable reste signalé', () => {
   const { root, app, vpx } = setup();
   try {
-    const component = { files: { 'VPinballX_BGFX64.exe': 40 }, executable: 'VPinballX_BGFX64.exe', executablePattern: '^VPinballX.*64\\.exe$' };
+    const component = { files: { 'VPinballX_BGFX64.exe': 40, 'plugins/pup/plugin-pup64.dll': 20 }, executable: 'VPinballX_BGFX64.exe', executablePattern: '^VPinballX.*64\\.exe$' };
     corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app);
     const accepted = corrige.vpxCorrigeSizes(app, corrige.VPX_CORRIGE_VERSION);
     assert.deepEqual(installer.checkComponentFiles(vpx, component, accepted)!.changed, []);
-    assert.equal(installer.checkComponentFiles(vpx, component)!.changed.length, 1, 'sans lui, la taille diffère');
+    assert.equal(installer.checkComponentFiles(vpx, component)!.changed.length, 2, 'sans lui, les tailles diffèrent');
     assert.deepEqual(corrige.vpxCorrigeSizes(app, '10.9.0-6948'), {}, 'rien d’admis pour une autre version');
     fs.writeFileSync(path.join(vpx, 'VPinballX_BGFX64.exe'), Buffer.alloc(33, 3));
     assert.equal(installer.checkComponentFiles(vpx, component, accepted)!.changed.length, 1, 'un exécutable étranger reste vu');
@@ -133,6 +171,37 @@ test('le correctif livré bride bien chaque fenêtre annexe à son écran, et la
   assert.match(patch === undefined ? '' : fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '01-cadence-fenetres-annexes.patch'), 'utf8'), /Cyber Pinball, \d{4}-\d{2}-\d{2}/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
   const frontend = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /installVpxCorrige\(path\.dirname\(install\.exe\), install\.version/, 'posé avant chaque partie, avec la version du VPX lancé');
+});
+
+test('correctif 03, plugin PuP : le label décode son image sans garder son verrou, et la fabrication livre le plugin', () => {
+  // Rapport du 21/11/2026 (The Matrix) : arrêts de 200 à 300 ms, boucle de jeu en attente d'un verrou du plugin PuP ;
+  // le label décodait un GIF plein écran de 5 Mo en gardant son verrou, que Render et LabelSet attendent.
+  const diff = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '03-pup-label-sans-verrou.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2}/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
+  const added = (marker: string) => diff.split('\n').filter((l) => l.startsWith(marker)).join('\n');
+  assert.match(added('-'), /std::async\(std::launch::async, \[this\]\(\) \{\n-\s+std::lock_guard lock\(m_mutex\);\n-\s+return UpdateImageTexture/, 'l’ancienne tâche prenait le verrou avant de décoder');
+  assert.match(added('+'), /std::async\(std::launch::async, \[this, type, path\]\(\) \{\n\+\s+return UpdateImageTexture\(type, path\);/, 'la nouvelle décode sans lui');
+  assert.match(added('+'), /SDL_Surface\* const decoded = cached \? nullptr : loadRGBA\(szPath\);\n\+\s+std::lock_guard lock\(m_mutex\);/, 'image tournée : décodée avant de prendre le verrou');
+  assert.match(added('+'), /frames\[i\] = converted/, 'images du GIF converties hors du rendu');
+  const fabriquer = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
+  assert.match(fabriquer, /'plugins', 'pup', VPX_CORRIGE_PUP/, 'le plugin PuP corrigé part avec l’application');
+  const recette = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige.mjs'), 'utf8');
+  assert.match(recette, /'--target', 'vpinball', 'PUPPlugin'/);
+  const sources = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige-sources.mjs'), 'utf8');
+  for (const lib of ['SDL_image-', 'SDL_ttf-', 'FFmpeg-', 'libdmdutil-', 'libpupdmd-']) assert.ok(sources.includes(`'${lib}'`), `sources complètes : ${lib}`);
+  assert.deepEqual((corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES, ['VPinballX_BGFX64.exe', 'plugins/pup/plugin-pup64.dll']);
+});
+
+test('construction : un dossier de sources par série de correctifs, une construction à la fois', () => {
+  // 21/11/2026 : une publication groupée (série 1) et une branche (série 2) construisaient dans le même dossier de
+  // sources ; chacune effaçait les sources de l'autre au milieu de sa compilation.
+  const recette = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige.mjs'), 'utf8');
+  assert.match(recette, /path\.join\(work, `src-\$\{VPX_BASE\.patch\}`\)/);
+  assert.match(recette, /path\.join\(work, `vpx-build-\$\{VPX_BASE\.patch\}`\)/);
+  assert.doesNotMatch(recette, /path\.join\(work, 'src'\)|path\.join\(work, 'vpx-build'\)/, 'plus de dossier de sources commun à toutes les séries');
+  assert.match(recette, /return withBuildLock\(\(\) => buildLocked\(/, 'toute construction passe par le verrou');
+  assert.match(recette, /flag: 'wx'/, 'verrou pris de façon exclusive');
 });
 
 test('correctif 02 : « Fit Table » garde le haut de la table, réglages connus du schéma de la 5436 seulement', () => {

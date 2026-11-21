@@ -20,6 +20,7 @@ import { VPX_CORRIGE_EXE } from './vpx-corrige.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXE = 'VPinballX_BGFX64.exe';
+const PUP = path.join('plugins', 'pup', 'plugin-pup64.dll');
 
 function args(argv) {
   const out = {};
@@ -29,7 +30,7 @@ function args(argv) {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Une partie de `dureeMs` avec l'exécutable `exe` posé dans une copie de `vpx` ; le bilan lu dans son journal. */
-async function partie({ nom, vpx, exe, table, roms, dureeMs, core }) {
+async function partie({ nom, vpx, exe, pup, table, roms, dureeMs, core }) {
   const dir = path.join(os.tmpdir(), 'banc-vpx-corrige', nom);
   const copie = path.join(dir, 'vpx');
   if (!fs.existsSync(path.join(copie, EXE))) {
@@ -38,16 +39,27 @@ async function partie({ nom, vpx, exe, table, roms, dureeMs, core }) {
     if (r.status >= 8) throw new Error(`copie de VPX impossible (robocopy ${r.status})`);
   }
   fs.copyFileSync(exe, path.join(copie, EXE));
+  // Plugin PuP (série 3) : le corrigé pour la partie corrigée, celui de l'archive pour l'officielle.
+  fs.copyFileSync(pup ?? path.join(vpx, PUP), path.join(copie, PUP));
   const appdata = path.join(dir, 'appdata');
   fs.rmSync(appdata, { recursive: true, force: true });
   const pinmame = path.join(dir, 'pinmame');
   fs.rmSync(pinmame, { recursive: true, force: true });
   fs.mkdirSync(path.join(pinmame, 'roms'), { recursive: true });
-  for (const f of fs.readdirSync(roms)) fs.copyFileSync(path.join(roms, f), path.join(pinmame, 'roms', f));
-  const jouee = path.join(dir, path.basename(table));
+  if (roms) for (const f of fs.readdirSync(roms)) fs.copyFileSync(path.join(roms, f), path.join(pinmame, 'roms', f));
+  // La table, et son PuP-Pack s'il y en a un : une seule copie pour les deux parties (un PuP-Pack pèse des Go).
+  const tableDir = path.join(os.tmpdir(), 'banc-vpx-corrige', 'table');
+  fs.mkdirSync(tableDir, { recursive: true });
+  const jouee = path.join(tableDir, path.basename(table));
   if (!fs.existsSync(jouee)) fs.copyFileSync(table, jouee);
   const b2s = table.replace(/\.vpx$/i, '.directb2s');
   if (fs.existsSync(b2s) && !fs.existsSync(jouee.replace(/\.vpx$/i, '.directb2s'))) fs.copyFileSync(b2s, jouee.replace(/\.vpx$/i, '.directb2s'));
+  const pack = path.join(path.dirname(table), 'pupvideos');
+  if (fs.existsSync(pack) && !fs.existsSync(path.join(tableDir, 'pupvideos'))) {
+    const r = spawnSync('robocopy', [pack, path.join(tableDir, 'pupvideos'), '/E', '/XJ', '/NFL', '/NDL', '/NJH', '/NJS', '/NP'], { windowsHide: true });
+    if (r.status >= 8) throw new Error(`copie du PuP-Pack impossible (robocopy ${r.status})`);
+  }
+  fs.rmSync(path.join(tableDir, 'crash.txt'), { force: true });
   const settings = [
     ...core.VPX_PLAY_SETTINGS,
     { section: 'Player', key: 'MusicVolume', value: '0' },
@@ -73,6 +85,7 @@ async function partie({ nom, vpx, exe, table, roms, dureeMs, core }) {
     { section: 'Plugin.B2S', key: 'Enable', value: '1' },
     { section: 'Plugin.B2SLegacy', key: 'Enable', value: '0' },
     { section: 'Plugin.CyberPinballDmd', key: 'Enable', value: '1' },
+    { section: 'Plugin.PUP', key: 'Enable', value: '1' },
   ];
   const ini = path.join(dir, 'VPinballX.ini');
   const doc = core.IniDocument.parse('');
@@ -102,14 +115,16 @@ async function partie({ nom, vpx, exe, table, roms, dureeMs, core }) {
     fenetres: core.readVpxWindows(log).map((w) => `${w.playfield ? 'playfield' : 'annexe'} ${w.hz} Hz`),
     cadence,
     erreurs: log.filter((l) => / ERROR /.test(l)).map((l) => l.replace(/^.*?\] /, '').slice(0, 160)),
+    pup: log.filter((l) => /\[PUP:/.test(l)).length,
+    arrets: log.filter((l) => /Cadence: stall/.test(l)).map((l) => l.replace(/^.*?Cadence: /, '').slice(0, 200)),
     crash: fs.existsSync(path.join(path.dirname(jouee), 'crash.txt')),
   };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = args(process.argv.slice(2));
-  if (!a.vpx || !a.table || !a.roms) {
-    console.error('Usage : --vpx <dossier de VPX 10.8.1-5436> --table <fichier.vpx> --roms <dossier des ROM> [--duree 75000]');
+  if (!a.vpx || !a.table) {
+    console.error('Usage : --vpx <dossier de VPX 10.8.1-5436> --table <fichier.vpx> [--roms <dossier des ROM>] [--duree 75000]');
     process.exit(2);
   }
   if (!fs.existsSync(VPX_CORRIGE_EXE)) {
@@ -119,11 +134,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const dureeMs = Number(a.duree ?? 75000);
   const resultats = [];
-  for (const [nom, exe] of [
-    ['officiel', path.join(a.vpx, EXE)],
-    ['corrige', VPX_CORRIGE_EXE],
+  const pupCorrige = path.join(path.dirname(VPX_CORRIGE_EXE), PUP);
+  for (const [nom, exe, pup] of [
+    ['officiel', path.join(a.vpx, EXE), undefined],
+    ['corrige', VPX_CORRIGE_EXE, fs.existsSync(pupCorrige) ? pupCorrige : undefined],
   ])
-    resultats.push(await partie({ nom, vpx: a.vpx, exe, table: a.table, roms: a.roms, dureeMs, core }));
+    resultats.push(await partie({ nom, vpx: a.vpx, exe, pup, table: a.table, roms: a.roms, dureeMs, core }));
   for (const r of resultats) {
     const c = r.cadence;
     console.log(`\n== ${r.nom} : ${r.vivant ? `encore en partie au bout de ${r.secondes} s (arrêté par le banc)` : `VPX s'est arrêté seul (code ${r.code})`}${r.crash ? ', crash.txt écrit' : ''}`);
@@ -131,6 +147,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`   fenêtres : ${r.fenetres.join(', ') || 'aucune'}`);
     console.log(c ? `   cadence : ${c.fps} i/s, médiane ${c.p50} ms, 99e centile ${c.p99} ms, ${c.stalls} à-coup(s), sur ${c.durationS} s` : '   cadence : aucun bilan');
     console.log(`   erreurs du journal : ${r.erreurs.length}${r.erreurs.length ? `\n     ${r.erreurs.slice(0, 8).join('\n     ')}` : ''}`);
+    console.log(`   lignes du plugin PuP : ${r.pup} ; à-coups relevés : ${r.arrets.length}${r.arrets.length ? `\n     ${r.arrets.slice(0, 5).join('\n     ')}` : ''}`);
   }
   const [o, n] = resultats;
   const ok = o.vivant && n.vivant && !n.crash && n.cadence && o.cadence && n.fenetres.length === o.fenetres.length && n.erreurs.length <= o.erreurs.length && n.cadence.fps >= o.cadence.fps * 0.95;

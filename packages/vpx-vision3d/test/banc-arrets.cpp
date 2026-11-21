@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <thread>
 #include "arrets.h"
@@ -146,6 +147,64 @@ int main()
       VERIFIE(attente.find(" samples: in ntdll.dll") < r);
       VERIFIE(r != std::string::npos && attente.find(" samples: in banc-arrets.exe", r) != std::string::npos);
       VERIFIE(r != std::string::npos && attente.find("; top banc-arrets.exe+0x", r) != std::string::npos);
+   }
+   {
+      // StallThreads = 1 (rapport du 21/11/2026, The Matrix) : la boucle de jeu attend un verrou tenu par un autre fil
+      // qui calcule ; le relevé de tous les fils doit le nommer, et ne rien dire des fils qui dorment.
+      ReleveArrets releve;
+      releve.suivreTous(true);
+      std::mutex verrou;
+      std::atomic<bool> tenir { false }, tenu { false }, fini { false };
+      std::thread travailleur([&]
+      {
+         SetThreadDescription(GetCurrentThread(), L"Travailleur.CmdQueue");
+         while (!fini.load())
+         {
+            if (tenir.load())
+            {
+               std::lock_guard l(verrou);
+               tenu.store(true);
+               calcul(300);
+               tenir.store(false);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+         }
+      });
+      std::thread dormeur([&]
+      {
+         SetThreadDescription(GetCurrentThread(), L"Dormeur");
+         while (!fini.load())
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      });
+      std::string attente;
+      std::thread images([&]
+      {
+         VERIFIE(releve.demarrer());
+         char ou[2048];
+         for (int i = 0; i < 20; i++)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            releve.image(false, ou, sizeof(ou));
+         }
+         tenir.store(true);
+         while (!tenu.load())
+            std::this_thread::yield();
+         {
+            std::lock_guard l(verrou); // la boucle de jeu attend le verrou, comme Render du lecteur PuP
+         }
+         releve.image(true, ou, sizeof(ou));
+         attente = ou;
+         releve.arreter();
+      });
+      images.join();
+      fini.store(true);
+      travailleur.join();
+      dormeur.join();
+      std::printf("verrou tenu ailleurs : %s\n", attente.c_str());
+      const size_t t = attente.find(" | thread Travailleur.CmdQueue ");
+      VERIFIE(t != std::string::npos);
+      VERIFIE(t != std::string::npos && attente.find(" samples: in banc-arrets.exe", t) != std::string::npos);
+      VERIFIE(attente.find("Dormeur") == std::string::npos);
    }
    std::printf(echecs ? "%d echec(s)\n" : "tout va bien\n", echecs);
    return echecs ? 1 : 0;

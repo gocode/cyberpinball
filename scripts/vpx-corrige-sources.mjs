@@ -1,7 +1,8 @@
 // Sources du VPX corrigé (packages/vpx-corrige), publiées une fois par version du correctif dans une release GitHub à
 // part du dépôt public : licences de VPX (GPLv3+, et licence héritée de MAME qui demande, pour un binaire modifié, le
 // code source complet, celui des composants qu'il utilise compris). L'archive réunit exactement ce que la construction
-// a téléchargé (sources de VPX au commit de la 5436, SDL3, FreeImage, bgfx, OpenXR), les correctifs, la recette et les
+// a téléchargé (sources de VPX au commit de la 5436, SDL3, SDL_image, SDL_ttf, FreeImage, bgfx, OpenXR, FFmpeg,
+// libdmdutil, libpupdmd, PinMAME), les correctifs, la recette et les
 // licences. La release n'a ni numéro de version ni flux de mise à jour : les bornes ne la lisent pas (update.ts).
 //   node scripts/vpx-corrige-sources.mjs            -> crée la release si elle manque (jeton : scripts/jeton-github.mjs)
 //   node scripts/vpx-corrige-sources.mjs --archive  -> l'archive seule, dans build\vpx-corrige
@@ -13,7 +14,7 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
-import { VPX_BASE, VPX_CORRIGE_SOURCE, vpxCorrigeWorkDir } from './vpx-corrige.mjs';
+import { VPX_BASE, VPX_CORRIGE_SOURCE, vpxCorrigeSrcDir, vpxCorrigeWorkDir } from './vpx-corrige.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { copyTree } = createRequire(import.meta.url)(path.join(repo, 'packages', 'core', 'dist', 'copytree.js'));
@@ -26,7 +27,7 @@ export const VPX_SOURCES_NAME = `${VPX_SOURCES_TAG}.zip`;
 export function vpxSourcesArchive() {
   const dl = path.join(vpxCorrigeWorkDir(), 'dl');
   const tarballs = fs.existsSync(dl) ? fs.readdirSync(dl).filter((f) => f.endsWith('.tar.gz')) : [];
-  for (const needed of [VPX_BASE.commit, 'SDL-', 'freeimage-', 'bgfx.cmake.', 'bgfx-', 'OpenXR-SDK-Source-'])
+  for (const needed of [VPX_BASE.commit, 'SDL-', 'SDL_image-', 'SDL_ttf-', 'freeimage-', 'bgfx.cmake.', 'bgfx-', 'OpenXR-SDK-Source-', 'FFmpeg-', 'libdmdutil-', 'libpupdmd-', 'pinmame-'])
     if (!tarballs.some((f) => f.includes(needed))) throw new Error(`sources incomplètes dans ${dl} (${needed}…) : lancer d'abord node scripts/vpx-corrige.mjs`);
   const out = path.join(repo, 'build', 'vpx-corrige');
   const stage = path.join(out, 'sources');
@@ -36,7 +37,7 @@ export function vpxSourcesArchive() {
   copyTree(VPX_CORRIGE_SOURCE, path.join(stage, 'vpx-corrige'));
   fs.mkdirSync(path.join(stage, 'recette'), { recursive: true });
   for (const f of ['vpx-corrige.mjs', 'casque-vr.mjs']) fs.copyFileSync(path.join(repo, 'scripts', f), path.join(stage, 'recette', f));
-  const license = path.join(vpxCorrigeWorkDir(), 'src', 'LICENSE');
+  const license = path.join(vpxCorrigeSrcDir(), 'LICENSE');
   if (fs.existsSync(license)) fs.copyFileSync(license, path.join(stage, 'LICENSE-VPX'));
   const zip = path.join(out, VPX_SOURCES_NAME);
   fs.rmSync(zip, { force: true });
@@ -47,9 +48,9 @@ export function vpxSourcesArchive() {
 }
 
 const BODY = [
-  'Complete sources of the patched VPX executable shipped with Cyber Pinball (VPinballX_BGFX64.exe, Visual Pinball X 10.8.1-5436 with the patches listed in vpx-corrige/LISEZMOI.md), as required by the VPX licenses (GPLv3+ and the MAME-derived license): VPX sources at commit af26b2d93, the sources of the libraries it is built with (SDL3, FreeImage, bgfx, OpenXR), the patches and the build recipe. Not a Cyber Pinball release: cabinets never download it.',
+  'Complete sources of the patched VPX files shipped with Cyber Pinball (VPinballX_BGFX64.exe and plugins/pup/plugin-pup64.dll, Visual Pinball X 10.8.1-5436 with the patches listed in vpx-corrige/README.md), as required by the VPX licenses (GPLv3+ and the MAME-derived license): VPX sources at commit af26b2d93, the sources of the libraries they are built with (SDL3, SDL_image, SDL_ttf, FreeImage, bgfx, OpenXR, FFmpeg, libdmdutil, libpupdmd, PinMAME), the patches and the build recipe. Not a Cyber Pinball release: cabinets never download it.',
   '',
-  'Sources complètes de l’exécutable de VPX corrigé livré avec Cyber Pinball (VPinballX_BGFX64.exe, Visual Pinball X 10.8.1-5436 avec les correctifs décrits dans vpx-corrige/LISEZMOI.md), comme le demandent les licences de VPX (GPLv3+ et licence dérivée de MAME) : sources de VPX au commit af26b2d93, celles des bibliothèques avec lesquelles il est construit (SDL3, FreeImage, bgfx, OpenXR), les correctifs et la recette de construction. Ce n’est pas une version de Cyber Pinball : les bornes ne la téléchargent jamais.',
+  'Sources complètes des fichiers de VPX corrigés livrés avec Cyber Pinball (VPinballX_BGFX64.exe et plugins/pup/plugin-pup64.dll, Visual Pinball X 10.8.1-5436 avec les correctifs décrits dans vpx-corrige/LISEZMOI.md), comme le demandent les licences de VPX (GPLv3+ et licence dérivée de MAME) : sources de VPX au commit af26b2d93, celles des bibliothèques avec lesquelles ils sont construits (SDL3, SDL_image, SDL_ttf, FreeImage, bgfx, OpenXR, FFmpeg, libdmdutil, libpupdmd, PinMAME), les correctifs et la recette de construction. Ce n’est pas une version de Cyber Pinball : les bornes ne la téléchargent jamais.',
 ].join('\n');
 
 /**

@@ -39,6 +39,9 @@ public:
    void ajouter(const char* dans, const char* sous, const char* modulePosition, uint64_t position)
    {
       m_releves++;
+      // Actif : le fil était ailleurs que dans les attentes de Windows (ntdll, win32u, KERNELBASE).
+      if (dans && std::strcmp(dans, "ntdll.dll") != 0 && std::strcmp(dans, "win32u.dll") != 0 && std::strcmp(dans, "KERNELBASE.dll") != 0)
+         m_actifs++;
       compter(m_dans, dans);
       compter(m_sous, sous);
       if (!modulePosition || !*modulePosition)
@@ -61,6 +64,8 @@ public:
    }
 
    int releves() const { return m_releves; }
+   /** Relevés où le fil travaillait (hors attentes de Windows). */
+   int actifs() const { return m_actifs; }
 
    /** « N samples: in a 60, b 20; under c 70; top c+0x1234 (40) » ; vide sans relevé. */
    void dire(char* ligne, size_t taille) const
@@ -150,6 +155,7 @@ private:
    Nom m_sous[NOMS] {};
    Position m_positions[POSITIONS] {};
    int m_releves = 0;
+   int m_actifs = 0;
 };
 
 } // namespace cyberpinball
@@ -167,6 +173,7 @@ private:
 #include <tlhelp32.h>
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <utility>
@@ -253,11 +260,26 @@ public:
          CloseHandle(m_rendu);
       m_rendu = nullptr;
       m_renduCherche = 0;
+      fermerAutres();
       m_derniere.store(0);
    }
 
    /** Nom du second fil relevé pendant un arrêt (celui du rendu de VPX) ; à appeler avant demarrer(). */
    void suivreAussi(const wchar_t* nom) { m_nomRendu = nom; }
+
+   /**
+    * Banc et essais seulement ([Plugin.CyberPinballDmd] StallThreads = 1) : pendant un arrêt, tous les autres fils du
+    * processus sont relevés aussi, et la ligne nomme ceux qui travaillaient (« | thread <nom> … »). Rapport du 21/11/2026
+    * (The Matrix) : la boucle de jeu attendait un verrou du plugin PuP sans dire quel fil le tenait. Désactivé par
+    * défaut : suspendre tous les fils (son compris) n'a pas sa place dans les parties des joueurs.
+    */
+   void suivreTous(bool oui)
+   {
+      m_tous = oui;
+      // Sur le tas, et seulement s'il sert : 64 fils et leurs comptes pèsent plus de 300 Ko.
+      if (oui && !m_autres)
+         m_autres = std::make_unique<AutreFil[]>(AUTRES);
+   }
 
    /**
     * Une image vient d'être préparée (fil suivi). Si l'écart qu'elle termine est un à-coup (`aCoup`), écrit dans
@@ -282,9 +304,12 @@ public:
                const size_t m = std::strlen(ligne);
                m_comptesRendu.dire(ligne + m, taille - m);
             }
+            direAutres(ligne, taille);
          }
          m_comptes.remiseAZero();
          m_comptesRendu.remiseAZero();
+         for (int i = 0; i < m_nAutres; i++)
+            m_autres[i].comptes.remiseAZero();
          m_arret = 0;
       }
       m_derniere.store(t.QuadPart);
@@ -327,13 +352,92 @@ private:
                m_renduCherche = t.QuadPart;
                m_rendu = ouvrirFilNomme(m_nomRendu);
             }
+            if (m_tous && m_autres)
+               ouvrirAutres();
          }
          m_parArret.second++;
-         releve(derniere, m_fil, false);
+         releve(derniere, m_fil, m_comptes);
          if (m_rendu)
-            releve(derniere, m_rendu, true);
+            releve(derniere, m_rendu, m_comptesRendu);
+         for (int i = 0; i < m_nAutres; i++)
+            releve(derniere, m_autres[i].h, m_autres[i].comptes);
       }
       timeEndPeriodSur();
+   }
+
+   struct AutreFil
+   {
+      HANDLE h;
+      char nom[48];
+      Comptes comptes; // sous m_verrou
+   };
+   static constexpr int AUTRES = 64;
+
+   void fermerAutres()
+   {
+      const std::lock_guard<std::mutex> verrou(m_verrou);
+      for (int i = 0; i < m_nAutres; i++)
+         CloseHandle(m_autres[i].h);
+      m_nAutres = 0;
+   }
+
+   /** Tous les fils du processus sauf la veille, la boucle de jeu et le rendu, avec leur nom ; refait à chaque arrêt. */
+   void ouvrirAutres()
+   {
+      fermerAutres();
+      using GetDescription = HRESULT(WINAPI*)(HANDLE, PWSTR*);
+      static const auto getDescription = reinterpret_cast<GetDescription>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
+      HANDLE instantane = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+      if (instantane == INVALID_HANDLE_VALUE)
+         return;
+      const DWORD moi = GetCurrentProcessId();
+      const DWORD fil = GetThreadId(m_fil), rendu = m_rendu ? GetThreadId(m_rendu) : 0;
+      THREADENTRY32 e { sizeof(e) };
+      const std::lock_guard<std::mutex> verrou(m_verrou);
+      for (BOOL encore = Thread32First(instantane, &e); encore && m_nAutres < AUTRES; encore = Thread32Next(instantane, &e))
+      {
+         if (e.th32OwnerProcessID != moi || e.th32ThreadID == GetCurrentThreadId() || e.th32ThreadID == fil || e.th32ThreadID == rendu)
+            continue;
+         HANDLE h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, e.th32ThreadID);
+         if (!h)
+            continue;
+         AutreFil& a = m_autres[m_nAutres++];
+         a.h = h;
+         a.comptes.remiseAZero();
+         std::snprintf(a.nom, sizeof(a.nom), "tid%lu", static_cast<unsigned long>(e.th32ThreadID));
+         PWSTR description = nullptr;
+         if (getDescription && SUCCEEDED(getDescription(h, &description)) && description && *description)
+         {
+            WideCharToMultiByte(CP_UTF8, 0, description, -1, a.nom, sizeof(a.nom), nullptr, nullptr);
+            a.nom[sizeof(a.nom) - 1] = '\0';
+         }
+         if (description)
+            LocalFree(description);
+      }
+      CloseHandle(instantane);
+   }
+
+   /** « | thread <nom> N samples: … » pour les trois fils qui ont le plus travaillé pendant l'arrêt (sous m_verrou). */
+   void direAutres(char* ligne, size_t taille)
+   {
+      bool dit[AUTRES] {};
+      for (int rang = 0; rang < 3; rang++)
+      {
+         int meilleur = -1;
+         for (int i = 0; i < m_nAutres; i++)
+            if (!dit[i] && m_autres[i].comptes.actifs() * 4 >= m_autres[i].comptes.releves() && m_autres[i].comptes.actifs() > 0
+               && (meilleur < 0 || m_autres[i].comptes.actifs() > m_autres[meilleur].comptes.actifs()))
+               meilleur = i;
+         if (meilleur < 0)
+            return;
+         dit[meilleur] = true;
+         const size_t n = std::strlen(ligne);
+         if (n + 80 >= taille)
+            return;
+         std::snprintf(ligne + n, taille - n, " | thread %s ", m_autres[meilleur].nom);
+         const size_t m = std::strlen(ligne);
+         m_autres[meilleur].comptes.dire(ligne + m, taille - m);
+      }
    }
 
    /** Le fil de ce processus qui porte ce nom (SetThreadDescription), ouvert pour être relevé ; nullptr sinon. */
@@ -368,7 +472,7 @@ private:
       return trouve;
    }
 
-   void releve(int64_t arret, HANDLE cible, bool rendu)
+   void releve(int64_t arret, HANDLE cible, Comptes& comptes)
    {
       // --- Fil suivi suspendu : rien qui prenne un verrou. ---
       if (SuspendThread(cible) == static_cast<DWORD>(-1))
@@ -419,9 +523,11 @@ private:
       {
          m_comptes.remiseAZero();
          m_comptesRendu.remiseAZero();
+         for (int i = 0; i < m_nAutres; i++)
+            m_autres[i].comptes.remiseAZero();
          m_arret = arret;
       }
-      (rendu ? m_comptesRendu : m_comptes).ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0);
+      comptes.ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0);
    }
 
    /** Le module dont la partie exécutable contient `adresse` ; la liste est relue une fois par arrêt au plus. */
@@ -494,6 +600,9 @@ private:
    const wchar_t* m_nomRendu = nullptr;
    int64_t m_renduCherche = 0; // fil de veille seul : dernière recherche du fil du rendu
    Comptes m_comptesRendu; // sous m_verrou
+   bool m_tous = false;
+   std::unique_ptr<AutreFil[]> m_autres; // poignées : fil de veille (et arreter) ; comptes : sous m_verrou
+   int m_nAutres = 0;
    HMODULE m_winmm = nullptr;
    int64_t m_frequence = 1;
    std::atomic<int64_t> m_derniere { 0 };
