@@ -75,6 +75,8 @@ export interface RankingsMenuHost {
   network(table: TableEntry, scope: NetScope, period: ScorePeriod): RankingView;
   /** Le classement des joueurs ; absent : la porte « Joueurs » est grisée. */
   players?: PlayersSource;
+  /** Les tables du jour (daily-tables-menu.ts) : la troisième porte ; absente sans réseau des bornes. */
+  daily?: { detail(): string; open(back: () => void): void };
   /** Touches MagnaSave relevées (la gauche d'abord) : la portée suivante, ou la précédente. */
   zoneKeys(): readonly string[];
   /** Touches des boutons de la borne : flippers (précédent, suivant) et Start. */
@@ -617,13 +619,14 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       actions: [
         { label: t('Joueurs'), detail: playersDetail(), icon: 'gauge', ...(players ? { tone: 'quiet' as const } : {}), run: openPlayers },
         { label: t('Tables'), detail: t('Le tableau des scores de chaque table : recherche, dernières jouées'), icon: 'trophy', run: openTables },
+        ...(host.daily ? [{ label: t('Tables du jour'), detail: host.daily.detail(), icon: 'star' as const, run: () => host.daily!.open(() => home(2)) }] : []),
         { label: t('Retour : Communauté'), icon: 'back', run: () => back() },
       ],
       back: () => back(),
     };
   }
 
-  /** L'accueil des classements, le curseur sur la porte d'où l'on revient (0 : Joueurs, 1 : Tables). */
+  /** L'accueil des classements, le curseur sur la porte d'où l'on revient (0 : Joueurs, 1 : Tables, 2 : Tables du jour). */
   function home(at: number): void {
     host.library.openCustom(buildHome, at);
   }

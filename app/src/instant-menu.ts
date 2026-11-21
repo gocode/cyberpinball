@@ -12,6 +12,7 @@
 import { createHash } from 'node:crypto';
 import {
   avatarView,
+  boardKey,
   INSTANT_MAX_PLAYERS,
   INSTANT_MIN_PLAYERS,
   INSTANT_OPEN_MS,
@@ -62,6 +63,11 @@ export interface InstantMenu {
   open(back: () => void): void;
   /** Entrée « Partie instantanée » de la fiche d'une table : le nombre de joueurs, puis la partie ouverte. */
   sheetAction(table: TableEntry, back: () => void): Action;
+  /**
+   * Fiche d'une table : une partie ouverte par un autre sur cette version exacte (boardKey), à
+   * rejoindre ; elle passe avant « Jouer ». Undefined : aucune.
+   */
+  joinOn(board: string, back: () => void): Action | undefined;
   /** Parties ouvertes par d'autres en ce moment. */
   count(): number;
   /** Pour « Joueurs » au téléphone : les parties ouvertes, en ouvrir une, la mienne (instant-menu.ts reste la source). */
@@ -399,6 +405,12 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       if (problem) return { ...base, detail: problem, tone: 'quiet', run: () => undefined };
       if (table.emulator !== 'vpx') return { ...base, detail: t('Parties en direct : tables VPX seulement'), tone: 'quiet', run: () => undefined };
       return { ...base, detail: t('Ouverte à tous : elle part dès qu’elle est complète'), run: () => ((back = from), openChooseCount(table, from)) };
+    },
+    joinOn(board, from) {
+      if (unavailable() || myInstant()) return undefined;
+      const g = games.instantGames().find((x) => x.key !== myKey() && boardKey(x.table) === board && instantFree(x) > 0);
+      if (!g) return undefined;
+      return { label: t('Rejoindre la partie de {name}', { name: g.name }), detail: t('{n} sur {max} joueurs · départ dès qu’elle est complète', { n: g.seats.length, max: g.max }), icon: 'friends', tone: 'ok', attention: true, run: () => ((back = from), joinGame(g)) };
     },
     count: () => (unavailable() ? 0 : games.instantGames().filter((g) => g.key !== myKey()).length),
   };

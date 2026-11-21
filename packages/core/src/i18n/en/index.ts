@@ -67,8 +67,9 @@ import { messages as localplay } from './localplay';
 import { messages as follow } from './follow';
 import { messages as systemmenu } from './systemmenu';
 import { messages as teamthreads } from './teamthreads';
+import { messages as dailytables } from './dailytables';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, hardwaredmd, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, hardwaredmd, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads, dailytables };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

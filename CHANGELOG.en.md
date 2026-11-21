@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Tables of the day (Community › Leaderboards): the most played tables today worldwide, in your country or among friends, the record of the day with its author's avatar and level, your place and your gap to the player just ahead of you; Start launches the table. Few games today: the week shows instead, never an empty board. A version other than yours stays visible, greyed, with "Get this version" from a friend who has it.
+- Your games of the day and of the week, per exact table version, travel with your signed public card (capped; "?" when they are implausible).
+- Table page: "On this table" shows the goal (the player just above you), the record of the day, the friend playing it right now and your friends this week; a table nobody has played online says your next score will be the first. Your record and your group move to the statistics; the files stay in "Manage the table…".
+- Table page: an instant game open on your version comes before "Play", which states the goal; "Play together…" groups "Play with a friend" and "Instant game" ("Challenge a player" comes later).
+- Launching a table: the "Goal" card on Cyber Pinball's loading screen and in the desktop panel, never over a loading video or image you chose, and with no added sound.
 - ROM tables: the first game no longer stops on the "FACTORY SETTINGS RESTORED" screen, where coins made a sound without giving credits and you had to quit and relaunch. Without a memory, a ROM starts like a machine with a dead battery and waits for the coin door button. Cyber Pinball now does this first start-up itself, with no screen and no sound: in the background as soon as a ROM table has no memory yet (a table just installed), and while the game loads if it is still missing. A memory already there is never replaced.
 - Loading: when this start-up happens before a game, the loading screen says so right away; Exit stops it as it stops the loading.
 - ROM volume: since the memory exists from the first game, the recommended volume is set from that game on, instead of the next one.

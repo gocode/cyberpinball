@@ -44,6 +44,7 @@ import {
   rarityLabel,
   levelOf,
   weekKey,
+  tableKey,
   weekXp,
   tierLabel,
   type AvatarView,
@@ -405,6 +406,10 @@ import { createCommunityMenu } from './community-menu';
 import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
 import { createRankingsMenu, type RemoteAllTables } from './rankings-menu';
+import { createDailyTables } from './daily-tables';
+import { createDailyTablesMenu } from './daily-tables-menu';
+import { createTableSocial } from './table-social';
+import { loadingObjective, type LoadingObjectiveView } from './loading-objective';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
 import { createMdnsResponder } from './mdns-responder';
@@ -1261,6 +1266,8 @@ const library = createLibrary({
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
   localPlay: () => localPlay(),
   ...(socialNetMode(process.env) === 'off' ? {} : { instantGame: (table: TableEntry, back: () => void) => instantMenu.sheetAction(table, back) }),
+  // La fiche côté joueurs (table-social.ts) : « Sur cette table », l'objectif, « Jouer ensemble… » ; fermée en invité et en jeu local.
+  ...(socialNetMode(process.env) === 'off' ? {} : { tableSocial: (table: TableEntry, back: () => void) => (socialClosed() ? undefined : tableSocial.sheet(table, back)) }),
   scores: (table, period) => tableScores.board(table, period),
   rankings: (table, scope, period) => tableRankings.view(table, scope, period),
   hideScore: (id) => socialNet.hideScore(id),
@@ -2799,7 +2806,7 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
     case 'community': {
       if (localPlay()) return { gone: local };
       if (!socialNet.state().enabled) return { gone: t('Indisponible : partage désactivé (Partage et réseau)') };
-      const open = { home: () => communityMenu.openHome(back), instant: () => instantMenu.open(back), groups: () => groupsMenu.open(back) }[target.door];
+      const open = { home: () => communityMenu.openHome(back), instant: () => instantMenu.open(back), groups: () => groupsMenu.open(back), daily: () => dailyTablesMenu.open(back) }[target.door];
       return { run: open };
     }
     case 'level':
@@ -2978,6 +2985,26 @@ const levelTracker = createLevelTracker({
   changed: () => socialChanged(),
   log: (line) => console.log(line),
 });
+// Tables du jour (daily-tables.ts, engagement du 21/11/2026) : mes parties par version de table, jointes
+// à ma carte publique ; les tables du jour, le record du jour et l'objectif d'une table (écran des
+// Classements, fiche, chargement ; l'Arène s'en sert aussi).
+const dailyTables = createDailyTables({
+  dataDir: loc.dataDir,
+  net: socialNet,
+  myXp: () => levelTracker.state().xp,
+  tables: () => tables,
+  versionOf: (table) => tableRankings.version(table),
+  myBest: (table) => myTableBest(table),
+  log: (line) => console.log(line),
+});
+dailyTables.start();
+
+/** Mon record sur une table : le meilleur relevé par le niveau, ou une partie de cette borne au tableau des scores. */
+function myTableBest(table: TableEntry): number | undefined {
+  const best = levelTracker.state().bests[tableKey(presenceTable(table))] ?? 0;
+  const played = tableScores.board(table, 'all').lines.find((l) => l.at)?.score ?? 0;
+  return Math.max(best, played) || undefined;
+}
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
 let cabinetVolume: CabinetVolume | undefined;
 // Fiche > « DMD sur la roue » : le DMD du menu affiché ou masqué pour chaque table, et sa place (menu-dmd.ts).
@@ -3224,9 +3251,34 @@ socialNet.onRoomLines((lines) => {
   const news = roomsMenu.newsOf(lines);
   if (news.length) menuNotices.push(news.map((l) => ({ kind: 'room-line' as const, key: `${l.room}|${l.id}`, at: Date.now(), who: l.name, player: l.key, subject: roomsMenu.roomName(l.room), extra: s.filter ? maskWords(l.text) : l.text })));
 });
+// Classements > Tables du jour (daily-tables-menu.ts) : les plus jouées, le record du jour, ma place ; Start lance la table.
+const dailyTablesMenu = createDailyTablesMenu({
+  library,
+  service: dailyTables,
+  tables: () => tables,
+  play: (table) => {
+    if (library.isActive()) library.leave();
+    void play(table);
+  },
+  versionHolders: (board) => friendsMenu.versionHolders(board),
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  openSharing: (back) => library.runSystemItem('sharing', back),
+});
+// La fiche d'une table côté joueurs (table-social.ts) : « Sur cette table », l'objectif, « Jouer ensemble… ».
+const tableSocial = createTableSocial({
+  library,
+  service: dailyTables,
+  net: socialNet,
+  myBest: (table) => myTableBest(table),
+  groupsOf: (table) => groupsMenu.weekOf(table),
+  playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
+  instantGame: (table, back) => instantMenu.sheetAction(table, back),
+  joinInstant: (board, back) => instantMenu.joinOn(board, back),
+});
 // Classements de toutes mes tables (rankings-menu.ts) : la porte « Classements » de l'accueil Communauté.
 const rankingsMenu = createRankingsMenu({
   library,
+  daily: { detail: () => dailyTablesMenu.detail(), open: (back) => dailyTablesMenu.open(back) },
   tables: () => tables,
   local: (table, period) => tableScores.board(table, period),
   network: (table, scope, period) => tableRankings.view(table, scope, period),
@@ -5784,6 +5836,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
+    // Tables du jour : une partie d'au moins une minute, sur sa version exacte ; ni en invité, ni avec le VPX d'essai.
+    if (!autoStopAfterMs && !guest.active && result.seconds >= 60 && !vpxInstall(loc)?.trial) void notePlayedVersion(table);
     // Le niveau (level-tracker.ts) : la partie, ses scores s'ils sont relevés, ses records, son mode.
     const levelFacts = { table: presenceTable(table), seconds: result.seconds, entered: double ? [] : entered.map((e) => e.rank), newTable: (table.info.User?.StartCount ?? 0) === 0, at: new Date(), ...(vrGame !== undefined ? { mode: 'vr' as const } : vision3dMenu.setting().mode === 'on' ? { mode: 'vision3d' as const } : {}) };
     const levelAfterGame = (scores?: number[]) => {
@@ -5871,6 +5925,34 @@ async function publishScores(table: TableEntry, kept: readonly PlayedScore[], mu
   for (const p of solo) {
     const sent = socialNet.publishScore({ board, ...(balls ? { balls } : {}), table: presenceTable(table), score: p.score, at: p.at, how: p.how });
     if (sent) console.log(`Classements (${table.id}) : ${p.score} publié (${balls ? `${balls} billes` : 'billes inconnues'}).`); // i18n-ignore : journal
+  }
+}
+
+/** La carte « Objectif » du chargement, calculée une fois par lancement (une version encore en calcul se relit). */
+let objectiveKept: { file: string; since: number; view?: LoadingObjectiveView } | undefined;
+function loadingObjectiveFor(table: TableEntry | undefined): LoadingObjectiveView | undefined {
+  if (!table || table.emulator !== 'vpx' || socialClosed() || socialNetMode(process.env) === 'off') return undefined;
+  if (objectiveKept?.file === table.file && Date.now() - objectiveKept.since < 60_000) return objectiveKept.view;
+  try {
+    const goal = dailyTables.goalOf(table);
+    const view = loadingObjective(goal, { face: (h) => dailyTables.face(h), best: myTableBest(table), country: socialNet.country() });
+    if (goal.state !== 'pending') objectiveKept = { file: table.file, since: Date.now(), ...(view ? { view } : {}) };
+    return view;
+  } catch (error) {
+    console.log(`Chargement (${table.id}) : objectif non calculé (${(error as Error).message}).`); // i18n-ignore : journal
+    return undefined;
+  }
+}
+
+/** Tables du jour (daily-tables.ts) : la partie comptée sur la version exacte de la table et son nombre de billes. */
+async function notePlayedVersion(table: TableEntry): Promise<void> {
+  try {
+    const board = boardKey(await liveGames.versionOf(table));
+    if (!board) return;
+    const balls = (await ballCounts.of(table))?.balls;
+    dailyTables.gamePlayed(table, { board, ...(balls ? { balls } : {}) });
+  } catch (error) {
+    console.log(`Tables du jour (${table.id}) : partie non comptée (${(error as Error).message}).`); // i18n-ignore : journal
   }
 }
 
@@ -6656,6 +6738,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && m && table ? m.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
+    // La carte « Objectif » (loading-objective.ts) : le rendu ne la pose que sur l'écran de repli ou dans l'encart du bureau, jamais sur un média du joueur.
+    objective: state.phase === 'loading' && role === 'playfield' && !displayMode ? loadingObjectiveFor(playing ?? table) : undefined,
     // Partie dans le casque, casque pas sur la tête : la consigne sur le playfield et le fronton, du Start à la fin.
     vrWear: vrFront.vrWearHint && (role === 'playfield' || role === 'backglass') && (state.phase === 'loading' || state.phase === 'playing') ? vrFront.vrWearHint : undefined,
     // Chargement qui tarde (loadingprogress.ts) : l'étape vue, l'heure du Start (le rendu compte les secondes), comment arrêter.

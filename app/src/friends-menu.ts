@@ -12,6 +12,7 @@
 
 import {
   avatarView,
+  boardKey,
   countryCodes,
   countryName,
   flagView,
@@ -129,6 +130,11 @@ export interface FriendsMenu {
   openDeleteAccount(back: () => void): void;
   /** Historique des parties : le détail d'une partie, s'il la garde (son « Retour » vers `back`). */
   history: { has(id: string): boolean; openGame(id: string, back: () => void): void };
+  /**
+   * Tables du jour : les amis dont la bibliothèque partagée a cette version exacte (boardKey), et de
+   * quoi la récupérer chez chacun (sa table cochée d'office, comme « Récupérer sa version chez … »).
+   */
+  versionHolders(board: string): { key: string; name: string; fetch(back: () => void): void }[];
   items: {
     friends: ProvidedSystemItem;
     'game-history': ProvidedSystemItem;
@@ -913,6 +919,16 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     openFind: () => openFind(),
     openDeleteAccount: (back) => openDeleteAccount(back),
     history: { has: (id) => host.games.history().some((g) => g.id === id), openGame: (id, back) => historyMenu.openGame(id, back) },
+    versionHolders(board) {
+      const out: { key: string; name: string; fetch(back: () => void): void }[] = [];
+      for (const f of net.state().friends) {
+        const view = libraryMenu.liveView(f.key);
+        if (view.library !== 'ready') continue;
+        const found = view.tables.find((x) => boardKey(x) === board);
+        if (found) out.push({ key: f.key, name: f.name, fetch: (back) => libraryMenu.openMatching(f.key, found.table, back, ['table']) });
+      }
+      return out;
+    },
     items: {
       friends: {
         get detail() {

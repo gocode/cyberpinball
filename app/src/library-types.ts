@@ -8,6 +8,7 @@ import { type ScoreboardView } from './scoreboard-menu';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import type { RomVolumeView } from './rom-volume';
+import type { SheetSocial } from './table-social';
 import { BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   type SystemGroupId,
@@ -106,6 +107,12 @@ export interface LibraryHost {
   playWithFriend?(table: TableEntry, back: () => void): Action;
   /** « Partie instantanée » (instant-menu.ts) : ouverte à tous ; grisée avec sa raison (partage coupé, Pinball FX). */
   instantGame?(table: TableEntry, back: () => void): Action;
+  /**
+   * La fiche côté joueurs (table-social.ts) : « Sur cette table » à la place des fichiers, mon record
+   * et mon groupe dans les statistiques, une partie ouverte avant « Jouer », « Jouer ensemble… ».
+   * Undefined (jeu en local, communauté fermée) : la fiche d'avant, avec ses fichiers.
+   */
+  tableSocial?(table: TableEntry, back: () => void): SheetSocial | undefined;
   /** « Tableau des scores » (table-scores.ts) : le tableau d'une période. */
   scores?(table: TableEntry, period: ScorePeriod): TableBoard;
   /** Classements en réseau d'une table (table-rankings.ts) : amis, pays, monde. */

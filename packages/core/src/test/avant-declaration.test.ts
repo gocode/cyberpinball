@@ -64,6 +64,8 @@ const REVIEWED = new Set([
   'socialNet',
   'stopNotice',
   'tableRankings',
+  // Fiche d'une table côté joueurs (table-social.ts) : lue par la fiche, à son ouverture ; jamais pendant l'initialisation.
+  'tableSocial',
   // Réalité virtuelle (vr-frontend.ts) : le réseau du casque, lu par le relevé de santé de la borne (minuterie
   // après le démarrage, ou écran ouvert) ; jamais pendant l'initialisation.
   'vrFront',

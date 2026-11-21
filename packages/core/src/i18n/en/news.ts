@@ -161,11 +161,13 @@ export const messages: Record<string, string> = {
   'La dernière page donne toujours les commandes de la partie, avec les boutons de votre borne.': 'The last page always gives the game controls, with your cabinet’s buttons.',
   'Fiche d’une table › Prospectus et règles': 'Table page › Flyer and rules',
 
-  'Vos tables d’une autre installation': 'Your tables from another installation',
-  'Chaque table arrive avec tout son dossier : PuP-Pack, ROM, sauvegarde, sons et médias.': 'Each table comes with its whole folder: PuP-Pack, ROM, save, sounds and media.',
-  'Vous venez d’un autre front-end ? Cyber Pinball montre d’abord les tables que vous jouiez vraiment, avec leurs listes, et reprend chacune avec tout ce qui l’accompagne, rangé au bon endroit.':
-    'Coming from another front-end? Cyber Pinball first shows the tables you actually played, with their lists, and takes each one with everything that goes with it, put in the right place.',
-  'Les copies et anciennes versions restent à part ; rien n’est déplacé sans votre accord.': 'Copies and old versions stay apart; nothing is moved without your agreement.',
+  'Les tables du jour': 'Tables of the day',
+  'Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.': 'The most played tables today, the record of the day and the player just ahead of you.',
+  'Dans le monde, votre pays ou entre amis : chaque table montre son record du jour, votre place et ce qu’il vous manque. Start lance la table.':
+    'Worldwide, in your country or among friends: each table shows its record of the day, your place and what you are missing. Start launches the table.',
+  'La fiche d’une table dit qui battre, qui y joue en ce moment, et regroupe les parties à plusieurs dans « Jouer ensemble… ». Sans vidéo de chargement, l’objectif s’affiche aussi au lancement.':
+    'A table’s page says who to beat and who is playing it right now, and groups multiplayer games under “Play together…”. Without a loading video, the goal also shows at launch.',
+  'Communauté › Classements › Tables du jour': 'Community › Leaderboards › Tables of the day',
   'Menu système › Tables › Ajouter une table › Depuis une autre installation': 'System menu › Tables › Add a table › From another installation',
 
 

@@ -2820,6 +2820,95 @@ html.loading-video #media-bg::after {
 }
 
 /*
+ * Carte « Objectif » du chargement (loading-objective.ts) : le joueur à battre. En borne, sous la
+ * barre d'attente du repli, centrée ; au bureau, dans l'encart, entre l'état et les commandes.
+ * Jamais sur un média de chargement du joueur (frontend.js, loadingScreen). Panneau cerclé de
+ * sarcelle, intertitre en vert signal espacé, score en vert ; textes à 20 au moins.
+ */
+.loading-objective {
+  box-sizing: border-box;
+  width: min(100%, calc(820 * var(--u)));
+  margin: calc(56 * var(--u)) auto 0;
+  padding: calc(32 * var(--u)) calc(40 * var(--u));
+  border: 1.5px solid color-mix(in oklab, var(--table-tint) 60%, transparent);
+  border-radius: calc(20 * var(--u));
+  background: color-mix(in oklab, var(--surface-sunken) 82%, transparent);
+  box-shadow: 0 0 calc(28 * var(--u)) color-mix(in oklab, var(--table-tint) 18%, transparent);
+  color: var(--ink);
+  text-align: left;
+}
+
+.loading-card .loading-objective {
+  width: 100%;
+  margin: calc(var(--after-bar) * var(--u)) 0 0;
+  padding: calc(24 * var(--u)) calc(28 * var(--u));
+}
+
+.loading-objective-label {
+  font-size: calc(22 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: var(--signal);
+}
+
+.loading-objective-line {
+  display: flex;
+  align-items: center;
+  gap: calc(20 * var(--u));
+  margin-top: calc(16 * var(--u));
+}
+
+.loading-objective-avatar {
+  flex: none;
+  width: calc(88 * var(--u));
+  height: calc(88 * var(--u));
+  font-size: calc(32 * var(--u));
+}
+
+.loading-card .loading-objective-avatar {
+  width: calc(64 * var(--u));
+  height: calc(64 * var(--u));
+  font-size: calc(24 * var(--u));
+}
+
+.loading-objective-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(44 * var(--u));
+  font-weight: 600;
+}
+
+.loading-objective-score {
+  flex: none;
+  font-size: calc(48 * var(--u));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--signal);
+}
+
+.loading-card .loading-objective-name {
+  font-size: calc(32 * var(--u));
+}
+
+.loading-card .loading-objective-score {
+  font-size: calc(34 * var(--u));
+}
+
+.loading-objective-detail {
+  margin-top: calc(10 * var(--u));
+  font-size: calc(28 * var(--u));
+  line-height: 1.3;
+  color: var(--ink-muted);
+}
+
+.loading-card .loading-objective-detail {
+  font-size: calc(22 * var(--u));
+}
+
+/*
  * Encart du bureau, à droite du cadre : mêmes cotes que lui (haut 92, hauteur 944, bord de
  * l'écran à 80, pour un petit côté de 1080), le même chant (ombres de #media-bg) ; entre les
  * deux, l'écart qui sépare le cadre du bord de l'écran (60 de chant à chant). Dans le flux,

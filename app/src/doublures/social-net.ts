@@ -33,6 +33,7 @@ export function fakeSocialNet(over?: Partial<SocialNet>): SocialNet {
       publish: noop,
       checkBadges: () => ({ events: [], fresh: [], silent: true }),
       setLevel: noop,
+      setPlays: noop,
       likesGiven: () => 0,
       invitations: () => ({ v: 1, received: [] }),
       declareInviter: noop,

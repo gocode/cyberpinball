@@ -211,6 +211,7 @@ export * from './reactions';
 export * from './publicprofile';
 export * from './invitations';
 export * from './playerranking';
+export * from './dailytables';
 export * from './livepresence';
 export * from './rooms';
 export * from './typing';

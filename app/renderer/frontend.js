@@ -881,18 +881,19 @@ function dropLoadingFallback() {
  * reçoit l'aide-mémoire du réglage de l'affichage en borne. Sans fallback.js, rien : le fond
  * du playfield reste sombre.
  */
-function loadingStandIn(s, className, slot) {
+function loadingStandIn(s, className, slot, objective) {
   const kit = window.CyberFallback;
   if (typeof kit?.loading !== 'function') {
     dropLoadingFallback();
     return undefined;
   }
-  const key = JSON.stringify([className, s.table.title, s.table.manufacturer, s.table.year, slot ? s.loadingKeys : null]);
+  const key = JSON.stringify([className, s.table.title, s.table.manufacturer, s.table.year, slot ? s.loadingKeys : null, objective ? s.objective : null]);
   if (loadingFallback?.key !== key) {
     dropLoadingFallback();
     const box = el('section', `loading-fallback ${className}`);
     const handle = kit.loading(box, { title: s.table.title, manufacturer: s.table.manufacturer, year: s.table.year }, { label: false });
     if (slot) handle.slot?.append(slot);
+    if (objective) handle.slot?.append(objective);
     loadingFallback = { key, box, handle };
   }
   return loadingFallback.box;
@@ -918,7 +919,27 @@ function loadingCard(s) {
   // Chargement qui tarde : l'étape vue à la place de « Chargement de la table… », et sous la barre le temps écoulé et l'arrêt.
   state.append(el('span', s.slow ? 'loading-slow-step' : '', s.slow ? s.slow.step : t('Chargement de la table…')), bar);
   if (s.slow) state.append(slowMeta(s.slow));
-  card.append(head, state, keysGrid(s.loadingKeys.title, s.loadingKeys.rows));
+  card.append(head, state);
+  // La carte « Objectif » dans l'encart : à droite du cadre du média, jamais dessus.
+  if (s.objective) card.append(objectiveCard(s.objective));
+  card.append(keysGrid(s.loadingKeys.title, s.loadingKeys.rows));
+  return card;
+}
+
+/**
+ * Carte « Objectif » du chargement (app/src/loading-objective.ts) : le joueur à battre, son score,
+ * mon record et l'écart. Seulement sur ce que Cyber Pinball dessine lui-même (l'écran de repli en
+ * borne, l'encart au bureau) : jamais sur un média de chargement choisi par le joueur, et sans son.
+ */
+function objectiveCard(o) {
+  const card = el('section', 'loading-objective');
+  card.append(el('div', 'loading-objective-label', o.label));
+  const line = el('div', 'loading-objective-line');
+  if (o.avatar && typeof avatarNode === 'function') line.append(avatarNode(o.avatar, 'loading-objective-avatar'));
+  line.append(el('span', 'loading-objective-name', o.name));
+  if (o.score) line.append(el('span', 'loading-objective-score', o.score));
+  card.append(line);
+  for (const text of o.lines ?? []) card.append(el('div', 'loading-objective-detail', text));
   return card;
 }
 
@@ -1013,7 +1034,8 @@ function loadingScreen(s) {
   // Réglage de l'affichage : les boutons du menu de VPX restent lisibles, sur le média.
   const reminder = s.loadingKeys.display ? keysGrid(s.loadingKeys.title, s.loadingKeys.rows) : undefined;
   reminder?.classList.add('display-reminder');
-  const standIn = s.loading?.url ? dropLoadingFallback() : loadingStandIn(s, 'full', reminder);
+  // Média de chargement du joueur : rien par-dessus, pas même l'objectif (règle du 21/11/2026) ; sur le repli, sous la barre d'attente.
+  const standIn = s.loading?.url ? dropLoadingFallback() : loadingStandIn(s, 'full', reminder, s.objective ? objectiveCard(s.objective) : undefined);
   // En borne, rien d'autre sur le média, même quand la table tarde : ni commandes, ni cartouche
   // (demande du mainteneur, 06/11/2026). Exit et Ctrl+Maj+K arrêtent quand même le lancement.
   if (standIn) return [standIn];

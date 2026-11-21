@@ -75,10 +75,14 @@ export interface RankingView {
   note?: string;
 }
 
-type Version = { state: 'pending' } | { state: 'none' } | { state: 'ok'; board: string; balls?: number };
+/** La version exacte d'une de mes tables (boardKey) et ses billes : en calcul, illisible, ou connue. */
+export type TableVersion = { state: 'pending' } | { state: 'none' } | { state: 'ok'; board: string; balls?: number };
+type Version = TableVersion;
 
 export interface TableRankings {
   view(table: TableEntry, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod): RankingView;
+  /** Sa version exacte : calculée une fois, en arrière-plan (l'écran se redessine à son arrivée). */
+  version(table: TableEntry): TableVersion;
 }
 
 /**
@@ -147,6 +151,7 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
   }
 
   return {
+    version: versionOf,
     view(table, scope, period) {
       const state = opts.net.state();
       if (!state.enabled) return { lines: [], players: 0, unavailable: t('Partage désactivé : Communauté > Partage et réseau') };

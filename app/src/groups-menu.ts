@@ -108,6 +108,8 @@ export interface GroupsMenu {
    * groupe » à la borne (le nom s'y tape, au clavier du téléphone), son « Retour » vers `back`.
    */
   remoteAct(act: RemoteGroupAct, g: string | undefined, key: string | undefined, back: () => void): void;
+  /** Fiche d'une table : mes groupes dont elle est la table de la semaine, et jusqu'à quand. */
+  weekOf(table: TableEntry): { name: string; until: string }[];
 }
 
 /** Messages du fil montrés au plus (les plus anciens restent sur la borne). */
@@ -1079,6 +1081,13 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
   }
 
   return {
+    weekOf: (table) =>
+      blocked()
+        ? []
+        : groups
+            .groups()
+            .filter(({ view }) => view.week && Date.parse(view.week.until) > now().getTime() && localTable(view.week.table) === table)
+            .map(({ view }) => ({ name: view.name, until: untilText(view.week!.until) })),
     door,
     open,
     openGroup,

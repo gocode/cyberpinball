@@ -2676,10 +2676,14 @@ export function createLibrary(host: LibraryHost) {
     }
     // Ce qui demande un œil (fichiers à vérifier, option du PuP-Pack) se voit dès la fiche.
     const watch = manage.filter((a) => a.tone === 'warning').map((a) => a.label);
+    // Côté joueurs (table-social.ts) : « Sur cette table » à la place des fichiers, qui restent dans « Gérer la table… ».
+    const social = host.tableSocial && !localPlay() ? kept('joueurs', () => host.tableSocial!(table, () => openSheet(table))) : undefined;
     const actions: SheetAction[] = [
       ...missing,
+      ...(social?.first.map((a): SheetAction => ({ ...a, door: 'sheet.instant' })) ?? []),
       {
         label: t('Jouer'),
+        ...(social?.playDetail ? { detail: social.playDetail } : {}),
         icon: 'play',
         door: 'sheet.play',
         run: () => {
@@ -2689,8 +2693,13 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
-      ...(host.playWithFriend && !localPlay() ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
-      ...(host.instantGame && !localPlay() ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
+      // « Jouer ensemble… » regroupe ami et partie instantanée (table-social.ts) ; sans lui, les deux entrées d'avant.
+      ...(social
+        ? [notFx({ ...social.together, door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))]
+        : [
+            ...(host.playWithFriend && !localPlay() ? [notFx({ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))] : []),
+            ...(host.instantGame && !localPlay() ? [notFx({ ...host.instantGame(table, () => openSheet(table)), door: 'sheet.instant' as const }, t('Parties en direct : tables VPX seulement'))] : []),
+          ]),
       ...(host.scores ? [notFx(scoresAction(table), t('{game} ne donne pas ses scores', { game: zenName }), t('Scores de {game} : pas encore lus par Cyber Pinball', { game: zenName }))] : []),
       pagesAction(table),
       { label: t('Crédits'), detail: kept('credits', () => credits.summary(table)), icon: 'credits', door: 'sheet.credits', run: () => credits.open(table) },
@@ -2715,7 +2724,9 @@ export function createLibrary(host: LibraryHost) {
       favorite: isFavorite(table.info),
       subheading: [table.manufacturer, table.year].filter(Boolean).join(' · ') || undefined,
       lead: s.flash ?? table.version,
-      sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: fx ? fxFiles : files }])],
+      sections: social
+        ? [social.section, { title: t('Statistiques'), rows: [...social.stats, ...stats] }]
+        : [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: fx ? fxFiles : files }])],
       actions,
       back: exit,
     };

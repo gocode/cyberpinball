@@ -26,7 +26,7 @@ export const NEWS_FILE = 'nouveautes.json';
 /** Où « Essayer » mène : une entrée du menu système, une porte de la Communauté, « Mon niveau », le Juke-box, une partie de la fiche de la table choisie. */
 export type NewsReach =
   | { kind: 'system'; id: SystemEntryId }
-  | { kind: 'community'; door: 'home' | 'instant' | 'groups' }
+  | { kind: 'community'; door: 'home' | 'instant' | 'groups' | 'daily' }
   | { kind: 'level' }
   | { kind: 'jukebox' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' };
@@ -53,6 +53,23 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    // Tables du jour et objectif à battre (engagement, 21/11/2026) ; « Vos tables d'une autre
+    // installation » (0.1.7) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'tables-du-jour',
+    date: '2026-11-21',
+    version: '0.2.3',
+    get title() { return t('Les tables du jour'); },
+    get detail() { return t('Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.'); },
+    get more() {
+      return [
+        t('Dans le monde, votre pays ou entre amis : chaque table montre son record du jour, votre place et ce qu’il vous manque. Start lance la table.'),
+        t('La fiche d’une table dit qui battre, qui y joue en ce moment, et regroupe les parties à plusieurs dans « Jouer ensemble… ». Sans vidéo de chargement, l’objectif s’affiche aussi au lancement.'),
+      ];
+    },
+    get where() { return t('Communauté › Classements › Tables du jour'); },
+    reach: { kind: 'community', door: 'daily' },
+  },
   {
     // Dialogue avec l'équipe sur un rapport (21/11/2026) ; « Sauvegardes » (0.1.7) sort de la liste
     // pour la garder à 24. Date à poser au jour de la version finale (publier.mjs le rappelle).
@@ -428,21 +445,6 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Fiche d’une table › Prospectus et règles'); },
     reach: { kind: 'sheet', part: 'rules' },
     preview: true,
-  },
-  {
-    id: 'autre-installation',
-    date: '2026-11-06',
-    version: '0.1.7',
-    get title() { return t('Vos tables d’une autre installation'); },
-    get detail() { return t('Chaque table arrive avec tout son dossier : PuP-Pack, ROM, sauvegarde, sons et médias.'); },
-    get more() {
-      return [
-        t('Vous venez d’un autre front-end ? Cyber Pinball montre d’abord les tables que vous jouiez vraiment, avec leurs listes, et reprend chacune avec tout ce qui l’accompagne, rangé au bon endroit.'),
-        t('Les copies et anciennes versions restent à part ; rien n’est déplacé sans votre accord.'),
-      ];
-    },
-    get where() { return t('Menu système › Tables › Ajouter une table › Depuis une autre installation'); },
-    reach: { kind: 'system', id: 'add-table' },
   },
 ];
 
