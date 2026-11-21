@@ -786,7 +786,12 @@ function titleArrive(v) {
   // l'écran vient de l'observateur de taille, et l'espacement final est celui de la feuille de
   // style (image clé finale implicite).
   const blur = (6 * (rootWidth || root.offsetWidth)) / 1080;
-  v.text.animate([{ opacity: 0, letterSpacing: '-0.06em', filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, filter: 'blur(0px)' }], { duration: 360, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
+  const timing = { duration: 360, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' };
+  v.text.animate([{ opacity: 0, letterSpacing: '-0.06em' }, { opacity: 1 }], timing);
+  // Le flou s'ajoute à la lueur verte du titre (filter de frontend.css, .menu-band .menu-title .title) au
+  // lieu de la remplacer : animé seul, il l'éteignait pendant l'effet, et elle revenait d'un coup à la
+  // fin, en retard sur le texte (21/11/2026). Animation à part : composite 'add' additionnerait aussi l'opacité.
+  v.text.animate([{ filter: `blur(${blur.toFixed(1)}px)`, composite: 'add' }, { filter: 'blur(0px)', composite: 'add' }], timing);
   v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
 }
 

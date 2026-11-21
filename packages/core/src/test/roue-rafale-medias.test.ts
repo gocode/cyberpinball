@@ -113,8 +113,9 @@ test('roue en rafale : le titre change sans effet, puis l’effet se joue une fo
   const title = document.querySelector('.menu .title') as unknown as { animate?: unknown; textContent: string | null };
   assert.ok(title, 'titre de la table');
   const played: string[] = [];
-  title.animate = () => {
-    played.push(title.textContent ?? '');
+  // Un effet = l'animation d'opacité (le flou, animé à part, l'accompagne : animations-legeres.test.ts).
+  title.animate = (frames: { opacity?: number }[]) => {
+    if (frames[0]?.opacity !== undefined) played.push(title.textContent ?? '');
     return { cancel() {}, finish() {} };
   };
   // La roue se pose après le premier état.

@@ -109,6 +109,26 @@ test('animations : aucun filtre animé dans la roue, en transition ni sans fin',
   assert.deepEqual(found, []);
 });
 
+// Le titre de la roue porte sa lueur verte en filter (drop-shadow) ; son effet d'arrivée animait
+// filter: blur(), qui remplaçait la lueur pendant 360 ms : elle revenait d'un coup, en retard sur le
+// texte (21/11/2026). Une animation de filtre lancée par le rendu s'ajoute au filtre de la feuille de
+// style (composite 'add'), et n'anime rien d'autre (sinon l'opacité, par exemple, s'additionnerait aussi).
+test('animations du rendu : un filtre animé s’ajoute à celui de la feuille de style, jamais ne le remplace', () => {
+  const found: string[] = [];
+  for (const name of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.js'))) {
+    const js = fs.readFileSync(path.join(RENDERER, name), 'utf8');
+    for (const m of js.matchAll(/\.animate\??\.?\(\s*\[([\s\S]*?)\]\s*,/g)) {
+      const frames = m[1]!;
+      if (!/\bfilter\s*:/.test(frames)) continue;
+      const line = js.slice(0, m.index).split('\n').length;
+      const each = frames.split(/\}\s*,\s*\{/);
+      if (!each.every((f) => /composite\s*:\s*'add'/.test(f))) found.push(`${name}:${line} : filtre animé sans composite 'add' (il remplacerait la lueur ou l'ombre de la feuille de style)`);
+      if (/\b(opacity|transform|letterSpacing)\s*:/.test(frames)) found.push(`${name}:${line} : un filtre en composite 'add' s'anime seul (l'opacité s'additionnerait aussi)`);
+    }
+  }
+  assert.deepEqual(found, []);
+});
+
 test('animations : une couleur ou une valeur héritée ne glisse jamais sur toute la page', () => {
   const all = sheets();
   const inherited = new Set<string>();
