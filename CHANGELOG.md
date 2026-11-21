@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Faire défiler vite la roue ne lance plus la vidéo de chaque table survolée sur chaque écran (plateau, fronton, DMD, topper) : les médias de la table attendent que la roue s'arrête (un cinquième de seconde) ; un appui isolé les change toujours tout de suite.
+- Le titre de la table « s'écarte en se précisant » sur un appui isolé ; pendant un défilement rapide, il change sans effet, puis l'effet se joue une fois sur la table où la roue s'arrête.
 - Échanges avec l'équipe : tant qu'une conversation est en cours (moins de deux heures depuis le dernier message), la borne relève les réponses chaque minute au lieu de toutes les 20 minutes ; la notification arrive presque tout de suite.
 - La roue de l'écran des tables est plus fluide : passer d'une table à l'autre ne fait plus recalculer toute la page pendant le fondu de la couleur de la table (sur un playfield 4K, de 40 à 60 images par seconde aux appuis isolés). Le fondu de couleur reste le même.
 - Le halo vert de la table choisie baisse pendant le glissement et souffle à l'arrêt comme avant, mais sans faire repeindre ses lueurs à chaque image : la roue garde ses 60 images par seconde à chaque arrêt.

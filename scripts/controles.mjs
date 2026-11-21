@@ -13,7 +13,7 @@
 // suites pour quatre problèmes visibles en une minute). Lancé aussi en tête de scripts/avant-fusion.mjs
 // et par scripts/fusionner.mjs. Journaux complets : tmp/controles-<étape>.txt.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,17 +23,42 @@ import { collectTests } from './verifier.mjs';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Lance une commande, sortie complète dans un fichier ; rend { code, out }. */
-export function run(cmd, args, { cwd, log, shell = false }) {
+/** Délai d'un test (node --test-timeout) : un test figé échoue au lieu de bloquer toute la suite. */
+export const TEST_TIMEOUT_MS = 5 * 60_000;
+
+/** Fichiers de test encore en cours sous un lanceur node --test (ceux qui l'empêchent de finir). */
+export function runningTestFiles(pid) {
+  const r = spawnSync('powershell', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${Number(pid)}' | ForEach-Object CommandLine`], { encoding: 'utf8', windowsHide: true });
+  return [...(r.stdout ?? '').matchAll(/(\S+\.test\.m?js)/g)].map((m) => m[1].replace(/^"|"$/g, ''));
+}
+
+/**
+ * Lance une commande, sortie complète dans un fichier ; rend { code, out, timedOut, hung }.
+ * `timeoutMs` : au-delà, l'arbre de processus est arrêté (taskkill /T) ; `hung` liste les fichiers
+ * de test qui tournaient encore. Le 21/11/2026, telecommande.test.js figé a tenu le verrou de suite
+ * plus de dix minutes : toutes les fusions de la machine attendaient derrière.
+ */
+export function run(cmd, args, { cwd, log, shell = false, timeoutMs } = {}) {
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd, windowsHide: true, shell });
     let out = '';
+    let timedOut = false;
+    let hung = [];
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          timedOut = true;
+          hung = runningTestFiles(child.pid);
+          out += `\n# délai dépassé (${Math.round(timeoutMs / 60_000)} min) : arrêt${hung.length ? ` ; encore en cours : ${hung.join(', ')}` : ''}\n`;
+          spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
+        }, timeoutMs)
+      : undefined;
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (out += d));
     child.on('error', (error) => (out += `\n${error.message}`));
     child.on('close', (code) => {
+      if (timer) clearTimeout(timer);
       if (log) fs.writeFileSync(log, out);
-      resolve({ code: code ?? 1, out });
+      resolve({ code: timedOut ? 1 : code ?? 1, out, timedOut, hung });
     });
   });
 }
@@ -50,9 +75,9 @@ export async function rerunAlone(files, { cwd, say = console.log, prefix = 'rela
   for (const file of files) {
     const name = path.basename(file);
     say(`Relance seule : ${name}…`);
-    const again = await run(process.execPath, ['--test', '--test-reporter=tap', file], { cwd, log: path.join(cwd, 'tmp', `${prefix}-${name}.txt`) });
+    const again = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, file], { cwd, log: path.join(cwd, 'tmp', `${prefix}-${name}.txt`), timeoutMs: TEST_TIMEOUT_MS + 60_000 });
     if (again.code === 0) flaky.push(name);
-    else failures.push({ file: name, details: failureDetails(again.out) });
+    else failures.push({ file: name, details: again.timedOut ? [{ name: 'figé : ne finit pas, même seul', file: name }] : failureDetails(again.out) });
   }
   if (flaky.length) {
     let reg = {};
@@ -118,9 +143,9 @@ export async function runControles({ cwd = here, tests = true, say = console.log
   if (tests && compiled) {
     const fast = collectTests(cwd).filter((t) => !t.slow);
     say(`Contrôles : ${fast.length} fichiers de tests rapides…`);
-    const { code, out } = await run(node, ['--test', '--test-reporter=tap', ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt') });
+    const { code, out, hung } = await run(node, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
     if (code !== 0) {
-      const files = failedFiles(out);
+      const files = [...new Set([...failedFiles(out), ...hung])];
       if (!files.length) {
         problems.push({ etape: 'tests rapides', lignes: ['  échec sans fichier identifiable : voir tmp/controles-tests.txt'] });
       } else {

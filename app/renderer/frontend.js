@@ -594,6 +594,8 @@ function wheelMoved(v, dir) {
   }
   v.landing = setTimeout(() => {
     v.stage.classList.remove('moving');
+    // Le titre d'une rafale reçoit son effet à l'arrêt (menuPanel, titleOnLanding).
+    v.onLanded?.();
     if (quietMotion()) return;
     // Classe reposée d'un coup : ses animations (souffle du halo, lueur) repartent de zéro.
     void v.stage.offsetWidth;
@@ -722,6 +724,8 @@ function menuPanel(s) {
   else delete document.documentElement.dataset.menuBand;
   showBackglass(s, Boolean(style));
   v.node.dataset.stableShape = style ?? 'list';
+  // La roue glissait déjà quand cet état est arrivé : appui d'une rafale (lu avant que wheelStage ne relance le glissement).
+  const inBurst = Boolean(style && wheelView?.stage.classList.contains('moving'));
   if (style) {
     const stage = wheelStage(s, style);
     if (v.nav.firstChild !== stage) v.nav.replaceChildren(stage);
@@ -731,17 +735,13 @@ function menuPanel(s) {
   const newTitle = v.text.textContent !== s.table.title && v.text.textContent !== '';
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
-  // Soie (maquette validée) : le nouveau titre s'écarte en se précisant (360 ms), fabricant · année
-  // en fondu (160 ms). Il part plus serré que sa forme finale, jamais plus large : il ne change pas
-  // de ligne, et sa zone ne bouge pas.
-  if (newTitle && v.text.animate && !quietMotion()) {
-    // Sans lecture de mise en page ni de style au milieu de l'appui (13/11/2026) : la largeur de
-    // l'écran vient de l'observateur de taille, et l'espacement final est celui de la feuille de
-    // style (image clé finale implicite).
-    const blur = (6 * (rootWidth || root.offsetWidth)) / 1080;
-    v.text.animate([{ opacity: 0, letterSpacing: '-0.06em', filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, filter: 'blur(0px)' }], { duration: 360, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
-    v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
-  }
+  // Soie (maquette validée) : le nouveau titre s'écarte en se précisant. Sur un appui isolé, tout de
+  // suite ; pendant une rafale, le texte change sans effet et l'effet se joue une fois, sur le dernier
+  // titre, quand la roue se pose (titleOnLanding), comme le souffle du halo (21/11/2026 : rejouer
+  // l'effet à chaque appui recalculait la mise en page du titre pendant tout le défilement).
+  if (newTitle && inBurst) v.titleWaiting = true;
+  else if (newTitle) titleArrive(v);
+  if (wheelView && !wheelView.onLanded) wheelView.onLanded = () => titleOnLanding();
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
   v.node.classList.toggle('community-chosen', Boolean(s.table.community || s.table.collectionsMedallion));
   // Médaillon Juke-box, Communauté ou Collections choisi au bureau : son affiche dans le cadre du fronton du menu.
@@ -775,6 +775,27 @@ function menuPanel(s) {
 }
 
 /**
+ * Effet d'arrivée du titre (maquette Soie validée) : il s'écarte en se précisant (360 ms), fabricant ·
+ * année en fondu (160 ms). Il part plus serré que sa forme finale, jamais plus large : il ne change
+ * pas de ligne, et sa zone ne bouge pas.
+ */
+function titleArrive(v) {
+  v.titleWaiting = false;
+  if (!v.text.animate || quietMotion()) return;
+  // Sans lecture de mise en page ni de style au milieu de l'appui (13/11/2026) : la largeur de
+  // l'écran vient de l'observateur de taille, et l'espacement final est celui de la feuille de
+  // style (image clé finale implicite).
+  const blur = (6 * (rootWidth || root.offsetWidth)) / 1080;
+  v.text.animate([{ opacity: 0, letterSpacing: '-0.06em', filter: `blur(${blur.toFixed(1)}px)` }, { opacity: 1, filter: 'blur(0px)' }], { duration: 360, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' });
+  v.meta.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'linear' });
+}
+
+/** La roue s'est posée après une rafale : le dernier titre reçoit son effet, une fois. */
+function titleOnLanding() {
+  if (menuView?.titleWaiting && menuView.node.isConnected) titleArrive(menuView);
+}
+
+/**
  * Repère de la collection active, « ☆ FAVORIS │ 1 / 4 » : la collection et la place de la table
  * choisie dedans, dans l'encart du dessus de la plaque du titre (frontend.css) ; il remplace le
  * compteur. Changer de table n'en change que le chiffre, changer de collection le nom. Mode
@@ -798,7 +819,7 @@ function fillShelf(box, shelf, s) {
  */
 function showBackglass(s, band) {
   const view = band && document.documentElement.classList.contains('menu-desktop') && s.backglass?.url ? s.backglass : undefined;
-  menuBackglass.show(view && { ...view, fit: 'cover', fallback: 'none' });
+  menuBackglass.show(view && { ...view, fit: 'cover', fallback: 'none' }, { settle: inWheelBurst });
   // La vidéo ne joue que si elle se voit, comme le fond du playfield.
   menuBackglass.setActive(Boolean(view) && backgroundVisible(s));
 }
@@ -1758,7 +1779,8 @@ function hideDmdMessage() {
   dmdMessageShown = undefined;
 }
 
-function renderZones(s) {
+/** `burst` : la table vient de changer en pleine rafale d'appuis dans la roue (wheelBurst) : les médias attendent l'arrêt. */
+function renderZones(s, burst = false) {
   for (const z of zones) {
     // Messagerie : la carte de l'ami au fronton, l'annonce d'un message au DMD (par-dessus ses points).
     if (z.role === 'backglass' && !s.friendCard) hideFriendCard();
@@ -1782,7 +1804,8 @@ function renderZones(s) {
       z.layer.setActive(false);
       continue;
     }
-    z.layer.show(viewOf(s, z.role));
+    // Écran des tables : en rafale d'appuis, le média de la table attend l'arrêt (media.js, settle).
+    z.layer.show(viewOf(s, z.role), { settle: burst });
     z.layer.setActive(z !== dmdZone || dmdMediaActive());
   }
 }
@@ -2062,8 +2085,36 @@ window.cyberEtat = () => ({
   couches: [...(background ? [['playfield', background]] : []), ...(menuBackglass ? [['fronton-menu', menuBackglass]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
 });
 
+/**
+ * Rafale d'appuis dans la roue : la table choisie change moins de WHEEL_BURST_MS après le changement
+ * précédent. Les médias de la table et le préchargement de ses voisines attendent alors l'arrêt
+ * (media.js, settle) ; un appui isolé, ou le premier d'une rafale, les change tout de suite.
+ */
+const WHEEL_BURST_MS = 200;
+let burstTable;
+let burstAt = -Infinity;
+/** L'état en cours de rendu fait partie d'une rafale (lu par showBackglass, plus loin dans le rendu). */
+let inWheelBurst = false;
+
+function wheelBurst(s) {
+  if (s.phase !== 'menu' || s.game || s.intro) {
+    burstTable = undefined;
+    return false;
+  }
+  const table = s.neighbors?.find((n) => n.offset === 0)?.key ?? s.table?.title;
+  if (table === burstTable) return false;
+  const now = Date.now();
+  const burst = burstTable !== undefined && now - burstAt < WHEEL_BURST_MS;
+  burstTable = table;
+  burstAt = now;
+  return burst;
+}
+
 window.cyber.onState((s) => {
   lastState = s;
+  // Avant tout média : cet état fait-il partie d'une rafale d'appuis dans la roue ?
+  const burst = wheelBurst(s);
+  inWheelBurst = burst;
   // Juke-box quitté (Exit, partie, extinction) : la lecture de cette fenêtre s'arrête, ses zones sont oubliées.
   document.documentElement.classList.toggle('jukebox-phase', s.phase === 'jukebox');
   // Au bureau, la gestion ouverte depuis le lecteur garde la musique : le clip, caché, joue en fond.
@@ -2080,7 +2131,7 @@ window.cyber.onState((s) => {
     document.body.append(rest);
   } else if (!s.inHeadset && rest) rest.remove();
   document.documentElement.classList.toggle('in-game', Boolean(s.game));
-  CyberMedia.preload(s.preload);
+  CyberMedia.preload(s.preload, { settle: burst });
   // Sons de l'interface : muets pendant la partie, même si un ordre de jouer arrivait.
   window.CyberUiSounds?.setPhase(s.phase);
   // Son du menu (playfield seulement) : musique, son de lancement, son de la vidéo du plateau.
@@ -2192,10 +2243,11 @@ window.cyber.onState((s) => {
     // Écran de chargement (garde-fou de mise en page, layout-check.ts).
     document.documentElement.classList.toggle('loading-phase', s.phase === 'loading' && Boolean(s.table) && !s.attract);
     renderPlayfield(s);
-    background.show(backdrop);
+    // Écran des tables : en rafale d'appuis, la vidéo de la table attend l'arrêt (media.js, settle).
+    background.show(backdrop, { settle: burst });
     background.setActive(Boolean(loadingVideo) || backgroundVisible(s));
   } else root.replaceChildren();
-  renderZones(s);
+  renderZones(s, burst);
   pauseUnderVeil();
 });
 

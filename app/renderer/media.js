@@ -28,6 +28,12 @@
   /** Éléments gardés prêts (voisins préchargés, médias quittés) ; les vidéos coûtent un décodeur chacune. */
   const POOL_MAX = 8;
   const POOL_MAX_VIDEOS = 4;
+  /**
+   * Repos qui clôt une rafale d'appuis dans la roue : les médias de la table (et le préchargement de
+   * ses voisines) attendent jusque-là. Même repos que la lecture de la wheel du DMD (dmd-wheel.ts),
+   * et que la détection de la rafale (frontend.js, WHEEL_BURST_MS).
+   */
+  const SETTLE_MS = 200;
 
   /** Composants de fallback.js (T3) pour chaque repli du catalogue. */
   const FALLBACK_KINDS = {
@@ -167,8 +173,28 @@
     node.load();
   }
 
-  /** Médias des tables voisines, chargés d'avance : le changement de table n'attend pas le disque. */
-  function preload(views) {
+  /**
+   * Médias des tables voisines, chargés d'avance : le changement de table n'attend pas le disque.
+   * `opts.settle` (rafale d'appuis dans la roue, frontend.js) : seule la dernière liste est chargée,
+   * après SETTLE_MS de repos ; chaque table survolée créait sinon des vidéos aussitôt abandonnées.
+   * Un état reçu pendant cette attente met la liste à jour sans relancer l'attente.
+   */
+  let preloadTimer;
+  let preloadViews;
+  function preload(views, opts = {}) {
+    preloadViews = views;
+    if (opts.settle) {
+      clearTimeout(preloadTimer);
+      preloadTimer = setTimeout(() => {
+        preloadTimer = undefined;
+        preloadNow(preloadViews);
+      }, SETTLE_MS);
+      return;
+    }
+    if (!preloadTimer) preloadNow(views);
+  }
+
+  function preloadNow(views) {
     for (const view of views ?? []) {
       if (!view?.url || pool.has(view.url) || shownUrls().has(view.url)) continue;
       pool.set(view.url, createElement(view));
@@ -328,7 +354,38 @@
       } else video.pause();
     }
 
+    /** Média voulu pendant une rafale (show avec settle), posé quand elle s'arrête. */
+    let pending;
+
+    /**
+     * Média à montrer. `opts.settle` : la table vient de changer en pleine rafale d'appuis dans la roue
+     * (frontend.js, wheelBurst) ; le média attend SETTLE_MS de repos, et seul le dernier est posé. Un
+     * état qui redemande ce même média le laisse attendre ; un autre (média remplacé, autre phase) le
+     * remplace aussitôt. Sans cela, chaque table survolée lançait sa vidéo (décodeur, fondu) sur
+     * chaque écran (21/11/2026).
+     */
     function show(view, opts = {}) {
+      const key = keyOf(view, opts);
+      if (pending) {
+        if (pending.key === key) return;
+        clearTimeout(pending.timer);
+        pending = undefined;
+      }
+      if (current?.key === key) return;
+      if (opts.settle) {
+        pending = {
+          key,
+          timer: setTimeout(() => {
+            pending = undefined;
+            showNow(view, opts);
+          }, SETTLE_MS),
+        };
+        return;
+      }
+      showNow(view, opts);
+    }
+
+    function showNow(view, opts) {
       const key = keyOf(view, opts);
       if (current?.key === key) return;
       // Une couche encore en attente de sa première image est abandonnée.
@@ -457,6 +514,8 @@
       urls: () => [...slots].map((s) => s.url).filter(Boolean),
       refresh: () => setActive(active),
       destroy() {
+        clearTimeout(pending?.timer);
+        pending = undefined;
         for (const slot of [...slots]) retire(slot);
         root.remove();
         layers.delete(handle);

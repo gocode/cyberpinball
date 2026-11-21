@@ -88,17 +88,23 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
       }
       // 3. Tests.
       const cert = readCertificate(branche, dir);
-      if (cert && cert.empreinte === workFingerprint(cwd)) {
-        say('Suite complète déjà verte pour ce travail : contrôles express et tests lents touchés par la branche.');
-        const controles = await runControles({ cwd, say });
+      const head = git(['rev-parse', 'HEAD'], cwd);
+      if (cert && cert.head === head) {
+        say('Suite complète verte sur ce commit même : rien à revérifier.');
+      } else if (cert && cert.empreinte === workFingerprint(cwd)) {
+        // Le travail est celui de la suite verte ; seul proto/ecrans a changé. Pas de nouvelle passe
+        // complète (21/11/2026 : refaire les 360 fichiers rapides à chaque fusion, hors verrou,
+        // prenait 8 minutes sur une machine chargée) : contrôles sans tests, puis les tests touchés.
+        say('Suite complète déjà verte pour ce travail : contrôles sans tests, puis les tests touchés par la branche.');
+        const controles = await runControles({ cwd, say, tests: false });
         printControles(controles, say);
         if (!controles.ok) {
           withdraw(branche, dir);
           return 1;
         }
-        const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies', '--electron'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-lents.txt') });
+        const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-touches.txt'), timeoutMs: 15 * 60_000 });
         if (touched.code !== 0) {
-          say('Des tests lents touchés par la branche échouent (tmp/fusionner-lents.txt) : vérification complète, avec relance des instables.');
+          say('Des tests touchés par la branche échouent (tmp/fusionner-touches.txt) : vérification complète, avec relance des instables.');
           const full = await runAvantFusion({ cwd, say });
           if (!full.ok) return 1;
         }

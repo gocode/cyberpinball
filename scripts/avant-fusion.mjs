@@ -23,7 +23,7 @@ import {
   APRES_TESTS_MS, DUREE_FUSION_MS, REPO, BASE, announce, coordinationDir, currentBranch, expectedSuiteMs, git, lockHolder,
   readDurations, readFlaky, recordDuration, sleep, tryLock, withdraw, workFingerprint, writeCertificate,
 } from './coordination.mjs';
-import { printControles, rerunAlone, run, runControles } from './controles.mjs';
+import { TEST_TIMEOUT_MS, printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
 
@@ -49,16 +49,9 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
   const tmp = path.join(cwd, 'tmp');
   fs.mkdirSync(tmp, { recursive: true });
 
-  announce({ branche, etape: 'controles', finPrevue: iso(Date.now() + 2 * 60_000 + expected + DUREE_FUSION_MS) }, dir);
   say(`Avant-fusion de ${branche}.`);
-  const controles = await runControles({ cwd, say });
-  printControles(controles, say);
-  if (!controles.ok) {
-    withdraw(branche, dir);
-    return { ok: false, failures: controles.problems.map((p) => p.etape), flaky: [] };
-  }
-
-  // Une suite lente à la fois sur la machine.
+  // Une vérification complète à la fois sur la machine, contrôles express compris : trois suites
+  // menées ensemble mettaient le processeur à 100 % et chacune durait trois fois plus (21/11/2026).
   const lockFile = path.join(dir, 'suite.lock');
   let release;
   let told;
@@ -75,14 +68,22 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
   const started = Date.now();
   announce({ branche, etape: 'tests', finPrevue: iso(started + expected + DUREE_FUSION_MS) }, dir);
   try {
+    const controles = await runControles({ cwd, say });
+    printControles(controles, say);
+    if (!controles.ok) {
+      withdraw(branche, dir);
+      return { ok: false, failures: controles.problems.map((p) => p.etape), flaky: [] };
+    }
     await ensureElectron(cwd, say);
     const slow = collectTests(cwd).filter((t) => t.slow);
-    say(`Tests lents : ${slow.length} fichiers (durée habituelle ${Math.round(expected / 60_000)} min)…`);
+    say(`Tests lents : ${slow.length} fichiers…`);
     const log = path.join(tmp, 'avant-fusion.txt');
-    const first = await run(process.execPath, ['--test', '--test-reporter=tap', ...slow.map((t) => path.relative(cwd, t.file))], { cwd, log });
-    recordDuration(Date.now() - started, dir);
+    // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond.
+    const first = await run(process.execPath, ['--test', '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...slow.map((t) => path.relative(cwd, t.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
+    if (first.timedOut) say(`Suite lente arrêtée au plafond${first.hung.length ? ` ; figés : ${first.hung.map((f) => path.basename(f)).join(', ')}` : ''}.`);
+    else recordDuration(Date.now() - started, dir);
     const t = totals(first.out);
-    let failing = first.code === 0 ? [] : failedFiles(first.out);
+    let failing = first.code === 0 ? [] : [...new Set([...failedFiles(first.out), ...first.hung])];
     if (first.code !== 0 && !failing.length) failing = ['(sortie illisible : voir tmp/avant-fusion.txt)'];
     const unreadable = failing.filter((f) => !f.endsWith('js'));
     const { flaky, failures } = await rerunAlone(failing.filter((f) => f.endsWith('js')), { cwd, say, prefix: 'avant-fusion-relance' });
@@ -98,7 +99,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log } = {}) {
     if (git(['status', '--porcelain'], cwd)) say('Modifications non commitées : pas de certificat, npm run fusionner refera la suite après le commit.');
     else writeCertificate(branche, { empreinte: workFingerprint(cwd), head: git(['rev-parse', 'HEAD'], cwd), base: git(['rev-parse', BASE], cwd) }, dir);
     announce({ branche, etape: 'testee', finPrevue: iso(Date.now() + APRES_TESTS_MS) }, dir);
-    say(`\nAvant-fusion : vert (${Math.round((Date.now() - started) / 60_000)} min de tests lents, ${t.pass ?? '?'} passés${flaky.length ? `, ${flaky.length} instable(s)` : ''}). Suite suivante : npm run fusionner.`);
+    say(`\nAvant-fusion : vert (${Math.round((Date.now() - started) / 60_000)} min, ${t.pass ?? '?'} passés${flaky.length ? `, ${flaky.length} instable(s)` : ''}). Suite suivante : npm run fusionner.`);
     return { ok: true, failures: [], flaky };
   } finally {
     release();

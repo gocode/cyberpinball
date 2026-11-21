@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Scrolling the wheel fast no longer starts the video of every table passed on every screen (playfield, backglass, DMD, topper): the table's media wait until the wheel stops (a fifth of a second); a single press still changes them at once.
+- The table title still "spreads out and sharpens" on a single press; during fast scrolling it changes without the effect, which then plays once on the table where the wheel stops.
 - Conversations with the team: while a conversation is active (less than two hours since the last message), the cabinet checks for replies every minute instead of every 20 minutes; the notification arrives almost right away.
 - The table wheel is smoother: moving from one table to the next no longer recomputes the whole page during the table color fade (on a 4K playfield, from 40 to 60 frames per second on single presses). The color fade looks the same.
 - The green halo of the selected table still dims while sliding and breathes when the wheel stops, but without repainting its glow on every frame: the wheel keeps 60 frames per second at each stop.

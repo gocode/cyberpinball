@@ -213,7 +213,7 @@ test('roue : le chemin d’un appui ne force aucun calcul de mise en page', () =
     return text;
   };
   const LAYOUT = /\.(offset(Width|Height|Top|Left)|client(Width|Height)|scroll(Top|Left|Width|Height)|innerText)\b|getBoundingClientRect|getComputedStyle/;
-  for (const name of ['wheelStage', 'placeWheelItem', 'haloSync', 'wheelMoved', 'wheelPulse', 'fitMedallion', 'menuPanel']) {
+  for (const name of ['wheelStage', 'placeWheelItem', 'haloSync', 'wheelMoved', 'wheelPulse', 'fitMedallion', 'menuPanel', 'titleArrive', 'titleOnLanding']) {
     const text = body(name).replace(/rootWidth \|\| root\.offsetWidth/g, 'rootWidth');
     assert.doesNotMatch(text, LAYOUT, `${name} lit la mise en page pendant l'appui`);
   }
