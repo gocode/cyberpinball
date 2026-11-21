@@ -16,7 +16,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { setLanguage } from '../i18n';
 import type { ReportEnvelope } from '../feedback';
-import { sealTeamReply, threadAnswerKey, type FeedbackThread, type TeamReplyBox, type ThreadLine } from '../feedback-threads';
+import { sealTeamReply, threadAnswerKey, threadPollDelay, THREAD_LIVE_MS, THREAD_POLL_IDLE_MS, THREAD_POLL_LIVE_MS, type FeedbackThread, type TeamReplyBox, type ThreadLine } from '../feedback-threads';
 import { NOTICE_RULES } from '../notices';
 import { REPO_ROOT } from './i18n-scan';
 import { frontendSource } from './frontend-source';
@@ -37,6 +37,7 @@ type Threads = {
   stamp(envelope: ReportEnvelope, title: string): ReportEnvelope;
   write(fil: string, text: string): Promise<'sent' | 'queued' | 'failed'>;
   poll(): Promise<void>;
+  tick(): Promise<void>;
   visible(): FeedbackThread[];
   thread(fil: string): FeedbackThread | undefined;
   unread(): number;
@@ -56,6 +57,7 @@ function setup(opts: { anonymous?: boolean; online?: boolean } = {}) {
   const pending: TeamReplyBox[] = [];
   const arrived: { thread: FeedbackThread; line: ThreadLine }[][] = [];
   let anonymous = opts.anonymous ?? false;
+  const clock = { at: NOW };
   const threads = createTeamThreads({
     dataDir: dir,
     service: fakeFeedbackService({
@@ -71,9 +73,9 @@ function setup(opts: { anonymous?: boolean; online?: boolean } = {}) {
     changed: () => undefined,
     arrived: (added: { thread: FeedbackThread; line: ThreadLine }[]) => arrived.push(added),
     log: () => undefined,
-    now: () => NOW,
+    now: () => clock.at,
   });
-  return { dir, threads, sent, pending, arrived, setAnonymous: (on: boolean) => (anonymous = on), done: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  return { clock, dir, threads, sent, pending, arrived, setAnonymous: (on: boolean) => (anonymous = on), done: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
 const report = (over: Partial<ReportEnvelope> = {}): ReportEnvelope => ({ v: 1, kind: 'report', text: 'Le DMD reste noir', table: 'Glass Lagoon', version: '0.2.3', lang: 'fr', borne: 'borneEssai01', at: NOW, ...over });
@@ -154,6 +156,33 @@ test('échanges : un fil neuf se relève à l’ouverture des échanges, même j
     s.pending.push({ fil: env.fil!, id: 'rep0000003', at: NOW + 2, data: sealTeamReply({ v: 1, text: 'Autre', at: NOW }, env.answer!) });
     await s.threads.pollIfOld();
     assert.equal(s.threads.unread(), 1);
+  } finally {
+    s.done();
+  }
+});
+
+test('échanges : une conversation en cours est relevée à la minute, un échange ancien toutes les 20 minutes', async () => {
+  const s = setup();
+  try {
+    const env = s.threads.stamp(report(), 'Le DMD reste noir');
+    await s.threads.tick();
+    // L'équipe répond une minute plus tard : la borne le sait à la relève suivante, une minute après.
+    s.clock.at = NOW + 60_000;
+    s.pending.push({ fil: env.fil!, id: 'rep0000004', at: NOW + 50_000, data: sealTeamReply({ v: 1, text: 'Bien reçu', at: NOW }, env.answer!) });
+    await s.threads.tick();
+    assert.equal(s.threads.unread(), 1, 'relevée à la minute pendant la conversation');
+    // Trois heures sans rien : plus de relève à la minute, seulement toutes les 20 minutes.
+    s.clock.at = NOW + 3 * 3_600_000;
+    await s.threads.tick();
+    s.pending.push({ fil: env.fil!, id: 'rep0000005', at: s.clock.at, data: sealTeamReply({ v: 1, text: 'Plus tard', at: NOW }, env.answer!) });
+    s.clock.at += 60_000;
+    await s.threads.tick();
+    assert.equal(s.threads.unread(), 1, 'pas relevée une minute après, hors conversation');
+    s.clock.at += 20 * 60_000;
+    await s.threads.tick();
+    assert.equal(s.threads.unread(), 2, 'relevée après 20 minutes');
+    assert.equal(threadPollDelay({ v: 1, threads: [] }, NOW), THREAD_POLL_IDLE_MS);
+    assert.equal(threadPollDelay({ v: 1, threads: [{ ...s.threads.visible()[0]!, updated: NOW - THREAD_LIVE_MS + 1 }] }, NOW), THREAD_POLL_LIVE_MS);
   } finally {
     s.done();
   }

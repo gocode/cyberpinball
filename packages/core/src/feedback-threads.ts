@@ -292,6 +292,20 @@ export function noteProposalReplies(store: ThreadStore, proposals: readonly Prop
   return { store: next, added };
 }
 
+/**
+ * Cadence de la relève (21/11/2026, essai réel : réponse arrivée 16 minutes avant la relève
+ * suivante). Un échange qui a bougé dans les THREAD_LIVE_MS dernières (rapport envoyé, réponse de
+ * l'équipe, message du joueur) est une conversation en cours : relevé chaque minute. Sinon, toutes
+ * les 20 minutes.
+ */
+export const THREAD_LIVE_MS = 2 * 3_600_000;
+export const THREAD_POLL_LIVE_MS = 60_000;
+export const THREAD_POLL_IDLE_MS = 20 * 60_000;
+
+export function threadPollDelay(store: ThreadStore, now: number): number {
+  return store.threads.some((x) => now - x.updated < THREAD_LIVE_MS) ? THREAD_POLL_LIVE_MS : THREAD_POLL_IDLE_MS;
+}
+
 /** Réponses de l'équipe non lues, tous fils confondus. */
 export const threadsUnread = (store: ThreadStore): number => store.threads.reduce((n, x) => n + x.unread, 0);
 

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Conversations with the team: while a conversation is active (less than two hours since the last message), the cabinet checks for replies every minute instead of every 20 minutes; the notification arrives almost right away.
 - The table wheel is smoother: moving from one table to the next no longer recomputes the whole page during the table color fade (on a 4K playfield, from 40 to 60 frames per second on single presses). The color fade looks the same.
 - The green halo of the selected table still dims while sliding and breathes when the wheel stops, but without repainting its glow on every frame: the wheel keeps 60 frames per second at each stop.
 - The glint across the selected medallion and the shine along the menu screens' rule slide without recomputing the layout; the live medallions (Juke-box, Community, Collections) no longer wake the page when nothing moves.

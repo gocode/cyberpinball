@@ -19,6 +19,7 @@ import {
   noteProposalReplies,
   saveThreads,
   threadAnswerKey,
+  threadPollDelay,
   threadsToPoll,
   threadsUnread,
   visibleThreads,
@@ -57,9 +58,12 @@ export interface TeamThreadsOptions {
   now?(): number;
 }
 
-/** Relève des fils : la première peu après le démarrage, puis toutes les 20 minutes. */
+/**
+ * Relève des fils : la première peu après le démarrage, puis à la cadence de threadPollDelay (chaque
+ * minute pendant une conversation, toutes les 20 minutes sinon), vérifiée chaque minute.
+ */
 const FIRST_POLL_MS = 60_000;
-const POLL_EVERY_MS = 20 * 60_000;
+const TICK_MS = 60_000;
 /** À l'ouverture d'un écran des échanges : pas plus d'une relève toutes les dix secondes. */
 const POLL_AGAIN_MS = 10_000;
 
@@ -173,13 +177,20 @@ export function createTeamThreads(opts: TeamThreadsOptions) {
 
   function watch(): void {
     setTimeout(() => void poll(), FIRST_POLL_MS).unref?.();
-    setInterval(() => void poll(), POLL_EVERY_MS).unref?.();
+    setInterval(() => void tick(), TICK_MS).unref?.();
+  }
+
+  /** Relève si la cadence du moment est échue (conversation en cours : chaque minute). */
+  function tick(): Promise<void> {
+    // Une marge de deux secondes : les minuteries ne tombent jamais pile.
+    return now() - polledAt >= threadPollDelay(store, now()) - 2_000 ? poll() : Promise.resolve();
   }
 
   return {
     stamp,
     write,
     poll,
+    tick,
     /** Relève si la dernière date de plus de dix secondes (ouverture de la liste des échanges, d'un fil). */
     pollIfOld: () => (now() - polledAt > POLL_AGAIN_MS ? poll() : Promise.resolve()),
     noteProposals,

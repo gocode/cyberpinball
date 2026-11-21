@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Échanges avec l'équipe : tant qu'une conversation est en cours (moins de deux heures depuis le dernier message), la borne relève les réponses chaque minute au lieu de toutes les 20 minutes ; la notification arrive presque tout de suite.
 - La roue de l'écran des tables est plus fluide : passer d'une table à l'autre ne fait plus recalculer toute la page pendant le fondu de la couleur de la table (sur un playfield 4K, de 40 à 60 images par seconde aux appuis isolés). Le fondu de couleur reste le même.
 - Le halo vert de la table choisie baisse pendant le glissement et souffle à l'arrêt comme avant, mais sans faire repeindre ses lueurs à chaque image : la roue garde ses 60 images par seconde à chaque arrêt.
 - L'éclat qui traverse le médaillon choisi et le reflet du filet des écrans de menu glissent sans recalculer la mise en page ; les médaillons vivants (Juke-box, Communauté, Collections) ne réveillent plus la page quand rien ne bouge.
