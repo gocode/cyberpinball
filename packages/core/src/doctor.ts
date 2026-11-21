@@ -2923,13 +2923,24 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       if (Math.abs(Math.log(am / screen)) <= tolerance) return true;
       const lost = Math.round((1 - Math.min(am, screen) / Math.max(am, screen)) * 100);
       const turned = am > 1.1 !== screen > 1.1 && Math.abs(Math.log(am)) > 0.1 && Math.abs(Math.log(screen)) > 0.1;
-      const how = turned
-        ? am < 1
-          ? t('en portrait sur un écran en paysage')
-          : t('en paysage sur un écran en portrait')
-        : am > screen
-          ? t('bandes noires en haut et en bas')
-          : t('bandes noires sur les côtés');
+      const facing = am < 1 ? t('en portrait sur un écran en paysage') : t('en paysage sur un écran en portrait');
+      if (mediaTypeInfo(type).fit === 'fill') {
+        // Étiré à tout son écran (le fronton, comme pendant la partie) : jamais de bandes noires, l'image est déformée.
+        lines.push(
+          t('« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}étiré à tout l’écran comme pendant la partie, image déformée de {lost} %.', {
+            name: item.name,
+            size,
+            ratio: ratioLabel(am),
+            role: ROLE_LABELS[role],
+            screen: ratioLabel(screen),
+            note,
+            how: turned ? `${facing}, ` : '',
+            lost,
+          }),
+        );
+        return true;
+      }
+      const how = turned ? facing : am > screen ? t('bandes noires en haut et en bas') : t('bandes noires sur les côtés');
       lines.push(
         t('« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}, {lost} % de l’écran inutilisé.', {
           name: item.name,

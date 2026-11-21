@@ -314,6 +314,8 @@ export const messages: Record<string, string> = {
   'bandes noires en haut et en bas': 'black bars top and bottom',
   'bandes noires sur les côtés': 'black bars on the sides',
   '« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}, {lost} % de l’écran inutilisé.': '“{name}” ({size}, {ratio}) on {role} ({screen}){note}: {how}, {lost}% of the screen unused.',
+  '« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}étiré à tout l’écran comme pendant la partie, image déformée de {lost} %.':
+    '“{name}” ({size}, {ratio}) on {role} ({screen}){note}: {how}stretched to the whole screen as during the game, image distorted by {lost}%.',
   ', faute de média « {type} » ({code})': ', for lack of “{type}” media ({code})',
   ', qui le remplit mieux que « {name} »': ', which fills it better than “{name}”',
   'Proportions du média différentes de son écran': 'Media proportions don’t match the screen',

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Diagnostic d'une table : un fronton aux proportions différentes de son écran n'est plus décrit avec des « bandes noires » et un écran en partie inutilisé. Il est étiré à tout l'écran, comme pendant la partie, et le diagnostic dit de combien l'image est déformée. Le DMD et le topper, eux, gardent leurs bandes noires.
+
 ## 0.2.2
 
 - Une partie calée sur un écran plus lent que le playfield (backglass à 50 ou 60 Hz pour un playfield à 120 Hz) n'est plus présentée comme « La table rame » : le diagnostic nomme l'écran qui bride la partie et dit comment monter sa fréquence. La version 10.8.1 de VPX dessine tous ses écrans au rythme du plus lent.

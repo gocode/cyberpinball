@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Table diagnosis: a backglass whose proportions differ from its screen is no longer described with "black bars" and a partly unused screen. It is stretched to the whole screen, as during the game, and the diagnosis says how much the image is distorted. The DMD and topper keep their black bars.
+
 ## 0.2.2
 
 - A game paced by a screen slower than the playfield (backglass at 50 or 60 Hz with a 120 Hz playfield) is no longer reported as "The table is sluggish": the diagnosis names the screen that limits the game and says how to raise its refresh rate. VPX 10.8.1 draws all its screens at the pace of the slowest one.

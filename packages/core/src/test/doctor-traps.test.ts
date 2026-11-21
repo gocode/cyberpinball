@@ -1132,10 +1132,19 @@ test('médecin des médias : proportions, orientation du plateau et DMD selon la
   write(media(folder, `(Playfield) ${TABLE}.mp4`), mp4(1000, 1000));
   assert.match(ratio(CABINET)!.detail, /Presque carré/);
   fs.rmSync(media(folder, `(Playfield) ${TABLE}.mp4`));
-  // Fronton en portrait sur un écran en paysage.
+  // Fronton en portrait sur un écran en paysage : étiré comme les autres frontons.
   write(media(folder, `(Backglass) ${TABLE}.png`), png(1080, 1920));
-  assert.match(ratio(CABINET)!.detail, /en portrait sur un écran en paysage/);
+  assert.match(ratio(CABINET)!.detail, /en portrait sur un écran en paysage, étiré à tout l’écran/);
+  // Fronton 4:3 sur un écran 16:9 : étiré à tout son écran (fit 'fill', comme pendant la partie),
+  // jamais décrit avec des bandes noires ni un écran inutilisé.
+  write(media(folder, `(Backglass) ${TABLE}.png`), png(1024, 768));
+  assert.match(ratio(CABINET)!.detail, /4:3.*16:9.*étiré à tout l’écran.*déformée de 25 %/);
+  assert.doesNotMatch(ratio(CABINET)!.detail, /bandes noires|inutilisé/);
   fs.rmSync(media(folder, `(Backglass) ${TABLE}.png`));
+  // Topper 4:3 sur un écran 16:9 (fit 'contain') : il garde ses bandes noires.
+  write(media(folder, `(Topper) ${TABLE}.png`), png(1024, 768));
+  assert.match(ratio({ ...CABINET, topper: true, aspects: { ...CABINET.aspects, topper: 16 / 9 } })!.detail, /bandes noires sur les côtés, 25 % de l’écran inutilisé/);
+  fs.rmSync(media(folder, `(Topper) ${TABLE}.png`));
   // DMD 4:1 sur un écran 4:1 : rien. Seulement un FullDMD 16:9 : montré réduit, faute de DMD.
   write(media(folder, `(DMD) ${TABLE}.png`), png(512, 128));
   assert.equal(ratio(CABINET), undefined);
