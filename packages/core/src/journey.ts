@@ -206,7 +206,11 @@ export function gameSources(vps: VpsDb | undefined, vpsId: string | undefined, k
   if (kind === 'table') {
     const table = liveLinks(version).length ? version : recommendVersion(game)?.file;
     files = table ? [table] : [];
-  } else files = requirements(game, version, { screens, roms: new Set(), installed: true }).find((n) => n.kind === kind)?.files ?? [];
+  }
+  // On demande cette partie parce qu'elle manque à la table installée (ou pour la remplacer) : ce que
+  // VPS annonce avec la table (« incl. PuP ») n'y est donc pas ; ses fichiers à part sont proposés.
+  // Avant le 21/11/2026, la liste restait vide pour le PuP-Pack de la Galaxy Edition de JP's Space Cadet.
+  else files = requirements(game, version, { screens, roms: new Set(), installed: true, tableParts: ['table'] }).find((n) => n.kind === kind)?.files ?? [];
   return files.flatMap((file) => {
     const link = liveLinks(file)[0];
     return link ? [{ game, kind, file, url: link.url, host: linkHost(link.url) }] : [];

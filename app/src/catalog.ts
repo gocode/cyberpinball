@@ -78,6 +78,7 @@ import {
   type CatalogLine,
   removeGame,
   removeItem,
+  receivedParts,
   requirements,
   samePath,
   setAside,
@@ -379,6 +380,9 @@ export function createCatalog(ctx: CatalogContext) {
    */
   const transfers = new Map<string, { item: string; progress: TransferProgress }>();
 
+  /** Élément pour lequel la fenêtre était ouverte au début de chaque téléchargement, par nom de fichier. */
+  const startedFor = new Map<string, string>();
+
   /** Où en est le téléchargement d'un élément attendu ; undefined s'il n'y en a pas. */
   function transferOf(itemId: string): TransferProgress | undefined {
     for (const tr of transfers.values()) if (tr.item === itemId) return tr.progress;
@@ -498,11 +502,17 @@ export function createCatalog(ctx: CatalogContext) {
    * remplace ; l'ancien fichier est gardé de côté, rien n'est perdu.
    */
   async function received(file: string, facts: { urls?: string[]; filename: string }, via: 'window' | 'watch', vps: VpsDb | undefined): Promise<void> {
-    if (via === 'window') transfers.delete(facts.filename);
+    // L'élément pour lequel la page était ouverte quand le fichier a commencé, pas quand il finit :
+    // la fenêtre fermée pendant l'enregistrement le laissait « de côté » (pack de 1,2 Go, 21/11/2026).
+    const opened = via === 'window' ? (startedFor.get(facts.filename) ?? transfers.get(facts.filename)?.item ?? windowItem) : undefined;
+    if (via === 'window') {
+      transfers.delete(facts.filename);
+      startedFor.delete(facts.filename);
+    }
     const seen = await inspect(file);
     const l = waitList();
     const url = facts.urls?.at(-1);
-    const place = placeDownload(l, { ...facts, content: seen.content }, vps, via === 'window' ? windowItem : undefined);
+    const place = placeDownload(l, { ...facts, content: seen.content }, vps, opened);
     // Rangé dans la partie que dit son contenu, quel que soit l'élément qu'on attendait.
     const routed = routeReceived(l, place, { file, via, url, ...seen });
     if (routed) {
@@ -562,9 +572,12 @@ export function createCatalog(ctx: CatalogContext) {
   const acquirer = createAcquirer({
     dir: acquisitionDir,
     adBlocker,
+    started: (filename) => {
+      if (windowItem) startedFor.set(filename, windowItem);
+    },
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
     progress: (filename, progress) => {
-      const item = transfers.get(filename)?.item ?? windowItem;
+      const item = transfers.get(filename)?.item ?? startedFor.get(filename) ?? windowItem;
       if (item) transfers.set(filename, { item, progress });
       notice = {
         text: t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: formatTransfer(progress, true) }),
@@ -574,6 +587,7 @@ export function createCatalog(ctx: CatalogContext) {
     },
     failed: (filename, reason) => {
       transfers.delete(filename);
+      startedFor.delete(filename);
       notice = {
         text: reason === 'cancelled' ? t('Téléchargement annulé : « {file} ». Rien n’a été gardé.', { file: filename }) : t('Téléchargement interrompu : « {file} ». Rien n’a été gardé.', { file: filename }),
         tone: 'warning',
@@ -1225,7 +1239,15 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   function needsOf(game: VpsGame, version: VpsTableFile): Need[] {
-    return requirements(game, version, { screens: cabinetScreens(loadCabinet(dataDir())), roms: romsHere(), installed: installedVersion(game).source === version.id });
+    // Le fichier de la table reçu pour cette version (attendu, reçu ou installé) : ce qu'il apporte vraiment.
+    const tableItem = waitList().items.find((i) => i.gameId === game.id && i.kind === 'table' && i.fileId === version.id && i.received);
+    const tableParts = receivedParts(tableItem?.received);
+    return requirements(game, version, {
+      screens: cabinetScreens(loadCabinet(dataDir())),
+      roms: romsHere(),
+      installed: installedVersion(game).source === version.id,
+      ...(tableParts ? { tableParts } : {}),
+    });
   }
 
   /**
@@ -1905,10 +1927,31 @@ export function createCatalog(ctx: CatalogContext) {
       quick = undefined;
       return openCatalog();
     }
+    // Ce que la table reçue révèle (un PuP-Pack annoncé avec elle, absent de son archive) entre
+    // dans l'installation rapide : il se récupère à la suite, au lieu d'être découvert en partie.
+    const found = quickExtras(game, version);
+    if (found.length) {
+      notice = { text: t('La table est arrivée sans {items}, annoncé avec elle : récupéré à part, à la suite.', { items: formatList(found.map((i) => NEED_LABELS[i.kind])) }), tone: 'info' };
+      save();
+    }
     const items = quickItems();
     const next = items.find((i) => i.state === 'waiting');
     if (next) return fetchItem(next, () => openNeeds(game.id, version.id));
     quickDone(game.id);
+  }
+
+  /** Ajoute à l'installation rapide l'indispensable apparu depuis son départ (quickNeeds recalculé) ; rend ce qui est ajouté. */
+  function quickExtras(game: VpsGame, version: VpsTableFile): WaitItem[] {
+    if (!quick) return [];
+    const added: WaitItem[] = [];
+    for (const need of quickNeeds(needsOf(game, version)).get) {
+      if (!need.required) continue;
+      const item = itemFor(game, need) ?? addToWaitList(waitList(), game, need, need.files[0]!, liveLinks(need.files[0]!)[0]!.url);
+      if (quick.items.includes(item.id)) continue;
+      quick.items.push(item.id);
+      added.push(item);
+    }
+    return added;
   }
 
   /** Fin de l'installation rapide : la fenêtre se ferme, le plan s'ouvre (un fronton encore attendu le reste). */

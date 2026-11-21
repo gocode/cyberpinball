@@ -674,6 +674,39 @@ export interface NeedContext {
   roms: Set<string>;
   /** La table de cette version est déjà installée. */
   installed?: boolean;
+  /**
+   * Ce qu'apporte vraiment le fichier de la table reçu pour cette version (receivedParts) ;
+   * undefined tant qu'il n'est pas arrivé, ou s'il est illisible. Une partie que VPS annonce
+   * avec la table (« incl. PuP ») et qui n'y est pas redevient à récupérer.
+   */
+  tableParts?: readonly NeedKind[];
+}
+
+/**
+ * VPS annonce-t-il cette partie avec la table (« incl. PuP »), et le fichier reçu le confirme-t-il ?
+ * 'unchecked' : annoncée, table pas encore reçue ; 'missing' : annoncée, absente de l'archive reçue.
+ * Le 21/11/2026, la Galaxy Edition de JP's Space Cadet, « incl. PuP » chez VPS, est arrivée sans son
+ * pack (1,2 Go, à part sur mega.nz) : il était dit « fourni avec la table », jamais récupéré, et la
+ * table, dont tout l'afficheur est le pack, paraissait figée. 326 versions de VPS sont « incl. PuP ».
+ */
+export function claimedPart(version: VpsTableFile, feature: string, kind: NeedKind, tableParts: readonly NeedKind[] | undefined): 'no' | 'unchecked' | 'yes' | 'missing' {
+  if (!hasFeature(version, feature)) return 'no';
+  if (!tableParts) return 'unchecked';
+  return tableParts.includes(kind) ? 'yes' : 'missing';
+}
+
+/** « fourni avec la table », ou, la table pas encore reçue, ce que VPS en dit et quand on le vérifie. */
+function includedDetail(claim: 'yes' | 'unchecked'): string {
+  return claim === 'yes' ? t('fourni avec la table') : t('annoncé avec la table : vérifié à sa réception');
+}
+
+/**
+ * Les parties qu'apporte vraiment un fichier reçu : sa partie principale, et les autres d'une
+ * archive complète (contentParts, noté seulement quand il y en a plusieurs). undefined : contenu inconnu.
+ */
+export function receivedParts(received: { content?: ContentKind; parts?: NeedKind[] } | undefined): NeedKind[] | undefined {
+  if (!received?.content || received.content === 'unknown') return undefined;
+  return received.parts?.length ? [...received.parts] : [received.content as NeedKind];
 }
 
 const withLinks = <T extends { urls?: VpsLink[] }>(files: T[] | undefined): T[] => (files ?? []).filter((f) => liveLinks(f).length);
@@ -705,7 +738,9 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   const b2s = withLinks(game.b2sFiles).map((f) => f as VpsTableFile);
   const fits = (f: VpsTableFile) => (ctx.screens.dmd === 'full' ? hasFeature(f, 'FullDMD') || hasFeature(f, '3Screens') : ctx.screens.dmd === 'small' ? hasFeature(f, '3Screens') : hasFeature(f, '2Screens'));
   b2s.sort((a, b) => Number(fits(b)) - Number(fits(a)) || recent(a, b));
-  if (hasFeature(version, 'incl. B2S')) needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'included', detail: t('fourni avec la table'), files: [] });
+  // Annoncé avec la table : dit « fourni » ; démenti par l'archive reçue, il se récupère à part, comme les autres.
+  const claimB2s = claimedPart(version, 'incl. B2S', 'b2s', ctx.tableParts);
+  if (claimB2s === 'yes' || claimB2s === 'unchecked') needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'included', detail: includedDetail(claimB2s), files: [] });
   else if (!ctx.screens.backglass) needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'useless', detail: t('cette borne n’a pas d’écran de fronton'), files: b2s });
   else if (b2s.length) {
     const detail = fits(b2s[0]!)
@@ -718,7 +753,8 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   if (!versionWithoutRom(game, version)) {
     const roms = [...new Set((game.romFiles ?? []).map((r) => (r.version ?? '').trim()).filter(Boolean))];
     const present = roms.filter((r) => ctx.roms.has(r.toLowerCase()));
-    if (hasFeature(version, 'incl. ROM')) needs.push({ kind: 'rom', required: requiredForPlay('rom'), state: 'included', detail: t('fournie avec la table'), files: [], roms });
+    const claimRom = claimedPart(version, 'incl. ROM', 'rom', ctx.tableParts);
+    if (claimRom === 'yes' || claimRom === 'unchecked') needs.push({ kind: 'rom', required: requiredForPlay('rom'), state: 'included', detail: claimRom === 'yes' ? t('fournie avec la table') : t('annoncée avec la table : vérifiée à sa réception'), files: [], roms });
     else if (present.length) needs.push({ kind: 'rom', required: requiredForPlay('rom'), state: 'have', detail: t('{roms} : déjà sur la borne', { roms: present.join(', ') }), files: [], roms });
     else {
       const files = withLinks(game.romFiles).map((r) => ({ ...r, id: r.id ?? `rom:${r.version}` }) as VpsTableFile).sort(recent);
@@ -739,8 +775,21 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
 
   // Compléments facultatifs.
   const optional = (kind: NeedKind, files: VpsTableFile[] | undefined, detail: string, included?: string) => {
-    if (included && hasFeature(version, included)) return needs.push({ kind, required: requiredForPlay(kind), state: 'included', detail: t('fourni avec la table'), files: [] });
+    const claim = included ? claimedPart(version, included, kind, ctx.tableParts) : 'no';
+    if (claim === 'yes' || claim === 'unchecked') return needs.push({ kind, required: requiredForPlay(kind), state: 'included', detail: includedDetail(claim), files: [] });
     const usable = withLinks(files).sort(recent);
+    // Annoncé avec la table mais absent de son archive : la version est faite pour être jouée avec
+    // (tout l'afficheur de la Galaxy Edition est son PuP-Pack). Indispensable, il entre dans
+    // l'installation rapide ; sans lien connu, il ne bloque rien et le dit.
+    if (claim === 'missing') {
+      return needs.push({
+        kind,
+        required: usable.length > 0,
+        state: usable.length ? 'todo' : 'unavailable',
+        detail: usable.length ? t('annoncé avec la table par VPS, mais absent de son archive : à récupérer à part') : t('annoncé avec la table par VPS, mais absent de son archive, et aucun lien connu'),
+        files: usable,
+      });
+    }
     if (usable.length) needs.push({ kind, required: requiredForPlay(kind), state: 'optional', detail, files: usable });
   };
   optional('pup', game.pupPackFiles, t('facultatif : vidéos sur le fronton et l’afficheur pendant la partie'), 'incl. PuP');

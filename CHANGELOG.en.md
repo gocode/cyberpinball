@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Catalog: a PuP-Pack, backglass or ROM that the VPS database announces "with the table" is no longer taken at its word. Until the table has arrived, "What it takes" says it will be checked on arrival; if the received archive does not contain it, it becomes something to get separately again. The Galaxy Edition of JP's Space Cadet, announced with its PuP-Pack, arrived without it: it was shown as included, never fetched, and the table, whose whole display is that pack, looked frozen.
+- Quick install: what the received table reveals (a PuP-Pack announced with it and missing from its archive) joins the install and is fetched next, instead of being discovered while playing.
+- "What's missing to play" offers the separate PuP-Pack files of an installed table announced with its pack; the list used to be empty.
+- "Get" window: a file is filed for the item whose page was open when it started, even if the window closes or moves to another page before it finishes saving. A 1.2 GB PuP-Pack from mega.nz used to stay "set aside" and had to be downloaded again.
 - Cabinet network: at startup and after a network change, the search for other cabinets is repeated every few seconds for two minutes. One failed search no longer leaves two cabinets started together unable to see each other for three minutes.
 - Table diagnosis: pressing Start twice no longer sends a report to the developers by mistake. When the table has no problem, Start leads to the next table or back to the table sheet, and a report is only sent with a description of what is wrong.
 - Across the front-end, an action that sends something (report, friend request, publishing scores, sharing the library) is never under the cursor when a screen opens: reach it with the flippers.

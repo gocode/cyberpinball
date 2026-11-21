@@ -206,6 +206,12 @@ export interface DownloadClaim {
 export interface AcquireEvents {
   /** Dossier où ranger les fichiers reçus (<racine>\downloads\acquisition). */
   dir(): string;
+  /**
+   * Un téléchargement de la liste d'attente commence (nom du fichier gardé) : celui qui attend
+   * note pour quoi la page était ouverte. La fenêtre peut se fermer, ou ouvrir une autre page,
+   * avant que le fichier finisse de s'enregistrer (1,2 Go de mega.nz, 21/11/2026).
+   */
+  started?(filename: string): void;
   /** Fichier reçu en entier, avec les adresses traversées. */
   received(file: string, facts: { urls: string[]; filename: string }): void;
   /** Progression d'un téléchargement, deux fois par seconde au plus (octets reçus, total s'il est connu, débit, temps restant). */
@@ -411,6 +417,7 @@ export function createAcquirer(events: AcquireEvents) {
       const target = freeName(dir, item.getFilename());
       item.setSavePath(target);
       const filename = path.basename(target);
+      if (!claim) events.started?.(filename);
       if (!claim || visible) setStatus(t('Téléchargement de {file}…', { file: filename }));
       if (claim?.signal) {
         if (claim.signal.aborted) item.cancel();

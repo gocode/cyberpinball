@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Catalogue : un PuP-Pack, un fronton ou une ROM que la base VPS annonce « avec la table » n'est plus cru sur parole. Tant que la table n'est pas arrivée, « Ce qu'il faut » dit qu'il sera vérifié à sa réception ; si l'archive reçue ne le contient pas, il redevient à récupérer, à part. La Galaxy Edition de JP's Space Cadet, annoncée avec son PuP-Pack, arrivait sans lui : il était dit fourni, jamais récupéré, et la table, dont tout l'afficheur est ce pack, paraissait figée.
+- Installation rapide : ce que la table reçue révèle (un PuP-Pack annoncé avec elle et absent de son archive) entre dans l'installation et se récupère à la suite, au lieu d'être découvert en jouant.
+- « Ce qu'il manque pour jouer » propose les fichiers du PuP-Pack à part d'une table installée annoncée avec son pack ; la liste restait vide.
+- Fenêtre « Récupérer » : un fichier est rangé pour l'élément dont la page était ouverte quand il a commencé, même si la fenêtre se ferme ou change de page avant la fin de son enregistrement. Un PuP-Pack de 1,2 Go venu de mega.nz restait « gardé de côté » et devait être retéléchargé.
 - Réseau des bornes : au démarrage et après un changement de réseau, la recherche des autres bornes se refait toutes les quelques secondes pendant deux minutes. Une recherche ratée ne laisse plus deux bornes démarrées ensemble sans se voir pendant trois minutes.
 - Diagnostic d'une table : deux appuis sur Start n'envoient plus de rapport aux développeurs par mégarde. Quand la table n'a aucun problème, Start mène à la table suivante ou à la fiche, et un rapport ne part qu'avec une description de ce qui ne va pas.
 - Dans tout le front-end, une action qui envoie quelque chose (rapport, demande d'ami, publication des scores, partage de la bibliothèque) n'est plus jamais sous le curseur à l'ouverture d'un écran : on y va aux flippers.

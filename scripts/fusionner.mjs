@@ -25,7 +25,8 @@ import { fileURLToPath } from 'node:url';
 import {
   BASE, DUREE_FUSION_MS, REPO, announce, coordinationDir, currentBranch, git, lockHolder, mainDir, readCertificate, sleep, withdraw, workFingerprint,
 } from './coordination.mjs';
-import { printControles, run, runControles } from './controles.mjs';
+import { printControles, rerunAlone, run, runControles } from './controles.mjs';
+import { failedFiles, shortReport } from './sortie-tests.mjs';
 import { runAvantFusion } from './avant-fusion.mjs';
 import { publishGrouped, requestLeger } from './publication-groupee.mjs';
 
@@ -104,9 +105,20 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
         }
         const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-touches.txt'), timeoutMs: 15 * 60_000 });
         if (touched.code !== 0) {
-          say('Des tests touchés par la branche échouent (tmp/fusionner-touches.txt) : vérification complète, avec relance des instables.');
-          const full = await runAvantFusion({ cwd, say });
-          if (!full.ok) return 1;
+          // Relance à part des seuls fichiers en échec, jamais une suite complète : le 21/11/2026,
+          // telecommande (instable connu) relançait 11 puis 8 minutes de suite à chaque réintégration.
+          const failing = [...new Set([...failedFiles(touched.out), ...touched.hung])];
+          if (!failing.length) {
+            say('Tests touchés en échec sans fichier identifiable (tmp/fusionner-touches.txt).');
+            withdraw(branche, dir);
+            return 1;
+          }
+          const { failures } = await rerunAlone(failing, { cwd, say, prefix: 'fusionner-relance' });
+          if (failures.length) {
+            say(`Échecs confirmés :\n${failures.map((f) => `  ${f.file}\n${shortReport(f.details, 6)}`).join('\n')}`);
+            withdraw(branche, dir);
+            return 1;
+          }
         }
       } else {
         if (cert) say('Le travail a changé depuis la dernière suite verte : vérification complète.');
