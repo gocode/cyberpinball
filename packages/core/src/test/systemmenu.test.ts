@@ -9,6 +9,7 @@ import { frontendSource } from './frontend-source';
 import {
   isSystemGroup,
   MAX_SYSTEM_ENTRIES,
+  MAX_SYSTEM_ROOT_ENTRIES,
   SYSTEM_GROUP_IDS,
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
@@ -60,7 +61,9 @@ test('menu système : aucun écran ne dépasse huit lignes', () => {
   // 20/11/2026 : Borne avait 17 lignes, Cyber Pinball 14, Communauté 12 ; on ne voyait plus la liste
   // d'un coup d'œil. Une entrée de plus va dans une sous-rubrique, jamais au bout d'une liste.
   assert.equal(MAX_SYSTEM_ENTRIES, 8);
-  assert.ok(SYSTEM_ROOT_ENTRIES.length <= MAX_SYSTEM_ENTRIES, `la racine a ${SYSTEM_ROOT_ENTRIES.length} lignes`);
+  // La racine : une ligne de plus depuis l'Arène (21/11/2026), la porte de son médaillon.
+  assert.equal(MAX_SYSTEM_ROOT_ENTRIES, 9);
+  assert.ok(SYSTEM_ROOT_ENTRIES.length <= MAX_SYSTEM_ROOT_ENTRIES, `la racine a ${SYSTEM_ROOT_ENTRIES.length} lignes`);
   for (const group of SYSTEM_GROUP_IDS) {
     // Bureau Windows et l'Explorateur ne sont jamais fournis ensemble (l'un remplace l'autre en borne dédiée).
     const shown = SYSTEM_GROUPS[group].entries.filter((id) => id !== 'explorer');
@@ -73,7 +76,14 @@ test('menu système : la racine suit l’usage, « Quitter ou éteindre » en de
   assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => !isSystemGroup(id)), [...SYSTEM_ROOT_ITEMS]);
   // Ordre décidé le 20/11/2026 : ce qu'on ouvre le plus d'abord ; Quitter ou éteindre en dernier,
   // à deux appuis du flipper gauche depuis l'ouverture (la liste boucle, Retour entre les deux).
-  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['tables', 'borne', 'downloads', 'activity', 'amis', 'jukebox', 'aide', 'quitter']);
+  // L'Arène (21/11/2026) juste après la Communauté, comme leurs médaillons dans la roue.
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['tables', 'borne', 'downloads', 'activity', 'amis', 'arene', 'jukebox', 'aide', 'quitter']);
+  // Ce qui se joue contre les autres : dans l'Arène, plus dans la Communauté ; Mon niveau devient Progression.
+  assert.deepEqual(systemPathOf('instant'), ['arene']);
+  assert.deepEqual(systemPathOf('rankings'), ['arene']);
+  assert.deepEqual(systemPathOf('my-level'), ['arene', 'progression']);
+  assert.deepEqual(systemPathOf('badges'), ['arene', 'progression']);
+  assert.deepEqual(systemPathOf('game-history'), ['arene', 'progression']);
   // Langue dans la Configuration de la borne, Nouveautés dans Aide et infos, Collections et Migration dans Tables.
   assert.deepEqual(systemPathOf('news'), ['aide']);
   assert.deepEqual(systemPathOf('collections'), ['tables']);
@@ -247,7 +257,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments("Friends > Friend's requests'),"), ['Friends', "Friend's requests"], 'apostrophe dans le nom, puis fin de la chaîne de code');
   assert.equal(checkPath(segments("Help and info > What's new): the big new things")), undefined, '« What’s new » est dans Aide et infos');
   assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Ma borne, Téléchargements, Activité récente, Communauté, Arène, Juke-box, Aide et infos, Quitter ou éteindre)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.match(checkPath(['Tables', 'Téléchargements'])!, /n'est pas dans cette rubrique/, 'et seulement là (20/11/2026)');
   assert.equal(checkPath(['Ma borne', 'Configuration de la borne', 'Language / Langue']), undefined, 'la configuration ouvre son propre écran');

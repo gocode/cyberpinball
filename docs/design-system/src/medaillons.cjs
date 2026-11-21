@@ -31,9 +31,10 @@ const SMALL = 512;
  * L'image fixe et le médaillon animé de la roue sont ainsi le même dessin.
  *   juke-box   : « Onde », trois fils Soie autour du rond à la note ;
  *   communaute : « Montée », le bonhomme vert dans le rond, des bulles d'emojis qui montent ;
- *   collections : « Éclat », l’étoile verte des favoris dans le rond, des petites étoiles qui en partent.
+ *   collections : « Éclat », l’étoile verte des favoris dans le rond, des petites étoiles qui en partent ;
+ *   arene      : « Coupe », la coupe verte dans le rond, des confettis violets, bleus et verts qui tombent.
  */
-const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }, { name: 'collections' }];
+const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }, { name: 'arene' }, { name: 'collections' }];
 
 const page = (ring, items) => `
 (async () => {

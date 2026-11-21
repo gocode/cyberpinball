@@ -196,6 +196,7 @@ export * from './avatar';
 export * from './friendpresence';
 export * from './badges';
 export * from './levels';
+export * from './arena';
 export * from './account';
 export * from './localplay';
 export * from './recovery';

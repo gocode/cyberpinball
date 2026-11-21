@@ -2,7 +2,8 @@
 
 ## Mon compte
 
-Ce qui est à vous est dans Menu système > « Communauté » > « Mon profil », en tête de la Communauté (le même écran que le médaillon Communauté de la roue) : « Mon niveau », « Mes badges », « Historique des parties », puis trois rubriques.
+Ce qui est à vous est dans Menu système > « Communauté » > « Mon profil », en tête de la Communauté (le même écran que le médaillon Communauté de la roue) : trois rubriques.
+Votre niveau, vos badges et l'historique de vos parties sont dans Menu système > « Arène » > « Progression ».
 « Modifier mon profil » réunit votre pseudo, votre avatar et votre pays ; « Confidentialité », votre profil public et ce que voient les autres ; « Mon compte », de quoi retrouver votre compte sur un autre PC et sa suppression.
 Le compte, c'est la clé du joueur de la borne (voir « Identité » dans [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#communauté--le-réseau-des-bornes)), avec son pseudo, son pays, ses amis, ses badges, son niveau et son avatar.
 Il vit dans le dossier des données de Cyber Pinball ; la copie de secours, le code de récupération et le mot de passe le gardent aussi ailleurs, pour une réinstallation ou un autre PC.

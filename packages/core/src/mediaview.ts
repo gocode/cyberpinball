@@ -600,7 +600,13 @@ export interface MenuMediaSettings {
    */
   community: boolean;
   /**
-   * Médaillon Collections en tête de chaque collection, après la Communauté (collections-menu.ts,
+   * Médaillon Arène en tête de chaque collection, après la Communauté (arena-menu.ts, décidé le
+   * 21/11/2026 : jouer contre les autres) : montré par défaut, masquable (Tables > Roue) ; jamais en
+   * mode invité ni en jeu local.
+   */
+  arena: boolean;
+  /**
+   * Médaillon Collections en tête de chaque collection, après l'Arène (collections-menu.ts,
    * demandé le 13/11/2026) : Start ouvre la liste des collections, une collection choisie s'affiche
    * sur la roue. Montré par défaut, masquable (Tables > Roue).
    */
@@ -654,6 +660,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   wheelMotion: 'selected',
   jukebox: true,
   community: true,
+  arena: true,
   collectionsMedallion: true,
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   jukeboxAudio: DEFAULT_JUKEBOX_AUDIO,
@@ -700,6 +707,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     wheelMotion: WHEEL_MOTIONS.includes(r.wheelMotion as WheelMotion) ? (r.wheelMotion as WheelMotion) : d.wheelMotion,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
     community: typeof r.community === 'boolean' ? r.community : d.community,
+    arena: typeof r.arena === 'boolean' ? r.arena : d.arena,
     collectionsMedallion: typeof r.collectionsMedallion === 'boolean' ? r.collectionsMedallion : d.collectionsMedallion,
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     jukeboxAudio: normalizeJukeboxAudio(r.jukeboxAudio),

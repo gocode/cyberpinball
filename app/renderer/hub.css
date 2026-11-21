@@ -1,0 +1,740 @@
+/*
+ * Écran à onglets et à cartes (hub.js, app/src/hub-screen.ts) : l'écran de l'Arène, d'après la
+ * planche validée le 21/11/2026. Cotes pour un petit côté de 1 080 px (règle du design system) :
+ * N unités = N × --u.
+ */
+
+/* Teintes des paliers (levels.ts, tierOf), les mêmes que l'anneau des pastilles (theme.css, .avatar.tier-*). */
+.tier-tint-novice { --tier: #7f958f; }
+.tier-tint-flippeur { --tier: #3fb8a8; }
+.tier-tint-habitue { --tier: #5fb4cf; }
+.tier-tint-expert { --tier: #8be23a; }
+.tier-tint-maitre { --tier: #a98bff; }
+.tier-tint-sorcier { --tier: #f0d27a; }
+.tier-tint-legende { --tier: #ffe08a; }
+
+.lib-hub {
+  --u: calc(100cqmin / 1080);
+  /* Les marges que la marque (frontend.css, .brand) compense pour rester à sa place. */
+  --pad-top: calc(34 * var(--u));
+  --pad-side: calc(64 * var(--u));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: calc(28 * var(--u));
+  padding: var(--pad-top) var(--pad-side) calc(24 * var(--u));
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+/* ---------- En-tête : médaillon, titre, chiffres, bande du niveau ---------- */
+
+.hub-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(24 * var(--u));
+  row-gap: calc(16 * var(--u));
+}
+
+.hub-head > .hub-logo {
+  position: relative;
+  width: calc(132 * var(--u));
+  height: calc(132 * var(--u));
+  /* La lueur verte du médaillon : un drop-shadow, jamais coupé (aucun parent ne masque ce qui déborde). */
+  filter: drop-shadow(0 0 calc(24 * var(--u)) rgba(139, 226, 58, 0.22));
+}
+
+.hub-title {
+  margin: 0;
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: calc(70 * var(--u));
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+}
+
+.hub-facts {
+  margin: calc(8 * var(--u)) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u)) calc(22 * var(--u));
+  font-size: calc(25 * var(--u));
+  color: var(--meta);
+}
+
+.hub-facts b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* La bande « Votre niveau » : le numéro dans l'anneau du palier, la barre, ce qu'il manque. */
+.hub-band {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: calc(8 * var(--u)) calc(22 * var(--u));
+  align-items: center;
+  padding: calc(14 * var(--u)) calc(22 * var(--u)) calc(14 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) solid color-mix(in oklab, var(--tier) 60%, var(--line-strong));
+  background: linear-gradient(100deg, color-mix(in oklab, var(--tier) 16%, var(--surface)), var(--surface-sunken) 70%);
+}
+
+.hub-band-n {
+  grid-row: span 3;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  width: calc(112 * var(--u));
+  height: calc(112 * var(--u));
+  margin: calc(8 * var(--u));
+  border-radius: 50%;
+  box-shadow: 0 0 0 calc(4 * var(--u)) var(--void), 0 0 0 calc(8 * var(--u)) var(--tier), 0 0 calc(26 * var(--u)) color-mix(in oklab, var(--tier) 40%, transparent);
+  background: var(--surface-sunken);
+}
+
+.hub-band-n small {
+  font-size: calc(20 * var(--u));
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--ink-muted);
+}
+
+.hub-band-n strong {
+  font-size: calc(56 * var(--u));
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.hub-band-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: calc(16 * var(--u));
+  font-size: calc(24 * var(--u));
+}
+
+.hub-band-tier {
+  color: var(--tier);
+  font-size: calc(27 * var(--u));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hub-band-missing b {
+  color: var(--signal);
+}
+
+.hub-band-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(4 * var(--u)) calc(22 * var(--u));
+  font-size: calc(21 * var(--u));
+  color: var(--ink-muted);
+}
+
+/* La barre : l'acquis, et en hachures ce qu'une partie peut encore rapporter. Sa lueur reste dans la barre (pas de halo au-dehors). */
+.hub-xpbar {
+  position: relative;
+  height: calc(16 * var(--u));
+  border-radius: calc(8 * var(--u));
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.hub-xp-got {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: calc(8 * var(--u));
+  background: linear-gradient(90deg, color-mix(in oklab, var(--tier) 70%, var(--signal)), var(--signal));
+}
+
+.hub-xp-may {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--signal) 55%, transparent) 0 calc(6 * var(--u)), transparent calc(6 * var(--u)) calc(12 * var(--u)));
+}
+
+/* « Niv. 18 » à la teinte du palier, à côté d'un nom. */
+.hub-lv {
+  display: inline-block;
+  margin: 0 calc(10 * var(--u));
+  padding: calc(1 * var(--u)) calc(10 * var(--u));
+  border-radius: 999px;
+  font-size: calc(20 * var(--u));
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--tier);
+  border: calc(1.5 * var(--u)) solid color-mix(in oklab, var(--tier) 70%, transparent);
+  vertical-align: calc(2 * var(--u));
+  white-space: nowrap;
+}
+
+/* ---------- Onglets ---------- */
+
+.hub-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: calc(10 * var(--u));
+}
+
+.hub-tab {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: calc(6 * var(--u));
+  min-width: 0;
+  padding: calc(10 * var(--u)) calc(4 * var(--u)) calc(8 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-soft);
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  font-size: calc(21 * var(--u));
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.hub-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-tab-icon {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  color: var(--ink);
+}
+
+.hub-tab.hub-on {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+  box-shadow: var(--glow-signal);
+}
+
+.hub-tab.hub-on .hub-tab-icon {
+  color: var(--on-signal);
+}
+
+/* Le curseur sur un onglet (flippers, ou clic) : le contour vert, comme une carte choisie. */
+.hub-tab.selected:not(.hub-on) {
+  border-color: var(--signal);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 calc(1 * var(--u)) var(--signal);
+}
+
+/* Pas encore disponible : grisé, sa raison sous le nom (règle de design : jamais caché). */
+.hub-tab.hub-off {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.hub-tab.hub-off .hub-tab-icon {
+  color: var(--ink-faint);
+}
+
+.hub-tab-why {
+  font-size: calc(20 * var(--u));
+  font-weight: 500;
+  color: var(--ink-faint);
+  line-height: 1;
+}
+
+.hub-dot {
+  position: absolute;
+  top: calc(10 * var(--u));
+  right: calc(14 * var(--u));
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* ---------- Corps : sections de cartes ---------- */
+
+.hub-body {
+  display: grid;
+  align-content: start;
+  gap: calc(40 * var(--u));
+  min-height: 0;
+  overflow-y: auto;
+  /*
+   * La lueur d'une carte choisie (--glow-signal : flou de 18 px, portée de 27 px) n'est jamais coupée
+   * par le bord qui défile : une marge intérieure qui la contient, compensée par une marge négative.
+   */
+  --glow-room: max(calc(30 * var(--u)), 28px);
+  margin: calc(-1 * var(--glow-room));
+  padding: var(--glow-room);
+}
+
+.hub-body.hub-cols {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: calc(40 * var(--u));
+}
+
+.hub-col {
+  display: grid;
+  align-content: start;
+  gap: calc(34 * var(--u));
+  min-width: 0;
+}
+
+.hub-sec {
+  display: grid;
+  gap: calc(16 * var(--u));
+  min-width: 0;
+}
+
+/* Titre de section : capitales espacées vertes, un filet qui le prolonge, la note à droite. */
+.hub-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: calc(18 * var(--u));
+  font-weight: 700;
+  font-size: calc(21 * var(--u));
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.hub-eyebrow::after {
+  content: '';
+  flex: 1;
+  order: 1;
+  height: calc(1.5 * var(--u));
+  background: linear-gradient(90deg, color-mix(in oklab, var(--signal) 45%, var(--line-strong)), transparent);
+}
+
+.hub-eyebrow em {
+  order: 2;
+  font-style: normal;
+  font-size: calc(21 * var(--u));
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--ink-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hub-cards {
+  display: grid;
+  gap: calc(16 * var(--u));
+}
+
+.hub-cards.hub-layout-cards {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.hub-cards.hub-layout-list {
+  gap: 0;
+  border-radius: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-soft);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+}
+
+.hub-cards.hub-layout-chips {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(10 * var(--u)) calc(16 * var(--u));
+}
+
+/* Une carte : l'image à gauche, le texte, la valeur à droite, ses boutons dessous. */
+.hub-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(10 * var(--u)) calc(20 * var(--u));
+  min-width: 0;
+  padding: calc(18 * var(--u)) calc(22 * var(--u));
+  border-radius: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-strong);
+  background: linear-gradient(160deg, var(--surface-raised), var(--surface-sunken));
+}
+
+.hub-card:not(:has(> .hub-card-face, > .hub-card-ic)) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hub-card.selected {
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal), inset 0 0 0 calc(1 * var(--u)) var(--signal);
+}
+
+.hub-card.hub-quiet {
+  opacity: 0.6;
+}
+
+.hub-card-face {
+  width: calc(64 * var(--u));
+  height: calc(64 * var(--u));
+  font-size: calc(26 * var(--u));
+}
+
+.hub-card-ic {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  width: calc(60 * var(--u));
+  height: calc(60 * var(--u));
+  border-radius: 50%;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 calc(1 * var(--u)) var(--line-strong);
+  color: var(--meta);
+}
+
+.hub-card-icon {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+}
+
+.hub-card-main {
+  display: grid;
+  gap: calc(8 * var(--u));
+  min-width: 0;
+}
+
+.hub-card-eyebrow {
+  font-size: calc(20 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+
+.hub-card.hub-tone-warning .hub-card-eyebrow {
+  color: var(--warning);
+}
+
+.hub-card.hub-tone-signal .hub-card-eyebrow {
+  color: var(--signal);
+}
+
+.hub-card-title {
+  margin: 0;
+  font-size: calc(28 * var(--u));
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.hub-card-detail {
+  margin: 0;
+  font-size: calc(21 * var(--u));
+  color: var(--ink-muted);
+  line-height: 1.3;
+}
+
+.hub-card-aside {
+  font-size: calc(24 * var(--u));
+  font-weight: 800;
+  color: var(--signal);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Un écart à combler (le score du joueur juste devant) : en ambre ; le vert reste à ce qui se gagne. */
+.hub-card-aside.hub-tone-warning {
+  color: var(--warning);
+}
+
+.hub-buttons {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(12 * var(--u));
+  padding-top: calc(6 * var(--u));
+}
+
+.hub-button {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  padding: calc(10 * var(--u)) calc(20 * var(--u));
+  border-radius: 999px;
+  border: calc(1.5 * var(--u)) solid var(--line-strong);
+  font-size: calc(22 * var(--u));
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.hub-button-xp {
+  font-size: 0.9em;
+  font-weight: 800;
+  color: var(--signal);
+}
+
+.hub-button.hub-go {
+  border-color: color-mix(in oklab, var(--signal) 70%, var(--line-strong));
+  color: var(--signal);
+}
+
+/* Le bouton choisi : plein, en vert, comme l'onglet ouvert. */
+.hub-button.selected {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+  box-shadow: var(--glow-signal);
+}
+
+.hub-button.selected .hub-button-xp {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* La touche qui valide le bouton choisi, cerclée (« START Reprendre ma place »). */
+.hub-button-key {
+  font: inherit;
+  font-size: calc(20 * var(--u));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: calc(2 * var(--u)) calc(10 * var(--u));
+  border-radius: 999px;
+  border: calc(1.5 * var(--u)) solid currentColor;
+}
+
+/* La carte du moment, en grand : le contour vert lumineux (planche validée). */
+.hub-card.hub-layout-hero {
+  padding: calc(22 * var(--u)) calc(24 * var(--u));
+  border: calc(2 * var(--u)) solid var(--signal);
+  box-shadow: var(--glow-signal);
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--signal) 10%, var(--surface-raised)), var(--surface-sunken) 70%);
+}
+
+.hub-card.hub-layout-hero.hub-tone-warning {
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--warning) 14%, var(--surface-raised)), var(--surface-sunken) 70%);
+}
+
+.hub-card.hub-layout-hero .hub-card-face {
+  width: calc(100 * var(--u));
+  height: calc(100 * var(--u));
+  font-size: calc(40 * var(--u));
+}
+
+.hub-card.hub-layout-hero .hub-card-ic {
+  width: calc(100 * var(--u));
+  height: calc(100 * var(--u));
+  color: var(--signal);
+}
+
+.hub-card.hub-layout-hero .hub-card-icon {
+  width: calc(50 * var(--u));
+  height: calc(50 * var(--u));
+}
+
+.hub-card.hub-layout-hero .hub-card-title {
+  font-size: calc(32 * var(--u));
+}
+
+/* Les lignes d'une liste : sans cadre chacune, un filet entre elles. */
+.hub-card.hub-layout-list {
+  border: 0;
+  border-top: calc(1 * var(--u)) solid var(--line-soft);
+  border-radius: 0;
+  background: none;
+  padding: calc(14 * var(--u)) calc(20 * var(--u));
+}
+
+.hub-card.hub-layout-list:first-child {
+  border-top: 0;
+}
+
+.hub-card.hub-layout-list.selected {
+  border-radius: calc(14 * var(--u));
+  background: var(--signal-wash);
+  box-shadow: inset 0 0 0 calc(1.5 * var(--u)) var(--signal);
+}
+
+.hub-card.hub-layout-list .hub-card-title {
+  font-size: calc(25 * var(--u));
+}
+
+.hub-card.hub-layout-list .hub-card-face,
+.hub-card.hub-layout-list .hub-card-ic {
+  width: calc(60 * var(--u));
+  height: calc(60 * var(--u));
+}
+
+/* Les puces du barème : une icône, le nom, les XP. */
+.hub-card.hub-layout-chips {
+  padding: calc(10 * var(--u)) calc(18 * var(--u));
+  border-radius: 999px;
+  border-color: var(--line-soft);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  gap: calc(14 * var(--u));
+}
+
+.hub-card.hub-layout-chips .hub-card-ic {
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  background: none;
+  box-shadow: none;
+}
+
+.hub-card.hub-layout-chips .hub-card-icon {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+
+.hub-card.hub-layout-chips .hub-card-title {
+  font-size: calc(22 * var(--u));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-card.hub-layout-chips .hub-card-aside {
+  font-size: calc(22 * var(--u));
+}
+
+/* Les places d'une partie : les joueurs assis, les places libres en pointillés. */
+.hub-seats {
+  display: flex;
+  gap: calc(10 * var(--u));
+  align-items: center;
+}
+
+.hub-seat {
+  width: calc(58 * var(--u));
+  height: calc(58 * var(--u));
+  font-size: calc(24 * var(--u));
+}
+
+.hub-seat.hub-free {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: calc(2 * var(--u)) dashed var(--line-strong);
+  color: var(--ink-faint);
+  font-style: normal;
+  font-size: calc(28 * var(--u));
+}
+
+.hub-bar {
+  position: relative;
+  height: calc(10 * var(--u));
+  border-radius: calc(5 * var(--u));
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.hub-bar > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: calc(5 * var(--u));
+  background: var(--meta);
+}
+
+.hub-empty {
+  display: grid;
+  gap: calc(8 * var(--u));
+  padding: calc(40 * var(--u));
+  border-radius: calc(18 * var(--u));
+  border: calc(1.5 * var(--u)) dashed var(--line-strong);
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: calc(22 * var(--u));
+}
+
+.hub-empty b {
+  color: var(--ink);
+  font-size: calc(28 * var(--u));
+}
+
+/* ---------- Pied : les commandes ---------- */
+
+.hub-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(8 * var(--u)) calc(26 * var(--u));
+  padding-top: calc(12 * var(--u));
+  border-top: calc(1 * var(--u)) solid var(--line-soft);
+  font-size: calc(21 * var(--u));
+  color: var(--ink-muted);
+}
+
+.hub-foot kbd {
+  font: inherit;
+  font-weight: 700;
+  color: var(--signal);
+  letter-spacing: 0.08em;
+  margin-right: calc(8 * var(--u));
+  text-transform: uppercase;
+}
+
+/* ---------- Bureau (1920 × 1080) : la bande à droite du titre, deux colonnes ---------- */
+
+.lib-hub.hub-desk {
+  --pad-top: calc(26 * var(--u));
+  gap: calc(20 * var(--u));
+  padding: var(--pad-top) var(--pad-side) calc(20 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-head {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: calc(28 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-band {
+  grid-column: 3;
+}
+
+.lib-hub.hub-desk .hub-head > .hub-logo {
+  width: calc(104 * var(--u));
+  height: calc(104 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-title {
+  font-size: calc(58 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-band-n {
+  width: calc(96 * var(--u));
+  height: calc(96 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-band-n strong {
+  font-size: calc(48 * var(--u));
+}
+
+/* Au bureau, la bande garde le prochain palier et le badge le plus proche (maquette) : pas le compte des parties. */
+.lib-hub.hub-desk .hub-band-lines > span:first-child:not(:only-child) {
+  display: none;
+}
+
+.lib-hub.hub-desk .hub-tab {
+  grid-auto-flow: column;
+  justify-content: center;
+  align-items: center;
+  gap: calc(12 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-tab-icon {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+
+/* La carte du moment au bureau : son titre tient sur une ligne dans sa colonne (planche : 27 unités). */
+.lib-hub.hub-desk .hub-card.hub-layout-hero .hub-card-title {
+  font-size: calc(27 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-card.hub-layout-hero .hub-card-face,
+.lib-hub.hub-desk .hub-card.hub-layout-hero .hub-card-ic {
+  width: calc(84 * var(--u));
+  height: calc(84 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-body {
+  gap: calc(26 * var(--u));
+}

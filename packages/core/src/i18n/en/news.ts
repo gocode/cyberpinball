@@ -154,20 +154,13 @@ export const messages: Record<string, string> = {
   'Accepté une fois, il est gardé : il revient ensuite sans QR code.': 'Accepted once, it is kept: it comes back without the QR code afterwards.',
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 
-  'Les règles de chaque table': 'Every table’s rules',
-  'Prospectus, règles trouvées toutes seules et commandes de la partie, page par page.': 'Flyer, rules found automatically and game controls, page by page.',
-  'Cyber Pinball trouve les règles d’une table : la carte et le texte que l’auteur a rangés dans la table, une feuille de règles en ligne, sa vidéo. Elles se lisent page par page, aux flippers.':
-    'Cyber Pinball finds a table’s rules: the card and text the author put in the table, a rule sheet online, its video. They read page by page, with the flippers.',
-  'La dernière page donne toujours les commandes de la partie, avec les boutons de votre borne.': 'The last page always gives the game controls, with your cabinet’s buttons.',
-  'Fiche d’une table › Prospectus et règles': 'Table page › Flyer and rules',
-
   'Les tables du jour': 'Tables of the day',
   'Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.': 'The most played tables today, the record of the day and the player just ahead of you.',
   'Dans le monde, votre pays ou entre amis : chaque table montre son record du jour, votre place et ce qu’il vous manque. Start lance la table.':
     'Worldwide, in your country or among friends: each table shows its record of the day, your place and what you are missing. Start launches the table.',
   'La fiche d’une table dit qui battre, qui y joue en ce moment, et regroupe les parties à plusieurs dans « Jouer ensemble… ». Sans vidéo de chargement, l’objectif s’affiche aussi au lancement.':
     'A table’s page says who to beat and who is playing it right now, and groups multiplayer games under “Play together…”. Without a loading video, the goal also shows at launch.',
-  'Communauté › Classements › Tables du jour': 'Community › Leaderboards › Tables of the day',
+  'Arène › Du jour': 'Arena › Daily',
   'Menu système › Tables › Ajouter une table › Depuis une autre installation': 'System menu › Tables › Add a table › From another installation',
 
 

@@ -478,7 +478,8 @@ test('feuilles du menu : une classe n’est définie que dans une feuille (sauf 
   // guide.css, l'écran du guide du jeu (guide.js), ses classes gd-* ; jukebox.css, les écrans du Juke-box (jukebox.js), ses classes jb-*.
   // schema-manettes.css, le schéma des manettes du casque (schema-manettes.js), ses classes schema-*, partagé avec la page de l'image de la pause.
   // niveau.css, la carte du joueur, la pastille des badges et le moment d'un badge (niveau.js), ses classes player-card*, badges-pill*, lm-*.
-  assert.deepEqual(sheets.sort(), ['fallback.css', 'frontend.css', 'guide.css', 'intro.css', 'jukebox.css', 'library.css', 'niveau.css', 'schema-manettes.css', 'theme.css']);
+  // hub.css, l'écran à onglets et à cartes (hub.js), ses classes hub-* ; arena.css, l'affiche de l'Arène (arena.js), ses classes ar-*.
+  assert.deepEqual(sheets.sort(), ['arena.css', 'fallback.css', 'frontend.css', 'guide.css', 'hub.css', 'intro.css', 'jukebox.css', 'library.css', 'niveau.css', 'schema-manettes.css', 'theme.css']);
   const shared = new Set(['current', 'selected', 'mouse']);
   const seen = new Map<string, string>();
   const clashes: string[] = [];

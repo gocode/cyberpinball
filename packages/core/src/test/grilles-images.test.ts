@@ -20,6 +20,7 @@ const TEXT_ONLY: Record<string, string> = {
   '.guest-lock-glyph': 'icône du cadenas, taille fixe',
   '.cine-disc': 'médaillon sans logo : le titre en texte',
   '.journey-num': 'numéro d’étape',
+  '.hub-seat.hub-free': 'place libre d’une partie (écran de l’Arène), un « + »',
   '.state-done .witness-sign,\n.state-short .witness-sign,\n.state-failed .witness-sign': 'signe du bilan, un caractère',
 };
 

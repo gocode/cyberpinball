@@ -93,7 +93,7 @@ const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.
  * Lignes de l'écran, dans l'ordre : un sous-écran revient sur sa ligne par son rang, tiré
  * d'ici (une ligne ajoutée ne décale pas les retours).
  */
-export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community', 'collectionsMedallion'] as const;
+export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community', 'arena', 'collectionsMedallion'] as const;
 type Row = (typeof WHEEL_SETTINGS_ROWS)[number];
 const row = (key: Row) => WHEEL_SETTINGS_ROWS.indexOf(key);
 
@@ -165,10 +165,18 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         icon: 'friends',
         run: () => set({ community: !v.community }),
       },
+      arena: {
+        label: v.arena ? t('Arène dans la roue : affichée') : t('Arène dans la roue : masquée'),
+        detail: v.arena
+          ? t('Le médaillon Arène suit la Communauté en tête de chaque collection : parties instantanées, classements, progression (Start : le masquer)')
+          : t('L’Arène reste dans Menu système › Arène (Start : afficher le médaillon)'),
+        icon: 'trophy',
+        run: () => set({ arena: !v.arena }),
+      },
       collectionsMedallion: {
         label: v.collectionsMedallion ? t('Collections dans la roue : affichées') : t('Collections dans la roue : masquées'),
         detail: v.collectionsMedallion
-          ? t('Le médaillon Collections suit la Communauté en tête de chaque collection : Start ouvre la liste des collections (Start : le masquer)')
+          ? t('Le médaillon Collections suit l’Arène en tête de chaque collection : Start ouvre la liste des collections (Start : le masquer)')
           : t('Les MagnaSave et Menu système › Tables › Collections changent toujours de collection (Start : afficher le médaillon)'),
         icon: 'star',
         run: () => set({ collectionsMedallion: !v.collectionsMedallion }),

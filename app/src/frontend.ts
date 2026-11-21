@@ -215,6 +215,7 @@ import {
   DRESS_COVERED,
   type TableDressing,
   type TableEntry,
+  type PresenceTable,
   type VcRuntimeStatus,
   type MediaTarget,
   type MediaType,
@@ -298,6 +299,8 @@ import {
   type Medallion,
   JUKEBOX_WHEEL_KEY,
   COMMUNITY_WHEEL_KEY,
+  ARENA_WHEEL_KEY,
+  tableKey as levelTableKey,
   COLLECTIONS_WHEEL_KEY,
   remoteMenuTarget,
   toRemoteEntry,
@@ -403,6 +406,7 @@ import { createGroupsMenu } from './groups-menu';
 import { createProfileMenu } from './profile-menu';
 import { createPhoneCommunity } from './phone-community';
 import { createCommunityMenu } from './community-menu';
+import { createArenaMenu } from './arena-menu';
 import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
 import { createRankingsMenu, type RemoteAllTables } from './rankings-menu';
@@ -519,8 +523,8 @@ function menuKeys(): [string, string][] {
  */
 function menuFooter(): [string, string?][] {
   const magna = collectionKeys();
-  // Médaillons Communauté et Collections : Start ouvre l'accueil, ou la liste des collections.
-  if (onCommunity() || onCollections())
+  // Médaillons Communauté, Arène et Collections : Start ouvre l'accueil, l'écran de l'Arène, ou la liste des collections.
+  if (onCommunity() || onArena() || onCollections())
     return [
       [t('Flippers : choisir')],
       ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
@@ -1463,6 +1467,19 @@ function onCommunity(): boolean {
 }
 
 /**
+ * Le médaillon Arène est dans la roue (réglage « Arène dans la roue ») ; comme la Communauté, jamais
+ * en mode invité ni en jeu local (« Jouer en local » retire toute la partie sociale, niveaux compris).
+ */
+function arenaShown(): boolean {
+  return mediaSettings.arena && !socialClosed();
+}
+
+/** Le médaillon Arène est choisi dans la roue. */
+function onArena(): boolean {
+  return arenaShown() && state.medallion === 'arena' && !attractTable();
+}
+
+/**
  * Le médaillon Collections est dans la roue (réglage « Collections dans la roue ») ; pas quand le
  * mode invité impose une collection ou ferme le choix des collections.
  */
@@ -1475,18 +1492,26 @@ function onCollections(): boolean {
   return collectionsShown() && state.medallion === 'collections' && !attractTable();
 }
 
-/** Un médaillon (Juke-box, Communauté, Collections) est choisi : rien de ce qui parle d'une table ne s'applique. */
+/** Un médaillon (Juke-box, Communauté, Arène, Collections) est choisi : rien de ce qui parle d'une table ne s'applique. */
 function onMedallion(): boolean {
-  return onJukebox() || onCommunity() || onCollections();
+  return onJukebox() || onCommunity() || onArena() || onCollections();
 }
 
-/** Les médaillons en tête de la roue, dans l'ordre : le Juke-box, la Communauté, puis les Collections (le plus près des tables). */
+/**
+ * Les médaillons en tête de la roue, dans l'ordre : le Juke-box, la Communauté, l'Arène (21/11/2026),
+ * puis les Collections (le plus près des tables).
+ */
 function wheelLeads(): Medallion[] {
-  return [...(jukeboxShown() ? (['jukebox'] as const) : []), ...(communityShown() ? (['community'] as const) : []), ...(collectionsShown() ? (['collections'] as const) : [])];
+  return [
+    ...(jukeboxShown() ? (['jukebox'] as const) : []),
+    ...(communityShown() ? (['community'] as const) : []),
+    ...(arenaShown() ? (['arena'] as const) : []),
+    ...(collectionsShown() ? (['collections'] as const) : []),
+  ];
 }
 
 function selectedMedallion(): Medallion | undefined {
-  return onJukebox() ? 'jukebox' : onCommunity() ? 'community' : onCollections() ? 'collections' : undefined;
+  return onJukebox() ? 'jukebox' : onCommunity() ? 'community' : onArena() ? 'arena' : onCollections() ? 'collections' : undefined;
 }
 
 /**
@@ -1540,6 +1565,20 @@ function openCommunity(): void {
   if (!guest.knock('menu.system')) return;
   cancelWheelPress();
   communityMenu.openHome(() => library.leave());
+  broadcast();
+}
+
+/** Ce que le menu dit du médaillon Arène : mon niveau, les parties ouvertes sur mes tables. */
+function arenaCard() {
+  const c = arenaMenu.card();
+  return { title: c.title, subtitle: c.subtitle, arena: true, favorite: false, plays: 0 };
+}
+
+/** Start sur le médaillon Arène : son écran à onglets (arena-menu.ts) ; Exit revient à la roue. */
+function openArena(): void {
+  if (!guest.knock('menu.system')) return;
+  cancelWheelPress();
+  arenaMenu.openHome(() => library.leave());
   broadcast();
 }
 
@@ -1858,6 +1897,7 @@ function wheelEntries(media = false): MenuEntries {
   const leads = wheelLeads();
   if (leads.includes('jukebox')) items.push({ ...toRemoteEntry({ label: t('Juke-box'), detail: jukeboxCard().subtitle, icon: 'jukebox' }), pick: () => remotePickJukebox() });
   if (leads.includes('community')) items.push({ ...toRemoteEntry({ label: t('Communauté'), detail: communityCard().subtitle, icon: 'friends' }), pick: () => remotePickCommunity() });
+  if (leads.includes('arena')) items.push({ ...toRemoteEntry({ label: t('Arène'), detail: arenaCard().subtitle, icon: 'trophy' }), pick: () => remotePickArena() });
   if (leads.includes('collections')) items.push({ ...toRemoteEntry({ label: t('Collections'), detail: collectionsCard().subtitle, icon: 'star' }), pick: () => remotePickCollections() });
   for (const table of shelf.tables) {
     const file = table.file;
@@ -2003,6 +2043,16 @@ function remotePickCommunity(): void {
   if (onCommunity()) return void openCommunity();
   if (!guest.knock('menu.choose')) return;
   state = { ...state, medallion: 'community' };
+  playUiSound('solenoid');
+  broadcast();
+}
+
+/** Le médaillon Arène touché au téléphone : choisi, ou, déjà choisi, ouvert (son écran à onglets, à la borne). */
+function remotePickArena(): void {
+  if (!remoteWakes() || state.phase !== 'menu' || !arenaShown()) return;
+  if (onArena()) return void openArena();
+  if (!guest.knock('menu.choose')) return;
+  state = { ...state, medallion: 'arena' };
   playUiSound('solenoid');
   broadcast();
 }
@@ -2811,6 +2861,9 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
     }
     case 'level':
       return localPlay() ? { gone: local } : { run: () => levelMenu.open(back) };
+    // L'écran de l'Arène (arena-menu.ts) : son Exit revient d'où l'on vient.
+    case 'arena':
+      return localPlay() ? { gone: local } : { run: () => arenaMenu.openHome(back) };
     case 'jukebox':
       return { run: () => openJukebox() };
     case 'sheet': {
@@ -3399,6 +3452,41 @@ library.provideSystemItem('online-players', communityMenu.item);
   if (home.rooms) library.provideSystemItem('rooms', home.rooms);
   if (home.rankings) library.provideSystemItem('rankings', home.rankings);
 }
+
+// Arène (arena-menu.ts, 21/11/2026) : le médaillon de ce qui se joue contre les autres. Son affiche et
+// son écran à onglets ; la rubrique Arène du Menu système range Parties instantanées, Classements et
+// Progression (fournis ci-dessus et par level-menu.ts).
+/** Une table des classements (son nom, sa référence VPS) dans la collection montrée par la roue. */
+function shelfTableOf(table: PresenceTable): TableEntry | undefined {
+  const key = levelTableKey(table);
+  return collections.shelf().tables.find((entry) => levelTableKey(presenceTable(entry)) === key);
+}
+const arenaMenu = createArenaMenu({
+  library,
+  net: socialNet,
+  levels: levelTracker,
+  instant: instantMenu,
+  rankings: rankingsMenu,
+  daily: { detail: () => dailyTablesMenu.detail(), open: (back) => dailyTablesMenu.open(back) },
+  level: levelMenu,
+  history: { open: (back) => library.runSystemItem('game-history', back) },
+  players: () => communityMenu.players(),
+  // La roue sur la table d'un rival ou d'un record : comme une table touchée au téléphone.
+  table: {
+    has: (table) => Boolean(shelfTableOf(table)),
+    go: (table) => {
+      const entry = shelfTableOf(table);
+      if (!entry) return;
+      const shelf = collections.shelf();
+      const picked = collections.move(shelf.tables.indexOf(entry) - shelf.index);
+      pointAtTable(picked ?? entry);
+      library.leave();
+      playUiSound('solenoid');
+      broadcast();
+    },
+  },
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+});
 
 /** Un message sur une ligne : ses retours à la ligne deviennent des espaces. */
 const oneLine = (text: string) => text.replace(/\s*\n\s*/g, ' ');
@@ -3989,6 +4077,7 @@ export function startFrontend(): void {
       // Clic sur la table au centre : comme Start (la fiche, ou la partie en « jouer directement ») ; le médaillon Juke-box : le lecteur.
       if (action.offset === 0 && onJukebox()) return void openJukebox();
       if (action.offset === 0 && onCommunity()) return void openCommunity();
+      if (action.offset === 0 && onArena()) return void openArena();
       if (action.offset === 0 && onCollections()) return void openCollectionsMedallion();
       if (action.offset === 0) wheelConfirm(tables[state.index]!, !wheelPlays());
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
@@ -4791,6 +4880,10 @@ function handleKey(input: Input, fromPhone = false): boolean {
       } else if (button === 'confirm' && onCommunity()) {
         // Médaillon Communauté : Start ouvre l'accueil.
         if (!input.isAutoRepeat) openCommunity();
+        return true;
+      } else if (button === 'confirm' && onArena()) {
+        // Médaillon Arène : Start ouvre son écran à onglets.
+        if (!input.isAutoRepeat) openArena();
         return true;
       } else if (button === 'confirm' && onCollections()) {
         // Médaillon Collections : Start ouvre la liste des collections.
@@ -6694,7 +6787,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
         ? { offset: p.offset, key: JUKEBOX_WHEEL_KEY, title: t('Juke-box'), jukebox: true }
         : p.medallion === 'community'
           ? { offset: p.offset, key: COMMUNITY_WHEEL_KEY, title: t('Communauté'), community: true }
-          : { offset: p.offset, key: COLLECTIONS_WHEEL_KEY, title: t('Collections'), collectionsMedallion: true }
+          : p.medallion === 'arena'
+            ? { offset: p.offset, key: ARENA_WHEEL_KEY, title: t('Arène'), arena: true }
+            : { offset: p.offset, key: COLLECTIONS_WHEEL_KEY, title: t('Collections'), collectionsMedallion: true }
       : neighbor(list[p.table]!, p.offset),
   );
   // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
@@ -6716,7 +6811,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     help: state.help,
     count: ring.count,
     position: ring.position,
-    table: !shown && onJukebox() ? jukeboxCard() : !shown && onCommunity() ? communityCard() : !shown && onCollections() ? collectionsCard() : table ? describe(table, !shown) : undefined,
+    table: !shown && onJukebox() ? jukeboxCard() : !shown && onCommunity() ? communityCard() : !shown && onArena() ? arenaCard() : !shown && onCollections() ? collectionsCard() : table ? describe(table, !shown) : undefined,
     neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
     // sa zone ne bouge jamais). La liste des collections ne paraît plus par-dessus la roue : le médaillon Collections l'ouvre.
@@ -6796,6 +6891,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     jukebox: jukeboxPlayer.view(role, (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging()),
     // Communauté : l'affiche du médaillon choisi (plateau, fronton), comme celle du Juke-box.
     community: state.phase === 'menu' && !state.help && onCommunity() ? { poster: communityMenu.poster() } : undefined,
+    // Arène : son affiche (arena.js) : jauge du niveau, tableau des records à points, qui joue en ce moment.
+    arena: state.phase === 'menu' && !state.help && onArena() ? { poster: arenaMenu.poster() } : undefined,
     // Collections : l'affiche du médaillon choisi, de même (même mise en page, community.js).
     collectionsMedallion: state.phase === 'menu' && !state.help && onCollections() ? { poster: collectionsPoster(collections) } : undefined,
     gameKeys: gameKeys(buttons, tilt),
@@ -6961,7 +7058,7 @@ function playerCard(): PlayerCardView {
 function moveSelection(offset: number): void {
   const leads = wheelLeads();
   if (leads.length) {
-    // Les médaillons (Juke-box, Communauté, Collections) en tête de la collection : ils se choisissent comme une table.
+    // Les médaillons (Juke-box, Communauté, Arène, Collections) en tête de la collection : ils se choisissent comme une table.
     const shelf = collections.shelf();
     const chosen = selectedMedallion();
     const target = medallionWheelMove({ tables: shelf.tables.length, at: shelf.index, leads, selected: chosen }, offset);

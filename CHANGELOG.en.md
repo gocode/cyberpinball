@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- New "Arena" medallion on the wheel, between Community and Collections: everything played against others. Its live medallion shows a cup and confetti; hide it in System menu › Tables › Wheel ("Arena on the wheel").
+- When focused, the Arena poster shows your level and what one game can still bring, then a records board in DMD dots whose pages turn every six seconds, the most pressing first (open game, place to win back, your ranking, your records), and who is playing right now.
+- Start opens the Arena screen: the "Your level" band, icon tabs switched with the MagnaSave buttons, and cards picked with the flippers. On top, the most pressing action (a place just taken from you, an instant game waiting for you), then the games open on your tables and the XP each action brings. The Daily tab opens the tables of the day; the Challenges and League tabs arrive in a coming version.
+- System menu: new Arena section, with Instant games, Rankings and Progress (My level, My badges, Game history), which leave Community. "Play locally" also removes the Arena.
 - DMD colors (Serum, PIN2DMD): a colorization dropped on its own is stored under the name of the ROM the table plays, with the file names VPX reads (`<rom>.cRZ`, `pin2dmd.pal` and `pin2dmd.vni`). Before, a `pin2dmd.pal` ended up in `vni\pin2dmd` and the DMD stayed uncolored. There is nothing to tick: VPinMAME's F1 window does not exist with Cyber Pinball's VPX, the colors apply by themselves.
 - Colors already stored under the wrong name are renamed automatically before the next game. The table diagnostic also reports a colorization made for another revision of the ROM (one click to try it) and files VPX never reads (`.pac`, `.cROM`).
 - Stutters in game: the cabinet report now also tells where the VPX render thread was during each freeze (graphics driver, video, texture loading…), not only the game loop, which is then just waiting for that thread.

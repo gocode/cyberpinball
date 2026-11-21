@@ -5570,7 +5570,7 @@ export function createLibrary(host: LibraryHost) {
    * chacune de ses étapes est rattachée à une action, que choisir amène dans la vue.
    */
   function readable(built: Built, zones: Zones | undefined): boolean {
-    if (!screen || zones || screen.kind === 'pages' || built.media || built.health || built.journey || built.scoreboard) return false;
+    if (!screen || zones || screen.kind === 'pages' || built.media || built.health || built.journey || built.scoreboard || built.hub) return false;
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return false;
     return built.sections.length > 0;
   }
@@ -6000,6 +6000,8 @@ export function createLibrary(host: LibraryHost) {
       journey: built.journey,
       health: built.health,
       scoreboard: built.scoreboard,
+      // Écran à onglets et à cartes (hub-screen.ts) : il se dessine en entier (app/renderer/hub.js).
+      hub: built.hub,
       newsPage: built.newsPage,
       tabs: built.tabs,
       // L'ordre des flippers (visualOrder) : le garde-fou de mise en page le compare à celui de l'affichage.

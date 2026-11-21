@@ -1,0 +1,264 @@
+// Arène (21/11/2026, planche « Engagement » validée) : le médaillon de ce qui se joue contre les autres.
+// Ces tests fixent les invariants de la planche : seulement des données réelles (une page ou une
+// section sans donnée n'existe pas, ce qui n'existe pas encore a son onglet grisé avec sa raison),
+// l'ordre de la roue, l'écran à onglets générique (flippers, MagnaSave, Exit), et le câblage.
+
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { test } from 'node:test';
+import { arenaBoardPages, arenaLevelBand, arenaMoment, arenaRecords, arenaRivals, dmdNumber, gameReach, levelBandLines } from '../arena';
+import { setLanguage } from '../i18n';
+import { dayKey, emptyLevels, levelStart, XP } from '../levels';
+import { medallionWheel, type Medallion } from '../jukebox-screens';
+import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
+import type { RankedScore, RankingStore } from '../rankings';
+import { fakeSocialNet } from './doublures';
+import { frontendSource } from './frontend-source';
+import { REPO_ROOT } from './i18n-scan';
+
+setLanguage('fr');
+
+const NOW = new Date('2026-11-21T20:40:00');
+const ago = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
+const ME = 'a'.repeat(64);
+const LEA = 'e'.repeat(64);
+const PAUL = 'f'.repeat(64);
+const facts = new Proxy({ games: 84, tables: 21, seconds: 30 * 3600, longestTable: 4 * 3600, records: 6, championTables: 0, beaten: 21 }, { get: (o: Record<string, number>, k: string) => o[k] ?? 0 }) as never;
+
+function score(key: string, name: string, board: string, title: string, value: number, min: number): RankedScore {
+  return { key, name, board, table: { title }, score: value, at: ago(min), how: 'rom', sig: '' };
+}
+
+const store = (): RankingStore => ({
+  v: 1,
+  hidden: [],
+  scores: [
+    score(PAUL, 'Paul', 'afm', 'Attack from Mars', 10_340_000, 2400),
+    score(LEA, 'Léa', 'afm', 'Attack from Mars', 9_450_000, 20),
+    score(ME, 'Kiko', 'afm', 'Attack from Mars', 8_912_340, 1500),
+    score(ME, 'Kiko', 'afm', 'Attack from Mars', 7_000_000, 3000),
+    score(PAUL, 'Paul', 'tz', 'Twilight Zone', 698_400_120, 7000),
+    score(ME, 'Kiko', 'tz', 'Twilight Zone', 640_120_300, 300),
+    score(ME, 'Kiko', 'mm', 'Medieval Madness', 3_980_000, 4000),
+  ],
+});
+
+// ---------- Le niveau ----------
+
+test('niveau : ce qu’une partie peut encore rapporter, la première du jour comprise, jamais au-delà du plafond', () => {
+  const fresh = { days: {} };
+  assert.equal(gameReach(fresh, NOW), XP.game + 10 * XP.minute + XP.personalBest + XP.firstOfDay);
+  const played = { days: { [dayKey(NOW)]: { xp: 100, seconds: 600, games: 1 } } };
+  assert.equal(gameReach(played, NOW), XP.game + 10 * XP.minute + XP.personalBest, 'la première du jour est déjà jouée');
+  const capped = { days: { [dayKey(NOW)]: { xp: 590, seconds: 9000, games: 12 } } };
+  assert.equal(gameReach(capped, NOW), 10, 'le plafond du jour retient le reste');
+});
+
+test('niveau : la bande dit ce qu’il manque, le prochain palier et le badge le plus proche', () => {
+  const state = { ...emptyLevels(), xp: levelStart(12) + 270 };
+  const b = arenaLevelBand(state, [], facts, NOW);
+  assert.equal(b.level, 12);
+  assert.equal(b.tierLabel, 'Flippeur');
+  assert.equal(b.missing, 380);
+  assert.deepEqual(b.nextTier, { level: 20, label: 'Habitué' });
+  assert.ok(b.reachShare > 0 && b.progress + b.reachShare <= 1, 'les hachures tiennent dans la barre');
+  assert.ok(b.badge, 'un badge entamé : le plus proche');
+  const lines = levelBandLines(b);
+  assert.match(lines[0]!, /Une partie peut rapporter jusqu’à 65 XP aujourd’hui/, 'au-delà de trois parties : ce qu’une partie rapporte, pas un compte qui décourage');
+  assert.match(lines[1]!, /Palier Habitué au niveau 20/);
+  // Une partie suffit : elle le dit.
+  const close = arenaLevelBand({ ...emptyLevels(), xp: levelStart(13) - 30 }, [], facts, NOW);
+  assert.equal(levelBandLines(close)[0], 'Une partie peut suffire');
+});
+
+// ---------- Rivaux et records ----------
+
+test('rivaux : le joueur juste devant moi, l’écart, et s’il vient de me passer devant', () => {
+  const rivals = arenaRivals(store(), ME);
+  assert.deepEqual(
+    rivals.map((r) => [r.table.title, r.rival.name, r.gap, r.passed, r.mine.rank]),
+    [
+      ['Attack from Mars', 'Léa', 537_660, true, 3],
+      ['Twilight Zone', 'Paul', 58_279_820, false, 2],
+    ],
+    'celle qui vient de me passer devant d’abord ; MM : personne devant moi, pas de rival',
+  );
+  // Un score masqué sur cette borne ne compte pas.
+  const s = store();
+  s.hidden.push(`k:${LEA}`);
+  assert.equal(arenaRivals(s, ME)[0]!.rival.name, 'Paul');
+  assert.deepEqual(arenaRivals({ v: 1, hidden: [], scores: [] }, ME), [], 'rien de publié : aucun rival');
+});
+
+test('records : mon meilleur score par table, ma place, les plus récents d’abord', () => {
+  const records = arenaRecords(store(), ME);
+  assert.deepEqual(
+    records.map((r) => [r.table.title, r.score, r.rank, r.players]),
+    [
+      ['Twilight Zone', 640_120_300, 2, 2],
+      ['Attack from Mars', 8_912_340, 3, 3],
+      ['Medieval Madness', 3_980_000, 1, 1],
+    ],
+  );
+});
+
+// ---------- L'action du moment ----------
+
+test('action du moment : la plus pressante parmi ce qui existe, rien sinon', () => {
+  const rivals = arenaRivals(store(), ME);
+  const open = [{ id: 'g', title: 'TZ', host: { key: PAUL, name: 'Paul' }, seats: [{ key: PAUL, name: 'Paul' }], max: 4, joinable: true }];
+  const band = arenaLevelBand({ ...emptyLevels(), xp: levelStart(12) + 270 }, [], facts, NOW);
+  assert.equal(arenaMoment({ mine: { title: 'TZ', seated: 1, max: 2 }, open, rivals, band, playedToday: false, now: NOW })?.kind, 'my-game');
+  assert.equal(arenaMoment({ open, rivals, band, playedToday: false, now: NOW })?.kind, 'rival', 'une place prise il y a 20 min : en tête (planche validée)');
+  assert.equal(arenaMoment({ open, rivals: rivals.slice(1), band, playedToday: false, now: NOW })?.kind, 'open-game');
+  assert.equal(arenaMoment({ open: [], rivals: [], band, playedToday: false, now: NOW })?.kind, 'first-of-day');
+  assert.equal(arenaMoment({ open: [], rivals: [], band, playedToday: true, now: NOW }), undefined, 'rien de pressant : pas de carte inventée');
+});
+
+// ---------- Le tableau à points ----------
+
+test('tableau à points : une page par donnée réelle, la plus pressante d’abord ; aucune donnée, aucune page', () => {
+  const input = { open: [], rivals: [], records: [], ago: () => 'il y a 20 min', now: NOW };
+  assert.deepEqual(arenaBoardPages(input), [], 'ni ligue, ni défi, ni rendez-vous inventés');
+  const rivals = arenaRivals(store(), ME);
+  const records = arenaRecords(store(), ME);
+  const open = [{ id: 'g', title: 'Twilight Zone', host: { key: PAUL, name: 'Paul' }, seats: [{ key: PAUL, name: 'Paul' }], max: 4, joinable: true }];
+  const pages = arenaBoardPages({ ...input, open, rivals, records, standing: { world: { rank: 412, players: 2310 } } });
+  assert.deepEqual(pages.map((p) => p.id), ['rival', 'open-game', 'standing', 'records']);
+  const rival = pages[0]!;
+  assert.equal(rival.lines[0]!.cells[0]!.text, 'Votre place est prise');
+  assert.deepEqual(rival.lines[2]!.cells.map((c) => c.text), ['2 Léa', '9.450.000']);
+  assert.equal(rival.lines[4]!.cells[0]!.text, 'À reprendre : 537.660');
+  assert.equal(rival.foot, 'Léa vous a dépassé il y a 20 min');
+  for (const p of pages) assert.ok(p.lines.length <= 5, `${p.id} : cinq lignes au plus sur le tableau`);
+  assert.equal(dmdNumber(9_450_000), '9.450.000');
+});
+
+// ---------- La roue et le réglage ----------
+
+test('roue : Juke-box · Communauté · Arène · Collections, puis les tables', () => {
+  const leads: Medallion[] = ['jukebox', 'community', 'arena', 'collections'];
+  const on = medallionWheel({ tables: 5, at: 0, leads, selected: 'arena' });
+  assert.equal(on.position, 3);
+  assert.deepEqual(on.places.find((p) => p.offset === -1), { offset: -1, medallion: 'community' });
+  assert.deepEqual(on.places.find((p) => p.offset === 1), { offset: 1, medallion: 'collections' });
+  assert.equal(DEFAULT_MENU_MEDIA_SETTINGS.arena, true);
+  assert.equal(normalizeMenuMediaSettings({}).arena, true, 'une borne d’avant ce réglage voit le médaillon');
+  assert.equal(normalizeMenuMediaSettings({ arena: false }).arena, false);
+});
+
+// ---------- L'écran à onglets ----------
+
+interface HubBuilt {
+  heading: string;
+  actions: { label: string; key?: string; run: () => void }[];
+  back: () => void;
+  keys?: (input: { code: string }) => boolean;
+  hub: { tabs: { label: string; current: boolean; disabled?: string; action?: number }[]; sections: { title?: string; cards: { title: string; action?: number; buttons?: { action: number }[] }[] }[] };
+}
+
+function arena(overrides: Record<string, unknown> = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createArenaMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'arena-menu.js')) as { createArenaMenu(host: unknown): { openHome(back: () => void): void; poster(): { pages: unknown[]; chips: unknown[]; live?: unknown } } };
+  let opened: { build: () => HubBuilt; at?: number } | undefined;
+  const events: string[] = [];
+  const levels = { ...emptyLevels(), xp: levelStart(12) + 270, days: { [dayKey(NOW)]: { xp: 0, seconds: 0, games: 1 } } };
+  const menu = createArenaMenu({
+    library: { openCustom: (build: () => HubBuilt, at?: number) => (opened = { build, at }) },
+    net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }) }),
+    levels: { state: () => levels, facts: () => facts },
+    instant: { door: () => ({ detail: 'Aucune partie ouverte : lancez la vôtre', quiet: false }), arena: () => ({ open: [] }), open: () => events.push('parties'), openNew: () => events.push('ouvrir') },
+    rankings: { standing: () => undefined, open: () => events.push('classements') },
+    level: { open: () => events.push('niveau'), openBadges: () => events.push('badges'), openRules: () => events.push('barème') },
+    history: { open: () => events.push('historique') },
+    players: () => [],
+    zoneKeys: () => ['MagnaLeft', 'MagnaRight'],
+    now: () => NOW,
+    ...overrides,
+  });
+  return { menu, events, built: () => opened!.build(), at: () => opened!.at };
+}
+
+test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encore grisés avec leur raison et sautés', () => {
+  const h = arena();
+  h.menu.openHome(() => h.events.push('roue'));
+  const b = h.built();
+  // Les six onglets de la planche validée ; les classements vivent dans Progression.
+  assert.deepEqual(b.hub.tabs.map((t) => t.label), ['Accueil', 'Parties', 'Défis', 'Du jour', 'Ligue', 'Progression']);
+  for (const id of ['Défis', 'Du jour', 'Ligue']) {
+    const tab = b.hub.tabs.find((t) => t.label === id)!;
+    assert.equal(tab.disabled, 'Bientôt', `${id} : grisé avec sa raison`);
+    assert.equal(tab.action, undefined, `${id} : ni flipper ni clic ne l’ouvrent`);
+  }
+  assert.equal(b.hub.tabs[0]!.current, true);
+  // Les actions suivent l'affichage : les onglets qui s'ouvrent, puis les cartes.
+  assert.deepEqual(b.actions.slice(0, 3).map((a) => a.key), ['tab:home', 'tab:games', 'tab:progress']);
+  assert.equal(h.at(), 3, 'le curseur sur la première carte, après les onglets');
+  // Aucune section de ce qui n'existe pas encore (ligue, missions, rendez-vous, défis, série).
+  const titles = b.hub.sections.map((s) => s.title ?? '');
+  for (const absent of ['Ligue', 'Missions', 'Défi', 'Série', 'Vendredi']) assert.ok(!titles.some((t) => t.includes(absent)), `pas de section « ${absent} »`);
+  assert.ok(titles.includes('Ce que rapportent les XP'), 'le barème, d’après levels.ts');
+  // MagnaSave : l'onglet suivant qui s'ouvre (Parties), puis Progression (Défis, Du jour et Ligue sautés).
+  assert.equal(b.keys!({ code: 'MagnaRight' }), true);
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Parties');
+  h.built().keys!({ code: 'MagnaRight' });
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression');
+  h.built().keys!({ code: 'MagnaLeft' });
+  assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Parties', 'le MagnaSave gauche revient en arrière');
+  // Exit : la roue.
+  h.built().back();
+  assert.deepEqual(h.events, ['roue']);
+});
+
+test('écran de l’Arène : l’onglet « Du jour » s’ouvre dès que les tables du jour existent', () => {
+  const h = arena({ daily: { detail: () => '3 tables jouées aujourd’hui', open: () => h.events.push('du jour') } });
+  h.menu.openHome(() => undefined);
+  const tab = h.built().hub.tabs.find((t) => t.label === 'Du jour')!;
+  assert.equal(tab.disabled, undefined);
+  h.built().actions.find((a) => a.key === 'tab:daily')!.run();
+  h.built().actions.find((a) => a.label === 'Les plus jouées aujourd’hui')!.run();
+  assert.equal(h.events.at(-1), 'du jour');
+});
+
+test('écran de l’Arène : les cartes mènent aux écrans complets (parties, classements, progression)', () => {
+  const h = arena();
+  h.menu.openHome(() => undefined);
+  h.built().actions.find((a) => a.key === 'tab:progress')!.run();
+  const progress = h.built();
+  for (const [title, event] of [['Mon niveau', 'niveau'], ['Tous les classements', 'classements'], ['Mes badges', 'badges'], ['Historique des parties', 'historique'], ['Comment gagner des XP', 'barème']] as const) {
+    progress.actions.find((a) => a.label === title)!.run();
+    assert.equal(h.events.at(-1), event, title);
+  }
+  h.built().actions.find((a) => a.key === 'tab:games')!.run();
+  h.built().actions.find((a) => a.label === 'Ouvrir une partie instantanée')!.run();
+  assert.equal(h.events.at(-1), 'ouvrir');
+});
+
+test('affiche de l’Arène : sans donnée réelle, ni tableau, ni joueurs, ni puces inventés', () => {
+  // Un joueur qui débute : aucune partie, aucun badge entamé, rien de publié, personne en ligne.
+  const none = new Proxy({}, { get: () => 0 });
+  const p = arena({ levels: { state: () => ({ ...emptyLevels(), days: {} }), facts: () => none } }).menu.poster();
+  assert.deepEqual(p.pages, []);
+  assert.equal(p.live, undefined);
+  assert.deepEqual(p.chips, [], 'pas de partie ouverte, pas d’XP cette semaine, aucun badge entamé');
+});
+
+// ---------- Câblage ----------
+
+test('frontend : le médaillon Arène est câblé comme les autres (roue, Start, clic, téléphone, affiche, rendu)', () => {
+  const main = frontendSource();
+  assert.match(main, /\.\.\.\(communityShown\(\) \? \(\['community'\] as const\) : \[\]\),\s*\.\.\.\(arenaShown\(\) \? \(\['arena'\] as const\) : \[\]\),\s*\.\.\.\(collectionsShown\(\)/, 'entre la Communauté et les Collections');
+  assert.match(main, /button === 'confirm' && onArena\(\)/, 'Start ouvre son écran');
+  assert.match(main, /action\.offset === 0 && onArena\(\)/, 'clic au centre de la roue');
+  assert.match(main, /leads\.includes\('arena'\)/, 'au téléphone');
+  assert.match(main, /arena: state\.phase === 'menu' && !state\.help && onArena\(\) \? \{ poster: arenaMenu\.poster\(\) \}/, 'son affiche');
+  const renderer = (f: string) => fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', f), 'utf8');
+  assert.match(renderer('frontend.js'), /n\.arena \? 'arene'/);
+  assert.match(renderer('frontend.js'), /CyberArena\.wheelPoster/);
+  assert.match(renderer('frontend.js'), /window\.CyberArena\?\.zone/);
+  assert.match(renderer('library.js'), /if \(v\.hub && window\.CyberHub\)/, 'l’écran à onglets se dessine en entier');
+  for (const f of ['arena.js', 'hub.js', 'arena.css', 'hub.css']) assert.match(renderer('frontend.html'), new RegExp(f.replace('.', '\\.')), `${f} chargé`);
+  assert.match(renderer('medaillons-vivants.js'), /arene: \{ draw: coupe/, 'intérieur vivant « Coupe »');
+  for (const f of ['arene.png', 'arene-512.webp']) assert.ok(fs.existsSync(path.join(REPO_ROOT, 'app', 'renderer', 'medaillons', f)), `${f} généré (medaillons.cjs)`);
+});

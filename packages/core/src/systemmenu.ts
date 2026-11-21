@@ -22,6 +22,12 @@ import type { IconName } from './icons';
 
 /** Lignes d'un écran du Menu système, « Retour » non compris : au-delà, on ne voit plus la liste d'un coup d'œil. */
 export const MAX_SYSTEM_ENTRIES = 8;
+/**
+ * Lignes de la racine : une de plus depuis l'Arène (21/11/2026), la porte de son médaillon à côté de
+ * celle de la Communauté. Rien d'autre à la racine ne pouvait céder sa place (Activité récente parle
+ * de tout, Téléchargements et Juke-box n'ont pas d'autre rubrique, Tables est pleine).
+ */
+export const MAX_SYSTEM_ROOT_ENTRIES = 9;
 
 /** Entrées fournies par l'application. */
 export const SYSTEM_ITEM_IDS = [
@@ -110,6 +116,8 @@ export const SYSTEM_GROUP_IDS = [
   'demarrage',
   'sante',
   'amis',
+  'arene',
+  'progression',
   'mon-profil',
   'modifier-profil',
   'confidentialite',
@@ -144,12 +152,12 @@ export interface SystemGroup extends SystemEntry {
 
 /**
  * La racine du menu système telle qu'elle s'affiche, dans l'ordre de l'usage (20/11/2026) : gérer ses
- * tables, régler sa borne, suivre ses téléchargements, puis les portes de la Communauté et du Juke-box
- * (leurs médaillons sont dans la roue), l'aide, et « Quitter ou éteindre » en dernier, à deux appuis du
- * flipper gauche depuis l'ouverture (la liste boucle). Rubriques et entrées mêlées : Téléchargements,
- * Activité récente et Juke-box n'ont pas d'autre place.
+ * tables, régler sa borne, suivre ses téléchargements, puis les portes de la Communauté, de l'Arène
+ * (21/11/2026) et du Juke-box (leurs médaillons sont dans la roue), l'aide, et « Quitter ou éteindre »
+ * en dernier, à deux appuis du flipper gauche depuis l'ouverture (la liste boucle). Rubriques et
+ * entrées mêlées : Téléchargements, Activité récente et Juke-box n'ont pas d'autre place.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['tables', 'borne', 'downloads', 'activity', 'amis', 'jukebox', 'aide', 'quitter'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['tables', 'borne', 'downloads', 'activity', 'amis', 'arene', 'jukebox', 'aide', 'quitter'];
 
 /** Rubriques de la racine, dans son ordre. */
 export const SYSTEM_ROOT: readonly SystemGroupId[] = SYSTEM_ROOT_ENTRIES.filter((id): id is SystemGroupId => isSystemGroup(id));
@@ -225,20 +233,38 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   },
   // Communauté : l'accueil du médaillon de la roue, le même écran depuis le Menu système (community-menu.ts
   // y ajoute le nombre de joueurs en ligne et ce que voient les autres). Nommée « Amis » jusqu'au 18/11/2026.
+  // Le 21/11/2026, ce qui se joue contre les autres (parties instantanées, classements, niveau) part dans l'Arène.
   amis: {
     id: 'amis',
     icon: 'friends',
     get label() { return t('Communauté'); },
-    get detail() { return t('Mon profil, joueurs en ligne, amis, messages, groupes et salons, classements, réglages'); },
-    entries: ['mon-profil', 'online-players', 'instant', 'friends', 'messages', 'groupes-salons', 'rankings', 'reglages-communaute'],
+    get detail() { return t('Mon profil, joueurs en ligne, amis, messages, groupes et salons, réglages'); },
+    entries: ['mon-profil', 'online-players', 'friends', 'messages', 'groupes-salons', 'reglages-communaute'],
   },
-  // Tout ce qui est « moi » : niveau, badges, parties, profil, et de quoi retrouver son compte sur un autre PC.
+  // Arène (21/11/2026, arena-menu.ts) : jouer contre les autres. Son médaillon ouvre l'écran à onglets ;
+  // ici, la porte de ses écrans complets.
+  arene: {
+    id: 'arene',
+    icon: 'trophy',
+    get label() { return t('Arène'); },
+    get detail() { return t('Parties instantanées, classements, progression : niveau, badges, historique'); },
+    entries: ['instant', 'rankings', 'progression'],
+  },
+  // Tout ce qui se mesure : niveau, badges, parties jouées (« Mon niveau » de la Communauté jusqu'au 21/11/2026).
+  progression: {
+    id: 'progression',
+    icon: 'upgrade',
+    get label() { return t('Progression'); },
+    get detail() { return t('Niveau, badges, historique des parties'); },
+    entries: ['my-level', 'badges', 'game-history'],
+  },
+  // Tout ce qui est « moi » : profil, et de quoi retrouver son compte sur un autre PC.
   'mon-profil': {
     id: 'mon-profil',
     icon: 'avatar',
     get label() { return t('Mon profil'); },
-    get detail() { return t('Niveau et badges, historique des parties, pseudo, avatar, pays, confidentialité, compte'); },
-    entries: ['my-level', 'badges', 'game-history', 'modifier-profil', 'confidentialite', 'compte'],
+    get detail() { return t('Pseudo, avatar, pays, confidentialité, compte'); },
+    entries: ['modifier-profil', 'confidentialite', 'compte'],
   },
   'modifier-profil': {
     id: 'modifier-profil',
@@ -320,8 +346,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   groups: { icon: 'friends', get label() { return t('Groupes'); } },
   // Le salon du pays (rooms-menu.ts) : le libellé le nomme.
   rooms: { icon: 'globe', get label() { return t('Salons par pays'); } },
-  // Classements des tables (rankings-menu.ts).
-  rankings: { icon: 'trophy', get label() { return t('Classements'); } },
+  // Classements des tables (rankings-menu.ts) ; la coupe est à la rubrique Arène qui les range.
+  rankings: { icon: 'list', get label() { return t('Classements'); } },
   // Présence publique, salons, filtre de mots, joueurs ignorés, règles (rooms-menu.ts).
   'community-settings': { icon: 'gear', get label() { return t('Présence et salons'); } },
   // La file des signalements des salons (rooms-menu.ts) : fournie aux seuls modérateurs de la charte.

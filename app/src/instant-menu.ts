@@ -70,6 +70,14 @@ export interface InstantMenu {
   joinOn(board: string, back: () => void): Action | undefined;
   /** Parties ouvertes par d'autres en ce moment. */
   count(): number;
+  /**
+   * Pour l'Arène (arena-menu.ts) : ma partie qui attend des joueurs, et les parties ouvertes par les
+   * autres sur mes tables (celles que je n'ai pas sont écartées), chacune avec de quoi la rejoindre ou
+   * pourquoi elle ne se rejoint pas ; `back` : où revenir après la partie ou son refus.
+   */
+  arena(back: () => void): { mine?: { title: string; seated: number; max: number; open(): void }; open: { game: InstantGame; joinable: boolean; reason?: string; join(): void }[] };
+  /** « Ouvrir une partie instantanée » : la table, puis le nombre de joueurs ; « Retour » vers `back`. */
+  openNew(back: () => void): void;
   /** Pour « Joueurs » au téléphone : les parties ouvertes, en ouvrir une, la mienne (instant-menu.ts reste la source). */
   remote(): RemoteInstant;
   /**
@@ -413,5 +421,28 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       return { label: t('Rejoindre la partie de {name}', { name: g.name }), detail: t('{n} sur {max} joueurs · départ dès qu’elle est complète', { n: g.seats.length, max: g.max }), icon: 'friends', tone: 'ok', attention: true, run: () => ((back = from), joinGame(g)) };
     },
     count: () => (unavailable() ? 0 : games.instantGames().filter((g) => g.key !== myKey()).length),
+    arena(to) {
+      if (unavailable()) return { open: [] };
+      const mine = myInstant();
+      const busy = host.busy?.();
+      const open = games
+        .instantGames()
+        .filter((g) => g.key !== myKey() && mine?.id !== g.id)
+        .map((g) => ({ g, found: matchOf(g) }))
+        // Sur mes tables : celles que je n'ai pas du tout ne se proposent pas (la liste complète les montre).
+        .filter(({ found }) => found.match !== 'missing')
+        .map(({ g, found }) => {
+          const reason = busy ?? (!found.match ? t('Vérification de la table sur votre borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : undefined);
+          return { game: g, joinable: !reason, ...(reason ? { reason } : {}), join: () => ((back = to), joinGame(g)) };
+        });
+      return {
+        ...(mine ? { mine: { title: mine.title, seated: mine.players.filter((p) => p.host || p.state === 'accepted').length, max: mine.instant!.max, open: () => host.live.open(to) } } : {}),
+        open,
+      };
+    },
+    openNew(to) {
+      back = to;
+      openChooseTable(to);
+    },
   };
 }

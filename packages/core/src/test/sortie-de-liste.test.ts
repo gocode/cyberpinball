@@ -248,6 +248,7 @@ test('rendu : chaque conteneur de liste de contenu de library.js passe par le ca
 const SCROLLING: Record<string, string> = {
   'library.css | .lib-content': 'liste de contenu : dans le cadre de sa zone (zoneFrame) dès que l’écran a d’autres actions ; texte sans rien à choisir : zone de lecture aux flippers (readingFrame, reading.ts, lecture.test.ts)',
   'library.css | .lib-actions': 'actions de l’écran : Exit y revient en arrière',
+  'hub.css | .hub-body': 'écran à onglets (hub-screen.ts) : ses cartes sont les actions de l’écran, les flippers amènent la carte choisie dans la vue ; Exit revient à la roue',
   'library.css | .lib-body.lib-health > .health, .lib-body.lib-health > .lib-zone > .health': 'liste de contenu (Santé de la borne) : dans le cadre de sa zone',
   'library.css | .lib-picker .kind-places': 'liste de contenu (emplacements du sélecteur de fichiers) : dans le cadre de la zone, avec les fichiers',
   'library.css | .lib-picker .kind-entries': 'liste de contenu (fichiers du sélecteur) : dans le cadre de la zone',

@@ -25,8 +25,22 @@ test('jouer en local : toute la rubrique Communauté part, sauf l’interrupteur
   }
 });
 
-test('jouer en local : seule la part sociale de la Communauté part, jamais la mise à jour ni le reste', () => {
-  const social = new Set<SystemItemId>(systemItemsUnder('amis').filter((id) => !MINE.includes(id)));
+test('jouer en local : toute l’Arène part, rubrique et médaillon (21/11/2026)', () => {
+  // Ce qui se joue contre les autres, niveaux compris : parties instantanées, classements, progression.
+  // Toute entrée de la rubrique, présente ou ajoutée plus tard, disparaît d'office.
+  const arena = systemItemsUnder('arene');
+  assert.ok(arena.length >= 5, arena.join(', '));
+  for (const id of arena) {
+    assert.equal(hiddenInLocalPlay(id, true), true, `${id} doit disparaître en jeu local`);
+    assert.equal(hiddenInLocalPlay(id, false), false, `${id} reste quand la communauté est là`);
+  }
+  // Le médaillon de la roue (et du téléphone, qui suit wheelLeads) : comme la Communauté.
+  assert.match(frontendSource(), /function arenaShown\(\): boolean \{\s*return mediaSettings\.arena && !socialClosed\(\);/);
+  assert.match(frontendSource(), /\.\.\.\(arenaShown\(\) \? \(\['arena'\] as const\) : \[\]\)/);
+});
+
+test('jouer en local : seule la part sociale de la Communauté et de l’Arène part, jamais la mise à jour ni le reste', () => {
+  const social = new Set<SystemItemId>([...systemItemsUnder('amis'), ...systemItemsUnder('arene')].filter((id) => !MINE.includes(id)));
   for (const id of LOCAL_PLAY_HIDDEN) assert.ok(social.has(id), `${id} n’est pas social : il ne doit pas disparaître`);
   for (const id of ['updates', 'news', 'feedback', 'backups', 'downloads', 'phone-remote', 'account', 'player-name', 'avatar', 'country', 'guest-mode'] as const) {
     assert.ok((SYSTEM_ITEM_IDS as readonly string[]).includes(id), id);

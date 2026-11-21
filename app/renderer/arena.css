@@ -1,0 +1,319 @@
+/*
+ * Affiche du médaillon Arène (arena.js), d'après la planche validée le 21/11/2026. Fond, cadre et
+ * place : ceux des affiches du Juke-box et de la Communauté (jukebox.css, .jb-poster,
+ * .jb-wheel-poster) ; ici, la composition propre. Cotes en unités d'une affiche de référence
+ * (--pw × --ph) : N × --a.
+ */
+
+.ar-poster {
+  --pw: 1080;
+  --ph: 1920;
+}
+
+/* La composition, centrée en colonne : sur le plateau, dans les 1 370 premiers pixels (la roue dessous). */
+.ar-stage {
+  /* Mesurée sur l'affiche (.jb-poster, son conteneur) : l'unité de la composition. */
+  --a: min(100cqw / var(--pw), 100cqh / var(--ph));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(38 * var(--a));
+  padding: calc(110 * var(--a)) calc(64 * var(--a)) 0;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  font-size: max(calc(24 * var(--a)), var(--jb-floor));
+}
+
+.ar-wheel:not(.ar-desk) .ar-stage {
+  bottom: auto;
+  height: calc(1370 * var(--a));
+}
+
+/* Au bureau : le cadre 9:16 du plateau, la composition plus grande et centrée (maquette « desk »). */
+.ar-wheel.ar-desk {
+  --pw: 700;
+  --ph: 1244;
+}
+
+.ar-wheel.ar-desk .ar-stage {
+  justify-content: center;
+  gap: calc(28 * var(--a));
+  padding: calc(40 * var(--a));
+}
+
+.ar-emblem {
+  position: relative;
+  flex: none;
+  width: calc(250 * var(--a));
+  height: calc(250 * var(--a));
+  /* La lueur verte : un drop-shadow, la composition ne masque rien de ce qui déborde. */
+  filter: drop-shadow(0 0 calc(30 * var(--a)) rgba(139, 226, 58, 0.22));
+}
+
+.ar-wheel.ar-desk .ar-emblem {
+  width: calc(210 * var(--a));
+  height: calc(210 * var(--a));
+}
+
+.ar-emblem > .ar-logo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ar-titles {
+  display: grid;
+  justify-items: center;
+  gap: calc(8 * var(--a));
+  text-align: center;
+}
+
+.ar-title {
+  margin: 0;
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: calc(108 * var(--a));
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+}
+
+.ar-wheel.ar-desk .ar-title {
+  font-size: calc(80 * var(--a));
+}
+
+.ar-tag {
+  margin: 0;
+  font-weight: 600;
+  font-size: max(calc(24 * var(--a)), var(--jb-floor));
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.ar-wheel.ar-desk .ar-tag {
+  font-size: max(calc(26 * var(--a)), var(--jb-floor));
+  letter-spacing: 0.2em;
+}
+
+/* La jauge du niveau : la puce du palier, la barre, ce qu'il manque. */
+.ar-level {
+  width: 100%;
+  max-width: calc(952 * var(--a));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: calc(18 * var(--a));
+  align-items: center;
+  font-size: max(calc(24 * var(--a)), var(--jb-floor));
+}
+
+.ar-wheel.ar-desk .ar-level {
+  font-size: max(calc(27 * var(--a)), var(--jb-floor));
+}
+
+.ar-level-chip {
+  padding: calc(4 * var(--a)) calc(16 * var(--a));
+  border-radius: 999px;
+  border: calc(2 * var(--a)) solid var(--tier);
+  color: var(--tier);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ar-level-after {
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.ar-xpbar {
+  position: relative;
+  height: calc(16 * var(--a));
+  border-radius: calc(8 * var(--a));
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.ar-xp-got {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: calc(8 * var(--a));
+  background: linear-gradient(90deg, color-mix(in oklab, var(--tier) 70%, var(--signal)), var(--signal));
+}
+
+.ar-xp-may {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--signal) 55%, transparent) 0 calc(6 * var(--a)), transparent calc(6 * var(--a)) calc(12 * var(--a)));
+}
+
+/* Le tableau à points : le cadre sombre du DMD, sa phrase et ses pages dessous. */
+.ar-dmd {
+  width: 100%;
+  max-width: calc(952 * var(--a));
+  display: grid;
+  gap: calc(10 * var(--a));
+}
+
+.ar-dmd-frame {
+  padding: calc(16 * var(--a));
+  border-radius: calc(16 * var(--a));
+  background: #010302;
+  border: calc(2 * var(--a)) solid var(--line-strong);
+  box-shadow: inset 0 0 calc(40 * var(--a)) rgba(0, 0, 0, 0.9), 0 0 calc(40 * var(--a)) rgba(139, 226, 58, 0.08);
+}
+
+.ar-dmd-dots {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ar-dmd-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: calc(20 * var(--a));
+  font-size: max(calc(22 * var(--a)), var(--jb-floor));
+  color: var(--ink-muted);
+}
+
+.ar-wheel.ar-desk .ar-dmd-foot {
+  font-size: max(calc(26 * var(--a)), var(--jb-floor));
+}
+
+.ar-dmd-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ar-dots {
+  display: flex;
+  gap: calc(10 * var(--a));
+  align-items: center;
+  flex: none;
+}
+
+.ar-dots i {
+  width: calc(12 * var(--a));
+  height: calc(12 * var(--a));
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.ar-dots i.ar-on {
+  background: var(--signal);
+  box-shadow: 0 0 calc(10 * var(--a)) var(--signal-haze);
+}
+
+/* Qui joue en ce moment : le point vert, les pastilles empilées, la phrase. */
+.ar-live {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(16 * var(--a));
+  font-size: max(calc(24 * var(--a)), var(--jb-floor));
+}
+
+.ar-wheel.ar-desk .ar-live {
+  font-size: max(calc(27 * var(--a)), var(--jb-floor));
+}
+
+.ar-pulse {
+  width: calc(14 * var(--a));
+  height: calc(14 * var(--a));
+  border-radius: 50%;
+  background: #3fcf6b;
+  box-shadow: 0 0 calc(12 * var(--a)) #3fcf6b;
+  flex: none;
+}
+
+.ar-stack {
+  display: inline-flex;
+}
+
+.ar-face {
+  width: calc(52 * var(--a));
+  height: calc(52 * var(--a));
+  font-size: calc(22 * var(--a));
+  margin-left: calc(-14 * var(--a));
+}
+
+.ar-face:first-child {
+  margin-left: 0;
+}
+
+.ar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: calc(12 * var(--a));
+  max-width: calc(952 * var(--a));
+}
+
+.ar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--a));
+  padding: calc(11 * var(--a)) calc(20 * var(--a));
+  border-radius: 999px;
+  border: calc(1.5 * var(--a)) solid var(--line-strong);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  font-size: max(calc(23 * var(--a)), var(--jb-floor));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ar-wheel.ar-desk .ar-chip {
+  font-size: max(calc(27 * var(--a)), var(--jb-floor));
+}
+
+.ar-chip-icon {
+  width: calc(26 * var(--a));
+  height: calc(26 * var(--a));
+  color: var(--meta);
+}
+
+.ar-chip.ar-hot {
+  border-color: color-mix(in oklab, var(--signal) 60%, var(--line-strong));
+}
+
+.ar-chip.ar-hot .ar-chip-icon {
+  color: var(--signal);
+}
+
+/*
+ * Au bureau, la jauge sur deux lignes (la puce et ce qu'il manque, puis la barre en entier) : sur une
+ * ligne, « 380 XP avant le niveau 13 » ne laissait plus de place à la barre (captures du 21/11/2026).
+ * Les pastilles des joueurs à leur taille de la maquette (le plancher de 20 px pour leurs initiales).
+ */
+.ar-wheel.ar-desk .ar-level {
+  grid-template-columns: auto minmax(0, 1fr);
+  row-gap: calc(12 * var(--a));
+}
+
+.ar-wheel.ar-desk .ar-level .ar-xpbar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.ar-wheel.ar-desk .ar-level-after {
+  justify-self: end;
+}
+
+.ar-wheel.ar-desk .ar-face {
+  width: calc(60 * var(--a));
+  height: calc(60 * var(--a));
+  font-size: calc(28 * var(--a));
+}
+
+/* Au fronton (mise en page des affiches, jukebox.css) : la puce du niveau à la teinte du palier. */
+.ar-fronton-level {
+  color: var(--tier) !important;
+}

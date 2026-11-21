@@ -1,5 +1,5 @@
 // Médaillons vivants des rubriques (13/11/2026) : l'intérieur des médaillons Juke-box (« Onde ») et
-// Communauté (« Montée »), puis Collections (« Éclat », 13/11/2026) dessiné en direct dans un canevas, sous l'anneau chromé commun
+// Communauté (« Montée »), puis Collections (« Éclat », 13/11/2026) et Arène (« Coupe », 21/11/2026) dessiné en direct dans un canevas, sous l'anneau chromé commun
 // (medaillons/contour.png, contour-512.webp). Dessin validé par le mainteneur sur la planche du
 // 13/11/2026 : trois fils Soie en fuseau autour du rond à la note ; le même rond avec le bonhomme vert,
 // et des bulles de discussion qui montent, portant des emojis ou trois points. Un reflet en haut à
@@ -375,10 +375,108 @@
     volume(c);
   }
 
+  // ---------- Arène : « Coupe » ----------
+
+  /*
+   * Retenu par le mainteneur le 21/11/2026 (planche de l'engagement, piste « Coupe ») : le même rond
+   * que les autres, la coupe vert signal au centre (descendue de 9 unités : son dessin pèse en haut,
+   * demandé après un premier essai à 6), et derrière, des confettis violets, bleus et verts qui
+   * tombent doucement en tournant. Formes pleines, aucun fil, aucune pulsation.
+   */
+  const CONFETTI_COLORS = [VIOLET, META, SIGNAL];
+
+  /** Un confetti : dégradé doux, liseré sombre pour se détacher (comme les étoiles d'Éclat). */
+  function confettiPiece(c, w, col, a) {
+    if (a <= 0.01) return;
+    const R = w / 2;
+    c.save();
+    c.globalAlpha = a;
+    c.lineJoin = 'round';
+    c.beginPath();
+    if (c.roundRect) c.roundRect(-R, -w * 0.32, w, w * 0.64, 2);
+    else c.rect(-R, -w * 0.32, w, w * 0.64);
+    c.lineWidth = Math.max(2, R * 0.3);
+    c.strokeStyle = '#0a1a19';
+    c.stroke();
+    const g = c.createLinearGradient(0, -R, 0, R);
+    g.addColorStop(0, rgba(mix(col, [255, 255, 255], 0.25), 1));
+    g.addColorStop(1, rgba(mix(col, [0, 0, 0], 0.15), 1));
+    c.fillStyle = g;
+    c.fill();
+    c.restore();
+  }
+
+  /** Quatorze confettis, couloirs au nombre d'or, départs réguliers : ils tombent sans se rattraper. */
+  function confetti(c, t) {
+    for (let i = 0; i < 14; i++) {
+      const ph = frac(t * 0.09 + i / 14);
+      const x = 40 + 220 * frac(i * 0.618) + 8 * Math.sin(t * 0.9 + i * 1.7);
+      const y = 10 + 280 * ph;
+      const env = Math.sin(Math.PI * ph);
+      const w = 13 + 4 * seed(i, 3);
+      const flip = Math.cos(t * (1.6 + seed(i, 5)) + i);
+      // Jamais plus mince que le tiers de sa largeur (vu sur la tranche, un confetti devenait un trait
+      // à 250 px), et un fondu avant l'anneau (une trajectoire de côté passait sous le chrome à moitié
+      // allumée) : éteint à 4 unités du bord, sur 12 unités.
+      const reachPiece = Math.hypot(w / 2, w * 0.32) + Math.max(2, w * 0.15) / 2;
+      const margin = 147 - Math.hypot(x - 150, y - 150) - reachPiece;
+      c.save();
+      c.translate(x, y);
+      c.rotate(t * 0.8 + i);
+      c.scale(Math.max(0.35, Math.abs(flip)), 1);
+      confettiPiece(c, w, CONFETTI_COLORS[i % 3], Math.min(1, 3 * env) * clamp((margin - 4) / 12));
+      c.restore();
+    }
+  }
+
+  /** La coupe verte du rond, avec sa lueur : vasque, anses, pied et socle. */
+  function cup(c, k) {
+    c.save();
+    c.translate(150, 150);
+    c.scale(1.22, 1.22);
+    c.translate(-150, -141);
+    c.fillStyle = '#8be23a';
+    c.strokeStyle = '#8be23a';
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    c.shadowColor = 'rgba(139,226,58,.55)';
+    c.shadowBlur = 12 * k;
+    c.beginPath();
+    c.moveTo(124, 112);
+    c.lineTo(176, 112);
+    c.lineTo(174, 128);
+    c.bezierCurveTo(172, 146, 162, 154, 150, 155);
+    c.bezierCurveTo(138, 154, 128, 146, 126, 128);
+    c.closePath();
+    c.fill();
+    c.lineWidth = 5;
+    c.beginPath();
+    c.arc(125, 125, 10, 0.5 * Math.PI, 1.5 * Math.PI);
+    c.stroke();
+    c.beginPath();
+    c.arc(175, 125, 10, -0.5 * Math.PI, 0.5 * Math.PI);
+    c.stroke();
+    c.fillRect(145, 153, 10, 14);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(131, 166, 38, 10, 3);
+    else c.rect(131, 166, 38, 10);
+    c.fill();
+    c.restore();
+  }
+
+  function coupe(c, t, k) {
+    disc(c);
+    confetti(c, t);
+    label(c, k, 0.45);
+    cup(c, k);
+    volume(c);
+  }
+
   /** Les intérieurs, et l'instant de leur première image (la plus parlante, montrée à l'arrêt). */
   const KINDS = {
     'juke-box': { draw: onde, t0: 1.1 },
     communaute: { draw: montee, t0: 4 },
+    arene: { draw: coupe, t0: 4 },
     collections: { draw: eclat, t0: 1.6 },
   };
 

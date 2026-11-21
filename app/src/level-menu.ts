@@ -56,7 +56,9 @@ export interface LevelMenu {
   open(back: () => void): void;
   /** « Mes badges », son « Retour » vers `back`. */
   openBadges(back: () => void): void;
-  /** Menu système > Communauté > Mon profil > Mes badges. */
+  /** « Comment gagner des XP » (le barème), son « Retour » vers `back`. */
+  openRules(back: () => void): void;
+  /** Menu système > Arène > Progression > Mes badges. */
   badgesItem: ProvidedSystemItem;
   /** Ce que dit l'entrée « Mon niveau » (accueil Communauté) : palier, niveau, XP restants. */
   detail(): string;
@@ -275,6 +277,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
   return {
     open: (back) => open(back),
     openBadges,
+    openRules,
     detail,
     remoteSummary() {
       const state = host.levels.state();

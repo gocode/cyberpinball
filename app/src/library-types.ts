@@ -5,6 +5,7 @@
 import type { PhoneRemote, RemoteBar } from './phone-remote';
 import { type RemoteWording } from './phone-remote-menu';
 import { type ScoreboardView } from './scoreboard-menu';
+import type { HubView } from './hub-screen';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import type { RomVolumeView } from './rom-volume';
@@ -522,6 +523,11 @@ export interface Built {
   health?: HealthView;
   /** Tableau des scores d'une table (scoreboard-menu.ts) : onglets des périodes et lignes, à la place des sections. */
   scoreboard?: ScoreboardView;
+  /**
+   * Écran à onglets et à cartes (hub-screen.ts, l'Arène) : tout l'écran, à la place de l'en-tête, des
+   * sections et de la colonne des actions (app/renderer/hub.js) ; ses onglets et ses cartes sont les actions.
+   */
+  hub?: HubView;
   /**
    * Onglets en tête de la liste (Joueurs en ligne : les filtres) : chacun ouvre son action, qui n'est
    * pas répétée dans la colonne des actions. L'onglet ouvert en bleu (le vert reste au choix) ; un

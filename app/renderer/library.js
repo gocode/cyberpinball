@@ -41,6 +41,19 @@ function renderLibrary(v) {
   // Un état redessiné pour une autre raison (téléchargement, horloge) ne le rejoue pas.
   const moved = drawn !== undefined && drawn.screen === v.screen && drawn.heading === v.heading && drawn.cursor !== v.cursor;
   drawn = v;
+  // Écran à onglets et à cartes (hub-screen.ts, l'Arène) : il se dessine en entier (hub.js).
+  if (v.hub && window.CyberHub) {
+    keepTextCatcher(false);
+    const o = CyberHub.render(v);
+    if (v.busy) {
+      const busy = libEl('div', 'lib-busy');
+      busy.append(libEl('div', 'spinner'), libEl('div', '', v.busy));
+      o.append(busy);
+    }
+    forgetMediaNodes();
+    forgetInfoCard();
+    return o;
+  }
   // Rang des lignes, pour leur arrivée en cascade (library.css, .lib-arrive) ; plafonné : une longue liste ne traîne pas.
   let rank = 0;
   // Page d'un guide du jeu : elle prend la place de l'en-tête (guide.css).
@@ -1770,7 +1783,7 @@ document.addEventListener('drop', (event) => {
 });
 
 /** Défilement du menu (scroll-keeper.js) : capture avant chaque rendu, revealSelection après. */
-const menuScroll = CyberScroll.keeper([['.lib-row.selected, .chat-line.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected', 'nearest']]);
+const menuScroll = CyberScroll.keeper([['.lib-row.selected, .chat-line.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected, .hub-card.selected, .hub-button.selected', 'nearest']]);
 
 /**
  * Remet chaque liste où elle était, et garde visible l'élément choisi quand la liste dépasse
@@ -1782,7 +1795,7 @@ function revealSelection(root, screen) {
   menuScroll.settle(root, screen);
   settleReading(drawn);
   // Une liste qui défile seule dans son écran (morceaux d'un import en borne) a aussi ses filets.
-  for (const list of document.querySelectorAll('.lib-actions, .lib-content, .kind-jb-entries > .lib-rows')) {
+  for (const list of document.querySelectorAll('.lib-actions, .lib-content, .kind-jb-entries > .lib-rows, .hub-body')) {
     markOverflow(list);
     if (list.dataset.overflowWatch) continue;
     list.dataset.overflowWatch = '';

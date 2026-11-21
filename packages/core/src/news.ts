@@ -23,10 +23,11 @@ import type { SystemEntryId } from './systemmenu';
 
 export const NEWS_FILE = 'nouveautes.json';
 
-/** Où « Essayer » mène : une entrée du menu système, une porte de la Communauté, « Mon niveau », le Juke-box, une partie de la fiche de la table choisie. */
+/** Où « Essayer » mène : une entrée du menu système, une porte de la Communauté, l'écran de l'Arène, « Mon niveau », le Juke-box, une partie de la fiche de la table choisie. */
 export type NewsReach =
   | { kind: 'system'; id: SystemEntryId }
   | { kind: 'community'; door: 'home' | 'instant' | 'groups' | 'daily' }
+  | { kind: 'arena' }
   | { kind: 'level' }
   | { kind: 'jukebox' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' };
@@ -54,6 +55,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Le médaillon Arène (21/11/2026, planche « Engagement ») ; « Les règles de chaque table » (0.1.8)
+    // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'arene',
+    date: '2026-11-21',
+    version: '0.2.3',
+    get title() { return t('L’Arène'); },
+    get detail() { return t('Un médaillon pour se mesurer aux autres : parties ouvertes, places à reprendre, votre niveau.'); },
+    get more() {
+      return [
+        t('Dans la roue, à côté de la Communauté. Son affiche fait tourner vos records et les places qu’on vient de vous prendre ; Start ouvre l’Arène, ses onglets se changent aux MagnaSave.'),
+        t('En tête, votre niveau et ce qu’une partie peut encore rapporter, puis ce qu’il y a de plus pressant : une place à reprendre, une partie instantanée qui vous attend. Chaque action dit ce qu’elle rapporte en XP.'),
+      ];
+    },
+    get where() { return t('Roue › Arène'); },
+    reach: { kind: 'arena' },
+  },
+  {
     // Tables du jour et objectif à battre (engagement, 21/11/2026) ; « Vos tables d'une autre
     // installation » (0.1.7) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'tables-du-jour',
@@ -67,7 +85,8 @@ export const NEWS: readonly NewsItem[] = [
         t('La fiche d’une table dit qui battre, qui y joue en ce moment, et regroupe les parties à plusieurs dans « Jouer ensemble… ». Sans vidéo de chargement, l’objectif s’affiche aussi au lancement.'),
       ];
     },
-    get where() { return t('Communauté › Classements › Tables du jour'); },
+    // Les classements sont passés dans l'Arène (21/11/2026) : son onglet « Du jour ».
+    get where() { return t('Arène › Du jour'); },
     reach: { kind: 'community', door: 'daily' },
   },
   {
@@ -428,22 +447,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
     reach: { kind: 'system', id: 'phone-remote' },
-    preview: true,
-  },
-  {
-    id: 'regles',
-    date: '2026-11-07',
-    version: '0.1.8',
-    get title() { return t('Les règles de chaque table'); },
-    get detail() { return t('Prospectus, règles trouvées toutes seules et commandes de la partie, page par page.'); },
-    get more() {
-      return [
-        t('Cyber Pinball trouve les règles d’une table : la carte et le texte que l’auteur a rangés dans la table, une feuille de règles en ligne, sa vidéo. Elles se lisent page par page, aux flippers.'),
-        t('La dernière page donne toujours les commandes de la partie, avec les boutons de votre borne.'),
-      ];
-    },
-    get where() { return t('Fiche d’une table › Prospectus et règles'); },
-    reach: { kind: 'sheet', part: 'rules' },
     preview: true,
   },
 ];
