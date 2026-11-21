@@ -72,5 +72,12 @@ test('verifier : la suite rapide et test:electron se partagent tous les tests, l
   const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8'));
   assert.match(pkg.scripts.verifier, /scripts\/verifier\.mjs/);
   assert.match(pkg.scripts['test:electron'], /scripts\/verifier\.mjs --electron/);
-  assert.match(pkg.scripts['avant-fusion'], /audit-publication\.mjs/, 'l’audit de publication reste avant chaque fusion');
+  // L'audit de publication reste avant chaque fusion : avant-fusion et fusionner passent par les contrôles express.
+  assert.match(pkg.scripts['avant-fusion'], /scripts\/avant-fusion\.mjs/);
+  assert.match(pkg.scripts.fusionner, /scripts\/fusionner\.mjs/);
+  const read = (f) => fs.readFileSync(path.join(repo, 'scripts', f), 'utf8');
+  assert.match(read('controles.mjs'), /audit-publication\.mjs/, 'l’audit de publication est dans les contrôles express');
+  assert.match(read('controles.mjs'), /traductions\.mjs/, 'les traductions aussi');
+  assert.match(read('avant-fusion.mjs'), /runControles\(/, 'avant-fusion commence par les contrôles express');
+  assert.match(read('fusionner.mjs'), /runControles\(|runAvantFusion\(/, 'fusionner vérifie avant de fusionner');
 });

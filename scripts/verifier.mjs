@@ -110,21 +110,32 @@ function readIfExists(file) {
   }
 }
 
+/**
+ * Tous les fichiers de test (compilés et scripts), chacun marqué lent ou rapide. Sert aussi aux
+ * contrôles express (tous les rapides) et à avant-fusion (les lents) : scripts/controles.mjs.
+ */
+export function collectTests(root = repo) {
+  const testDir = path.join(root, 'packages', 'core', 'dist', 'test');
+  const srcTestDir = path.join(root, 'packages', 'core', 'src', 'test');
+  const scriptsDir = path.join(root, 'scripts');
+  const core = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.js'));
+  const scripts = fs.readdirSync(scriptsDir).filter((f) => f.endsWith('.test.mjs'));
+  const slowCore = slowFiles(core, (name) => readIfExists(path.join(testDir, `${name}.js`)));
+  // Les tests des scripts importent les scripts eux-mêmes (qui lancent git, tsc…) : seul le test compte.
+  const slowScripts = slowFiles(scripts, (name) => readIfExists(path.join(scriptsDir, `${name}.mjs`)), { follow: false });
+  return [
+    ...core.map((f) => ({ name: f, file: path.join(testDir, f), slow: slowCore.has(f), source: () => readIfExists(path.join(srcTestDir, f.replace(/\.js$/, '.ts'))) })),
+    ...scripts.map((f) => ({ name: f, file: path.join(scriptsDir, f), slow: slowScripts.has(f), source: () => readIfExists(path.join(scriptsDir, f)) })),
+  ];
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.build) {
     const run = spawnSync('npm run build', { cwd: repo, stdio: 'inherit', shell: true });
     if (run.status !== 0) process.exit(run.status ?? 1);
   }
-  const core = fs.readdirSync(TEST_DIR).filter((f) => f.endsWith('.test.js'));
-  const scripts = fs.readdirSync(SCRIPTS).filter((f) => f.endsWith('.test.mjs'));
-  const slowCore = slowFiles(core, (name) => readIfExists(path.join(TEST_DIR, `${name}.js`)));
-  // Les tests des scripts importent les scripts eux-mêmes (qui lancent git, tsc…) : seul le test compte.
-  const slowScripts = slowFiles(scripts, (name) => readIfExists(path.join(SCRIPTS, `${name}.mjs`)), { follow: false });
-  const all = [
-    ...core.map((f) => ({ name: f, file: path.join(TEST_DIR, f), slow: slowCore.has(f), source: () => readIfExists(path.join(SRC_TEST_DIR, f.replace(/\.js$/, '.ts'))) })),
-    ...scripts.map((f) => ({ name: f, file: path.join(SCRIPTS, f), slow: slowScripts.has(f), source: () => readIfExists(path.join(SCRIPTS, f)) })),
-  ];
+  const all = collectTests();
   let chosen;
   if (opts.electron) chosen = all.filter((t) => t.slow && (!opts.patterns.length || opts.patterns.some((p) => t.name.toLowerCase().includes(p))));
   else if (opts.patterns.length) chosen = all.filter((t) => opts.patterns.some((p) => t.name.toLowerCase().includes(p)));
