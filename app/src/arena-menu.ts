@@ -413,14 +413,79 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     }
   }
 
+  /** Un joueur devant moi sur une table, en ligne de liste : Start met la roue sur la table. */
+  function rivalRow(r: ArenaRival): HubCardSpec {
+    return {
+      key: `rival:${r.board}`,
+      avatar: face(r.rival.key, r.rival.name, r.rival.xp),
+      name: r.rival.name,
+      title: t('devant vous sur {table}', { table: r.table.title }),
+      ...(levelChip(levelOfPlayer(r.rival.key, r.rival.xp)) ? { level: levelChip(levelOfPlayer(r.rival.key, r.rival.xp))! } : {}),
+      detail: r.passed ? t('Vous a dépassé {ago} · vous êtes {rank}ᵉ sur {n}', { ago: ago(r.rival.at), rank: r.mine.rank, n: r.players }) : t('Vous êtes {rank}ᵉ sur {n}', { rank: r.mine.rank, n: r.players }),
+      aside: t('−{n}', { n: fmt(r.gap) }),
+      asideTone: 'warning' as const,
+      ...(reachable(r.table) ? { run: reachable(r.table)! } : {}),
+    };
+  }
+
+  /**
+   * L'Accueil (demande du 21/11/2026 : « qu'il n'ait pas à se balader dans les onglets, sauf pour des
+   * actions spécifiques ») : la carte du moment, puis un bloc par sujet, chacun ouvrant d'un Start ce
+   * qui compte : jouer (parties ouvertes, en ouvrir une, tables du jour), les classements (mes places,
+   * les joueurs juste devant moi, tous les classements), la progression (niveau, badge le plus proche,
+   * records, badges), et le barème des XP. Au bureau, le moment et le jeu à gauche, le reste à droite.
+   */
   function homeSections(back: () => void, here: () => void): HubSectionSpec[] {
     const out: HubSectionSpec[] = [];
     const moment = momentCard(back, here);
     if (moment) out.push({ layout: 'hero', cards: [moment] });
+
+    // Jouer : les parties ouvertes sur mes tables (celle de la carte du moment mise à part), en ouvrir une, les tables du jour.
+    const door = host.instant.door();
     const games = host.instant.arena(here);
     const shownId = moment?.key.startsWith('moment:game:') ? moment.key.slice('moment:game:'.length) : undefined;
-    const open = games.open.filter((o) => o.joinable && o.game.id !== shownId);
-    if (open.length) out.push({ title: t('À jouer maintenant'), note: tn(open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables'), layout: 'cards', cards: open.slice(0, 4).map(gameCard) });
+    const open = games.open.filter((o) => o.game.id !== shownId);
+    const play: HubCardSpec[] = open.slice(0, 3).map((o) => {
+      const g = o.game;
+      const seats: (AvatarView | null)[] = [...g.seats.map((s) => face(s.key, s.name)), ...Array.from({ length: Math.max(0, g.max - g.seats.length) }, () => null)];
+      return {
+        key: `game:${g.id}`,
+        icon: 'rocket',
+        title: g.title,
+        seats,
+        detail: o.reason ?? t('{name} attend · {free}', { name: g.name, free: tn(g.max - g.seats.length, '{n} place libre', '{n} places libres') }),
+        aside: xpText(XP.live),
+        ...(o.joinable ? { run: o.join } : { quiet: true }),
+      };
+    });
+    if (door.quiet) play.push({ key: 'instant:off', icon: 'network', title: t('Parties instantanées'), detail: door.detail, quiet: true });
+    else if (!games.mine) play.push({ key: 'new', icon: 'plus', title: t('Ouvrir une partie instantanée'), detail: t('La table et le nombre de joueurs : elle part dès qu’elle est complète'), aside: xpText(XP.live), run: () => host.instant.openNew(here) });
+    if (host.daily) {
+      const daily = host.daily;
+      play.push({ key: 'daily', icon: 'sparkle', title: t('Les tables du jour'), detail: daily.detail(), run: () => daily.open(here) });
+    }
+    if (!door.quiet) play.push({ key: 'all-games', icon: 'gamepad', title: t('Toutes les parties instantanées'), detail: door.detail, run: () => host.instant.open(here) });
+    out.push({ title: t('À jouer maintenant'), ...(open.length ? { note: tn(open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') } : {}), layout: 'list', cards: play });
+
+    // Classements : mes places, les joueurs juste devant moi (celui de la carte du moment mis à part), tous les classements.
+    const st = standing();
+    const ranks: HubCardSpec[] = [];
+    if (st?.world) ranks.push({ key: 'world', icon: 'globe', title: t('{n}ᵉ au monde', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }), run: () => host.rankings.open(here) });
+    if (st?.country) ranks.push({ key: 'country', icon: 'language', title: t('{country} : {n}ᵉ', { country: st.country.name, n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: () => host.rankings.open(here) });
+    const heroRival = moment?.key.startsWith('moment:rival:') ? moment.key.slice('moment:rival:'.length) : undefined;
+    ranks.push(...published().rivals.filter((r) => r.board !== heroRival).slice(0, 3).map(rivalRow));
+    ranks.push({ key: 'all-rankings', icon: 'list', title: t('Tous les classements'), detail: t('Chaque table, par portée et par période'), run: () => host.rankings.open(here) });
+    out.push({ title: t('Vos classements'), ...(st ? { note: t('Selon vos XP, de tout temps') } : {}), layout: 'list', cards: ranks });
+
+    // Progression : le niveau, le badge le plus proche, les derniers records, mes badges.
+    const b = band();
+    const progress: HubCardSpec[] = [{ key: 'level', icon: 'gauge', title: t('Niveau {n} · {tier}', { n: b.level, tier: b.tierLabel }), detail: levelBandLines(b)[0]!, aside: t('{n} XP', { n: fmt(b.missing) }), progress: b.progress, run: () => host.level.open(here) }];
+    const near = nearestBadges(net.state().badges, facts(), 1)[0];
+    if (near) progress.push({ key: `badge:${near.badge.id}`, icon: near.badge.icon, title: near.badge.label, detail: near.badge.detail, aside: `${fmt(near.value)} / ${fmt(near.badge.target)}`, progress: near.progress, run: () => host.level.openBadges(here) });
+    for (const r of published().records.slice(0, 2)) progress.push({ key: `record:${r.table.title}:${r.at}`, icon: 'star', title: r.table.title, detail: t('{rank}ᵉ sur {n} · {ago}', { rank: r.rank, n: r.players, ago: ago(r.at) }), aside: fmt(r.score), ...(reachable(r.table) ? { run: reachable(r.table)! } : {}) });
+    progress.push({ key: 'badges', icon: 'medal', title: t('Mes badges'), detail: t('{n} reçus', { n: net.state().badges.length }), run: () => host.level.openBadges(here) });
+    out.push({ title: t('Votre progression'), layout: 'list', cards: progress });
+
     out.push({ title: t('Ce que rapportent les XP'), note: t('Le barème du niveau'), layout: 'chips', cards: arenaXpRules().map((r) => ({ key: `rule:${r.text}`, icon: r.icon, title: r.text, aside: xpText(r.xp) })) });
     return out;
   }
@@ -458,17 +523,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
         title: t('À battre'),
         note: t('Le joueur juste devant vous, table par table'),
         layout: 'list',
-        cards: rivals.map((r) => ({
-          key: `rival:${r.board}`,
-          avatar: face(r.rival.key, r.rival.name, r.rival.xp),
-          name: r.rival.name,
-          title: t('devant vous sur {table}', { table: r.table.title }),
-          ...(levelChip(levelOfPlayer(r.rival.key, r.rival.xp)) ? { level: levelChip(levelOfPlayer(r.rival.key, r.rival.xp))! } : {}),
-          detail: r.passed ? t('Vous a dépassé {ago} · vous êtes {rank}ᵉ sur {n}', { ago: ago(r.rival.at), rank: r.mine.rank, n: r.players }) : t('Vous êtes {rank}ᵉ sur {n}', { rank: r.mine.rank, n: r.players }),
-          aside: t('−{n}', { n: fmt(r.gap) }),
-          asideTone: 'warning' as const,
-          ...(reachable(r.table) ? { run: reachable(r.table)! } : {}),
-        })),
+        cards: rivals.map(rivalRow),
       });
     return out;
   }

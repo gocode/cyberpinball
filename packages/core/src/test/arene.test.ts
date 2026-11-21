@@ -260,8 +260,9 @@ test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exi
   assert.ok(b.actions.every((a) => a.key!.startsWith('block:')), b.actions.map((a) => a.key).join(', '));
   assert.equal(b.actions[0]!.key, 'block:tabs');
   assert.equal(h.at(), 1, 'à l’ouverture, le curseur sur le premier bloc du contenu');
-  // Le barème des XP se lit seulement : ce n'est pas un bloc (aucun arrêt pour rien).
-  assert.equal(b.actions.length, 2, 'la barre d’onglets et la carte du moment ; le barème n’est qu’à lire');
+  // Les blocs de l'Accueil : la barre d'onglets, la carte du moment, jouer, classements, progression ;
+  // le barème des XP se lit seulement : ce n'est pas un bloc (aucun arrêt pour rien).
+  assert.equal(b.actions.length, 5, b.actions.map((a) => a.label).join(', '));
   // Start sur un bloc à plusieurs actions : on y entre ; seules ses actions se choisissent.
   h.run('block:section:0');
   const inside = h.built();
@@ -296,6 +297,25 @@ test('écran de l’Arène : l’onglet « Du jour » s’ouvre dès que les tab
   h.tab('daily');
   h.run('block:section:0');
   assert.equal(h.events.at(-1), 'du jour', 'Start sur le bloc : sa seule action, sans y entrer');
+});
+
+test('Accueil de l’Arène : jouer, les classements et la progression à un Start, sans passer par les autres onglets', () => {
+  // Demande du 21/11/2026 : « qu'il n'ait pas à se balader dans les onglets, sauf pour des actions spécifiques ».
+  const h = arena({
+    net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }), rankings: () => store() }),
+    rankings: { standing: () => ({ world: { rank: 412, players: 2310 }, country: { code: 'FR', rank: 37, players: 418 } }), open: () => h.events.push('classements') },
+    daily: { detail: () => '3 tables jouées aujourd’hui', open: () => h.events.push('du jour') },
+  });
+  h.menu.openHome(() => undefined);
+  const titles = h.built().hub.sections.map((s) => s.title ?? '');
+  for (const t of ['À jouer maintenant', 'Vos classements', 'Votre progression']) assert.ok(titles.includes(t), `bloc « ${t} »`);
+  for (const [label, event] of [['Tous les classements', 'classements'], ['412ᵉ au monde', 'classements'], ['Les tables du jour', 'du jour'], ['Ouvrir une partie instantanée', 'ouvrir'], ['Toutes les parties instantanées', 'parties'], ['Mes badges', 'badges']] as const) {
+    h.item(label);
+    assert.equal(h.events.at(-1), event, label);
+    assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Accueil', `${label} : sans changer d’onglet`);
+  }
+  // Le joueur juste devant moi sur une autre table que celle de la carte du moment : dans les classements.
+  assert.ok(h.built().hub.sections.find((s) => s.title === 'Vos classements')!.cards.some((c) => /Twilight Zone/.test(c.title)));
 });
 
 test('écran de l’Arène : les cartes mènent aux écrans complets (parties, classements, progression)', () => {

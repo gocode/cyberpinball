@@ -297,7 +297,8 @@
    * par le bord qui défile : une marge intérieure qui la contient, compensée par une marge négative.
    */
   --glow-room: max(calc(30 * var(--u)), 28px);
-  margin: calc(-1 * var(--glow-room));
+  /* Sur les côtés seulement : en haut et en bas, la marge négative mordait sur la barre d'onglets et le pied. */
+  margin: 0 calc(-1 * var(--glow-room));
   padding: var(--glow-room);
 }
 

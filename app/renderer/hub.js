@@ -268,6 +268,9 @@
     if (h.tabs.length) o.append(blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
     else o.classList.add('hub-no-tabs');
     const body = el('div', 'hub-body');
+    // Les blocs du contenu s'atteignent aux flippers (le choix d'un bloc l'amène dans la vue) ; depuis
+    // la barre d'onglets, en en sortant (Exit) : une liste de blocs, pas un texte hors d'atteinte.
+    body.dataset.choices = '';
     if (h.empty) {
       const empty = el('div', 'hub-empty');
       empty.append(el('b', '', h.empty.title), el('span', '', h.empty.detail));
