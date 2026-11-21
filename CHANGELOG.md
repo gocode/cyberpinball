@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Couleurs du DMD (Serum, PIN2DMD) : une colorisation déposée seule est rangée sous le nom de la ROM que joue la table, avec les noms de fichiers que VPX lit (`<rom>.cRZ`, `pin2dmd.pal` et `pin2dmd.vni`). Avant, un `pin2dmd.pal` finissait dans `vni\pin2dmd` et le DMD restait sans couleur. Il n'y a rien à cocher : la fenêtre F1 de VPinMAME n'existe pas avec le VPX de Cyber Pinball, la couleur s'applique d'elle-même.
+- Les couleurs déjà mal rangées sont remises au bon nom d'office avant la prochaine partie. Le diagnostic des tables signale aussi une colorisation faite pour une autre révision de la ROM (à essayer d'un clic) et les fichiers que VPX ne lit jamais (`.pac`, `.cROM`).
 - À-coups en partie : le rapport de la borne dit désormais aussi où était le fil du rendu de VPX pendant chaque arrêt (pilote de la carte graphique, vidéo, chargement de textures…), et plus seulement la boucle de jeu, qui ne fait alors qu'attendre ce fil.
 - Une partie qui rame à cause d'arrêts (antivirus, script) n'est plus prise à tort pour une partie bridée par la fréquence d'un écran.
 - Tables du jour (Communauté › Classements) : les tables les plus jouées aujourd'hui dans le monde, votre pays ou entre amis, le record du jour avec l'avatar et le niveau de son auteur, votre place et votre écart au joueur juste devant vous ; Start lance la table. Peu de parties aujourd'hui : c'est la semaine qui s'affiche, jamais un tableau vide. Une autre version que la vôtre reste visible, grisée, avec « Récupérer cette version » chez un ami qui l'a.

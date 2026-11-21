@@ -72,6 +72,7 @@ export * from './pupcapture';
 export * from './romlibrary';
 export * from './romzip';
 export * from './romalias';
+export * from './dmdcolors';
 export * from './romaudio';
 export * from './romfirstboot';
 export * from './vpmalias';

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- DMD colors (Serum, PIN2DMD): a colorization dropped on its own is stored under the name of the ROM the table plays, with the file names VPX reads (`<rom>.cRZ`, `pin2dmd.pal` and `pin2dmd.vni`). Before, a `pin2dmd.pal` ended up in `vni\pin2dmd` and the DMD stayed uncolored. There is nothing to tick: VPinMAME's F1 window does not exist with Cyber Pinball's VPX, the colors apply by themselves.
+- Colors already stored under the wrong name are renamed automatically before the next game. The table diagnostic also reports a colorization made for another revision of the ROM (one click to try it) and files VPX never reads (`.pac`, `.cROM`).
 - Stutters in game: the cabinet report now also tells where the VPX render thread was during each freeze (graphics driver, video, texture loading…), not only the game loop, which is then just waiting for that thread.
 - A game slowed down by freezes (antivirus, script) is no longer mistaken for a game limited by a screen's refresh rate.
 - Tables of the day (Community › Leaderboards): the most played tables today worldwide, in your country or among friends, the record of the day with its author's avatar and level, your place and your gap to the player just ahead of you; Start launches the table. Few games today: the week shows instead, never an empty board. A version other than yours stays visible, greyed, with "Get this version" from a friend who has it.

@@ -37,6 +37,7 @@ import {
   type VariantChoice,
 } from './puppack';
 import { listRoms, romFile, romHash, romKey, sameRomFile, tableRomsDir } from './romlibrary';
+import { colorImportTarget } from './dmdcolors';
 import { buildZip, isRomZip, listRelative, readZipEntries, recognizeRomName, romContent, zipContentHash, type RomHints, type RomZipMember } from './romzip';
 import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles';
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
@@ -935,9 +936,13 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
         add(item, path.join('altsound', name));
         break;
       case 'serum':
-      case 'vni':
-        add(item, item.isDir ? path.join(item.kind, name) : path.join(item.kind, stem, name));
+      case 'vni': {
+        // Rangées sous le nom de la ROM jouée, avec les noms de fichiers que VPX lit (dmdcolors.ts) :
+        // une colorisation PIN2DMD déposée seule finissait dans vni\pin2dmd, jamais chargée.
+        const played = game.roms.length === 1 ? game.roms[0] : game.roms.find((r) => linkedRoms.includes(romKey(r)) || game.others.some((o) => o.kind === 'rom' && o.rom?.name.toLowerCase() === r.toLowerCase()));
+        add(item, colorImportTarget(item.kind, name, item.isDir, game.roms, played));
         break;
+      }
       case 'media':
         // Recognised media: renamed "(Type) <folder>", further down with the others of the same type.
         if (item.media) incomingMedias.push({ from: item.path, source: item.source, media: item.media });

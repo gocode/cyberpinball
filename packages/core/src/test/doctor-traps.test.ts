@@ -216,6 +216,10 @@ const TRAPS: Trap[] = [
   // Bouchon « Generic » d'une installation PinUP Popper (Indiana Jones, 13/11/2026) : le plugin B2S plante dessus.
   { code: 'backglassEmpty', arm: (folder) => write(path.join(folder, `${TABLE}.directb2s`), EMPTY_B2S) },
   { code: 'romMissing', arm: (folder) => fs.rmSync(path.join(folder, 'pinmame'), { recursive: true }) },
+  // Couleurs du DMD (dmdcolors.ts) : colorisation PIN2DMD déposée seule, rangée sous le nom de son fichier (21/11/2026).
+  { code: 'dmdColorsMisnamed', arm: (folder) => write(path.join(folder, 'vni', 'pin2dmd', 'pin2dmd.pal'), 'pal') },
+  { code: 'dmdColorsOtherRom', arm: (folder) => write(path.join(folder, 'serum', 'afm_11', 'afm_11.cRZ'), 'crz') },
+  { code: 'dmdColorsUnread', arm: (folder) => write(path.join(folder, 'vni', 'afm_113b', 'pin2dmd.pac'), 'pac') },
   {
     code: 'romMisplaced',
     arm: (folder) => fs.renameSync(path.join(folder, 'pinmame', 'roms', 'afm_113b.zip'), path.join(folder, 'afm_113b.zip')),
@@ -1259,6 +1263,43 @@ test('fichier des erreurs de lecture : compteur, entrée périmée quand le fich
     [['(Wheel) T2.png', 'image']],
   );
   fs.rmSync(dir, { recursive: true });
+});
+
+test('couleurs du DMD : rangées d’office avant la partie sous le nom de la ROM ; une autre révision attend un clic', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-couleurs-'));
+  const folder = healthyTable(tablesDir);
+  const trashDir = `${tablesDir}-corbeille`;
+  const ctx = { tablesDir, script: scriptFacts(SCRIPT), cabinet: CABINET };
+  const codes = () => diagnose(scanTables(tablesDir)[0]!, ctx).map((f) => f.code);
+  // Bien rangées (dossier au nom de la ROM, noms de fichiers lus par VPX) : rien à dire.
+  write(path.join(folder, 'serum', 'afm_113b', 'afm_113b.cRZ'), 'crz');
+  write(path.join(folder, 'pinmame', 'altcolor', 'afm_113b', 'pin2dmd.pal'), 'pal');
+  assert.ok(!codes().some((c) => c.startsWith('dmdColors')), codes().join(', '));
+  fs.rmSync(path.join(folder, 'serum'), { recursive: true });
+  fs.rmSync(path.join(folder, 'pinmame', 'altcolor'), { recursive: true });
+  // Le cas signalé : vni\pin2dmd\pin2dmd.pal, avec un .vni au nom de la table.
+  write(path.join(folder, 'vni', 'pin2dmd', 'pin2dmd.pal'), 'pal');
+  write(path.join(folder, 'vni', 'pin2dmd', 'Attack from Mars.vni'), 'vni');
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }).map((f) => f.code), ['dmdColorsMisnamed']);
+  assert.deepEqual(fs.readdirSync(path.join(folder, 'vni')), ['afm_113b']);
+  assert.deepEqual(fs.readdirSync(path.join(folder, 'vni', 'afm_113b')).sort(), ['pin2dmd.pal', 'pin2dmd.vni']);
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }), []);
+  // Fichier Serum au mauvais nom dans le bon dossier : renommé.
+  write(path.join(folder, 'serum', 'afm_113b', 'Attack from Mars v1.2.cRZ'), 'crz');
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }).map((f) => f.code), ['dmdColorsMisnamed']);
+  assert.deepEqual(fs.readdirSync(path.join(folder, 'serum', 'afm_113b')), ['afm_113b.cRZ']);
+  // Une autre révision du même jeu : signalée, pas renommée d'office.
+  write(path.join(folder, 'serum', 'afm_11', 'afm_11.cRZ'), 'crz');
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir }), []);
+  assert.ok(codes().includes('dmdColorsOtherRom'));
+  assert.ok(!diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'dmdColorsOtherRom')!.fix, 'place prise : pas de renommage proposé');
+  fs.rmSync(path.join(folder, 'serum', 'afm_113b'), { recursive: true });
+  const other = diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'dmdColorsOtherRom')!;
+  applyOps(other.fix!.ops, { trashDir });
+  assert.deepEqual(fs.readdirSync(path.join(folder, 'serum', 'afm_113b')), ['afm_113b.cRZ']);
+  assert.ok(!codes().some((c) => c.startsWith('dmdColors')));
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
 });
 
 test('fronton sans image : écarté avant la partie ; un vrai fronton et un fichier qui n’est pas du XML restent', () => {

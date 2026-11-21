@@ -708,4 +708,19 @@ export const messages: Record<string, string> = {
     '{list} should have been called {names}: a copy made under Node 22 wrote their accents as “Ã©”. What they hold is not where it is looked for. A file already present under the real name goes to the trash, replaced by the copy.',
   'Ranger son contenu sous son vrai nom': 'Move its contents under its real name',
   'Ranger leur contenu sous leur vrai nom': 'Move their contents under their real names',
+  'Couleurs du DMD illisibles par VPX': 'DMD colors VPX cannot read',
+  '{folder} : {list}. VPX ne lit ni les .pac (colorisations chiffrées pour un vrai PIN2DMD) ni les .cROM. Il lui faut un .cRZ ou un .cROMc (Serum), ou un .pal avec son .vni (PIN2DMD).':
+    '{folder}: {list}. VPX reads neither .pac files (colorizations encrypted for a real PIN2DMD) nor .cROM files. It needs a .cRZ or a .cROMc (Serum), or a .pal with its .vni (PIN2DMD).',
+  'Couleurs du DMD faites pour une autre ROM': 'DMD colors made for another ROM',
+  '{folder} : colorisation de la ROM {made}, alors que la table joue {rom}. VPX ne la charge pas. Renommée pour {rom}, elle colore les images que les deux révisions ont en commun.':
+    '{folder}: colorization of the {made} ROM, while the table plays {rom}. VPX does not load it. Renamed for {rom}, it colors the frames both revisions have in common.',
+  'Essayer avec la ROM {rom}': 'Try it with the {rom} ROM',
+  'Couleurs du DMD mal nommées : VPX ne les charge pas': 'Misnamed DMD colors: VPX does not load them',
+  '{folder} : VPX cherche les couleurs dans {target}, au nom de la ROM que joue la table, avec les noms de fichiers qu’il connaît. Il n’y a rien à cocher : rangées là, le DMD passe en couleur.':
+    '{folder}: VPX looks for the colors in {target}, named after the ROM the table plays, with the file names it knows. There is nothing to tick: stored there, the DMD turns to color.',
+  '{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renommez ce dossier.':
+    '{folder}: VPX only looks for the colors in a folder named after the ROM the table plays ({rom}). Rename this folder.',
+  'Ranger dans {target}': 'Move to {target}',
+  'couleurs du DMD que VPX ne lit pas (.pac, .cROM)': 'DMD colors VPX does not read (.pac, .cROM)',
+  'couleurs du DMD mal nommées : VPX ne les charge pas': 'misnamed DMD colors: VPX does not load them',
 };

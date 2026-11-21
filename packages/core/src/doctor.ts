@@ -82,7 +82,8 @@ import {
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, compatFixesFromLog, vpmInitCallCount, vrRoomFlags, type CompatFix } from './scriptcompat';
-import { aliasComment, aliasFor, historicAlias, IMPORTED_ALIAS_COMMENT, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
+import { aliasComment, aliasFor, historicAlias, IMPORTED_ALIAS_COMMENT, loadedRoms, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
+import { colorProblems } from './dmdcolors';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
@@ -189,6 +190,9 @@ export const FINDING_CODES = [
   'musicMissing',
   'dmdImagesMissing',
   'tableTooNew',
+  'dmdColorsMisnamed',
+  'dmdColorsOtherRom',
+  'dmdColorsUnread',
 ] as const;
 
 export interface Finding {
@@ -778,6 +782,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push({ code: 'romUnknown', severity: 'info', title: t('ROM non vérifiée'), detail: t('La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.') });
     } else if (ctx.script.usesPinmame) {
       findings.push(...checkRom(folder, ctx.script.roms, ctx.romLibrary));
+      findings.push(...dmdColorFindings(folder, ctx.script, ctx));
     }
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
       const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame, ctx.tablesDir);
@@ -1644,7 +1649,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 October 2026: game played without the .vbs that switches the pack on), and a table that the core.vbs
  * stops does not start (Back to the Future, 30 October 2026: vpmInit called twice).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['backglassEmpty', 'scriptCoreCompat', 'flexImagesLate', 'importedView', 'dmdDesktopOption','pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupNoScreens', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames', 'dmdColorsMisnamed'];
 
 /**
  * Repairable findings of PUP_PLAY_REPAIRS for this table. Without a known script (outdated
@@ -1673,6 +1678,7 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   if (emptyB2s) found.push(emptyB2s);
   const desktopDmd = desktopDmdFinding(entry, { ...ctx, script });
   if (desktopDmd) found.push(desktopDmd);
+  if (script && !('error' in script)) found.push(...dmdColorFindings(entry.folder, script, ctx));
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
   // Framing set for the table in its old installation (tableview.ts): only when the direction of the game is checked.
   const view = ctx.orientation && !manualViewFinding(entry.file) ? importedViewFinding(entry.file, ctx.orientation) : undefined;
@@ -3119,6 +3125,52 @@ function listDirs(dir: string): string[] {
  */
 export function romBlockers(folder: string, roms: string[], library?: string): Finding[] {
   return roms.length ? playBlockers(checkRom(folder, roms, library)) : [];
+}
+
+/**
+ * Couleurs du DMD (Serum, PIN2DMD) que VPX ne chargera pas (dmdcolors.ts) : dossier ou fichiers qui
+ * ne portent pas le nom de la ROM jouée, colorisation d'une autre révision, fichiers jamais lus.
+ * Un dossier sans nom de ROM est renommé d'office avant chaque partie (PUP_PLAY_REPAIRS) ; celui
+ * d'une autre révision seulement à la demande, ses images peuvent ne pas correspondre.
+ */
+function dmdColorFindings(folder: string, facts: ScriptFacts, ctx: Pick<DoctorContext, 'romLibrary' | 'tablesDir'>): Finding[] {
+  if (!facts.usesPinmame || !facts.roms.length) return [];
+  const loaded = loadedRoms(folder, facts.roms);
+  const library = ctx.romLibrary ?? path.join(path.dirname(ctx.tablesDir), 'pinmame', 'roms');
+  const present = (r: string) => [path.join(folder, 'pinmame', 'roms'), library].some((d) => fs.existsSync(path.join(d, `${r}.zip`)));
+  const rom = loaded.find(present) ?? (loaded.length === 1 ? loaded[0] : undefined);
+  const findings: Finding[] = [];
+  for (const p of colorProblems(folder, [...facts.roms, ...loaded], rom)) {
+    const ops: FileOp[] = p.moves.map((m) => ({ op: 'move', from: m.from, to: m.to }));
+    const params = { folder: p.rel, target: p.target ?? '', rom: rom ?? facts.roms.join(', '), made: p.madeFor ?? '', list: formatList(p.unread.map((f) => path.basename(f))) };
+    if (p.reason === 'unread') {
+      findings.push({
+        code: 'dmdColorsUnread',
+        severity: 'warning',
+        title: t('Couleurs du DMD illisibles par VPX'),
+        detail: t('{folder} : {list}. VPX ne lit ni les .pac (colorisations chiffrées pour un vrai PIN2DMD) ni les .cROM. Il lui faut un .cRZ ou un .cROMc (Serum), ou un .pal avec son .vni (PIN2DMD).', params),
+      });
+    } else if (p.reason === 'otherRom') {
+      findings.push({
+        code: 'dmdColorsOtherRom',
+        severity: 'warning',
+        title: t('Couleurs du DMD faites pour une autre ROM'),
+        detail: t('{folder} : colorisation de la ROM {made}, alors que la table joue {rom}. VPX ne la charge pas. Renommée pour {rom}, elle colore les images que les deux révisions ont en commun.', params),
+        ...(ops.length && { fix: { label: t('Essayer avec la ROM {rom}', params), ops } }),
+      });
+    } else {
+      findings.push({
+        code: 'dmdColorsMisnamed',
+        severity: 'warning',
+        title: t('Couleurs du DMD mal nommées : VPX ne les charge pas'),
+        detail: p.target
+          ? t('{folder} : VPX cherche les couleurs dans {target}, au nom de la ROM que joue la table, avec les noms de fichiers qu’il connaît. Il n’y a rien à cocher : rangées là, le DMD passe en couleur.', params)
+          : t('{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renommez ce dossier.', params),
+        ...(ops.length && { fix: { label: t('Ranger dans {target}', params), ops } }),
+      });
+    }
+  }
+  return findings;
 }
 
 function checkRom(folder: string, roms: string[], library?: string): Finding[] {

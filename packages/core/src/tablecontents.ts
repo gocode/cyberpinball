@@ -16,6 +16,7 @@ import { romFile, sameRomFile, storedRom } from './romlibrary';
 import type { CompatFix } from './scriptcompat';
 import { readScriptPatchFile } from './scriptpatch';
 import { classifyDir, classifyFile, companion, type FileKind } from './tablefiles';
+import { colorProblems } from './dmdcolors';
 
 export type TableFileState = 'ok' | 'info' | 'warning' | 'error' | 'quiet';
 
@@ -94,6 +95,8 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
   const lower = (s: string) => s.toLowerCase();
   const backglass = companion(folder, base, opts.ownFolder, '.directb2s');
   const wanted = opts.script?.usesPinmame ? opts.script.roms : [];
+  // Couleurs du DMD qui ne portent pas le nom de la ROM jouée (dmdcolors.ts) : le médecin les range.
+  const colorIssues = opts.ownFolder && wanted.length ? colorProblems(folder, [...wanted, ...loadedRoms(folder, wanted)]) : [];
   const versions = listDirents(folder).filter((d) => d.isFile() && lower(d.name).endsWith('.vpx')).map((d) => lower(d.name.replace(/\.vpx$/i, '')));
   const add = (e: Omit<TableFileEntry, 'name' | 'path'> & { name?: string }) => {
     const p = path.join(folder, e.rel);
@@ -195,7 +198,12 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
       if (isPupFolderName(ln) || ['altsound', 'serum', 'vni'].includes(ln)) {
         const kind: FileKind = isPupFolderName(ln) ? 'pup' : (ln as FileKind);
         const note = kind === 'pup' ? t('PuP-Pack') : ln === 'altsound' ? t('sons alternatifs') : t('couleurs du DMD');
-        for (const sub of listDirents(full).filter((s) => s.isDirectory() && !isJunkName(s.name))) dirEntry(path.join(name, sub.name), kind, 'ok', note);
+        for (const sub of listDirents(full).filter((s) => s.isDirectory() && !isJunkName(s.name))) {
+          const rel = path.join(name, sub.name);
+          const colors = colorIssues.find((p) => lower(p.rel) === lower(rel));
+          if (colors) dirEntry(rel, kind, 'warning', colors.reason === 'unread' ? t('couleurs du DMD que VPX ne lit pas (.pac, .cROM)') : t('couleurs du DMD mal nommées : VPX ne les charge pas'));
+          else dirEntry(rel, kind, 'ok', note);
+        }
         continue;
       }
       if (ln === 'music') {
