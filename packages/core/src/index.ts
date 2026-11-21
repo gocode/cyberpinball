@@ -8,6 +8,7 @@ export * from './vpxwindows';
 export * from './vr';
 export * from './vr-profil';
 export * from './vision3d';
+export * from './anaglyph';
 export * from './casque';
 export * from './manettes';
 export * from './casque-scene';

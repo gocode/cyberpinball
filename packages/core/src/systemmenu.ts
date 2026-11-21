@@ -70,6 +70,7 @@ export const SYSTEM_ITEM_IDS = [
   'other-vpx',
   'vpx-trial',
   'vision3d',
+  'anaglyph',
   'vr',
   'vr-calibrate',
   'vr-controllers',
@@ -212,8 +213,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'realite-virtuelle',
     icon: 'vr',
     get label() { return t('Réalité virtuelle et vision 3D'); },
-    get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D'); },
-    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d'],
+    get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D, lunettes 3D'); },
+    // Les lunettes 3D (anaglyphe, 21/11/2026) juste après la vision 3D : les deux se cumulent.
+    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d', 'anaglyph'],
   },
   // Comment la borne démarre, et qui a le droit de faire quoi.
   demarrage: {
@@ -388,6 +390,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'vr-mirror': { icon: 'screens', get label() { return t('Recopie sur le playfield'); } },
   // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.
   vision3d: { icon: 'eye', get label() { return t('Vision 3D'); } },
+  // La table en relief avec des lunettes à filtres colorés (anaglyph.ts), seule ou avec la vision 3D.
+  anaglyph: { icon: 'glasses', get label() { return t('Lunettes 3D'); } },
   // La liste des boutons du front-end et de la partie : une aide, ouverte aussi par la touche d'aide.
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
   // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).

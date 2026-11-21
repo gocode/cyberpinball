@@ -558,7 +558,7 @@ test('ancrage sur la limite du Quest (13 novembre 2026) : la borne reposée par 
 test('option « Recalage automatique » retirée (13 novembre 2026, l’ancrage la remplace) : ni réglage, ni relevés, ni repos appris', () => {
   const menu = read('packages', 'core', 'src', 'systemmenu.ts');
   assert.equal(menu.includes('vr-auto-calibrate'), false);
-  assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d'\]/);
+  assert.match(menu, /entries: \['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d', 'anaglyph'\]/);
   const front = frontendSource();
   assert.equal(/vr-auto-calibrate|autoRecalSample|watchRest|Borne recalée sur les manettes posées/.test(front), false);
   const casque = read('app', 'src', 'casque.ts');
@@ -803,7 +803,8 @@ test('couche du repère pour VPX (essai réel du 13 novembre 2026, 23:50-23:52 :
   // en partie reporté du repère du lancement par les sauts que la couche a appliqués.
   const front = frontendSource();
   assert.match(front, /const roomEnv = vrGame && simulated === undefined \? startGameRoom\(\) : undefined;/);
-  assert.match(front, /const vpxEnv = \{ \.\.\.\(roomEnv \? \{ env: roomEnv \} : \{\}\), \.\.\.\(vrGame\?\.tableIni \? \{ tableIni: vrGame\.tableIni\.file \} : \{\}\) \};/);
+  // L'INI de la table neutralisé pour le casque d'abord ; sinon, celui des lunettes 3D (anaglyph-menu.ts).
+  assert.match(front, /const vpxEnv = \{ \.\.\.\(roomEnv \? \{ env: roomEnv \} : \{\}\), \.\.\.\(vrGame\?\.tableIni \? \{ tableIni: vrGame\.tableIni\.file \} : anaglyphGame \? \{ tableIni: anaglyphGame\.file \} : \{\}\) \};/);
   assert.match(front, /vpxPrefDir: vpxPrefDir\(install\.version\), \.\.\.vpxEnv, onVr,/);
   assert.match(front, /if \(gameRoom && \(playing \|\| launch\)\) \{\s*try \{\s*gameRoom\.onJump\(jump\);/);
   assert.match(front, /const room = endGameRoom\(\{ \.\.\.result, stopAsked: gameStopAsked \}\);[\s\S]*?if \(playedVr && vrGame\) checkVrPlaceAfterGame\(vrGame\.ini, played\.file, room\);/);

@@ -3864,6 +3864,82 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   margin-left: -1.1cqmin;
 }
 
+/* ---------- Calibrage des lunettes 3D (library.js, renderAnaglyph) ---------- */
+
+/* Les visages et la consigne à gauche, les gestes à droite ; en borne (portrait), les gestes dessous. */
+.lib-body.lib-anaglyph-body {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+@container (orientation: portrait) {
+  .lib-body.lib-anaglyph-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+
+.lib-anaglyph {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqmin;
+}
+
+/* Les deux carrés : aussi grands que la place le permet, jamais déformés (le calibrage compare des surfaces). */
+.lib-anaglyph-faces {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 46cqmin;
+  aspect-ratio: 1;
+  display: block;
+}
+
+.lib-anaglyph-steps {
+  display: flex;
+  gap: 1.2cqmin;
+}
+
+.lib-anaglyph-steps i {
+  width: 1.4cqmin;
+  height: 1.4cqmin;
+  border-radius: 50%;
+  border: 0.2cqmin solid var(--ink-muted);
+}
+
+.lib-anaglyph-steps i.done {
+  background: var(--ink-muted);
+}
+
+.lib-anaglyph-steps i.current {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.lib-anaglyph-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8cqmin;
+  text-align: center;
+}
+
+.lib-anaglyph-copy p {
+  margin: 0;
+  font-size: 2.4cqmin;
+  color: var(--ink);
+}
+
+.lib-anaglyph-copy p:last-child {
+  font-size: 3.2cqmin;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Recadrage d'un avatar (library.js, renderCrop) ---------- */
 
 /* L'image et l'aperçu à gauche, les gestes à droite ; en borne (portrait), les gestes dessous. */

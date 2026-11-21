@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- 3D glasses (beta): tables are played in 3D with simple colour filter glasses (red / cyan, green / magenta or amber / blue), in System menu > My cabinet > Virtual reality and 3D vision > 3D glasses. They combine with 3D vision: the depth then follows your head too.
+- Glasses calibration with the cabinet buttons, in front of the playfield screen: six settings, one eye closed each time, for less ghosting and truer colours. Depth and colours are set in the same place.
+- The 3D effect goes through a copy of the table's settings, given to VPX for the game: neither the cabinet's VPinballX.ini nor the table's own file is changed. SMAA anti-aliasing, which VPX does not apply in 3D, is replaced by quality FXAA for the game.
 - What's new: the System menu entry now counts its nine sections, the Arena included.
 - What's new: every entry now has its picture, a screen of the feature or an illustration, in English and French (twelve had none: the Arena, today's tables, conversations with the team, the System menu, sound, Future Pinball, Pinball FX, importing without duplicating, other VPX versions, DOF, credits, 3D vision).
 - Install plan from another installation: it now says large files are linked and the others copied, instead of saying everything is copied.

@@ -48,6 +48,7 @@ import {
   type RankingScope,
   type ScorePeriod,
   type VrNetworkFacts,
+  type AnaglyphCalibrationView,
 } from '@cyberpinball/core';
 import { type PreparedImport } from './archives';
 import { type ScriptResult } from './vbs';
@@ -597,6 +598,11 @@ export interface Built {
    * d'état sous ses réactions (Section.kind « news-reactions », rendue dans la carte).
    */
   newsPage?: { preview?: string; lines: string[]; where: string; note?: string };
+  /**
+   * Calibrage des lunettes 3D (anaglyph-menu.ts), à la place des sections : les deux visages (couleur
+   * pure sur gris, gris sur couleur pure), les points des six étapes et la consigne.
+   */
+  anaglyph?: AnaglyphCalibrationView & { lines: string[] };
 }
 
 /** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */

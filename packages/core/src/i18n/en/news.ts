@@ -5,10 +5,6 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
-  'La Communauté, en un coup d’œil': 'The Community at a glance',
-  'Le message qui vous attend, qui est en ligne, le salon de votre pays : répondez d’un appui.': 'The message waiting for you, who is online, your country’s room: reply with one press.',
-  'Son affiche montre qui vous a écrit, vos amis en ligne et ce qu’ils font, et le salon de votre pays qui défile. Start ouvre la Communauté, ses onglets se changent aux MagnaSave.': 'Its poster shows who wrote to you, your friends online and what they are doing, and your country’s room scrolling by. Start opens the Community; MagnaSave switches its tabs.',
-  'Une conversation qui attend se répond d’une phrase toute prête. Quand peu de monde est en ligne, des joueurs proches de vous sont suggérés : un appui pour les ajouter. « Joueurs » réunit vos amis et tous les joueurs.': 'A waiting conversation can be answered with a ready-made phrase. When few people are online, players close to you are suggested: one press to add them. “Players” brings your friends and all players together.',
   'Un échange avec l’équipe': 'A conversation with the team',
   'Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.': 'Send a report: the team replies on your cabinet, and you can reply back.',
   'Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.':
@@ -152,6 +148,13 @@ export const messages: Record<string, string> = {
   'Roue › Collections': 'Wheel › Collections',
 
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
+
+  'La table en relief avec de simples lunettes rouge et cyan, et avec la Vision 3D si vous voulez.': 'The table in 3D with simple red and cyan glasses, and with 3D vision if you like.',
+  'Mettez des lunettes à filtres colorés : rouge / cyan, vert / magenta ou ambre / bleu. Le plateau sort de l’écran ; avec la Vision 3D, le relief suit aussi votre tête.':
+    'Put on colour filter glasses: red / cyan, green / magenta or amber / blue. The playfield comes out of the screen; with 3D vision, the depth follows your head too.',
+  'Calibrez vos lunettes aux boutons de la borne, un œil fermé à chaque fois : moins d’images fantômes, des couleurs plus justes.':
+    'Calibrate your glasses with the cabinet buttons, one eye closed each time: less ghosting, truer colours.',
+  'Menu système › Ma borne › Réalité virtuelle et vision 3D › Lunettes 3D': 'System menu › My cabinet › Virtual reality and 3D vision › 3D glasses',
 
   'Les tables du jour': 'Tables of the day',
   'Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.': 'The most played tables today, the record of the day and the player just ahead of you.',

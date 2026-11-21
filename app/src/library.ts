@@ -6008,6 +6008,8 @@ export function createLibrary(host: LibraryHost) {
       // Écran à onglets et à cartes (hub-screen.ts) : il se dessine en entier (app/renderer/hub.js).
       hub: built.hub,
       newsPage: built.newsPage,
+      // Calibrage des lunettes 3D (anaglyph-menu.ts) : les deux visages et la consigne.
+      anaglyph: built.anaglyph,
       tabs: built.tabs,
       // L'ordre des flippers (visualOrder) : le garde-fou de mise en page le compare à celui de l'affichage.
       order: visualOrder(built, built.actions.length, host.landscape?.() ?? false),

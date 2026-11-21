@@ -105,6 +105,8 @@ function renderLibrary(v) {
       ? `lib-body lib-pages${guide ? ' lib-guide-body' : ''}`
       : v.newsPage
         ? 'lib-body lib-news-page'
+      : v.anaglyph
+        ? 'lib-body lib-anaglyph-body'
       : v.crop
         ? 'lib-body lib-crop-body'
       : v.media
@@ -125,6 +127,7 @@ function renderLibrary(v) {
   else if (v.reading?.active) body.classList.add('zone-list');
   if (v.pages) body.append(renderPages(v.pages));
   else if (v.newsPage) body.append(renderNewsPage(v.newsPage, v));
+  else if (v.anaglyph) body.append(renderAnaglyph(v.anaglyph));
   else if (v.crop) body.append(renderCrop(v.crop));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
@@ -394,6 +397,49 @@ function renderLibrary(v) {
  * les actions de l'écran ; à la souris, on glisse le cadre (un seul geste envoyé au lâcher, pour
  * que le dessin suive le pointeur sans attendre) et la molette zoome.
  */
+/**
+ * Calibrage des lunettes 3D (anaglyph-menu.ts) : deux carrés côte à côte, un visage de la couleur pure
+ * sur le gris réglé, puis un visage gris sur la couleur pure (le calibrage de VPX, StereoSettingsPage.cpp) ;
+ * dessous, un point par étape et la consigne. Une mire, pas une icône : dessinée sur un canevas, les
+ * couleurs écrites telles quelles (sRGB), comme VPX. Le visage arrive en polygones d'un carré de 160 × 320.
+ */
+function renderAnaglyph(a) {
+  const box = libEl('div', 'lib-anaglyph');
+  const canvas = libEl('canvas', 'lib-anaglyph-faces');
+  canvas.setAttribute('aria-hidden', 'true');
+  // Deux fois la taille du dessin : net à l'écran, la page le réduit (library.css).
+  const scale = 2;
+  canvas.width = 320 * scale;
+  canvas.height = 320 * scale;
+  const g = canvas.getContext('2d');
+  g.scale(scale, scale);
+  for (const v of [0, 1]) {
+    g.fillStyle = v === 0 ? a.gray : a.color;
+    g.fillRect(160 * v, 0, 160, 320);
+    // Chaque morceau rempli et cerné de sa couleur : remplis seuls, ils laissaient un liseré du fond entre eux.
+    g.fillStyle = g.strokeStyle = v === 0 ? a.color : a.gray;
+    g.lineWidth = 0.8;
+    g.lineJoin = 'round';
+    for (const points of a.face) {
+      g.beginPath();
+      points.split(' ').forEach((p, i) => {
+        const [x, y] = p.split(',').map(Number);
+        if (i === 0) g.moveTo(160 * v + x, y);
+        else g.lineTo(160 * v + x, y);
+      });
+      g.closePath();
+      g.fill();
+      g.stroke();
+    }
+  }
+  const steps = libEl('div', 'lib-anaglyph-steps');
+  for (let i = 0; i < a.steps; i++) steps.append(libEl('i', i < a.step ? 'done' : i === a.step ? 'current' : ''));
+  const copy = libEl('div', 'lib-anaglyph-copy');
+  for (const line of a.lines) copy.append(libEl('p', '', line));
+  box.append(canvas, steps, copy);
+  return box;
+}
+
 function renderCrop(c) {
   const box = libEl('div', 'lib-crop');
   const area = libEl('div', 'lib-crop-area');

@@ -147,6 +147,8 @@ export const ICON_NAMES = [
   'upload',
   // Réalité virtuelle (Menu système > Ma borne)
   'vr',
+  // Lunettes 3D (anaglyphe), dans la même rubrique
+  'glasses',
   // Crédits de la communauté (fiche d'une table, Menu système > Aide et infos > Crédits)
   'credits',
   // « J'aime » du profil public : pouce levé, rempli quand on aime déjà

@@ -443,6 +443,7 @@ import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
 import { installVpxCorrige, installVpxCorrigeAtStartup } from './vpx-corrige';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
+import { createAnaglyphMenu } from './anaglyph-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
 import { shrinkDmdVideos } from './dmd-video-shrink';
 import { createVrFrontend } from './vr-frontend';
@@ -3799,6 +3800,14 @@ const vision3dMenu = createVision3dMenu({
   showDesktop: () => showDesktop(),
 });
 const { headTracker, setVision3dTuning, prepareVision3d, warmVision3d, noteVision3dGame } = vision3dMenu;
+// « Lunettes 3D » (même rubrique, anaglyph-menu.ts) : la table en relief avec des lunettes à filtres colorés.
+const anaglyphMenu = createAnaglyphMenu({
+  dataDir: loc.dataDir,
+  library,
+  keys: () => KEYS,
+  vision3dOn: () => vision3dMenu.setting().mode === 'on',
+  vrOn: () => vrFront.vrMode === 'auto',
+});
 
 
 /** Une partie se prépare ou se joue : les relevés au journal attendent. */
@@ -5897,7 +5906,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const recordIni = recording && simulated === undefined && !vrGame && !double && !otherVpx ? prepareRecordingIni(table) : undefined;
   // Partie dans le casque : la couche du repère de la pièce garde la table à sa place si le Quest remet l'origine.
   const roomEnv = vrGame && simulated === undefined ? vrFront.startGameRoom() : undefined;
-  const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : {}) };
+  // Lunettes 3D (anaglyph-menu.ts) : la stéréo posée dans une copie du fichier de la table, passée par -TableIni ;
+  // jamais dans le casque, ni pour régler l'affichage, ni avec un autre VPX.
+  const anaglyphGame = simulated === undefined && !displayMode && !otherVpx && !vrGame ? anaglyphMenu.prepareGame(played.file, double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)) : undefined;
+  const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
@@ -6001,6 +6013,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       console.warn(`Réalité virtuelle : réglages de la table pas reportés (${(error as Error).message}).`); // i18n-ignore : journal
     }
   }
+  // Partie en relief : de même, sans la stéréo posée par Cyber Pinball.
+  if (anaglyphGame) anaglyphMenu.restoreGame(anaglyphGame);
   if (playedVr && vrGame) vrFront.checkVrPlaceAfterGame(vrGame.ini, played.file, room);
   // La pièce a pu sauter pendant la partie : la borne du menu reposée sur la limite du Quest.
   if (playedVr) setTimeout(vrFront.anchorCheck, 0);

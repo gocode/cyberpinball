@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Lunettes 3D (bêta) : les tables se jouent en relief avec de simples lunettes à filtres colorés (rouge / cyan, vert / magenta ou ambre / bleu), dans Menu système > Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D. Elles se cumulent avec la Vision 3D : le relief suit alors aussi la tête.
+- Calibrage des lunettes aux boutons de la borne, devant l'écran du plateau : six réglages, un œil fermé à chaque fois, pour moins d'images fantômes et des couleurs plus justes. Profondeur et couleurs se règlent au même endroit.
+- Le relief passe par une copie des réglages de la table, donnée à VPX pour la partie : ni le VPinballX.ini de la borne ni le fichier de la table ne sont modifiés. L'anticrénelage SMAA, que VPX n'applique pas en relief, est remplacé par FXAA qualité pour la partie.
 - Nouveautés : la ligne du Menu système compte maintenant ses neuf rubriques, Arène comprise.
 - Nouveautés : chaque nouveauté a maintenant son image, un écran de la fonction ou une illustration, en français et en anglais (douze en étaient privées : l'Arène, les tables du jour, les échanges avec l'équipe, le Menu système, le son, Future Pinball, Pinball FX, la reprise sans duplication, les autres versions de VPX, DOF, les crédits, la vision 3D).
 - Plan d'installation d'une autre installation : il dit maintenant que les gros fichiers sont liés et les autres copiés, au lieu d'annoncer que tout est copié.
