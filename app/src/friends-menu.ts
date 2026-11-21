@@ -99,6 +99,11 @@ export interface FriendsMenuHost {
   chat?: { openThread(key: string, back: () => void): void; writeDetail(key: string): string };
   /** Le profil d'un joueur (profile-menu.ts) : le seul écran d'un joueur, ami ou non ; `playerPart` y ajoute la relation. */
   profile: { open(key: string, back: () => void): void };
+  /**
+   * « Joueurs », onglet des amis (community-menu.ts) : depuis le 21/11/2026, « Mes amis » et « Joueurs
+   * en ligne » ne font qu'un écran ; « Mes amis » y mène. Absent (essais) : la liste des amis d'ici.
+   */
+  players?(back?: () => void): void;
   /** Supprimer mon compte (account-delete.ts) ; absent : l'action n'est pas proposée (essais). */
   account?: {
     /** Le service des retours : mes propositions et mes votes. */
@@ -255,6 +260,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   // ---------- Mes amis ----------
 
   function openFriends(at?: number): void {
+    if (host.players) return host.players();
     host.library.openCustom(buildFriends, at);
   }
 
@@ -310,7 +316,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   /** Amis qui partagent leur bibliothèque et qui ont des tables absentes de la borne : combien. */
   function addFromFriendDetail(): string {
     const friends = net.state().friends;
-    if (!friends.length) return t('Pas encore d’ami : Menu système > Communauté > « Mes amis » > « Trouver un joueur »');
+    if (!friends.length) return t('Pas encore d’ami : Menu système > Communauté > « Joueurs » > « Trouver un joueur »');
     const online = friends.filter((f) => net.online(f.key)).length;
     return online
       ? tn(online, 'Les tables d’un ami, récupérées de sa borne · {n} ami en ligne', 'Les tables d’un ami, récupérées de sa borne · {n} amis en ligne')

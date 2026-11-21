@@ -11,6 +11,14 @@ son interface).
 
 ## 0.2.3
 
+- La Communauté passe à l'écran à onglets de l'Arène : Accueil, Messages, Joueurs, Groupes, Salons et Profil, avec la même navigation par blocs (les flippers vont de bloc en bloc, Start y entre, Exit en ressort, MagnaSave change d'onglet).
+- L'accueil de la Communauté mène par ce qui vous attend : la conversation où l'on vous a écrit, avec la bulle du dernier message et trois réponses toutes prêtes à envoyer d'un appui.
+- « En ligne » montre vos amis avec l'anneau de leur présence et ce qu'ils font ; quand peu de monde est là, des joueurs proches de vous (tables en commun, même pays, niveau proche, nouveaux venus) sont suggérés, à ajouter d'un appui (+25 XP par nouvel ami).
+- Le salon de votre pays se lit en direct sur l'accueil, avec ses phrases toutes prêtes ; « Ça bouge » propose de saluer un nouveau venu ou de féliciter l'exploit d'un ami.
+- Chaque joueur montre son niveau (« Niv. 18 ») et l'anneau de son palier.
+- « Faites découvrir Cyber Pinball » : un QR code de la page de téléchargement, sur l'accueil au bureau et dans l'onglet Joueurs en borne.
+- Nouvelle affiche du médaillon Communauté : le message qui vous attend, vos amis en ligne, le salon de votre pays qui défile, vos groupes et les demandes d'ami. Le niveau et les places sont désormais sur l'affiche de l'Arène.
+- « Mes amis » et « Joueurs en ligne » ne font plus qu'une entrée, « Joueurs » (Menu système > Communauté > Joueurs) : l'onglet Amis vient en premier, les demandes reçues en tête.
 - Après la mise à jour qui l'apporte, le VPX corrigé est posé dès le démarrage de Cyber Pinball : la fiche technique affiche tout de suite « patched Cyber Pinball 1 », et la Santé de la borne ne garde plus l'alerte sur la fréquence du fronton.
 - Recherche d'une table : vider le champ « Chercher un titre » puis valider efface la recherche, comme annoncé ; avant, elle restait jusqu'au redémarrage de Cyber Pinball. « Effacer les filtres » retire aussi le titre cherché.
 - Toutes les saisies : un champ vidé puis validé est pris en compte (sujet d'un salon retiré, ZeDMD en wifi coupé, adresse Art-Net sur tout le réseau, correction du Juke-box rendue à l'information d'origine, recherche des Classements effacée). Exit annule toujours.

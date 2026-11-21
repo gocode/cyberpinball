@@ -157,7 +157,7 @@ test('relevé : le gagnant parmi les scores classés, ou moi ; aucun score, aucu
 const ev = (kind: NoticeKind, who: string, extra: Partial<NoticeEvent> = {}): NoticeEvent => ({ kind, key: `0123456789abcdef|${who}`, at: 0, who, subject: 'Glass Lagoon (Inventé 1987)', ...extra });
 
 test('textes : regroupés par genre, avec les noms ; la raison ; le gagnant, ma place et le chemin des résultats', () => {
-  assert.deepEqual(noticeText('live-accepted', [ev('live-accepted', 'Bruno')]), { title: 'Bruno a accepté votre invitation', detail: 'Pour lancer : Menu système > Communauté > Mes amis' });
+  assert.deepEqual(noticeText('live-accepted', [ev('live-accepted', 'Bruno')]), { title: 'Bruno a accepté votre invitation', detail: 'Pour lancer : Menu système > Communauté > Joueurs' });
   assert.equal(noticeText('live-accepted', [ev('live-accepted', 'Bruno'), ev('live-accepted', 'Léa')]).title, 'Bruno et Léa ont accepté');
   assert.equal(noticeText('live-accepted', ['Bruno', 'Léa', 'David'].map((n) => ev('live-accepted', n))).title, 'Bruno, Léa et David ont accepté');
   assert.equal(noticeText('live-accepted', ['Maximilien-Alexandre', 'Léa', 'Anne-Charlotte'].map((n) => ev('live-accepted', n))).title, '3 invités ont accepté', 'un nom ne se coupe pas : le nombre');

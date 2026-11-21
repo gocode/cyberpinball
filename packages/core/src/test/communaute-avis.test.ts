@@ -124,11 +124,13 @@ test('Communauté : le nombre de joueurs en ligne ne se dit qu’au-delà de cin
   const few = views(3);
   assert.equal(few.stats, '1 ami');
   assert.equal(few.item, '1 ami');
-  assert.ok(few.tabs.every((c) => c === ''), few.tabs.join('|'));
+  // L'onglet Amis (21/11/2026) compte toujours mes amis en ligne ; les autres, au-delà de cinq seulement.
+  assert.equal(few.tabs[0], '1');
+  assert.ok(few.tabs.slice(1).every((c) => c === ''), few.tabs.join('|'));
   // Huit inconnus et Bruno : neuf en ligne, dont neuf en France.
   const many = views(8);
   assert.match(many.stats, /^9 joueurs en ligne · 8 en France · 1 ami$/);
-  assert.equal(many.tabs[0], '9');
+  assert.equal(many.tabs[1], '9', 'l’onglet Tous');
 });
 
 // Le nom de la porte (17/11/2026) : « Avis » ne disait pas qu'on y signale aussi un problème ; « Retours et

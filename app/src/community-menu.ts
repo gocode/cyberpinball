@@ -1,13 +1,14 @@
-// Communauté (décidée le 12/11/2026) : l'accueil ouvert par le médaillon de la roue, qui est la
-// rubrique Communauté du Menu système depuis le 20/11/2026 (Mon profil, Joueurs en ligne, Partie
-// instantanée, Mes amis, Messages, Groupes et salons, Classements, Réglages), et la liste
-// « Joueurs en ligne », amis ou non (livepresence.ts).
+// Communauté (décidée le 12/11/2026) : la rubrique Communauté du Menu système (Mon profil, Joueurs,
+// Messages, Groupes et salons, Réglages de la communauté), l'affiche du médaillon de la roue, et
+// l'écran « Joueurs » (livepresence.ts). Depuis le 21/11/2026, Start sur le médaillon ouvre l'écran à
+// onglets (community-hub.ts) ; la rubrique reste la porte du Menu système, médaillon masqué ou non.
 //
-// La liste réunit mes amis en ligne (leur présence entre amis, friendpresence.ts) et les joueurs dont
-// le signal public a moins de cinq minutes. Pour un joueur qui n'est pas mon ami, jamais la table en
-// cours : « En ligne » ou « En partie », puis ce qui nous rapproche (tables en commun, réseau local).
-// MagnaSave passe d'un filtre à l'autre (Tous, Mon pays, À proximité, Mêmes tables) ; Start ouvre son
-// profil public, ou la fiche d'un ami.
+// « Joueurs » réunit les anciennes entrées « Mes amis » et « Joueurs en ligne » (21/11/2026) : le
+// premier onglet, Amis, montre les demandes reçues en tête puis mes amis, en ligne d'abord ; les
+// suivants (Tous, Mon pays, À proximité, Mêmes tables) les joueurs dont le signal public a moins de
+// cinq minutes, puis tous ceux que la borne a croisés. Pour un joueur qui n'est pas mon ami, jamais la
+// table en cours : « En ligne » ou « En partie », puis ce qui nous rapproche (tables en commun, réseau
+// local). MagnaSave passe d'un onglet à l'autre ; Start ouvre son profil, le seul écran d'un joueur.
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
@@ -23,6 +24,9 @@ import {
   locale,
   nearbyPlayers,
   ONLINE_FILTERS,
+  roomOfCountry,
+  shownLevel,
+  tierOf,
   socialAgo,
   onlineCounts,
   onlineGroups,
@@ -31,6 +35,8 @@ import {
   tierLabel,
   tn,
   type FlagView,
+  type IconName,
+  type TierId,
   type LevelView,
   type OnlineFilter,
   type OnlineGroup,
@@ -38,7 +44,8 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
-import type { PlayerStanding, StandingPlace } from './rankings-menu';
+import type { PlayerStanding } from './rankings-menu';
+import { communityPeople, suggestReasonText, type CommunityRoomPeek, type CommunityThread } from './community-hub';
 import type { RoomGlance } from './rooms-menu';
 import type { SocialNet } from './social-net';
 import type { RemotePeople } from './phone-remote';
@@ -57,14 +64,21 @@ export interface CommunityMenuHost {
   /** Les tables de la borne : « tables en commun » avec les joueurs classés. */
   tables(): readonly TableEntry[];
   openProfile(key: string, back: () => void): void;
-  /** Mes amis (friends-menu.ts) : leur état en une ligne (en ligne, demandes reçues) et la liste, « Retour » vers `back`. */
-  friends?: { detail(): string; attention(): boolean; open(back: () => void): void };
+  /**
+   * Mes amis (friends-menu.ts) : leur état en une ligne (en ligne, demandes reçues), « Trouver un
+   * joueur », les demandes reçues et envoyées, et la partie en direct qui attend (en tête de l'onglet Amis).
+   */
+  friends?: { detail(): string; attention(): boolean; find?(): void; requests?(back: () => void): void; pending?(here: () => void): Action | undefined };
+  /** L'écran à onglets (community-hub.ts) : ce qu'ouvre le médaillon. */
+  hub?: { openHome(back: () => void): void };
   /** La messagerie (chat-menu.ts) : son état en une ligne et sa liste, « Retour » vers `back`. */
-  messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void };
-  /** Les groupes (groups-menu.ts) : ce que dit leur porte, et les ouvrir. */
-  groups?: { door(): { detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void };
-  /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, et l'ouvrir. */
-  rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; open(back: () => void): void };
+  messages: { detail(): string; attention(): boolean; quiet(): boolean; open(back: () => void): void; waiting?(): CommunityThread[] };
+  /** Les groupes (groups-menu.ts) : ce que dit leur porte, mes groupes, et les ouvrir. */
+  groups?: { door(): { detail: string; attention: boolean; quiet: boolean }; open(back: () => void): void; mine?(): CommunityThread[] };
+  /** Le salon de mon pays (rooms-menu.ts) : ce que dit sa porte, ses dernières lignes, et l'ouvrir. */
+  rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; peek?(): CommunityRoomPeek; problem?(): string | undefined; open(back: () => void): void };
+  /** Mon niveau : le rapprochement avec les joueurs suggérés. */
+  myLevel?(): number;
   /** Les parties instantanées, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
   instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
@@ -77,11 +91,11 @@ export interface CommunityMenuHost {
 }
 
 export interface CommunityMenu {
-  /** L'accueil Communauté (médaillon de la roue), son « Retour » vers `back`. */
+  /** L'écran de la Communauté (médaillon de la roue), son « Retour » vers `back`. */
   openHome(back: () => void): void;
-  /** « Joueurs en ligne », son « Retour » vers `back` ; sans lui, le menu système. */
-  openPlayers(back?: () => void): void;
-  /** Menu système > Communauté > Joueurs en ligne. */
+  /** « Joueurs », sur l'onglet des amis (sinon `tab`), son « Retour » vers `back` ; sans lui, le menu système. */
+  openPlayers(back?: () => void, tab?: PlayersTab): void;
+  /** Menu système > Communauté > Joueurs. */
   item: ProvidedSystemItem;
   /** Les autres entrées de l'accueil fournies ici : Mon niveau, Partie instantanée, Groupes, salon du pays, Classements. */
   homeItems: Partial<Record<'my-level' | 'instant' | 'groups' | 'rooms' | 'rankings', ProvidedSystemItem>>;
@@ -89,6 +103,8 @@ export interface CommunityMenu {
   summary(): { online: number; country: number; friends: number; attention: boolean };
   /** Les joueurs en ligne, amis compris, dans l'ordre de la liste (téléphone). */
   players(): OnlinePlayer[];
+  /** Tous les joueurs connus de la borne, ceux en ligne d'abord (joueurs suggérés). */
+  everyone(): OnlinePlayer[];
   /** « Joueurs » au téléphone : demandes reçues, filtres et groupes de la borne, `max` joueurs au plus par filtre. */
   remotePeople(max: number): RemotePeople;
   /** L'affiche du médaillon choisi dans la roue (plateau, fronton), comme celle du Juke-box. */
@@ -96,10 +112,16 @@ export interface CommunityMenu {
 }
 
 /**
- * L'affiche du médaillon Communauté (app/renderer/community.js), textes déjà traduits : la marque,
- * le grand titre, les chiffres, le salon de mon pays et sa dernière ligne, les amis en ligne.
+ * L'affiche du médaillon Communauté (app/renderer/community.js), textes déjà traduits.
+ * - Au fronton (mise en page des affiches du Juke-box) : la marque, le grand titre, les chiffres, puis
+ *   ce qui attend le plus (le message qu'on m'a écrit, sinon la dernière ligne du salon).
+ * - Sur le plateau (planche « Engagement » du 21/11/2026) : le message qui m'attend (qui m'a écrit, sa
+ *   bulle), mes amis en ligne avec l'anneau de leur présence et ce qu'ils font (des joueurs suggérés
+ *   quand personne n'est là), le salon de mon pays qui défile, l'activité de mes groupes et les demandes
+ *   d'ami. Le niveau et les places ne sont plus ici : ils sont sur l'affiche de l'Arène.
  */
-export interface CommunityPosterView {
+/** L'affiche d'un médaillon dans la mise en page de celles du Juke-box (fronton ; plateau des Collections). */
+export interface MedallionPosterView {
   edition: string;
   label: string;
   title: string;
@@ -108,36 +130,39 @@ export interface CommunityPosterView {
   eyebrow: string;
   heading: string;
   detail?: string;
-  /** Mon niveau et ma place, mondiale et nationale : sur le plateau seulement (18/11/2026). */
-  standing?: PosterStanding;
   tagline: string;
   start: string;
   open: string;
 }
 
-/** Une case de l'affiche : « Niveau 14 », « Mondial 412ᵉ », « France 37ᵉ ». */
-export interface PosterTile {
-  label: string;
-  value: string;
-  detail: string;
-  /** Avancée dans le niveau, de 0 à 1. */
-  progress?: number;
-  flag?: FlagView;
-  /** Rien à classer (pays non choisi, pas encore d'XP) : la case reste, grisée. */
-  quiet?: boolean;
+export interface CommunityPosterView extends MedallionPosterView {
+  /** Le message qui m'attend : qui, quand, sa bulle (« <Bruno> » en tête pour un groupe). */
+  said?: { avatar?: AvatarView; icon?: IconName; name: string; when: string; text: string; who?: string; group?: boolean };
+  /** Mes amis en ligne (ou des joueurs suggérés) : la pastille et son anneau, le niveau, ce qu'il fait. */
+  people: PosterPerson[];
+  /** Le salon de mon pays : ses dernières lignes (elles défilent), ou pourquoi il est fermé. */
+  room?: { name: string; flag?: FlagView; present?: string; lines: { time: string; nick: string; hue: number; text: string }[]; problem?: string; quiet?: string };
+  /** Les groupes et les demandes d'ami, en puces. */
+  chips: { icon: IconName; text: string; hot?: boolean }[];
 }
 
-export interface PosterStanding {
-  tiles: PosterTile[];
-  /** La semaine en une ligne : XP gagnés depuis lundi et places de la semaine. */
-  week?: string;
+export interface PosterPerson {
+  avatar: AvatarView;
+  name: string;
+  level?: { text: string; tier: TierId };
+  ring: 'online' | 'playing' | 'suggested';
+  status: string;
 }
+
+/** Les onglets de « Joueurs » : mes amis d'abord, puis les filtres des joueurs en ligne. */
+export type PlayersTab = 'friends' | OnlineFilter;
+export const PLAYERS_TABS: readonly PlayersTab[] = ['friends', ...ONLINE_FILTERS];
 
 export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   const net = host.net;
   const lib = host.library;
   const now = () => host.now?.() ?? new Date();
-  let filter: OnlineFilter = 'all';
+  let filter: PlayersTab = 'friends';
   let playersBack: (() => void) | undefined;
 
   /** Les joueurs en ligne : mes amis (présence entre amis), puis les signaux publics des autres. */
@@ -233,8 +258,10 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
 
   // ---------- Joueurs en ligne ----------
 
-  function filterLabel(f: OnlineFilter): string {
+  function filterLabel(f: PlayersTab): string {
     switch (f) {
+      case 'friends':
+        return t('Amis');
       case 'all':
         return t('Tous');
       case 'country':
@@ -247,7 +274,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   }
 
   /** Pourquoi un filtre ne peut rien montrer (grisé, avec sa raison) ; undefined : il marche. */
-  function filterProblem(f: OnlineFilter): string | undefined {
+  function filterProblem(f: PlayersTab): string | undefined {
     if (f === 'nearby' && !net.state().lan) return t('Réseau local coupé');
     if (f === 'country' && !myCountry()) return t('Pays non choisi');
     return undefined;
@@ -272,7 +299,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   }
 
   /** Ce qui rapproche : les tables en commun (nommées dans « Mêmes tables »), le réseau local. */
-  function closeness(p: OnlinePlayer, tables: ReadonlyMap<string, readonly string[]>, shown: OnlineFilter = filter): string | undefined {
+  function closeness(p: OnlinePlayer, tables: ReadonlyMap<string, readonly string[]>, shown: PlayersTab = filter): string | undefined {
     const common = tables.get(p.key) ?? [];
     if (shown === 'tables' && common.length) return tn(common.length, '{n} table : {list}', '{n} tables : {list}', { list: common.slice(0, 3).join(', ') + (common.length > 3 ? '…' : '') });
     if (p.nearby) return t('Sur votre réseau local');
@@ -286,7 +313,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
    * l'a pas vu ; « Ami » seulement hors de la section des amis, la demande envoyée, ce qui rapproche.
    * La même ligne à la borne et au téléphone.
    */
-  function personDetail(p: OnlinePlayer, group: OnlineGroup['id'], tables: ReadonlyMap<string, readonly string[]>, shown: OnlineFilter): string {
+  function personDetail(p: OnlinePlayer, group: OnlineGroup['id'], tables: ReadonlyMap<string, readonly string[]>, shown: PlayersTab): string {
     const table = p.friend && p.status === 'playing' ? net.presenceOf(p.key)?.table?.title : undefined;
     const doing =
       p.status === 'playing' ? (table ? t('En partie sur {table}', { table }) : t('En partie')) : p.status === 'online' ? t('En ligne') : p.seen ? t('Vu {ago}', { ago: socialAgo(p.seen, now()) }) : t('Hors ligne');
@@ -338,6 +365,38 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     };
   }
 
+  /**
+   * L'onglet Amis de « Joueurs » (21/11/2026 : « Mes amis » et « Joueurs en ligne » réunis) : les
+   * demandes reçues en tête, puis mes amis en ligne (en partie d'abord), puis ceux hors ligne. Start
+   * ouvre le profil, le seul écran d'un joueur (accepter ou refuser une demande s'y fait).
+   */
+  function friendSections(list: readonly OnlinePlayer[], actions: Action[], here: () => void, tables: ReadonlyMap<string, readonly string[]>): Section[] {
+    const s = net.state();
+    const sections: Section[] = [];
+    const row = (p: OnlinePlayer, group: OnlineGroup['id']): Row => {
+      const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: 'friend-list', run: () => host.openProfile(p.key, here) }) - 1;
+      return { text: p.name, avatar: avatar(p.key, p.name), flag: playerFlag(p.country, locale()), detail: personDetail(p, group, tables, 'friends'), ...(p.status === 'offline' ? {} : { tone: 'ok' as const }), action: index, pick: true };
+    };
+    if (s.incoming.length)
+      sections.push({
+        title: t('Demandes reçues ({n})', { n: s.incoming.length }),
+        kind: 'players',
+        rows: s.incoming.map((r) => {
+          const index = actions.push({ label: r.name, key: `request:${r.key}`, icon: 'friend-request', attention: true, run: () => host.openProfile(r.key, here) }) - 1;
+          const country = net.publicCard(r.key)?.country;
+          return { text: r.name, avatar: avatar(r.key, r.name), flag: playerFlag(country, locale()), detail: t('Demande reçue {ago} · Start : accepter ou refuser', { ago: socialAgo(r.at, now()) }), tone: 'ok', action: index, pick: true } satisfies Row;
+        }),
+      });
+    const friends = list.filter((p) => p.friend);
+    const on = friends.filter((p) => p.status !== 'offline');
+    const off = friends.filter((p) => p.status === 'offline');
+    if (on.length) sections.push({ title: t('En ligne ({n})', { n: on.length }), kind: 'players', rows: on.map((p) => row(p, 'friends')) });
+    if (off.length) sections.push({ title: t('Hors ligne ({n})', { n: off.length }), kind: 'players', rows: off.map((p) => row(p, 'offline')) });
+    if (!friends.length && !s.incoming.length)
+      sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), icon: 'info', tone: 'quiet' }] });
+    return sections;
+  }
+
   function buildPlayers(): Built {
     const s = net.state();
     const status = net.status();
@@ -355,52 +414,69 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       sections.push({ rows: [{ text: status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…'), icon: 'network', tone: 'quiet' }] });
     }
     const tables = commonTables(host.tables().map(presenceTable), net.rankings().scores);
-    const groups = onlineGroups(list, myCountry(), filter);
-    // Les onglets des filtres, rendus en tête de la liste : leurs actions d'abord, dans l'ordre de
-    // lecture (de haut en bas), puis les joueurs, puis la colonne des actions.
-    const tabs = ONLINE_FILTERS.map((f) => {
+    // Les onglets, rendus en tête de la liste : leurs actions d'abord, dans l'ordre de lecture (de haut
+    // en bas), puis les joueurs, puis la colonne des actions.
+    const tabs = PLAYERS_TABS.map((f) => {
       const problem = filterProblem(f);
-      const action = actions.push({ label: t('Filtre {name}', { name: filterLabel(f) }), key: `filter-${f}`, run: () => ((filter = f), here()) }) - 1;
-      // Des joueurs connectés : le nombre au-delà de cinq seulement (shownCrowd).
-      const count = shownCrowd(counts[f]);
+      const action = actions.push({ label: t('Onglet {name}', { name: filterLabel(f) }), key: `filter-${f}`, run: () => ((filter = f), here()) }) - 1;
+      // Mes amis en ligne toujours comptés ; les autres joueurs au-delà de cinq seulement (shownCrowd).
+      const count = f === 'friends' ? online.filter((p) => p.friend).length || undefined : shownCrowd(counts[f]);
       return { label: filterLabel(f), count: problem ?? (count === undefined ? '' : String(count)), current: f === filter, disabled: Boolean(problem), action, ...(f === 'country' && myCountry() ? { flag: flagView(myCountry()!, locale()) } : {}) };
     });
-    for (const g of groups) {
-      sections.push({
-        title: groupTitle(g),
-        kind: 'players',
-        rows: g.players.map((p) => {
-          const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => host.openProfile(p.key, here) }) - 1;
-          // Son drapeau devant le nom ; sans pays, le drapeau Cyber Pinball (13/11/2026).
-          const flag = playerFlag(p.country, locale());
-          return {
-            text: p.name,
-            avatar: avatar(p.key, p.name),
-            flag,
-            detail: personDetail(p, g.id, tables, filter),
-            ...(p.status === 'offline' ? {} : { tone: 'ok' as const }),
-            action: index,
-            pick: true,
-          } satisfies Row;
-        }),
-      });
-    }
-    if (s.enabled && status.running && !groups.length) {
-      const problem = filterProblem(filter);
-      sections.push({
-        rows: [
-          problem
-            ? { text: t('{filter} : {reason}', { filter: filterLabel(filter), reason: problem }), detail: filter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Mon profil › Modifier mon profil › Mon pays'), icon: 'info', tone: 'quiet' }
-            : list.length
-              ? { text: t('Personne pour ce filtre en ce moment'), detail: t('MagnaSave : filtre suivant'), icon: 'info', tone: 'quiet' }
-              : { text: t('Aucun joueur connu pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
-        ],
-      });
-      if (problem) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
+    if (filter === 'friends') {
+      // Une partie en direct ou une invitation qui attend : en tête, avant les amis.
+      const pending = s.enabled ? host.friends?.pending?.(here) : undefined;
+      if (pending) actions.push(pending);
+      if (s.enabled) sections.push(...friendSections(list, actions, here, tables));
+    } else {
+      const shownFilter = filter;
+      const groups = onlineGroups(list, myCountry(), shownFilter);
+      for (const g of groups) {
+        sections.push({
+          title: groupTitle(g),
+          kind: 'players',
+          rows: g.players.map((p) => {
+            const index = actions.push({ label: p.name, key: `player:${p.key}`, icon: p.friend ? 'friend-list' : 'account', run: () => host.openProfile(p.key, here) }) - 1;
+            // Son drapeau devant le nom ; sans pays, le drapeau Cyber Pinball (13/11/2026).
+            const flag = playerFlag(p.country, locale());
+            return {
+              text: p.name,
+              avatar: avatar(p.key, p.name),
+              flag,
+              detail: personDetail(p, g.id, tables, shownFilter),
+              ...(p.status === 'offline' ? {} : { tone: 'ok' as const }),
+              action: index,
+              pick: true,
+            } satisfies Row;
+          }),
+        });
+      }
+      if (s.enabled && status.running && !groups.length) {
+        const problem = filterProblem(shownFilter);
+        sections.push({
+          rows: [
+            problem
+              ? { text: t('{filter} : {reason}', { filter: filterLabel(shownFilter), reason: problem }), detail: shownFilter === 'nearby' ? t('Le réactiver : Partage et réseau') : t('Le choisir : Mon profil › Modifier mon profil › Mon pays'), icon: 'info', tone: 'quiet' }
+              : list.length
+                ? { text: t('Personne pour ce filtre en ce moment'), detail: t('MagnaSave : onglet suivant'), icon: 'info', tone: 'quiet' }
+                : { text: t('Aucun joueur connu pour l’instant'), detail: t('La liste se remplit à mesure que les bornes se signalent'), icon: 'info', tone: 'quiet' },
+          ],
+        });
+        if (problem) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
+      }
     }
     // Partage désactivé : de quoi le réactiver, dans la colonne des actions (après la liste, dans l'ordre de lecture).
     if (!s.enabled) actions.push({ label: t('Partage et réseau'), icon: 'network', run: () => host.openSharing(here) });
     if (s.enabled) {
+      if (host.friends?.find) actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => host.friends!.find!() });
+      if (host.friends?.requests)
+        actions.push({
+          label: t('Demandes d’amis'),
+          detail: s.incoming.length ? tn(s.incoming.length, '{n} à valider', '{n} à valider') : t('Reçues et envoyées'),
+          icon: 'friend-request',
+          ...(s.incoming.length ? { attention: true } : {}),
+          run: () => host.friends!.requests!(here),
+        });
       const shown = s.publicPresence !== false;
       actions.push({
         label: shown ? t('Apparaître en ligne pour tous : oui') : t('Apparaître en ligne pour tous : non'),
@@ -411,40 +487,40 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     }
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return {
-      heading: t('Joueurs en ligne'),
+      heading: t('Joueurs'),
       icon: 'friends',
       subheading: countsLine(online),
-      lead: t('Tous les joueurs croisés par votre borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.'),
+      lead: filter === 'friends' ? t('Vos amis, ceux en ligne d’abord, et les demandes reçues en tête. Start ouvre le profil d’un joueur.') : t('Tous les joueurs croisés par votre borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.'),
       tabs,
       sections,
       actions,
       back,
-      hint: t('Flippers : choisir · Start : son profil · MagnaSave : filtre suivant · Exit : retour'),
-      listHint: t('Flippers : parcourir · Start : son profil · MagnaSave : filtre suivant · Exit : sortir de la liste'),
+      hint: t('Flippers : choisir · Start : son profil · MagnaSave : onglet suivant · Exit : retour'),
+      listHint: t('Flippers : parcourir · Start : son profil · MagnaSave : onglet suivant · Exit : sortir de la liste'),
       keys: (input) => {
         const magna = host.zoneKeys();
         if (!magna.includes(input.code)) return false;
         const dir = magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
-        const at = ONLINE_FILTERS.indexOf(filter);
-        filter = ONLINE_FILTERS[(at + dir + ONLINE_FILTERS.length) % ONLINE_FILTERS.length]!;
+        const at = PLAYERS_TABS.indexOf(filter);
+        filter = PLAYERS_TABS[(at + dir + PLAYERS_TABS.length) % PLAYERS_TABS.length]!;
         here();
         return true;
       },
     };
   }
 
-  function openPlayers(back?: () => void): void {
+  function openPlayers(back?: () => void, tab: PlayersTab = 'friends'): void {
     playersBack = back;
-    filter = 'all';
-    // Le curseur sur le premier joueur (juste après les onglets des filtres).
-    lib.openCustom(buildPlayers, ONLINE_FILTERS.length);
+    filter = tab;
+    // Le curseur sur le premier joueur (juste après les onglets).
+    lib.openCustom(buildPlayers, PLAYERS_TABS.length);
   }
 
-  // ---------- Accueil Communauté ----------
-  // L'accueil EST la rubrique Communauté du Menu système (systemmenu.ts, 20/11/2026) : le même écran
-  // depuis le médaillon de la roue et depuis le menu, rangé par l'arbre. Ce module en fournit les
-  // entrées qui sont à lui, et ce qu'il ajoute en tête (le compte des joueurs, ce que voient les autres).
-  // Les écrans ouverts de là reviennent à l'accueil par le menu système (openSystem).
+  // ---------- Rubrique Communauté du Menu système ----------
+  // La porte du Menu système (systemmenu.ts), toujours là même médaillon masqué ; le médaillon ouvre
+  // l'écran à onglets (community-hub.ts, 21/11/2026). Ce module fournit les entrées qui sont à lui, et
+  // ce que la rubrique dit en tête (le compte des joueurs, ce que voient les autres). Les écrans ouverts
+  // de là reviennent à la rubrique par le menu système (openSystem).
 
   const toHome = () => lib.openSystem();
 
@@ -524,64 +600,86 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     };
   }
 
-  /** Amis en ligne nommés au plus sur l'affiche ; au-delà, « +2 ». */
-  const POSTER_FRIENDS = 3;
+  // ---------- L'affiche ----------
+
+  /** Joueurs montrés au plus sur l'affiche ; lignes du salon qui défilent. */
+  const POSTER_PEOPLE = 3;
+  const POSTER_LINES = 4;
+
+  /** Le niveau d'un joueur : le mien, ou celui que dit sa carte publique (vraisemblable seulement). */
+  function levelOf(key: string): number | undefined {
+    if (key === net.state().key.publicKey) return host.myLevel?.();
+    return shownLevel(net.publicCard(key)?.xp, net.cardFirstSeen(key), now());
+  }
+  const face = (key: string, name: string): AvatarView => {
+    const level = levelOf(key);
+    return { ...avatar(key, name), ...(level ? { level } : {}) };
+  };
+  const cap = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+  /** Mes amis en ligne, et ce qu'ils font ; personne : des joueurs suggérés (jamais une affiche vide). */
+  function posterPeople(): PosterPerson[] {
+    return communityPeople({ net, players: { online: players, everyone }, levelOf, myLevel: host.myLevel?.() ?? 1 }, POSTER_PEOPLE).map(({ player: p, reason }) => {
+      const level = levelOf(p.key);
+      const table = p.friend && p.status === 'playing' ? net.presenceOf(p.key)?.table?.title : undefined;
+      const status = reason ? suggestReasonText(reason, p.commonTables ?? 0) : p.status === 'playing' ? (table ? t('Sur {table}', { table }) : t('En partie')) : t('En ligne');
+      return { avatar: face(p.key, p.name), name: p.name, ...(level ? { level: { text: t('Niv. {n}', { n: level }), tier: tierOf(level) } } : {}), ring: reason ? 'suggested' : p.status === 'playing' ? 'playing' : 'online', status };
+    });
+  }
 
   function poster(): CommunityPosterView {
-    const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Joueurs, salons, classements.'), start: t('Start'), open: t('Ouvrir la Communauté') };
+    const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Votre borne. Vos joueurs.'), start: t('Start'), open: t('Ouvrir la Communauté') };
     if (!net.state().enabled)
-      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Réglages de la communauté › Partage et réseau') };
+      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Réglages de la communauté › Partage et réseau'), people: [], chips: [] };
+    const s = net.state();
     const list = players();
-    const room = host.rooms?.glance?.();
+    // Le message qui m'attend : la conversation la plus récente où quelque chose attend.
+    const waiting = host.messages.waiting?.() ?? [];
+    const first = [...waiting].sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0))[0];
+    const said: CommunityPosterView['said'] = first?.last
+      ? {
+          ...(first.key ? { avatar: face(first.key, first.name) } : { icon: first.kind === 'group' ? ('group' as const) : ('globe' as const) }),
+          name: first.name,
+          when: cap(socialAgo(new Date(first.last.at).toISOString(), now())),
+          text: first.last.text,
+          ...(first.last.who ? { who: first.last.who } : {}),
+          ...(first.kind !== 'friend' ? { group: true } : {}),
+        }
+      : undefined;
+    // Le salon de mon pays : ses dernières lignes, qui défilent.
+    const problem = host.rooms?.problem?.();
+    const peek = problem ? undefined : host.rooms?.peek?.();
+    const c = myCountry();
+    const room: CommunityPosterView['room'] = problem
+      ? { name: host.rooms?.glance?.().name ?? t('Salon'), lines: [], problem }
+      : peek
+        ? {
+            name: peek.name,
+            ...(c && peek.id === roomOfCountry(c) ? { flag: flagView(c, locale()) } : {}),
+            ...(peek.present ? { present: tn(peek.present, '{n} présent', '{n} présents') } : {}),
+            lines: peek.lines.slice(-POSTER_LINES).map((l) => ({ time: l.time, nick: l.nick, hue: l.hue, text: l.text })),
+            ...(peek.lines.length ? {} : { quiet: t('Rien de neuf pour l’instant') }),
+          }
+        : undefined;
+    // Les puces : l'activité de mes groupes (table de la semaine, messages), puis les demandes d'ami.
+    const chips: CommunityPosterView['chips'] = [];
+    const groups = host.groups?.mine?.() ?? [];
+    const busy = groups.find((g) => g.unread) ?? groups.find((g) => g.detail);
+    if (busy) chips.push({ icon: 'group', text: busy.unread ? tn(busy.unread, '{group} · {n} message', '{group} · {n} messages', { group: busy.name }) : t('{group} · {detail}', { group: busy.name, detail: busy.detail! }), hot: Boolean(busy.unread) });
+    if (s.incoming.length) chips.push({ icon: 'friend-add', text: tn(s.incoming.length, '{n} demande d’ami', '{n} demandes d’ami'), hot: true });
+    // Au fronton, une phrase : le message qui attend, sinon la dernière ligne du salon.
+    const last = peek?.lines.at(-1);
+    const eyebrow = said ? t('{name} vous a écrit · {when}', { name: said.name, when: said.when.toLocaleLowerCase() }) : room ? (room.present ? `${room.name} · ${room.present}` : room.name) : t('Joueurs en ligne');
+    const heading = said ? (said.who ? `<${said.who}> ${said.text}` : said.text) : (room?.problem ?? (last ? `<${last.nick}> ${last.text}` : t('Rien de neuf pour l’instant')));
     const friends = list.filter((p) => p.friend);
-    const named = friends.slice(0, POSTER_FRIENDS).map((p) => p.name);
-    const more = friends.length - named.length;
-    const detail = friends.length
-      ? t('Amis en ligne : {names}', { names: [...named, ...(more ? [`+${more}`] : [])].join(', ') })
-      : host.messages.attention()
-        ? host.messages.detail()
-        : t('Joueurs en ligne, messages, salon, classements');
-    const eyebrow = room ? (room.problem || !room.present ? room.name : `${room.name} · ${tn(room.present, '{n} présent', '{n} présents')}`) : t('Joueurs en ligne');
-    const heading = room?.problem ?? (room?.last ? `<${room.last.name}> ${room.last.text}` : room ? t('Rien de neuf pour l’instant') : t('Start pour ouvrir la Communauté'));
-    const standing = standingView();
-    return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail, ...(standing ? { standing } : {}) };
+    const detail = friends.length ? t('Amis en ligne : {names}', { names: friends.slice(0, 3).map((p) => p.name).join(', ') + (friends.length > 3 ? ` +${friends.length - 3}` : '') }) : t('Messages, joueurs, groupes et salons');
+    return { ...frame, stats: countsLine(list), empty: false, eyebrow, heading, detail, ...(said ? { said } : {}), people: posterPeople(), ...(room ? { room } : {}), chips };
   }
 
-  /** Une place : « 1ᵉʳ », « 412ᵉ ». */
-  const ordinal = (n: number) => (n === 1 ? t('1ᵉʳ') : t('{n}ᵉ', { n: formatNumber(n) }));
-
-  /**
-   * Mon niveau, ma place au monde et dans mon pays, de tout temps ; la semaine en une ligne dessous
-   * (demande du 18/11/2026 : « un petit peu plus de data » sur le plateau). Une place qui manque
-   * (pays non choisi, pas encore d'XP) garde sa case, grisée, avec sa raison.
-   */
-  function standingView(): PosterStanding | undefined {
-    const lv = host.level?.view?.();
-    const st = host.rankings.standing?.();
-    if (!lv && !st) return undefined;
-    const tiles: PosterTile[] = [];
-    if (lv) tiles.push({ label: t('Niveau'), value: formatNumber(lv.level), detail: tierLabel(lv.tier), progress: lv.progress });
-    if (st) {
-      const place = (label: string, p: StandingPlace | undefined, why: string, flag?: FlagView): PosterTile =>
-        p?.rank
-          ? { label, value: ordinal(p.rank), detail: tn(p.players, 'sur {n} joueur', 'sur {n} joueurs'), ...(flag ? { flag } : {}) }
-          : { label, value: '—', detail: why, quiet: true, ...(flag ? { flag } : {}) };
-      tiles.push(place(t('Mondial'), st.world, t('Pas encore classé')));
-      const c = st.country;
-      tiles.push(c ? place(countryLabel(c.code)!, c, t('Pas encore classé'), flagView(c.code, locale())) : place(t('National'), undefined, t('Pays non choisi')));
-    }
-    const parts: string[] = [];
-    if (lv) parts.push(lv.week > 0 ? t('Cette semaine : +{n} XP', { n: formatNumber(lv.week) }) : t('Pas encore d’XP cette semaine'));
-    if (st?.world.week) parts.push(st.world.week === 1 ? t('1ᵉʳ au monde') : t('{n}ᵉ au monde', { n: formatNumber(st.world.week) }));
-    if (st?.country?.week) parts.push(st.country.week === 1 ? t('1ᵉʳ dans votre pays') : t('{n}ᵉ dans votre pays', { n: formatNumber(st.country.week) }));
-    // Chaque segment insécable : la ligne ne passe à la ligne qu'entre deux segments (« 5ᵉ / au monde » sur l'affiche du bureau).
-    const nbsp = String.fromCharCode(160);
-    return { tiles, ...(parts.length ? { week: parts.map((p) => p.replace(/ /g, nbsp)).join(' · ') } : {}) };
-  }
-
-  /** L'accueil, ouvert par le médaillon : la rubrique Communauté, son « Retour » vers `back`. */
+  /** L'écran de la Communauté, ouvert par le médaillon : ses onglets ; sans eux (essais), la rubrique du Menu système. */
   function openHome(back: () => void): void {
-    lib.openSystemGroupFrom('amis', back);
+    if (host.hub) host.hub.openHome(back);
+    else lib.openSystemGroupFrom('amis', back);
   }
 
   return {
@@ -592,7 +690,10 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       get detail() {
         const s = net.state();
         if (!s.enabled) return t('Indisponible : partage désactivé (Partage et réseau)');
-        return countsLine(players());
+        return [host.friends?.detail(), countsLine(players())].filter(Boolean).join(' · ');
+      },
+      get attention() {
+        return Boolean(host.friends?.attention() || net.state().incoming.length);
       },
       get tone() {
         return net.state().enabled ? undefined : ('quiet' as const);
@@ -602,6 +703,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     summary,
     poster,
     players: () => onlineGroups(players(), myCountry(), 'all').flatMap((g) => g.players),
+    everyone,
     remotePeople,
   };
 }

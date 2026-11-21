@@ -17,8 +17,24 @@
 import { t, type AvatarView, type IconName, type TierId } from '@cyberpinball/core';
 import type { Action, Built } from './library';
 
-/** Disposition d'une section : la carte du moment en grand, des cartes côte à côte, une liste, des puces. */
-export type HubLayout = 'hero' | 'cards' | 'list' | 'chips';
+/**
+ * Disposition d'une section : la carte du moment en grand, des cartes côte à côte, une liste, des puces,
+ * ou des joueurs en tuiles (la pastille et son anneau, le nom, ce qu'il fait : Communauté, 21/11/2026).
+ */
+export type HubLayout = 'hero' | 'cards' | 'list' | 'chips' | 'people';
+
+/** L'anneau de présence autour de la pastille d'un joueur : en ligne, en partie, ou suggéré. */
+export type HubRing = 'online' | 'playing' | 'suggested';
+
+/** Une ligne du journal d'un salon : l'heure, le pseudo à sa teinte, le texte (une ligne à la manière d'IRC). */
+export interface HubLogLine {
+  time: string;
+  nick: string;
+  hue: number;
+  text: string;
+  /** Ligne qui me cite, ou que j'ai écrite. */
+  kind?: 'mention' | 'own';
+}
 
 /** « Niv. 18 » à la teinte du palier, à côté d'un nom. */
 export interface HubLevel {
@@ -32,6 +48,8 @@ export interface HubButtonSpec {
   xp?: string;
   /** L'action principale : pleine, en vert. */
   primary?: boolean;
+  /** Une phrase toute prête à envoyer : en pastille de couleur, comme les phrases du salon. */
+  quick?: boolean;
   key: string;
   run: () => void;
 }
@@ -56,6 +74,14 @@ export interface HubCardSpec {
   asideTone?: 'warning';
   /** Barre de progression sous le texte, de 0 à 1. */
   progress?: number;
+  /** Le dernier message, en bulle sous le titre (« <Bruno> » en tête pour un groupe). */
+  bubble?: { text: string; who?: string; group?: boolean };
+  /** Le journal d'un salon : ses dernières lignes, sous le titre. */
+  lines?: HubLogLine[];
+  /** Anneau de présence autour de la pastille. */
+  ring?: HubRing;
+  /** Messages non lus : le nombre en pastille, après le titre. */
+  count?: number;
   /** Ce que Start fait sur la carte ; absent avec des boutons (chacun est un arrêt des flippers), ou pour une carte à lire. */
   run?: () => void;
   buttons?: HubButtonSpec[];
@@ -68,6 +94,8 @@ export interface HubSectionSpec {
   /** À droite du titre, plus discret (« encore 240 XP »). */
   note?: string;
   layout: HubLayout;
+  /** Au bureau, sa colonne (sinon : la carte du moment et la suivante à gauche, le reste partagé). */
+  column?: 'left' | 'right';
   cards: HubCardSpec[];
 }
 
@@ -128,11 +156,15 @@ export interface HubCardView {
   aside?: string;
   asideTone?: 'warning';
   progress?: number;
+  bubble?: { text: string; who?: string; group?: boolean };
+  lines?: HubLogLine[];
+  ring?: HubRing;
+  count?: number;
   quiet?: boolean;
   /** La carte elle-même se choisit (absent : elle a des boutons, ou se lit seulement). */
   action?: number;
   /** Les boutons ; `action` seulement quand on est entré dans le bloc de la carte. */
-  buttons?: { label: string; xp?: string; primary?: boolean; action?: number }[];
+  buttons?: { label: string; xp?: string; primary?: boolean; quick?: boolean; action?: number }[];
 }
 
 export interface HubView {
@@ -148,7 +180,7 @@ export interface HubView {
   tabsBlock?: HubBlockView;
   /** On est entré dans un bloc : les autres s'éteignent un peu. */
   inside?: true;
-  sections: { title?: string; note?: string; layout: HubLayout; block?: HubBlockView; cards: HubCardView[] }[];
+  sections: { title?: string; note?: string; layout: HubLayout; column?: 'left' | 'right'; block?: HubBlockView; cards: HubCardView[] }[];
   empty?: { title: string; detail: string };
 }
 
@@ -275,11 +307,12 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
           ...(s.title ? { title: s.title } : {}),
           ...(s.note ? { note: s.note } : {}),
           layout: s.layout,
+          ...(s.column ? { column: s.column } : {}),
           ...(block ? { block } : {}),
           cards: s.cards.map((c): HubCardView => {
             const { key, run: _run, buttons, ...shown } = c;
             const out: HubCardView = { ...shown };
-            if (buttons?.length) out.buttons = buttons.map((b) => ({ label: b.label, ...(b.xp ? { xp: b.xp } : {}), ...(b.primary ? { primary: true } : {}), ...(itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}) }));
+            if (buttons?.length) out.buttons = buttons.map((b) => ({ label: b.label, ...(b.xp ? { xp: b.xp } : {}), ...(b.primary ? { primary: true } : {}), ...(b.quick ? { quick: true } : {}), ...(itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}) }));
             else if (itemAction.has(key)) out.action = itemAction.get(key)!;
             return out;
           }),

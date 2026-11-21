@@ -15,7 +15,6 @@ export const messages: Record<string, string> = {
   'Borne dédiée, lancement au démarrage, relance par Start, mode invité': 'Dedicated cabinet, launch at startup, relaunch with Start, guest mode',
   'Santé et sauvegardes': 'Health and backups',
   'Santé de la borne, fiche technique, sauvegardes': 'Cabinet health, tech sheet, backups',
-  'Mon profil, joueurs en ligne, amis, messages, groupes et salons, réglages': 'My profile, players online, friends, messages, groups and rooms, settings',
   'Parties instantanées, classements, progression : niveau, badges, historique': 'Instant games, leaderboards, progress: level, badges, history',
   'Niveau, badges, historique des parties': 'Level, badges, game history',
   'Mon profil': 'My profile',

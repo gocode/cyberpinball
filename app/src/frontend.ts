@@ -306,6 +306,8 @@ import {
   toRemoteEntry,
   tn,
   shownCrowd,
+  invitedOf,
+  type RoomId,
   REMOTE_ENTRIES_MAX,
   isJukeboxAction,
   type RemoteJukeboxOp,
@@ -406,6 +408,7 @@ import { createGroupsMenu } from './groups-menu';
 import { createProfileMenu } from './profile-menu';
 import { createPhoneCommunity } from './phone-community';
 import { createCommunityMenu } from './community-menu';
+import { createCommunityHub, type CommunityRoomPeek, type CommunityThread } from './community-hub';
 import { createArenaMenu } from './arena-menu';
 import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
@@ -3192,6 +3195,8 @@ const friendsMenu = createFriendsMenu({
   redraw: socialChanged,
   chat: { openThread: (key, back) => chatMenu.openThread(key, back), writeDetail: (key) => chatMenu.writeDetail(key) },
   profile: { open: (key, back) => profileMenu.openProfile(key, back) },
+  // « Mes amis » : l'onglet Amis de « Joueurs » (community-menu.ts, 21/11/2026).
+  players: (back) => communityMenu.openPlayers(back, 'friends'),
   // Supprimer mon compte (account-delete.ts) : retours, avis d'oubli, fichiers, puis redémarrage avec une clé neuve.
   account: {
     forgetFeedback: () => feedbackService.forgetMe(),
@@ -3423,13 +3428,18 @@ const communityMenu = createCommunityMenu({
     view: () => ({ ...levelOf(levelTracker.state().xp), week: weekXp(levelTracker.state(), new Date()) }),
   },
   instant: { door: () => instantMenu.door(), open: (back) => instantMenu.open(back) },
-  rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), open: (back) => roomsMenu.openDefault(back) },
-  groups: { door: () => groupsMenu.door(), open: (back) => groupsMenu.open(back) },
+  rooms: { door: () => roomsMenu.door(), glance: () => roomsMenu.glance(), peek: () => communityRoomPeek(), problem: () => communityRoomProblem(), open: (back) => roomsMenu.openDefault(back) },
+  groups: { door: () => groupsMenu.door(), open: (back) => groupsMenu.open(back), mine: () => communityGroups() },
   friends: {
     detail: () => friendsMenu.items.friends.detail ?? '',
     attention: () => Boolean(friendsMenu.items['friend-requests'].attention || friendsMenu.items.friends.attention),
-    open: (back) => library.runSystemItem('friends', back),
+    find: () => friendsMenu.openFind(),
+    requests: (back) => friendsMenu.openRequests(back),
+    pending: (here) => friendsMenu.live.pendingAction(here),
   },
+  // Le médaillon ouvre l'écran à onglets (community-hub.ts, 21/11/2026).
+  hub: { openHome: (back) => communityHub.openHome(back) },
+  myLevel: () => levelTracker.view().level,
   library,
   net: socialNet,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
@@ -3440,6 +3450,7 @@ const communityMenu = createCommunityMenu({
     attention: () => Boolean(chatMenu.item.attention),
     quiet: () => chatMenu.item.tone === 'quiet',
     open: (back) => library.runSystemItem('messages', back),
+    waiting: () => communityWaiting(),
   },
   rankings: { detail: () => rankingsMenu.detail(), open: (back) => rankingsMenu.open(back), standing: () => rankingsMenu.standing() },
   openSharing: (back) => library.runSystemItem('sharing', back),
@@ -3454,6 +3465,109 @@ library.provideSystemItem('online-players', communityMenu.item);
   if (home.rooms) library.provideSystemItem('rooms', home.rooms);
   if (home.rankings) library.provideSystemItem('rankings', home.rankings);
 }
+
+// Communauté à onglets (community-hub.ts, 21/11/2026) : l'écran du médaillon. Ici, seulement ce qu'il
+// lit des services : les conversations qui attendent, mes groupes, le salon de mon pays.
+/** Une conversation des Messages en attente (inboxThreads), telle que la Communauté la montre. */
+function communityThreadOf(x: InboxThread): CommunityThread | undefined {
+  const last = x.last ? { ...(x.last.who ? { who: x.last.who } : {}), text: x.last.text, at: x.last.at } : undefined;
+  if (x.kind === 'friend-message')
+    return { kind: 'friend', id: x.id, key: x.id, name: x.name, unread: x.unread, ...(last ? { last } : {}), open: (back) => chatMenu.openThread(x.id, back), reply: (text) => chatService.send(x.id, text) };
+  if (x.kind === 'group-message') return communityGroups().find((g) => g.id === x.id);
+  if (x.kind === 'room-mention') return { kind: 'room', id: x.id, name: x.name, unread: x.unread, ...(last ? { last } : {}), open: (back) => roomsMenu.openRoom(x.id as RoomId, back) };
+  return undefined;
+}
+function communityWaiting(): CommunityThread[] {
+  return inboxThreads()
+    .filter((x) => !x.muted)
+    .map(communityThreadOf)
+    .filter((x): x is CommunityThread => Boolean(x))
+    .sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0));
+}
+/** Les conversations à deux les plus récentes (messagerie entre amis). */
+function communityRecent(max: number): CommunityThread[] {
+  const s = socialNet.state();
+  const out: CommunityThread[] = [];
+  for (const [key, c] of Object.entries(chatService.state().conversations)) {
+    const friend = s.friends.find((f) => f.key === key);
+    const line = c.lines.at(-1);
+    if (!friend || !line?.text) continue;
+    out.push({ kind: 'friend', id: key, key, name: friend.name, unread: c.unread, last: { ...(line.out ? { who: s.name } : {}), text: oneLine(line.text), at: Date.parse(line.at) }, open: (back) => chatMenu.openThread(key, back), reply: (text) => chatService.send(key, text) });
+  }
+  return out.sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0)).slice(0, max);
+}
+/** Mes groupes : le dernier message, la table de la semaine, et y répondre. */
+function communityGroups(): CommunityThread[] {
+  const me = socialNet.state().key.publicKey;
+  return groupService
+    .groups()
+    .filter(({ entry }) => !entry.gone)
+    .map(({ entry, view }): CommunityThread => {
+      const last = [...entry.lines].reverse().find((l) => l.body.k === 'msg');
+      const text = last?.body.k === 'msg' ? oneLine(last.body.text) : undefined;
+      return {
+        kind: 'group',
+        id: view.id,
+        name: view.name,
+        unread: entry.muted ? 0 : entry.unread,
+        ...(last && text ? { last: { who: last.by === me ? socialNet.state().name : last.name, text, at: Date.parse(last.at) } } : {}),
+        ...(view.week ? { detail: t('Table de la semaine : {table}', { table: view.week.table.title }) } : {}),
+        open: (back) => groupsMenu.openGroup(view.id, back),
+        reply: (text) => 'line' in groupService.send(view.id, text),
+      };
+    })
+    .sort((a, b) => (b.last?.at ?? 0) - (a.last?.at ?? 0));
+}
+/** Pourquoi le salon de mon pays est fermé (partage, salons coupés) ; undefined : ouvert. */
+function communityRoomProblem(): string | undefined {
+  const door = roomsMenu.door();
+  return door.quiet ? door.detail : undefined;
+}
+/** Le salon de mon pays d'un coup d'œil (rooms-menu.ts, remote) : ses lignes, ses phrases, les autres salons. */
+function communityRoomPeek(): CommunityRoomPeek {
+  const r = roomsMenu.remote();
+  const present = shownCrowd(r.present ?? 0);
+  return {
+    id: r.room,
+    name: r.name,
+    ...(present ? { present } : {}),
+    lines: r.lines.filter((l) => l.kind !== 'masked').map((l) => ({ time: l.time, nick: l.nick ?? '', hue: l.hue ?? 0, text: l.text, ...(l.kind === 'mention' ? { kind: 'mention' as const } : l.kind === 'own' ? { kind: 'own' as const } : {}) })),
+    phrases: r.phrases,
+    ...(r.blocked ? { blocked: r.blocked } : {}),
+    others: (r.rooms ?? []).filter((x) => x.room !== r.room).map((x) => ({ id: x.room, name: x.name, ...(x.present ? { present: x.present } : {}) })),
+  };
+}
+const communityHub = createCommunityHub({
+  library,
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  net: socialNet,
+  myLevel: () => levelTracker.view().level,
+  players: {
+    online: () => communityMenu.players(),
+    everyone: () => communityMenu.everyone(),
+    open: (back, tab) => communityMenu.openPlayers(back, tab),
+    detail: () => communityMenu.item.detail ?? '',
+  },
+  profile: { open: (key, back) => profileMenu.openProfile(key, back), openMine: (back) => profileMenu.openMine(back) },
+  friends: { find: () => friendsMenu.openFind(), requests: (back) => friendsMenu.openRequests(back) },
+  messages: { waiting: () => communityWaiting(), recent: (max) => communityRecent(max), open: (back) => library.runSystemItem('messages', back), detail: () => chatMenu.item.detail ?? '' },
+  groups: { mine: () => communityGroups(), open: (back) => groupsMenu.open(back), door: () => groupsMenu.door() },
+  room: {
+    peek: () => communityRoomPeek(),
+    problem: () => communityRoomProblem(),
+    write: (text) => roomsMenu.write(roomsMenu.defaultRoom(), text),
+    open: (back) => roomsMenu.openDefault(back),
+    openRoom: (id, back) => roomsMenu.openRoom(id as RoomId, back),
+  },
+  invite: {
+    count: () => {
+      const key = socialNet.state().key.publicKey;
+      const card = socialNet.publicCard(key);
+      return card ? invitedOf(key, card.invited, card.invitedTotal).count : 0;
+    },
+  },
+  desk: () => playfieldLandscape(),
+});
 
 // Arène (arena-menu.ts, 21/11/2026) : le médaillon de ce qui se joue contre les autres. Son affiche et
 // son écran à onglets ; la rubrique Arène du Menu système range Parties instantanées, Classements et
@@ -3555,7 +3669,7 @@ function inboxLinks(): InboxLink[] {
     { label: t('Messages'), detail: chatMenu.item.detail ?? '', icon: 'message', open: (back) => library.runSystemItem('messages', back) },
     { label: t('Groupes'), detail: groups.detail, icon: 'group', ...(groups.attention ? { attention: true } : {}), open: (back) => groupsMenu.open(back) },
     { label: rooms.label, detail: rooms.detail, icon: 'globe', open: (back) => roomsMenu.openDefault(back) },
-    { label: t('Amis'), detail: friendsMenu.items.friends.detail ?? '', icon: 'friends', ...(friendsMenu.items['friend-requests'].attention ? { attention: true } : {}), open: (back) => library.runSystemItem('friends', back) },
+    { label: t('Joueurs'), detail: friendsMenu.items.friends.detail ?? '', icon: 'friends', ...(friendsMenu.items['friend-requests'].attention ? { attention: true } : {}), open: (back) => communityMenu.openPlayers(back, 'friends') },
     { label: t('Activité récente'), detail: activityMenu.item.detail ?? '', icon: 'bell', open: (back) => activityMenu.open(back) },
   ];
 }
@@ -3565,20 +3679,6 @@ const inboxMenu = createInboxMenu({
   threads: inboxThreads,
   open: openThread,
   links: inboxLinks,
-});
-// Mes amis : les demandes reçues et « Trouver un joueur » sont dans son écran ; une demande qui attend
-// met la pastille sur la ligne (20/11/2026 : plus d'entrées à part dans la rubrique).
-library.provideSystemItem('friends', {
-  get detail() {
-    return friendsMenu.items.friends.detail;
-  },
-  get attention() {
-    return Boolean(friendsMenu.items.friends.attention || friendsMenu.items['friend-requests'].attention);
-  },
-  get tone() {
-    return friendsMenu.items.friends.tone;
-  },
-  run: () => friendsMenu.items.friends.run(),
 });
 library.provideSystemItem('game-history', friendsMenu.items['game-history']);
 library.provideSystemItem('badges', levelMenu.badgesItem);
@@ -4023,7 +4123,7 @@ export function startFrontend(): void {
     // Pastille des téléchargements.
     else if (action.type === 'downloads') openFromCorner((back) => library.downloads.open(undefined, back));
     // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
-    else if (action.type === 'friends') openFromCorner((back) => library.runSystemItem('friends', back));
+    else if (action.type === 'friends') openFromCorner((back) => communityMenu.openPlayers(back, 'friends'));
     else if (action.type === 'friend-requests') openFromCorner((back) => friendsMenu.openRequests(back));
     // Carte du joueur (coin d'état) : Mon niveau ; pastille des badges : Mes badges.
     else if (action.type === 'level') openFromCorner((back) => levelMenu.open(back));

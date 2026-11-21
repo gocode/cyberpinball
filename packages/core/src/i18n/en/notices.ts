@@ -8,7 +8,7 @@ export const messages: Record<string, string> = {
   '{n} ami vient de se connecter': '{n} friend just came online',
   '{n} amis viennent de se connecter': '{n} friends just came online',
   'Demande d’ami : {name}': 'Friend request: {name}',
-  'Menu système > Communauté > Mes amis > Demandes d’amis': 'System menu > Community > My friends > Friend requests',
+  'Menu système > Communauté > Joueurs > Demandes d’amis': 'System menu > Community > Players > Friend requests',
   '{n} demande d’ami': '{n} friend request',
   '{n} demandes d’ami': '{n} friend requests',
   '{name} a accepté votre demande': '{name} accepted your request',
@@ -47,7 +47,7 @@ export const messages: Record<string, string> = {
   // packages/core/src/notices.ts : la partie entre amis (livenotices.ts)
   'N’a pas la même version': 'Does not have the same version',
   'Sa partie n’a pas démarré': 'Their game did not start',
-  'Menu système > Communauté > Mes amis': 'System menu > Community > My friends',
+  'Menu système > Communauté > Joueurs': 'System menu > Community > Players',
   '{name} vous invite à rejoindre une partie': '{name} invites you to join a game',
   '{n} invitation à une partie': '{n} invitation to a game',
   '{n} invitations à une partie': '{n} invitations to a game',

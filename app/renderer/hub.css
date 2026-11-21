@@ -699,6 +699,208 @@
   box-shadow: var(--glow-signal), inset 0 0 0 calc(1 * var(--u)) var(--signal);
 }
 
+/*
+ * ---------- Communauté (21/11/2026) : bulles, journal du salon, joueurs en tuiles ----------
+ * D'après la planche validée : le dernier message en bulle violette (bleue pour un groupe), trois
+ * réponses en pastilles de couleur, le journal du salon à la manière d'IRC, les joueurs en tuiles avec
+ * l'anneau de leur palier et, autour, celui de leur présence.
+ */
+
+/* Une carte seule dans sa section (le salon en direct, mon profil) : toute la largeur. */
+.hub-cards.hub-layout-cards > .hub-card:only-child {
+  grid-column: 1 / -1;
+}
+
+/* Messages non lus d'une conversation : le nombre en pastille rouge, après le titre. */
+.hub-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  margin-left: calc(12 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--ink);
+  font-style: normal;
+  font-size: calc(20 * var(--u));
+  font-weight: 800;
+  vertical-align: calc(3 * var(--u));
+}
+
+.hub-bubble {
+  justify-self: start;
+  max-width: 100%;
+  margin: 0;
+  padding: calc(12 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(18 * var(--u)) calc(18 * var(--u)) calc(18 * var(--u)) calc(4 * var(--u));
+  background: color-mix(in oklab, #a984dc 26%, var(--surface));
+  font-size: calc(24 * var(--u));
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.hub-bubble-text {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hub-bubble.hub-bubble-group {
+  background: color-mix(in oklab, var(--meta) 22%, var(--surface));
+}
+
+.hub-bubble-who {
+  font-weight: 700;
+  color: var(--meta);
+}
+
+/* Les phrases toutes prêtes : des pastilles de couleur, comme au salon et au téléphone. */
+.hub-button.hub-quick {
+  border-color: transparent;
+  font-weight: 600;
+  background: color-mix(in oklab, #a984dc 20%, var(--surface));
+}
+
+.hub-button.hub-quick:nth-child(3n + 2) {
+  background: color-mix(in oklab, var(--meta) 22%, var(--surface));
+}
+
+.hub-button.hub-quick:nth-child(3n) {
+  background: color-mix(in oklab, var(--signal) 18%, var(--surface));
+}
+
+.hub-button.hub-quick.selected {
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+/* Le journal d'un salon : fond noir, une ligne par message (l'heure, le pseudo à sa teinte, le texte). */
+.hub-log {
+  display: grid;
+  gap: calc(6 * var(--u));
+  padding: calc(14 * var(--u)) calc(18 * var(--u));
+  border-radius: calc(14 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-strong);
+  background: #020605;
+}
+
+.hub-line {
+  display: grid;
+  grid-template-columns: calc(74 * var(--u)) auto minmax(0, 1fr);
+  gap: calc(12 * var(--u));
+  align-items: baseline;
+  font-size: calc(23 * var(--u));
+  line-height: 1.35;
+}
+
+.hub-line time {
+  font-size: calc(20 * var(--u));
+  color: var(--ink-faint);
+}
+
+.hub-nick {
+  font-weight: 700;
+  color: hsl(var(--nick-hue, 170) 60% 68%);
+}
+
+.hub-line-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-line.hub-line-mention .hub-line-text {
+  color: var(--signal);
+}
+
+/* Les joueurs en tuiles : la pastille, le nom et son niveau, ce qu'il fait, son bouton. */
+.hub-cards.hub-layout-people {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(14 * var(--u));
+}
+
+.hub-card.hub-layout-people {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: start;
+  text-align: center;
+  gap: calc(10 * var(--u));
+  padding: calc(20 * var(--u)) calc(8 * var(--u)) calc(14 * var(--u));
+  border-color: var(--line-soft);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+}
+
+.hub-card.hub-layout-people.selected {
+  border-color: var(--signal);
+}
+
+.hub-card.hub-layout-people .hub-card-face {
+  width: calc(84 * var(--u));
+  height: calc(84 * var(--u));
+  font-size: calc(32 * var(--u));
+}
+
+.hub-card.hub-layout-people .hub-card-main {
+  justify-items: center;
+  gap: calc(6 * var(--u));
+  width: 100%;
+}
+
+.hub-card.hub-layout-people .hub-card-title {
+  display: grid;
+  justify-items: center;
+  gap: calc(6 * var(--u));
+  max-width: 100%;
+  font-size: calc(23 * var(--u));
+  overflow-wrap: anywhere;
+}
+
+.hub-card.hub-layout-people .hub-lv {
+  margin: 0;
+}
+
+.hub-card.hub-layout-people .hub-card-detail {
+  font-size: calc(20 * var(--u));
+  line-height: 1.25;
+}
+
+.hub-card.hub-layout-people.hub-tone-signal .hub-card-detail {
+  color: var(--signal);
+}
+
+.hub-card.hub-layout-people .hub-buttons {
+  justify-content: center;
+  padding-top: 0;
+}
+
+.hub-card.hub-layout-people .hub-button {
+  padding: calc(6 * var(--u)) calc(14 * var(--u));
+  font-size: calc(20 * var(--u));
+}
+
+/*
+ * L'anneau de présence, autour de celui du palier (theme.css, .avatar.tiered) : un liseré sombre, puis
+ * le vert signal en ligne, le vert lumineux en partie, le bleu des joueurs suggérés. Sa lueur déborde
+ * de la pastille : rien autour ne la coupe (.hub-body garde sa marge).
+ */
+.hub-card-face.hub-ring.hub-ring-online,
+.hub-card-face.hub-ring.hub-ring-playing,
+.hub-card-face.hub-ring.hub-ring-suggested {
+  --ring: var(--signal);
+  box-shadow: 0 0 0 0.07em var(--void), 0 0 0 0.17em var(--tier, var(--line-strong)), 0 0 0 0.27em var(--void), 0 0 0 0.38em var(--ring);
+}
+
+.hub-card-face.hub-ring.hub-ring-playing {
+  box-shadow: 0 0 0 0.07em var(--void), 0 0 0 0.17em var(--tier, var(--line-strong)), 0 0 0 0.27em var(--void), 0 0 0 0.38em var(--ring), 0 0 0.6em var(--signal-haze, rgba(139, 226, 58, 0.35));
+}
+
+.hub-card-face.hub-ring.hub-ring-suggested {
+  --ring: var(--meta);
+}
+
 /* ---------- Pied : les commandes ---------- */
 
 .hub-foot {
@@ -786,4 +988,9 @@
 
 .lib-hub.hub-desk .hub-body {
   gap: calc(26 * var(--u));
+}
+
+/* Au bureau, la colonne est moitié moins large : quatre joueurs par rangée. */
+.lib-hub.hub-desk .hub-cards.hub-layout-people {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }

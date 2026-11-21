@@ -9,6 +9,14 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- The Community moves to the Arena's tabbed screen: Home, Messages, Players, Groups, Rooms and Profile, with the same block navigation (flippers move from block to block, Start enters, Exit leaves, MagnaSave switches tabs).
+- The Community home leads with what is waiting for you: the conversation where someone wrote to you, with the last message's bubble and three ready-made replies sent with one press.
+- "Online" shows your friends with their presence ring and what they are doing; when few people are around, players close to you (tables in common, same country, close level, newcomers) are suggested, to add with one press (+25 XP per new friend).
+- Your country's room can be read live on the home tab, with its ready-made phrases; "What's happening" offers to welcome a newcomer or congratulate a friend's feat.
+- Each player shows their level ("Lvl 18") and their tier ring.
+- "Introduce Cyber Pinball": a QR code to the download page, on the home tab on a desktop and in the Players tab on a cabinet.
+- New Community medallion poster: the message waiting for you, your friends online, your country's room scrolling by, your groups and friend requests. Level and rankings are now on the Arena poster.
+- "My friends" and "Online players" are now a single entry, "Players" (System menu > Community > Players): the Friends tab comes first, with received requests at the top.
 - After the update that brings it, the patched VPX is installed as soon as Cyber Pinball starts: the technical sheet shows "patched Cyber Pinball 1" right away, and the cabinet health no longer keeps the backglass refresh rate warning.
 - Table search: clearing the "Search for a title" field and confirming now clears the search, as stated; before, it stayed until Cyber Pinball was restarted. "Clear the filters" also removes the searched title.
 - All text fields: a field cleared and confirmed is now taken into account (room topic removed, ZeDMD Wi-Fi turned off, Art-Net address on the whole network, Juke-box correction back to the original information, Rankings search cleared). Exit still cancels.

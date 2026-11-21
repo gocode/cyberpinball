@@ -310,7 +310,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const friends = host.net.state().friends;
     const online = friends.filter((f) => host.net.online(f.key)).length;
     const base = { label: t('Jouer avec un ami'), icon: 'gamepad' as const };
-    if (!friends.length) return { ...base, detail: t('Pas encore d’ami : Menu système > Communauté > Mes amis > Trouver un joueur'), tone: 'quiet', run: () => undefined };
+    if (!friends.length) return { ...base, detail: t('Pas encore d’ami : Menu système > Communauté > Joueurs > Trouver un joueur'), tone: 'quiet', run: () => undefined };
     if (!online) return { ...base, detail: searching() ? t('Recherche des amis…') : t('Aucun ami en ligne pour l’instant'), tone: 'quiet', run: () => undefined };
     return { ...base, detail: tn(online, '{n} ami en ligne : chacun sur sa borne, au même moment', '{n} amis en ligne : chacun sur sa borne, au même moment'), tone: 'ok', run: () => host.library.openCustom(() => buildChooseFriend(table, back)) };
   }

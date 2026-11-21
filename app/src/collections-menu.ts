@@ -27,7 +27,7 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
-import type { CommunityPosterView } from './community-menu';
+import type { MedallionPosterView } from './community-menu';
 
 /** Collections nommées au plus sur l'affiche du médaillon ; au-delà, « +3 ». */
 const POSTER_OTHERS = 4;
@@ -37,7 +37,7 @@ const POSTER_OTHERS = 4;
  * (app/renderer/community.js) : la marque, le grand titre, le nombre de collections et de tables, la
  * collection montrée par la roue, quelques autres ; « Start · Choisir une collection » au fronton.
  */
-export function collectionsPoster(collections: Pick<CollectionsMenu, 'list' | 'current'>): CommunityPosterView {
+export function collectionsPoster(collections: Pick<CollectionsMenu, 'list' | 'current'>): MedallionPosterView {
   const list = collections.list().filter((c) => c.tables.length);
   const current = collections.current();
   const all = list.find((c) => c.id === 'all') ?? current;

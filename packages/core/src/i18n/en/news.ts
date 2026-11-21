@@ -5,6 +5,10 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
+  'La Communauté, en un coup d’œil': 'The Community at a glance',
+  'Le message qui vous attend, qui est en ligne, le salon de votre pays : répondez d’un appui.': 'The message waiting for you, who is online, your country’s room: reply with one press.',
+  'Son affiche montre qui vous a écrit, vos amis en ligne et ce qu’ils font, et le salon de votre pays qui défile. Start ouvre la Communauté, ses onglets se changent aux MagnaSave.': 'Its poster shows who wrote to you, your friends online and what they are doing, and your country’s room scrolling by. Start opens the Community; MagnaSave switches its tabs.',
+  'Une conversation qui attend se répond d’une phrase toute prête. Quand peu de monde est en ligne, des joueurs proches de vous sont suggérés : un appui pour les ajouter. « Joueurs » réunit vos amis et tous les joueurs.': 'A waiting conversation can be answered with a ready-made phrase. When few people are online, players close to you are suggested: one press to add them. “Players” brings your friends and all players together.',
   'Un échange avec l’équipe': 'A conversation with the team',
   'Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.': 'Send a report: the team replies on your cabinet, and you can reply back.',
   'Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.':
@@ -147,11 +151,6 @@ export const messages: Record<string, string> = {
   'Créez vos propres collections, et choisissez celle qu’un invité a le droit de parcourir.': 'Create your own collections, and choose the one a guest may browse.',
   'Roue › Collections': 'Wheel › Collections',
 
-  'Le téléphone pilote tout': 'Your phone drives everything',
-  'Tout le front-end, le Juke-box et les scores dans la main, sans rien installer.': 'The whole front-end, the Juke-box and the scores in your hand, with nothing to install.',
-  'Visez le QR code de la borne : votre téléphone devient sa télécommande, dans tout le front-end. Il ouvre directement n’importe quel écran, tape un texte, envoie un fichier.':
-    'Scan the cabinet’s QR code: your phone becomes its remote, all over the front-end. It opens any screen directly, types text, sends a file.',
-  'Accepté une fois, il est gardé : il revient ensuite sans QR code.': 'Accepted once, it is kept: it comes back without the QR code afterwards.',
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 
   'Les tables du jour': 'Tables of the day',

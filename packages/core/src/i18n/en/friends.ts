@@ -23,7 +23,7 @@ export const messages: Record<string, string> = {
   '{tables}, toutes déjà sur votre borne : leurs parties et médias à prendre': '{tables}, all already on your cabinet: their parts and media to take',
   'Ses tables absentes de votre borne d’abord : choisissez-en une pour la récupérer. Chaque fichier est vérifié à l’arrivée, puis le plan d’ajout montre tout avant d’installer.':
     'Their tables missing from your cabinet first: choose one to get it. Each file is checked on arrival, then the add plan shows everything before installing.',
-  'Pas encore d’ami : Menu système > Communauté > « Mes amis » > « Trouver un joueur »': 'No friend yet: System menu > Community > "My friends" > "Find a player"',
+  'Pas encore d’ami : Menu système > Communauté > « Joueurs » > « Trouver un joueur »': 'No friend yet: System menu > Community > "Players" > "Find a player"',
   'Les tables d’un ami, récupérées de sa borne · {n} ami en ligne': 'A friend’s tables, taken from their cabinet · {n} friend online',
   'Les tables d’un ami, récupérées de sa borne · {n} amis en ligne': 'A friend’s tables, taken from their cabinet · {n} friends online',
   'Les tables d’un ami, récupérées de sa borne · aucun ami en ligne': 'A friend’s tables, taken from their cabinet · no friend online',
@@ -369,7 +369,7 @@ export const messages: Record<string, string> = {
   'Hors ligne : invitez-le quand il sera connecté': 'Offline: invite them once they are connected',
   'En partie : il recevra une notification discrète sur sa table': 'In a game: they will get a discreet notification on their table',
   'Jouer avec un ami': 'Play with a friend',
-  'Pas encore d’ami : Menu système > Communauté > Mes amis > Trouver un joueur': 'No friend yet: System menu > Community > My friends > Find a player',
+  'Pas encore d’ami : Menu système > Communauté > Joueurs > Trouver un joueur': 'No friend yet: System menu > Community > Players > Find a player',
   'Aucun ami en ligne pour l’instant': 'No friend online right now',
   '{n} ami en ligne : chacun sur sa borne, au même moment': '{n} friend online: each on their own cabinet, at the same time',
   '{n} amis en ligne : chacun sur sa borne, au même moment': '{n} friends online: each on their own cabinet, at the same time',

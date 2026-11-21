@@ -194,5 +194,6 @@ test('téléphone, Joueurs : la page reçoit la liste de la borne et le profil, 
   assert.doesNotMatch(page, /players:\s*Array\.isArray/, 'plus de liste « Autres joueurs » recopiée à part');
   // Les lignes des joueurs viennent de la borne (community-menu.ts, personDetail), une seule fonction pour les deux.
   const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'community-menu.ts'), 'utf8');
-  assert.equal((menu.match(/personDetail\(/g) ?? []).length, 3, 'définie une fois, utilisée à la borne et au téléphone');
+  // Quatre : la définition, l'onglet Amis et les autres onglets de « Joueurs » (21/11/2026), le téléphone.
+  assert.equal((menu.match(/personDetail\(/g) ?? []).length, 4, 'définie une fois, utilisée à la borne et au téléphone');
 });

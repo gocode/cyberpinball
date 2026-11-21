@@ -115,8 +115,19 @@ test('menu système : la Communauté et Mon compte ne vivent qu’à un endroit,
   assert.deepEqual(systemPathOf('compte'), ['amis', 'mon-profil']);
   assert.deepEqual(systemPathOf('local-play'), ['amis', 'reglages-communaute']);
   const community = fs.readFileSync(path.join(APP, 'community-menu.ts'), 'utf8');
-  assert.match(community, /lib\.openSystemGroupFrom\('amis', back\)/, 'le médaillon ouvre la rubrique elle-même');
+  // 21/11/2026 : le médaillon ouvre l'écran à onglets (community-hub.ts) ; sans lui, la rubrique.
+  assert.match(community, /if \(host\.hub\) host\.hub\.openHome\(back\);\s*else lib\.openSystemGroupFrom\('amis', back\)/, 'le médaillon ouvre l’écran à onglets');
   assert.doesNotMatch(community, /function buildHome/, 'plus d’accueil dessiné à part');
+});
+
+test('menu système : « Mes amis » et « Joueurs en ligne » ne font qu’une entrée, « Joueurs » (21/11/2026)', () => {
+  assert.ok(!(SYSTEM_ITEM_IDS as readonly string[]).includes('friends'), '« Mes amis » n’est plus une entrée à part');
+  assert.deepEqual(systemPathOf('online-players'), ['amis']);
+  assert.equal(systemEntry('online-players').label, 'Joueurs');
+  assert.deepEqual([...SYSTEM_GROUPS.amis.entries], ['mon-profil', 'online-players', 'messages', 'groupes-salons', 'reglages-communaute']);
+  // Les réglages de la communauté restent au Menu système : l'écran à onglets n'en a pas.
+  const hub = fs.readFileSync(path.join(APP, 'community-hub.ts'), 'utf8');
+  assert.doesNotMatch(hub, /reglages-communaute|community-settings|'sharing'/);
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {

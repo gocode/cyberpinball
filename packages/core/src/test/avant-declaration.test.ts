@@ -28,6 +28,10 @@ const REVIEWED = new Set([
   'activityMenu',
   'chatMenu',
   'chatService',
+  // Communauté à onglets (21/11/2026) : « Mes amis » mène à l'écran « Joueurs », le médaillon à l'écran
+  // à onglets ; appelés seulement quand on ouvre ces écrans, jamais pendant l'initialisation.
+  'communityHub',
+  'communityMenu',
   'configurations',
   'converter',
   'desktop',

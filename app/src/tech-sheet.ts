@@ -251,7 +251,7 @@ export function createTechSheet(ctx: TechSheetContext) {
         );
       if (!drives.length) pick({ icon: 'usb', text: t('Sur une clé USB'), detail: t('Aucune clé branchée : elle apparaît ici dès qu’elle l’est'), tone: 'quiet' }, { label: t('Sur une clé USB'), key: 'report:usb', run: self });
       if (friends?.length) pick({ icon: 'message', text: t('À un ami'), detail: t('Le résumé, dans la messagerie · {online}', { online: tn(friends.filter((f) => f.online).length, '{n} ami en ligne', '{n} amis en ligne') }) }, { label: t('À un ami'), key: 'report:friend', run: () => openFriends() });
-      else pick({ icon: 'message', text: t('À un ami'), detail: friends ? t('Aucun ami pour l’instant : Menu système > Communauté > Mes amis > Trouver un joueur') : t('Réseau des amis coupé'), tone: 'quiet' }, { label: t('À un ami'), key: 'report:friend', run: self });
+      else pick({ icon: 'message', text: t('À un ami'), detail: friends ? t('Aucun ami pour l’instant : Menu système > Communauté > Joueurs > Trouver un joueur') : t('Réseau des amis coupé'), tone: 'quiet' }, { label: t('À un ami'), key: 'report:friend', run: self });
       pick({ icon: 'folder', text: t('Dans un dossier de la borne'), detail: t('{dir} · à copier vous-même', { dir: reportDir() }) }, { label: t('Dans un dossier de la borne'), key: 'report:folder', run: () => sendFolder(reportDir()) });
       const contents: Row[] = [
         { icon: 'report', text: t('La fiche technique et la santé de la borne'), detail: t('Une page lisible dans tout navigateur, sur ordinateur ou téléphone') },

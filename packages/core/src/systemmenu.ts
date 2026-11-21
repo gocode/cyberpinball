@@ -55,7 +55,6 @@ export const SYSTEM_ITEM_IDS = [
   'moderation',
   'messages',
   'public-profile',
-  'friends',
   'avatar',
   'game-history',
   'badges',
@@ -231,15 +230,16 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     get detail() { return t('Santé de la borne, fiche technique, sauvegardes'); },
     entries: ['health', 'tech-sheet', 'backups'],
   },
-  // Communauté : l'accueil du médaillon de la roue, le même écran depuis le Menu système (community-menu.ts
-  // y ajoute le nombre de joueurs en ligne et ce que voient les autres). Nommée « Amis » jusqu'au 18/11/2026.
+  // Communauté : sa porte du Menu système, toujours là même médaillon masqué (community-menu.ts y ajoute le
+  // nombre de joueurs en ligne et ce que voient les autres) ; depuis le 21/11/2026, le médaillon ouvre l'écran
+  // à onglets (community-hub.ts), et ses réglages restent ici. Nommée « Amis » jusqu'au 18/11/2026.
   // Le 21/11/2026, ce qui se joue contre les autres (parties instantanées, classements, niveau) part dans l'Arène.
   amis: {
     id: 'amis',
     icon: 'friends',
     get label() { return t('Communauté'); },
-    get detail() { return t('Mon profil, joueurs en ligne, amis, messages, groupes et salons, réglages'); },
-    entries: ['mon-profil', 'online-players', 'friends', 'messages', 'groupes-salons', 'reglages-communaute'],
+    get detail() { return t('Mon profil, joueurs et amis, messages, groupes et salons, réglages'); },
+    entries: ['mon-profil', 'online-players', 'messages', 'groupes-salons', 'reglages-communaute'],
   },
   // Arène (21/11/2026, arena-menu.ts) : jouer contre les autres. Son médaillon ouvre l'écran à onglets ;
   // ici, la porte de ses écrans complets.
@@ -338,8 +338,9 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'account-delete': { icon: 'trash', get label() { return t('Supprimer mon compte'); } },
   // Mon niveau (level-menu.ts) : le récap des XP, en tête de Mon profil.
   'my-level': { icon: 'gauge', get label() { return t('Mon niveau'); } },
-  // Joueurs en ligne, amis ou non (community-menu.ts).
-  'online-players': { icon: 'globe', get label() { return t('Joueurs en ligne'); } },
+  // Joueurs (community-menu.ts) : mes amis et les demandes reçues d'abord, puis tous les joueurs ; « Mes amis »
+  // et « Joueurs en ligne » réunis le 21/11/2026. L'identifiant reste celui d'avant (menu-systeme.json, téléphone).
+  'online-players': { icon: 'friend-list', get label() { return t('Joueurs'); } },
   // Parties instantanées (instant-menu.ts) : le libellé dit s'il y en a une ouverte.
   instant: { icon: 'rocket', get label() { return t('Partie instantanée'); } },
   // Groupes publics ou privés (groups-menu.ts).
@@ -354,8 +355,6 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   moderation: { icon: 'alert', get label() { return t('Modération'); } },
   // La messagerie entre amis (chat-menu.ts) : la pastille rouge quand un message attend.
   messages: { icon: 'message', get label() { return t('Messages'); } },
-  // Mes amis (friends-menu.ts) : les demandes reçues et « Trouver un joueur » y sont.
-  friends: { icon: 'friend-list', get label() { return t('Mes amis'); } },
   avatar: { icon: 'avatar', get label() { return t('Mon avatar'); } },
   // Ce que voient les joueurs qui ne sont pas mes amis, et qui a aimé mon activité (profile-menu.ts).
   'public-profile': { icon: 'thumb-up', get label() { return t('Mon profil public'); } },

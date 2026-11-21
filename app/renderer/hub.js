@@ -104,12 +104,39 @@
     return box;
   }
 
+  /** La bulle du dernier message : « <Bruno> » en tête pour un groupe. */
+  function bubble(b) {
+    const node = el('p', `hub-bubble${b.group ? ' hub-bubble-group' : ''}`);
+    // Le texte coupé à deux lignes dans son propre élément : la marge de la bulle ne laisse rien paraître de la troisième.
+    const text = el('span', 'hub-bubble-text');
+    if (b.who) text.append(el('b', 'hub-bubble-who', `<${b.who}> `));
+    text.append(document.createTextNode(b.text));
+    node.append(text);
+    node.title = b.text;
+    return node;
+  }
+
+  /** Le journal d'un salon : une ligne par message, l'heure, le pseudo à sa teinte, le texte coupé au bord. */
+  function log(lines) {
+    const box = el('div', 'hub-log');
+    for (const l of lines) {
+      const row = el('div', `hub-line${l.kind ? ` hub-line-${l.kind}` : ''}`);
+      const nick = el('span', 'hub-nick', `<${l.nick}>`);
+      nick.style.setProperty('--nick-hue', String(Number(l.hue) || 0));
+      const text = el('span', 'hub-line-text', l.text);
+      text.title = l.text;
+      row.append(el('time', '', l.time), nick, text);
+      box.append(row);
+    }
+    return box;
+  }
+
   function card(c, layout, cursor, start) {
     const selected = c.action !== undefined && c.action === cursor;
     const node = el('div', `hub-card hub-layout-${layout}${c.tone ? ` hub-tone-${c.tone}` : ''}${c.quiet ? ' hub-quiet' : ''}${selected ? ' selected' : ''}`);
     if (c.action !== undefined) act(node, c.action);
-    // L'image à gauche : la pastille d'un joueur, sinon une icône dans son rond.
-    if (c.avatar) node.append(face(c.avatar, 'hub-card-face'));
+    // L'image à gauche : la pastille d'un joueur (et son anneau de présence), sinon une icône dans son rond.
+    if (c.avatar) node.append(face(c.avatar, `hub-card-face${c.ring ? ` hub-ring hub-ring-${c.ring}` : ''}`));
     else if (c.icon) {
       const ic = el('span', 'hub-card-ic');
       ic.append(icon(c.icon, 'hub-card-icon'));
@@ -128,8 +155,11 @@
       title.append(document.createTextNode(c.title));
       if (c.level) title.append(levelChip(c.level));
     }
+    if (c.count) title.append(el('em', 'hub-count', String(c.count)));
     main.append(title);
     if (c.seats?.length) main.append(seats(c.seats));
+    if (c.bubble) main.append(bubble(c.bubble));
+    if (c.lines?.length) main.append(log(c.lines));
     if (c.detail) main.append(el('p', 'hub-card-detail', c.detail));
     if (c.progress !== undefined) {
       const bar = el('div', 'hub-bar');
@@ -143,7 +173,7 @@
     if (c.buttons?.length) {
       const row = el('div', 'hub-buttons');
       for (const b of c.buttons) {
-        const btn = el('span', `hub-button${b.primary ? ' hub-go' : ''}${b.action === cursor ? ' selected' : ''}`);
+        const btn = el('span', `hub-button${b.primary ? ' hub-go' : ''}${b.quick ? ' hub-quick' : ''}${b.action !== undefined && b.action === cursor ? ' selected' : ''}`);
         // Le bouton choisi porte la touche qui le valide.
         if (b.action === cursor && start) btn.append(el('kbd', 'hub-button-key', start));
         btn.append(el('span', '', b.label));
@@ -226,7 +256,9 @@
       const left = el('div', 'hub-col');
       const right = el('div', 'hub-col');
       const split = h.sections[0].layout === 'hero' ? 2 : Math.ceil(h.sections.length / 2);
-      h.sections.forEach((s, i) => (i < split ? left : right).append(section(s, v.cursor, h.start)));
+      // Une section peut dire sa colonne (la Communauté : conversations et joueurs à gauche, salon et nouvelles à droite).
+      const leftSide = (s, i) => (s.column ? s.column === 'left' : i < split);
+      h.sections.forEach((s, i) => (leftSide(s, i) ? left : right).append(section(s, v.cursor, h.start)));
       body.append(left, right);
     } else for (const s of h.sections) body.append(section(s, v.cursor, h.start));
     o.append(body, foot(v.hint));

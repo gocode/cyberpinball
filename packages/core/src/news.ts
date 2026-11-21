@@ -55,6 +55,22 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // La Communauté à onglets (21/11/2026, planche « Engagement ») ; « Le téléphone pilote tout » (0.1.8)
+    // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'communaute-onglets',
+    date: '2026-11-21',
+    version: '0.2.3',
+    get title() { return t('La Communauté, en un coup d’œil'); },
+    get detail() { return t('Le message qui vous attend, qui est en ligne, le salon de votre pays : répondez d’un appui.'); },
+    get more() {
+      return [
+        t('Son affiche montre qui vous a écrit, vos amis en ligne et ce qu’ils font, et le salon de votre pays qui défile. Start ouvre la Communauté, ses onglets se changent aux MagnaSave.'),
+        t('Une conversation qui attend se répond d’une phrase toute prête. Quand peu de monde est en ligne, des joueurs proches de vous sont suggérés : un appui pour les ajouter. « Joueurs » réunit vos amis et tous les joueurs.'),
+      ];
+    },
+    get where() { return t('Roue › Communauté'); },
+    reach: { kind: 'community', door: 'home' },
+  },  {
     // Le médaillon Arène (21/11/2026, planche « Engagement ») ; « Les règles de chaque table » (0.1.8)
     // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'arene',
@@ -431,22 +447,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Collections'); },
     reach: { kind: 'system', id: 'collections' },
-    preview: true,
-  },
-  {
-    id: 'telephone',
-    date: '2026-11-07',
-    version: '0.1.8',
-    get title() { return t('Le téléphone pilote tout'); },
-    get detail() { return t('Tout le front-end, le Juke-box et les scores dans la main, sans rien installer.'); },
-    get more() {
-      return [
-        t('Visez le QR code de la borne : votre téléphone devient sa télécommande, dans tout le front-end. Il ouvre directement n’importe quel écran, tape un texte, envoie un fichier.'),
-        t('Accepté une fois, il est gardé : il revient ensuite sans QR code.'),
-      ];
-    },
-    get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
-    reach: { kind: 'system', id: 'phone-remote' },
     preview: true,
   },
 ];
