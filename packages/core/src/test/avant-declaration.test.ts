@@ -49,6 +49,9 @@ const REVIEWED = new Set([
   // Niveau du joueur : lu par les rappels du salon, des groupes et des parties en ligne (une ligne écrite,
   // une partie finie) et par le relevé différé du réseau ; jamais pendant l'initialisation.
   'levelTracker',
+  // Place prise (21/11/2026) : lue à l'arrivée de scores relayés (un message du réseau, toujours après le
+  // tour d'initialisation, qui est synchrone) et par Start sur une ligne d'Activité ; jamais pendant l'initialisation.
+  'placeTaken',
   // Réglages du Juke-box : ouverts depuis sa gestion, par l'utilisateur.
   'jukeboxSettings',
   // Rappel du service des retours : appelé au chargement du tableau, jamais pendant l'initialisation.

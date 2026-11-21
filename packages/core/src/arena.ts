@@ -17,6 +17,7 @@ import { badgeLabel, nearestBadges, type BadgeFacts } from './badges';
 import { formatNumber, t, tn } from './i18n';
 import { DAILY_PLAY_CAP, dayKey, levelOf, tierLabel, tierOf, XP, type LevelState, type TierId } from './levels';
 import { isHidden, type RankedScore, type RankingStore } from './rankings';
+import type { PlaceTaken } from './overtakes';
 import type { EarnedBadge, PresenceTable } from './social';
 import type { IconName } from './icons';
 
@@ -247,6 +248,8 @@ export interface ArenaMyGame {
 
 export type ArenaMoment =
   | { kind: 'my-game'; game: ArenaMyGame }
+  /** Une place qu'on vient de me prendre (overtakes.ts, la notification), au jour ou de tout temps. */
+  | { kind: 'taken'; taken: PlaceTaken }
   | { kind: 'open-game'; game: ArenaOpenGame }
   | { kind: 'rival'; rival: ArenaRival }
   | { kind: 'level'; band: ArenaLevelBand }
@@ -261,8 +264,10 @@ const PASSED_FRESH_MS = 24 * 3600_000;
  * partie ouverte qui se rejoint, un niveau à une partie, la première partie du jour, le rival le plus
  * proche ; rien sinon (la section n'apparaît pas).
  */
-export function arenaMoment(d: { mine?: ArenaMyGame; open: readonly ArenaOpenGame[]; rivals: readonly ArenaRival[]; band?: ArenaLevelBand; playedToday: boolean; now: Date }): ArenaMoment | undefined {
+export function arenaMoment(d: { mine?: ArenaMyGame; taken?: PlaceTaken; open: readonly ArenaOpenGame[]; rivals: readonly ArenaRival[]; band?: ArenaLevelBand; playedToday: boolean; now: Date }): ArenaMoment | undefined {
   if (d.mine) return { kind: 'my-game', game: d.mine };
+  // La place prise annoncée (classement du jour compris) : la même que la notification.
+  if (d.taken) return { kind: 'taken', taken: d.taken };
   const passed = d.rivals.find((r) => r.passed && d.now.getTime() - Date.parse(r.rival.at) < PASSED_FRESH_MS);
   if (passed) return { kind: 'rival', rival: passed };
   const open = d.open.find((g) => g.joinable);
@@ -313,6 +318,8 @@ const pair = (left: string, right: string, dim?: boolean): ArenaBoardLine => ({ 
 export interface ArenaBoardInput {
   open: readonly ArenaOpenGame[];
   mine?: ArenaMyGame;
+  /** La place qu'on vient de me prendre (overtakes.ts) : la première page, juste après ma partie qui attend. */
+  taken?: PlaceTaken;
   rivals: readonly ArenaRival[];
   records: readonly ArenaRecord[];
   standing?: { world?: { rank: number; players: number }; country?: { rank: number; players: number; name: string } };
@@ -342,12 +349,26 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
       ],
       foot: rival.passed ? t('{name} vous a dépassé {ago}', { name: rival.rival.name, ago: d.ago(rival.rival.at) }) : t('{name} est juste devant vous', { name: rival.rival.name }),
     };
-  const freshPassed = Boolean(rival?.passed && d.now.getTime() - Date.parse(rival.rival.at) < PASSED_FRESH_MS);
+  const tk = d.taken;
+  // La place annoncée a sa page ; le rival de la même table ne la redit pas.
+  const freshPassed = Boolean(rival?.passed && d.now.getTime() - Date.parse(rival.rival.at) < PASSED_FRESH_MS) && !(tk && rival?.board === tk.board);
   if (d.mine)
     pages.push({
       id: 'my-game',
       lines: [heading(t('Votre partie attend')), centered(d.mine.title), centered(t('{n} sur {max} joueurs', { n: d.mine.seated, max: d.mine.max })), centered(t('Départ dès qu’elle est complète'), true)],
       foot: t('Votre partie instantanée part dès qu’elle est complète'),
+    });
+  if (tk)
+    pages.push({
+      id: 'taken',
+      lines: [
+        centered(t('Votre place est prise'), true),
+        centered(tk.title),
+        pair(`${tk.rival.rank} ${tk.rival.name}`, dmdNumber(tk.rival.score)),
+        pair(`${tk.mine.rank} ${t('Vous')}`, dmdNumber(tk.mine.score), true),
+        centered(t('À reprendre : {n}', { n: dmdNumber(tk.rival.score - tk.mine.score) })),
+      ],
+      foot: t('{name} vous a dépassé {ago}', { name: tk.rival.name, ago: d.ago(tk.rival.at) }),
     });
   if (freshPassed) pages.push(rivalPage()!);
   const open = d.open.find((g) => g.joinable) ?? d.open[0];
@@ -357,7 +378,7 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
       lines: [heading(t('Partie ouverte')), centered(open.title), centered(t('Avec {name}', { name: open.host.name })), centered(tn(open.max - open.seats.length, '{n} place libre', '{n} places libres'))],
       foot: d.open.length > 1 ? tn(d.open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') : t('{name} attend des joueurs', { name: open.host.name }),
     });
-  if (rival && !freshPassed) pages.push(rivalPage()!);
+  if (rival && !freshPassed && !(tk && rival.board === tk.board)) pages.push(rivalPage()!);
   const st = d.standing;
   if (st?.world || st?.country) {
     // Court : l'intitulé tient sur une ligne du vrai DMD (128 points).

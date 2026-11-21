@@ -45,6 +45,7 @@ import {
   type IconName,
   type InstantGame,
   type OnlinePlayer,
+  type PlaceTaken,
   type PresenceTable,
   type TierId,
 } from '@cyberpinball/core';
@@ -76,6 +77,14 @@ export interface ArenaMenuHost {
   players(): readonly OnlinePlayer[];
   /** La roue sur cette table (le rival d'une table, un record), si elle est dans la collection montrée. */
   table?: { has(table: PresenceTable): boolean; go(table: PresenceTable): void };
+  /**
+   * Les places qu'on vient de me prendre (place-taken.ts) : la plus récente est l'action du moment et la
+   * première page de l'affiche ; `retake` lance la table (« Reprendre ma place »), undefined : elle n'est
+   * pas sur la borne.
+   */
+  places?: { current(): readonly PlaceTaken[]; retake(taken: PlaceTaken): (() => void) | undefined };
+  /** Écrire à un joueur (la messagerie, entre amis) : de quoi ouvrir le fil, ou pourquoi pas. */
+  write?(key: string, back: () => void): { run?: () => void; off?: string };
   zoneKeys(): readonly string[];
   now?(): Date;
 }
@@ -213,9 +222,12 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
   function boardPages(): ArenaBoardPage[] {
     const games = host.instant.arena(() => undefined);
     const { rivals, records } = published();
+    // La place qu'on vient de me prendre (place-taken.ts) : la première page, après ma partie qui attend.
+    const taken = host.places?.current()[0];
     return arenaBoardPages({
       open: games.open.map((o) => toOpenGame(o.game, o.joinable)),
       ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}),
+      ...(taken ? { taken } : {}),
       rivals,
       records,
       ...(standing() ? { standing: standing()! } : {}),
@@ -327,10 +339,36 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const { rivals } = published();
     const b = band();
     const open = games.open.map((o) => toOpenGame(o.game, o.joinable));
-    const m = arenaMoment({ ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}), open, rivals, band: b, playedToday: playedToday(), now: now() });
+    const taken = host.places?.current()[0];
+    const m = arenaMoment({ ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}), ...(taken ? { taken } : {}), open, rivals, band: b, playedToday: playedToday(), now: now() });
     if (!m) return undefined;
     const pick = { label: t('Choisir une table'), key: 'wheel', run: back };
     switch (m.kind) {
+      case 'taken': {
+        // « Votre place est prise » (planche validée) : reprendre ma place lance la table ; défier n'existe pas encore.
+        const p = m.taken;
+        const retake = host.places?.retake(p);
+        const write = host.write?.(p.rival.key, here);
+        const level = p.rival.level ? levelChip(p.rival.level) : undefined;
+        const where = p.period === 'today' ? t('vous êtes {rank}ᵉ du jour', { rank: p.mine.rank }) : t('vous êtes {rank}ᵉ sur {n}', { rank: p.mine.rank, n: p.players });
+        return {
+          key: `moment:taken:${p.board}`,
+          eyebrow: t('Votre place est prise'),
+          tone: 'warning',
+          avatar: face(p.rival.key, p.rival.name),
+          name: p.rival.name,
+          title: t('vous a dépassé sur {table}', { table: p.title }),
+          ...(level ? { level } : {}),
+          detail: t('{ago} · {their} contre vos {mine} · {where}', { ago: cap(ago(p.rival.at)), their: fmt(p.rival.score), mine: fmt(p.mine.score), where }),
+          buttons: [
+            retake
+              ? { label: t('Reprendre ma place'), xp: xpText(XP.personalBest), primary: true, key: 'retake', run: retake }
+              : { label: t('Reprendre ma place'), key: 'retake', run: () => undefined, off: t('Table absente de cette borne') },
+            { label: t('Défier {name}', { name: p.rival.name }), key: 'challenge', run: () => undefined, off: t('Bientôt') },
+            write?.run ? { label: t('Lui écrire'), key: 'write', run: write.run } : { label: t('Lui écrire'), key: 'write', run: () => undefined, off: write?.off ?? t('Entre amis seulement') },
+          ],
+        };
+      }
       case 'my-game':
         return { key: 'moment:my-game', eyebrow: t('Votre partie attend'), tone: 'signal', icon: 'rocket', title: m.game.title, detail: t('{n} sur {max} joueurs · départ dès qu’elle est complète', { n: m.game.seated, max: m.game.max }), buttons: [{ label: t('Voir la partie'), primary: true, key: 'open', run: games.mine!.open }] };
       case 'open-game': {

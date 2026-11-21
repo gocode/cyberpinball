@@ -286,6 +286,8 @@ export type UiAction =
   | { type: 'team-threads' }
   /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
   | { type: 'my-profile' }
+  /** Notification d'une place prise : « Reprendre ma place », la table lancée (place-taken.ts) ; `key` : la notification. */
+  | { type: 'place-taken'; key?: string }
   /** Carte du joueur du coin d'état : Mon niveau (level-menu.ts) ; pastille des badges : Mes badges. */
   | { type: 'level' }
   | { type: 'badges' }

@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Place prise : quand un joueur passe devant vous au classement du jour (ou de tout temps) sur une version de table que vous avez jouée, une notification le dit (« Léa vous a dépassé sur Attack from Mars »), une fois par table et par jour au plus, et reste dans l'Activité récente ; « Reprendre ma place » lance directement la table.
+- Arène : la place qu'on vient de vous prendre devient la carte en tête de l'accueil (« Reprendre ma place », « Lui écrire » entre amis, « Défier » grisé tant que les défis n'existent pas) et la première page du tableau de l'affiche.
+- Retour de partie : après une partie qui apporte du neuf (record battu, joueur dépassé), un écran montre le score et le record, les XP gagnés sur la barre du niveau avec leur détail, le joueur dépassé, la place gagnée et le prochain à battre, puis « Rejouer », « Un mot à … » (phrases préparées, entre amis) et « Retour aux tables » ; l'animation des badges et du niveau vient ensuite.
 - La Communauté passe à l'écran à onglets de l'Arène : Accueil, Messages, Joueurs, Groupes, Salons et Profil, avec la même navigation par blocs (les flippers vont de bloc en bloc, Start y entre, Exit en ressort, MagnaSave change d'onglet).
 - L'accueil de la Communauté mène par ce qui vous attend : la conversation où l'on vous a écrit, avec la bulle du dernier message et trois réponses toutes prêtes à envoyer d'un appui.
 - « En ligne » montre vos amis avec l'anneau de leur présence et ce qu'ils font ; quand peu de monde est là, des joueurs proches de vous (tables en commun, même pays, niveau proche, nouveaux venus) sont suggérés, à ajouter d'un appui (+25 XP par nouvel ami).

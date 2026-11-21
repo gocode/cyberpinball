@@ -52,6 +52,8 @@ export interface HubButtonSpec {
   quick?: boolean;
   key: string;
   run: () => void;
+  /** Pas encore possible (« Bientôt », « Entre amis seulement ») : grisé avec sa raison, sauté par les flippers. */
+  off?: string;
 }
 
 export interface HubCardSpec {
@@ -121,6 +123,8 @@ export interface HubBand {
   progress: number;
   /** Part qu'une partie peut encore ajouter (hachures). */
   reach: number;
+  /** Part que la partie vient d'ajouter, en clair au bout de l'acquis (retour de partie), de 0 à 1. */
+  fresh?: number;
   lines: string[];
 }
 
@@ -139,6 +143,16 @@ export interface HubSpec {
   sections: HubSectionSpec[];
   /** L'onglet n'a rien à montrer : ce qu'il dit à la place. */
   empty?: { title: string; detail: string };
+  /** Les commandes en pied, quand ce ne sont pas celles des onglets (un écran sans onglets). */
+  hint?: string;
+  /**
+   * Un petit écran sans onglets (le retour de partie) : pas de blocs, les flippers vont d'un bouton à
+   * l'autre et Exit quitte l'écran d'un appui. `focus` : le curseur sur cette action (sa clé) à l'ouverture.
+   */
+  flat?: true;
+  focus?: string;
+  /** Une touche, avant les MagnaSave : vrai si elle est prise (un écran qui ignore un bouton encore tenu). */
+  keys?: (input: { code: string }) => boolean;
 }
 
 // ---------- Vue envoyée au rendu (Built.hub) ----------
@@ -163,8 +177,8 @@ export interface HubCardView {
   quiet?: boolean;
   /** La carte elle-même se choisit (absent : elle a des boutons, ou se lit seulement). */
   action?: number;
-  /** Les boutons ; `action` seulement quand on est entré dans le bloc de la carte. */
-  buttons?: { label: string; xp?: string; primary?: boolean; quick?: boolean; action?: number }[];
+  /** Les boutons ; `action` seulement quand on est entré dans le bloc de la carte ; `off` : grisé, sa raison, jamais d'action. */
+  buttons?: { label: string; xp?: string; primary?: boolean; quick?: boolean; action?: number; off?: string }[];
 }
 
 export interface HubView {
@@ -202,6 +216,9 @@ export interface HubScreen {
   /** L'onglet ouvert. */
   current(): string;
 }
+
+/** Le seul bloc d'un écran à plat (HubSpec.flat). */
+const FLAT = 'flat';
 
 /** Ce qui se choisit dans un bloc : un onglet, une carte, un bouton d'une carte. */
 interface BlockItem {
@@ -249,11 +266,14 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     spec.sections.forEach((s, i) => {
       const items: BlockItem[] = [];
       for (const c of s.cards) {
-        if (c.buttons?.length) for (const b of c.buttons) items.push({ label: b.label, key: `${c.key}:${b.key}`, run: b.run });
+        // Un bouton grisé (`off`) n'est jamais un arrêt des flippers.
+        if (c.buttons?.length) for (const b of c.buttons) !b.off && items.push({ label: b.label, key: `${c.key}:${b.key}`, run: b.run });
         else if (c.run) items.push({ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run });
       }
       if (items.length) out.push({ key: `section:${i}`, label: s.title ?? s.cards[0]?.title ?? '', items });
     });
+    // Un écran à plat : un seul bloc, tout ce qui se choisit, sans liseré ni entrée.
+    if (spec.flat) return [{ key: FLAT, label: spec.title, items: out.flatMap((b) => b.items) }];
     return out;
   }
 
@@ -263,6 +283,12 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     inside = undefined;
     const spec = describe(tab, reopen);
     const blocks = blocksOf(spec);
+    // Un écran à plat (retour de partie) : le curseur sur l'action demandée.
+    if (spec.flat) {
+      inside = FLAT;
+      const at = blocks[0]?.items.findIndex((item) => item.key === spec.focus) ?? -1;
+      return void host.library.openCustom(build, Math.max(0, at));
+    }
     host.library.openCustom(build, blocks[0]?.key === 'tabs' && blocks.length > 1 ? 1 : 0);
   }
 
@@ -285,6 +311,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     if (!spec.tabs.some((tab) => tab.id === current && !tab.disabled)) current = usable(spec)[0]?.id ?? current;
     const blocks = blocksOf(spec);
     // Le bloc où l'on était a disparu (onglet changé, partie fermée) : retour au choix des blocs.
+    if (spec.flat) inside = FLAT;
     const enteredAt = inside ? blocks.findIndex((b) => b.key === inside) : -1;
     if (enteredAt < 0) inside = undefined;
     const actions: Action[] = [];
@@ -312,7 +339,14 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
           cards: s.cards.map((c): HubCardView => {
             const { key, run: _run, buttons, ...shown } = c;
             const out: HubCardView = { ...shown };
-            if (buttons?.length) out.buttons = buttons.map((b) => ({ label: b.label, ...(b.xp ? { xp: b.xp } : {}), ...(b.primary ? { primary: true } : {}), ...(b.quick ? { quick: true } : {}), ...(itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}) }));
+            if (buttons?.length)
+              out.buttons = buttons.map((b) => ({
+                label: b.label,
+                ...(b.xp ? { xp: b.xp } : {}),
+                ...(b.primary ? { primary: true } : {}),
+                ...(b.quick ? { quick: true } : {}),
+                ...(b.off ? { off: b.off } : itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}),
+              }));
             else if (itemAction.has(key)) out.action = itemAction.get(key)!;
             return out;
           }),
@@ -328,7 +362,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       ...(spec.band ? { band: spec.band } : {}),
       tabs,
       ...(tabsBlock ? { tabsBlock } : {}),
-      ...(inside ? { inside: true } : {}),
+      ...(inside && !spec.flat ? { inside: true } : {}),
       sections,
       ...(spec.empty && !sections.length ? { empty: spec.empty } : {}),
     };
@@ -337,10 +371,12 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       icon: spec.icon,
       sections: [],
       actions,
-      back: enteredAt >= 0 ? () => leave(enteredAt) : back,
+      // À plat, Exit quitte l'écran d'un appui ; dans un bloc, il en ressort.
+      back: enteredAt >= 0 && !spec.flat ? () => leave(enteredAt) : back,
       hub,
-      hint: enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue'),
+      hint: spec.hint ?? (enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue')),
       keys: (input) => {
+        if (spec.keys?.(input)) return true;
         const magna = host.zoneKeys();
         if (!magna.includes(input.code)) return false;
         const list = usable(spec);

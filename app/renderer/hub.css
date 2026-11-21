@@ -158,6 +158,33 @@
   background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--signal) 55%, transparent) 0 calc(6 * var(--u)), transparent calc(6 * var(--u)) calc(12 * var(--u)));
 }
 
+/* Retour de partie : la part que la partie vient d'ajouter, en clair au bout de l'acquis. */
+.hub-xp-fresh {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 calc(8 * var(--u)) calc(8 * var(--u)) 0;
+  background: color-mix(in oklab, var(--signal) 45%, var(--ink));
+  box-shadow: var(--glow-signal);
+}
+
+/* Un écran sans barre d'onglets (le retour de partie) : une rangée de moins. */
+.lib-hub.hub-no-tabs {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+/* Un bouton pas encore possible : grisé, en pointillés, sa raison à la suite. */
+.hub-button.hub-off {
+  opacity: 0.55;
+  border-style: dashed;
+  color: var(--ink-faint);
+}
+
+/* La raison garde la taille du bouton (plancher de 20 px) : seule sa graisse la distingue. */
+.hub-button-why {
+  font-weight: 500;
+}
+
 /* « Niv. 18 » à la teinte du palier, à côté d'un nom. */
 .hub-lv {
   display: inline-block;

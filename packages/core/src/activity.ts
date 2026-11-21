@@ -71,7 +71,9 @@ export type ActivityAct =
   /** La discussion d'un groupe (son identifiant). */
   | { type: 'group'; id: string }
   /** Un salon (son identifiant). */
-  | { type: 'room'; id: string };
+  | { type: 'room'; id: string }
+  /** Une place prise (overtakes.ts) : la table, pour la reprendre ; `key` : celle de la notification (placeTakenKey). */
+  | { type: 'place'; key: string };
 
 /** Les messages : une ligne par conversation et par jour (repeatKey), lue avec sa conversation (markThreadRead). */
 export const ACTIVITY_MESSAGE_KINDS: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['friend-message', 'group-message', 'group-mention', 'room-mention']);
@@ -388,6 +390,8 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
     case 'update-installed':
     case 'update-failed':
       return { type: 'system', item: 'updates' };
+    case 'place-taken':
+      return { type: 'place', key: e.key };
     default:
       return e.item ? { type: 'system', item: e.item } : undefined;
   }

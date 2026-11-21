@@ -38,6 +38,7 @@ import {
   settleWeeks,
   startLevels,
   startXp,
+  tableKey,
   weekKey,
   weekXp,
   type BadgeFacts,
@@ -83,7 +84,8 @@ export interface LevelTracker {
   facts(): BadgeFacts;
   /** Au démarrage : niveau de départ (une fois), badges, semaines à verser. */
   start(): void;
-  gameEnded(f: GameFacts): void;
+  /** Une partie finie : ce qu'elle a rapporté (l'écran de retour, game-return.ts) ; undefined : rien ne compte (invité, essai). */
+  gameEnded(f: GameFacts): GameReport | undefined;
   liveFinished(entry: HistoryGame): void;
   /** J'ai écrit dans un salon ou un groupe. */
   roomMessage(): void;
@@ -98,6 +100,16 @@ export interface LevelTracker {
   /** Le joueur l'a vu. */
   seen(): void;
   stop(): void;
+}
+
+/** Ce qu'une partie a rapporté : ses gains (badges à part, ils ont leur moment), mes XP avant et après eux, mon record d'avant. */
+export interface GameReport {
+  gains: XpGain[];
+  from: number;
+  to: number;
+  /** Mon meilleur score relevé sur cette table avant la partie (levels.ts, bests), et celui de la partie. */
+  previousBest?: number;
+  best?: number;
 }
 
 /** Combien de temps « +85 XP » reste sur la carte du joueur. */
@@ -313,13 +325,17 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
     facts,
     start,
     gameEnded(f) {
-      if (frozen || !host.active()) return;
+      if (frozen || !host.active()) return undefined;
+      const previous = state.bests[tableKey(f.table)];
+      const from = state.xp;
       const r = gameGains(state, f);
       const done = r.state.lastPlay !== state.lastPlay;
       apply(r.state, r.gains, `partie sur ${f.table.title}${r.capped ? ', plafond du jour atteint' : ''}`); // i18n-ignore : journal
       // Une partie menée au bout : l'invitation déclarée compte (invitations.ts) ; rien si c'est déjà fait.
       if (done) host.net.confirmInvitation();
       noteRankings();
+      const best = Math.max(0, ...(f.scores ?? []));
+      return { gains: r.gains, from, to: from + r.gains.reduce((a, g) => a + g.xp, 0), ...(previous ? { previousBest: previous } : {}), ...(best > 0 ? { best } : {}) };
     },
     liveFinished(entry) {
       if (frozen || !host.active()) return;

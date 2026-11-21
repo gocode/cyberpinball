@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Place taken: when a player passes you in today's (or the all-time) ranking on a table version you have played, a notification says so ("Léa passed you on Attack from Mars"), at most once per table and per day, and stays in Recent activity; "Win back my place" starts the table directly.
+- Arena: the place just taken from you becomes the top card of the home tab ("Win back my place", "Write to them" between friends, "Challenge" greyed out until challenges exist) and the first page of the poster's board.
+- Game return: after a game that brings something new (record beaten, player passed), a screen shows the score and the record, the XP earned on the level bar with their breakdown, the player passed, the place gained and the next one to beat, then "Play again", "A word to …" (ready-made phrases, between friends) and "Back to the tables"; the badge and level animation comes next.
 - The Community moves to the Arena's tabbed screen: Home, Messages, Players, Groups, Rooms and Profile, with the same block navigation (flippers move from block to block, Start enters, Exit leaves, MagnaSave switches tabs).
 - The Community home leads with what is waiting for you: the conversation where someone wrote to you, with the last message's bubble and three ready-made replies sent with one press.
 - "Online" shows your friends with their presence ring and what they are doing; when few people are around, players close to you (tables in common, same country, close level, newcomers) are suggested, to add with one press (+25 XP per new friend).

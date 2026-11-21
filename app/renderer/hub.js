@@ -52,13 +52,23 @@
     return el('span', `hub-lv tier-tint-${level.tier}`, level.text);
   }
 
-  /** La barre du niveau : l'acquis, et en hachures ce qu'une partie peut encore rapporter. */
-  function xpBar(progress, reach) {
+  /**
+   * La barre du niveau : l'acquis, et en hachures ce qu'une partie peut encore rapporter ; au retour
+   * d'une partie, la part qu'elle vient d'ajouter en clair au bout de l'acquis.
+   */
+  function xpBar(progress, reach, fresh) {
     const bar = el('div', 'hub-xpbar');
     const pct = Math.max(0, Math.min(1, progress)) * 100;
     const got = el('span', 'hub-xp-got');
     got.style.width = `${pct}%`;
     bar.append(got);
+    if (fresh > 0) {
+      const part = Math.min(pct, fresh * 100);
+      const now = el('span', 'hub-xp-fresh');
+      now.style.left = `${pct - part}%`;
+      now.style.width = `${part}%`;
+      bar.append(now);
+    }
     if (reach > 0) {
       const may = el('span', 'hub-xp-may');
       may.style.left = `${pct}%`;
@@ -78,7 +88,7 @@
     top.append(el('b', 'hub-band-tier', b.tierLabel), missing);
     const bottom = el('div', 'hub-band-lines');
     b.lines.forEach((line, i) => bottom.append(el('span', i ? 'more' : '', line)));
-    box.append(n, top, xpBar(b.progress, b.reach), bottom);
+    box.append(n, top, xpBar(b.progress, b.reach, b.fresh), bottom);
     return box;
   }
 
@@ -173,6 +183,15 @@
     if (c.buttons?.length) {
       const row = el('div', 'hub-buttons');
       for (const b of c.buttons) {
+        // Pas encore possible : grisé, sa raison à la suite (« Bientôt »), sans action.
+        if (b.off) {
+          const off = el('span', 'hub-button hub-off');
+          off.append(el('span', '', b.label));
+          off.append(el('span', 'hub-button-why', b.off));
+          off.title = b.off;
+          row.append(off);
+          continue;
+        }
         const btn = el('span', `hub-button${b.primary ? ' hub-go' : ''}${b.quick ? ' hub-quick' : ''}${b.action !== undefined && b.action === cursor ? ' selected' : ''}`);
         // Le bouton choisi porte la touche qui le valide.
         if (b.action === cursor && start) btn.append(el('kbd', 'hub-button-key', start));
@@ -244,7 +263,10 @@
     }
     head.append(medal(h.medallion), titles);
     if (h.band) head.append(band(h.band));
-    o.append(head, blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
+    // Un écran sans onglets (le retour de partie) : pas de barre vide.
+    o.append(head);
+    if (h.tabs.length) o.append(blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
+    else o.classList.add('hub-no-tabs');
     const body = el('div', 'hub-body');
     if (h.empty) {
       const empty = el('div', 'hub-empty');

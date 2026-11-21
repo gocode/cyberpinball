@@ -53,13 +53,27 @@ export type NoticeKind =
   | 'group-message'
   | 'group-mention'
   | 'group-invite'
+  | 'place-taken'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
 /** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' } | { type: 'groups' } | { type: 'team-threads' };
+export type NoticeAct =
+  | { type: 'friends' }
+  | { type: 'friend-requests' }
+  | { type: 'downloads' }
+  | { type: 'live-game' }
+  | { type: 'activity' }
+  | { type: 'messages' }
+  | { type: 'my-profile' }
+  | { type: 'rooms' }
+  | { type: 'moderation' }
+  | { type: 'groups' }
+  | { type: 'team-threads' }
+  /** Une place prise (overtakes.ts) : « Reprendre ma place » lance la table ; `key` : la notification (placeTakenKey). */
+  | { type: 'place-taken'; key?: string };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -164,6 +178,10 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'group-mention': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'group', tone: 'info', act: { type: 'groups' }, away: true, sound: 'news' },
   // Une invitation dans un groupe : dans le front-end, comme une demande d'ami.
   'group-invite': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'groups' }, sound: 'news' },
+  // Un joueur passe devant moi sur une version que j'ai jouée (overtakes.ts, 21/11/2026) : partout, par-dessus
+  // VPX compris si le réglage le permet ; une fois par table et par jour (la clé porte le jour) ; Start sur sa
+  // ligne d'Activité, ou un clic, lance la table (« Reprendre ma place »).
+  'place-taken': { priority: 7, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'trophy', tone: 'warning', act: { type: 'place-taken' }, away: true, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
   'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'thumb-up', tone: 'ok', act: { type: 'my-profile' } },
@@ -430,6 +448,15 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'group-invite':
       // `subject` : le groupe.
       return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
+    case 'place-taken': {
+      // `who` : celui qui me passe devant ; `subject` : la table ; `extra` : les scores et ma place.
+      if (one) {
+        const long = t('{name} vous a dépassé sur {table}', { name: who(one), table: one.subject ?? '' });
+        if (full || [...long].length <= NOTICE_TITLE_MAX) return fit({ title: long, ...(one.extra ? { detail: one.extra } : {}) });
+        return fit({ title: t('{name} vous a dépassé', { name: who(one) }), detail: [subject(one), one.extra].filter(Boolean).join(' · ') });
+      }
+      return fit({ title: tn(n, 'On vous a dépassé sur {n} table', 'On vous a dépassé sur {n} tables'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
+    }
     case 'room-report': {
       const last = events[events.length - 1]!;
       if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
@@ -514,6 +541,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} message de salon', '{n} messages de salon');
     case 'room-report':
       return tn(n, '{n} signalement', '{n} signalements');
+    case 'place-taken':
+      return tn(n, '{n} place prise', '{n} places prises');
     case 'group-message':
       return tn(n, '{n} message de groupe', '{n} messages de groupe');
     case 'group-mention':
@@ -675,7 +704,8 @@ export function createNoticeCenter(): NoticeCenter {
         tone: rule.tone,
         ...noticeText(group.kind, group.events),
         ...(lone ? { player: { key: lone.player!, name: lone.who ?? '?' } } : {}),
-        act: rule.act,
+        // Une place prise : la table de la plus récente (un clic la lance).
+        act: rule.act.type === 'place-taken' ? { type: 'place-taken', key: group.events[group.events.length - 1]!.key } : rule.act,
         ...(rule.live ? { live: true as const } : {}),
         ...(rule.away ? { away: true as const } : {}),
         ...(rule.sound ? { sound: rule.sound } : {}),

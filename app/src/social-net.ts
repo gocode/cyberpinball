@@ -379,6 +379,8 @@ export interface SocialNetOptions {
   onLike?: (likes: Like[]) => void;
   /** De nouvelles personnes invitées confirmées (invitations.ts) : la notification et les XP. */
   onInvited?: (invitations: Invitation[]) => void;
+  /** Des scores relayés tout juste gardés (rankings.ts) : qui vient de me passer devant (place-taken.ts). */
+  onScores?: (fresh: readonly RankedScore[]) => void;
   /** Empreinte de cette machine (invitations.ts, machineTag) ; undefined : pas encore lue, ou illisible. */
   machine?: () => string | undefined;
   /** Essais : attente avant de fermer les liaisons après l'avis d'oubli de mon compte (1,5 s). */
@@ -1621,6 +1623,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     saveRankingsSoon();
     relayScores(fresh, from);
     changed();
+    try {
+      opts.onScores?.(fresh);
+    } catch (error) {
+      opts.log?.(`Classements : scores reçus, suite en échec (${(error as Error).message}).`); // i18n-ignore : journal
+    }
   }
 
   /** Scores à toutes les bornes reliées et saluées, sauf celle d'où ils viennent. */

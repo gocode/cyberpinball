@@ -414,6 +414,8 @@ import { createInstantMenu } from './instant-menu';
 import { createRoomsMenu } from './rooms-menu';
 import { createRankingsMenu, type RemoteAllTables } from './rankings-menu';
 import { createDailyTables } from './daily-tables';
+import { createPlaceTaken } from './place-taken';
+import { createGameReturn } from './game-return';
 import { createDailyTablesMenu } from './daily-tables-menu';
 import { createTableSocial } from './table-social';
 import { loadingObjective, type LoadingObjectiveView } from './loading-objective';
@@ -447,7 +449,7 @@ import { createVrFrontend } from './vr-frontend';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
-import { createLevelTracker } from './level-tracker';
+import { createLevelTracker, type GameReport } from './level-tracker';
 import { createLevelMenu } from './level-menu';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -2664,6 +2666,8 @@ const socialNet = createSocialNet({
   // personne que j'ai invitée finit sa première partie.
   machine: machineTagOf,
   onInvited: (list) => menuNotices.push(list.map((i) => ({ kind: 'player-invited' as const, key: `invited|${i.me}`, at: Date.now(), who: i.name, player: i.me }))),
+  // Des scores relayés : un joueur vient-il de me passer devant (place-taken.ts) ?
+  onScores: (fresh) => placeTaken.scores(fresh),
   // Un « J'aime » sur mon activité publique : la notification, regroupée, au menu.
   onLike: (likes) => {
     const mine = socialNet.publicCard(socialNet.state().key.publicKey);
@@ -2817,6 +2821,8 @@ const activityMenu = createActivityMenu({
   },
   // Une ligne de messages : ce qui attend encore dans sa conversation, et l'ouvrir (Messages en attente).
   threads: { pending: (kind, thread) => threadPending(kind, thread), open: (kind, thread, back) => openThread(kind, thread, back) },
+  // Une place prise (place-taken.ts) : Start reprend ma place, la table lancée.
+  places: { reach: (key) => placeTaken.reach(key) },
   // La pastille de la roue dentée et de l'entrée suit le non lu.
   changed: () => {
     if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
@@ -3056,6 +3062,23 @@ const dailyTables = createDailyTables({
   log: (line) => console.log(line),
 });
 dailyTables.start();
+// Place prise (place-taken.ts, 21/11/2026) : un joueur passe devant moi sur une version que j'ai jouée ;
+// la notification, sa ligne d'Activité, et l'action du moment de l'Arène. Rien en jeu local ni en invité.
+const placeTaken = createPlaceTaken({
+  daily: dailyTables,
+  push: (events) => menuNotices.push(events),
+  journal: () => activityMenu.entries(),
+  closed: () => socialClosed(),
+  play: (table) => playFromNotice(table),
+  log: (line) => console.log(line),
+});
+
+/** Une table lancée hors de la roue (« Reprendre ma place », « Rejouer ») : l'écran ouvert se ferme d'abord. */
+function playFromNotice(table: TableEntry): void {
+  if (state.phase !== 'menu' && state.phase !== 'library') return;
+  if (library.isActive()) library.leave();
+  void play(table);
+}
 
 /** Mon record sur une table : le meilleur relevé par le niveau, ou une partie de cette borne au tableau des scores. */
 function myTableBest(table: TableEntry): number | undefined {
@@ -3601,7 +3624,31 @@ const arenaMenu = createArenaMenu({
       broadcast();
     },
   },
+  // La place qu'on vient de me prendre (place-taken.ts) : l'action du moment ; « Reprendre ma place » lance la table.
+  places: {
+    current: () => placeTaken.current(),
+    retake: (taken) => {
+      const entry = placeTaken.tableOf(taken);
+      return entry ? () => playFromNotice(entry) : undefined;
+    },
+  },
+  // « Lui écrire » : le fil de la messagerie, entre amis seulement.
+  write: (key, back) => (socialNet.state().friends.some((f) => f.key === key) ? { run: () => chatMenu.openThread(key, back) } : { off: t('Entre amis seulement') }),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+});
+// Retour de partie (game-return.ts, 21/11/2026) : après une partie qui apporte du neuf, le score, les XP,
+// le joueur dépassé et la suite ; avant le moment des badges, qui l'attend.
+const gameReturn = createGameReturn({
+  library,
+  daily: dailyTables,
+  friends: {
+    isFriend: (key) => socialNet.state().friends.some((f) => f.key === key),
+    send: (key, text) => chatService.send(key, text),
+  },
+  play: (table) => playFromNotice(table),
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
+  log: (line) => console.log(line),
 });
 
 /** Un message sur une ligne : ses retours à la ligne deviennent des espaces. */
@@ -4163,6 +4210,14 @@ export function startFrontend(): void {
     // Nouvelle de la partie entre amis (au menu des tables ou dans le menu système) : l'écran de la partie.
     else if (action.type === 'live-game') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) friendsMenu.live.open(() => library.leave());
+    }
+    // Place prise : « Reprendre ma place », la table lancée ; absente de la borne, Activité récente dit pourquoi.
+    else if (action.type === 'place-taken') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) {
+        const run = action.key ? placeTaken.reach(action.key).run : undefined;
+        if (run) run();
+        else activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
+      }
     }
     // Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier ; Retour ramène où l'on était.
     else if (action.type === 'activity') {
@@ -6037,12 +6092,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (!autoStopAfterMs && !guest.active && result.seconds >= 60 && !vpxInstall(loc)?.trial) void notePlayedVersion(table);
     // Le niveau (level-tracker.ts) : la partie, ses scores s'ils sont relevés, ses records, son mode.
     const levelFacts = { table: presenceTable(table), seconds: result.seconds, entered: double ? [] : entered.map((e) => e.rank), newTable: (table.info.User?.StartCount ?? 0) === 0, at: new Date(), ...(vrGame !== undefined ? { mode: 'vr' as const } : vision3dMenu.setting().mode === 'on' ? { mode: 'vision3d' as const } : {}) };
+    // Retour de partie (game-return.ts) : seul à la table, hors essai ; le moment des badges attend son bilan.
+    const returnShown = !autoStopAfterMs && !double && !socialClosed();
+    if (returnShown) gameReturn.expect();
     const levelAfterGame = (scores?: number[]) => {
+      let report: GameReport | undefined;
       try {
-        levelTracker.gameEnded({ ...levelFacts, ...(scores ? { scores } : {}) });
+        report = levelTracker.gameEnded({ ...levelFacts, ...(scores ? { scores } : {}) });
       } catch (error) {
         console.log(`Partie (${table.id}) : niveau et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
       }
+      if (returnShown && report) void showGameReturn(table, report, startedAt);
+      else gameReturn.release();
     };
     // Les scores de la partie, datés, au tableau des scores de la table ; sans retarder le retour au menu.
     if (!autoStopAfterMs && scoresBefore) {
@@ -6138,6 +6199,19 @@ function loadingObjectiveFor(table: TableEntry | undefined): LoadingObjectiveVie
   } catch (error) {
     console.log(`Chargement (${table.id}) : objectif non calculé (${(error as Error).message}).`); // i18n-ignore : journal
     return undefined;
+  }
+}
+
+/** Retour de partie (game-return.ts) : la version exacte de la table, puis l'écran s'il y a du neuf. */
+async function showGameReturn(table: TableEntry, report: GameReport, since: Date): Promise<void> {
+  try {
+    const board = boardKey(await liveGames.versionOf(table));
+    const balls = board ? (await ballCounts.of(table))?.balls : undefined;
+    const fresh = tables.find((x) => x.id === table.id) ?? table;
+    if (gameReturn.report({ table: fresh, ...(board ? { version: { board, ...(balls ? { balls } : {}) } } : {}), since, report })) broadcast();
+  } catch (error) {
+    gameReturn.release();
+    console.log(`Retour de partie (${table.id}) : bilan non montré (${(error as Error).message}).`); // i18n-ignore : journal
   }
 }
 
@@ -7078,8 +7152,9 @@ let levelMomentAt: number | undefined;
 let levelMomentKey: string | undefined;
 
 /** Le moment d'un badge ou d'un niveau est à l'écran (levelMomentView), sans effet de bord : soundView le lit aussi. */
+// Le retour de partie passe avant : le moment attend son bilan (game-return.ts), puis la roue.
 function levelMomentShowing(): boolean {
-  return !!levelTracker.pending() && !localPlay() && state.phase === 'menu' && !attract.active && !guest.active;
+  return !!levelTracker.pending() && !localPlay() && state.phase === 'menu' && !attract.active && !guest.active && !gameReturn.holding();
 }
 
 /**

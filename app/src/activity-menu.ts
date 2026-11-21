@@ -93,6 +93,11 @@ export interface ActivityMenuHost {
     pending(kind: MessageKind, thread: string): number | undefined;
     open(kind: MessageKind, thread: string, back: () => void): void;
   };
+  /**
+   * Les places prises (place-taken.ts) : Start sur la ligne lance la table (« reprendre ma place ») ; la
+   * table absente de la borne, la ligne est grisée avec sa raison. Absent (essais) : la ligne n'ouvre rien.
+   */
+  places?: { reach(key: string): { run?: () => void; gone?: string; status?: string } };
   /** Le journal a changé (une ligne de plus, une ligne vue) : la pastille de la roue dentée se redessine. */
   changed?(): void;
   now?: () => number;
@@ -286,6 +291,12 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         if (waiting === undefined) return { gone: act.type === 'chat' ? t('N’est plus dans vos amis') : act.type === 'group' ? t('Vous n’êtes plus dans ce groupe') : t('Salon fermé') };
         const label = act.type === 'chat' ? t('lire la conversation') : act.type === 'group' ? t('ouvrir la discussion du groupe') : t('ouvrir le salon');
         return { run: () => threads.open(kind, thread, back), label, ...(waiting ? { status: tn(waiting, '{n} en attente', '{n} en attente') } : {}) };
+      }
+      case 'place': {
+        const r = host.places?.reach(act.key);
+        if (!r) return {};
+        if (r.gone) return { gone: r.gone };
+        return { ...(r.run ? { run: r.run, label: t('reprendre ma place') } : {}), ...(r.status ? { status: r.status } : {}) };
       }
       case 'system':
         if (!host.library.hasSystemItem(act.item)) return {};

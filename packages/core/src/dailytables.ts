@@ -396,6 +396,14 @@ export function dailyTables(input: DailyInput, opts: { scope: DailyScope; period
   return { scope: opts.scope, period, calm: period === 'week' && !opts.period, lines, plays: all.reduce((a, c) => a + c.plays, 0), players: players.size, dayPlayers };
 }
 
+/**
+ * Le classement d'une version pendant la période, dans la portée : le meilleur score de chaque joueur,
+ * du meilleur au moins bon, avec son rang (overtakes.ts : qui m'a dépassé, qui je dépasse).
+ */
+export function rankedOn(input: DailyInput, table: { board: string; balls?: number }, scope: DailyScope, period: DailyPeriod | 'all', now = new Date()): DailyHolder[] {
+  return bestOf(input, prepare(input), groupOf(table), scope, period, now);
+}
+
 /** Le joueur juste au-dessus d'un score : le moins bon de ceux qui font mieux (un autre que moi). */
 function closestAbove(best: readonly DailyHolder[], score: number | undefined): DailyHolder | undefined {
   const above = best.filter((h) => !h.mine && (score === undefined || h.score > score));
