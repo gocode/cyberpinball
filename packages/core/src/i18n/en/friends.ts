@@ -114,7 +114,7 @@ export const messages: Record<string, string> = {
   '{n} amis en ligne': '{n} friends online',
   'Annuler la partie': 'Cancel the game',
   'Les invités en sont prévenus': 'The guests are told',
-  'Le salon reste ouvert : « Mes amis » y ramène': 'The room stays open: "Mes amis" (My friends) leads back to it',
+  'Le salon reste ouvert : « Mes amis » y ramène': 'The room stays open: “My friends” leads back to it',
   'Vous restez dans la partie': 'You stay in the game',
   'Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.':
     'Start when your friends are ready: a shared countdown, then the table starts on every cabinet.',
@@ -125,7 +125,7 @@ export const messages: Record<string, string> = {
   'C’est parti !': 'Go!',
   'Joueurs': 'Players',
   'Rejouer avec les mêmes joueurs': 'Play again with the same players',
-  'Les résultats arrivent dans « Mes amis »': 'The results arrive in "Mes amis" (My friends)',
+  'Les résultats arrivent dans « Mes amis »': 'The results arrive in “My friends”',
   'Résultats de la partie en direct': 'Live game results',
   'Partie en direct en cours': 'Live game in progress',
   'Invitation envoyée à {n} joueur': 'Invitation sent to {n} player',

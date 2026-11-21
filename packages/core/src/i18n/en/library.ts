@@ -275,6 +275,7 @@ export const messages: Record<string, string> = {
   'Rien à installer': 'Nothing to install',
   'Les fichiers quittent le dossier d’import ; les archives déballées et les fichiers remplacés vont à la corbeille.': 'Files leave the import folder; unpacked archives and replaced files go to the trash.',
   'Les fichiers sont copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.': 'Files are copied: your original files are not changed. Replaced files go to the trash.',
+  'Les gros fichiers sont liés, les autres copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.': 'Large files are linked, the others copied: your original files are not changed. Replaced files go to the trash.',
   'Aucune table (.vpx) ni complément reconnu dans cette sélection.': 'No table (.vpx) or recognized add-on in this selection.',
   'remplace celle de la bibliothèque': 'replaces the library’s',
   'version de la bibliothèque gardée': 'library version kept',

@@ -48,7 +48,7 @@ export const messages: Record<string, string> = {
   'Elle change quand on branche le DMD, ou dans Menu système > Ma borne > DMD et LED > DMD réel (automatique, oui, non, ZeDMD en wifi). {keep}': 'It changes when the DMD is plugged in, or in System menu > My cabinet > DMD and LEDs > Real DMD (automatic, yes, no, ZeDMD over Wi-Fi). {keep}',
   // Rubrique Borne > DMD (systemmenu.ts, frontend.ts)
   'DMD du front-end': 'Menu DMD',
-  'Indisponible : la borne n’a pas d’écran de DMD (assistant d’écrans, étape « Disposition »)': 'Unavailable: the cabinet has no DMD screen (screen wizard, “Disposition” (Layout) step)',
+  'Indisponible : la borne n’a pas d’écran de DMD (assistant d’écrans, étape « Disposition »)': 'Unavailable: the cabinet has no DMD screen (screen wizard, “Layout” step)',
   // hardware-dmd-menu.ts
   'Toujours allumé, même s’il n’est pas reconnu : DMDUtil le cherche au début de chaque partie (Start : non)': 'Always on, even when not recognized: DMDUtil looks for it at the start of each game (Start: no)',
   'Jamais allumé : DMDUtil ne lui envoie rien, même branché (Start : automatique)': 'Never on: DMDUtil sends it nothing, even when plugged in (Start: automatic)',

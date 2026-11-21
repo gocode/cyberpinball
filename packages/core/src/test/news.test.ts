@@ -2,8 +2,8 @@
 // main (17/11/2026). Ces tests fixent la classe de comportement, pas un cas :
 // - la liste reste une sélection : des nouveautés datées, la plus récente en haut, pas plus de
 //   quatre le même jour ni plus de vingt-quatre en tout (jamais une ligne par version) ;
-// - chacune existe en entier dans les deux langues, mène à une fonction qui existe, et son aperçu,
-//   quand elle en a un, est livré en français et en anglais (et rien d'autre dans le dossier) ;
+// - chacune existe en entier dans les deux langues, mène à une fonction qui existe, et a son aperçu
+//   (sauf raison écrite), livré en français et en anglais (et rien d'autre dans le dossier) ;
 // - la pastille rouge s'allume dès la première installation (la dernière date à voir), s'éteint
 //   quand on ouvre l'écran, se rallume pour une nouveauté ajoutée ensuite ;
 // - l'entrée est en tête du menu système tant que les nouveautés sont récentes ou pas vues, puis
@@ -73,16 +73,31 @@ test('nouveautés : « Essayer » mène à une fonction qui existe', () => {
   for (const n of NEWS) assert.ok(ok(n.reach), `${n.id} : ${JSON.stringify(n.reach)} n'est pas une entrée du menu système`);
 });
 
-test('nouveautés : chaque aperçu est livré en français et en anglais, et rien d’autre', () => {
-  const wanted = new Set(NEWS.filter((n) => n.preview).flatMap((n) => [`${n.id}-fr.webp`, `${n.id}-en.webp`]));
+// Une liste sans images était terne : 12 nouveautés sur 24 n'en avaient pas, l'aperçu étant
+// facultatif (21/11/2026). Désormais chacune a le sien, un écran de la fonction ou une illustration ;
+// l'exception s'écrit (`noPreview`, la raison), et chaque image a sa recette dans la démonstration
+// interne des aperçus, pour être refaite quand l'écran change.
+test('nouveautés : chacune a son aperçu, en français et en anglais, et rien d’autre', () => {
+  for (const n of NEWS) if (n.noPreview !== undefined) assert.ok(n.noPreview.trim().length >= 30, `${n.id} : sans aperçu, la raison s'écrit en entier (noPreview)`);
+  const wanted = new Set(NEWS.filter((n) => !n.noPreview).flatMap((n) => [`${n.id}-fr.webp`, `${n.id}-en.webp`]));
   const present = new Set(fs.existsSync(PREVIEWS) ? fs.readdirSync(PREVIEWS) : []);
-  for (const f of wanted) assert.ok(present.has(f), `aperçu manquant : app/renderer/nouveautes/${f}`);
+  for (const f of wanted) assert.ok(present.has(f), `aperçu manquant : app/renderer/nouveautes/${f} (un écran de la fonction, ou une illustration)`);
   for (const f of present) assert.ok(wanted.has(f), `fichier sans nouveauté : app/renderer/nouveautes/${f}`);
   for (const f of wanted) {
     const size = fs.statSync(path.join(PREVIEWS, f)).size;
     assert.ok(size < 400_000, `${f} : ${Math.round(size / 1000)} ko, trop lourd pour un aperçu`);
+    assert.ok(size > 6_000, `${f} : ${Math.round(size / 1000)} ko, une image presque vide n'est pas un aperçu`);
     const head = fs.readFileSync(path.join(PREVIEWS, f)).subarray(0, 12).toString('latin1');
     assert.ok(head.startsWith('RIFF') && head.endsWith('WEBP'), `${f} : pas un WebP`);
+  }
+  // Chaque aperçu se refait : son identifiant figure dans la recette (absente d'une copie publiée).
+  const recipe = path.join(REPO_ROOT, 'interne', 'demos', 'nouveautes-apercus.ps1');
+  if (fs.existsSync(recipe)) {
+    const text = fs.readFileSync(recipe, 'utf8');
+    for (const n of NEWS) if (!n.noPreview) assert.ok(text.includes(`'${n.id}'`), `${n.id} : aperçu sans recette dans la démonstration des aperçus`);
+    // Et pas de recette d'une nouveauté retirée : elle referait une image sans ligne.
+    const ids = new Set(NEWS.map((n) => n.id));
+    for (const m of text.matchAll(/^\s*'([a-z0-9-]+)'\s*=/gm)) assert.ok(ids.has(m[1]!), `${m[1]} : recette d'une nouveauté qui n'est plus dans la liste`);
   }
 });
 
@@ -164,7 +179,7 @@ test('nouveautés, écran : la date une fois par jour, « Nouveau » sur ce qui 
     const first = i === 0 || NEWS[i - 1]!.date !== NEWS[i]!.date;
     assert.equal(r.news!.first, first, `${NEWS[i]!.id} : date dite ${first ? '' : 'pas '}sur cette ligne`);
     assert.equal(r.action, i, 'chaque ligne s’ouvre');
-    assert.equal(Boolean(r.news!.preview), Boolean(NEWS[i]!.preview));
+    assert.equal(Boolean(r.news!.preview), !NEWS[i]!.noPreview);
   });
   assert.equal(rows.at(-1)!.news!.last, true);
   const newest = newestNewsDate();

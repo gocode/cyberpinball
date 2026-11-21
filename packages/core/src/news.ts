@@ -1,7 +1,8 @@
 // Nouveautés (Menu système > Aide et infos > Nouveautés, app/src/news-menu.ts) : les grandes nouveautés de Cyber
 // Pinball, choisies à la main, jamais tirées du CHANGELOG (17/11/2026). Une chronologie : la plus
 // récente en haut, la date dite une seule fois pour les nouveautés du même jour ; chaque ligne a son
-// détail et, si elle en a un, un petit aperçu ; Start l'agrandit (grand aperçu, texte entier) et
+// détail et son petit aperçu (une image, toujours : la liste doit rester vivante, 21/11/2026) ;
+// Start l'agrandit (grand aperçu, texte entier) et
 // « Essayer » mène à la fonction.
 //
 // Règles de choix (docs/manuel, rubrique « Nouveautés ») : une ligne par vraie capacité nouvelle,
@@ -48,8 +49,12 @@ export interface NewsItem {
   readonly reach: NewsReach;
   /** Fonction encore en essai : badge « BÊTA ». */
   readonly beta?: boolean;
-  /** Elle a un aperçu (app/renderer/nouveautes/<id>-fr.webp et -en.webp). */
-  readonly preview?: boolean;
+  /**
+   * Chaque nouveauté a son aperçu (app/renderer/nouveautes/<id>-fr.webp et -en.webp, faits par la
+   * démonstration interne des aperçus) : un écran de la fonction ou, à défaut, une illustration.
+   * Exception rare, à justifier ici : pourquoi aucune image n'est possible (news.test.ts l'exige).
+   */
+  readonly noPreview?: string;
 }
 
 /** Les nouveautés, la plus récente d'abord. */
@@ -70,7 +75,8 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Communauté'); },
     reach: { kind: 'community', door: 'home' },
-  },  {
+  },
+  {
     // Le médaillon Arène (21/11/2026, planche « Engagement ») ; « Les règles de chaque table » (0.1.8)
     // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'arene',
@@ -206,7 +212,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
     reach: { kind: 'system', id: 'phone-remote' },
-    preview: true,
   },
   {
     // Demandé par un joueur (Retours et propositions, 18/11/2026) : réinstallé, il avait perdu son niveau.
@@ -223,7 +228,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Communauté › Mon profil › Mon compte'); },
     reach: { kind: 'system', id: 'account' },
-    preview: true,
   },
   {
     id: 'autres-vpx',
@@ -271,7 +275,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Mon niveau'); },
     reach: { kind: 'level' },
-    preview: true,
   },
   {
     id: 'parties-instantanees',
@@ -287,7 +290,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Parties instantanées'); },
     reach: { kind: 'community', door: 'instant' },
-    preview: true,
   },
   {
     id: 'groupes',
@@ -303,7 +305,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Groupes'); },
     reach: { kind: 'community', door: 'groups' },
-    preview: true,
   },
   {
     id: 'pinball-fx',
@@ -335,7 +336,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Aide et infos › Retours et propositions'); },
     reach: { kind: 'system', id: 'feedback' },
-    preview: true,
   },
   {
     id: 'communaute',
@@ -351,7 +351,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Communauté'); },
     reach: { kind: 'community', door: 'home' },
-    preview: true,
   },
   {
     id: 'credits',
@@ -382,7 +381,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Juke-box'); },
     reach: { kind: 'jukebox' },
-    preview: true,
   },
   {
     id: 'classements',
@@ -398,7 +396,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Fiche d’une table › Tableau des scores'); },
     reach: { kind: 'sheet', part: 'scores' },
-    preview: true,
   },
   {
     id: 'realite-virtuelle',
@@ -415,7 +412,6 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D'); },
     reach: { kind: 'system', id: 'realite-virtuelle' },
     beta: true,
-    preview: true,
   },
   {
     id: 'vision-3d',
@@ -447,7 +443,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Collections'); },
     reach: { kind: 'system', id: 'collections' },
-    preview: true,
   },
 ];
 

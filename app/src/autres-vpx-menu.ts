@@ -92,7 +92,8 @@ export function buildVpxChoice(o: {
         (v): Action => ({
           label: otherVpxLabel(v),
           detail: v.id === o.current ? t('{exe} · choix actuel', { exe: v.exe }) : v.exe,
-          icon: 'layers',
+          // Pas d'icône : la même sur chaque VPX ne dirait rien (garde-fou de mise en page) ; le choix
+          // actuel se dit dans le détail et la couleur.
           tone: v.id === o.current ? 'ok' : undefined,
           run: () => o.choose(v.id),
         }),

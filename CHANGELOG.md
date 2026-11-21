@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Nouveautés : chaque nouveauté a maintenant son image, un écran de la fonction ou une illustration, en français et en anglais (douze en étaient privées : l'Arène, les tables du jour, les échanges avec l'équipe, le Menu système, le son, Future Pinball, Pinball FX, la reprise sans duplication, les autres versions de VPX, DOF, les crédits, la vision 3D).
+- Plan d'installation d'une autre installation : il dit maintenant que les gros fichiers sont liés et les autres copiés, au lieu d'annoncer que tout est copié.
+- Anglais : les textes qui citent un écran ou un bouton le citent sous son nom anglais (sauvegardes, DOF, amis, DMD, manettes du casque), au lieu du nom français.
 - Place prise : quand un joueur passe devant vous au classement du jour (ou de tout temps) sur une version de table que vous avez jouée, une notification le dit (« Léa vous a dépassé sur Attack from Mars »), une fois par table et par jour au plus, et reste dans l'Activité récente ; « Reprendre ma place » lance directement la table.
 - Arène : la place qu'on vient de vous prendre devient la carte en tête de l'accueil (« Reprendre ma place », « Lui écrire » entre amis, « Défier » grisé tant que les défis n'existent pas) et la première page du tableau de l'affiche.
 - Retour de partie : après une partie qui apporte du neuf (record battu, joueur dépassé), un écran montre le score et le record, les XP gagnés sur la barre du niveau avec leur détail, le joueur dépassé, la place gagnée et le prochain à battre, puis « Rejouer », « Un mot à … » (phrases préparées, entre amis) et « Retour aux tables » ; l'animation des badges et du niveau vient ensuite.

@@ -213,7 +213,7 @@ if (!signatureConfigured()) {
   }
   const latest = news.NEWS[0];
   const listed = own.length ? `${own.length} pour la ${base} (${own.map((n) => n.title).join(', ')})` : `aucune pour la ${base}`;
-  console.log(`Nouveautés du front-end : ${listed} ; dernière ligne le ${latest.date} (« ${latest.title} »). Une fonction de cette publication mérite-t-elle une ligne ? Rien n'est ajouté d'office (packages/core/src/news.ts).`);
+  console.log(`Nouveautés du front-end : ${listed} ; dernière ligne le ${latest.date} (« ${latest.title} »). Une fonction de cette publication mérite-t-elle une ligne ? Rien n'est ajouté d'office (packages/core/src/news.ts), et chaque ligne vient avec son image (écran de la fonction ou illustration).`);
 }
 
 step('Contrôle de publication');

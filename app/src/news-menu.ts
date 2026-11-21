@@ -84,7 +84,7 @@ export interface NewsMenu {
 }
 
 /** L'aperçu d'une nouveauté, dans la langue de l'interface (app/renderer/nouveautes). */
-export const newsPreview = (n: NewsItem): string | undefined => (n.preview ? `nouveautes/${n.id}-${language() === 'en' ? 'en' : 'fr'}.webp` : undefined);
+export const newsPreview = (n: NewsItem): string | undefined => (!n.noPreview ?`nouveautes/${n.id}-${language() === 'en' ? 'en' : 'fr'}.webp` : undefined);
 
 /** Le bout du chemin, pour le bouton : « Communauté › Parties instantanées » donne « Parties instantanées ». */
 const lastStep = (where: string) => where.split(' › ').at(-1) ?? where;

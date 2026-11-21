@@ -238,7 +238,8 @@ export function createDofMenu(host: DofMenuHost) {
           key: `legacy-${i}`,
           label: t('Reprendre la configuration de l’ancien DOF'),
           detail: t('{files} · {dir} · {date} : seuls les fichiers du configtool sont copiés', { files: legacyDofFiles(l), dir: l.dir, date: formatDate(l.modified) }),
-          icon: 'import',
+          // « restore » : « Importer la configuration du configtool… », sur la même page, a déjà « import ».
+          icon: 'restore',
           tone: 'ok',
           run: () => void takeLegacy(l),
         }),

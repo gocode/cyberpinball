@@ -5229,7 +5229,10 @@ export function createLibrary(host: LibraryHost) {
         : count
           ? s.mode === 'move'
             ? t('Les fichiers quittent le dossier d’import ; les archives déballées et les fichiers remplacés vont à la corbeille.')
-            : t('Les fichiers sont copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
+            : // Des gros fichiers liés (même disque, import-links-menu.ts) : « copiés » contredisait le plan juste dessous.
+              s.links?.linkedFiles
+              ? t('Les gros fichiers sont liés, les autres copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
+              : t('Les fichiers sont copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
           : t('Aucune table (.vpx) ni complément reconnu dans cette sélection.'),
       sections,
       actions,

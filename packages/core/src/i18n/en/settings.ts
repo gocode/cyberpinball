@@ -123,7 +123,7 @@ export const messages: Record<string, string> = {
   'Manettes pas encore reconnues : prenez-les en main, casque porté': 'Controllers not recognised yet: hold them, with the headset on',
   'boutons réglés': 'buttons set',
   'boutons proposés par défaut': 'default buttons',
-  '{casque} · {etat} · Dans le casque : ≡ > « Manettes »': '{casque} · {etat} · In the headset: ≡ > “Manettes” (Controllers)',
+  '{casque} · {etat} · Dans le casque : ≡ > « Manettes »': '{casque} · {etat} · In the headset: ≡ > “Controllers”',
   'Vos yeux sont mesurés à {h} m du sol : le sol du Quest est mal réglé, et la borne serait à vos pieds. Avant de caler, dans le Quest : Paramètres rapides > Paramètres > Configuration de l’environnement > Limite > « Définir le niveau du sol », puis touchez le sol avec la manette.': 'Your eyes are measured {h} m above the floor: the Quest floor is wrong, and the cabinet would be at your feet. Before aligning, in the Quest: Quick settings > Settings > Environment setup > Boundary > “Set floor level”, then touch the floor with the controller.',
   'Le Quest garde ce calage avec une limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis, et le calage revient d’office': 'The Quest keeps this alignment with a roomscale boundary; with a stationary boundary it moves the room every time the headset is put back on, and the alignment comes back by itself',
   'À tout moment, dans le front-end comme en partie : {combo}': 'Any time, in the menu or in a game: {combo}',
