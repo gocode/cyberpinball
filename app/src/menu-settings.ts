@@ -461,7 +461,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
       t('Couleur (hexadécimal)'),
       (s().dmdColor === DMD_TABLE_COLOR ? DMD_COLOR_PRESETS[0]!.hex : s().dmdColor).toUpperCase(),
       (value) => {
-        if (value === undefined) return openDmdColor(at);
+        if (!value?.trim()) return openDmdColor(at);
         const color = parseDmdColor(value);
         if (!color) return openFreeDmdColor(t('« {value} » n’est pas une couleur : six chiffres hexadécimaux (0 à 9, A à F), comme #8BE23A.', { value }));
         if (!dmdColorReadable(color)) return openFreeDmdColor(t('{hex} est trop sombre : les points ne se verraient pas sur le noir de l’afficheur.', { hex: color.toUpperCase() }));

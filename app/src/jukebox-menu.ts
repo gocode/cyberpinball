@@ -1034,7 +1034,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       t('Lien YouTube, ou identifiant de la playlist'),
       value,
       (link) => {
-        if (link === undefined) return host.account ? openImportStart(prefer) : open();
+        if (!link?.trim()) return host.account ? openImportStart(prefer) : open();
         startImport(link, 'prompt', prefer);
       },
       problem ?? (phone ? t('Collez le lien sur le téléphone, puis Envoyer. Dans YouTube : Partager, puis Copier le lien.') : t('Tapez l’identifiant de la playlist (PL…, OLAK5uy_…), ou collez le lien entier avec Ctrl+V. Dans YouTube : Partager, puis Copier le lien.')),
@@ -1051,7 +1051,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   function askSearch(prefer?: string): void {
     flash = undefined;
     ask(t('Chercher sur YouTube'), t('Playlists à chercher'), '', (query) => {
-      if (query !== undefined) {
+      if (query?.trim()) {
         host.account?.openSearch(query);
         flash = { text: t('« Récupérer » est ouvert sur YouTube : « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import.'), tone: 'info' };
       }

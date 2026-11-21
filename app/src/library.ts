@@ -274,6 +274,7 @@ import {
   eraseBeforeCaret,
   insertAtCaret,
   flipperMovesKey,
+  promptAnswer,
   moveCaret,
   mediaOriginOf,
   MEDIADB_NAME,
@@ -3296,7 +3297,8 @@ export function createLibrary(host: LibraryHost) {
     if (s.kind === 'prompt') {
       const value = e?.kind === 'text' ? prefixedText(shownPrefix(e), e.value) : '';
       endPromptInput(s);
-      s.done(save && value ? value : undefined);
+      // Validée : le texte, même vide ; annulée : undefined (promptAnswer, textedit.ts).
+      s.done(promptAnswer(save, value));
       host.broadcast();
       return;
     }

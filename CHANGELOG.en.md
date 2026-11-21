@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Table search: clearing the "Search for a title" field and confirming now clears the search, as stated; before, it stayed until Cyber Pinball was restarted. "Clear the filters" also removes the searched title.
+- All text fields: a field cleared and confirmed is now taken into account (room topic removed, ZeDMD Wi-Fi turned off, Art-Net address on the whole network, Juke-box correction back to the original information, Rankings search cleared). Exit still cancels.
 - New "Arena" medallion on the wheel, between Community and Collections: everything played against others. Its live medallion shows a cup and confetti; hide it in System menu › Tables › Wheel ("Arena on the wheel").
 - When focused, the Arena poster shows your level and what one game can still bring, then a records board in DMD dots whose pages turn every six seconds, the most pressing first (open game, place to win back, your ranking, your records), and who is playing right now.
 - Start opens the Arena screen: the "Your level" band, icon tabs switched with the MagnaSave buttons, and cards picked with the flippers. On top, the most pressing action (a place just taken from you, an instant game waiting for you), then the games open on your tables and the XP each action brings. The Daily tab opens the tables of the day; the Challenges and League tabs arrive in a coming version.

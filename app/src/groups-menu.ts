@@ -432,7 +432,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     lib.openPrompt(t('Nom du groupe'), t('Nom'), value, (text) => {
       const name = (text ?? '').replace(/\s+/g, ' ').trim();
       if (text !== undefined && [...name].length > GROUP_NAME_MAX) flash = { text: t('Nom trop long : {n} caractères au plus', { n: GROUP_NAME_MAX }), tone: 'warning' };
-      done(text === undefined ? value : [...name].slice(0, GROUP_NAME_MAX).join(''));
+      // Validé vide : le nom d'avant reste (un groupe a toujours un nom).
+      done(text === undefined || !name ? value : [...name].slice(0, GROUP_NAME_MAX).join(''));
     }, t('{n} caractères au plus. Le clavier à l’écran, ou votre téléphone appairé.', { n: GROUP_NAME_MAX }));
   }
 

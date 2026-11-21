@@ -738,7 +738,7 @@ export function createDofMenu(host: DofMenuHost) {
           icon: 'keyboard',
           run: () =>
             library.openPrompt(t('Port série'), t('Port (COM5…)'), d.port, (value) => {
-              if (value !== undefined) d.port = value.trim().toUpperCase();
+              if (value?.trim()) d.port = value.trim().toUpperCase();
               openEditor(1);
             }),
         },

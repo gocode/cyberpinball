@@ -128,7 +128,7 @@ export function createCollectionsItem(host: {
       icon: 'plus',
       run: () =>
         lib.openPrompt(t('Nouvelle collection'), t('Nom de la collection'), '', (name) => {
-          if (name !== undefined) host.collections.addMine(name);
+          if (name?.trim()) host.collections.addMine(name);
           reopen();
         }),
     });
@@ -182,7 +182,7 @@ export function createCollectionsItem(host: {
             icon: 'edit',
             run: () =>
               lib.openPrompt(t('Renommer la collection'), t('Nom de la collection'), m.name, (name) => {
-                if (name !== undefined) host.collections.renameMine(m.id, name);
+                if (name?.trim()) host.collections.renameMine(m.id, name);
                 lib.openCustom(build);
               }),
           },
@@ -271,7 +271,7 @@ export function tableCollectionsAction(host: {
             icon: 'plus',
             run: () =>
               lib.openPrompt(t('Nouvelle collection'), t('Nom de la collection'), '', (name) => {
-                if (name !== undefined) host.collections.addMine(name, table);
+                if (name?.trim()) host.collections.addMine(name, table);
                 lib.openCustom(build);
               }),
           });

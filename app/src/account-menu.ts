@@ -388,7 +388,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       t('Les 24 mots, dans l’ordre'),
       value,
       (text) => {
-        if (text === undefined) return reopenRestore();
+        if (!text?.trim()) return reopenRestore();
         const words = parseRecoveryText(text);
         if (words.length < RECOVERY_WORD_COUNT) {
           flash = { text: problemText({ kind: 'count', count: words.length }), tone: 'warning' };
@@ -422,13 +422,13 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
 
   function askLogin(): void {
     host.library.openPrompt(t('Reprendre un compte'), t('Identifiant (votre pseudo)'), '', (login) => {
-      if (login === undefined) return reopenRestore(1);
+      if (!login?.trim()) return reopenRestore(1);
       host.library.openPrompt(
         t('Reprendre un compte'),
         t('Votre mot de passe'),
         '',
         (password) => {
-          if (password === undefined) return reopenRestore(1);
+          if (!password) return reopenRestore(1);
           void open(() => svc.openWithPassword(login, password), () => askLogin());
         },
         t('Le mot de passe du compte {name}.', { name: login }),

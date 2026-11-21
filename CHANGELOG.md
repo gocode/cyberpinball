@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Recherche d'une table : vider le champ « Chercher un titre » puis valider efface la recherche, comme annoncé ; avant, elle restait jusqu'au redémarrage de Cyber Pinball. « Effacer les filtres » retire aussi le titre cherché.
+- Toutes les saisies : un champ vidé puis validé est pris en compte (sujet d'un salon retiré, ZeDMD en wifi coupé, adresse Art-Net sur tout le réseau, correction du Juke-box rendue à l'information d'origine, recherche des Classements effacée). Exit annule toujours.
 - Nouveau médaillon « Arène » dans la roue, entre la Communauté et les Collections : tout ce qui se joue contre les autres. Son médaillon vivant montre une coupe et des confettis ; il se masque dans Menu système › Tables › Roue (« Arène dans la roue »).
 - Au focus, l'affiche de l'Arène montre votre niveau et ce qu'une partie peut encore rapporter, puis un tableau des records en points de DMD dont les pages tournent toutes les six secondes, la plus pressante d'abord (partie ouverte, place à reprendre, votre classement, vos records), et qui joue en ce moment.
 - Start ouvre l'écran de l'Arène : la bande « Votre niveau », des onglets à icônes que les MagnaSave font défiler, et des cartes choisies aux flippers. En tête, l'action la plus pressante (une place qu'on vient de vous prendre, une partie instantanée qui vous attend), puis les parties ouvertes sur vos tables et ce que rapporte chaque action en XP. L'onglet Du jour ouvre les tables du jour ; les onglets Défis et Ligue arrivent dans une prochaine version.

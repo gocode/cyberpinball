@@ -96,6 +96,18 @@ export function atWordStart(t: CaretText): boolean {
 }
 
 /**
+ * Ce que rend une saisie qui se ferme : validée (OK, Entrée, Start sur OK, le téléphone), son
+ * texte, même vide ; annulée (Exit, « Annuler »), undefined. Un champ vidé puis validé est une
+ * réponse : « vide pour tout revoir » (recherche du catalogue), « vide : plus de sujet », « laissez
+ * vide pour couper le wifi ». Au 21/11/2026, il valait une annulation : la recherche d'une table ne
+ * s'effaçait plus qu'en relançant Cyber Pinball. Un appel pour qui un texte vide n'a pas de sens
+ * (un nom, un lien) le traite lui-même (`!value?.trim()`).
+ */
+export function promptAnswer(validated: boolean, text: string): string | undefined {
+  return validated ? text : undefined;
+}
+
+/**
  * Texte arrivé d'ailleurs que les touches (panneau des emojis de Windows, Win + point ; méthode
  * de saisie d'une autre langue) : une seule ligne, sans caractère de commande.
  */

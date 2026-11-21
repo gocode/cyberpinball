@@ -988,7 +988,8 @@ export function createCatalog(ctx: CatalogContext) {
     { key: 'state', name: () => t('Sur la borne'), values: CATALOG_STATES, label: (v) => CATALOG_STATE_LABELS[v as CatalogState], line: (v) => t('Sur la borne : {value}', { value: CATALOG_STATE_LABELS[v as CatalogState] }) },
   ];
   const valueOf = (key: FilterKey) => (filter[key] ?? DEFAULT_FILTER[key]) as string;
-  const isDefault = () => FILTERS.every((f) => valueOf(f.key) === DEFAULT_FILTER[f.key]);
+  // Le titre cherché compte aussi : « Effacer les filtres » le retire (21/11/2026).
+  const isDefault = () => !filter.text && FILTERS.every((f) => valueOf(f.key) === DEFAULT_FILTER[f.key]);
 
   function openFilters(at = 0): void {
     refresh = undefined;
@@ -1033,7 +1034,7 @@ export function createCatalog(ctx: CatalogContext) {
             detail: t('Tous les jeux, pas encore installés, les plus populaires d’abord'),
             icon: 'close',
             run: () => {
-              Object.assign(filter, DEFAULT_FILTER, { page: 0 });
+              Object.assign(filter, DEFAULT_FILTER, { page: 0, text: undefined });
               saveChoice();
               ctx.show(() => buildFilters(db), ctx.cursor());
             },
