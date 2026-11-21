@@ -35,6 +35,8 @@ export const PAIRS = [
   // Document interne (non publié) : vérifié quand il est là.
   { fr: 'interne/tests-manuels/tests-manuels.md', en: 'interne/tests-manuels/manual-tests.md' },
   { fr: 'docs/design-system/README.md', en: 'docs/design-system/README.en.md' },
+  // Livré avec l'exécutable du VPX corrigé (natif\vpx-corrige) et dans l'archive de ses sources.
+  { fr: 'packages/vpx-corrige/LISEZMOI.md', en: 'packages/vpx-corrige/README.md' },
 ];
 
 /**

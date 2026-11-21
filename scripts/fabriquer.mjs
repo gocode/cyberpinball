@@ -183,6 +183,25 @@ for (const name of fs.readdirSync(installerDir)) {
     console.log(`Serveur du DMD : ${path.join('natif', 'dmdserver', path.basename(exe))}`);
   }
 }
+// VPX corrigé (app/src/vpx-corrige.ts) : l'exécutable de VPX 10.8.1-5436 avec les correctifs de packages/vpx-corrige,
+// posé à la place de l'officiel avant chaque partie. Construit avec les mêmes outils ; sans eux, ou en cas d'échec,
+// l'application part sans lui et les parties gardent l'exécutable officiel. Le correctif et sa recette vont avec
+// (licence GPL de VPX : les sources des changements accompagnent le binaire).
+{
+  const { buildVpxCorrige, VPX_CORRIGE_SOURCE } = await import('./vpx-corrige.mjs');
+  try {
+    const exe = buildVpxCorrige({ quiet: true });
+    const dir = path.join(stage, 'natif', 'vpx-corrige');
+    fs.mkdirSync(path.join(dir, 'correctifs'), { recursive: true });
+    fs.copyFileSync(exe, path.join(dir, path.basename(exe)));
+    for (const f of fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs'))) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs', f), path.join(dir, 'correctifs', f));
+    for (const doc of ['LISEZMOI.md', 'README.md']) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, doc), path.join(dir, doc));
+    fs.copyFileSync(path.join(path.dirname(exe), 'LICENSE'), path.join(dir, 'LICENSE'));
+    console.log(`VPX corrigé : ${path.join('natif', 'vpx-corrige', path.basename(exe))}`);
+  } catch (error) {
+    console.log(`VPX corrigé : pas construit (${error.message}) ; les parties garderont l'exécutable officiel.`);
+  }
+}
 // koffi et son binaire natif, livré à part dans un paquet propre à la plateforme
 // (seul celui de win32-x64 est copié). Du paquet koffi, on ne garde que le
 // JavaScript chargé à l'exécution : ni sources C++, ni en-têtes, ni documentation.

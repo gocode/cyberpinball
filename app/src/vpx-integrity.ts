@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { componentPaths, layoutOf, peFileVersion, t, tLater, type DownloadManager, type Locations } from '@cyberpinball/core';
 import { checkComponentFiles, restoreComponentFiles, type ChangedComponentFile } from '@cyberpinball/installer';
 import { vpxCurrent } from './paths';
+import { vpxCorrigeSizes } from './vpx-corrige';
 
 export interface VpxFilesStatus {
   /** Dossier de la version active. */
@@ -44,7 +45,8 @@ export function vpxFilesStatus(loc: Locations): VpxFilesStatus | undefined {
   // Une version d'essai n'a pas d'archive téléchargeable à vérifier ni à remettre (distribution manuelle).
   if (!active?.entry || active.entry.distribution === 'manual') return undefined;
   const dir = componentPaths(loc.root, active.entry.installDir, active.version).version;
-  const check = checkComponentFiles(dir, active.entry);
+  // L'exécutable du VPX corrigé, posé par Cyber Pinball avant chaque partie (vpx-corrige.ts), n'est pas une modification.
+  const check = checkComponentFiles(dir, active.entry, vpxCorrigeSizes(path.join(__dirname, '..'), active.version));
   if (!check) return undefined;
   return { dir, version: active.version, ...check };
 }

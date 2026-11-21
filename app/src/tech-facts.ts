@@ -244,6 +244,8 @@ export interface TechCollectContext {
   vpxIniText(): string;
   vpxVersion(): string | undefined;
   vpxKnown(): string | undefined;
+  /** Numéro de la série de correctifs du VPX corrigé en place (vpx-corrige.ts) ; undefined : exécutable officiel. */
+  vpxPatch?(): number | undefined;
   /** Fichiers de VPX modifiés hors de Cyber Pinball (vpx-integrity.ts), décrits ; vide : d'origine. */
   vpxChangedFiles?(): string[];
   vcRuntime(): { ok: boolean; detail?: string } | undefined;
@@ -283,7 +285,7 @@ export async function collectTechFacts(ctx: TechCollectContext): Promise<TechFac
   };
   const iniText = ctx.vpxIniText();
   const software: TechFacts['software'] = {
-    vpx: { version: ctx.vpxVersion(), known: ctx.vpxKnown(), ...(ctx.vpxChangedFiles?.().length && { changedFiles: ctx.vpxChangedFiles!() }) },
+    vpx: { version: ctx.vpxVersion(), known: ctx.vpxKnown(), ...(ctx.vpxPatch?.() && { patch: ctx.vpxPatch!() }), ...(ctx.vpxChangedFiles?.().length && { changedFiles: ctx.vpxChangedFiles!() }) },
     plugins: vpxPlugins(ctx.vpxDir(), iniText),
     ...(ctx.pupPacks() !== undefined && { pupPacks: ctx.pupPacks() }),
   };

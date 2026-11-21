@@ -34,9 +34,10 @@ export interface ComponentFilesCheck {
 
 /**
  * Les fichiers du composant installé dans `dir` comparés à son archive. undefined : le manifeste ne
- * les décrit pas pour cette version (rien d'affirmé).
+ * les décrit pas pour cette version (rien d'affirmé). `accepted` : autre taille admise pour un fichier que Cyber
+ * Pinball remplace lui-même (l'exécutable du VPX corrigé, app/src/vpx-corrige.ts).
  */
-export function checkComponentFiles(dir: string, component: Pick<Component, 'files' | 'executable' | 'executablePattern'>): ComponentFilesCheck | undefined {
+export function checkComponentFiles(dir: string, component: Pick<Component, 'files' | 'executable' | 'executablePattern'>, accepted: Readonly<Record<string, number>> = {}): ComponentFilesCheck | undefined {
   if (!component.files || !Object.keys(component.files).length) return undefined;
   const changed: ChangedComponentFile[] = [];
   for (const [file, expected] of Object.entries(component.files)) {
@@ -46,7 +47,7 @@ export function checkComponentFiles(dir: string, component: Pick<Component, 'fil
     } catch {
       actual = undefined;
     }
-    if (actual !== expected) changed.push({ file, expected, ...(actual !== undefined && { actual }) });
+    if (actual !== expected && (actual === undefined || actual !== accepted[file])) changed.push({ file, expected, ...(actual !== undefined && { actual }) });
   }
   const re = new RegExp(component.executablePattern, 'i');
   let names: string[] = [];

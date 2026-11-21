@@ -400,6 +400,15 @@ if (privateRepo) {
   commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}`, source: frozen });
 }
 
+// Le VPX corrigé (packages/vpx-corrige) est un binaire de VPX modifié : ses sources complètes doivent être publiées
+// (licences de VPX). Une release à part, faite une fois par version du correctif ; sans elle, rien ne part.
+if (!privateRepo) {
+  step('Sources du VPX corrigé (licences de VPX)');
+  const { ensureVpxCorrigeSources } = await import('./vpx-corrige-sources.mjs');
+  const sources = await ensureVpxCorrigeSources({ repository, token }).catch((error) => fail(`sources du VPX corrigé : ${error.message}`));
+  console.log(`Sources : ${sources}`);
+}
+
 step(`Release v${version} sur github.com/${target}${privateRepo ? ' (essai privé)' : ''}`);
 // Anglais d'abord, puis français ; pied bilingue (scripts/page-release.mjs).
 const body = releaseBody({

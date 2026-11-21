@@ -298,6 +298,7 @@ import { onPin2dmdProbe } from './pin2dmd-probe';
 import { dofDir, knownLegacyDof, readDof, scanLegacyDof, vpxWorkDir } from './dof-files';
 import { dmdHints } from './dmd-hints';
 import { backupDir, locations } from './paths';
+import { vpxCorrigeInPlace } from './vpx-corrige';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { openPinballFxStore, zenSetup, type ZenSetup } from './pinballfx-install';
@@ -1503,6 +1504,11 @@ export function createLibrary(host: LibraryHost) {
         },
         vpxIniText: () => readTextIfExists(activeVpxIni(locations())),
         vpxVersion: () => host.vpxVersion?.(),
+        // « patched Cyber Pinball 1 » : l'exécutable en place est le VPX corrigé livré (vpx-corrige.ts).
+        vpxPatch: () => {
+          const exe = host.vpxExe();
+          return exe ? vpxCorrigeInPlace(path.dirname(exe), host.vpxVersion?.(), path.join(__dirname, '..')) : undefined;
+        },
         vpxChangedFiles: () => health.facts()?.vpx.changedFiles ?? [],
         vpxKnown: () => {
           try {

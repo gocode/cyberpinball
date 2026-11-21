@@ -559,9 +559,11 @@ function softwareBlock(f: TechFacts): TechBlock {
   const play: TechRow[] = [];
   const notes: TechBlock['notes'] = [];
   const vpx = s?.vpx;
+  // Nom du VPX corrigé, en anglais dans toutes les langues : c'est celui que VPX affiche dans son journal.
+  const vpxName = vpx?.version && vpx.patch ? `${vpx.version} patched Cyber Pinball ${vpx.patch}` : vpx?.version; // i18n-ignore : nom de version
   if (vpx?.version) {
     const newer = vpx.known && vpx.known !== vpx.version;
-    play.push({ label: t('Visual Pinball X'), value: vpx.version, detail: newer ? t('{version} disponible, facultative', { version: vpx.known! }) : undefined, state: newer ? 'info' : 'ok' });
+    play.push({ label: t('Visual Pinball X'), value: vpxName!, detail: newer ? t('{version} disponible, facultative', { version: vpx.known! }) : undefined, state: newer ? 'info' : 'ok' });
     // Le numéro vient du marqueur d'installation : des fichiers remplacés depuis (un autre VPX par-dessus) le démentent.
     if (vpx.changedFiles?.length) {
       const files = vpx.changedFiles.slice(0, 3).join(', ') + (vpx.changedFiles.length > 3 ? '…' : '');
@@ -579,7 +581,7 @@ function softwareBlock(f: TechFacts): TechBlock {
   if (others.length) play.push({ label: t('Autres plugins'), value: tn(others.filter((p) => p.enabled).length, '{n} activé', '{n} activés'), detail: others.map((p) => p.name).join(', ') });
   if (s?.roms !== undefined) play.push({ label: t('ROM'), value: tn(s.roms, '{n} ROM', '{n} ROM') });
   if (s?.pupPacks !== undefined) play.push({ label: t('PuP-Packs'), value: tn(s.pupPacks, '{n} table avec un PuP-Pack', '{n} tables avec un PuP-Pack') });
-  const essentials = [vpx?.version ? t('VPX {version}', { version: vpx.version }) : t('VPX absent'), key.length ? tn(plugins.filter((p) => p.enabled).length, '{n} plugin activé', '{n} plugins activés') : ''].filter(Boolean);
+  const essentials = [vpx?.version ? t('VPX {version}', { version: vpxName! }) : t('VPX absent'), key.length ? tn(plugins.filter((p) => p.enabled).length, '{n} plugin activé', '{n} plugins activés') : ''].filter(Boolean);
   return block('software', t('Logiciels'), 'layers', [{ rows: play }], notes, essentials);
 }
 
