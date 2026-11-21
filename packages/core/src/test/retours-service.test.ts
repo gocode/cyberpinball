@@ -21,6 +21,7 @@ import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { REPO_ROOT } from './i18n-scan';
 import { memoryD1 } from './fausse-d1';
+import { addThread, emptyThreadStore, mergeTeamReplies, newThread, openTeamReply, sealTeamReply } from '../feedback-threads';
 
 const SERVICE = path.join(REPO_ROOT, 'packages', 'service-telephone');
 const NOW = Date.UTC(2026, 10, 16, 12);
@@ -516,6 +517,51 @@ test("retours : l'administrateur relève, lit et efface les rapports", async () 
   assert.equal((await s.adminCall('GET', `/api/admin/rapports/${first}`)).status, 404);
   assert.deepEqual(((await (await s.adminCall('GET', '/api/admin/rapports')).json()) as { rapports: { id: string }[] }).rapports.map((x) => x.id), [second]);
   assert.equal((await s.adminCall('GET', '/api/admin/inconnue')).status, 404);
+});
+
+test("retours : l'équipe répond dans le fil d'un rapport, la borne seule relève et ouvre sa réponse", async () => {
+  const s = await service();
+  const { thread, answer } = newThread('report', 'Le DMD reste noir', NOW);
+  const other = newThread('crash', 'Plantage', NOW).thread;
+  const sealed = sealTeamReply({ v: 1, text: 'Merci ! Corrigé dans la prochaine version.', at: NOW }, answer);
+  const post = (fil: string, data: Uint8Array, opts?: { key?: Keys }) => s.adminCall('POST', `/api/admin/fils/${fil}`, JSON.stringify({ data: Buffer.from(data).toString('base64') }), opts);
+  // Sans la clé d'administration : refusé ; une boîte qui n'est pas une réponse « CPM1 », trop grande : refusées.
+  assert.equal((await post(thread.fil, sealed, { key: keys() })).status, 403);
+  assert.equal((await post(thread.fil, report(200))).status, 400);
+  assert.equal((await post(thread.fil, report(20_000, 'CPM1'))).status, 400);
+  assert.equal((await s.adminCall('POST', '/api/admin/fils/court', JSON.stringify({ data: '' }))).status, 404);
+  let r = await post(thread.fil, sealed);
+  assert.equal(r.status, 201);
+  const first = (await r.json()) as { id: string; at: number };
+  assert.equal(first.at, NOW);
+  // Relève : les identifiants dans le corps ; seulement les réponses après `since`, jamais celles d'un autre fil.
+  const poll = async (fils: { fil: string; since?: number }[]) => {
+    const res = await s.call('POST', '/api/fils', JSON.stringify({ fils }));
+    assert.equal(res.status, 200);
+    return ((await res.json()) as { reponses: { fil: string; id: string; at: number; data: string }[] }).reponses;
+  };
+  let got = await poll([{ fil: thread.fil, since: 0 }, { fil: other.fil, since: 0 }]);
+  assert.deepEqual(got.map((x) => [x.fil, x.id]), [[thread.fil, first.id]]);
+  assert.deepEqual(await poll([{ fil: thread.fil, since: NOW }]), []);
+  assert.equal((await s.call('GET', '/api/fils')).status, 405);
+  assert.equal((await s.call('POST', '/api/fils', JSON.stringify({ fils: [{ fil: '../x' }] }))).status, 400);
+  assert.equal((await s.call('POST', '/api/fils', JSON.stringify({ fils: Array.from({ length: 65 }, () => ({ fil: thread.fil })) }))).status, 400);
+  // La borne ouvre la réponse avec la clé du fil : non lue, comptée une fois même relevée deux fois.
+  const boxes = got.map((x) => ({ ...x, data: Buffer.from(x.data, 'base64') }));
+  let store = addThread(emptyThreadStore(), thread);
+  store = mergeTeamReplies(store, boxes).store;
+  const merged = mergeTeamReplies(store, boxes);
+  assert.equal(merged.added.length, 0);
+  assert.deepEqual(merged.store.threads[0]!.lines.map((l) => [l.from, l.text]), [['team', 'Merci ! Corrigé dans la prochaine version.']]);
+  assert.equal(merged.store.threads[0]!.unread, 1);
+  assert.equal(merged.store.threads[0]!.since, NOW);
+  // Pour un autre fil, la même boîte ne s'ouvre pas.
+  assert.equal(openTeamReply(sealed, other.key), undefined);
+  // Une réponse de plus d'un an est effacée au dépôt suivant.
+  s.state.clock += 366 * DAY;
+  r = await post(thread.fil, sealTeamReply({ v: 1, text: 'Toujours là ?', at: s.state.clock }, answer));
+  got = await poll([{ fil: thread.fil, since: 0 }]);
+  assert.deepEqual(got.map((x) => x.at), [s.state.clock]);
 });
 
 test('retours : sans base liée, 503 ; le relais du téléphone reste intact', async () => {

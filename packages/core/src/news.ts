@@ -54,6 +54,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Dialogue avec l'équipe sur un rapport (21/11/2026) ; « Sauvegardes » (0.1.7) sort de la liste
+    // pour la garder à 24. Date à poser au jour de la version finale (publier.mjs le rappelle).
+    id: 'echanges-equipe',
+    date: '2026-11-21',
+    version: '0.2.3',
+    get title() { return t('Un échange avec l’équipe'); },
+    get detail() { return t('Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.'); },
+    get more() {
+      return [
+        t('Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.'),
+        t('Vos rapports partent avec votre pseudo, ou anonymement si vous le choisissez : l’équipe peut vous répondre dans les deux cas. Tout reste chiffré entre la borne et l’équipe.'),
+      ];
+    },
+    get where() { return t('Menu système › Aide et infos › Retours et propositions › Mes échanges avec l’équipe'); },
+    reach: { kind: 'system', id: 'feedback' },
+  },
+  {
     // Refonte du Menu système (0.2.2-essai), retenue pour les Nouveautés de la 0.2.2 (20/11/2026) ;
     // la ligne « Amis, de borne à borne » (0.1.4) sort de la liste pour la garder à 24.
     id: 'menu-systeme',
@@ -426,22 +443,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Tables › Ajouter une table › Depuis une autre installation'); },
     reach: { kind: 'system', id: 'add-table' },
-  },
-  {
-    id: 'sauvegardes',
-    date: '2026-11-06',
-    version: '0.1.7',
-    get title() { return t('Sauvegardes'); },
-    get detail() { return t('Vos réglages, vos scores et vos tables copiés, puis restaurés partie par partie.'); },
-    get more() {
-      return [
-        t('Copiez vos réglages et vos scores, vos tables en plus si vous le voulez, sur un autre disque ou une clé USB. Une sauvegarde automatique peut s’en charger chaque jour ou chaque semaine.'),
-        t('Pour restaurer, un plan dit d’abord, partie par partie, ce qui sera remplacé, remis ou gardé.'),
-      ];
-    },
-    get where() { return t('Menu système › Ma borne › Santé et sauvegardes › Sauvegardes'); },
-    reach: { kind: 'system', id: 'backups' },
-    preview: true,
   },
 ];
 

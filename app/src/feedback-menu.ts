@@ -131,6 +131,15 @@ export interface FeedbackMenuContext {
   openReportContents?(back: () => void): void;
   /** La ligne discrète « Nous suivre » (follow-menu.ts), Retour revenant ici. */
   follow?(back: () => void): Action;
+  /**
+   * Les fils avec l'équipe (team-threads.ts) : chaque rapport qui part en ouvre un, où l'équipe peut
+   * répondre ; son enveloppe reçoit le fil, sa clé de réponse et le pseudo (sauf anonymat).
+   */
+  threads?: { stamp(envelope: ReportEnvelope, title: string): ReportEnvelope };
+  /** La ligne « Mes échanges avec l'équipe » (team-threads-menu.ts), Retour revenant ici. */
+  threadsEntry?(back: () => void): Action;
+  /** Le pseudo du joueur, dit sur les écrans d'envoi (« Avec votre pseudo Pilote »). */
+  who?(): FeedbackPerson | undefined;
   log(line: string): void;
 }
 
@@ -201,6 +210,38 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
 
   const consentLabel = (c: CrashConsent) => (c === 'yes' ? t('Oui') : c === 'no' ? t('Non') : t('Demander au prochain plantage'));
 
+  // ---------- Pseudo ou anonymat, et le fil de chaque rapport ----------
+
+  function setAnonymous(on: boolean): void {
+    state = { ...state, anonymous: on };
+    save();
+    ctx.log(`Retours : rapports ${on ? 'anonymes' : 'avec le pseudo'}.`); // i18n-ignore : journal
+  }
+
+  /** Le rapport qui part : son fil ouvert, le pseudo joint sauf anonymat (team-threads.ts). */
+  const stamped = (envelope: ReportEnvelope, title: string): ReportEnvelope => (ctx.threads ? ctx.threads.stamp(envelope, title) : envelope);
+
+  /**
+   * « Envoyé avec votre pseudo / anonymement », changé d'un appui et retenu pour les rapports suivants
+   * (plantages automatiques compris). Dans les deux cas, l'équipe peut répondre.
+   */
+  function signatureAction(reopen: () => void): Action {
+    const name = ctx.who?.()?.name;
+    return {
+      label: t('Envoyé'),
+      detail: state.anonymous ? t('Anonymement · l’équipe peut quand même vous répondre') : name ? t('Avec votre pseudo, {name} · l’équipe pourra vous répondre', { name }) : t('Avec votre pseudo · l’équipe pourra vous répondre'),
+      icon: state.anonymous ? 'lock' : 'account',
+      key: 'feedback:anonymous',
+      run: () => {
+        setAnonymous(!state.anonymous);
+        reopen();
+      },
+    };
+  }
+
+  /** La ligne de l'écran « Merci » : la réponse de l'équipe arrivera dans les messages. */
+  const answerRow = (): Row => ({ icon: 'message', text: t('L’équipe peut vous répondre'), detail: t('Sa réponse arrivera avec une notification, dans vos messages en attente et dans « Mes échanges avec l’équipe »'), tone: 'info' });
+
   // ---------- L'accueil : le tableau des propositions ----------
 
   function open(back: () => void = () => ctx.openSystem()): void {
@@ -222,6 +263,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       });
       actions.push({ label: t('Proposer une idée'), detail: t('Amélioration ou nouvelle fonction · publique, les autres joueurs votent'), icon: 'plus', tone: 'ok', key: 'feedback:idea', run: () => openForm({ kind: 'feature', title: '', text: '', attach: false, context: {}, files: [] }, self) });
       actions.push({ label: t('Signaler un problème'), detail: t('Ce qui ne marche pas · rapport technique joint, lu par l’équipe seule'), icon: 'alert', key: 'feedback:bug', run: () => openForm({ kind: 'bug', title: '', text: '', attach: true, context: {}, files: [] }, self) });
+      if (ctx.threadsEntry) actions.push(ctx.threadsEntry(self));
       actions.push({
         label: t('Rapports de plantage automatiques'),
         detail: consentLabel(state.crashes),
@@ -482,6 +524,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         run: () => ((draft.attach = !draft.attach), self()),
       });
       if (draft.attach && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'feedback:contents', run: () => ctx.openReportContents!(self) });
+      if (ctx.threads) actions.push(signatureAction(self));
       const filesSection = attachmentsUi(draft, self, actions);
       const ready = Boolean(title) && !draft.sending;
       const why = draft.sending ? t('Envoi en cours…') : !title ? t('Indisponible : écrivez d’abord un titre ({min} caractères au moins)', { min: PROPOSAL_TITLE_MIN }) : !ctx.service.canWrite() ? t('Indisponible : la borne n’a pas encore sa clé de joueur') : undefined;
@@ -558,7 +601,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       const { file, dropped } = reportFile((files) => ctx.techReport(body, files), draft.attach, draft.files);
       const env = envelope(draft, id);
       if (dropped) env.text = `${env.text ?? ''}\n[rapport technique trop lourd avec les pièces jointes, retiré]`.trim(); // i18n-ignore : lu par l'équipe
-      report = await ctx.service.sendReport(env, file);
+      report = await ctx.service.sendReport(stamped(env, draft.title || draft.context.about || draft.text.split('\n')[0] || PROPOSAL_KIND_VIEW[draft.kind].label), file);
     }
     draft.sending = false;
     openSent(draft, published, report, id, back);
@@ -572,6 +615,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     if (report === 'sent') rows.push({ icon: 'lock', text: draft.attach ? t('Rapport technique envoyé à l’équipe') : t('Message envoyé à l’équipe'), detail: draft.files.length ? tn(draft.files.length, 'Chiffré, avec {n} fichier joint : seule l’équipe peut le lire', 'Chiffré, avec {n} fichiers joints : seule l’équipe peut le lire') : t('Chiffré : seule l’équipe peut le lire'), tone: 'ok', badges: [t('✓ Envoyé')] });
     else if (report === 'queued') rows.push({ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] });
     else if (report === 'failed') rows.push({ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' });
+    if (ctx.threads && (report === 'sent' || report === 'queued')) rows.push(answerRow());
     const home = () => open(back);
     const thanks = (): Built => ({
       heading: t('Merci !'),
@@ -610,7 +654,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     if (!crashDue(state, signature)) return 'known';
     state = noteCrashSent(state, signature);
     save();
-    void ctx.service.sendReport({ v: 1, kind: 'crash', signature, text: about, ...(table ? { table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() }, ctx.techReport(about));
+    void ctx.service.sendReport(stamped({ v: 1, kind: 'crash', signature, text: about, ...(table ? { table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() }, about), ctx.techReport(about));
     return 'sent';
   }
 
@@ -635,7 +679,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       // les fichiers joints, si.
       const { file, dropped } = reportFile((files) => ctx.techReport(body, files), !report.notified, box.files);
       const envelope: ReportEnvelope = { v: 1, kind: 'report', signature: report.signature, text: dropped ? `${body}\n[rapport technique trop lourd avec les pièces jointes, retiré]` : body, ...(report.table ? { table: report.table } : {}), version: ctx.version, lang: ctx.language(), borne: state.borne, at: Date.now() }; // i18n-ignore : lu par l'équipe
-      result = await ctx.service.sendReport(envelope, file);
+      result = await ctx.service.sendReport(stamped(envelope, report.about), file);
       sending = false;
       // Envoyé à la main : un « Oui » à la question des rapports automatiques ne le renvoie pas aujourd'hui.
       if (result !== 'failed') {
@@ -654,12 +698,13 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
             ...(findings.length ? [{ icon: 'list' as const, text: t('Le diagnostic de la table'), detail: findings.slice(0, 3).join(' · ') + (findings.length > 3 ? ' …' : '') }] : []),
             { icon: 'report', text: t('La fiche technique, la santé de la borne et les journaux'), detail: t('Ce qu’envoie « Envoyer un rapport » de la fiche technique') },
           ];
-      what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
+      what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: ctx.threads && !state.anonymous ? t('Votre pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis') : t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
       const sections: Built['sections'] = [{ rows: head }];
       if (result === 'sent') sections.push({ rows: [{ icon: 'check', text: t('Rapport envoyé aux développeurs'), detail: box.files.length ? tn(box.files.length, 'Chiffré, avec {n} fichier joint : seuls les développeurs peuvent le lire. Ils vont l’examiner.', 'Chiffré, avec {n} fichiers joints : seuls les développeurs peuvent le lire. Ils vont l’examiner.') : t('Chiffré : seuls les développeurs peuvent le lire. Ils vont l’examiner.'), tone: 'ok', badges: [t('✓ Envoyé')] }] });
       else if (result === 'queued') sections.push({ rows: [{ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] }] });
       else if (result === 'failed') sections.push({ rows: [{ icon: 'alert', text: t('Rapport non envoyé'), detail: t('Écriture impossible dans les données de la borne'), tone: 'error' }] });
       else sections.push({ title: t('Ce qui part'), rows: what });
+      if (ctx.threads && (result === 'sent' || result === 'queued')) sections.push({ rows: [answerRow()] });
       const actions: Action[] = [];
       if (result === 'sent' || result === 'queued') {
         actions.push({ label: t('Retour'), icon: 'back', tone: 'ok', run: back });
@@ -690,6 +735,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         const filesSection = attachmentsUi(box, () => show(build), actions);
         if (filesSection) sections.push(filesSection);
         if (!report.notified && ctx.openReportContents) actions.push({ label: t('Voir le contenu du rapport'), icon: 'eye', key: 'devreport:contents', run: () => ctx.openReportContents!(() => show(build)) });
+        if (ctx.threads) actions.push(signatureAction(() => show(build)));
         actions.push({ label: t('Retour'), icon: 'back', run: back });
       }
       return {
@@ -723,7 +769,12 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           title: t('Ce qui part'),
           rows: [
             { icon: 'report', text: t('La fiche technique, la santé de la borne et les journaux'), detail: t('Ce qu’envoie « Envoyer un rapport » de la fiche technique') },
-            { icon: 'lock', text: t('Chiffré pour l’équipe, anonymisé'), detail: t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus'), tone: 'info' },
+            {
+              icon: 'lock',
+              text: t('Chiffré pour l’équipe, anonymisé'),
+              detail: ctx.threads && !state.anonymous ? t('Votre pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus') : t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus'),
+              tone: 'info',
+            },
           ],
         },
       ],
@@ -747,6 +798,11 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     /** « Envoyer un rapport aux développeurs » : écran d'une partie échouée, Diagnostic d'une table. */
     openSendReport,
     consent: () => state.crashes,
+    /** Rapports anonymes (choix retenu) : lu par les fils avec l'équipe, changé aussi depuis leur liste. */
+    anonymous: () => state.anonymous,
+    setAnonymous,
+    /** Le numéro de borne des rapports. */
+    borne: () => state.borne,
     detail: () => {
       const n = ctx.service.list().length;
       return n ? tn(n, 'Votez et proposez · {n} proposition', 'Votez et proposez · {n} propositions') : t('Votez pour les idées des joueurs, proposez les vôtres, signalez un problème');

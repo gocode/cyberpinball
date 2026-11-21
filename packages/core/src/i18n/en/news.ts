@@ -5,6 +5,13 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
+  'Un échange avec l’équipe': 'A conversation with the team',
+  'Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.': 'Send a report: the team replies on your cabinet, and you can reply back.',
+  'Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.':
+    'Every report, automatic crash reports included, opens a conversation. The team’s reply comes with a notification, in your waiting messages.',
+  'Vos rapports partent avec votre pseudo, ou anonymement si vous le choisissez : l’équipe peut vous répondre dans les deux cas. Tout reste chiffré entre la borne et l’équipe.':
+    'Your reports go with your nickname, or anonymously if you choose: the team can reply either way. Everything stays encrypted between the cabinet and the team.',
+  'Menu système › Aide et infos › Retours et propositions › Mes échanges avec l’équipe': 'System menu › Help and info › Feedback and ideas › My conversations with the team',
   'Le Menu système, plus court': 'A shorter System menu',
   'Huit lignes au plus par écran, rangées dans l’ordre où l’on s’en sert.': 'Eight lines at most per screen, in the order you use them.',
   'Huit rubriques dans l’ordre de l’usage : Tables, Ma borne, Téléchargements, Activité récente, Communauté, Juke-box, Aide et infos, Quitter ou éteindre. Aucun écran n’a plus de huit lignes.':
@@ -161,11 +168,6 @@ export const messages: Record<string, string> = {
   'Les copies et anciennes versions restent à part ; rien n’est déplacé sans votre accord.': 'Copies and old versions stay apart; nothing is moved without your agreement.',
   'Menu système › Tables › Ajouter une table › Depuis une autre installation': 'System menu › Tables › Add a table › From another installation',
 
-  'Vos réglages, vos scores et vos tables copiés, puis restaurés partie par partie.': 'Your settings, your scores and your tables copied, then restored part by part.',
-  'Copiez vos réglages et vos scores, vos tables en plus si vous le voulez, sur un autre disque ou une clé USB. Une sauvegarde automatique peut s’en charger chaque jour ou chaque semaine.':
-    'Copy your settings and scores, and your tables too if you like, to another drive or a USB stick. An automatic backup can do it every day or every week.',
-  'Pour restaurer, un plan dit d’abord, partie par partie, ce qui sera remplacé, remis ou gardé.': 'To restore, a plan first says, part by part, what will be replaced, put back or kept.',
-  'Menu système › Ma borne › Santé et sauvegardes › Sauvegardes': 'System menu › My cabinet › Health and backups › Backups',
 
   // app/src/news-menu.ts : l'écran
   'Les grandes nouveautés de Cyber Pinball, une ligne chacune': 'The big new things in Cyber Pinball, one line each',

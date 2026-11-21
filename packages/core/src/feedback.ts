@@ -356,8 +356,11 @@ export function similarProposals<P extends Proposal>(text: string, list: readonl
 /** Ce qui accompagne le fichier d'un rapport, scellé avec lui. */
 export interface ReportEnvelope {
   v: 1;
-  /** Plantage envoyé seul, ou rapport fait par le joueur (formulaire, fiche technique). */
-  kind: 'crash' | 'report';
+  /**
+   * Plantage envoyé seul, rapport fait par le joueur (formulaire, fiche technique), ou message du
+   * joueur dans un fil ouvert avec l'équipe (feedback-threads.ts, `fil` obligatoire).
+   */
+  kind: 'crash' | 'report' | 'message';
   /** Plantage : sa signature (« vpx:0xC0000005:<table> »), pour regrouper. */
   signature?: string;
   /** Ce que le joueur a écrit, s'il a écrit. */
@@ -370,19 +373,63 @@ export interface ReportEnvelope {
   /** Identifiant tiré au hasard à la première utilisation : regroupe les rapports d'une même borne, sans rien dire d'elle. */
   borne: string;
   at: number;
+  /**
+   * Le fil de ce rapport (feedback-threads.ts, 21/11/2026) : l'équipe y répond ; le joueur y écrit
+   * ensuite (kind 'message'). Tiré au hasard par la borne, il ne dit rien d'elle.
+   */
+  fil?: string;
+  /** Clé publique X25519 (hexadécimal) du fil : les réponses de l'équipe sont scellées pour elle. */
+  answer?: string;
+  /** Pseudo et pays du joueur ; absent quand il a choisi d'envoyer ses rapports anonymement. */
+  who?: FeedbackPerson;
 }
 
-function x25519Public(hex: string): crypto.KeyObject {
+export function x25519Public(hex: string): crypto.KeyObject {
   return crypto.createPublicKey({ key: { kty: 'OKP', crv: 'X25519', x: Buffer.from(hex, 'hex').toString('base64url') }, format: 'jwk' });
 }
 
-function rawPublic(key: crypto.KeyObject): Buffer {
+export function rawPublic(key: crypto.KeyObject): Buffer {
   return Buffer.from(key.export({ format: 'jwk' }).x!, 'base64url');
 }
 
-function boxKey(shared: Buffer, epk: Buffer, rpk: Buffer): Buffer {
-  return crypto.createHash('sha256').update(Buffer.from('cyberpinball:rapport:v1')).update(shared).update(epk).update(rpk).digest();
+function boxKey(label: string, shared: Buffer, epk: Buffer, rpk: Buffer): Buffer {
+  return crypto.createHash('sha256').update(Buffer.from(label)).update(shared).update(epk).update(rpk).digest();
 }
+
+/**
+ * Boîte scellée pour une clé X25519 : en-tête (4 octets ASCII) | clé éphémère (32) | nonce (12) |
+ * étiquette (16) | chiffré. `label` sépare les usages (rapport, réponse de l'équipe) : une boîte faite
+ * pour l'un ne s'ouvre pas pour l'autre.
+ */
+export function sealBox(magic: string, label: string, plain: Uint8Array, recipient: string): Buffer {
+  const rpk = x25519Public(recipient);
+  const eph = crypto.generateKeyPairSync('x25519');
+  const epk = rawPublic(eph.publicKey);
+  const key = boxKey(label, crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: rpk }), epk, Buffer.from(recipient, 'hex'));
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([Buffer.from(magic, 'ascii'), epk, iv, cipher.getAuthTag(), body]);
+}
+
+/** Ouvre une boîte de sealBox avec la clé privée (PEM PKCS #8, X25519) ; undefined si elle n'est pas pour elle. */
+export function openBox(magic: string, label: string, sealed: Uint8Array, privatePem: string): Buffer | undefined {
+  const box = Buffer.from(sealed);
+  if (box.length < 64 || box.subarray(0, 4).toString('ascii') !== magic) return undefined;
+  try {
+    const priv = crypto.createPrivateKey(privatePem);
+    const rpk = rawPublic(crypto.createPublicKey(priv));
+    const epk = box.subarray(4, 36);
+    const key = boxKey(label, crypto.diffieHellman({ privateKey: priv, publicKey: x25519Public(epk.toString('hex')) }), epk, rpk);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, box.subarray(36, 48));
+    decipher.setAuthTag(box.subarray(48, 64));
+    return Buffer.concat([decipher.update(box.subarray(64)), decipher.final()]);
+  } catch {
+    return undefined;
+  }
+}
+
+const REPORT_LABEL = 'cyberpinball:rapport:v1';
 
 /**
  * Scelle un rapport : CPR1 | clé éphémère (32) | nonce (12) | étiquette (16) | chiffré. Le clair :
@@ -392,29 +439,14 @@ export function sealReport(envelope: ReportEnvelope, file: Uint8Array | undefine
   const head = Buffer.from(JSON.stringify(envelope), 'utf8');
   const len = Buffer.alloc(4);
   len.writeUInt32BE(head.length);
-  const plain = Buffer.concat([len, head, file ? Buffer.from(file) : Buffer.alloc(0)]);
-  const rpk = x25519Public(recipient);
-  const eph = crypto.generateKeyPairSync('x25519');
-  const epk = rawPublic(eph.publicKey);
-  const key = boxKey(crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: rpk }), epk, Buffer.from(recipient, 'hex'));
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const body = Buffer.concat([cipher.update(plain), cipher.final()]);
-  return Buffer.concat([Buffer.from(REPORT_MAGIC, 'ascii'), epk, iv, cipher.getAuthTag(), body]);
+  return sealBox(REPORT_MAGIC, REPORT_LABEL, Buffer.concat([len, head, file ? Buffer.from(file) : Buffer.alloc(0)]), recipient);
 }
 
 /** Ouvre un rapport scellé avec la clé privée « retours » (PEM PKCS #8, X25519) ; undefined s'il n'est pas pour elle. */
 export function openSealedReport(sealed: Uint8Array, privatePem: string): { envelope: ReportEnvelope; file?: Buffer } | undefined {
-  const box = Buffer.from(sealed);
-  if (box.length < 64 || box.subarray(0, 4).toString('ascii') !== REPORT_MAGIC) return undefined;
+  const plain = openBox(REPORT_MAGIC, REPORT_LABEL, sealed, privatePem);
+  if (!plain) return undefined;
   try {
-    const priv = crypto.createPrivateKey(privatePem);
-    const rpk = rawPublic(crypto.createPublicKey(priv));
-    const epk = box.subarray(4, 36);
-    const key = boxKey(crypto.diffieHellman({ privateKey: priv, publicKey: x25519Public(epk.toString('hex')) }), epk, rpk);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, box.subarray(36, 48));
-    decipher.setAuthTag(box.subarray(48, 64));
-    const plain = Buffer.concat([decipher.update(box.subarray(64)), decipher.final()]);
     const n = plain.readUInt32BE(0);
     const envelope = JSON.parse(plain.subarray(4, 4 + n).toString('utf8')) as ReportEnvelope;
     const file = plain.subarray(4 + n);
@@ -436,13 +468,18 @@ export interface FeedbackState {
   borne: string;
   /** Dernier envoi de chaque plantage (sa signature) : un même plantage part une fois par jour. */
   sent: Record<string, number>;
+  /**
+   * Rapports envoyés sans le pseudo du joueur (choix retenu, 21/11/2026). Par défaut, le pseudo et le
+   * pays partent avec : l'équipe sait à qui elle répond. Anonymes, l'équipe peut quand même répondre.
+   */
+  anonymous: boolean;
 }
 
 export const FEEDBACK_FILE = 'retours.json';
 export const CRASH_RESEND_MS = 24 * 3600_000;
 
 export function newFeedbackState(): FeedbackState {
-  return { crashes: 'ask', borne: crypto.randomBytes(9).toString('base64url'), sent: {} };
+  return { crashes: 'ask', borne: crypto.randomBytes(9).toString('base64url'), sent: {}, anonymous: false };
 }
 
 /**
@@ -462,6 +499,7 @@ export function loadFeedbackState(dataDir: string): FeedbackState {
     crashes: raw.crashes === 'yes' || raw.crashes === 'no' ? raw.crashes : 'ask',
     borne: kept ?? newFeedbackState().borne,
     sent: raw.sent && typeof raw.sent === 'object' ? Object.fromEntries(Object.entries(raw.sent).filter(([, v]) => typeof v === 'number')) : {},
+    anonymous: raw.anonymous === true,
   };
   if (!kept) {
     try {

@@ -57,6 +57,8 @@ import { type HealthView } from './health';
 import { type DisplayLinkFacts } from './tech-facts';
 import { type ReportFriend } from './tech-sheet';
 import type { FeedbackService } from './feedback-service';
+import type { TeamThreads } from './team-threads';
+import type { FeedbackPerson } from '@cyberpinball/core';
 
 export interface LibraryHost {
   /** Musique tirée des ROM (rom-music.ts) : repli de la musique du jeu, et source « Musique de la ROM ». */
@@ -75,6 +77,10 @@ export interface LibraryHost {
   reportNames?(): string[];
   /** Le service des retours (feedback-service.ts) : propositions, votes, rapports privés. */
   feedbackService?: FeedbackService;
+  /** Les fils avec l'équipe (team-threads.ts) : chaque rapport en ouvre un, l'équipe y répond. */
+  teamThreads?: TeamThreads;
+  /** Le pseudo et le pays du joueur (écrans d'envoi des rapports). */
+  feedbackWho?(): FeedbackPerson | undefined;
   /** Lecteurs de la borne (clés USB pour le rapport). */
   listDrives?(): Promise<DriveInfo[]>;
   ejectDrive?(drive: DriveInfo): Promise<boolean>;
@@ -268,6 +274,8 @@ export type UiAction =
   | { type: 'messages' }
   /** Pastille des messages en attente (coin d'état) : l'écran Messages en attente (inbox-menu.ts). */
   | { type: 'inbox' }
+  /** Notification d'une réponse de l'équipe : l'échange qui l'attend (team-threads-menu.ts). */
+  | { type: 'team-threads' }
   /** Notification d'un « J'aime » : Mon profil public (profile-menu.ts). */
   | { type: 'my-profile' }
   /** Carte du joueur du coin d'état : Mon niveau (level-menu.ts) ; pastille des badges : Mes badges. */

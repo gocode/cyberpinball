@@ -24,6 +24,7 @@ export function fakeFeedbackService(over?: Partial<FeedbackService>): FeedbackSe
         react: async () => ({ ok: false, why: 'offline' }),
       },
       sendReport: async () => 'failed',
+      replies: async () => [],
       queuedCount: () => 0,
       flush: async () => undefined,
       watch: noop,

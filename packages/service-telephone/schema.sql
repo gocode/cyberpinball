@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS rapports (
 );
 CREATE INDEX IF NOT EXISTS rapports_at ON rapports (at);
 
+-- Réponses de l'équipe dans le fil d'un rapport (21/11/2026) : des boîtes scellées « CPM1 » pour la clé
+-- de réponse du fil, que seule la borne qui a envoyé le rapport peut ouvrir. `fil` : identifiant tiré
+-- au hasard par la borne, connu seulement d'elle et de l'équipe. Gardées un an.
+CREATE TABLE IF NOT EXISTS reponses (
+  id TEXT PRIMARY KEY,
+  fil TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  data BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reponses_fil ON reponses (fil, at);
+CREATE INDEX IF NOT EXISTS reponses_at ON reponses (at);
+
 -- Signatures déjà reçues (clé publique ou « admin », date signée), gardées vingt minutes : un rejeu est refusé.
 CREATE TABLE IF NOT EXISTS signatures (
   pk TEXT NOT NULL,

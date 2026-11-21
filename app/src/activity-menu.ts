@@ -99,7 +99,8 @@ export interface ActivityMenuHost {
   log?: (line: string) => void;
 }
 
-export type MessageKind = 'friend-message' | 'group-message' | 'room-mention';
+/** `team-message` : une réponse de l'équipe dans le fil d'un rapport ou d'une proposition (team-threads.ts). */
+export type MessageKind = 'friend-message' | 'group-message' | 'room-mention' | 'team-message';
 
 export interface ActivityMenu {
   /**
@@ -229,7 +230,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
       if (e.read || !ACTIVITY_MESSAGE_KINDS.has(e.kind)) continue;
       const thread = activityThread(e);
       // Une mention dans un groupe se lit avec la discussion du groupe.
-      const kind = (e.kind === 'group-mention' ? 'group-message' : e.kind) as MessageKind;
+      const kind = (e.kind === 'group-mention' ? 'group-message' : e.kind) as Exclude<MessageKind, 'team-message'>;
       if (thread !== undefined && host.threads.pending(kind, thread) === 0) changed = markThreadRead(log, kind, thread) || changed;
     }
     if (changed) save();

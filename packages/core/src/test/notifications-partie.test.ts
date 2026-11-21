@@ -561,7 +561,7 @@ test('partout : pendant la partie entre amis, sa bande garde ce qu’elle montre
 
 test('règles : ce qui se montre partout, et son son ; les sons des notifications sonnent pendant la partie', () => {
   const away = (Object.keys(NOTICE_RULES) as NoticeKind[]).filter((k) => NOTICE_RULES[k].away);
-  assert.deepEqual(away.sort(), ['friend-message', 'friend-online', 'group-mention', 'group-message', 'live-accepted', 'live-cancelled', 'live-declined', 'live-finished', 'live-invite', 'live-invite-ended', 'live-joined', 'live-left', 'program-open', 'room-mention']);
+  assert.deepEqual(away.sort(), ['friend-message', 'friend-online', 'group-mention', 'group-message', 'live-accepted', 'live-cancelled', 'live-declined', 'live-finished', 'live-invite', 'live-invite-ended', 'live-joined', 'live-left', 'program-open', 'room-mention', 'team-reply']);
   assert.equal(NOTICE_RULES['friend-online'].sound, 'friend');
   // Un message d'un ami : partout, par-dessus VPX compris (messagerie), avec le son des nouvelles.
   assert.equal(NOTICE_RULES['friend-message'].sound, 'news');

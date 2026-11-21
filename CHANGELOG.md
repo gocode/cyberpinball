@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Échange avec l'équipe : chaque rapport (écrit, envoyé aux développeurs ou plantage automatique) ouvre un échange. La réponse de l'équipe arrive sur la borne avec une notification et dans les messages en attente, et le joueur peut y répondre ; tout reste chiffré entre la borne et l'équipe (Menu système > Aide et infos > Retours et propositions > Mes échanges avec l'équipe).
+- Une réponse de l'équipe sur l'une de vos propositions publiques vous est aussi annoncée, et vous pouvez lui répondre en privé.
+- Vos rapports partent désormais avec votre pseudo, pour que l'équipe sache à qui elle répond ; vous pouvez choisir de les envoyer anonymement (réglage retenu), l'équipe peut alors quand même vous répondre.
 - Mises à jour : la borne cherche une nouvelle version toutes les 30 minutes (au lieu de 6 heures), et aussi au réveil du PC et au retour d'une partie. La pastille rouge paraît peu après une publication, sans ouvrir « Mise à jour de Cyber Pinball ».
 - Écran « Mise à jour de Cyber Pinball » : quand la recherche trouve une version, son retour mène bien à l'écran d'où l'on venait (Activité récente, par exemple), et non plus à « Aide et infos ».
 - Diagnostic d'une table : un fronton aux proportions différentes de son écran n'est plus décrit avec des « bandes noires » et un écran en partie inutilisé. Il est étiré à tout l'écran, comme pendant la partie, et le diagnostic dit de combien l'image est déformée. Le DMD et le topper, eux, gardent leurs bandes noires.

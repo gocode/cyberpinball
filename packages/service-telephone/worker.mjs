@@ -26,6 +26,11 @@
 //      date, sans auteur, et seulement les plus récentes.
 //    L'administrateur (requêtes /api/admin/…, signées par ADMIN_PUBLIC_KEY) masque, change le statut,
 //    répond, fusionne les doublons, et relève les rapports.
+//    Dialogue sur un rapport (21/11/2026, packages/core/src/feedback-threads.ts) : chaque rapport porte,
+//    scellé, l'identifiant d'un fil et une clé publique de réponse. L'administrateur dépose sa réponse,
+//    scellée pour cette clé (POST /api/admin/fils/<fil>) ; la borne relève ses fils (POST /api/fils,
+//    les identifiants dans le corps, jamais dans l'adresse). Le service ne garde que des boîtes « CPM1 »
+//    qu'il ne peut pas lire, un an au plus ; le joueur répond par un nouveau rapport scellé.
 //    Les réactions aux Nouveautés du front-end : GET /api/nouveautes rend les totaux de chaque
 //    nouveauté (et la mienne si `pk` est donné) ; POST /api/nouveautes pose, change ou retire ma
 //    réaction, signée comme un vote, une par borne et par nouveauté.
@@ -175,6 +180,15 @@ export const REPORT_MAX = 1_900_000;
 export const REPORTS_KEPT = 2000;
 export const REPORTS_BYTES_MAX = 400_000_000;
 export const PROPOSALS_PER_DAY = 5;
+/** Identifiant d'un fil (THREAD_ID_RE, feedback-threads.ts). */
+export const FIL = /^[A-Za-z0-9_-]{22}$/;
+/** Réponse scellée de l'équipe, en octets (TEAM_REPLY_SEALED_MAX). */
+export const TEAM_REPLY_MAX = 16_384;
+/** Fils relevés en une requête (THREAD_POLL_MAX), réponses rendues au plus. */
+export const FILS_MAX = 64;
+export const REPLIES_LIST_MAX = 300;
+/** Une réponse est gardée un an. */
+export const REPLIES_KEPT_MS = 365 * 86_400_000;
 /** Taille du texte signé `b` d'une borne, en octets UTF-8. */
 export const SIGNED_MAX = 8192;
 /** Propositions rendues par la liste publique. */
@@ -747,6 +761,57 @@ async function report(request, env, now) {
   return reply(201, { id });
 }
 
+/**
+ * Relève des fils d'une borne : { fils: [{ fil, since }] } → les réponses de l'équipe arrivées après
+ * `since` (date du service), scellées. Sans signature : un fil ne se connaît que par son rapport.
+ */
+async function listReplies(request, env) {
+  const text = await boundedText(request, 8192);
+  if (text === undefined) return reply(413, { erreur: 'taille' });
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return reply(400, { erreur: 'forme' });
+  }
+  const asked = Array.isArray(body?.fils) ? body.fils : undefined;
+  if (!asked || asked.length > FILS_MAX || !asked.every((x) => x && typeof x.fil === 'string' && FIL.test(x.fil) && Number.isSafeInteger(x.since ?? 0))) return reply(400, { erreur: 'forme' });
+  if (!asked.length) return reply(200, { reponses: [] });
+  const db = env.RETOURS;
+  const out = [];
+  // Une requête par lot de fils : D1 borne le nombre de paramètres liés.
+  for (let i = 0; i < asked.length && out.length < REPLIES_LIST_MAX; i += 16) {
+    const part = asked.slice(i, i + 16);
+    const where = part.map((_, j) => `(fil = ?${2 * j + 1} AND at > ?${2 * j + 2})`).join(' OR ');
+    const { results } = await db
+      .prepare(`SELECT fil, id, at, data FROM reponses WHERE ${where} ORDER BY at ASC LIMIT ${REPLIES_LIST_MAX}`)
+      .bind(...part.flatMap((x) => [x.fil, x.since ?? 0]))
+      .all();
+    for (const r of results) out.push({ fil: r.fil, id: r.id, at: r.at, data: toB64(new Uint8Array(r.data)) });
+  }
+  return reply(200, { reponses: out.slice(0, REPLIES_LIST_MAX) });
+}
+
+/** L'administrateur dépose une réponse scellée dans un fil : { data } (base64 d'une boîte « CPM1 »). */
+async function adminReply(env, fil, raw, date, now) {
+  let body;
+  try {
+    body = JSON.parse(new TextDecoder().decode(raw));
+  } catch {
+    return reply(400, { erreur: 'forme' });
+  }
+  const data = fromB64(body?.data);
+  if (!data || data.length < REPORT_MIN || data.length > TEAM_REPLY_MAX || String.fromCharCode(...data.subarray(0, 4)) !== 'CPM1') return reply(400, { erreur: 'forme' });
+  const db = env.RETOURS;
+  const id = newId();
+  const refused = await writeOnce(db, 'admin', date, [
+    ...markSeen(db, 'admin', date, now),
+    db.prepare('INSERT INTO reponses (id, fil, at, data) VALUES (?1, ?2, ?3, ?4)').bind(id, fil, now, data),
+    db.prepare('DELETE FROM reponses WHERE at < ?1').bind(now - REPLIES_KEPT_MS),
+  ]);
+  return refused ?? reply(201, { id, at: now });
+}
+
 /** Vérifie la signature d'administration (en-têtes X-Retours-Date et X-Retours-Signature) ; rend la raison d'un refus. */
 export async function verifyAdmin(request, env, raw, now) {
   const date = request.headers.get('X-Retours-Date') ?? '';
@@ -854,6 +919,8 @@ async function admin(request, env, url, now, ctx) {
   if (backers) return request.method === 'GET' ? supporters(db, backers[1], { admin: true }) : reply(405, { erreur: 'méthode' });
   const edit = /^propositions\/([A-Za-z0-9_-]{10})$/.exec(route);
   if (edit) return request.method === 'POST' ? adminEdit(env, edit[1], raw, date, now, ctx) : reply(405, { erreur: 'méthode' });
+  const fil = /^fils\/([A-Za-z0-9_-]{22})$/.exec(route);
+  if (fil) return request.method === 'POST' ? adminReply(env, fil[1], raw, date, now) : reply(405, { erreur: 'méthode' });
   if (route === 'rapports') {
     if (request.method !== 'GET') return reply(405, { erreur: 'méthode' });
     const { results } = await db.prepare('SELECT id, at, size FROM rapports ORDER BY at DESC, rowid DESC').all();
@@ -1015,7 +1082,7 @@ async function coffre(request, env, url, now) {
 /** Les routes des retours (/api/propositions, /api/soutiens, /api/votes, /api/rapports, /api/admin/…) ; undefined pour les autres. */
 async function retours(request, env, url, now, ctx) {
   const path = url.pathname;
-  const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/noms' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
+  const known = path === '/api/propositions' || path === '/api/soutiens' || path === '/api/noms' || path === '/api/votes' || path === '/api/oubli' || path === '/api/rapports' || path === '/api/fils' || path === '/api/nouveautes' || path.startsWith('/api/admin/');
   if (!known) return undefined;
   if (!env.RETOURS) return reply(503, { erreur: 'indisponible' });
   try {
@@ -1032,6 +1099,7 @@ async function retours(request, env, url, now, ctx) {
     if (request.method !== 'POST') return reply(405, { erreur: 'méthode' });
     if (path === '/api/oubli') return await forget(request, env, now);
     if (path === '/api/noms') return await rename(request, env, now);
+    if (path === '/api/fils') return await listReplies(request, env);
     return path === '/api/votes' ? await vote(request, env, now) : await report(request, env, now);
   } catch {
     // Rien n'est journalisé : ni la requête, ni l'erreur (qui pourrait citer un contenu).

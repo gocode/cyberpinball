@@ -70,7 +70,7 @@ export function inboxOrder(threads: readonly InboxThread[]): InboxThread[] {
   return threads.filter((x) => x.unread > 0).sort((a, b) => Number(!!a.muted) - Number(!!b.muted) || (b.last?.at ?? 0) - (a.last?.at ?? 0));
 }
 
-const ICONS: Record<MessageKind, IconName> = { 'friend-message': 'message', 'group-message': 'group', 'room-mention': 'globe' };
+const ICONS: Record<MessageKind, IconName> = { 'friend-message': 'message', 'group-message': 'group', 'room-mention': 'globe', 'team-message': 'report' };
 
 export function createInboxMenu(host: InboxMenuHost): InboxMenu {
   const now = () => host.now?.() ?? Date.now();
@@ -96,7 +96,7 @@ export function createInboxMenu(host: InboxMenuHost): InboxMenu {
     const rows: Row[] = threads.map((x) => {
       const index: number = actions.push({ label: x.name, key: `inbox:${x.kind}:${x.id}`, icon: ICONS[x.kind], run: () => host.open(x.kind, x.id, here(index)) }) - 1;
       const said = x.last ? (x.last.who ? t('{name} : {text}', { name: x.last.who, text: x.last.text }) : x.last.text) : undefined;
-      const kindText = x.kind === 'friend-message' ? t('Message privé') : x.kind === 'group-message' ? t('Groupe') : t('Salon');
+      const kindText = x.kind === 'friend-message' ? t('Message privé') : x.kind === 'group-message' ? t('Groupe') : x.kind === 'team-message' ? t('Réponse de l’équipe') : t('Salon');
       return {
         text: x.name,
         detail: said ? `${kindText} · ${said}` : kindText,

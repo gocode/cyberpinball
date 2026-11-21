@@ -45,6 +45,7 @@ export type NoticeKind =
   | 'player-like'
   | 'player-invited'
   | 'idea-shipped'
+  | 'team-reply'
   | 'program-open'
   | 'room-mention'
   | 'room-line'
@@ -58,7 +59,7 @@ export type NoticeKind =
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' } | { type: 'groups' };
+export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' } | { type: 'messages' } | { type: 'my-profile' } | { type: 'rooms' } | { type: 'moderation' } | { type: 'groups' } | { type: 'team-threads' };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -174,6 +175,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // de PinUP Popper : arrêts de 1 à 2 s sur presque toutes les tables). Par-dessus VPX, une fois par jour et par programme.
   'program-open': { priority: 6, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'alert', tone: 'warning', act: { type: 'activity' }, away: true, journal: false },
   'idea-shipped': { priority: 12, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'sparkle', tone: 'ok', act: { type: 'my-profile' }, sound: 'news' },
+  // L'équipe répond à un rapport ou à une proposition du joueur (feedback-threads.ts) : partout, comme
+  // un message d'ami ; un clic ouvre l'échange (team-threads-menu.ts).
+  'team-reply': { priority: 8, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'message', tone: 'ok', act: { type: 'team-threads' }, away: true, sound: 'news' },
   'friend-request': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'friend-requests' } },
   'friend-accepted': { priority: 11, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friends', tone: 'ok', act: { type: 'friends' } },
   'download-failed': { priority: 12, ttlMs: 60 * MIN, quietMs: 60 * MIN, icon: 'alert', tone: 'error', act: { type: 'downloads' } },
@@ -446,6 +450,12 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'idea-shipped':
       // `subject` : le titre de la proposition.
       return fit(one ? { title: t('Votre idée est arrivée dans Cyber Pinball'), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} de vos idées est arrivée dans Cyber Pinball', '{n} de vos idées sont arrivées dans Cyber Pinball'), detail: subjectList(events.map(subject)) });
+    case 'team-reply': {
+      // `subject` : le fil (titre du rapport, de la proposition) ; `extra` : la réponse.
+      const last = events[events.length - 1]!;
+      if (one) return fit({ title: t('L’équipe vous répond'), detail: one.extra ?? subject(one) });
+      return fit({ title: tn(n, '{n} réponse de l’équipe', '{n} réponses de l’équipe'), detail: last.extra ?? subjectList(events.map(subject)) });
+    }
     case 'friend-online':
       return fit(one ? { title: t('{name} vient de se connecter', { name: who(one) }) } : { title: tn(n, '{n} ami vient de se connecter', '{n} amis viennent de se connecter'), detail: names() });
     case 'friend-request':
@@ -496,6 +506,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} programme ouvert', '{n} programmes ouverts');
     case 'idea-shipped':
       return tn(n, '{n} idée arrivée', '{n} idées arrivées');
+    case 'team-reply':
+      return tn(n, '{n} réponse de l’équipe', '{n} réponses de l’équipe');
     case 'room-mention':
       return tn(n, '{n} mention', '{n} mentions');
     case 'room-line':

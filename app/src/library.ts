@@ -337,7 +337,8 @@ import { findComponent } from '@cyberpinball/installer';
 import { createHealth } from './health';
 import { collectTechFacts, loadTechFacts, recentErrors, saveTechFacts } from './tech-facts';
 import { createTechSheet } from './tech-sheet';
-import { createFeedbackMenu, doctorReport } from './feedback-menu';
+import { createFeedbackMenu, doctorReport, type FeedbackMenu } from './feedback-menu';
+import { createTeamThreadsMenu, type TeamThreadsMenu } from './team-threads-menu';
 import { launchAttachments } from './launch-evidence';
 import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 import { installationHints } from './installation-hints';
@@ -1553,7 +1554,7 @@ export function createLibrary(host: LibraryHost) {
   });
 
   // Retours et propositions (Menu système > Aide et infos) : le formulaire des retours et le tableau des propositions.
-  const feedback = host.feedbackService
+  const feedback: FeedbackMenu | undefined = host.feedbackService
     ? createFeedbackMenu({
         dataDir: host.dataDir,
         service: host.feedbackService,
@@ -1573,9 +1574,23 @@ export function createLibrary(host: LibraryHost) {
         },
         openReportContents: (back) => techSheet.openContents(back),
         follow: (back) => follow.action(back),
+        ...(host.teamThreads ? { threads: host.teamThreads, threadsEntry: (back: () => void): Action => teamThreadsMenu!.entry(back) } : {}),
+        ...(host.feedbackWho ? { who: () => host.feedbackWho!() } : {}),
         log: (line) => console.log(line),
       })
     : undefined;
+  // Mes échanges avec l'équipe (team-threads-menu.ts) : les fils des rapports, et leurs réponses.
+  const teamThreadsMenu: TeamThreadsMenu | undefined =
+    host.teamThreads && feedback
+      ? createTeamThreadsMenu({
+          threads: host.teamThreads,
+          openCustom: (build, at) => openCustom(build, at),
+          showing: (build) => screen?.kind === 'custom' && screen.build === build,
+          prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+          anonymous: () => feedback.anonymous(),
+          setAnonymous: (on) => feedback.setAnonymous(on),
+        })
+      : undefined;
   if (feedback)
     provideSystemItem('feedback', {
       get detail() {
@@ -6573,6 +6588,8 @@ export function createLibrary(host: LibraryHost) {
   return {
     /** Retours et propositions : le formulaire (plantage, téléphone), la question du premier plantage ; undefined sans service. */
     feedback,
+    /** Mes échanges avec l'équipe : la liste des fils, un fil ; undefined sans service. */
+    teamThreadsMenu,
     provideSystemItem,
     withdrawSystemItem,
     provideAddFromFriend,

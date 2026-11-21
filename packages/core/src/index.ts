@@ -250,6 +250,7 @@ export * from './vr-ecrans';
 export * from './credits';
 export * from './follow';
 export * from './feedback';
+export * from './feedback-threads';
 export * from './textedit';
 export * from './forget';
 export * from './autres-vpx';

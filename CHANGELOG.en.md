@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Conversation with the team: every report (written, sent to the developers or an automatic crash report) opens a conversation. The team's reply arrives on the cabinet with a notification and in your waiting messages, and you can reply back; everything stays encrypted between the cabinet and the team (System menu > Help and info > Feedback and ideas > My conversations with the team).
+- A reply from the team on one of your public ideas is also announced to you, and you can answer it privately.
+- Your reports now go with your nickname, so the team knows who it is replying to; you can choose to send them anonymously (the choice is kept), and the team can still reply to you.
 - Updates: the cabinet looks for a new version every 30 minutes (instead of 6 hours), and also when the PC wakes up and after a game. The red dot shows up soon after a release, without opening "Cyber Pinball update".
 - "Cyber Pinball update" screen: when the search finds a version, its back button now leads to the screen you came from (Recent activity, for example), no longer to "Help and info".
 - Table diagnosis: a backglass whose proportions differ from its screen is no longer described with "black bars" and a partly unused screen. It is stretched to the whole screen, as during the game, and the diagnosis says how much the image is distorted. The DMD and topper keep their black bars.

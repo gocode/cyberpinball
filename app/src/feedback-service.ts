@@ -28,6 +28,8 @@ import {
   type Reaction,
   REPORT_SEALED_MAX,
   saveContributions,
+  sealTeamReply,
+  type TeamReplyBox,
   type Contributions,
   RELAY_ORIGIN,
   sealReport,
@@ -290,8 +292,28 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
 
   // ---------- Rapports privés ----------
 
+  // ---------- Fils avec l'équipe (feedback-threads.ts) ----------
+
+  /** Les réponses de l'équipe dans ces fils, arrivées après `since` ; undefined : service injoignable. */
+  async function replies(fils: readonly { fil: string; since: number }[]): Promise<TeamReplyBox[] | undefined> {
+    if (!fils.length) return [];
+    try {
+      const r = await call('POST', '/api/fils', JSON.stringify({ fils }));
+      if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
+      const list = (r.json as { reponses?: unknown[] } | undefined)?.reponses ?? [];
+      return list.flatMap((x) => {
+        const b = x as { fil?: unknown; id?: unknown; at?: unknown; data?: unknown };
+        return typeof b.fil === 'string' && typeof b.id === 'string' && typeof b.at === 'number' && typeof b.data === 'string' ? [{ fil: b.fil, id: b.id, at: b.at, data: Buffer.from(b.data, 'base64') }] : [];
+      });
+    } catch (error) {
+      opts.log(`Retours : réponses de l'équipe injoignables (${(error as Error).message}).`); // i18n-ignore : journal
+      return undefined;
+    }
+  }
+
   /** Scelle et envoie ; hors ligne, le rapport attend et repartira. Vrai : parti tout de suite. */
   async function sendReport(envelope: ReportEnvelope, file?: Uint8Array): Promise<'sent' | 'queued' | 'failed'> {
+    sim?.noteEnvelope(envelope);
     // Un rapport écrit par le joueur compte comme contribution (un par jour) ; un plantage automatique, non.
     if (envelope.kind === 'report') noteContributions({ contributions: noteReport(contributions), shipped: [] });
     let sealed = sealReport(envelope, file);
@@ -389,6 +411,7 @@ export function createFeedbackService(opts: FeedbackServiceOptions) {
       react: reactNews,
     },
     sendReport,
+    replies,
     queuedCount: () => queued().length,
     flush,
     watch,
@@ -438,6 +461,16 @@ function simulatedStore(seedFile: string, dataDir: string) {
   } catch {
     // Pas de graine : aucune réaction.
   }
+  // Réponses de l'équipe (POST /api/fils) : la graine peut en faire écrire une à chaque rapport reçu
+  // (champ « reponseEquipe » : son texte), scellée pour le fil comme le ferait la gestion des retours.
+  const teamReplies: { fil: string; id: string; at: number; data: string }[] = [];
+  let autoReply: string | undefined;
+  try {
+    const seed = JSON.parse(fs.readFileSync(seedFile, 'utf8')) as { reponseEquipe?: unknown };
+    autoReply = typeof seed.reponseEquipe === 'string' && seed.reponseEquipe.trim() ? seed.reponseEquipe : undefined;
+  } catch {
+    autoReply = undefined;
+  }
   const newsView = (item: string, pk: string | undefined) => {
     const who = reactions.get(item) ?? new Map<string, string>();
     const counts: Record<string, number> = {};
@@ -446,8 +479,18 @@ function simulatedStore(seedFile: string, dataDir: string) {
     return { counts, ...(mine ? { mine } : {}) };
   };
   return {
+    /** Un rapport part (vu en clair, avant d'être scellé) : la réponse automatique de la graine, s'il y en a une. */
+    noteEnvelope(envelope: ReportEnvelope): void {
+      if (!autoReply || !envelope.fil || !envelope.answer || envelope.kind === 'message') return;
+      const at = Date.now() + 1;
+      teamReplies.push({ fil: envelope.fil, id: crypto.randomBytes(8).toString('base64url').slice(0, 10), at, data: sealTeamReply({ v: 1, text: autoReply, at }, envelope.answer).toString('base64') });
+    },
     async call(method: string, route: string, body: string | Uint8Array | undefined, pk: string | undefined): Promise<{ status: number; json?: unknown }> {
       await new Promise((r) => setTimeout(r, 120));
+      if (method === 'POST' && route === '/api/fils' && typeof body === 'string') {
+        const asked = (JSON.parse(body) as { fils: { fil: string; since: number }[] }).fils;
+        return { status: 200, json: { reponses: teamReplies.filter((r) => asked.some((a) => a.fil === r.fil && r.at > a.since)) } };
+      }
       if (method === 'GET' && route.startsWith('/api/nouveautes')) {
         return { status: 200, json: { reactions: Object.fromEntries([...reactions.keys()].map((item) => [item, newsView(item, pk)])) } };
       }

@@ -435,6 +435,8 @@ import { createLevelMenu } from './level-menu';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { createActivityMenu, type MessageKind } from './activity-menu';
+import { createTeamThreads } from './team-threads';
+import { language as uiLanguage, loadFeedbackState as loadFeedbackStateFile, type FeedbackPerson as FeedbackSigner } from '@cyberpinball/core';
 import { createInboxMenu, type InboxLink, type InboxThread } from './inbox-menu';
 import { createLocalPlayItem } from './local-play';
 import { createNewsMenu } from './news-menu';
@@ -1186,11 +1188,37 @@ const feedbackService = createFeedbackService({
     if (shipped.length) menuNotices.push(shipped.map((p) => ({ kind: 'idea-shipped' as const, key: `idea|${p.id}`, at: Date.now(), subject: p.title })));
   },
 });
+/** Mon pseudo et mon pays : signés avec mes propositions, joints à mes rapports sauf anonymat. */
+function feedbackWho(): FeedbackSigner {
+  const country = socialNet.country();
+  return { name: socialNet.state().name, ...(country ? { country } : {}) };
+}
+// Dialogue avec l'équipe (team-threads.ts, 21/11/2026) : chaque rapport ouvre un fil où l'équipe peut
+// répondre ; une réponse s'annonce partout (notification, pastille des messages en attente).
+const teamThreads = createTeamThreads({
+  dataDir: loc.dataDir,
+  service: feedbackService,
+  version: app.getVersion(),
+  language: () => uiLanguage(),
+  // Le réglage et le numéro de borne relus du fichier des retours, que le menu des retours tient à jour.
+  borne: () => loadFeedbackStateFile(loc.dataDir).borne,
+  anonymous: () => loadFeedbackStateFile(loc.dataDir).anonymous,
+  who: () => feedbackWho(),
+  changed: () => {
+    library.teamThreadsMenu?.changed();
+    broadcast();
+  },
+  // Les réponses publiques sur mes propositions y entrent aussi, à chaque relève (team-threads.ts, noteProposals).
+  arrived: (added) => menuNotices.push(added.map((a) => ({ kind: 'team-reply' as const, key: a.line.id, at: Date.now(), subject: a.thread.title, extra: a.line.text.replace(/\s*\n\s*/g, ' ') }))),
+  log: (line) => console.log(line),
+});
 // Volume de la ROM (rom-volume.ts) : lu sur la fiche, réglé dans « Réglages de cette table », posé avant
 // la partie. Déclaré avant la bibliothèque, qui le lit ; les ROM d'après le script déjà lu de la table.
 const romVolumes = createRomVolumes({ dataDir: loc.dataDir, romsOf: (table) => cachedScript(table.file, loc.dataDir)?.roms ?? [], sharedPinmame: () => (loc.root ? path.join(loc.root, 'pinmame') : undefined), log: (line) => console.log(line) });
 const library = createLibrary({
   feedbackService,
+  teamThreads,
+  feedbackWho: () => feedbackWho(),
   romMusic: () => romMusic,
   vrNetwork: () => vrFront.vrNetworkFacts(),
   root: loc.root,
@@ -2575,6 +2603,7 @@ const socialNet = createSocialNet({
 // restés en attente repartent peu après le démarrage, puis toutes les 30 minutes.
 onAppCrash((c) => library.feedback?.crashed(crashSignature('app', c.code, c.detail), undefined, c.about));
 feedbackService.watch();
+teamThreads.watch();
 // Messagerie entre amis (Menu système > Communauté > Messages) : un message pour un ami absent attend et
 // part à son retour ; l'arrivée d'un message passe par les notifications (menu-notices.ts).
 /** Le DMD annonce un message arrivé au menu pendant ce temps (« MESSAGE DE NOVA »), puis reprend son affichage. */
@@ -3335,6 +3364,12 @@ function inboxThreads(): InboxThread[] {
     out.push({ kind: 'group-message', id: view.id, name: view.name, unread: entry.unread, ...(entry.muted ? { muted: true } : {}), ...(last && text ? { last: { who: last.name, text: oneLine(text), at: Date.parse(last.at) } } : {}) });
   }
   for (const r of roomsMenu.mentionThreads()) out.push({ kind: 'room-mention', id: r.room, name: r.name, unread: r.count, last: r.last });
+  // Les réponses de l'équipe à mes rapports et à mes propositions (team-threads.ts).
+  for (const x of teamThreads.visible()) {
+    if (!x.unread) continue;
+    const last = [...x.lines].reverse().find((l) => l.from === 'team');
+    out.push({ kind: 'team-message', id: x.fil, name: x.title || t('Équipe Cyber Pinball'), unread: x.unread, ...(last ? { last: { who: t('Équipe Cyber Pinball'), text: oneLine(last.text), at: last.at } } : {}) });
+  }
   return out;
 }
 
@@ -3345,6 +3380,7 @@ function threadPending(kind: MessageKind, thread: string): number | undefined {
     const entry = groupService.entry(thread);
     return !entry || entry.gone ? undefined : entry.unread;
   }
+  if (kind === 'team-message') return teamThreads.thread(thread)?.unread;
   return roomsMenu.mentionThreads().find((r) => r.room === thread)?.count ?? 0;
 }
 
@@ -3352,6 +3388,7 @@ function threadPending(kind: MessageKind, thread: string): number | undefined {
 function openThread(kind: MessageKind, thread: string, back: () => void): void {
   if (kind === 'friend-message') chatMenu.openThread(thread, back);
   else if (kind === 'group-message') groupsMenu.openGroup(thread, back);
+  else if (kind === 'team-message') library.teamThreadsMenu?.openThread(thread, back);
   else roomsMenu.openRoom(thread, back);
 }
 
@@ -3847,6 +3884,15 @@ export function startFrontend(): void {
     // Pastille des messages en attente : l'écran qui les réunit.
     else if (action.type === 'inbox') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) inboxMenu.open(state.phase === 'menu' ? () => library.leave() : () => library.openSystem());
+    }
+    // Réponse de l'équipe : l'échange qui l'attend (le plus récent non lu), sinon la liste des échanges.
+    else if (action.type === 'team-threads') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system') && library.teamThreadsMenu) {
+        const back = state.phase === 'menu' ? () => library.leave() : () => library.openSystem();
+        const waiting = teamThreads.visible().find((x) => x.unread);
+        if (waiting) library.teamThreadsMenu.openThread(waiting.fil, back);
+        else library.teamThreadsMenu.openList(back);
+      }
     }
     else if (action.type === 'messages') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) chatMenu.openUnread(state.phase === 'menu' ? () => library.leave() : undefined);
