@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Stutters in game: the cabinet report now also tells where the VPX render thread was during each freeze (graphics driver, video, texture loading…), not only the game loop, which is then just waiting for that thread.
+- A game slowed down by freezes (antivirus, script) is no longer mistaken for a game limited by a screen's refresh rate.
 - Tables of the day (Community › Leaderboards): the most played tables today worldwide, in your country or among friends, the record of the day with its author's avatar and level, your place and your gap to the player just ahead of you; Start launches the table. Few games today: the week shows instead, never an empty board. A version other than yours stays visible, greyed, with "Get this version" from a friend who has it.
 - Your games of the day and of the week, per exact table version, travel with your signed public card (capped; "?" when they are implausible).
 - Table page: "On this table" shows the goal (the player just above you), the record of the day, the friend playing it right now and your friends this week; a table nobody has played online says your next score will be the first. Your record and your group move to the statistics; the files stay in "Manage the table…".

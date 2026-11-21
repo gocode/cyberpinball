@@ -10,6 +10,10 @@
 // (DLL ou exécutable). À l'à-coup, la ligne du journal le dit : « in vbscript.dll 60, ntdll.dll 20 ; under
 // VPinballX64.exe 70… ; top VPinballX64.exe+0x12ab30 » (position à rapprocher des symboles de la version de VPX).
 // Rien n'est relevé tant que les images arrivent à l'heure.
+// Le fil du rendu aussi (rapport du 21/11/2026) : avec BGFX, VPX 10.8 dessine dans un fil à part, « RenderThread »
+// (RenderDevice.cpp), et la boucle de jeu l'attend en dormant par tranches de 0,1 ms (uOverSleep → SDL_DelayNS) tant
+// qu'il n'a pas pris l'image précédente. Un arrêt du rendu ne montrait donc que « SDL364.dll » côté boucle de jeu. Ce
+// fil, retrouvé par son nom, est relevé en même temps ; la ligne ajoute « | render thread N samples: … ».
 // Sûreté : pendant que le fil est suspendu, la veille n'appelle rien qui prenne un verrou de l'espace utilisateur
 // (ni allocation, ni chargeur, ni journal) : GetThreadContext, VirtualQuery et une copie dans un tampon fait
 // d'avance. Tout le reste (modules, comptes) se fait une fois le fil relancé.
@@ -160,6 +164,7 @@ private:
 #endif
 #include <windows.h>
 #include <psapi.h>
+#include <tlhelp32.h>
 
 #include <atomic>
 #include <mutex>
@@ -244,12 +249,20 @@ public:
       if (m_fil)
          CloseHandle(m_fil);
       m_fil = nullptr;
+      if (m_rendu)
+         CloseHandle(m_rendu);
+      m_rendu = nullptr;
+      m_renduCherche = 0;
       m_derniere.store(0);
    }
 
+   /** Nom du second fil relevé pendant un arrêt (celui du rendu de VPX) ; à appeler avant demarrer(). */
+   void suivreAussi(const wchar_t* nom) { m_nomRendu = nom; }
+
    /**
     * Une image vient d'être préparée (fil suivi). Si l'écart qu'elle termine est un à-coup (`aCoup`), écrit dans
-    * `ligne` où était le fil pendant l'attente (vide sans relevé) ; sinon, oublie les relevés de cet écart.
+    * `ligne` où était le fil pendant l'attente, puis « | render thread … » pour le second fil (vide sans relevé) ;
+    * sinon, oublie les relevés de cet écart.
     */
    void image(bool aCoup, char* ligne, size_t taille)
    {
@@ -260,8 +273,18 @@ public:
       {
          const std::lock_guard<std::mutex> verrou(m_verrou);
          if (aCoup && m_arret && m_arret == m_derniere.load())
+         {
             m_comptes.dire(ligne, taille);
+            const size_t n = std::strlen(ligne);
+            if (n && m_comptesRendu.releves() && n + 20 < taille)
+            {
+               std::snprintf(ligne + n, taille - n, " | render thread ");
+               const size_t m = std::strlen(ligne);
+               m_comptesRendu.dire(ligne + m, taille - m);
+            }
+         }
          m_comptes.remiseAZero();
+         m_comptesRendu.remiseAZero();
          m_arret = 0;
       }
       m_derniere.store(t.QuadPart);
@@ -295,23 +318,66 @@ private:
          if (m_parArret.first == derniere && m_parArret.second >= MAX_PAR_ARRET)
             continue;
          if (m_parArret.first != derniere)
+         {
             m_parArret = { derniere, 0 };
+            // Le fil du rendu, cherché par son nom au premier arrêt (il naît après la première image), puis à chaque
+            // nouvel arrêt tant qu'il n'est pas trouvé, au plus une fois par seconde.
+            if (m_nomRendu && !m_rendu && (t.QuadPart - m_renduCherche) > m_frequence)
+            {
+               m_renduCherche = t.QuadPart;
+               m_rendu = ouvrirFilNomme(m_nomRendu);
+            }
+         }
          m_parArret.second++;
-         releve(derniere);
+         releve(derniere, m_fil, false);
+         if (m_rendu)
+            releve(derniere, m_rendu, true);
       }
       timeEndPeriodSur();
    }
 
-   void releve(int64_t arret)
+   /** Le fil de ce processus qui porte ce nom (SetThreadDescription), ouvert pour être relevé ; nullptr sinon. */
+   static HANDLE ouvrirFilNomme(const wchar_t* nom)
+   {
+      using GetDescription = HRESULT(WINAPI*)(HANDLE, PWSTR*);
+      static const auto getDescription = reinterpret_cast<GetDescription>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
+      if (!getDescription)
+         return nullptr;
+      HANDLE instantane = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+      if (instantane == INVALID_HANDLE_VALUE)
+         return nullptr;
+      HANDLE trouve = nullptr;
+      THREADENTRY32 fil { sizeof(fil) };
+      const DWORD moi = GetCurrentProcessId();
+      for (BOOL encore = Thread32First(instantane, &fil); encore && !trouve; encore = Thread32Next(instantane, &fil))
+      {
+         if (fil.th32OwnerProcessID != moi || fil.th32ThreadID == GetCurrentThreadId())
+            continue;
+         HANDLE h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, fil.th32ThreadID);
+         if (!h)
+            continue;
+         PWSTR description = nullptr;
+         if (SUCCEEDED(getDescription(h, &description)) && description && std::wcscmp(description, nom) == 0)
+            trouve = h;
+         if (description)
+            LocalFree(description);
+         if (h != trouve)
+            CloseHandle(h);
+      }
+      CloseHandle(instantane);
+      return trouve;
+   }
+
+   void releve(int64_t arret, HANDLE cible, bool rendu)
    {
       // --- Fil suivi suspendu : rien qui prenne un verrou. ---
-      if (SuspendThread(m_fil) == static_cast<DWORD>(-1))
+      if (SuspendThread(cible) == static_cast<DWORD>(-1))
          return;
       CONTEXT contexte {};
       contexte.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
       size_t copie = 0;
       uintptr_t ip = 0;
-      if (GetThreadContext(m_fil, &contexte))
+      if (GetThreadContext(cible, &contexte))
       {
 #if defined(_M_X64)
          ip = static_cast<uintptr_t>(contexte.Rip);
@@ -330,7 +396,7 @@ private:
             std::memcpy(m_pile, reinterpret_cast<const void*>(sp), copie);
          }
       }
-      ResumeThread(m_fil);
+      ResumeThread(cible);
       // --- Fil suivi relancé. ---
       if (!ip)
          return;
@@ -352,9 +418,10 @@ private:
       if (m_arret != arret)
       {
          m_comptes.remiseAZero();
+         m_comptesRendu.remiseAZero();
          m_arret = arret;
       }
-      m_comptes.ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0);
+      (rendu ? m_comptesRendu : m_comptes).ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0);
    }
 
    /** Le module dont la partie exécutable contient `adresse` ; la liste est relue une fois par arrêt au plus. */
@@ -423,6 +490,10 @@ private:
    }
 
    HANDLE m_fil = nullptr;
+   HANDLE m_rendu = nullptr; // fil de veille seul (et arreter, une fois la veille finie)
+   const wchar_t* m_nomRendu = nullptr;
+   int64_t m_renduCherche = 0; // fil de veille seul : dernière recherche du fil du rendu
+   Comptes m_comptesRendu; // sous m_verrou
    HMODULE m_winmm = nullptr;
    int64_t m_frequence = 1;
    std::atomic<int64_t> m_derniere { 0 };

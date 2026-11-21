@@ -90,6 +90,15 @@ test('table qui rame vraiment, ou sans écran annexe plus lent : toujours « La 
   assert.equal(readScreenCap(RAME_VRAIMENT, c, 120), undefined, '15 images/s ne sont pas la fréquence d’un écran à 60 Hz');
   assert.equal(readScreenCap(BRIDEE_50.filter((l) => !l.includes('Window #1')), cadence(BRIDEE_50), 119.91), undefined, 'sans backglass ouvert, rien ne bride');
   assert.equal(readScreenCap(BRIDEE_50, cadence(BRIDEE_50), undefined), undefined);
+  // Rapport du 21/11/2026 : Daredevil, 62,5 i/s de moyenne près d'un fronton à 60 Hz, mais une image toutes les 8 ms
+  // entre 49 arrêts de l'antivirus. Pas bridé par l'écran : la table rame.
+  const daredevil = [
+    '2026-11-21 14:08:38.235 INFO  [Main] [VPX::Window::Window@290] Window #0 (3840x2160) was created on display PL4380UH [3840x2160 119.91Hz SDL_PIXELFORMAT_XRGB8888]',
+    '2026-11-21 14:08:38.235 INFO  [Main] [Player::Player@344] Synchronization mode: 3 with maximum FPS: 119.91, display FPS: 119.91',
+    '2026-11-21 14:08:38.542 INFO  [Main] [VPX::Window::Window@290] Window #1 (1920x1080) was created on display 32W_LCD_TV [1920x1080 60Hz SDL_PIXELFORMAT_XRGB8888]',
+    "2026-11-21 14:09:28.000 INFO  [Main] [CyberPinballDmd:`anonymous-namespace'::direBilan@287] Cadence end: frames=3150 duration=50.4s fps=62.5 p50=8ms p95=120ms p99=260ms max=1045ms late=20.1% stalls=49 worst10s=23.4fps mem=5770MB",
+  ];
+  assert.equal(readScreenCap(daredevil, cadence(daredevil), 119.91), undefined);
   const logs = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ecran-bride-'));
   try {
     const file = path.join(logs, 'Funhouse.vpx');

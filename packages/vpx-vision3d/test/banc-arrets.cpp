@@ -2,6 +2,8 @@
 // 1. Comptes : le comptage par module et la ligne écrite.
 // 2. ReleveArrets en vrai : un fil « des images » qui tourne à 100 Hz, puis s'arrête 300 ms dans une fonction de cet
 //    exécutable (calcul) et 300 ms dans Windows (Sleep) ; le relevé doit dire où.
+// 3. Le fil « RenderThread » relevé en même temps : la boucle de jeu attend, le rendu calcule (VPX 10.8 en BGFX).
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -96,6 +98,54 @@ int main()
       VERIFIE(surSleep.find(" samples: in ntdll.dll") != std::string::npos);
       VERIFIE(surSleep.find("; under banc-arrets.exe") != std::string::npos);
       VERIFIE(std::atoi(surCalcul.c_str()) >= 20);
+      VERIFIE(surCalcul.find("render thread") == std::string::npos);
+   }
+   {
+      // Le cas de VPX 10.8 en BGFX (rapport du 21/11/2026) : la boucle de jeu attend en dormant pendant que le fil
+      // « RenderThread » calcule. Le relevé doit dire aussi où était ce fil-là.
+      ReleveArrets releve;
+      releve.suivreAussi(L"RenderThread");
+      std::atomic<bool> calculer { false }, fini { false };
+      std::thread rendu([&]
+      {
+         SetThreadDescription(GetCurrentThread(), L"RenderThread");
+         while (!fini.load())
+         {
+            if (calculer.load())
+            {
+               calcul(300);
+               calculer.store(false);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+         }
+      });
+      std::string attente;
+      std::thread images([&]
+      {
+         VERIFIE(releve.demarrer());
+         char ou[900];
+         for (int i = 0; i < 20; i++)
+         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            releve.image(false, ou, sizeof(ou));
+         }
+         calculer.store(true);
+         while (calculer.load())
+            Sleep(1); // la boucle de jeu attend le rendu
+         releve.image(true, ou, sizeof(ou));
+         attente = ou;
+         releve.arreter();
+      });
+      images.join();
+      fini.store(true);
+      rendu.join();
+      std::printf("attente du rendu : %s\n", attente.c_str());
+      const size_t r = attente.find(" | render thread ");
+      VERIFIE(r != std::string::npos);
+      // Côté boucle de jeu : Windows (Sleep) ; côté rendu : le calcul de ce banc.
+      VERIFIE(attente.find(" samples: in ntdll.dll") < r);
+      VERIFIE(r != std::string::npos && attente.find(" samples: in banc-arrets.exe", r) != std::string::npos);
+      VERIFIE(r != std::string::npos && attente.find("; top banc-arrets.exe+0x", r) != std::string::npos);
    }
    std::printf(echecs ? "%d echec(s)\n" : "tout va bien\n", echecs);
    return echecs ? 1 : 0;

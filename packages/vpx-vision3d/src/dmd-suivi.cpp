@@ -296,7 +296,7 @@ bool releveDemarre = false;
 void compterImage(double t)
 {
    const bool aCoup = cadence.image(t);
-   char ou[448];
+   char ou[900];
    if (releveDemarre)
       releve.image(aCoup && aCoupsDits < A_COUPS_DITS_MAX, ou, sizeof(ou));
    else
@@ -305,7 +305,7 @@ void compterImage(double t)
    {
       // Au moment même : l'heure de la ligne le rapproche de ce que VPX et les plugins écrivaient alors.
       aCoupsDits++;
-      char quoi[480];
+      char quoi[960];
       std::snprintf(quoi, sizeof(quoi), "%s%s%s", ou[0] ? "; main thread " : "", ou, aCoupsDits == A_COUPS_DITS_MAX ? " (no more stalls logged)" : "");
       LPI_LOGW("Cadence: stall of %d ms at %.1fs%s", static_cast<int>(cadence.dernierEcart() * 1000.0 + 0.5), cadence.tempsDePartie(t), quoi);
    }
@@ -321,7 +321,11 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    if (!enPartie)
       return;
    if (!releveDemarre)
+   {
+      // Le fil du rendu de VPX (BGFX), relevé avec la boucle de jeu pendant chaque à-coup (arrets.h).
+      releve.suivreAussi(L"RenderThread");
       releveDemarre = releve.demarrer();
+   }
    const double t = maintenant();
    compterImage(t);
    // Banc : les images comptées, dites toutes les 2 s (VPX qui ne rend plus se voit).

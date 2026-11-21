@@ -76,38 +76,77 @@ const STALL_PLACES: readonly [RegExp, string][] = [
   [/^vbscript\.dll$/, 'le script de la table'], // i18n-ignore : journal
   [/^(avcodec|avformat|avutil|swscale|swresample)[-\w]*\.dll$/, "le décodage d'une vidéo"], // i18n-ignore : journal
   [/^(nvoglv|nvwgf2um|nvd3dum|igd|amdxx|atiu|aticfx|d3d1[01]|dxgi)[\w]*\.dll$/, 'le pilote de la carte graphique'], // i18n-ignore : journal
+  // VPX 10.8 en BGFX : la boucle de jeu attend le fil du rendu en dormant par tranches de 0,1 ms (player.cpp,
+  // MultithreadedGameLoop : uOverSleep → SDL_DelayNS). Rapport du 21/11/2026 : 64 % des relevés là, le blocage ailleurs.
+  [/^sdl3?\d*\.dll$/, 'une pause de VPX, qui attend le fil du rendu'], // i18n-ignore : journal
 ];
 
-/**
- * Où était le fil des images de VPX pendant les à-coups d'une partie, d'après les lignes « Cadence: stall … ; main thread
- * N samples: … under A n, B m » du plugin du DMD (arrets.h) : le module le plus relevé sur la pile, sa part des relevés,
- * et ce qu'il fait quand il est connu. undefined : pas de relevé (plugin d'avant le 18/11/2026, ou aucun à-coup).
- */
-export function stallPlace(lines: readonly string[]): { module: string; share: number; samples: number; what?: string } | undefined {
-  const counts = new Map<string, number>();
+/** Fonctions de Windows où un fil ne fait qu'attendre : pour le fil du rendu, on regarde alors qui l'a appelé. */
+const WAITING = /^(ntdll|kernelbase|kernel32|win32u)\.dll$/i;
+
+type Place = { module: string; share: number; samples: number; what?: string };
+
+/** Le module le plus vu d'une liste « A n, B m » cumulée sur plusieurs lignes. */
+function addCounts(counts: Map<string, number>, list: string): number {
   let total = 0;
-  for (const line of lines) {
-    const under = /Cadence: stall of \d+ ms .*; main thread \d+ samples: .*?; under ([^;]+)/.exec(line)?.[1];
-    if (!under) continue;
-    for (const m of under.matchAll(/([^,]+?) (\d+)(?:,|$)/g)) {
-      const name = m[1]!.trim();
-      const n = Number(m[2]);
-      counts.set(name, (counts.get(name) ?? 0) + n);
-      total += n;
-    }
+  for (const m of list.matchAll(/([^,]+?) (\d+)(?:,|$)/g)) {
+    const name = m[1]!.trim();
+    const n = Number(m[2]);
+    counts.set(name, (counts.get(name) ?? 0) + n);
+    total += n;
   }
+  return total;
+}
+
+function topPlace(counts: Map<string, number>, total: number): Place | undefined {
   if (!total) return undefined;
   const [module, samples] = [...counts].sort((a, b) => b[1] - a[1])[0]!;
   const what = STALL_PLACES.find(([re]) => re.test(module.toLowerCase()))?.[1];
   return { module, share: samples / total, samples: total, ...(what ? { what } : {}) };
 }
 
+/**
+ * Où était le fil des images de VPX pendant les à-coups d'une partie, d'après les lignes « Cadence: stall … ; main thread
+ * N samples: … under A n, B m » du plugin du DMD (arrets.h) : le module le plus relevé sur la pile, sa part des relevés,
+ * et ce qu'il fait quand il est connu. `render` : le fil du rendu (« | render thread … », plugin du 21/11/2026), par le
+ * module où il était, ou celui qui l'a appelé quand il attendait dans Windows. undefined : pas de relevé.
+ */
+export function stallPlace(lines: readonly string[]): (Place & { render?: Place }) | undefined {
+  const main = new Map<string, number>();
+  const renderIn = new Map<string, number>();
+  const renderUnder = new Map<string, number>();
+  let total = 0;
+  let renderTotal = 0;
+  for (const line of lines) {
+    if (!line.includes('Cadence: stall of ')) continue;
+    const [mainPart, renderPart] = line.split(' | render thread ');
+    const under = /; main thread \d+ samples: .*?; under ([^;]+)/.exec(mainPart!)?.[1];
+    if (under) total += addCounts(main, under);
+    const r = renderPart && /^\d+ samples: in ([^;]+); under ([^;(]+)/.exec(renderPart);
+    if (r) {
+      renderTotal += addCounts(renderIn, r[1]!);
+      addCounts(renderUnder, r[2]!);
+    }
+  }
+  const place = topPlace(main, total);
+  if (!place) return undefined;
+  let render = topPlace(renderIn, renderTotal);
+  if (render && WAITING.test(render.module)) {
+    const caller = topPlace(renderUnder, [...renderUnder.values()].reduce((a, b) => a + b, 0));
+    if (caller && caller.module !== '-') render = caller;
+  }
+  // « Attend le fil du rendu » ne vaut que pour la boucle de jeu.
+  if (render?.what && /^sdl/i.test(render.module)) delete render.what;
+  return { ...place, ...(render ? { render } : {}) };
+}
+
 /** Ligne du journal de la borne qui dit où VPX attendait pendant les à-coups ; undefined sans relevé. */
 export function stallPlaceJournal(table: string, lines: readonly string[]): string | undefined {
   const place = stallPlace(lines);
   if (!place) return undefined;
-  const pct = Math.round(place.share * 100);
-  return `À-coups de la partie (${table}) : le fil des images de VPX était surtout dans ${place.module} (${pct} % de ${place.samples} relevés)${place.what ? `, ${place.what}` : ''}.`; // i18n-ignore : journal
+  const pct = (p: Place) => Math.round(p.share * 100);
+  const render = place.render ? ` ; le fil du rendu était surtout dans ${place.render.module} (${pct(place.render)} % de ${place.render.samples} relevés)${place.render.what ? `, ${place.render.what}` : ''}` : ''; // i18n-ignore : journal
+  return `À-coups de la partie (${table}) : le fil des images de VPX était surtout dans ${place.module} (${pct(place)} % de ${place.samples} relevés)${place.what ? `, ${place.what}` : ''}${render}.`; // i18n-ignore : journal
 }
 
 /** Le dernier bilan des lignes données (celles d'une partie) : celui de fin, sinon le dernier d'étape. */
@@ -194,7 +233,10 @@ export function readScreenCap(lines: readonly string[], c: VpxCadence | undefine
   const slower = readVpxWindows(lines)
     .filter((w) => !w.playfield && w.hz > 0 && w.hz < targetFps * 0.95)
     .sort((a, b) => a.hz - b.hz);
-  const w = slower.find((s) => c.fps >= s.hz * CAP_LOW && c.fps <= s.hz * CAP_HIGH);
+  // Calée sur un écran, la partie sort ses images au rythme de cet écran : médiane d'au moins 3/4 de sa période (16 à
+  // 17 ms pour 60 Hz, 17 ms pour 50 Hz sur un playfield à 120 Hz). Rapport du 21/11/2026 : Daredevil à 62,5 i/s de
+  // moyenne, médiane 8 ms et 49 arrêts de l'antivirus, avait été dite « bridée à 60 Hz » par la seule moyenne.
+  const w = slower.find((s) => c.fps >= s.hz * CAP_LOW && c.fps <= s.hz * CAP_HIGH && c.p50 >= (1000 / s.hz) * 0.75);
   return w ? { display: w.display, hz: w.hz } : undefined;
 }
 

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- À-coups en partie : le rapport de la borne dit désormais aussi où était le fil du rendu de VPX pendant chaque arrêt (pilote de la carte graphique, vidéo, chargement de textures…), et plus seulement la boucle de jeu, qui ne fait alors qu'attendre ce fil.
+- Une partie qui rame à cause d'arrêts (antivirus, script) n'est plus prise à tort pour une partie bridée par la fréquence d'un écran.
 - Tables du jour (Communauté › Classements) : les tables les plus jouées aujourd'hui dans le monde, votre pays ou entre amis, le record du jour avec l'avatar et le niveau de son auteur, votre place et votre écart au joueur juste devant vous ; Start lance la table. Peu de parties aujourd'hui : c'est la semaine qui s'affiche, jamais un tableau vide. Une autre version que la vôtre reste visible, grisée, avec « Récupérer cette version » chez un ami qui l'a.
 - Vos parties du jour et de la semaine, par version exacte de table, partent avec votre carte publique signée (plafonnées ; « ? » quand elles sont invraisemblables).
 - Fiche d'une table : « Sur cette table » montre l'objectif (le joueur juste au-dessus de vous), le record du jour, l'ami qui y joue en ce moment et vos amis de la semaine ; une table que personne n'a jouée en ligne dit que votre prochain score sera le premier. Votre record et votre groupe passent dans les statistiques ; les fichiers restent dans « Gérer la table… ».

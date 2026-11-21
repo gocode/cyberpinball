@@ -98,7 +98,8 @@ test('à-coups : chacun dit où était le fil des images (relevé pendant l’at
   assert.match(cpp, /releve\.arreter\(\);[\s\S]*CyberPinballDmdPluginUnload|CyberPinballDmdPluginUnload[\s\S]*releve\.arreter\(\);/);
   // Pendant la suspension : registres, VirtualQuery et une copie, rien d'autre (ni allocation, ni chargeur, ni journal).
   const h = read('packages', 'vpx-vision3d', 'src', 'arrets.h');
-  const suspended = h.slice(h.indexOf('SuspendThread(m_fil)'), h.indexOf('ResumeThread(m_fil)'));
+  // Le même relevé sert à la boucle de jeu et au fil du rendu (`cible`).
+  const suspended = h.slice(h.indexOf('SuspendThread(cible)'), h.indexOf('ResumeThread(cible)'));
   assert.ok(suspended.length > 0);
   const calls = [...suspended.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
   for (const call of calls) assert.ok(['SuspendThread', 'GetThreadContext', 'static_cast', 'reinterpret_cast', 'VirtualQuery', 'sizeof', 'min', 'memcpy', 'if', 'defined'].includes(call!), `appel pendant la suspension : ${call}`);
@@ -122,6 +123,30 @@ test('à-coups : où attendait VPX, lu dans les lignes du relevé (rapport de Da
   assert.equal(stallPlace(['Cadence: stall of 250 ms at 31.2s']), undefined);
   assert.equal(stallPlace(['Cadence: stall of 300 ms at 2.0s; main thread 50 samples: in avcodec-61.dll 50; under plugin-flexdmd64.dll 50; top x (1)'])?.module, 'plugin-flexdmd64.dll');
   assert.match(stallPlace(['Cadence: stall of 300 ms at 2.0s; main thread 50 samples: in x 50; under swscale-8.dll 50; top x (1)'])!.what!, /vidéo/);
+});
+
+test('à-coups : la boucle de jeu qui attend le rendu (rapport du 21/11/2026), et où était le fil du rendu', () => {
+  // Lignes réelles de la borne d'Eric (24, plugin d'avant le relevé du rendu) : SDL364.dll = la pause de la boucle de jeu.
+  const old = [
+    "2026-11-21 14:04:22.115 WARN  [Main] [CyberPinballDmd:`anonymous-namespace'::compterImage@309] Cadence: stall of 128 ms at 104.3s; main thread 20 samples: in ntdll.dll 13, SDL364.dll 5, KERNELBASE.dll 1, VPinballX_BGFX64.exe 1; under SDL364.dll 15, VPinballX_BGFX64.exe 5; top SDL364.dll+0x1770c0 (8)",
+    "2026-11-21 14:06:30.305 WARN  [Main] [CyberPinballDmd:`anonymous-namespace'::compterImage@309] Cadence: stall of 129 ms at 232.4s; main thread 20 samples: in ntdll.dll 17, SDL364.dll 2, USER32.dll 1; under SDL364.dll 20; top SDL364.dll+0x1770c0 (17)",
+  ];
+  assert.match(stallPlaceJournal('24', old)!, /surtout dans SDL364\.dll \(88 % de 40 relevés\), une pause de VPX, qui attend le fil du rendu\.$/);
+  // Nouveau relevé : la partie du rendu ne se mêle pas à celle de la boucle de jeu, et dit où le rendu bloquait.
+  const withRender = [
+    'Cadence: stall of 128 ms at 104.3s; main thread 20 samples: in ntdll.dll 15, SDL364.dll 5; under SDL364.dll 20; top SDL364.dll+0x1770c0 (8) | render thread 20 samples: in nvwgf2umx.dll 14, ntdll.dll 6; under VPinballX_BGFX64.exe 20; top VPinballX_BGFX64.exe+0x5c042d (9)',
+    'Cadence: stall of 131 ms at 120.0s; main thread 21 samples: in ntdll.dll 21; under SDL364.dll 21 | render thread 21 samples: in nvwgf2umx.dll 21; under VPinballX_BGFX64.exe 21; top VPinballX_BGFX64.exe+0x5c042d (21) (no more stalls logged)',
+  ];
+  const place = stallPlace(withRender)!;
+  assert.equal(place.module, 'SDL364.dll', 'la liste du rendu ne pollue pas celle de la boucle de jeu');
+  assert.equal(place.samples, 41);
+  assert.equal(place.render!.module, 'nvwgf2umx.dll');
+  assert.match(place.render!.what!, /pilote de la carte graphique/);
+  assert.match(stallPlaceJournal('24', withRender)!, / ; le fil du rendu était surtout dans nvwgf2umx\.dll \(85 % de 41 relevés\), le pilote de la carte graphique\.$/);
+  // Rendu qui attend dans Windows : on dit qui l'a appelé.
+  const waiting = ['Cadence: stall of 120 ms at 9.0s; main thread 10 samples: in ntdll.dll 10; under SDL364.dll 10 | render thread 10 samples: in ntdll.dll 10; under plugin-pup64.dll 10; top plugin-pup64.dll+0x40 (10)'];
+  assert.equal(stallPlace(waiting)!.render!.module, 'plugin-pup64.dll');
+  assert.equal(stallPlace(waiting)!.render!.what, undefined);
 });
 
 test('à-coups : banc du relevé (comptes par module, vrai fil suspendu), s’il est construit', (t) => {
