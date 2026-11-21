@@ -376,6 +376,9 @@ import { createProfileWelcome } from './profile-welcome';
 import { createInvitationsService, createMachineTag } from './invitations-service';
 import { createMenuSettings } from './menu-settings';
 import { createWheelSettings } from './wheel-settings';
+import { WheelRepeat } from './wheel-repeat';
+import { WheelThumbs } from './wheel-thumbs';
+import { screenPaceLine } from './screen-pace';
 import { createJukeboxSettings } from './jukebox-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
@@ -608,6 +611,8 @@ function wheelPlays(): boolean {
  * ne lance jamais une partie par surprise).
  */
 let wheelPress: { code: string; file: string; timer: NodeJS.Timeout } | undefined;
+/** Bouton tenu sur la roue : une table toutes les 100 ms au plus (wheel-repeat.ts). */
+const wheelRepeat = new WheelRepeat();
 
 function cancelWheelPress(): void {
   if (wheelPress) clearTimeout(wheelPress.timer);
@@ -3840,6 +3845,12 @@ export function startFrontend(): void {
     liveDmd.resend();
   });
   ipcMain.on('media-error', (event, error: MediaErrorReport) => !isHeadsetView(event.sender) && recordMediaError(error));
+  // Fluidité de l'écran des tables relevée par le plateau (cadence-ecran.js) : une ligne au journal.
+  ipcMain.on('screen-pace', (event, pace: unknown) => {
+    if (isHeadsetView(event.sender)) return;
+    const line = screenPaceLine(pace);
+    if (line) console.log(line);
+  });
   // Juke-box : temps, fin, erreur et niveaux du morceau en cours, place du clip (jukebox-player.ts) ;
   // jamais d'une fenêtre du casque (sa copie du clip, muette, ne commande rien).
   ipcMain.on('jukebox', (event, message: JukeboxMessage) => !isHeadsetView(event.sender) && jukeboxPlayer.message(message));
@@ -3991,8 +4002,15 @@ export function startFrontend(): void {
       vrFront.headset?.tintChanged();
     },
   });
-  // Les avatars des joueurs (avatar.ts) se lisent aussi par le protocole des médias.
-  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir)]);
+  // Logos de la roue réduits à leur taille d'affichage (wheel-thumbs.ts), jamais pendant une partie.
+  wheelThumbs = new WheelThumbs({
+    dataDir: loc.dataDir,
+    converter: () => (converter ??= createConverter()),
+    idle: () => state.phase !== 'playing' && state.phase !== 'loading',
+    log: (line) => console.log(line),
+  });
+  // Les avatars des joueurs (avatar.ts) et les miniatures de la roue se lisent aussi par le protocole des médias.
+  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir), wheelThumbs!.dir]);
   // Morceaux du Juke-box lus hors du processus principal (jukebox-media-server.ts).
   startJukeboxMedia({ log: (line) => console.log(line) });
   app.on('will-quit', () => stopJukeboxMedia());
@@ -4690,6 +4708,8 @@ function handleKey(input: Input, fromPhone = false): boolean {
       if (wheelPress && input.code !== wheelPress.code) cancelWheelPress();
       // Le rôle du bouton : la même résolution que dans le Juke-box (menuButton).
       const button = menuButton(input.code, KEYS, collectionKeys());
+      // Bouton tenu : la roue tourne au plus de 10 tables par seconde ; une répétition écartée ne renvoie rien.
+      if ((button === 'previous' || button === 'next') && !wheelRepeat.take(Boolean(input.isAutoRepeat))) return true;
       if (button === 'help') guest.knock('menu.commands') && (state = { ...state, help: !state.help });
       else if (state.help && button === 'exit') state = { ...state, help: false };
       else if (button === 'previous') guest.knock('menu.choose') && moveSelection(-1);
@@ -5978,6 +5998,10 @@ let dressCoveredSeen = false;
 let converter: ReturnType<typeof createConverter> | undefined;
 /** Couleur de chaque table au menu (table-tint.ts), créée avec les médias du menu. */
 let tints: TableTints | undefined;
+/** Miniatures des logos de la roue (wheel-thumbs.ts). */
+let wheelThumbs: WheelThumbs | undefined;
+/** Collection dont les logos ont été confiés à la tâche de fond des miniatures. */
+let thumbsWarmed: readonly TableEntry[] | undefined;
 /** Partie lancée pour régler l'affichage : le chargement rappelle les boutons du menu de VPX. */
 let displayMode = false;
 
@@ -6538,7 +6562,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   };
   // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
   // titre, fabricant et année (logo de repli de la roue), version et logo.
-  const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: wheel(t) });
+  // Dans la roue et la liste, le logo réduit à sa taille d'affichage dès qu'il existe (wheel-thumbs.ts).
+  const small = (t: TableEntry) => (wheelThumbs ? wheelThumbs.url(wheel(t)) : wheel(t));
+  const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: small(t) });
   // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent ;
   // moins de neuf entrées : chacune une seule fois (aucune répétée pour remplir), réparties de part
   // et d'autre du choix, en boucle comme la liste. Le médaillon Juke-box en tête de la collection
@@ -7092,6 +7118,11 @@ function broadcast(): void {
   // « Dans le casque », même casque retiré ; casque éteint ou Link coupé, le compagnon s'arrête et ils reprennent.
   const inHeadset = Boolean(vrFront.headset?.inUse);
   followTint();
+  // Écran des tables : les logos de toute la collection sont réduits en tâche de fond, une fois par collection.
+  if (wheelThumbs && medias && state.phase === 'menu' && thumbsWarmed !== tables) {
+    thumbsWarmed = tables;
+    wheelThumbs.warm(tables, (t) => medias?.wheel(t));
+  }
   syncLiveDmd();
   jukeboxPlayer.syncDmd((state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging());
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).

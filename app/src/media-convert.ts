@@ -22,7 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { session, WebContentsView } from 'electron';
-import { mediaKind, mp4VideoTrack, oggOpusFile, readWholeFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
+import { mediaContentType, mediaKind, mp4VideoTrack, oggOpusFile, readWholeFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
 
 const PARTITION = 'cyberpinball-conversion';
 const ORIGIN = 'https://conversion.cyberpinball.invalid';
@@ -155,6 +155,34 @@ window.fitJpeg = async (id, out, maxSide, quality) => {
   ctx.drawImage(bitmap, 0, 0, w, h);
   const jpeg = await canvas.convertToBlob({ type: 'image/jpeg', quality });
   await fetch('/out/' + out, { method: 'POST', body: jpeg });
+  return { width: w, height: h };
+};
+window.fitWebp = async (id, out, maxSide, type, quality) => {
+  const blob = await (await fetch('/in/' + id)).blob();
+  if (typeof ImageDecoder === 'function' && type && (await ImageDecoder.isTypeSupported(type))) {
+    const decoder = new ImageDecoder({ data: blob.stream(), type });
+    try {
+      await decoder.tracks.ready;
+      if (decoder.tracks.selectedTrack && decoder.tracks.selectedTrack.animated) return { kept: 'animated' };
+    } finally {
+      decoder.close();
+    }
+  }
+  const bitmap = await createImageBitmap(blob);
+  const side = Math.max(bitmap.width, bitmap.height);
+  if (side <= maxSide) {
+    bitmap.close();
+    return { kept: 'small' };
+  }
+  const w = Math.max(1, Math.round((bitmap.width * maxSide) / side));
+  const h = Math.max(1, Math.round((bitmap.height * maxSide) / side));
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const webp = await canvas.convertToBlob({ type: 'image/webp', quality });
+  await fetch('/out/' + out, { method: 'POST', body: webp });
   return { width: w, height: h };
 };
 window.cropJpeg = async (id, out, x, y, side, size, quality) => {
@@ -510,7 +538,30 @@ export function createConverter() {
     return { frames: frames.length, bytes: webm.length };
   }
 
-  return { probeAudio, audioToWav, audioToOggOpus, imageToPng, mediaFrames, fitJpeg, cropJpeg, shrinkVideo };
+  /**
+   * Miniature d'une image fixe, transparence gardée : `file` réduit à `maxSide` pixels de côté au plus,
+   * en WebP dans `out` (écriture atomique). Rien n'est écrit, et `kept` dit pourquoi, pour une image
+   * animée (APNG, GIF, WebP : la réduire la figerait) ou déjà assez petite.
+   */
+  async function fitWebp(file: string, out: string, maxSide: number, quality = 0.92): Promise<{ width?: number; height?: number; kept?: 'animated' | 'small' }> {
+    const id = inputId(file);
+    const key = `k${next++}`;
+    let got: { width?: number; height?: number; kept?: 'animated' | 'small' };
+    try {
+      got = await run(`fitWebp(${JSON.stringify(id)}, ${JSON.stringify(key)}, ${maxSide}, ${JSON.stringify(mediaContentType(file) ?? '')}, ${quality})`);
+    } catch (error) {
+      throw failure(error, 'image');
+    }
+    if (got.kept) return got;
+    const data = outputs.get(key);
+    outputs.delete(key);
+    if (!data) throw new Error(t('conversion sans résultat'));
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    writeFileAtomic(out, data.data);
+    return got;
+  }
+
+  return { probeAudio, audioToWav, audioToOggOpus, imageToPng, mediaFrames, fitJpeg, fitWebp, cropJpeg, shrinkVideo };
 
 }
 

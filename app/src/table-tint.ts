@@ -6,14 +6,18 @@
 // Calculée une fois par fichier, gardée dans
 // <données>\cache\teintes-tables.json, refaite quand le média change (chemin, taille, date).
 //
-// Rien n'est calculé pendant le défilement : la teinte montrée ne change que lorsque la table
-// choisie est restée en place SETTLE_MS ; d'ici là, l'ambiance garde la teinte d'avant (pas de
+// Rien n'est calculé pendant le défilement : en rafale, la teinte montrée ne change que lorsque la
+// table choisie est restée en place SETTLE_MS ; d'ici là, l'ambiance garde la teinte d'avant (pas de
 // clignotement à chaque cran), puis passe à la nouvelle en fondu (theme.css, 280 ms). Une seule
 // mesure à la fois, par le convertisseur hors écran (media-convert.ts) : quelques dizaines de
 // points de large, une image, ou quatre moments d'une vidéo.
+//
+// Appui isolé sur une table dont la teinte est déjà connue (en mémoire ou dans le cache) : elle est
+// montrée aussitôt, dans l'état que l'on envoie, et son fondu part avec celui des médias (21/11/2026 :
+// attendre SETTLE_MS la décalait en plein atterrissage de la roue, et coûtait un envoi de plus).
 
 import * as path from 'node:path';
-import { cachedTint, mediaKind, storeTint, tableTint, tintCacheFile, tintCacheKey, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
+import { cachedTint, mediaKind, storeTint, tableTint, tintCacheEntries, tintCacheFile, tintCacheKey, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
 import type { Converter } from './media-convert';
 
 /** Attente après le dernier changement de table avant de chercher sa teinte. */
@@ -27,7 +31,12 @@ export interface TableTintsOptions {
   /** La table montrée a une nouvelle teinte (ou plus de teinte) : l'état est à renvoyer. */
   onChange: () => void;
   settleMs?: number;
+  /** Horloge des essais. */
+  now?: () => number;
 }
+
+/** Teinte pas encore connue sans mesure (knownTint). */
+const UNKNOWN = Symbol('inconnue');
 
 /** Sujet des écrans : une clé (la table et ses médias), et les fichiers à lire dans l'ordre. */
 export interface TintSubject {
@@ -47,6 +56,10 @@ export class TableTints {
   private pendingKey?: string;
   private timer?: NodeJS.Timeout;
   private run = 0;
+  /** Dernier changement de table suivi (rafale : moins de SETTLE_MS entre deux). */
+  private lastFollow = -Infinity;
+  /** Cache sur disque, lu une fois : la teinte d'une table déjà mesurée se trouve sans relire le fichier à chaque appui. */
+  private disk?: Record<string, TintRecord>;
 
   constructor(private readonly opts: TableTintsOptions) {
     this.cacheFile = tintCacheFile(opts.dataDir);
@@ -58,8 +71,9 @@ export class TableTints {
   }
 
   /**
-   * Table montrée par les écrans (undefined : aucune, ou couleur coupée) : à chaque état envoyé.
-   * Rapide : ne fait qu'armer une attente quand le sujet change.
+   * Table montrée par les écrans (undefined : aucune, ou couleur coupée) : à chaque état envoyé, avant
+   * de le composer. Rapide : arme une attente quand le sujet change ; sur un appui isolé dont la teinte
+   * est connue, la montre aussitôt, sans onChange (l'état qu'on est en train d'envoyer la porte).
    */
   follow(subject: TintSubject | undefined): void {
     const key = subject?.key ?? '';
@@ -68,9 +82,20 @@ export class TableTints {
     clearTimeout(this.timer);
     this.timer = undefined;
     const run = ++this.run;
+    const settleMs = this.opts.settleMs ?? SETTLE_MS;
+    const now = (this.opts.now ?? Date.now)();
+    const isolated = now - this.lastFollow >= settleMs;
+    this.lastFollow = now;
     if (!subject) {
       // Plus de table (menu système, réglages, couleur coupée) : la sarcelle, sans attendre.
       return this.settle(undefined);
+    }
+    if (isolated) {
+      const known = this.knownTint(subject);
+      if (known !== UNKNOWN) {
+        this.shown = known;
+        return;
+      }
     }
     this.timer = setTimeout(() => {
       this.timer = undefined;
@@ -97,6 +122,33 @@ export class TableTints {
     const changed = this.shown?.color !== tint?.color || this.shown?.dmd !== tint?.dmd;
     this.shown = tint;
     if (changed) this.opts.onChange();
+  }
+
+  /**
+   * Teinte du sujet sans rien mesurer : le même choix que resolveSubject, d'après les seules mesures déjà
+   * faites (en mémoire, ou dans le cache lu une fois). UNKNOWN si un fichier à consulter n'a jamais été mesuré.
+   */
+  private knownTint(subject: TintSubject): ShownTint | undefined | typeof UNKNOWN {
+    const first = (files: readonly string[]): TableTint | undefined | typeof UNKNOWN => {
+      for (const file of files) {
+        const id = tintCacheKey(file);
+        // Fichier absent : pas de teinte pour lui, comme à la mesure.
+        if (!id) continue;
+        this.disk ??= tintCacheEntries(this.cacheFile);
+        const record = this.memo.get(id) ?? this.disk[id];
+        if (!record) return UNKNOWN;
+        this.memo.set(id, record);
+        if ('tint' in record) return record.tint;
+      }
+      return undefined;
+    };
+    const ambient = first(subject.files);
+    if (ambient === UNKNOWN) return UNKNOWN;
+    const dmdOwn = subject.dmdFiles?.length ? first(subject.dmdFiles) : undefined;
+    if (dmdOwn === UNKNOWN) return UNKNOWN;
+    const dmd = dmdOwn?.dmd ?? ambient?.dmd;
+    if (!ambient && !dmd) return undefined;
+    return { ...ambient, ...(dmd && { dmd }) };
   }
 
   /** Teinte du premier fichier qui en a une. */

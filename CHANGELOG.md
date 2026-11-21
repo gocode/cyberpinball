@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Écran des tables : la couleur d'une table déjà vue change en même temps que sa vidéo, au lieu d'arriver un quart de seconde plus tard pendant l'arrêt de la roue.
+- Flipper tenu sur l'écran des tables : la roue défile à 10 tables par seconde au lieu de 30, lisible et sans surcharge ; chaque appui distinct, même rapide, fait toujours avancer d'une table.
+- Les logos de la roue sont réduits une fois à leur taille d'affichage et gardés en cache, en tâche de fond et jamais pendant une partie : plus d'à-coup quand un grand logo apparaît pour la première fois. Les logos animés restent tels quels.
+- Le journal note la fluidité de l'écran des tables pendant le défilement (images lentes, la plus longue, rythme de l'écran), pour la mesurer sur chaque borne.
 - Écran des tables : la lueur verte du nom de la table ne disparaît plus pendant qu'il apparaît pour revenir d'un coup à la fin ; elle suit le texte du début à la fin de l'effet.
 - Mise à jour de Cyber Pinball : la recherche d'une nouvelle version part dès l'ouverture de l'entrée, sans avoir à choisir « Rechercher à nouveau ». Une version publiée quelques minutes plus tôt n'est plus cachée derrière « Cyber Pinball est à jour ».
 - Faire défiler vite la roue ne lance plus la vidéo de chaque table survolée sur chaque écran (plateau, fronton, DMD, topper) : les médias de la table attendent que la roue s'arrête (un cinquième de seconde) ; un appui isolé les change toujours tout de suite.

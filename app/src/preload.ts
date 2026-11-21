@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('cyber', {
   pathOf: (file: File) => webUtils.getPathForFile(file),
   // Médias des jeux : erreur de lecture d'une image ou d'une vidéo (journal du médecin).
   mediaError: (error: unknown) => ipcRenderer.send('media-error', error),
+  // Fluidité de l'écran des tables pendant le défilement (renderer/cadence-ecran.js, journal).
+  screenPace: (pace: unknown) => ipcRenderer.send('screen-pace', pace),
   // Assistant : sons de test joués par cette fenêtre sur la sortie audio demandée,
   // et compte rendu (sortie trouvée ou non, canaux disponibles).
   onSound: (callback: (command: unknown) => void) => {

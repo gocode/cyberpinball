@@ -585,6 +585,8 @@ function wheelMoved(v, dir) {
   clearTimeout(v.landing);
   v.stage.classList.remove('landed');
   v.stage.classList.add('moving');
+  // Fluidité relevée sur la borne, pendant le défilement seulement (cadence-ecran.js, journal).
+  if (role === 'playfield') window.CyberCadence?.watch();
   if (dir) wheelPulse(v, dir);
   // Durée lue une fois par style de roue : relue à chaque appui, elle forçait le calcul des styles
   // de toute la page au milieu de l'appui.
@@ -2120,6 +2122,8 @@ window.cyber.onState((s) => {
   // Avant tout média : cet état fait-il partie d'une rafale d'appuis dans la roue ?
   const burst = wheelBurst(s);
   inWheelBurst = burst;
+  // Écran des tables quitté : le relevé de fluidité en attente part au journal (cadence-ecran.js).
+  if (s.phase !== 'menu') window.CyberCadence?.flush();
   // Juke-box quitté (Exit, partie, extinction) : la lecture de cette fenêtre s'arrête, ses zones sont oubliées.
   document.documentElement.classList.toggle('jukebox-phase', s.phase === 'jukebox');
   // Au bureau, la gestion ouverte depuis le lecteur garde la musique : le clip, caché, joue en fond.

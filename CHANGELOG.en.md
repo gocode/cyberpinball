@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Table screen: the color of a table already seen now changes along with its video, instead of arriving a quarter of a second later while the wheel stops.
+- Holding a flipper on the table screen: the wheel scrolls at 10 tables per second instead of 30, readable and without overload; every separate press, however quick, still moves one table.
+- Wheel logos are scaled down once to their display size and cached, in the background and never during a game: no more hitch when a large logo first appears. Animated logos stay as they are.
+- The log records how smooth the table screen is while scrolling (slow frames, the longest one, screen rate), to measure it on every cabinet.
 - Table screen: the green glow of the table name no longer vanishes while the name appears and pops back at the end; it follows the text throughout the effect.
 - Cyber Pinball update: the search for a new version starts as soon as the entry opens, with no need to choose "Check again". A version published a few minutes earlier is no longer hidden behind "Cyber Pinball is up to date".
 - Scrolling the wheel fast no longer starts the video of every table passed on every screen (playfield, backglass, DMD, topper): the table's media wait until the wheel stops (a fifth of a second); a single press still changes them at once.

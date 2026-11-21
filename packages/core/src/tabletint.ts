@@ -311,6 +311,11 @@ function readTintCache(cacheFile: string): TintCacheFile {
   return { version: TINT_CACHE_VERSION, entries: {} };
 }
 
+/** Toutes les mesures gardées, par clé de média (tintCacheKey) : lues une fois, gardées en mémoire par l'appelant. */
+export function tintCacheEntries(cacheFile: string): Record<string, TintRecord> {
+  return readTintCache(cacheFile).entries;
+}
+
 /** Mesure déjà faite pour ce média ; undefined s'il n'a jamais été lu (ou a changé depuis). */
 export function cachedTint(cacheFile: string, media: string): TintRecord | undefined {
   const key = tintCacheKey(media);

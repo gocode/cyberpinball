@@ -259,6 +259,60 @@ test('menu : rien n’est mesuré pendant le défilement, la teinte suit la tabl
   }
 });
 
+// 21/11/2026 : même connue, la teinte attendait toujours SETTLE_MS, puis repartait dans un second envoi
+// de tout l'état ; son fondu tombait en plein atterrissage de la roue, après celui des médias.
+test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de suite, dans l’état envoyé ; en rafale, elle attend l’arrêt', async () => {
+  interface Tints {
+    follow(subject: { key: string; files: readonly string[] } | undefined): void;
+    current(): TableTint | undefined;
+    dispose(): void;
+  }
+  type Converter = { mediaFrames(file: string): Promise<{ width: number; height: number; images: RgbaImage[] }> };
+  const { TableTints } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-tint.js')) as {
+    TableTints: new (opts: { dataDir: string; settleMs?: number; onChange(): void; converter(): Converter }) => Tints;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teintes-isole-'));
+  try {
+    const at = (name: string) => {
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, name);
+      return file;
+    };
+    const images: Record<string, RgbaImage> = { bleu: solid('#2a5bd7'), rose: solid('#e0509a') };
+    let changes = 0;
+    const tints = new TableTints({
+      dataDir: dir,
+      settleMs: 40,
+      onChange: () => changes++,
+      converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
+    });
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const blue = { key: 'bleu', files: [at('bleu-backglass.png')] };
+    const pink = { key: 'rose', files: [at('rose-backglass.png')] };
+    const hueOf = () => tints.current()?.hue ?? -1;
+    // Premières visites : jamais mesurées, la teinte vient après l'attente et la mesure (un envoi de plus).
+    tints.follow(blue);
+    await wait(120);
+    tints.follow(pink);
+    await wait(120);
+    assert.equal(changes, 2);
+    assert.ok(hueDistance(hueOf(), lch('#e0509a')[2]) < 5);
+    // Appui isolé, table connue : la teinte est là tout de suite, sans second envoi.
+    tints.follow(blue);
+    assert.ok(hueDistance(hueOf(), lch('#2a5bd7')[2]) < 5, 'teinte montrée dans l’état en cours');
+    assert.equal(changes, 2, 'aucun envoi de plus');
+    // Rafale (appui suivant aussitôt) : la teinte d'avant reste jusqu'à l'arrêt, puis la nouvelle arrive.
+    tints.follow(pink);
+    assert.ok(hueDistance(hueOf(), lch('#2a5bd7')[2]) < 5, 'en rafale, pas de changement de couleur à chaque cran');
+    await wait(120);
+    assert.ok(hueDistance(hueOf(), lch('#e0509a')[2]) < 5);
+    assert.equal(changes, 3);
+    tints.dispose();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('menu : les points du DMD prennent d’abord la couleur du média de l’écran du DMD, l’ambiance celle du fronton (12/11/2026)', async () => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[]; dmdFiles?: readonly string[] } | undefined): void;
