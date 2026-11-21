@@ -185,6 +185,7 @@ export const messages: Record<string, string> = {
   '{n} autre fichier non joint': '{n} other file not attached',
   '{n} autres fichiers non joints': '{n} other files not attached',
   'Facultatif : ce que vous faisiez, depuis quand, ce que vous avez essayé': 'Optional: what you were doing, since when, what you tried',
+  'À écrire : le diagnostic ne voit rien, dites ce qui ne va pas': 'Required: the diagnosis sees nothing, say what is wrong',
   'Lue par les développeurs seuls. Ni nom, ni adresse, ni numéro de téléphone.': 'Read by the developers only. No name, no address, no phone number.',
   'Un rapport anonymisé aide les développeurs à corriger ce problème pour tout le monde.': 'An anonymised report helps the developers fix this problem for everyone.',
   'Flippers : choisir · Start : écrire, envoyer · Exit : revenir': 'Flippers: choose · Start: write, send · Exit: back',

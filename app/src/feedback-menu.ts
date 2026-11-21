@@ -80,11 +80,17 @@ export interface DevReport {
   findings?: string[];
   /** Le rapport automatique de ce plantage est déjà parti : seule la description du joueur reste à envoyer. */
   notified?: boolean;
+  /**
+   * Rien de connu ne décrit le problème (Diagnostic sans constat) : le rapport ne part qu'avec la
+   * description du joueur ou un fichier joint. Sans elle, il n'apprend rien à l'équipe.
+   */
+  needsText?: boolean;
 }
 
 /**
  * Le rapport du Diagnostic d'une table : ses constats (titre et détail), ce qui vient d'être réparé, et
- * une signature qui regroupe les mêmes constats sur la même table.
+ * une signature qui regroupe les mêmes constats sur la même table. Sans constat, le joueur décrit ce
+ * qu'il voit (needsText).
  */
 export function doctorReport(table: { id: string; title: string }, findings: readonly { code: string; title: string; detail?: string }[], repaired: readonly string[] = []): DevReport {
   const codes = [...new Set(findings.map((f) => f.code))].sort();
@@ -93,6 +99,7 @@ export function doctorReport(table: { id: string; title: string }, findings: rea
     table: table.title,
     signature: crashSignature('diagnostic', codes.join('+') || 'aucun', table.id),
     findings: [...findings.map((f) => (f.detail ? `${f.title} : ${f.detail}` : f.title)), ...repaired.map((fix) => t('Réparé : {fix}', { fix }))],
+    ...(findings.length ? {} : { needsText: true }),
   };
 }
 
@@ -539,6 +546,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         icon: 'lock',
         ...(privateReady ? (draft.kind === 'bug' ? { tone: 'ok' as const } : {}) : { tone: 'quiet' as const }),
         key: 'feedback:private',
+        sends: 'confirmation',
         run: () => (privateReady ? void send(draft, false, back) : self()),
       });
       actions.push({
@@ -547,6 +555,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         icon: 'upload',
         ...(publicReady ? (draft.kind === 'bug' ? {} : { tone: 'ok' as const }) : { tone: 'quiet' as const }),
         key: 'feedback:publish',
+        sends: 'confirmation',
         run: () => (publicReady ? void send(draft, true, back) : self()),
       });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
@@ -711,21 +720,24 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         // En attendant la réponse : les tutoriels et les questions, ailleurs que sur la borne.
         if (ctx.follow) actions.push(ctx.follow(() => show(build)));
       } else {
-        const ready = !sending && (!report.notified || Boolean(text) || box.files.length > 0);
+        // Déjà prévenus, ou rien de connu (Diagnostic sans constat) : le joueur dit d'abord ce qu'il voit.
+        const wanted = report.notified || report.needsText;
+        const ready = !sending && (!wanted || Boolean(text) || box.files.length > 0);
         actions.push({
           label: !report.notified ? t('Envoyer le rapport') : text || !box.files.length ? t('Envoyer ma description') : t('Envoyer mes fichiers'),
           detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décrivez d’abord ce qui s’est passé, ou joignez un fichier'),
           icon: 'upload',
           tone: ready ? 'ok' : 'quiet',
           key: 'devreport:send',
+          sends: 'confirmation',
           run: () => (ready ? void send() : show(build)),
         });
         actions.push({
           label: t('Décrire ce qui s’est passé'),
-          detail: text ? `« ${text.length > 60 ? `${text.slice(0, 60)}…` : text} »` : t('Facultatif : ce que vous faisiez, depuis quand, ce que vous avez essayé'),
+          detail: text ? `« ${text.length > 60 ? `${text.slice(0, 60)}…` : text} »` : report.needsText ? t('À écrire : le diagnostic ne voit rien, dites ce qui ne va pas') : t('Facultatif : ce que vous faisiez, depuis quand, ce que vous avez essayé'),
           icon: 'edit',
           key: 'devreport:text',
-          ...(report.notified && !text ? { attention: true } : {}),
+          ...(wanted && !text ? { attention: true } : {}),
           run: () =>
             ctx.prompt(t('Description'), t('Les détails'), text, (value) => {
               if (value !== undefined) text = cleanProposalText(value.slice(0, 2000)) ?? '';

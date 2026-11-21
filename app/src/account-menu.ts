@@ -586,7 +586,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
           ? { label: t('Activer mon profil public'), icon: 'eye', run: toggle(() => host.net.setPublicProfile(true), t('Profil public activé')) }
           : { label: t('Désactiver mon profil public'), icon: 'eye', run: toggle(() => host.net.setPublicProfile(false), t('Profil public désactivé')) },
         s.shareScores === false
-          ? { label: t('Publier mes scores'), icon: 'trophy', run: toggle(() => host.net.setShareScores(true), t('Vos scores sont publiés aux classements')) }
+          ? { label: t('Publier mes scores'), icon: 'trophy', sends: true as const, run: toggle(() => host.net.setShareScores(true), t('Vos scores sont publiés aux classements')) }
           : { label: t('Ne plus publier mes scores'), icon: 'trophy', run: toggle(() => host.net.setShareScores(false), t('Vos scores ne sont plus publiés')) },
         s.publicPresence === false
           ? { label: t('Apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(true), t('Vous apparaissez en ligne pour tous')) }

@@ -406,7 +406,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const entry = s.directory.find((d) => d.profile.key === key);
     const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
     if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
-    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), key: 'request', detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
+    if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), key: 'request', sends: true, detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
     const outgoing = s.outgoing.find((r) => r.key === key);
     if (rel === 'outgoing' && outgoing) {
       rows.push({ text: t('Demande envoyée le {date}', { date: new Date(outgoing.at).toLocaleDateString() }), detail: net.online(key) ? t('Remise à sa borne : il ne l’a pas encore acceptée') : t('Remise dès que sa borne sera en ligne'), tone: 'info', icon: 'friend-add' });
@@ -679,7 +679,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     actions.push(
       s.shareLibrary
         ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
+        : { label: t('Partager ma bibliothèque avec mes amis'), sends: true as const, detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });

@@ -476,6 +476,14 @@ export interface Action {
    * téléphone ouvre lui-même, au lieu d'envoyer Start à la borne. https seulement (remote-menus.ts).
    */
   link?: string;
+  /**
+   * L'action fait partir quelque chose de la borne (rapport, demande d'ami, publication) ou ouvre
+   * l'écran qui le fait : `true`, jamais sous le curseur à l'arrivée sur l'écran (focus.ts,
+   * `arrivalCursor`). `'confirmation'` : le bouton d'envoi de l'écran ouvert pour cela, que le joueur
+   * a déjà choisi d'ouvrir ; il peut l'attendre sous le curseur. Tout libellé « Envoyer… »,
+   * « Publier… » ou « Partager… » le déclare (garde : envoi-curseur.test.ts).
+   */
+  sends?: true | 'confirmation';
   run: () => void | Promise<void>;
 }
 

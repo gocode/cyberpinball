@@ -153,7 +153,7 @@ export function createTechSheet(ctx: TechSheetContext) {
     const checks = blocks.filter((b) => b.state !== 'ok').length;
     const rows: Row[] = blocks.map((b, i) => ({ action: i, pick: true, icon: b.icon, text: b.title, detail: b.summary, tone: b.state === 'ok' ? 'ok' : b.state === 'check' ? 'warning' : 'error', badges: [stateBadge(b.state)] }));
     const actions: Action[] = blocks.map((b) => ({ label: b.title, key: `sheet:${b.id}`, run: () => openBlock(b.id) }));
-    actions.push({ label: t('Envoyer un rapport'), detail: ctx.feedback ? t('À l’équipe, au téléphone, sur une clé USB ou à un ami · anonymisé') : t('Au téléphone, sur une clé USB ou à un ami · anonymisé'), icon: 'upload', tone: 'ok', key: 'sheet:report', run: () => openReport() });
+    actions.push({ label: t('Envoyer un rapport'), sends: true, detail: ctx.feedback ? t('À l’équipe, au téléphone, sur une clé USB ou à un ami · anonymisé') : t('Au téléphone, sur une clé USB ou à un ami · anonymisé'), icon: 'upload', tone: 'ok', key: 'sheet:report', run: () => openReport() });
     actions.push({ label: SYSTEM_ITEMS.health.label, icon: SYSTEM_ITEMS.health.icon, key: 'sheet:health', run: () => ctx.runSystemItem('health', () => open(false)) });
     actions.push({ label: running ? t('Relevé en cours…') : t('Relever à nouveau'), icon: 'refresh', tone: running ? 'quiet' : undefined, key: 'sheet:refresh', run: () => void refresh() });
     actions.push({ label: t('Retour'), icon: 'back', run: back });

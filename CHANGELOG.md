@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Diagnostic d'une table : deux appuis sur Start n'envoient plus de rapport aux développeurs par mégarde. Quand la table n'a aucun problème, Start mène à la table suivante ou à la fiche, et un rapport ne part qu'avec une description de ce qui ne va pas.
+- Dans tout le front-end, une action qui envoie quelque chose (rapport, demande d'ami, publication des scores, partage de la bibliothèque) n'est plus jamais sous le curseur à l'ouverture d'un écran : on y va aux flippers.
 - Mises à jour : quand GitHub ne répond pas depuis la borne, Cyber Pinball les fait passer tout seul par son propre service, qui va les chercher à sa place. Elles restent vérifiées comme d'habitude (signature, empreinte), et le joueur n'a rien à régler.
 - Écran « Mise à jour impossible » : nouveau bouton « Installer automatiquement la dernière version », qui cherche, télécharge et installe la dernière version par ce service, en un clic ; tables, médias et configuration sont gardés.
 - Les erreurs réseau des mises à jour et des téléchargements disent enfin pourquoi (adresse injoignable, nom du site introuvable, certificat refusé…), au lieu d'un simple « fetch failed ».

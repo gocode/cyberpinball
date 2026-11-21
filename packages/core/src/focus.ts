@@ -16,7 +16,13 @@
 //   s'ouvrait sur « Retour au menu », seule action de l'écran le temps de l'inventaire, que le
 //   curseur suivait une fois la liste arrivée, au lieu de sa première action ;
 // - un clic arrive avec l'identité de ce qui a été cliqué : il vaut pour cet élément où
-//   qu'il soit maintenant, et pour rien s'il a disparu.
+//   qu'il soit maintenant, et pour rien s'il a disparu ;
+// - à l'arrivée sur un écran (écran neuf, ou premier affichage après une opération longue),
+//   le curseur n'est jamais sur une action qui fait partir quelque chose de la borne
+//   (`avoid`) : Start ne doit pas envoyer ce que le joueur n'a pas choisi. Le 21/11/2026, sur
+//   le Diagnostic d'une table sans problème, « Envoyer un rapport aux développeurs » était la
+//   première action, et l'écran d'envoi s'ouvrait sur « Envoyer le rapport » : deux appuis sur
+//   Start pour passer la table envoyaient un rapport vide (18 sur 29 reçus du Diagnostic).
 
 /** Ce qu'il faut d'une action pour la reconnaître. */
 export interface Identified {
@@ -44,11 +50,26 @@ export interface FocusAnchor {
   screen: unknown;
   cursor: number;
   id: string | undefined;
+  /** La dernière vue attendait une opération longue : la suivante est une arrivée. */
+  busy?: boolean;
 }
 
 /** Ce que retient la vue : rien à suivre pendant une opération longue (`busy`), où rien ne se choisit. */
 export function anchorOf(screen: unknown, cursor: number, ids: readonly (string | undefined)[], busy: boolean): FocusAnchor {
-  return { screen, cursor, id: busy ? undefined : ids[cursor] };
+  return { screen, cursor, id: busy ? undefined : ids[cursor], ...(busy ? { busy: true } : {}) };
+}
+
+/**
+ * Curseur à l'arrivée sur un écran : s'il tombe sur une action qui envoie (`avoid`), il passe à la
+ * suivante qui n'envoie pas, sinon à la première. Hors arrivée (même écran, déjà montré hors
+ * opération longue), il reste où le joueur l'a mis : les flippers atteignent toujours ces actions.
+ */
+export function arrivalCursor(cursor: number, avoid: readonly boolean[], screen: unknown, anchor: FocusAnchor | undefined): number {
+  const arriving = !anchor || anchor.screen !== screen || anchor.busy === true;
+  if (!arriving || !avoid[cursor]) return cursor;
+  for (let i = cursor + 1; i < avoid.length; i++) if (!avoid[i]) return i;
+  for (let i = 0; i < cursor; i++) if (!avoid[i]) return i;
+  return cursor;
 }
 
 /**

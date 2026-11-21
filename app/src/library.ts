@@ -232,6 +232,7 @@ import {
   actionIds,
   indexOfId,
   anchorOf,
+  arrivalCursor,
   followCursor,
   resolveActivation,
   enterList,
@@ -2063,7 +2064,9 @@ export function createLibrary(host: LibraryHost) {
       current.script = script;
       current.findings = findings;
       current.ignored = ignored;
-      cursor = 0;
+      // Rien à réparer ni à ignorer : Start mène plus loin, sur la dernière action (« Table suivante »,
+      // « Retour à la fiche » : buildDoctor), que la vue recale (followCursor).
+      cursor = findings.every((f) => f.note && !f.fix) ? Number.MAX_SAFE_INTEGER : 0;
     });
   }
 
@@ -3340,6 +3343,7 @@ export function createLibrary(host: LibraryHost) {
         detail: findings.length ? tn(findings.length, 'Ce constat, la fiche technique et les journaux · chiffré', 'Ces {n} constats, la fiche technique et les journaux · chiffré') : t('Un souci que le diagnostic ne voit pas : la fiche technique et les journaux · chiffré'),
         icon: 'report',
         key: 'doctor:report',
+        sends: true,
         run: () => feedback.openSendReport(doctorReport(table, findings, s.log), () => go(s)),
       });
     }
@@ -3352,7 +3356,8 @@ export function createLibrary(host: LibraryHost) {
       for (const f of same) ignoredRows.push({ text: f.title, detail: f.detail, tone: 'quiet', action: index });
     }
     actions.push({ label: t('Analyser à nouveau'), run: () => void analyse() });
-    actions.push({ label: s.queue.length ? t('Table suivante') : s.back ? t('Retour') : t('Retour à la fiche'), run: next });
+    // Toujours la dernière action : une analyse sans constat y pose le curseur (analyse).
+    actions.push({ label: s.queue.length ? t('Table suivante') : s.back ? t('Retour') : t('Retour à la fiche'), key: 'doctor:next', run: next });
     // Hors de son dossier, la ROM n'est pas vérifiée (PinMAME la cherche alors ailleurs).
     const romChecked = !findings.some((f) => f.code === 'outsideFolder');
     if (s.findings && !findings.length) rows.push({ text: t('Aucun problème détecté'), detail: scriptNote(s.script), tone: 'ok' });
@@ -5938,6 +5943,8 @@ export function createLibrary(host: LibraryHost) {
     arrived(placeOf(screen, built), screen);
     const ids = actionIds(built.actions);
     cursor = followCursor(ids, cursor, screen, anchor);
+    // À l'arrivée, jamais sur une action qui envoie : Start n'envoie que ce que le joueur a choisi.
+    if (!busy) cursor = arrivalCursor(cursor, built.actions.map((a) => a.sends === true), screen, anchor);
     const zones = screenZones(built, built.actions.length);
     // Passage d'une zone à l'autre, par n'importe quel geste (flipper, MagnaSave, Exit, clic) : retenu pour y revenir.
     if (zones && anchor?.screen === screen && anchor.cursor < built.actions.length) {
