@@ -15,6 +15,9 @@
 // l'application est téléchargé, vérifié et déplié à côté, puis maj-legere.ts le met en place
 // une fois Cyber Pinball fermé et le relance. La source se règle ici aussi (« Versions reçues ») :
 // versions finales, préversions, ou essais d'un canal privé quand ce poste en a un (update.ts).
+// GitHub muet ou injoignable : les mêmes fichiers passent par le relais de Cyber Pinball
+// (updaterelay.ts), sans rien demander au joueur ; l'écran d'erreur propose en plus « Installer
+// automatiquement la dernière version », le relais d'abord.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -44,6 +47,7 @@ import {
   updateDownloadsDir,
   updateInstallerArguments,
   updatePlan,
+  updateFetchWithRelay,
   missedReleases,
   type LightUpdateJob,
   type Locations,
@@ -79,6 +83,10 @@ export interface UpdatesHost {
   available?(version: string, current: string): void;
   /** Au démarrage, la mise à jour lancée avant la fermeture : faite (`installed`), ou restée sans effet. */
   outcome?(o: { installed: boolean; to: string; previous: string }): void;
+  /** Essais : les lectures des mises à jour (par défaut GitHub, puis le relais de Cyber Pinball). */
+  fetch?: typeof fetch;
+  /** Essais : celles du secours « Installer automatiquement la dernière version » (par défaut le relais d'abord). */
+  rescueFetch?: typeof fetch;
 }
 
 type State =
@@ -139,11 +147,20 @@ export function createUpdatesMenu(host: UpdatesHost) {
   /** Source suivie : « essais » sans canal sur ce poste revient aux préversions publiques. */
   const source = (): UpdateSource => effectiveUpdateSource(loadUpdateSource(host.loc.dataDir), channel());
   /** Options de recherche de la source suivie. */
-  const sourceOptions = () => {
+  const sourceOptions = (get: typeof fetch = updateFetch) => {
     const s = source();
-    return { prereleases: s !== 'finales', ...(s === 'essais' && { channel: channel() }) };
+    return { prereleases: s !== 'finales', fetch: get, ...(s === 'essais' && { channel: channel() }) };
   };
   const plan = (latest: UpdateManifest): UpdatePlan => updatePlan(latest, host.version, socle());
+
+  /**
+   * Lectures de GitHub : en direct, puis par le relais de Cyber Pinball si GitHub ne répond pas
+   * (updaterelay.ts) ; le joueur n'a rien à faire. Le secours (« Installer automatiquement la
+   * dernière version », écran d'erreur) prend le relais d'abord.
+   */
+  const log = (line: string) => console.log(line);
+  const updateFetch = host.fetch ?? updateFetchWithRelay({ log });
+  const rescueFetch = host.rescueFetch ?? updateFetchWithRelay({ relayFirst: true, log });
 
   const sourceName = (s: UpdateSource) => ({ finales: t('versions finales'), preversions: t('préversions'), essais: t('essais privés') })[s];
 
@@ -305,7 +322,29 @@ export function createUpdatesMenu(host: UpdatesHost) {
     show();
   }
 
-  async function download(latest: UpdateManifest): Promise<void> {
+  /**
+   * Secours de l'écran d'erreur (« Installer automatiquement la dernière version », 21/11/2026) :
+   * recherche par le relais de Cyber Pinball d'abord, puis, si une version
+   * plus récente est publiée, téléchargement et installation dans la foulée, sans autre clic.
+   * Vérifiée comme d'habitude (signature du flux, empreinte du fichier).
+   */
+  async function rescue(): Promise<void> {
+    const known = state.kind === 'error' ? state.latest : undefined;
+    if (known) return download(known, rescueFetch);
+    state = { kind: 'checking' };
+    show();
+    try {
+      const result = await checkForUpdate({ current: host.version, ...sourceOptions(rescueFetch) });
+      state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
+    } catch (error) {
+      state = { kind: 'error', message: (error as Error).message };
+    }
+    console.log(`Mise à jour (secours) : ${describe()}`); // i18n-ignore : journal
+    if (state.kind === 'available' && installedRoot() && plan(state.latest).kind !== 'none') return download(state.latest, rescueFetch);
+    show();
+  }
+
+  async function download(latest: UpdateManifest, get: typeof fetch = updateFetch): Promise<void> {
     const root = installedRoot();
     const how = plan(latest);
     if (!root || !host.loc.root || how.kind === 'none') return;
@@ -327,7 +366,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     const progress = {
       signal: abort.signal,
       // Fichier d'un canal d'essai privé : lu avec son jeton ; toute autre adresse, telle quelle.
-      fetch: channelFetch(channel()),
+      fetch: channelFetch(channel(), get),
       onProgress: (received: number, total: number) => {
         job?.progress(received, total);
         if (state.kind !== 'downloading') return;
@@ -583,6 +622,17 @@ export function createUpdatesMenu(host: UpdatesHost) {
             state.latest
               ? { label: t('Réessayer le téléchargement'), icon: 'download', run: () => void download((state as { latest: UpdateManifest }).latest) }
               : { label: t('Réessayer'), icon: 'refresh', run: () => void check() },
+            // Si le problème persiste : un clic, par un autre chemin (le relais de Cyber Pinball).
+            ...(root
+              ? [
+                  {
+                    label: t('Installer automatiquement la dernière version'),
+                    detail: t('Si le problème persiste : par le service de Cyber Pinball, vérifiée comme d’habitude ; tables, médias et configuration gardés'),
+                    icon: 'download' as const,
+                    run: () => void rescue(),
+                  },
+                ]
+              : []),
             sourceAction(),
             retour,
           ],

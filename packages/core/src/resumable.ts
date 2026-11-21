@@ -18,6 +18,7 @@
 import { createHash, type Hash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describeNetworkError } from './netcause';
 import { t } from './i18n';
 
 export type ResumableHash = 'sha256' | 'md5';
@@ -147,7 +148,8 @@ export async function fetchResumable(opts: ResumableFetchOptions): Promise<Resum
     if (error instanceof ResumableError) return error;
     if (signal.aborted && signal.reason instanceof ResumableError) return signal.reason;
     if (opts.signal?.aborted) return new ResumableError(t('téléchargement annulé'), 'aborted', true);
-    return new ResumableError((error as Error)?.message ?? String(error), 'network', true);
+    // La cause lisible (adresse injoignable, certificat refusé…), pas seulement « fetch failed ».
+    return new ResumableError(describeNetworkError(error), 'network', true);
   };
 
   let handle: fs.promises.FileHandle | undefined;

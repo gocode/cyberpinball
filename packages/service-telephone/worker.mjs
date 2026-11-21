@@ -1,4 +1,4 @@
-// Service de t.cyberpinball.com : un Worker Cloudflare qui fait deux choses distinctes.
+// Service de t.cyberpinball.com : un Worker Cloudflare qui fait trois choses distinctes.
 //
 // 1. L'adresse stable du téléphone (packages/core/src/remote-relay.ts) :
 //    - garder, pour chaque borne, sa dernière déclaration (adresse locale chiffrée pour chacun de ses
@@ -34,6 +34,9 @@
 //    Les réactions aux Nouveautés du front-end : GET /api/nouveautes rend les totaux de chaque
 //    nouveauté (et la mienne si `pk` est donné) ; POST /api/nouveautes pose, change ou retire ma
 //    réaction, signée comme un vote, une par borne et par nouveauté.
+//
+// 3. Le relais des mises à jour (/maj/…, /telecharger) : pour une borne qui ne joint plus GitHub,
+//    voir « Relais des mises à jour » plus bas.
 //
 // Il ne journalise ni adresse IP ni contenu : l'adresse IP ne sert que de clé à la limite d'écritures.
 //
@@ -1107,11 +1110,86 @@ async function retours(request, env, url, now, ctx) {
   }
 }
 
+// ---------- Relais des mises à jour (21/11/2026) ----------
+//
+// Une borne qui ne joint plus GitHub (un réseau où seul l'IPv6 passe : GitHub n'a pas d'IPv6, ce
+// service si) lit ses mises à jour ici : le service va les chercher sur GitHub à sa place.
+//   GET /maj/api/releases?per_page=N            la liste des publications (API de GitHub), N ≤ 30
+//   GET /maj/github/releases/<chemin>            un fichier publié : releases/download/<tag>/<nom>
+//                                                ou releases/latest/download/<nom> (Range transmis)
+//   GET /telecharger                             l'installeur de la dernière version finale, pour un
+//                                                joueur qui ne peut plus ouvrir GitHub dans son navigateur
+// Seulement le dépôt de Cyber Pinball, jamais une autre adresse : ce n'est pas un relais ouvert.
+// Rien n'y est à croire sur parole : la borne vérifie la signature du flux et l'empreinte SHA-256
+// de chaque fichier, comme en direct. Rien n'est journalisé.
+
+export const UPDATE_REPOSITORY = 'gocode/cyberpinball';
+/** Liste des publications gardée quelques minutes : l'API de GitHub limite les requêtes sans compte. */
+export const RELEASES_CACHE_S = 120;
+const RELEASE_FILE = /^releases\/(download\/v[0-9A-Za-z.+-]{1,40}|latest\/download)\/[A-Za-z0-9._-]{1,120}$/;
+const RELAYED_HEADERS = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified'];
+
+function relayed(upstream, extra = {}) {
+  const headers = new Headers({ 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store', ...extra });
+  for (const name of RELAYED_HEADERS) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
+const githubHeaders = (accept) => ({ 'User-Agent': 'cyberpinball-relais', Accept: accept });
+
+/** Les routes du relais (/maj/…, /telecharger) ; undefined pour les autres. */
+export async function updateRelay(request, url, get = fetch) {
+  const path = url.pathname;
+  if (!path.startsWith('/maj/') && path !== '/telecharger') return undefined;
+  if (request.method !== 'GET' && request.method !== 'HEAD') return reply(405, { erreur: 'méthode' });
+  try {
+    if (path === '/maj/api/releases') {
+      const perPage = Math.min(30, Math.max(1, Number.parseInt(url.searchParams.get('per_page') ?? '10', 10) || 10));
+      const upstream = await get(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases?per_page=${perPage}`, {
+        headers: githubHeaders('application/vnd.github+json'),
+        cf: { cacheTtl: RELEASES_CACHE_S, cacheEverything: true },
+      });
+      return relayed(upstream);
+    }
+    if (path.startsWith('/maj/github/')) {
+      const rest = path.slice('/maj/github/'.length);
+      if (!RELEASE_FILE.test(rest) || rest.includes('..')) return reply(404, { erreur: 'inconnue' });
+      const range = request.headers.get('range');
+      const upstream = await get(`https://github.com/${UPDATE_REPOSITORY}/${rest}`, {
+        method: request.method,
+        headers: { ...githubHeaders('application/octet-stream'), ...(range ? { Range: range } : {}) },
+        redirect: 'follow',
+      });
+      return relayed(upstream);
+    }
+    if (path === '/telecharger') {
+      const latest = await get(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`, {
+        headers: githubHeaders('application/vnd.github+json'),
+        cf: { cacheTtl: RELEASES_CACHE_S, cacheEverything: true },
+      });
+      if (!latest.ok) return reply(502, { erreur: 'github' });
+      const release = await latest.json();
+      const asset = (release.assets ?? []).find((a) => /^CyberPinball-Setup\.exe$/i.test(a.name ?? '')) ?? (release.assets ?? []).find((a) => /Setup.*\.exe$/i.test(a.name ?? ''));
+      if (!asset?.browser_download_url?.startsWith(`https://github.com/${UPDATE_REPOSITORY}/releases/download/`)) return reply(404, { erreur: 'inconnue' });
+      const upstream = await get(asset.browser_download_url, { method: request.method, headers: githubHeaders('application/octet-stream'), redirect: 'follow' });
+      return relayed(upstream, { 'Content-Disposition': `attachment; filename="${asset.name}"` });
+    }
+    return reply(404, { erreur: 'inconnue' });
+  } catch {
+    return reply(502, { erreur: 'github' });
+  }
+}
+
 export default {
   async fetch(request, env, ctx, now = Date.now()) {
     const url = new URL(request.url);
     const call = /^\/api\/b\/([^/]+)$/.exec(url.pathname);
     if (call) return ID.test(call[1]) ? api(request, env, call[1], now) : reply(404, { erreur: 'inconnue' });
+    const relay = await updateRelay(request, url);
+    if (relay) return relay;
     const answered = (await coffre(request, env, url, now)) ?? (await retours(request, env, url, now, ctx));
     if (answered) return answered;
     // La page du raccourci d'une borne : la même pour toutes (page.js lit l'identifiant dans l'adresse).

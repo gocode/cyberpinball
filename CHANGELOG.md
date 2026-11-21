@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Mises à jour : quand GitHub ne répond pas depuis la borne, Cyber Pinball les fait passer tout seul par son propre service, qui va les chercher à sa place. Elles restent vérifiées comme d'habitude (signature, empreinte), et le joueur n'a rien à régler.
+- Écran « Mise à jour impossible » : nouveau bouton « Installer automatiquement la dernière version », qui cherche, télécharge et installe la dernière version par ce service, en un clic ; tables, médias et configuration sont gardés.
+- Les erreurs réseau des mises à jour et des téléchargements disent enfin pourquoi (adresse injoignable, nom du site introuvable, certificat refusé…), au lieu d'un simple « fetch failed ».
 - Écran des tables : la couleur d'une table déjà vue change en même temps que sa vidéo, au lieu d'arriver un quart de seconde plus tard pendant l'arrêt de la roue.
 - Flipper tenu sur l'écran des tables : la roue défile à 10 tables par seconde au lieu de 30, lisible et sans surcharge ; chaque appui distinct, même rapide, fait toujours avancer d'une table.
 - Les logos de la roue sont réduits une fois à leur taille d'affichage et gardés en cache, en tâche de fond et jamais pendant une partie : plus d'à-coup quand un grand logo apparaît pour la première fois. Les logos animés restent tels quels.

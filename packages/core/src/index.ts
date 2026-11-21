@@ -165,6 +165,8 @@ export * from './guestmode';
 export * from './health';
 export * from './techsheet';
 export * from './update';
+export * from './updaterelay';
+export * from './netcause';
 export * from './devkey';
 export * from './i18n';
 export * from './icons';

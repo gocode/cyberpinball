@@ -42,6 +42,7 @@ import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 import { fetchTextPatiently, type Patience, type PatientResponse } from './patientfetch';
 import { fetchResumable, ResumableError } from './resumable';
+import { describeNetworkError } from './netcause';
 
 /** GitHub repository of the releases; the same as "repository" in the root package.json (checked by the tests). */
 export const UPDATE_REPOSITORY = 'gocode/cyberpinball';
@@ -375,7 +376,8 @@ async function readUpdateSite(url: string, get: typeof fetch, signal: AbortSigna
     return await fetchTextPatiently(url, { ...patience, fetch: get, init, ...(signal ? { signal } : {}) });
   } catch (error) {
     if (signal?.aborted) throw error;
-    throw new Error(t('Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? ({message})', { message: (error as Error).message }));
+    // La cause lisible (adresse injoignable, nom introuvable, certificat refusé…), pas seulement « fetch failed ».
+    throw new Error(t('Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? ({message})', { message: describeNetworkError(error) }));
   }
 }
 

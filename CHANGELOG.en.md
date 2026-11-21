@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Updates: when GitHub does not answer from the cabinet, Cyber Pinball automatically gets them through its own service, which fetches them on its behalf. They are still checked as usual (signature, hash), and the player has nothing to set up.
+- "Update failed" screen: new "Install the latest version automatically" button, which finds, downloads and installs the latest version through this service in one click; tables, media and configuration are kept.
+- Network errors of updates and downloads now say why (address unreachable, site name not found, certificate refused…), instead of a bare "fetch failed".
 - Table screen: the color of a table already seen now changes along with its video, instead of arriving a quarter of a second later while the wheel stops.
 - Holding a flipper on the table screen: the wheel scrolls at 10 tables per second instead of 30, readable and without overload; every separate press, however quick, still moves one table.
 - Wheel logos are scaled down once to their display size and cached, in the background and never during a game: no more hitch when a large logo first appears. Animated logos stay as they are.
