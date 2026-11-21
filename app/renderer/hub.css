@@ -852,8 +852,11 @@
 
 .hub-card.hub-layout-people {
   grid-template-columns: minmax(0, 1fr);
+  /* La pastille, le texte qui prend la place restante, les boutons : « Ajouter » au même niveau dans toute la rangée. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: start;
   justify-items: center;
-  align-content: start;
+  align-content: stretch;
   text-align: center;
   gap: calc(10 * var(--u));
   padding: calc(20 * var(--u)) calc(8 * var(--u)) calc(14 * var(--u));
@@ -900,6 +903,7 @@
 }
 
 .hub-card.hub-layout-people .hub-buttons {
+  align-self: end;
   justify-content: center;
   padding-top: 0;
 }
