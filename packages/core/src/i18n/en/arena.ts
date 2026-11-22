@@ -1,6 +1,7 @@
 // Catalogue anglais : l'Arène (médaillon, affiche, écran à onglets), sa rubrique du Menu système et
 // son réglage dans la roue. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Flippers : parcourir · Exit : retour aux onglets': 'Flippers: browse · Exit: back to tabs',
   'Flippers : changer d’onglet · Start : y entrer · Exit : retour': 'Flippers: change tab · Start: enter · Exit: back',
   'Classement des scores': 'Score rankings',
   // packages/core/src/arena.ts

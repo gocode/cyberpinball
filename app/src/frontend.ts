@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { findWheelTable } from './wheel-table';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
@@ -302,7 +303,6 @@ import {
   JUKEBOX_WHEEL_KEY,
   COMMUNITY_WHEEL_KEY,
   ARENA_WHEEL_KEY,
-  tableKey as levelTableKey,
   COLLECTIONS_WHEEL_KEY,
   remoteMenuTarget,
   toRemoteEntry,
@@ -3698,8 +3698,7 @@ const communityHub = createCommunityHub({
 // Progression (fournis ci-dessus et par level-menu.ts).
 /** Une table des classements (son nom, sa référence VPS) dans la collection montrée par la roue. */
 function shelfTableOf(table: PresenceTable): TableEntry | undefined {
-  const key = levelTableKey(table);
-  return collections.shelf().tables.find((entry) => levelTableKey(presenceTable(entry)) === key);
+  return findWheelTable(collections.shelf().tables, table);
 }
 const arenaMenu = createArenaMenu({
   library,

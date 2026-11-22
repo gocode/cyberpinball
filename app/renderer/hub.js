@@ -436,7 +436,8 @@
       h.sections.forEach((s, i) => (leftSide(s, i) ? left : right).append(section(s, v.cursor, h.start)));
       body.append(left, right);
     } else for (const s of h.sections) body.append(section(s, v.cursor, h.start));
-    placeInto(o, [...top, body, foot(v.hint)]);
+    const reading = h.sections.some((s) => s.cards.some((c) => c.readOnly && c.action === v.cursor));
+    placeInto(o, [...top, body, foot(reading ? h.readingHint : v.hint)]);
     return o;
   }
 

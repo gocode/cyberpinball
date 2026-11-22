@@ -307,7 +307,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       { id: 'about', label: t('À propos'), icon: 'info' },
     ];
     // Des onglets en liste (règle du 22/11/2026 : hors de l'accueil, pas de blocs) : chaque publication, record ou option est un arrêt des flippers.
-    const spec: HubSpec = { heading: mine ? t('Mon profil') : name, icon: 'friend-list', medallion: 'communaute', title: name, facts, person, tabs, sections: [], list: true };
+    const spec: HubSpec = { heading: mine ? t('Mon profil') : name, icon: 'friend-list', medallion: 'communaute', title: name, facts, person, tabs, sections: [], list: true, readableCards: true };
     // Partage coupé (mon profil) : personne ne me voit ; rien d'autre à montrer.
     if (mine && !s.enabled) return { ...spec, sections: [], empty: { title: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »') } };
     switch (tab) {
@@ -406,7 +406,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       if (!likable || !card) return { ...base, detail: socialAgo(e.at, now()) };
       const n = card.likes[e.id] ?? 0;
       if (mine)
-        return { ...base, detail: n ? socialAgo(e.at, now()) : t('{ago} · pas encore de « J’aime »', { ago: socialAgo(e.at, now()) }), aside: String(n), asideIcon: n ? 'thumb-up-filled' : 'thumb-up', ...(n ? { run: () => openLikers(e as PublicEvent, reopen) } : {}) };
+        return { ...base, detail: n ? socialAgo(e.at, now()) : t('{ago} · pas encore de « J’aime »', { ago: socialAgo(e.at, now()) }), aside: String(n), asideIcon: n ? 'thumb-up-filled' : 'thumb-up', run: () => openLikers(e as PublicEvent, reopen) };
       const liked = net.likedByMe(key, e.id);
       return { ...base, detail: liked ? t('{ago} · vous aimez', { ago: socialAgo(e.at, now()) }) : socialAgo(e.at, now()), aside: String(n), asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', run: () => { net.like(key, e.id, !liked); reopen(); } };
     });

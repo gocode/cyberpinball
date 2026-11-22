@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Profile: all information remains reachable with the flippers, even without an associated action. My activity also opens an empty likes list; current tables can be found on the wheel when only their title is shared.
 - Profile: the tab bar receives focus on arrival, as in Arena and Community. Flippers display each section immediately; Start enters its content and Exit returns to the tabs.
 - Community: online players appear first in Players; the discovery strip has a clearer heading.
 - Arena: score rankings come first, with country and worldwide position badges on recently played tables.

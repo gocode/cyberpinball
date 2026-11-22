@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Profil : toutes les informations restent accessibles aux flippers, même sans action associée. Mon activité ouvre aussi la liste vide des « J’aime » ; les tables du moment retrouvent la roue même quand seul leur titre est partagé.
 - Profil : la barre d’onglets reçoit le focus à l’ouverture, comme dans l’Arène et la Communauté. Les flippers affichent immédiatement chaque section ; Start entre dans son contenu et Exit revient aux onglets.
 - Communauté : les connectés apparaissent en premier dans Joueurs ; la bande de découverte porte un intitulé adapté.
 - Arène : accès aux classements des scores en tête, et badges de position par pays et dans le monde sur les tables récentes.

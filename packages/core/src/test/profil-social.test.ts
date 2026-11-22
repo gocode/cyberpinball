@@ -60,7 +60,7 @@ test('Records : ses scores publiés, d’abord là où il me devance (le plus pe
 interface Hub {
   person: { name: string; eyebrow?: string; status?: { text: string }; buttons: { label: string; off?: string; primary?: boolean; xp?: string; action?: number }[] };
   tabs: { label: string; current: boolean; disabled?: string }[];
-  sections: { title?: string; cards: { title: string; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
+  sections: { title?: string; cards: { title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
 }
 interface Built {
   heading: string;
@@ -71,7 +71,7 @@ interface Built {
   back(): void;
 }
 
-function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean } = {}) {
+function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; likes?: number; plays?: boolean; tableAvailable?: boolean } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createProfileMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'profile-menu.js')) as {
     createProfileMenu(host: object): { openProfile(key: string, back: () => void): void; openMine(back: () => void): void };
@@ -88,7 +88,8 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean } = 
     xp: 20_000,
     friends: 12,
     events: [{ id: `ev-${k[0]}`, kind: 'record', at: ago(30), table: { title: 'Thunder Reef' }, score: 1_000, rank: 1 }],
-    likes: { [`ev-${k[0]}`]: 3 },
+    likes: { [`ev-${k[0]}`]: opts.likes ?? 3 },
+    ...(opts.plays ? { plays: { of: '2026-11-22', day: [], week: [{ board: BOARD('1'), title: 'Thunder Reef', n: 4 }] } } : {}),
     at: ago(5),
     sig: '',
   });
@@ -100,10 +101,11 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean } = 
     livePlayers: () => (opts.online ? [{ key: THEO, name: 'Théo', status: 'online', at: ago(1), sig: '' }] : []),
     likedByMe: () => false,
     like: (k: string, id: string, on: boolean) => events.push(`like:${id}:${on}`),
-    likers: () => [{ from: THEO, name: 'Théo', at: ago(3) }],
+    likers: () => opts.likes === 0 ? [] : [{ from: THEO, name: 'Théo', at: ago(3) }],
   });
   const menu = createProfileMenu({
     navKeys: () => ({ previous: ['FlipLeft'], next: ['FlipRight'] }),
+    table: { has: () => opts.tableAvailable ?? false, go: (table: { title: string }) => events.push(`table:${table.title}`) },
     library: { openCustom: (build: () => Built, at?: number) => (opened = { build, at }), openSystem: () => undefined },
     net,
     relation: (key: string, name: string) =>
@@ -250,4 +252,28 @@ for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un jo
   assert.deepEqual(p.events, []);
   p.built().back();
   assert.deepEqual(p.events, ['back']);
+});
+
+test('mon activité sans J’aime reste accessible et ouvre une liste vide, sans s’aimer soi-même', () => {
+  const p = profile({ mine: true, likes: 0 });
+  p.tab('Activité');
+  const post = p.built().hub.sections.find((s) => s.title === 'Mon activité')!.cards[0]!;
+  assert.ok(post.action !== undefined);
+  assert.equal(post.aside, '0');
+  p.pick('event:ev-a');
+  assert.equal(p.built().heading, 'Ont aimé');
+  assert.deepEqual(p.events, []);
+});
+
+for (const tableAvailable of [false, true]) test(`mes tables du moment : parcours aux flippers avec table ${tableAvailable ? 'présente' : 'absente'} de la collection`, () => {
+  const p = profile({ mine: true, likes: 0, plays: true, tableAvailable });
+  p.tab('Activité');
+  const week = p.built().hub.sections.find((s) => s.title === 'Mes tables du moment')!.cards[0]!;
+  assert.ok(week.action !== undefined, 'un arrêt même quand la table est seulement à lire');
+  assert.equal(Boolean(week.readOnly), !tableAvailable);
+  const cards = p.built().hub.sections.flatMap((s) => s.cards);
+  assert.ok(cards.every((c) => c.action !== undefined), 'le niveau et les autres informations restent lisibles aussi');
+  p.pick(`week:${BOARD('1')}`);
+  assert.deepEqual(p.events, tableAvailable ? ['table:Thunder Reef'] : []);
+  assert.ok(p.built().actions.some((a) => a.key?.endsWith('event:ev-a')), 'l’activité reste dans le parcours');
 });

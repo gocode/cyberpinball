@@ -211,6 +211,8 @@ export interface HubSpec {
    * pour l'accueil : résumés et accès rapides.
    */
   list?: true;
+  /** Les cartes sans action restent des arrêts de lecture dans la liste. */
+  readableCards?: true;
   singleColumn?: true;
   /** Une touche, avant les MagnaSave : vrai si elle est prise (un écran qui ignore un bouton encore tenu). */
   keys?: (input: { code: string }) => boolean;
@@ -219,6 +221,7 @@ export interface HubSpec {
 // ---------- Vue envoyée au rendu (Built.hub) ----------
 
 export interface HubCardView {
+  readOnly?: true;
   name?: string;
   title: string;
   eyebrow?: string;
@@ -259,6 +262,7 @@ export interface HubButtonView {
 }
 
 export interface HubView {
+  readingHint?: string;
   singleColumn?: true;
   medallion: string;
   /** Le nom de la touche Start, cerclé sur le bouton choisi (comme la maquette : « START Reprendre ma place »). */
@@ -371,6 +375,8 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
         // Un bouton grisé (`off`) n'est jamais un arrêt des flippers.
         if (c.buttons?.length) for (const b of c.buttons) !b.off && items.push({ label: b.label, key: `${c.key}:${b.key}`, run: b.run });
         else if (c.run) items.push({ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run });
+        // Arrêt de lecture : le curseur amène l'information dans la vue ; Start ne la modifie pas.
+        else if (spec.list && spec.readableCards) items.push({ label: c.title, key: c.key, run: () => undefined });
       }
       // Un onglet en liste : chaque élément est un arrêt à lui seul (un bloc d'une action, sans liseré).
       if (spec.list && !spec.flat) for (const item of items) out.push({ key: `item:${i}:${item.key}`, label: item.label, items: [item] });
@@ -521,7 +527,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
             : {}),
           cards: s.cards.map((c): HubCardView => {
             const { key, run: _run, buttons, ...shown } = c;
-            const out: HubCardView = { ...shown };
+            const out: HubCardView = { ...shown, ...(spec.readableCards && !c.run && !buttons?.length ? { readOnly: true as const } : {}) };
             // Dans le bloc où l'on est entré, ou, dans un onglet en liste, l'arrêt de l'élément lui-même.
             const own = (k: string) => itemAction.get(k) ?? blockAction.get(`item:${i}:${k}`);
             if (buttons?.length) out.buttons = buttons.map((b) => buttonView(b, own(`${key}:${b.key}`)));
@@ -560,6 +566,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       start: t('Start'),
       title: spec.title,
       facts: spec.facts,
+      ...(spec.readableCards ? { readingHint: t('Flippers : parcourir · Exit : retour aux onglets') } : {}),
       ...(spec.band ? { band: spec.band } : {}),
       ...(person ? { person } : {}),
       tabs,

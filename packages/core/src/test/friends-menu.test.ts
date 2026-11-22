@@ -274,8 +274,8 @@ test('profil d’un ami : l’invitation toujours là, grisée hors ligne avec s
   const playing = setup(undefined, 'playing');
   const busy = await friendPage(playing.menu, playing.last);
   assert.match(hubOf(busy).person.status?.text ?? '', /^En partie sur Glass Lagoon · depuis /, 'entre amis, sa table');
-  // Après Start dans Activité, le curseur est sur l'action principale.
-  assert.equal(playing.last().at, 0);
+  // Start dans Activité rejoint le contenu, même quand il contient seulement une information à lire.
+  assert.ok(hubOf(busy).sections.flatMap((s) => s.cards).some((c) => c.action === playing.last().at));
   await pressButton(busy, 'Inviter à jouer');
   assert.equal(playing.last().build().heading, 'Partie en direct avec Bruno');
 });
