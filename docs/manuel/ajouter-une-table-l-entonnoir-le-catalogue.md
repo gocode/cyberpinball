@@ -239,3 +239,9 @@ Le catalogue en ligne (**« Trouver une table en ligne »**) montre chaque jeu d
   Tests : `youtube-account.test.ts` (arguments, cookies triés, service avec un faux Edge).
 - **Code** : `packages/core/src/acquisition.ts` (hôtes, catalogue, conseil, ce qu'il faut, liste d'attente, rattachement, provenance, mises à jour), tests dans `packages/core/src/test/acquisition.test.ts` ; écrans dans `app/src/catalog.ts`, fenêtre dans `app/src/acquire-window.ts` (bandeau `app/renderer/acquire.*`), surveillance dans `app/src/downloads-watch.ts`, comptes et sondes de téléchargement dans `packages/core/src/sitesessions.ts` (tests `sitesessions.test.ts`).
   Écran du navigateur : `packages/core/src/browser-screen.ts` (tests `browser-screen.test.ts`), `app/src/browser-screen.ts`, choix dans `app/src/configurations-menu.ts`.
+
+### Contenu annoncé avec la table
+
+Une ROM, un fronton ou un PuP-Pack annoncé fourni par VPS reste à vérifier jusqu'à réception de l'archive de table.
+S'il manque, il redevient à récupérer séparément, entre dans la suite de l'installation rapide et reste proposé dans Ce qu'il manque pour jouer.
+Un fichier commencé dans Récupérer reste destiné à l'élément de départ, même si cette fenêtre se ferme ou change de page avant la fin.

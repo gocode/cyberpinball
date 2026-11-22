@@ -36,7 +36,7 @@ export function vpxSourcesArchive() {
   for (const f of tarballs) fs.copyFileSync(path.join(dl, f), path.join(stage, 'telechargements', f));
   copyTree(VPX_CORRIGE_SOURCE, path.join(stage, 'vpx-corrige'));
   fs.mkdirSync(path.join(stage, 'recette'), { recursive: true });
-  for (const f of ['vpx-corrige.mjs', 'casque-vr.mjs']) fs.copyFileSync(path.join(repo, 'scripts', f), path.join(stage, 'recette', f));
+  for (const f of ['vpx-corrige.mjs', 'vpx-cache.mjs', 'casque-vr.mjs']) fs.copyFileSync(path.join(repo, 'scripts', f), path.join(stage, 'recette', f));
   const license = path.join(vpxCorrigeSrcDir(), 'LICENSE');
   if (fs.existsSync(license)) fs.copyFileSync(license, path.join(stage, 'LICENSE-VPX'));
   const zip = path.join(out, VPX_SOURCES_NAME);

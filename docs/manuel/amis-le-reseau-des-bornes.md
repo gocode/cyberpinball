@@ -4,21 +4,19 @@
 
 Menu système > « Communauté » relie les bornes entre elles **sans serveur** : chacune trouve les autres et leur parle directement, par Internet ou sur le réseau local.
 Le partage est **activé par défaut** ; « Partage et réseau » le coupe.
-La Communauté du Menu système est le même écran que le médaillon Communauté de la roue (voir « Le médaillon Communauté » plus bas) : en tête, le nombre de joueurs en ligne et ce que voient les autres, puis huit entrées.
-Ce qui est à vous (niveau, badges, historique des parties, pseudo, avatar, pays, profil public, ce que voient les autres, suppression du compte) est dans Menu système > « Communauté » > « Mon profil » (voir [Mon compte](mon-compte.md#mon-compte)).
+La Communauté du Menu système et le médaillon Communauté ouvrent le même écran à six onglets : Accueil, Messages, Joueurs, Groupes, Salons et Profil.
+À l'ouverture, les flippers changent d'onglet et l'affichent tout de suite ; Start entre dans le contenu, Exit revient aux onglets, puis à la roue.
+MagnaSave change aussi d'onglet ; chaque onglet reste cliquable sur toute sa surface, même pendant un rafraîchissement.
+Dans le contenu, les flippers parcourent les blocs et Start y entre ; les actions du bas sont des lignes ordinaires.
+L'Accueil récapitule les onglets : Start sur un résumé ouvre l'onglet à cet endroit, Exit y ramène.
+Il montre le message qui attend avec trois réponses préparées, les amis en ligne et leur activité, le salon du pays en direct et les nouvelles à saluer ou féliciter.
+Joueurs réunit les anciens accès Mes amis et Joueurs en ligne : demandes reçues en tête, connectés d'abord, puis suggestions selon les tables et amis en commun, le pays et le niveau.
+« Tous les connectés » ouvre la liste complète ; tables partagées en médaillons (favorites d'abord) et amis en commun en pastilles aident à choisir un joueur.
+Le QR code de téléchargement « Faites découvrir Cyber Pinball » paraît sur l'Accueil au bureau et dans Joueurs en borne.
+Profil ouvre votre profil avec Modifier mon profil, Confidentialité et Mon compte ; Mon niveau, Mes badges et Historique des parties sont aussi dans Menu système > Arène > Progression.
+Les parties instantanées et les classements sont désormais dans l'Arène.
 
-| Entrée | Ce qu'elle montre |
-| --- | --- |
-| Mon profil | Mon niveau, Mes badges, Historique des parties, puis Modifier mon profil (pseudo, avatar, pays), Confidentialité (profil public, ce que voient les autres) et Mon compte (le protéger, le transférer, le supprimer). L'historique des parties : les parties entre amis finies sur cette borne, de la plus récente à la plus ancienne, par jour, la table, l'heure, et dessous les joueurs avec leur rang et leur score ; une partie s'ouvre pour revoir son détail (voir « Historique des parties » plus bas). |
-| Joueurs en ligne | Tous les joueurs que votre borne a croisés, amis ou non, ceux en ligne d'abord (voir « Communauté et joueurs en ligne » plus bas). |
-| Partie instantanée | Une partie en direct ouverte à tous, amis ou non ; le libellé dit s'il y en a une ouverte (voir « Parties instantanées » plus bas). |
-| Mes amis | En ligne, puis hors ligne. Pour chacun : en partie et sur quelle table (en temps réel), dans le front-end, ou vu il y a combien de temps ; son dernier évènement (« Nouveau meilleur score sur … », « Badge reçu : … », « A joué à … »). Start ouvre son profil, le seul écran d'un joueur (voir « Profil public et « J'aime » » plus bas) : sa présence, sa bibliothèque, son niveau, ses badges, une seule liste d'activité, « Inviter à une partie en direct » (grisée, « Hors ligne », quand il ne l'est pas), « Voir sa bibliothèque », « Écrire un message », « Retirer de mes amis », « Bloquer … ». En tête, une invitation reçue ou la partie en direct en cours. On y trouve aussi « Trouver un joueur » et les demandes d'amis (ci-dessous). |
-| Messages | Les conversations avec vos amis, la plus récente d'abord, puis les amis à qui vous n'avez pas encore écrit. La pastille rouge et « non lus » marquent ce qui attend. Start ouvre le fil d'un ami (voir « Messagerie » plus bas). |
-| Groupes et salons | Les groupes, publics ou privés, et les salons des pays (voir « Groupes » et « Salons par pays » plus bas). |
-| Classements | Les joueurs et les tables, aux portées Amis, National et Mondial (voir « Communauté et joueurs en ligne » plus bas). |
-| Réglages de la communauté | Présence et salons, Partage et réseau, Scores des amis pendant la partie, Masquer les notifications pendant les parties, Modération (bornes des modérateurs seulement), Jouer en local (ci-dessous). |
-
-Dans Mes amis et dans Réglages de la communauté :
+Dans Joueurs et dans Réglages de la communauté :
 
 | Entrée | Ce qu'elle montre |
 | --- | --- |
@@ -30,7 +28,7 @@ Dans Mes amis et dans Réglages de la communauté :
 
 **Jouer en local.**
 Menu système > Communauté > « Réglages de la communauté » > « Jouer en local » coupe le partage et arrête le réseau des bornes.
-Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, le médaillon Communauté de la roue, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
+Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, les médaillons Communauté et Arène de la roue, les défis, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
 Le tableau des scores d'une table ne garde que ceux de cette borne, sans onglets de portée.
 Dans Mon profil ne restent que Modifier mon profil (pseudo, avatar, pays) et Mon compte : Mon niveau, Mes badges, l'historique des parties et la Confidentialité sont retirés aussi.
 Restent toutes les tables et leurs scores sur cette borne, le Juke-box, la mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions.
@@ -513,47 +511,23 @@ Les messages sont gardés dans `<données>\amis\messagerie.json`.
 
 ### Profil public et « J'aime »
 
-Tout joueur a un **profil public**, lisible par ceux qui ne sont pas ses amis : son pseudo, son avatar, son niveau, ses badges, son pays, son nombre d'amis (jamais leur liste), le nombre de ses records publiés, ses personnes invitées, ses groupes publics et son **activité récente** (records et badges des 30 derniers jours).
-Table en cours, parties jouées, bibliothèque et messages restent entre amis, et le profil le dit (« Table en cours, parties jouées, bibliothèque : réservées à ses amis ») ; « En ligne » ou « En partie » se voient dans « Joueurs en ligne » (voir plus bas).
+Le profil montre le grand avatar avec anneau du niveau et présence verte en ligne, le pays, le pseudo, l'activité actuelle et les chiffres des amis, records, badges, groupes et tables en commun.
+Les actions de relation sont en tête : Inviter à jouer, Écrire et Sa bibliothèque pour un ami ; Ajouter (+25 XP), Accepter, Refuser, Annuler la demande ou souhaiter la bienvenue selon le cas.
+Une action indisponible reste grisée avec sa raison (« Hors ligne », « Entre amis seulement »).
+Le curseur démarre dans les onglets : flippers pour afficher, Start pour entrer, Exit pour revenir ; MagnaSave change aussi d'onglet.
+Toutes les informations restent accessibles aux flippers, même sans action associée.
 
-**Un seul écran par joueur.**
-Ami ou non, un joueur n'a qu'un écran, son profil (`app/src/profile-menu.ts`) ; jusqu'à la 0.1.13, la fiche d'un ami et son profil public faisaient doublon, avec deux listes d'activité différentes.
-Mes amis, « Joueurs en ligne », l'annuaire (« Trouver un joueur »), les demandes d'amis, la messagerie et les groupes (« Voir son profil »), les salons (les options d'une ligne) et l'Activité récente y mènent tous directement ; son « Retour » revient d'où l'on venait.
-Sous le pseudo, le palier et le niveau (« Flippeur · niveau 14 »), puis « Votre ami » ou « Profil public · pas votre ami ».
-De haut en bas :
+| Onglet | Contenu |
+| --- | --- |
+| Activité | Records, badges et parties avec leurs « J'aime », tables de la semaine, niveau et badges les plus rares. |
+| Records | Scores publiés, vos tables d'abord, avec l'écart à rattraper ; Start retrouve la table sur la roue même si seul le titre est partagé. |
+| Badges | Catalogue complet, obtenus et à obtenir, rareté et XP ; sur mon profil, progression et objectif restant. Les secrets gardent leur indice jusqu'à leur obtention. |
+| À propos | Pays, amitié, bibliothèque, identifiant, personnes invitées et groupes publics, puis Masquer son activité, Retirer de mes amis et Bloquer. |
 
-- ce que la relation ajoute (`playerPart` de `app/src/friends-menu.ts`) : pour un ami, sa présence (« En partie », « En ligne » ou « Hors ligne », depuis quand vous êtes amis, par où sa borne est reliée) et sa bibliothèque (avec « 1 réception en cours ») ; pour un autre joueur, où il a été vu (« Sur votre réseau local », « Vu il y a 3 j ») et la demande d'ami en cours, envoyée ou reçue ;
-- son pays, son nombre d'amis et ses records publiés, « Profil actualisé il y a … », puis son identifiant ;
-- son niveau et sa barre (« Flippeur · niveau 14 », « 350 / 750 XP ») ;
-- ses badges en médailles, les plus rares d'abord, douze au plus (« 23 badges sur 56 », « Les 12 plus rares ») ;
-- ses personnes invitées, s'il en a (voir « Personnes invitées » ci-dessous) ;
-- ses groupes publics, jamais un groupe privé (voir [Niveaux et badges](niveaux-et-badges.md#ce-que-voit-le-joueur)) ;
-- une seule liste d'activité, la plus récente en haut : ses records et badges des 30 derniers jours, à aimer, et, pour un ami, ses parties jouées sur les mêmes 30 jours (sans carte publique reçue, ses évènements d'ami seuls).
-
-La carte d'un joueur dont la borne n'a pas encore la version des niveaux n'a pas de niveau : la ligne dit « Niveau pas encore connu » (« Sa borne n'a pas encore la version qui donne le niveau »).
-Un niveau invraisemblable s'affiche « Niveau ? » (voir [Niveaux et badges](niveaux-et-badges.md#niveau-de-départ-et-vraisemblance)).
-Les actions : pour un ami, « Inviter à une partie en direct », « Voir sa bibliothèque », « Écrire un message » ; pour un autre joueur, « Envoyer une demande d'ami » (ou « Annuler la demande », « Accepter », « Refuser ») et « Écrire un message », grisé ; puis « Masquer son activité », « Retirer de mes amis » (un ami, avec confirmation), « Bloquer … » et « Retour ».
-
-**Aimer.**
-Sur le profil, les flippers choisissent un record ou un badge, Start l'aime, Start de nouveau ne l'aime plus.
-Chacun voit le nombre de « J'aime » ; seul l'auteur voit qui a aimé.
-Le « J'aime » se montre par un pouce levé, rempli quand vous l'aimez déjà ; le même pouce marque l'écran « Ont aimé », la notification d'un « J'aime » reçu, le détail des points d'expérience et les badges « Apprécié », « Populaire » et « Généreux ».
-On ne peut pas écrire à un joueur qui n'est pas un ami : « Écrire un message » reste visible, grisé, avec sa raison ; « Envoyer une demande d'ami » est à côté.
-« Masquer son activité » cache sur cette borne ses évènements et ses « J'aime », avec son niveau, ses badges et ses personnes invitées ; « Bloquer » coupe tout.
-
-**Mon profil public.**
-Menu système > « Communauté » > « Mon profil » > « Confidentialité » > « Mon profil public » montre ce que voient les autres (pays, amis et records, niveau et barre, badges en médailles, personnes invitées, groupes publics) et, pour chaque évènement de « Votre activité récente », qui l'a aimé (Start).
-Pendant le premier mois, il propose aussi « Qui vous a fait découvrir Cyber Pinball ? » (voir « Personnes invitées » ci-dessous).
-Un « J'aime » reçu s'annonce par une notification à l'écran des tables, regroupée (« Dora et Kiko aiment votre activité »).
-Le profil public est **activé par défaut** ; « Désactiver mon profil public », ici ou dans « Ce que voient les autres », ne laisse aux autres que le pseudo dans l'annuaire (et les scores, s'ils sont publiés).
-
-**Sans serveur.**
-La carte publique d'un joueur est signée par sa clé et passe de borne en borne comme les scores des classements : chaque borne la garde 60 jours, si bien qu'un profil se lit même quand son joueur est hors ligne, dans l'état de la dernière carte reçue (« Profil actualisé il y a … »).
-Un « J'aime » est un petit message signé, remis directement à la borne de l'auteur quand elle est reliée, sinon relayé par une ou deux bornes, et réessayé à chaque liaison pendant 30 jours.
-Le nombre affiché est celui de la dernière carte reçue.
-Une même borne ne peut pas donner plus de 100 « J'aime » par jour à un joueur.
-Les cartes envoyées ensemble tiennent sous 180 Kio par message (`withinBytes`, [publicprofile.ts](../../packages/core/src/publicprofile.ts)) : une carte porte jusqu'à vingt attestations de personnes invitées, et un message trop gros serait refusé entier.
-Cartes et « J'aime » sont gardés dans `<données>\amis\profils.json`.
+Mon profil présente le même écran que celui vu par les autres, avec Modifier mon profil, Confidentialité et Mon compte en tête.
+Start sur une de mes publications ouvre sa liste de « J'aime », même vide ; sur celle d'un autre joueur, il ajoute ou retire mon pouce.
+Confidentialité > Ce que voient les autres règle la liste d'amis : publique par défaut, amis seulement ou privée ; cela détermine aussi les amis en commun visibles.
+Un groupe privé ne paraît jamais sur un profil.
 
 ### Personnes invitées
 
@@ -595,7 +569,7 @@ Tests : [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 **Le médaillon Communauté.**
 Dans la roue, juste après le Juke-box et avant le médaillon Collections et les tables de chaque collection, un médaillon sur l'anneau chromé commun ouvre la communauté : son nom en vert, le nombre de joueurs en ligne et d'amis en ligne dessous.
 Partout (médaillon, affiche, Menu système, onglets de « Joueurs en ligne », téléphone), le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq, comme les présents d'un salon : un réseau presque vide, chiffré, découragerait ; les joueurs restent nommés, et vos amis en ligne se comptent toujours.
-Start ouvre l'**accueil**, le même écran que Menu système > Communauté, son « Retour » ramenant à la roue : en tête, le nombre de joueurs en ligne et ce que voient les autres, puis « Mon profil », « Joueurs en ligne », « Mes amis » (avec la pastille des demandes reçues), « Messages » (la messagerie entre amis), « Groupes et salons » (voir « Groupes » et « Salons par pays » ci-dessous) et « Réglages de la communauté ».
+Start ouvre l'Accueil à onglets, le même écran que Menu système > Communauté ; le retour rejoint la roue.
 Les parties instantanées (voir ci-dessous) et les classements, qui ouvrent sur deux portes, « Joueurs » et « Tables », sont dans l'Arène, son médaillon à côté de celui de la Communauté.
 « Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (Start ou MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
 Il s'ouvre sur National · Cette semaine (Mondial sans pays choisi) : la semaine d'abord, où chacun a sa chance.
@@ -618,11 +592,11 @@ Exit revient à la roue.
 Le médaillon se masque dans Menu système > Tables > Roue (« Communauté dans la roue ») ; il n'apparaît jamais en mode invité.
 Choisi dans la roue, il montre son **affiche**, comme le Juke-box : derrière la roue (tout le plateau en borne, le cadre du plateau au bureau) et à la place du média du fronton.
 Les deux affiches donnent les chiffres (joueurs en ligne, ceux de votre pays, vos amis) et les amis en ligne (sinon les messages non lus) ; partage désactivé, elles disent comment l'activer.
-Celle du plateau montre en plus votre niveau (son palier et sa barre), votre place au classement mondial et dans votre pays, et votre semaine en une ligne (« Cette semaine : +850 XP · 37ᵉ au monde · 3ᵉ dans votre pays ») ; une place encore inconnue garde sa case, grisée, avec sa raison (« Pas encore classé », « Pays non choisi »).
-Le salon de votre pays, avec ses présents et sa dernière ligne, ne paraît que sur l'affiche du fronton.
+L'affiche du plateau montre le message en attente, les amis en ligne, le salon du pays, les groupes et demandes d'ami ; le niveau et les places sont sur l'affiche de l'Arène.
+Le salon de votre pays se lit aussi sur l'affiche du fronton.
 
 **Joueurs en ligne.**
-Aussi dans Menu système > Communauté, juste après Mon profil.
+Accessible depuis Joueurs dans la Communauté.
 Tous les joueurs que votre borne a croisés, amis ou non (l'annuaire du réseau, vos amis, les joueurs des classements), **ceux en ligne d'abord** : vos **amis en ligne**, puis les joueurs de **votre pays**, puis les autres ; dans chaque groupe, ceux qui sont en partie d'abord, puis par nom.
 Viennent ensuite, dans « Hors ligne », tous les autres : vos amis d'abord, puis le plus récemment vu (« Vu il y a 3 j »).
 Chaque ligne porte la pastille du joueur, son drapeau devant son nom (le drapeau Cyber Pinball, une bille comète, pour un joueur qui n'a pas dit son pays ; de même dans les classements et les salons), un anneau vert autour de la pastille quand il est connecté, et dessous ce qu'il fait (« En partie », sur quelle table entre amis, « En ligne », « Vu il y a 3 j ») et ce qui vous rapproche (« 6 tables en commun », « Sur votre réseau local ») ; « Ami » (hors de la section des amis) ou « Demande envoyée » dans la même ligne.
@@ -650,11 +624,11 @@ Le module est [livepresence.ts](../../packages/core/src/livepresence.ts), l'écr
 ### Parties instantanées
 
 Une partie en direct ouverte à tous, amis ou non.
-Un joueur l'ouvre, choisit le nombre de joueurs, et elle s'affiche dans la Communauté de chaque borne en ligne ; n'importe qui la rejoint, et **dès qu'elle est complète, elle part d'elle-même pour tout le monde**.
+Un joueur l'ouvre, choisit le nombre de joueurs, et elle s’affiche dans l’Arène de chaque borne en ligne ; n'importe qui la rejoint, et **dès qu'elle est complète, elle part d'elle-même pour tout le monde**.
 La partie elle-même est celle des amis (voir « Communauté : le réseau des bornes ») : chacun joue sur sa borne, la même version de la table, avec les réglages de l'hôte, un départ commun et les résultats de chacun.
 
 **Ouvrir une partie.**
-Communauté > Partie instantanée > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
+Arène > Partie instantanée > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
 Aussi depuis la fiche d'une table : « Partie instantanée », juste après « Jouer avec un ami ».
 Le salon d'attente s'ouvre : « En attente de 2 joueurs », les joueurs déjà là et les places libres.
 À chaque arrivée, une notification (« Tiltman a rejoint votre partie ») et une ligne en tête du salon (« Encore 1 joueur et elle part »).
@@ -927,3 +901,26 @@ Pour l'instant, c'est toujours une image à soi : une photo ou une image prise s
 Une image à soi seulement : pas encore d'avatars tout faits à choisir.
 Pas de recadrage en rond : le carré est envoyé, le rond est dessiné par chaque borne.
 Une image animée (GIF) devient fixe.
+
+### Arène, scores et défis
+
+Le médaillon Arène, entre Communauté et Collections, et Menu système > « Arène » ouvrent le même espace.
+Menu système > Tables > « Roue » permet de masquer le médaillon ; Jouer en local retire aussi l'Arène et les défis.
+Son affiche montre votre niveau et un tableau à points qui change toutes les six secondes selon ce qui attend : défi bientôt terminé, partie ouverte, place à reprendre, classement et records.
+L'Accueil met l'action pressante en tête, puis le classement mondial (trois premiers et votre place), les parties ouvertes et les XP possibles.
+Vos places dans le monde et votre pays ouvrent directement leur classement ; Exit revient à l'Arène.
+Les onglets suivent la navigation de la Communauté ; hors Accueil, les flippers parcourent directement les lignes et Start valide, sans entrer dans un bloc.
+Scores (trophée) montre les tables récentes, leur premier et vos places nationales et mondiales, puis toutes les tables avec recherche, portée et période, et le classement des joueurs.
+Du jour montre les tables les plus jouées au monde, dans votre pays ou entre amis, le record du jour, votre place et le joueur juste devant ; faute de parties aujourd'hui, la semaine s'affiche.
+Start lance votre version exacte ; une autre version reste grisée, avec « Récupérer cette version » chez un ami qui l'a.
+Les nombres de parties du jour et de la semaine sont partagés par version exacte avec la carte publique signée ; les valeurs invraisemblables sont marquées « ? ».
+Quand quelqu'un vous dépasse au classement du jour ou de tout temps sur une version jouée, une notification (une au plus par table et par jour) et l'Activité récente proposent « Reprendre ma place ».
+Cette place devient la carte prioritaire de l'Arène : rejouer, écrire entre amis ou défier.
+
+**Défis** (flippers croisés) réunit ceux à jouer, ceux envoyés et les résultats récents.
+Fiche d'une table > Jouer ensemble… > Défier un joueur… permet de choisir un ami ou un joueur classé sur la même version exacte ; le défi est aussi accessible depuis une place prise ou le retour de partie.
+Votre meilleur score, ou celui de la partie terminée, est le score à battre : 48 heures, essais illimités, et chacun peut améliorer son score.
+Le destinataire peut refuser ; à l'échéance, le plus haut score gagne 40 XP, puis « Revanche » crée un nouveau défi.
+Seuls les scores relevés par Cyber Pinball comptent ; les joueurs bloqués ou exclus des salons ne peuvent pas vous défier.
+Les défis signés sont relayés de borne en borne, sans serveur : vous n'avez pas besoin d'être connectés en même temps.
+Les notifications annoncent réception, score dépassé, six dernières heures, résultat ou refus ; l'Activité récente garde une seule ligne par défi.

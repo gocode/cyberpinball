@@ -14,7 +14,7 @@ Demonstrations name an action under "Gérer la table…" by its name, and the au
 A table's game page (Start on a table in the menu) shows its statistics on one line and a **bounded summary** of its files: one line per kind present (table, backglass, ROM, DMD content, PuP videos, DMD colours, alternative sounds, music, own settings, media), three names at most per line ("t2_l3, t2_l4 and 4 more"), a "Absents" (Missing) line for the missing kinds and a "À vérifier" (To check) line (misnamed backglass, script replaced by a `.vbs`, crash report, low ROM volume).
 After the ROM, a "Volume de la ROM" (ROM volume) line gives, for a machine that keeps its volume in its memory, the one the ROM will play and what Cyber Pinball does with it ("12 sur 31, d'usine, faible : monté à 23 avant la partie" (12 of 31, factory, low: raised to 23 before the game), "18 sur 31 (votre réglage)" (18 of 31 (your setting))…, see [ROM volume](sound.md#rom-volume)).
 A table that is sluggish or stutters on the cabinet says so in "Diagnostiquer et réparer" (Diagnose and repair), with the figures of its last game (see [Cabinet health](cabinet-health.md#cabinet-health)).
-"Diagnostiquer et réparer" also offers "Envoyer un rapport aux développeurs" (Send a report to the developers): in one press, the table's findings, what was just repaired, the tech sheet and the logs, encrypted and anonymised; a description stays optional, and without findings the detail says "Un souci que le diagnostic ne voit pas" (A problem the diagnosis does not see).
+"Diagnostiquer et réparer" also offers "Envoyer un rapport aux développeurs" (Send a report to the developers): in one press, the table's findings, what was just repaired, the tech sheet and the logs, encrypted and anonymised; a description is required, and without findings the detail says "Un souci que le diagnostic ne voit pas" (A problem the diagnosis does not see).
 Upright (cabinet with a turned playfield, or portrait screen), the information keeps its place and the actions go on two columns; the action list scrolls if it overflows.
 On a cabinet, the action list used to take the whole height: with many files, only the first statistics line was still visible.
 
@@ -34,3 +34,12 @@ In the common tables folder, only the table's companion files (same name) belong
 The inventory is read when the game page opens, not on each button press.
 
 Code: [packages/core/src/tablecontents.ts](../../packages/core/src/tablecontents.ts) (inventory, tests `tablecontents.test.ts`), screens in [app/src/table-files.ts](../../app/src/table-files.ts), summary in `buildSheet` (`app/src/library.ts`), layout `.lib-sheet`, `.lib-files` and `.lib-facts` in `app/renderer/library.css`; lines to choose (`Row.pick`) do not repeat their action in the list.
+
+### Target and diagnostics
+
+On this table shows the player directly above you, the daily record, friends playing now and friends of the week; a table without an online score says yours will be the first.
+An open instant game on your version leads ahead of Play; Play together… groups friend, instant game and challenge actions.
+Your record and group are in statistics, files under Manage table….
+At launch, the target appears on Cyber Pinball loading and the desktop inset, without sound or covering your chosen loading media.
+A diagnostic without problems preselects the next step or return; sending a report requires a description and explicit choice.
+A backglass with different proportions is stretched as during play: diagnostics measures the distortion; DMD and topper keep their black bars.

@@ -769,3 +769,20 @@ Construction : `node scripts/vision3d.mjs` (avec `--banc` : banc d'essai sans VP
 
 Limites : l'effet ne vaut que pour le joueur suivi, et une caméra qui filme l'écran ne le montre pas ; la webcam a besoin d'un peu de lumière ; la Kinect pour Xbox One n'est pas prise en charge.
 Tests : `packages/core/src/test/vision3d.test.ts`, `vision3d-webcam.test.ts` (fausse caméra de Chromium et portrait d'essai), `vision3d-kinect.test.ts` (fausse `Kinect10.dll`, `packages/vpx-vision3d/test/kinect-factice.cpp`), banc du plugin (`packages/vpx-vision3d/test/banc.cpp`).
+
+### Lunettes 3D (bêta)
+
+Menu système > Ma borne > Réalité virtuelle et vision 3D > « Lunettes 3D » permet de jouer en relief avec des filtres rouge / cyan, vert / magenta ou ambre / bleu.
+Les lunettes se cumulent avec la Vision 3D : la perspective suit alors la tête.
+Le calibrage se fait aux boutons devant le playfield, avec six réglages et un œil fermé à chaque étape ; profondeur et couleurs se règlent au même endroit.
+« Roue en relief », activé avec les lunettes, met les médaillons et l'interface en profondeur ; le médaillon choisi vient devant les voisins, le fond de table et les cadres chromés du bureau restent à plat.
+Une copie des réglages est donnée à VPX pour la partie : VPinballX.ini et fichier de table ne changent pas ; SMAA, indisponible en relief, est remplacé par FXAA qualité.
+
+### Première partie à ROM et retour de partie
+
+Une ROM sans mémoire est initialisée hors écran et sans son, en arrière-plan après installation ou pendant le chargement si nécessaire ; une mémoire présente n'est jamais remplacée.
+Le chargement annonce cette préparation, Exit l'arrête et le volume conseillé est posé dès la première partie.
+Une ROM sans ses fichiers de son est notée sans musique sans faire échouer l'enregistreur.
+Après une partie avec record ou joueur dépassé, le retour montre score, record, XP détaillés, place gagnée et prochain objectif, puis Rejouer, message préparé entre amis, Défier et Retour aux tables selon le contexte.
+Les animations des badges et du niveau viennent ensuite.
+VPX 10.8.1-5436 patched Cyber Pinball 4 réunit fréquence indépendante des écrans annexes, cadrage, décodage des GIF PuP hors du rendu et temps GPU ; il est posé dès le démarrage après mise à jour.

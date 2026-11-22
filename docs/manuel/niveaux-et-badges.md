@@ -92,13 +92,13 @@ Les rivets et les étoiles brillent à la couleur de la rareté.
   En mode invité, la carte dit « Invité · Parties sans XP ».
   La carte et la pastille des badges restent aussi en haut des écrans pleins (Menu système et ses écrans, Mes badges, aide…), sur la ligne de la marque, à la hauteur des autres pastilles (`--pill-height`, [app/renderer/niveau.css](../../app/renderer/niveau.css)) ; jamais en mode attente ni au Juke-box.
   Là, « +85 XP » ne s'affiche pas (il tomberait sur le titre de l'écran), et en borne la carte cède sa place le temps d'une notification.
-  La roue dentée du Menu système, à leur droite, est une pastille ronde du même gabarit (voir [Menu système](menu-systeme-cinq-rubriques.md#menu-système--huit-rubriques)).
-- **Mon niveau**, en tête de l'accueil Communauté : la barre et les XP restants, les XP de la semaine, les quatre derniers gains, les classements de la semaine en cours avec les XP prévus, les deux badges les plus proches ; puis « Mes badges », « Comment gagner des XP » et « Mon profil public ».
+  La roue dentée du Menu système, à leur droite, est une pastille ronde du même gabarit (voir [Menu système](menu-systeme-cinq-rubriques.md#menu-système--neuf-rubriques)).
+- **Mon niveau**, dans Arène > Progression : la barre et les XP restants, les XP de la semaine, les quatre derniers gains, les classements de la semaine en cours avec les XP prévus, les deux badges les plus proches ; puis « Mes badges », « Comment gagner des XP » et « Mon profil public ».
 - **Mes badges** : chaque ligne porte le dessin du badge, dans sa forme et sa rareté ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
   Un badge reçu brille, avec un halo à la couleur de sa rareté et un reflet qui passe ; un badge pas encore reçu reste gris et éteint, sans reflet ; un secret pas encore reçu ne montre que son cadenas.
   Les deux badges les plus proches, dans « Mon niveau », ont le même dessin.
   Un badge pas encore reçu dit ce qu'il rapporte (« Jouer à 100 tables différentes · +1 000 XP à gagner »), badges secrets compris, après leur indice.
-- **Profil public** (voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#profil-public-et--jaime-)) : le palier et le niveau sous le pseudo ; puis, après le pays, le nombre d'amis (jamais leur liste) et les records, la ligne du niveau avec sa barre (« Flippeur · niveau 14 », « 350 / 750 XP ») et ses badges en médailles, les plus rares d'abord (douze au plus, « 23 badges sur 56 »).
+- **Profil public** (voir [Communauté : le réseau des bornes](amis-le-reseau-des-bornes.md#profil-public-et--jaime-)) : le palier et le niveau sous le pseudo ; puis, après le pays, le nombre d’amis, selon leur confidentialité et les records, la ligne du niveau avec sa barre (« Flippeur · niveau 14 », « 350 / 750 XP ») et ses badges en médailles, les plus rares d'abord (avec le catalogue complet dans l’onglet Badges).
   Sous chaque médaille, son nom entier, sur deux lignes au besoin, jamais coupé au milieu d'un mot (« Ambassadeu / r »), puis les XP qu'elle rapporte (« +150 XP »), à la couleur de sa rareté.
   La carte d'une borne qui n'a pas encore cette version n'a pas de niveau : « Niveau pas encore connu ».
   Ses personnes invitées viennent ensuite (« A fait découvrir Cyber Pinball à 3 joueurs », avec leurs avatars).
@@ -129,3 +129,7 @@ Le niveau est gardé dans `<données>\amis\niveau.json` : les XP, les quarante d
 Un fichier illisible est mis de côté (`niveau.json.illisible-<date>`) et le niveau repart de l'historique ; un fichier d'une version plus récente est montré sans être complété.
 
 Tests : [levels.test.ts](../../packages/core/src/test/levels.test.ts) (courbe, plafonds, record personnel, table laissée ouverte, classements de la semaine et leur versement le mardi, vie sociale, niveau de départ, vraisemblance, fichier, invariants des badges), [invitations.test.ts](../../packages/core/src/test/invitations.test.ts) (personnes invitées, leurs XP, badges de la Communauté, contributions), [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.test.ts) (la roue dentée au gabarit des pastilles, la carte du joueur et ses badges sur les écrans pleins).
+
+**Ouvrir une partie** que d'autres rejoignent rapporte 25 XP, une fois par groupe exact de joueurs ; rejouer avec les mêmes n'en donne plus, un groupe différent en redonne.
+**Gagner un défi** à son échéance rapporte 40 XP.
+L'onglet Badges de Mon profil indique pour chaque badge obtenu ou à obtenir ses XP, ma progression et l'objectif restant.

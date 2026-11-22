@@ -1410,3 +1410,5 @@
 .hub-ranks { display:flex; gap:0.6em; margin-left:auto; flex-shrink:0; align-items:center; }
 .hub-rank { display:flex; align-items:center; gap:0.45em; padding:0.4em 0.65em; border:1px solid var(--signal); border-radius:0.5em; font-size:calc(26 * var(--u)); white-space:nowrap; }
 .hub-rank-flag, .hub-rank-icon { width:1.4em; height:1.1em; object-fit:contain; }
+
+.hub-card-medal > span { width:100%; height:100%; }

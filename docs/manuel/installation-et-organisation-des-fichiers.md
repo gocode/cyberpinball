@@ -144,9 +144,9 @@ Le test `powershell-propre.test.ts` refuse le retour de ces signes dans le code 
 ### Mise à jour depuis la borne
 
 Une borne installée se met à jour depuis Menu système > Aide et infos > **« Mise à jour de Cyber Pinball »** (détail : version installée, et version disponible une fois cherchée).
-Rien ne s'installe d'office : une recherche discrète part dès le démarrage, puis toutes les 6 h tant que Cyber Pinball tourne (toutes les 5 min tant qu'elle échoue, par exemple quand le réseau n'est pas encore prêt au démarrage de la borne), sans rien télécharger ni rien afficher en cas d'échec ; une erreur d'une recherche faite à la main ne l'arrête pas ; une version disponible, ou une mise à jour qui n'a pas abouti (constatée au redémarrage, jusqu'à ce qu'on ouvre l'entrée), met une **pastille rouge** sur la roue dentée du front-end (⚙) et sur l'entrée « Mise à jour de Cyber Pinball » du menu système (`attention` des entrées du menu système, repris par la roue dentée dès qu'une entrée en porte une).
+Rien ne s'installe d'office : une recherche discrète part dès le démarrage, puis toutes les 30 min tant que Cyber Pinball tourne (toutes les 5 min tant qu'elle échoue, par exemple quand le réseau n'est pas encore prêt au démarrage de la borne), sans rien télécharger ni rien afficher en cas d'échec ; une erreur d'une recherche faite à la main ne l'arrête pas ; une version disponible, ou une mise à jour qui n'a pas abouti (constatée au redémarrage, jusqu'à ce qu'on ouvre l'entrée), met une **pastille rouge** sur la roue dentée du front-end (⚙) et sur l'entrée « Mise à jour de Cyber Pinball » du menu système (`attention` des entrées du menu système, repris par la roue dentée dès qu'une entrée en porte une).
 Ouverte, l'entrée montre aussitôt les nouveautés de chaque version manquée depuis celle de la borne (`history` du flux), et « Mettre à jour maintenant », choisi d'office : l'installation est à un bouton.
-Un résultat de plus de 10 minutes est recherché à nouveau.
+Chaque ouverture relance la recherche, même après un résultat récent.
 Hors écran, les essais ne cherchent que leur site d'essai (`CYBERPINBALL_MAJ_URL`), jamais GitHub.
 Code : [packages/core/src/update.ts](../../packages/core/src/update.ts) (flux, versions, téléchargement), [app/src/updates-menu.ts](../../app/src/updates-menu.ts) (écran).
 
@@ -276,3 +276,12 @@ La clé privée n'est jamais dans le dépôt : `%USERPROFILE%\.cyberpinball\cle-
 
 **Mise à jour en bac à sable** : `CYBERPINBALL_MAJ_URL` remplace l'adresse du flux ; `CYBERPINBALL_MAJ_CLE` (fichier PEM) la clé publique, seulement dans un bac à sable (`CYBERPINBALL_HOME`).
 Dans un bac à sable aussi, `CYBERPINBALL_MAJ_INSTALLEE=1` fait passer sa racine pour une installation : l'écran propose « Mettre à jour maintenant » même lancé depuis les sources.
+
+### Recherche et secours des mises à jour
+
+La recherche automatique se fait toutes les 30 minutes, au réveil du PC et au retour de partie ; ouvrir « Mise à jour de Cyber Pinball » lance aussi une recherche immédiate, sans résultat ancien gardé en cache.
+Le retour de l'écran rejoint sa provenance, notamment l'Activité récente.
+Si GitHub est injoignable, le service de Cyber Pinball récupère automatiquement la mise à jour à sa place ; signature et empreinte restent vérifiées.
+« Mise à jour impossible » propose « Installer automatiquement la dernière version » par ce service, en conservant tables, médias et configuration.
+Les erreurs de réseau indiquent la cause : adresse inaccessible, nom introuvable ou certificat refusé.
+Le plan d'une reprise d'installation distingue les gros fichiers liés et les autres fichiers copiés.

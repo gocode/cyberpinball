@@ -1,7 +1,7 @@
 // Nouveautés (news.ts, app/src/news-menu.ts) : la chronologie des grandes nouveautés, choisie à la
 // main (17/11/2026). Ces tests fixent la classe de comportement, pas un cas :
 // - la liste reste une sélection : des nouveautés datées, la plus récente en haut, pas plus de
-//   quatre le même jour ni plus de vingt-quatre en tout (jamais une ligne par version) ;
+//   huit le même jour ni plus de vingt-quatre en tout (jamais une ligne par version) ;
 // - chacune existe en entier dans les deux langues, mène à une fonction qui existe, et a son aperçu
 //   (sauf raison écrite), livré en français et en anglais (et rien d'autre dans le dossier) ;
 // - la pastille rouge s'allume dès la première installation (la dernière date à voir), s'éteint
@@ -50,7 +50,8 @@ test('nouveautés : une sélection datée, la plus récente en haut, jamais une 
   for (let i = 1; i < NEWS.length; i++) assert.ok(NEWS[i - 1]!.date >= NEWS[i]!.date, `${NEWS[i]!.id} : la plus récente en haut`);
   const perDay = new Map<string, number>();
   for (const n of NEWS) perDay.set(n.date, (perDay.get(n.date) ?? 0) + 1);
-  for (const [date, count] of perDay) assert.ok(count <= 4, `${date} : ${count} nouveautés le même jour, la liste n'est plus une sélection`);
+  // La sélection de la finale peut réunir huit capacités validées ensemble.
+  for (const [date, count] of perDay) assert.ok(count <= 8, `${date} : ${count} nouveautés le même jour, la liste n'est plus une sélection`);
   assert.ok(NEWS.length <= 24, `${NEWS.length} nouveautés : retirer les plus anciennes plutôt qu'allonger la liste`);
 });
 

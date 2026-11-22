@@ -1165,3 +1165,11 @@ Cyber Pinball films it while you play, with nothing to download or install: Chro
 - **Simulated game** (off-screen tests): no screen is captured; the recorder draws a fake table the way VPX would draw it (red band at the top, green flippers at the bottom), the rest of the path is the real one.
   Unattended, the recorded game lasts the delay and the length, plus 3 s; `CYBERPINBALL_PARTIE_MS` shortens it (end by leaving the table).
 - **Proof**: [enregistrement-partie.test.ts](../../packages/core/src/test/enregistrement-partie.test.ts) (events, delay, length, leaving, failure, witness, fade, settings, playfield orientation in the four orientations round trip with the wheel, desktop crop, shared zones, files, proposals).
+
+### Wheel scrolling
+
+A held flipper scrolls ten tables per second; each separate press advances one table.
+During fast scrolling, media waits for a fifth of a second at rest; a single press changes it immediately with the table colour.
+Still logos are resized and cached in the background outside games; animated logos remain animated.
+The title plays its effect on a single press and once after fast scrolling; halo and reflections retain their effects without slowing the wheel.
+A click skips the intro and wakes attract mode, night dimming or shutdown warning; wheel arrows are clickable and the mouse wheel advances one table per notch.

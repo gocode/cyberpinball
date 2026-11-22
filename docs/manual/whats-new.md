@@ -6,7 +6,7 @@
 It is not the list of fixes: that one stays in each version's notes ("Mise à jour de Cyber Pinball" (Cyber Pinball update) and the CHANGELOG).
 
 - **A timeline**: the most recent at the top, the date and version given only once for the new things of the same day.
-  Each line has its title, a sentence saying what it brings and, if it has one, a small preview; "Nouveau" (New) marks those not seen yet, "BÊTA" (BETA) those still being tested.
+  Each line has its title, a sentence saying what it brings and a small preview; "Nouveau" (New) marks those not seen yet, "BÊTA" (BETA) those still being tested.
   The players' reactions in brief always sit on their own line, at the start of the item, under the preview and the text, as under a message: the three most chosen and their total ("👍❤️😮 23"), marked in blue when you have reacted.
 - **One new thing full size**: Start on a line enlarges it, with its large preview, its full text and where to find it ("Où : Communauté › Parties instantanées" (Where: Community › Instant games)).
   "Essayer" (Try it) leads straight to the feature; its "Retour" (Back) brings you back to the new thing.
@@ -16,7 +16,7 @@ It is not the list of fixes: that one stays in each version's notes ("Mise à jo
   Start sets a reaction, or changes it; Start on yours removes it ("Votre réaction : … · Start sur elle la retire", Your reaction: … · Start on it removes it).
   One reaction per cabinet and per new thing, tied to the player key and counted by the feedback service; deleting your account also erases your reactions.
   Offline, the tiles stay visible, greyed out with their reason ("Réactions hors ligne : elles reviennent dès que le service répond", Reactions offline: they come back as soon as the service answers).
-- **The previews**: most lines have their own, including your account, Community on the phone, virtual reality and backups.
+- **The previews**: every item has an image in French and English: a screenshot of the feature with invented data, or an illustration.
 - **The red dot**: on the gear wheel and on the entry, as long as a new thing has not been seen, from the very first installation.
   Opening the screen marks them all seen; the "Nouveau" marker stays until you leave it.
   A new cabinet, or one updated from a version that did not have this screen, sees only those of the latest date as new.
@@ -25,7 +25,7 @@ It is not the list of fixes: that one stays in each version's notes ("Mise à jo
 - **Its place**: in the Aide et infos (Help and info) section, right after "Commandes de la borne" (Cabinet controls); the red dot of an unseen new thing goes through the Help and info line.
 - **What goes in**: one line per real new capability, never a fix, a speed gain or a setting.
   A feature improved over several versions has a single line, dated when it arrived.
-  Lines are not added with every version, only when a feature deserves it: never more than four on the same day, nor more than twenty-four in all (the oldest go).
-  The texts are written for the player, in French and English; the previews show Cyber Pinball's invented tables, never a real game.
+  Lines are not added with every version, only when a feature deserves it: never more than eight on the same day, nor more than twenty-four in all (the oldest go).
+  The texts are written for the player, in French and English; the screenshots show Cyber Pinball's invented tables, never a real game.
   Each release, pre-releases included, recalls the lines of its version and the latest line, and asks whether a feature deserves one; nothing is added automatically (`packages/core/src/news.ts`).
 - **Guest mode**: the screen is closed, like the whole system menu.

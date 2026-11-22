@@ -14,7 +14,7 @@ Les démonstrations nomment une action rangée sous « Gérer la table… » par
 La fiche d'une table (Start sur une table du front-end) montre ses statistiques sur une ligne et un **résumé borné** de ses fichiers : une ligne par sorte présente (table, backglass, ROM, contenu du DMD, vidéos PuP, couleurs du DMD, sons alternatifs, musique, réglages propres, médias), trois noms au plus par ligne (« t2_l3, t2_l4 et 4 autres »), une ligne « Absents » pour les sortes manquantes et une ligne « À vérifier » (backglass mal nommé, script remplacé par un `.vbs`, rapport de plantage, volume de la ROM bas).
 Après la ROM, une ligne « Volume de la ROM » dit, pour une machine qui garde son volume dans sa mémoire, celui que la ROM jouera et ce que Cyber Pinball en fait (« 12 sur 31, d'usine, faible : monté à 23 avant la partie », « 18 sur 31 (votre réglage) »…, voir [Volume de la ROM](son.md#volume-de-la-rom)).
 Une table qui rame ou saccade sur la borne le dit dans « Diagnostiquer et réparer », avec les chiffres de sa dernière partie (voir [Santé de la borne](sante-de-la-borne.md#santé-de-la-borne)).
-« Diagnostiquer et réparer » propose aussi « Envoyer un rapport aux développeurs » : d'un appui, les constats de la table, ce qui vient d'être réparé, la fiche technique et les journaux, chiffrés et anonymisés ; une description reste facultative, et sans constat le détail dit « Un souci que le diagnostic ne voit pas ».
+« Diagnostiquer et réparer » propose aussi « Envoyer un rapport aux développeurs » : d'un appui, les constats de la table, ce qui vient d'être réparé, la fiche technique et les journaux, chiffrés et anonymisés ; une description est demandée, et sans constat le détail dit « Un souci que le diagnostic ne voit pas ».
 En hauteur (borne, playfield tourné, ou écran portrait), les informations gardent leur place et les actions passent sur deux colonnes ; la liste des actions défile si elle dépasse.
 Sur une borne, la liste des actions mangeait toute la hauteur : avec beaucoup de fichiers, seule la première ligne des statistiques restait visible.
 
@@ -34,3 +34,12 @@ Dans le dossier commun des tables, seuls les fichiers compagnons de la table (m�
 L'inventaire est lu à l'ouverture de la fiche, pas à chaque bouton.
 
 Code : [packages/core/src/tablecontents.ts](../../packages/core/src/tablecontents.ts) (inventaire, tests `tablecontents.test.ts`), écrans dans [app/src/table-files.ts](../../app/src/table-files.ts), résumé dans `buildSheet` (`app/src/library.ts`), mise en page `.lib-sheet`, `.lib-files` et `.lib-facts` dans `app/renderer/library.css` ; les lignes à choisir (`Row.pick`) ne répètent pas leur action dans la liste.
+
+### Objectif et diagnostic
+
+« Sur cette table » montre le joueur juste au-dessus de vous, le record du jour, les amis qui jouent et ceux de la semaine ; une table sans score en ligne annonce que le vôtre sera le premier.
+Une partie instantanée ouverte sur votre version passe avant Jouer ; « Jouer ensemble… » réunit ami, partie instantanée et défi.
+Votre record et votre groupe sont dans les statistiques, les fichiers sous Gérer la table….
+Au lancement, l'objectif paraît sur le chargement de Cyber Pinball et l'encart du bureau, sans son ni recouvrement d'un média de chargement choisi.
+Un diagnostic sans problème présélectionne la suite ou le retour ; l'envoi d'un rapport demande une description et un choix explicite.
+Un fronton aux proportions différentes est étiré comme en partie : le diagnostic mesure la déformation ; DMD et topper gardent leurs bandes noires.

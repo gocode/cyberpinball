@@ -16,9 +16,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { cmakePath } from './casque-vr.mjs';
+import { filesFingerprint, matchingBuild, saveBuild } from './vpx-cache.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { copyTree } = createRequire(import.meta.url)(path.join(repo, 'packages', 'core', 'dist', 'copytree.js'));
+const { writeFileAtomic } = createRequire(import.meta.url)(path.join(repo, 'packages', 'core', 'dist', 'atomicwrite.js'));
 export const VPX_CORRIGE_SOURCE = path.join(repo, 'packages', 'vpx-corrige');
 const out = path.join(repo, 'build', 'vpx-corrige');
 export const VPX_CORRIGE_EXE = path.join(out, 'VPinballX_BGFX64.exe');
@@ -261,14 +263,42 @@ export function buildVpxCorrige({ clean = false, quiet = false } = {}) {
   quietOutput = quiet;
   const cmake = cmakePath();
   if (!cmake) throw new Error('CMake absent (winget install Kitware.CMake).');
+  return withBuildLock(() => buildLocked(cmake, clean));
+}
+
+function buildInputs(cmake) {
+  const located = spawnSync('where.exe', [cmake], { encoding: 'utf8', windowsHide: true });
+  const cmakeExe = path.isAbsolute(cmake) ? cmake : located.stdout?.trim().split(/\r?\n/)[0];
+  if (!cmakeExe) throw new Error('CMake : chemin de l’outil introuvable');
+  return filesFingerprint([
+    fileURLToPath(import.meta.url), path.join(repo, 'scripts', 'vpx-cache.mjs'),
+    path.join(repo, 'scripts', 'casque-vr.mjs'),
+    path.join(VPX_CORRIGE_SOURCE, 'correctifs'),
+    path.join(repo, 'packages', 'installer', 'components.json'),
+    vpxCorrigeSrcDir(), path.join(vpxBuildDir(), 'CMakeCache.txt'), cmakeExe,
+    // cl.exe charge notamment c1xx.dll et c2.dll : le pilote seul ne décrit pas le compilateur.
+    path.dirname(msvcTool('cl.exe')),
+  ]);
+}
+
+function buildLocked(cmake, clean) {
+  const certificate = path.join(vpxBuildDir(), 'construit.json');
+  const outputs = [VPX_CORRIGE_EXE, path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP), path.join(out, 'LICENSE')];
+  if (!clean && fs.existsSync(certificate)) {
+    try {
+      if (matchingBuild(certificate, buildInputs(cmake), outputs)) {
+        console.log('VPX corrigé : exécutable et plugin PuP vérifiés, compilation réutilisée.');
+        return VPX_CORRIGE_EXE;
+      }
+    } catch {
+      // Une entrée absente ou invalide impose de repasser par la construction.
+    }
+  }
   if (clean) {
     fs.rmSync(vpxCorrigeSrcDir(), { recursive: true, force: true });
     fs.rmSync(vpxBuildDir(), { recursive: true, force: true });
   }
-  return withBuildLock(() => buildLocked(cmake, clean));
-}
-
-function buildLocked(cmake, clean) {
+  fs.rmSync(certificate, { force: true });
   if (clean) for (const shared of ['dl', 'ext']) fs.rmSync(path.join(work, shared), { recursive: true, force: true });
 
   // Sources de la 5436, puis les correctifs, puis la version (comme le workflow de VPX : 9999 et « unknown »).
@@ -278,7 +308,7 @@ function buildLocked(cmake, clean) {
   const srcKey = `${VPX_BASE.commit}-${VPX_BASE.sha}-${patchKey.digest('hex').slice(0, 16)}`;
   const src = vpxCorrigeSrcDir();
   const srcStamp = `${src}.txt`;
-  if (!fs.existsSync(srcStamp) || fs.readFileSync(srcStamp, 'utf8').trim() !== srcKey) {
+  if (!fs.existsSync(src) || !fs.existsSync(srcStamp) || fs.readFileSync(srcStamp, 'utf8').trim() !== srcKey) {
     const scratch = `${src}-x`;
     const extracted = fetchTarball(`https://github.com/vpinball/vpinball/archive/${VPX_BASE.commit}.tar.gz`, `vpinball-${VPX_BASE.commit}.tar.gz`, scratch);
     fs.rmSync(src, { recursive: true, force: true });
@@ -378,6 +408,7 @@ function buildLocked(cmake, clean) {
   fs.copyFileSync(pup, path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP));
   // La licence de VPX (GPLv3+ et licence héritée de MAME) voyage avec le binaire.
   fs.copyFileSync(path.join(src, 'LICENSE'), path.join(out, 'LICENSE'));
+  saveBuild(certificate, buildInputs(cmake), outputs, writeFileAtomic);
   return VPX_CORRIGE_EXE;
 }
 

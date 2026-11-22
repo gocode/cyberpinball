@@ -2,6 +2,17 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties instantanées, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  'Indisponible : choisissez une table VPX sur la roue': 'Unavailable: choose a VPX table on the wheel',
+  "Le point de vue de chaque table": "Each table’s point of view",
+  "Gardez le cadrage de la borne, utilisez le POV fourni avec la table ou importez le vôtre, table par table.": "Keep the cabinet framing, use the POV supplied with the table or import your own, table by table.",
+  "Dans « Gérer la table… › Point de vue », choisissez le cadrage de la borne ou le POV de cette table. Vous pouvez aussi importer un fichier .pov ou le .ini d’un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque.": "In “Manage table… › Point of view”, choose the cabinet framing or this table’s POV. You can also import a .pov file or a VPX 10.8 POV .ini from Downloads, a USB stick or a drive.",
+  "Le POV importé est rangé avec la table et appliqué à elle seule. Une vue qui mettrait la table de travers sur la borne est refusée, avec la raison.": "The imported POV is stored with the table and applied to it alone. A view that would put the table sideways on the cabinet is rejected, with the reason.",
+  "Fiche d’une table › Gérer la table… › Point de vue": "Table details › Manage table… › Point of view",
+  "Le VPX corrigé de Cyber Pinball": "Cyber Pinball’s patched VPX",
+  "Le VPX de Cyber Pinball corrige les saccades des PuP-Packs et améliore le cadrage des tables.": "Cyber Pinball’s VPX fixes PuP-Pack stuttering and improves table framing.",
+  "Cyber Pinball installe son VPX 10.8.1-5436 corrigé et son plugin PuP : un fronton plus lent ne bride plus le plateau et les grandes images animées des PuP-Packs ne bloquent plus le rendu.": "Cyber Pinball installs its patched VPX 10.8.1-5436 and PuP plugin: a slower backglass no longer limits the playfield, and large animated PuP-Pack images no longer block rendering.",
+  "Le cadrage garde le haut du plateau visible, et le temps de rendu GPU permet au mode Auto d’adapter la qualité entre les parties. Les sources des correctifs sont publiées avec la version ; la fiche technique indique le VPX installé.": "Framing keeps the top of the playfield visible, and GPU rendering time lets Auto adjust quality between games. The patch sources are published with the release; the technical sheet shows the installed VPX.",
+  "Menu système › Aide et infos › Fiche technique": "System menu › Help and info › Technical sheet",
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
@@ -124,21 +135,6 @@ export const messages: Record<string, string> = {
   'Tout se pilote aux boutons de la borne, ou au téléphone. Le son peut sortir sur plusieurs haut-parleurs à la fois, chacun avec son volume.':
     'Everything is driven with the cabinet’s buttons, or your phone. Sound can play on several speakers at once, each with its own volume.',
   'Roue › Juke-box': 'Wheel › Juke-box',
-
-  'Classements jusqu’au mondial': 'Leaderboards, all the way to worldwide',
-  'Le tableau des scores de chaque table : votre borne, vos amis, votre pays, le monde.': 'Each table’s leaderboard: your cabinet, your friends, your country, the world.',
-  'Chaque partie laisse ses scores sur la fiche de la table. Les MagnaSave passent de « Cette borne » à « Amis », « National » et « Mondial » ; les flippers changent de période, de tout temps à aujourd’hui.':
-    'Every game leaves its scores on the table’s page. The MagnaSave buttons switch from “This cabinet” to “Friends”, “National” and “Worldwide”; the flippers change the period, from all time to today.',
-  'Un score n’est comparé qu’avec ceux de la même version de la table, jouée avec le même nombre de billes. Il passe de borne en borne, signé par son joueur, sans serveur.':
-    'A score is only compared with those of the same version of the table, played with the same number of balls. It goes from cabinet to cabinet, signed by its player, with no server.',
-  'Fiche d’une table › Tableau des scores': 'Table page › Leaderboard',
-
-  'Vos tables et le front-end dans un casque, la borne calée sur la vraie.': 'Your tables and the front-end in a headset, the cabinet lined up with the real one.',
-  'Avec un casque (Meta Quest par Link ou Virtual Desktop, SteamVR), le front-end s’affiche dans une borne habillée, et chaque table se joue en grand devant vous.':
-    'With a headset (Meta Quest through Link or Virtual Desktop, SteamVR), the front-end shows up in a decorated cabinet, and each table plays full size in front of you.',
-  '« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.':
-    '“Line up the cabinet” sets the headset’s cabinet exactly on the real one: you play with your cabinet’s buttons, under your hands.',
-  'Menu système › Ma borne › Réalité virtuelle et vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision',
 
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 

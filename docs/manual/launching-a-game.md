@@ -769,3 +769,20 @@ Build: `node scripts/vision3d.mjs` (with `--banc`: test bench without VPX); `npm
 
 Limits: the effect only works for the tracked player, and a camera filming the screen does not show it; the webcam needs some light; the Kinect for Xbox One is not supported.
 Tests: `packages/core/src/test/vision3d.test.ts`, `vision3d-webcam.test.ts` (Chromium fake camera and test portrait), `vision3d-kinect.test.ts` (fake `Kinect10.dll`, `packages/vpx-vision3d/test/kinect-factice.cpp`), plugin bench (`packages/vpx-vision3d/test/banc.cpp`).
+
+### 3D glasses (beta)
+
+System menu > My cabinet > Virtual reality and 3D vision > "3D glasses" enables stereo play with red/cyan, green/magenta or amber/blue filters.
+Glasses work with 3D vision: perspective then also follows your head.
+Calibrate with cabinet buttons in front of the playfield, using six settings and one eye closed at each step; depth and colours are adjusted in the same place.
+3D wheel, enabled with the glasses, gives medallions and interface elements depth; the selected medallion sits ahead of its neighbours, while the background and desktop chrome frames stay flat.
+VPX receives a settings copy for the game: VPinballX.ini and the table file stay unchanged; SMAA, unavailable in stereo, is replaced by quality FXAA.
+
+### First ROM game and post-game screen
+
+A ROM without memory is initialised offscreen and silently, in the background after installation or during loading if needed; existing memory is never replaced.
+Loading announces this preparation, Exit cancels it and the recommended volume is applied from the first game.
+A ROM missing its sound files is marked as having no music without crashing the recorder.
+After a record or overtaken player, the post-game screen shows score, record, detailed XP, gained place and next target, then Replay, a prepared message between friends, Challenge and Back to tables as appropriate.
+Badge and level animations follow.
+VPX 10.8.1-5436 patched Cyber Pinball 4 combines independent secondary-screen refresh rates, framing, PuP GIF decoding outside rendering and GPU timing; it is installed at startup after an update.

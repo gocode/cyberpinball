@@ -1165,3 +1165,11 @@ Cyber Pinball la filme pendant qu'on y joue, sans rien télécharger ni installe
 - **Partie simulée** (essais hors écran) : aucun écran n'est capturé ; l'enregistreur dessine une fausse table dans le sens où VPX la dessinerait (bandeau rouge en haut, flippers verts en bas), tout le reste du chemin est le vrai.
   Sans opérateur, la partie enregistrée dure le délai et la durée, plus 3 s ; `CYBERPINBALL_PARTIE_MS` la raccourcit (fin par la sortie de la table).
 - **Preuves** : [enregistrement-partie.test.ts](../../packages/core/src/test/enregistrement-partie.test.ts) (événements, délai, durée, sortie, échec, témoin, fondu, réglages, sens du plateau dans les quatre orientations aller-retour avec la roue, recadrage du bureau, zones partagées, fichiers, propositions).
+
+### Défilement de la roue
+
+Un flipper tenu fait défiler dix tables par seconde ; chaque appui distinct fait avancer d'une table.
+En défilement rapide, les médias attendent un cinquième de seconde d'arrêt ; un appui isolé les change immédiatement, avec la couleur de la table.
+Les logos fixes sont réduits et mis en cache en arrière-plan hors partie ; les logos animés restent animés.
+Le titre joue son effet sur un appui isolé et une seule fois après défilement rapide ; halo et reflets gardent leurs effets sans ralentir la roue.
+Un clic passe l'ouverture et réveille attente, voile de nuit ou préavis d'arrêt ; les flèches de roue se cliquent et la molette avance d'une table par cran.

@@ -393,3 +393,14 @@ L'aide-mémoire le dit, « Enregistrer grisé : rien n'a changé ; Lancer le ral
   Le pack garde le fronton et le topper ; une valeur déjà réglée pour la table dans le menu de VPX est respectée.
   Cas trouvé sur *2001* (score UltraDMD, option « DMD on Fulldmd »).
 - **Limites** : sans MagnaSave, on ne change pas de ligne dans le menu de VPX (`UIUp`, `UIDown`) ; l'ordre d'empilement de deux fenêtres de VPX qui se chevauchent (DMD sur le fronton) est laissé à Windows.
+
+### Couleurs du DMD, nom de ROM
+
+Une colorisation seule est rangée sous le nom de la ROM jouée : Serum utilise <rom>.cRZ, PIN2DMD pin2dmd.pal et pin2dmd.vni.
+Les anciens rangements incorrects sont réparés automatiquement avant la partie ; rien n'est à cocher dans F1, cette fenêtre VPinMAME n'existant pas dans le VPX livré.
+Le diagnostic propose d'essayer une colorisation d'une autre révision de ROM et signale les formats non lus, notamment .pac et .cROM.
+
+### VPX corrigé livré avec Cyber Pinball
+
+La fiche technique indique la version corrigée installée ; ses sources et celles de ses dépendances sont publiées avec les correctifs et la recette de construction.
+La fabrication réutilise VPX et son plugin PuP seulement si les empreintes des deux binaires, des sources, des correctifs, des dépendances et des outils correspondent à la dernière compilation réussie ; sinon elle reconstruit.

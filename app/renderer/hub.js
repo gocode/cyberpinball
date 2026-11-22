@@ -181,7 +181,11 @@
     const node = el('div', `hub-card hub-layout-${layout}${c.tone ? ` hub-tone-${c.tone}` : ''}${c.quiet ? ' hub-quiet' : ''}${selected ? ' selected' : ''}`);
     if (c.action !== undefined) act(node, c.action);
     // L'image à gauche : la pastille d'un joueur (et son anneau de présence), sinon une icône dans son rond.
-    if (c.avatar) node.append(face(c.avatar, `hub-card-face${c.ring ? ` hub-ring hub-ring-${c.ring}` : ''}`));
+    if (c.medal && typeof rowMedal === 'function') {
+      const art = el('span', 'hub-card-ic hub-card-medal');
+      art.append(rowMedal(c.medal));
+      node.append(art);
+    } else if (c.avatar) node.append(face(c.avatar, `hub-card-face${c.ring ? ` hub-ring hub-ring-${c.ring}` : ''}`));
     else if (c.icon) {
       const ic = el('span', 'hub-card-ic');
       ic.append(icon(c.icon, 'hub-card-icon'));

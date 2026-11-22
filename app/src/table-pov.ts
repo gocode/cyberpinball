@@ -31,6 +31,7 @@ export function framingText(state: TablePovState): string {
 
 export function createTablePov(ctx: TablePovContext) {
   let flash: { text: string; tone: Tone } | undefined;
+  let returnTo: (() => void) | undefined;
   // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
   onGesture(() => (flash = undefined));
 
@@ -129,7 +130,10 @@ export function createTablePov(ctx: TablePovContext) {
 
   function back(table: TableEntry): void {
     flash = undefined;
-    ctx.back(table);
+    const target = returnTo;
+    returnTo = undefined;
+    if (target) target();
+    else ctx.back(table);
   }
 
   function open(table: TableEntry, at?: number): void {
@@ -141,6 +145,9 @@ export function createTablePov(ctx: TablePovContext) {
   return {
     /** Entrée de la fiche : son détail dit le cadrage actuel. */
     detail: (table: TableEntry) => framingText(state(table)),
-    open: (table: TableEntry) => open(table),
+    open: (table: TableEntry, back?: () => void) => {
+      returnTo = back;
+      open(table);
+    },
   };
 }

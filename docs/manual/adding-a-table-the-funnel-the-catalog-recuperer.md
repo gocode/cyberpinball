@@ -237,3 +237,9 @@ The online catalog (**"Trouver une table en ligne" (Find a table online)**) show
   Tests: `youtube-account.test.ts` (arguments, sorted cookies, service with a fake Edge).
 - **Code**: `packages/core/src/acquisition.ts` (hosts, catalog, recommendation, what it takes, waiting list, matching, origin, updates), tests in `packages/core/src/test/acquisition.test.ts`; screens in `app/src/catalog.ts`, window in `app/src/acquire-window.ts` (banner `app/renderer/acquire.*`), watching in `app/src/downloads-watch.ts`, accounts and download probes in `packages/core/src/sitesessions.ts` (tests `sitesessions.test.ts`).
   Browser screen: `packages/core/src/browser-screen.ts` (tests `browser-screen.test.ts`), `app/src/browser-screen.ts`, choice in `app/src/configurations-menu.ts`.
+
+### Content advertised as bundled with a table
+
+A ROM, backglass or PuP-Pack advertised as included by VPS remains to be verified until the table archive arrives.
+If missing, it becomes a separate download again, joins the remaining quick-install steps and stays available in What's missing to play.
+A download begun in Récupérer remains assigned to its original item even if the window closes or changes page before completion.

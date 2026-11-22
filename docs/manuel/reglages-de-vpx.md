@@ -21,3 +21,11 @@
   L'écran ouvert seul (`--reglages --table=…`) l'a aussi.
   En bac à sable (`CYBERPINBALL_HOME`), il est écrit dans `<bac à sable>\sandbox\tables\` et jamais à côté du vrai .vpx.
 - Ces réglages sont ceux du VPX de Cyber Pinball : une table jouée avec un autre VPX du PC part avec les réglages de cet autre VPX, que Cyber Pinball ne touche jamais (voir [Autres versions de VPX](autres-versions-de-vpx.md#autres-versions-de-vpx)).
+
+### Pré-réglages de qualité (bêta)
+
+Menu système > Ma borne > VPX > « Pré-réglages » propose Auto, Performance, Équilibré, Qualité, Ultra et Personnalisé ; le choix actif porte une coche et un badge contrasté.
+Après mise à jour, une borne existante reste en Personnalisé et garde ses réglages jusqu'à votre choix.
+Auto part prudemment de la carte graphique et du playfield, puis ajuste la qualité entre les parties selon le temps de rendu GPU mesuré par VPX corrigé, jamais en partie.
+Les profils VR, les réglages propres à une table et les configurations de borne restent indépendants.
+Personnalisé retrouve les réglages conservés avant le premier pré-réglage ; changer un réglage graphique à la main désactive aussi l'adaptation automatique.

@@ -393,3 +393,14 @@ The reminder says so, "Save greyed out: nothing changed; Launch turns it back on
   The pack keeps the backglass and the topper; a value already set for the table in the VPX menu is kept.
   Case found on *2001* (UltraDMD score, "DMD on Fulldmd" option).
 - **Limits**: without MagnaSave, you cannot change line in VPX's menu (`UIUp`, `UIDown`); the stacking order of two overlapping VPX windows (DMD on the backglass) is left to Windows.
+
+### DMD colours and ROM names
+
+A standalone colourisation is stored under the played ROM's name: Serum uses <rom>.cRZ, PIN2DMD pin2dmd.pal and pin2dmd.vni.
+Earlier incorrect layouts are repaired automatically before play; nothing needs enabling in F1 because this VPinMAME window does not exist in the bundled VPX.
+Diagnostics offers to try colours for another ROM revision and flags unread formats, including .pac and .cROM.
+
+### Patched VPX shipped with Cyber Pinball
+
+The technical sheet shows the installed patched version; its sources and dependency sources are published with the patches and build recipe.
+The build reuses VPX and its PuP plugin only when the hashes of both binaries, sources, patches, dependencies and tools match the last successful build; otherwise it rebuilds.

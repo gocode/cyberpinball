@@ -200,7 +200,7 @@ test('fiche > Point de vue : le cadrage choisi pour la table, le retour à celui
 test('écran « Point de vue » : choisir le POV, revenir à la borne, importer (sans Electron)', async () => {
   type Shown = { heading: string; actions: { label: string; detail?: string; badge?: string; run(): void }[]; sections: { rows: { text: string }[] }[] };
   const mod = require(path.join(REPO_ROOT, 'app', 'dist', 'table-pov.js')) as {
-    createTablePov(ctx: { show(build: () => Shown): void; pick(): Promise<string[] | undefined>; orientation(): DoctorContext['orientation']; apply(ops: FileOp[]): void; back(): void }): { detail(table: TableEntry): string; open(table: TableEntry): void };
+    createTablePov(ctx: { show(build: () => Shown): void; pick(): Promise<string[] | undefined>; orientation(): DoctorContext['orientation']; apply(ops: FileOp[]): void; back(): void }): { detail(table: TableEntry): string; open(table: TableEntry, back?: () => void): void };
   };
   const s = setup({ [`${TABLE}.pov`]: POV, [`${TABLE}.ini`]: '[Player]\r\nCabinetAutofitMode = 1\r\n' });
   let shown: Shown | undefined;
@@ -229,5 +229,17 @@ test('écran « Point de vue » : choisir le POV, revenir à la borne, importer 
   assert.equal(shown!.heading, 'Point de vue');
   shown!.actions[3]!.run();
   assert.equal(backs, 1);
+  // Une entrée depuis une autre fonction garde son retour après une action et un import annulé.
+  let origin = 0;
+  pov.open(table, () => origin++);
+  shown!.actions[1]!.run();
+  shown!.actions[2]!.run();
+  await new Promise((r) => setImmediate(r));
+  shown!.actions[3]!.run();
+  assert.equal(origin, 1);
+  assert.equal(backs, 1);
+  pov.open(table);
+  shown!.actions[3]!.run();
+  assert.equal(backs, 2, 'ouvrir depuis la fiche oublie le retour externe');
   s.done();
 });

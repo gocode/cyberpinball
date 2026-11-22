@@ -137,3 +137,12 @@ Cyber Pinball y pose alors le cadrage manuel (`CabinetAutofitMode = 0`) pour cet
 C'est le constat « Cadrage réglé pour cette table » (`importedView`, information), réparé avant chaque partie (`PUP_PLAY_REPAIRS`) et à l'installation, donc aussi pour les tables déjà importées.
 Un cadrage déjà choisi pour la table (clé présente) n'est jamais touché ; « Régler l'affichage en partie » permet de le retoucher ou de passer au cadrage automatique.
 Test : [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test.ts).
+
+### Choisir et importer un point de vue (bêta)
+
+Fiche de la table > Gérer la table… > Point de vue indique ce qui cadre la table : cadrage commun de la borne, POV fourni avec la table ou POV importé.
+« Importer un POV… » accepte un .pov ou le .ini d'un POV VPX 10.8 depuis Téléchargements, une clé USB ou un disque ; il est rangé avec cette table et n'agit que sur elle.
+Un POV qui placerait les flippers du mauvais côté est refusé avec sa raison ; un POV fourni est proposé dans le diagnostic quand un cadrage a déjà été choisi.
+Un passage en cadrage manuel sans vue enregistrée n'est pas un cadrage propre à la table : le diagnostic propose le cadrage de la borne.
+Avec VPX corrigé, « Ajuster la table » garde le fond du plateau à l'écran : le bas décoratif et le vide au-dessus sortent en priorité, puis un étirement en largeur de 15 % au plus comble ce qui manque.
+« Garder le haut de la table » et « Étirement maximal en largeur » se règlent dans Réglages de VPX > Vue de la table et cadrage, et dans le menu de VPX en partie avec hauteur et recul des yeux.

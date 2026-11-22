@@ -1,6 +1,8 @@
 // Catalogue anglais : le profil d'un joueur en réseau social (22/11/2026), écran à onglets (Activité,
 // Records, Badges, À propos). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Progression non partagée': 'Progress not shared',
+  '{value} / {target} · reste {remaining}': '{value} / {target} · {remaining} remaining',
   // app/src/hub-screen.ts
   'Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour': 'Flippers: choose a tab · Start: open it · Exit: back',
   // app/src/friends-menu.ts
@@ -50,9 +52,6 @@ export const messages: Record<string, string> = {
   'à battre': 'to beat',
   'Ses autres records': 'Their other records',
   'Ses records': 'Their records',
-  'Épiques et légendaires': 'Epic and legendary',
-  'Rares': 'Rare',
-  'Communs': 'Common',
   '{xp} par personne invitée': '{xp} per invited player',
   'Options de la relation': 'Friendship options',
 };

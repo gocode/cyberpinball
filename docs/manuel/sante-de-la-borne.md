@@ -61,3 +61,10 @@ Un point Bloquant au dernier relevé met la pastille rouge sur « Santé de la b
 
 Code : les lignes et leurs états dans [packages/core/src/health.ts](../../packages/core/src/health.ts), le relevé, le cache et la page dans `app/src/health.ts`, le rendu dans `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) fixe chaque état de chaque contrôle et que **chaque ligne mène à un écran réel** : une entrée du menu système rangée dans l'arbre et fournie par l'application, le diagnostic d'une table, la liste des tables à revoir ou l'installation de VPX.
+
+### Fréquences et arrêts de rendu
+
+Le playfield sous sa fréquence possible reste à vérifier ; un écran annexe sous sa fréquence possible est seulement informatif s'il ne change pas la bille.
+Un écran annexe plus lent peut brider un ancien VPX 10.8.1 ; le VPX corrigé de Cyber Pinball donne à chacun sa fréquence indépendante.
+Les arrêts dus au script ou à l'antivirus ne sont pas assimilés à ce bridage ; le rapport situe aussi le fil de rendu pendant les pauses (pilote graphique, vidéo, textures).
+Le journal mesure la fluidité de la roue : images lentes, plus longue image et rythme de l'écran.

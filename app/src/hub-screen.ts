@@ -80,6 +80,7 @@ export interface HubCardSpec {
   asideIcon?: IconName;
   /** Des badges, dessinés comme partout (la rangée de médailles des autres menus). */
   medals?: HubMedal[];
+  medal?: { icon: IconName; rarity: BadgeRarity; earned: boolean };
   ranks?: { label: string; icon?: IconName; flag?: FlagView; place: string }[];
   /** Barre de progression sous le texte, de 0 à 1. */
   progress?: number;
@@ -235,6 +236,7 @@ export interface HubCardView {
   asideTone?: 'warning';
   asideIcon?: IconName;
   medals?: HubMedal[];
+  medal?: { icon: IconName; rarity: BadgeRarity; earned: boolean };
   ranks?: { label: string; icon?: IconName; flag?: FlagView; place: string }[];
   progress?: number;
   bubble?: { text: string; who?: string; group?: boolean };

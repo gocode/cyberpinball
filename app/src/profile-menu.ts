@@ -38,6 +38,8 @@ import {
   type PublicEvent,
   type SocialEvent,
 } from '@cyberpinball/core';
+import { profileBadgeSections } from './profile-badges';
+import type { BadgeFacts } from '@cyberpinball/core';
 import { onGesture } from './gesture-flash';
 import { createHubScreen, type HubButtonSpec, type HubCardSpec, type HubLevel, type HubMedal, type HubPersonSpec, type HubSectionSpec, type HubSpec, type HubTabSpec } from './hub-screen';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
@@ -114,6 +116,8 @@ export interface ProfileMenuHost {
   navKeys?(): { previous: readonly string[]; next: readonly string[] };
   /** Mon niveau (level-tracker.ts) : l'anneau de ma pastille, même quand mon profil public est coupé. */
   myLevel?(): number;
+  /** Compteurs actuels des badges du joueur local, jamais ceux d'un autre profil. */
+  badgeFacts?(): BadgeFacts;
   /** Mon profil : Modifier mon profil, Confidentialité, Mon compte (les rubriques du Menu système). */
   system?: { open(group: 'modifier-profil' | 'confidentialite' | 'compte', back: () => void): void };
   /** La roue sur une table (onglet Records, ses tables du moment) ; `has` : elle est dans la collection montrée. */
@@ -314,7 +318,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       case 'records':
         return { ...spec, sections: recordsSections(records, mine) };
       case 'badges':
-        return { ...spec, sections: badgesSections(card) };
+        return { ...spec, sections: !mine && !card ? [] : profileBadgeSections(mine ? net.state().badges.map((b) => b.id) : card?.badges ?? [], mine ? host.badgeFacts?.() : undefined) };
       case 'about':
         return { ...spec, sections: aboutSections(key, name, card, mine, friend, part, groups, reopen, back) };
       default:
@@ -461,26 +465,6 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     if (yours.length) out.push({ title: t('Sur vos tables'), note: t('à battre'), layout: 'list', column: 'left', cards: yours.map(card) });
     if (others.length) out.push({ title: yours.length ? t('Ses autres records') : t('Ses records'), layout: 'list', column: yours.length ? 'right' : 'left', cards: others.map(card) });
     return out;
-  }
-
-  /** Badges : tous les siens, rangés par rareté, dessinés comme partout. */
-  function badgesSections(card: PublicCard | undefined): HubSectionSpec[] {
-    if (!card) return [];
-    const medals = medalsOf(card);
-    const group = (title: string, rarities: readonly string[]): HubCardSpec[] => {
-      const list = medals.filter((m) => rarities.includes(m.rarity));
-      return list.length ? [{ key: `rarity:${rarities.join('-')}`, title, medals: list }] : [];
-    };
-    return [
-      {
-        title: t('Badges'),
-        note: t('{n} sur {total}', { n: card.badges.length, total: BADGES.length }),
-        layout: 'list',
-        column: 'left',
-        cards: [...group(t('Épiques et légendaires'), ['legendary', 'epic']), ...group(t('Rares'), ['rare'])],
-      },
-      { layout: 'list', column: 'right', cards: group(t('Communs'), ['common']) },
-    ].filter((s) => s.cards.length) as HubSectionSpec[];
   }
 
   /**

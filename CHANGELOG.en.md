@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- What’s new: eight highlights for 0.2.3, including each table’s point of view and Cyber Pinball’s patched VPX, with previews and direct links.
+- Profile Badges tab: full catalogue of earned and unearned badges, with XP rewards for each; my profile shows current progress and the remaining target.
+- Builds reuse VPX and its PuP plugin when their hashes and those of the sources, patches, dependencies and build tools match the last successful build.
 - Profile: all information remains reachable with the flippers, even without an associated action. My activity also opens an empty likes list; current tables can be found on the wheel when only their title is shared.
 - Profile: the tab bar receives focus on arrival, as in Arena and Community. Flippers display each section immediately; Start enters its content and Exit returns to the tabs.
 - Community: online players appear first in Players; the discovery strip has a clearer heading.

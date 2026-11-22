@@ -144,7 +144,7 @@ The `powershell-propre.test.ts` test refuses the return of these signs in the sh
 ### Updating from the cabinet
 
 An installed cabinet updates itself from System menu > Help and info > **"Cyber Pinball update"** (details: installed version, and available version once checked).
-Nothing is installed on its own: a quiet check runs right at start-up, then every 6 hours while Cyber Pinball keeps running (every 5 minutes while it fails, for instance when the network is not ready yet as the cabinet boots), without downloading anything or showing anything if it fails; an error from a manual check does not stop it; an available version, or an update that did not go through (found on restart, until the entry is opened), puts a **red dot** on the menu's gear (⚙) and on the "Mise à jour de Cyber Pinball" (Cyber Pinball update) entry of the system menu (`attention` on system menu entries, carried by the gear as soon as one entry has it).
+Nothing is installed on its own: a quiet check runs right at start-up, then every 30 minutes while Cyber Pinball keeps running (every 5 minutes while it fails, for instance when the network is not ready yet as the cabinet boots), without downloading anything or showing anything if it fails; an error from a manual check does not stop it; an available version, or an update that did not go through (found on restart, until the entry is opened), puts a **red dot** on the menu's gear (⚙) and on the "Mise à jour de Cyber Pinball" (Cyber Pinball update) entry of the system menu (`attention` on system menu entries, carried by the gear as soon as one entry has it).
 Once opened, the entry shows straight away the release notes of every version missed since the cabinet's own (the feed's `history`), and "Mettre à jour maintenant" (Update now), selected by default: installing takes one button press.
 A result older than 10 minutes is checked again.
 Off-screen, tests only check their own test site (`CYBERPINBALL_MAJ_URL`), never GitHub.
@@ -276,3 +276,12 @@ The private key is never in the repository: `%USERPROFILE%\.cyberpinball\cle-pub
 
 **Update in a sandbox**: `CYBERPINBALL_MAJ_URL` overrides the feed address; `CYBERPINBALL_MAJ_CLE` (PEM file) overrides the public key, only in a sandbox (`CYBERPINBALL_HOME`).
 Also only in a sandbox, `CYBERPINBALL_MAJ_INSTALLEE=1` makes its root count as an installation: the screen offers "Update now" even when running from source.
+
+### Update checks and recovery
+
+Automatic checks run every 30 minutes, on PC wake and after a game; opening Cyber Pinball update also runs a fresh check without retaining an old result.
+Returning from that screen leads to its source, including Recent activity.
+If GitHub is unreachable, Cyber Pinball's service automatically retrieves the update on its behalf; signature and hash verification remain mandatory.
+Update failed offers Automatically install the latest version through that service, preserving tables, media and configuration.
+Network errors explain the cause: unreachable address, unknown hostname or rejected certificate.
+An installation import plan distinguishes linked large files from other copied files.

@@ -1,10 +1,12 @@
 [Français](../manuel/menu-systeme-cinq-rubriques.md) · English · [Manual contents](../manual.md)
 
-## System menu: eight sections
+<a id="system-menu-eight-sections"></a>
 
-The system menu (Exit, Tab or ⚙ from the tables screen) fits in eight lines, in order of use: Tables, Ma borne (My cabinet), Téléchargements (Downloads), Activité récente (Recent activity), Communauté (Community), Juke-box, Aide et infos (Help and info), Quitter ou éteindre (Quit or shut down), then "Retour aux tables" (Back to tables).
-Downloads, Recent activity and Juke-box open their screen directly; the other five open on their entries.
-No screen of the menu has more than eight lines, "Retour" (Back) not included: the list reads at a glance.
+## System menu: nine sections
+
+The system menu (Exit, Tab or ⚙ from the tables screen) has nine sections, in order of use: Tables, Ma borne (My cabinet), Téléchargements (Downloads), Activité récente (Recent activity), Communauté (Community), Arena, Juke-box, Aide et infos (Help and info), Quitter ou éteindre (Quit or shut down), then "Retour aux tables" (Back to tables).
+Downloads, Recent activity and Juke-box open their screen directly; the other six open on their entries.
+Apart from the nine-section root, no menu screen has more than eight lines, "Retour" (Back) not included: the list reads at a glance.
 Each entry has a single place, and the root has no shortcut that duplicates a section.
 A section's line says what it holds, never the state or the BETA badge of one of its entries: they are read once inside, on the entry they concern.
 The menu opens with the cursor on the last line chosen at its root, even after a restart (kept in `<data>\menu-systeme.json`); someone who mostly opens it to shut down finds the cursor on "Quitter ou éteindre" (Quit or shut down).
@@ -20,10 +22,11 @@ Test: [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.tes
 | Section | Entries |
 | --- | --- |
 | Tables | All tables, Collections (see [Collections and favourites](game-media.md#collections-and-favourites)), Roue (Wheel, see [Wheel: its settings](game-media.md#wheel-its-settings)), Add a table, Find missing media (on VPinMediaDB), ROM library, Sound and attract mode, Migration (Import media, Gather ROMs) |
-| Ma borne (My cabinet) | Cabinet setup (Buttons, Screens, Cabinet sound, Langue / Language, Cabinet configurations, Full wizard: see [Setup wizard and configuration menu](setup-wizard-and-configuration-menu.md#setup-wizard-and-configuration-menu)), VPX (VPX settings, Other VPX versions, and Trial VPX on a development machine: see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)), DMD and LEDs (DMD screen, Menu DMD, DMD colour, Real DMD, LED and feedback (DOF)), Virtual reality and 3D vision (Virtual reality, Align the cabinet, Headset controllers, Mirror on the playfield, 3D vision), Phone remote, Startup and access (Dedicated cabinet, Launch at startup, Relaunch with Start: see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start), Guest mode), Health and backups (Cabinet health, Tech sheet, Backups: see [Backups](backups.md#backups)) |
+| Ma borne (My cabinet) | Cabinet setup (Buttons, Screens, Cabinet sound, Langue / Language, Cabinet configurations, Full wizard: see [Setup wizard and configuration menu](setup-wizard-and-configuration-menu.md#setup-wizard-and-configuration-menu)), VPX (Presets, VPX settings, Other VPX versions, and Trial VPX on a development machine: see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)), DMD and LEDs (DMD screen, Menu DMD, DMD colour, Real DMD, LED and feedback (DOF)), Virtual reality and 3D vision (Virtual reality, Align the cabinet, Headset controllers, Mirror on the playfield, 3D vision, 3D glasses), Phone remote, Startup and access (Dedicated cabinet, Launch at startup, Relaunch with Start: see [Relaunch with Start](relaunch-with-start.md#relaunch-with-start), Guest mode), Health and backups (Cabinet health, Tech sheet, Backups: see [Backups](backups.md#backups)) |
 | Téléchargements (Downloads) | The downloads screen (see [Downloads and file picker](downloads-and-file-picker.md#downloads-and-file-picker)) |
 | Activité récente (Recent activity) | The notifications of the last few days, in full (see [Recent activity](recent-activity.md#recent-activity)) |
-| Communauté (Community) | The same screen as the wheel's Community medallion: My profile (My level, My badges, Game history, Edit my profile, Privacy, My account: see [My account](my-account.md#my-account)), Players online, Instant game, My friends, Messages, Groups and rooms (Groups, Rooms by country), Leaderboards, Community settings (Presence and rooms, Sharing and network, Friends' scores during the game, Hide notifications during games, Moderation on moderators' cabinets, Local play) (see [Community: the cabinet network](friends-the-cabinet-network.md#community-the-cabinet-network)) |
+| Community | Home, Messages, Players, Groups, Rooms and Profile; Community settings. See [Community](friends-the-cabinet-network.md#community-the-cabinet-network). |
+| Arena | Instant games, Leaderboards and Progression (My level, My badges, Game history); the medallion also opens Arena with its scores, daily tables and challenges. |
 | Juke-box | The Juke-box screen, which also opens its settings (see [Juke-box settings](game-media.md#juke-box-settings)) |
 | Aide et infos (Help and info) | Cabinet controls, What's new (see [What's new](whats-new.md#whats-new)), Cyber Pinball update, Feedback and ideas (see [Feedback and ideas](feedback-and-ideas.md#feedback-and-ideas)), Follow us, Terms of use, Credits (see [Community credits](community-credits.md#community-credits)) |
 | Quitter ou éteindre (Quit or shut down) | Windows desktop (Open Windows Explorer on a [dedicated cabinet](dedicated-cabinet.md#dedicated-cabinet)), Quit Cyber Pinball, Restart Cyber Pinball, Sleep, Restart the cabinet, Shut down the cabinet (see [Shutting down, sleeping, restarting the cabinet](shutting-down-sleeping-restarting-the-cabinet.md#shutting-down-sleeping-restarting-the-cabinet)) |

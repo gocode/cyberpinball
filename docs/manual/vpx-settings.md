@@ -21,3 +21,11 @@ From the tables screen, R key (or System menu > My cabinet > VPX > "Réglages de
   The screen opened on its own (`--reglages --table=…`) has it too.
   In a sandbox (`CYBERPINBALL_HOME`), it is written to `<bac à sable>\sandbox\tables\` and never next to the real .vpx.
 - These settings are those of Cyber Pinball's VPX: a table played with another VPX of the PC starts with that other VPX's settings, which Cyber Pinball never touches (see [Other VPX versions](other-vpx-versions.md#other-vpx-versions)).
+
+### Quality presets (beta)
+
+System menu > My cabinet > VPX > "Presets" offers Auto, Performance, Balanced, Quality, Ultra and Custom; the active choice has a checkmark and contrasting badge.
+After an update, an existing cabinet stays in Custom and keeps its settings until you choose.
+Auto starts conservatively from the graphics card and playfield, then adjusts quality between games using GPU render time measured by patched VPX, never during a game.
+VR profiles, per-table overrides and cabinet configurations remain independent.
+Custom restores the settings kept before the first preset; manually changing a graphics setting also disables automatic adaptation.

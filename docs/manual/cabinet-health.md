@@ -61,3 +61,10 @@ A Blocking line in the last check puts the red dot on "Santé de la borne", on t
 
 Code: the lines and their states in [packages/core/src/health.ts](../../packages/core/src/health.ts), the check, the cache and the page in `app/src/health.ts`, the rendering in `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) pins every state of every check and that **every line leads to a real screen**: a system menu entry placed in the tree and provided by the application, a table's diagnosis, the list of tables to review or the VPX installation.
+
+### Refresh rates and rendering stalls
+
+A playfield below its available refresh rate remains worth checking; a secondary screen below its possible rate is informational when it does not affect the ball.
+A slower secondary screen may limit an older VPX 10.8.1; Cyber Pinball's patched VPX gives each screen its independent refresh rate.
+Script or antivirus stalls are not classified as this limit; the report also locates the render thread during pauses (graphics driver, video, textures).
+The log measures wheel smoothness: slow frames, longest frame and screen cadence.

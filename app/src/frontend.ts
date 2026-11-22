@@ -2893,6 +2893,10 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
     case 'sheet': {
       const table = tables[state.index];
       if (!table) return { gone: t('Choisissez d’abord une table sur la roue') };
+      if (target.part === 'pov') {
+        if (table.emulator !== 'vpx') return { gone: t('Indisponible : choisissez une table VPX sur la roue') };
+        return { run: () => library.openPov(table, back) };
+      }
       if (target.part === 'credits') return { run: () => library.credits.open(table) };
       if (target.part === 'scores') return { run: () => library.openScores(table, 'world', 'week', back) };
       return { run: () => library.openSheet(table) };
@@ -3331,6 +3335,7 @@ const wheelTable = {
   },
 };
 const profileMenu = createProfileMenu({
+  badgeFacts: () => levelTracker.facts(),
   navKeys: () => KEYS,
   library,
   net: socialNet,

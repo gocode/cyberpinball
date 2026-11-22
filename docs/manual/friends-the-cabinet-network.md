@@ -4,21 +4,19 @@
 
 System menu > "Communauté" (Community) links cabinets together **with no server**: each finds the others and talks to them directly, over the Internet or on the local network.
 Sharing is **on by default**; "Partage et réseau" (Sharing and network) turns it off.
-The system menu's Community is the same screen as the wheel's Community medallion (see "The Community medallion" below): at the top, the number of players online and what others see, then eight entries.
-What is yours (level, badges, game history, nickname, avatar, country, public profile, what others see, deleting the account) is in System menu > "Communauté" (Community) > "Mon profil" (My profile) (see [My account](my-account.md#my-account)).
+The system menu's Community and the Community medallion open the same six-tab screen: Home, Messages, Players, Groups, Rooms and Profile.
+At opening, flippers immediately show another tab; Start enters its content, Exit returns to the tabs, then to the wheel.
+MagnaSave also changes tabs; the whole surface of each tab remains clickable, including during refreshes.
+Inside content, flippers move between blocks and Start enters them; bottom actions are ordinary rows.
+Home summarises the tabs: Start on a summary opens its tab at that location, and Exit returns there.
+It shows a waiting message with three prepared replies, online friends and their activity, the live country room and news to welcome or congratulate.
+Players combines the former My friends and Players online entries: received requests lead, online players come first, then suggestions based on shared tables and friends, country and level.
+All online players opens the complete list; shared tables appear as medallions (favourites first) and mutual friends as avatars.
+The Share Cyber Pinball download QR code appears on Home in desktop mode and in Players on a cabinet.
+Profile opens your profile with Edit my profile, Privacy and My account; My level, My badges and Game history are also under System menu > Arena > Progression.
+Instant games and leaderboards now belong to Arena.
 
-| Entry | What it shows |
-| --- | --- |
-| Mon profil (My profile) | My level, My badges, Game history, then Edit my profile (nickname, avatar, country), Privacy (public profile, what others see) and My account (protect it, transfer it, delete it). The game history: the games with friends finished on this cabinet, newest first, by day, the table, the time, and below it the players with their rank and score; a game opens to review its details (see "Game history" below). |
-| Joueurs en ligne (Players online) | Every player your cabinet has come across, friends or not, those online first (see "Community and players online" below). |
-| Partie instantanée (Instant game) | A live game open to everyone, friends or not; the label says whether one is open (see "Instant games" below). |
-| Mes amis (My friends) | Online, then offline. For each: playing and which table (in real time), in the menu, or seen how long ago; their latest event ("Nouveau meilleur score sur …", New high score on; "Badge reçu : …", Badge earned; "A joué à …", Played). Start opens their profile, the one screen of a player (see "Public profile and likes" below): their presence, their library, their level, their badges, a single activity list, "Inviter à une partie en direct" (Invite to a live game; greyed out, "Hors ligne", Offline, when they are not), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message), "Retirer de mes amis" (Remove from my friends), "Bloquer …" (Block …). At the top, an invitation received or the live game in progress. "Trouver un joueur" (Find a player) and friend requests are there too (below). |
-| Messages | Conversations with your friends, the most recent first, then the friends you have not written to yet. The red dot and "non lus" (unread) mark what is waiting. Start opens a friend's conversation (see "Messaging" below). |
-| Groupes et salons (Groups and rooms) | Groups, public or private, and the country rooms (see "Groups" and "Rooms by country" below). |
-| Classements (Leaderboards) | Players and tables, in the Friends, National and World scopes (see "Community and players online" below). |
-| Réglages de la communauté (Community settings) | Presence and rooms, Sharing and network, Friends' scores during the game, Hide notifications during games, Moderation (moderators' cabinets only), Local play (below). |
-
-In My friends and in Community settings:
+In Players and in Community settings:
 
 | Entry | What it shows |
 | --- | --- |
@@ -30,7 +28,7 @@ In My friends and in Community settings:
 
 **Local play.**
 System menu > Community > "Réglages de la communauté" (Community settings) > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
-Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community medallion on the wheel, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
+Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community and Arena medallions on the wheel, challenges, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
 A table's scoreboard keeps only this cabinet's scores, with no scope tabs.
 In My profile only Edit my profile (nickname, avatar, country) and My account remain: My level, My badges, the game history and Privacy are removed too.
 All the tables and their scores on this cabinet, the Juke-box, Cyber Pinball updates, What's new, Feedback and ideas stay.
@@ -513,47 +511,23 @@ Messages are kept in `<data>\amis\messagerie.json`.
 
 ### Public profile and likes
 
-Every player has a **public profile**, readable by those who are not their friends: their nickname, avatar, level, badges, country, number of friends (never the list), the number of their published high scores, their invited players, their public groups and their **recent activity** (high scores and badges of the last 30 days).
-Current table, games played, library and messages stay between friends, and the profile says so ("Table en cours, parties jouées, bibliothèque : réservées à ses amis", Current table, games played, library: for their friends only); "Online" or "Playing" show in "Joueurs en ligne" (Players online, see below).
+The profile shows a large avatar with level ring and green online presence, country, nickname, current activity and counts for friends, records, badges, groups and shared tables.
+Relationship actions lead: Invite to play, Write and Their library for a friend; Add (+25 XP), Accept, Decline, Cancel request or welcome a newcomer as appropriate.
+Unavailable actions stay greyed out with a reason (Offline, Friends only).
+Focus starts on the tabs: flippers to show a tab, Start to enter, Exit to return; MagnaSave also changes tabs.
+Every piece of information is reachable with flippers, including rows without an action.
 
-**One screen per player.**
-Friend or not, a player has only one screen, their profile (`app/src/profile-menu.ts`); up to 0.1.13, a friend's page and their public profile duplicated each other, with two different activity lists.
-My friends, "Joueurs en ligne" (Players online), the directory ("Trouver un joueur", Find a player), friend requests, messaging and groups ("Voir son profil", See their profile), rooms (a line's options) and Recent activity all lead straight to it; its "Retour" (Back) returns where you came from.
-Under the nickname, the tier and level ("Flippeur · niveau 14", Flipper · level 14), then "Votre ami" (Your friend) or "Profil public · pas votre ami" (Public profile · not your friend).
-From top to bottom:
+| Tab | Contents |
+| --- | --- |
+| Activity | Records, badges and games with likes, tables of the week, level and rarest badges. |
+| Records | Published scores, your tables first, with the gap to catch up; Start finds the table on the wheel even when only its title is shared. |
+| Badges | Complete catalogue, earned and unearned, rarity and XP; on my profile, progress and remaining target. Secrets retain their hint until earned. |
+| About | Country, friendship, library, ID, invited players and public groups, then Hide activity, Remove friend and Block. |
 
-- what the relationship adds (`playerPart` in `app/src/friends-menu.ts`): for a friend, their presence ("En partie", Playing; "En ligne", Online; or "Hors ligne", Offline; since when you have been friends, how their cabinet is linked) and their library (with "1 réception en cours", 1 transfer in progress); for another player, where they were seen ("Sur votre réseau local", On your local network; "Vu il y a 3 j", Seen 3 days ago) and the pending friend request, sent or received;
-- their country, number of friends and published high scores, "Profil actualisé il y a …" (Profile updated … ago), then their ID;
-- their level and its bar ("Flippeur · niveau 14", "350 / 750 XP");
-- their badges as medals, the rarest first, twelve at most ("23 badges sur 56", 23 badges out of 56; "Les 12 plus rares", The 12 rarest);
-- their invited players, if any (see "Invited players" below);
-- their public groups, never a private group (see [Levels and badges](levels-and-badges.md#what-the-player-sees));
-- a single activity list, the most recent at the top: their high scores and badges of the last 30 days, to like, and, for a friend, the games they played over the same 30 days (with no public card received, their friend events alone).
-
-The card of a player whose cabinet does not have the levels version yet has no level: the line reads "Niveau pas encore connu" (Level not known yet; "Sa borne n'a pas encore la version qui donne le niveau", Their cabinet does not have the version that gives the level yet).
-An implausible level shows as "Niveau ?" (Level ?, see [Levels and badges](levels-and-badges.md#starting-level-and-plausibility)).
-The actions: for a friend, "Inviter à une partie en direct" (Invite to a live game), "Voir sa bibliothèque" (See their library), "Écrire un message" (Write a message); for another player, "Envoyer une demande d'ami" (Send a friend request; or cancel, accept, decline) and "Écrire un message", greyed out; then "Masquer son activité" (Hide their activity), "Retirer de mes amis" (Remove from my friends; a friend, with confirmation), "Bloquer …" (Block …) and "Retour" (Back).
-
-**Liking.**
-On the profile, the flippers choose a high score or a badge, Start likes it, Start again unlikes it.
-Everyone sees the number of likes; only the author sees who liked it.
-A like shows as a raised thumb, filled when you already like it; the same thumb marks the "Ont aimé" (Liked by) screen, the notification of a like received, the experience points detail and the "Apprécié" (Appreciated), "Populaire" (Popular) and "Généreux" (Generous) badges.
-You cannot write to a player who is not a friend: "Écrire un message" (Write a message) stays visible, greyed out, with its reason; "Envoyer une demande d'ami" (Send a friend request) is next to it.
-"Masquer son activité" (Hide their activity) hides their events and likes on this cabinet, along with their level, badges and invited players; "Bloquer" (Block) cuts everything.
-
-**My public profile.**
-System menu > "Communauté" (Community) > "Mon profil" (My profile) > "Confidentialité" (Privacy) > "Mon profil public" (My public profile) shows what others see (country, friends and high scores, level and bar, badges as medals, invited players, public groups) and, for each event of "Votre activité récente" (Your recent activity), who liked it (Start).
-During the first month, it also offers "Qui vous a fait découvrir Cyber Pinball ?" (Who introduced you to Cyber Pinball?, see "Invited players" below).
-A like received is announced by a notification in the table menu, grouped ("Dora and Kiko like your activity").
-The public profile is **on by default**; "Désactiver mon profil public" (Turn off my public profile), here or in "Ce que voient les autres" (What others see), leaves others only the nickname in the directory (and the scores, if they are published).
-
-**Without a server.**
-A player's public card is signed by their key and travels from cabinet to cabinet like the ranking scores: each cabinet keeps it 60 days, so a profile can be read even when its player is offline, as of the last card received ("Profil actualisé il y a …", Profile updated … ago).
-A like is a small signed message, delivered straight to the author's cabinet when it is linked, otherwise relayed by one or two cabinets, and retried at every link for 30 days.
-The number shown is the one of the last card received.
-One cabinet cannot give a player more than 100 likes a day.
-Cards sent together stay under 180 KiB per message (`withinBytes`, [publicprofile.ts](../../packages/core/src/publicprofile.ts)): a card carries up to twenty invited player certificates, and a message that is too big would be refused whole.
-Cards and likes are kept in `<data>\amis\profils.json`.
+My profile is the same screen others see, with Edit my profile, Privacy and My account at the top.
+Start on one of my posts opens its likes list, even empty; on someone else's post it adds or removes my like.
+Privacy > What others see controls the friends list: public by default, friends only or private; this also controls visible mutual friends.
+A private group never appears on a profile.
 
 ### Invited players
 
@@ -618,11 +592,11 @@ Exit goes back to the wheel.
 The medallion can be hidden in System menu > Tables > Wheel ("Communauté dans la roue", Community on the wheel); it never shows in guest mode.
 Chosen on the wheel, it shows its **poster**, like the Juke-box: behind the wheel (the whole playfield on a cabinet, the playfield frame on a desktop) and in place of the backglass media.
 Both posters give the figures (players online, those from your country, your friends) and the friends online (otherwise unread messages); with sharing turned off, they say how to turn it on.
-The playfield one also shows your level (its tier and bar), your place in the worldwide ranking and in your country, and your week in one line ("Cette semaine : +850 XP · 37ᵉ au monde · 3ᵉ dans votre pays", This week: +850 XP · 37th worldwide · 3rd in your country); a place not known yet keeps its box, greyed out, with its reason ("Pas encore classé", Not ranked yet; "Pays non choisi", Country not chosen).
-Your country's room, with those present and its last line, only appears on the backglass poster.
+The playfield poster shows a waiting message, online friends, the country room, groups and friend requests; level and standings belong to Arena's poster.
+Your country's room is also readable on the backglass poster.
 
 **Players online.**
-Also in System menu > Community, right after My profile.
+Available from Players in Community.
 Every player your cabinet has come across, friends or not (the network directory, your friends, the players from the leaderboards), **those online first**: your **friends online**, then the players from **your country**, then the others; in each group, those playing first, then by name.
 Then, under "Hors ligne" (Offline), all the others: your friends first, then the most recently seen ("Vu il y a 3 j", Seen 3 days ago).
 Each line carries the player's badge, their flag before their name (the Cyber Pinball flag, a comet ball, for a player who has not given their country; the same in the leaderboards and chat rooms), a green ring around the badge when they are connected, and below it what they are doing ("En partie", Playing, with the table between friends; "En ligne", Online; "Vu il y a 3 j", Seen 3 days ago) and what you have in common ("6 tables en commun", 6 tables in common; "Sur votre réseau local", On your local network); "Ami" (Friend, outside the friends section) or "Demande envoyée" (Request sent) on the same line.
@@ -927,3 +901,26 @@ For now it is always a picture of one's own: a photo or a picture taken from the
 A picture of one's own only: no ready-made avatars to choose from yet.
 No round cropping: the square is sent, the circle is drawn by each cabinet.
 An animated picture (GIF) becomes still.
+
+### Arena, scores and challenges
+
+The Arena medallion, between Community and Collections, and System menu > "Arena" open the same space.
+System menu > Tables > "Wheel" can hide the medallion; Local play also removes Arena and challenges.
+Its poster shows your level and a dot scoreboard changing every six seconds according to what awaits: an expiring challenge, an open game, a lost place, standings and records.
+Home leads with the urgent action, then world player standings (top three and your place), open games and possible XP.
+Your world and country positions open their standings directly; Exit returns to Arena.
+Tabs navigate like Community; outside Home, flippers move directly between rows and Start validates without entering a block.
+Scores (trophy) shows recent tables, their leader and your country and world positions, then all tables with search, scope and period, and player standings.
+Today's tab shows the most played tables worldwide, in your country or among friends, the daily record, your place and the player ahead; when today is quiet it shows the week.
+Start launches your exact version; another version stays greyed out with Get this version from a friend who owns it.
+Daily and weekly game counts are shared per exact version with the signed public card; implausible values show a question mark.
+When someone passes you in daily or all-time standings on a version played, a notification (at most once per table per day) and Recent activity offer Take my place back.
+That place becomes Arena's priority card: replay, message a friend or challenge.
+
+**Challenges** (crossed flippers) lists those to play, sent challenges and recent results.
+Table sheet > Play together… > Challenge a player… lets you choose a friend or ranked player on the same exact version; a challenge is also available from a lost place or post-game screen.
+Your best score, or the just-finished game's score, is the target: 48 hours, unlimited attempts, and either player may improve their score.
+The recipient can decline; at the deadline the highest score earns 40 XP, then Rematch creates a new challenge.
+Only scores recorded by Cyber Pinball count; blocked players or those excluded from rooms cannot challenge you.
+Signed challenges are relayed cabinet to cabinet without a server: you need not be online at the same time.
+Notifications announce receipt, an overtaken score, the final six hours, result or refusal; Recent activity keeps a single row per challenge.

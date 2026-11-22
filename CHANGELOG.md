@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Nouveautés : huit actualités pour la 0.2.3, avec le point de vue de chaque table et le VPX corrigé de Cyber Pinball, leurs aperçus et leurs accès directs.
+- Profil, onglet Badges : catalogue complet, badges obtenus et à obtenir, récompense en XP pour chacun ; sur mon profil, progression actuelle et objectif restant.
+- Fabrication : VPX et son plugin PuP sont réutilisés quand leurs empreintes et celles des sources, correctifs, dépendances et outils de compilation correspondent à la dernière compilation réussie.
 - Profil : toutes les informations restent accessibles aux flippers, même sans action associée. Mon activité ouvre aussi la liste vide des « J’aime » ; les tables du moment retrouvent la roue même quand seul leur titre est partagé.
 - Profil : la barre d’onglets reçoit le focus à l’ouverture, comme dans l’Arène et la Communauté. Les flippers affichent immédiatement chaque section ; Start entre dans son contenu et Exit revient aux onglets.
 - Communauté : les connectés apparaissent en premier dans Joueurs ; la bande de découverte porte un intitulé adapté.

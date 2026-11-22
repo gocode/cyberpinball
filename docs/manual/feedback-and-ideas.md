@@ -64,3 +64,12 @@ The team changes the status of ideas, replies, hides or merges duplicates (the d
 
 Code: [packages/core/src/feedback.ts](../../packages/core/src/feedback.ts) (protocol, sealing, duplicates, consent); [app/src/feedback-service.ts](../../app/src/feedback-service.ts) (the service seen from the cabinet, the queue); [app/src/feedback-menu.ts](../../app/src/feedback-menu.ts) (the screens).
 [feedback.test.ts](../../packages/core/src/test/feedback.test.ts) and [retours-service.test.ts](../../packages/core/src/test/retours-service.test.ts) pin the sealing, the signature, duplicates, consent, and that the cabinet and the service speak the same protocol; [retours-traduction.test.ts](../../packages/core/src/test/retours-traduction.test.ts) the translations, [feedback-etats.test.ts](../../packages/core/src/test/feedback-etats.test.ts) the status badges, [rapport-pieces-jointes.test.ts](../../packages/core/src/test/rapport-pieces-jointes.test.ts) the attached files.
+
+### My conversations with the team
+
+System menu > Help and info > Feedback and ideas > My conversations with the team lets you read and answer replies to reports.
+Every written report, developer report or automatic crash report opens a conversation; a reply to your public proposal is also announced and allows a private answer.
+Notifications and pending messages announce replies; checks run every minute for two hours after the last message, otherwise every twenty minutes.
+Reports include your nickname; anonymous sending remains available and remembered, and the team can still reply.
+Everything stays encrypted between cabinet and team.
+A diagnostic without problems opens on the next step or return: sending a report requires navigating to the action and describing the issue, so two accidental Start presses cannot send it.

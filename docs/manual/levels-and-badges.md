@@ -92,13 +92,13 @@ Rivets and stars glow in the rarity colour.
   In guest mode, the card says "Guest · Games without XP".
   The card and the badges pill also stay at the top of full-screen pages (System menu and its screens, My badges, help…), on the brand line, at the height of the other pills (`--pill-height`, [app/renderer/niveau.css](../../app/renderer/niveau.css)); never in attract mode nor in the Juke-box.
   There, "+85 XP" does not show (it would fall on the screen's title), and on a cabinet the card gives way while a notification is shown.
-  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-eight-sections)).
-- **My level**, first in the Community home: the bar and XP to go, this week's XP, the four latest gains, the current week's rankings with the expected XP, the two closest badges; then "My badges", "How to earn XP" and "My public profile".
+  The System menu gear, on their right, is a round pill of the same size (see [System menu](system-menu-five-sections.md#system-menu-nine-sections)).
+- **My level**, under Arena > Progression: the bar and XP to go, this week's XP, the four latest gains, the current week's rankings with the expected XP, the two closest badges; then "My badges", "How to earn XP" and "My public profile".
 - **My badges**: each row carries the badge's drawing, in its shape and rarity ([app/src/level-menu.ts](../../app/src/level-menu.ts), `Row.medal`).
   An earned badge shines, with a halo in its rarity colour and a passing gleam; a badge not earned yet stays grey and unlit, without a gleam; a secret not earned yet shows only its padlock.
   The two closest badges, in "My level", have the same drawing.
   A badge not earned yet says what it is worth ("Play 100 different tables · +1,000 XP to earn"), secret badges included, after their hint.
-- **Public profile** (see [Community: the cabinet network](friends-the-cabinet-network.md#public-profile-and-likes)): the tier and level under the name; then, after the country, the number of friends (never the list) and the high scores, the level line with its bar ("Flippeur · niveau 14", "350 / 750 XP") and their badges as medals, the rarest first (twelve at most, "23 badges sur 56", 23 badges out of 56).
+- **Public profile** (see [Community: the cabinet network](friends-the-cabinet-network.md#public-profile-and-likes)): the tier and level under the name; then, after the country, the friend count, according to their privacy and the high scores, the level line with its bar ("Flippeur · niveau 14", "350 / 750 XP") and their badges as medals, the rarest first (with the complete catalogue in the Badges tab).
   Under each medal, its full name, on two lines if needed, never cut in the middle of a word ("Ambassado / r"), then the XP it is worth ("+150 XP"), in its rarity colour.
   The card of a cabinet that does not have this version yet has no level: "Niveau pas encore connu" (Level not known yet).
   Their invited players come next ("A fait découvrir Cyber Pinball à 3 joueurs", Introduced 3 players to Cyber Pinball, with their avatars).
@@ -129,3 +129,7 @@ The level is kept in `<data>\amis\niveau.json`: XP, the forty latest gains, XP p
 An unreadable file is set aside (`niveau.json.illisible-<date>`) and the level starts again from the history; a file from a newer version is shown without being updated.
 
 Tests: [levels.test.ts](../../packages/core/src/test/levels.test.ts) (curve, caps, personal best, table left open, weekly rankings and their Tuesday payment, social life, starting level, plausibility, file, invariants of the badges), [invitations.test.ts](../../packages/core/src/test/invitations.test.ts) (invited players, their XP, Community badges, contributions), [entete-homogene.test.ts](../../packages/core/src/test/entete-homogene.test.ts) (the gear sized like the pills, the player card and its badges on full-screen pages).
+
+**Hosting a game** that others join earns 25 XP once per exact group of players; replaying with the same group earns no more, a different group earns it again.
+**Winning a challenge** at its deadline earns 40 XP.
+My profile's Badges tab shows each earned or unearned badge's XP, my progress and remaining target.

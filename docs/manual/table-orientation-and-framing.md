@@ -137,3 +137,12 @@ Cyber Pinball then sets manual framing (`CabinetAutofitMode = 0`) there for that
 This is the finding "Framing set for this table" (`importedView`, information), repaired before each game (`PUP_PLAY_REPAIRS`) and at installation, so also for tables already imported.
 A framing already chosen for the table (key present) is never touched; "Adjust display in game" lets you touch it up or switch to automatic framing.
 Test: [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test.ts).
+
+### Choosing and importing a point of view (beta)
+
+Table sheet > Manage table… > Point of view identifies the framing: shared cabinet framing, the table's supplied POV or an imported POV.
+Import a POV… accepts a .pov or VPX 10.8 POV .ini from Downloads, a USB drive or disk; it is stored with this table and affects only it.
+A POV putting the flippers on the wrong side is refused with its reason; a supplied POV is offered in diagnostics when framing is already chosen.
+Switching to manual framing without a saved view is not a per-table view: diagnostics offers cabinet framing.
+With patched VPX, Fit Table keeps the back of the playfield on screen: lower decoration and empty space above are cropped first, then width stretching of at most 15% fills the gap.
+Keep the top of the table and Maximum width stretch are available in VPX settings > Table view and framing, and VPX's in-game menu with eye height and distance.

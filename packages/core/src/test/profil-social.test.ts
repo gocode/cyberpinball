@@ -60,7 +60,7 @@ test('Records : ses scores publiés, d’abord là où il me devance (le plus pe
 interface Hub {
   person: { name: string; eyebrow?: string; status?: { text: string }; buttons: { label: string; off?: string; primary?: boolean; xp?: string; action?: number }[] };
   tabs: { label: string; current: boolean; disabled?: string }[];
-  sections: { title?: string; cards: { title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
+  sections: { title?: string; cards: { key?: string; title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
 }
 interface Built {
   heading: string;
@@ -105,6 +105,7 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; lik
   });
   const menu = createProfileMenu({
     navKeys: () => ({ previous: ['FlipLeft'], next: ['FlipRight'] }),
+    badgeFacts: () => ({ games: 42, tables: 7, seconds: 0, longestTable: 0, records: 0, championTables: 0 }),
     table: { has: () => opts.tableAvailable ?? false, go: (table: { title: string }) => events.push(`table:${table.title}`) },
     library: { openCustom: (build: () => Built, at?: number) => (opened = { build, at }), openSystem: () => undefined },
     net,
@@ -276,4 +277,14 @@ for (const tableAvailable of [false, true]) test(`mes tables du moment : parcour
   p.pick(`week:${BOARD('1')}`);
   assert.deepEqual(p.events, tableAvailable ? ['table:Thunder Reef'] : []);
   assert.ok(p.built().actions.some((a) => a.key?.endsWith('event:ev-a')), 'l’activité reste dans le parcours');
+});
+
+test('onglet Badges : le catalogue remplace les seules médailles, avec ma progression uniquement sur mon profil', () => {
+  const mine = profile({ mine: true }).tab('Badges').hub.sections.flatMap((s) => s.cards);
+  const other = profile().tab('Badges').hub.sections.flatMap((s) => s.cards);
+  assert.ok(mine.length > 40);
+  assert.equal(other.length, mine.length);
+  assert.match(mine.find((c) => c.title === 'Cent parties')!.detail!, /42 \/ 100 · reste 58/);
+  assert.match(other.find((c) => c.title === 'Cent parties')!.detail!, /Progression non partagée/);
+  assert.ok(mine.every((c) => c.action !== undefined), 'tous les objectifs sont parcourables aux flippers');
 });

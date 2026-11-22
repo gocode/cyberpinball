@@ -6697,6 +6697,7 @@ export function createLibrary(host: LibraryHost) {
       sheetManage = undefined;
       openSheet(table, flash);
     },
+    openPov: (table: TableEntry, back: () => void) => tablePov.open(table, back),
     openAdd,
     /** Opération longue : le message à l'écran, les touches ignorées (borne dédiée : l'autorisation de Windows). */
     task,

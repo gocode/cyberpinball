@@ -31,7 +31,7 @@ export type NewsReach =
   | { kind: 'arena' }
   | { kind: 'level' }
   | { kind: 'jukebox' }
-  | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' };
+  | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' | 'pov' };
 
 export interface NewsItem {
   /** Identité stable : l'état lu, le nom de l'aperçu (app/renderer/nouveautes/<id>-<langue>.webp). */
@@ -59,6 +59,37 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    id: 'point-de-vue',
+    date: '2026-11-22',
+    version: '0.2.3',
+    get title() { return t('Le point de vue de chaque table'); },
+    get detail() { return t('Gardez le cadrage de la borne, utilisez le POV fourni avec la table ou importez le vôtre, table par table.'); },
+    get more() {
+      return [
+        t('Dans « Gérer la table… › Point de vue », choisissez le cadrage de la borne ou le POV de cette table. Vous pouvez aussi importer un fichier .pov ou le .ini d’un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque.'),
+        t('Le POV importé est rangé avec la table et appliqué à elle seule. Une vue qui mettrait la table de travers sur la borne est refusée, avec la raison.'),
+      ];
+    },
+    get where() { return t('Fiche d’une table › Gérer la table… › Point de vue'); },
+    reach: { kind: 'sheet', part: 'pov' },
+    beta: true,
+  },
+  {
+    id: 'vpx-corrige',
+    date: '2026-11-22',
+    version: '0.2.3',
+    get title() { return t('Le VPX corrigé de Cyber Pinball'); },
+    get detail() { return t('Le VPX de Cyber Pinball corrige les saccades des PuP-Packs et améliore le cadrage des tables.'); },
+    get more() {
+      return [
+        t('Cyber Pinball installe son VPX 10.8.1-5436 corrigé et son plugin PuP : un fronton plus lent ne bride plus le plateau et les grandes images animées des PuP-Packs ne bloquent plus le rendu.'),
+        t('Le cadrage garde le haut du plateau visible, et le temps de rendu GPU permet au mode Auto d’adapter la qualité entre les parties. Les sources des correctifs sont publiées avec la version ; la fiche technique indique le VPX installé.'),
+      ];
+    },
+    get where() { return t('Menu système › Aide et infos › Fiche technique'); },
+    reach: { kind: 'system', id: 'tech-sheet' },
+  },
   {
     // Pré-réglages de qualité de VPX (22/11/2026) ; « Vision 3D » (0.1.9) sort de la
     // liste pour la garder à 24. Date à poser au jour de la version finale.
@@ -96,10 +127,9 @@ export const NEWS: readonly NewsItem[] = [
   },
   {
     // Lunettes 3D (anaglyphe, 21/11/2026) ; « Le téléphone pilote tout » (0.1.8) sort de la liste pour
-    // la garder à 24. « La Communauté, en un coup d'œil » (Communauté à onglets, même jour) n'y entre pas :
-    // quatre nouveautés par jour au plus, choix du 21/11/2026. Date à poser au jour de la version finale.
+    // la garder à 24. Sélection de la finale validée le 22/11/2026.
     id: 'lunettes-3d',
-    date: '2026-11-21',
+    date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Lunettes 3D'); },
     get detail() { return t('La table en relief avec de simples lunettes rouge et cyan, et avec la Vision 3D si vous voulez.'); },
@@ -117,7 +147,7 @@ export const NEWS: readonly NewsItem[] = [
     // Le médaillon Arène (21/11/2026, planche « Engagement ») ; « Les règles de chaque table » (0.1.8)
     // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'arene',
-    date: '2026-11-21',
+    date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('L’Arène'); },
     get detail() { return t('Un médaillon pour se mesurer aux autres : parties ouvertes, places à reprendre, votre niveau.'); },
@@ -134,7 +164,7 @@ export const NEWS: readonly NewsItem[] = [
     // Tables du jour et objectif à battre (engagement, 21/11/2026) ; « Vos tables d'une autre
     // installation » (0.1.7) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'tables-du-jour',
-    date: '2026-11-21',
+    date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Les tables du jour'); },
     get detail() { return t('Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.'); },
@@ -152,7 +182,7 @@ export const NEWS: readonly NewsItem[] = [
     // Dialogue avec l'équipe sur un rapport (21/11/2026) ; « Sauvegardes » (0.1.7) sort de la liste
     // pour la garder à 24. Date à poser au jour de la version finale (publier.mjs le rappelle).
     id: 'echanges-equipe',
-    date: '2026-11-21',
+    date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Un échange avec l’équipe'); },
     get detail() { return t('Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.'); },
@@ -419,37 +449,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Juke-box'); },
     reach: { kind: 'jukebox' },
-  },
-  {
-    id: 'classements',
-    date: '2026-11-11',
-    version: '0.1.9',
-    get title() { return t('Classements jusqu’au mondial'); },
-    get detail() { return t('Le tableau des scores de chaque table : votre borne, vos amis, votre pays, le monde.'); },
-    get more() {
-      return [
-        t('Chaque partie laisse ses scores sur la fiche de la table. Les MagnaSave passent de « Cette borne » à « Amis », « National » et « Mondial » ; les flippers changent de période, de tout temps à aujourd’hui.'),
-        t('Un score n’est comparé qu’avec ceux de la même version de la table, jouée avec le même nombre de billes. Il passe de borne en borne, signé par son joueur, sans serveur.'),
-      ];
-    },
-    get where() { return t('Fiche d’une table › Tableau des scores'); },
-    reach: { kind: 'sheet', part: 'scores' },
-  },
-  {
-    id: 'realite-virtuelle',
-    date: '2026-11-11',
-    version: '0.1.9',
-    get title() { return t('Réalité virtuelle'); },
-    get detail() { return t('Vos tables et le front-end dans un casque, la borne calée sur la vraie.'); },
-    get more() {
-      return [
-        t('Avec un casque (Meta Quest par Link ou Virtual Desktop, SteamVR), le front-end s’affiche dans une borne habillée, et chaque table se joue en grand devant vous.'),
-        t('« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.'),
-      ];
-    },
-    get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D'); },
-    reach: { kind: 'system', id: 'realite-virtuelle' },
-    beta: true,
   },
 
 ];
