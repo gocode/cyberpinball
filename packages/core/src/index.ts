@@ -177,6 +177,7 @@ export * from './i18n';
 export * from './icons';
 export * from './scriptpatch';
 export * from './scriptcompat';
+export * from './vpxclr';
 export * from './vbscript';
 export * from './fulldmdframe';
 export * from './fulldmdtable';

@@ -9,6 +9,11 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.2.4
+
+- Les composants ActiveX .NET historiques des scripts de table utilisent désormais le moteur .NET présent sur Windows, même sans .NET 3.5. Cela évite notamment l’arrêt de l’initialisation des musiques puis les erreurs UltraDMD en cascade, sans modifier les tables.
+- Le diagnostic affiche la première erreur de script et le nombre d’erreurs de la dernière partie de la table. Il ne confond pas les tables et retire ce constat après une nouvelle partie sans erreur.
+
 ## 0.2.3
 
 - Nouveautés : huit actualités pour la 0.2.3, avec le point de vue de chaque table et le VPX corrigé de Cyber Pinball, leurs aperçus et leurs accès directs.

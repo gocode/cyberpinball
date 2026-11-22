@@ -11,6 +11,7 @@ import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { flexAssets, musicNotFound, mutedAudioSettings } from './vpxgamelog';
 import { slowTableFinding } from './slowtable';
+import { scriptRuntimeFinding } from './scriptdiagnosis';
 import { flexPrewarmFor, type FlexPrewarm } from './flexprewarm';
 import { heavyDmdVideosFinding } from './dmdvideos';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
@@ -141,6 +142,7 @@ export const FINDING_CODES = [
   'dmdFolderMissing',
   'dmdVideosHeavy',
   'scriptUnreadable',
+  'scriptRuntimeError',
   'crashReport',
   'infoMissing',
   'pupMissing',
@@ -871,6 +873,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const muted = tableAudioMutedFinding(entry.file);
   if (muted) findings.push(muted);
   if (ctx.vpxLog) {
+    const runtime = scriptRuntimeFinding(entry.file, ctx.vpxLog);
+    if (runtime) findings.push(runtime);
     const music = musicNotFoundFinding(entry, ctx.vpxLog);
     if (music) findings.push(music);
     const images = dmdImagesMissingFinding(entry, ctx.vpxLog);

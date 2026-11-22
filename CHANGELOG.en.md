@@ -7,6 +7,11 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.2.4
+
+- Legacy .NET ActiveX components used by table scripts now use the .NET runtime available on Windows, even without .NET 3.5. This prevents music initialization failures followed by cascading UltraDMD errors, without changing tables.
+- The diagnosis shows the first script error and the number of errors from the table’s last game. It keeps different tables separate and clears the finding after a new game without errors.
+
 ## 0.2.3
 
 - What’s new: eight highlights for 0.2.3, including each table’s point of view and Cyber Pinball’s patched VPX, with previews and direct links.

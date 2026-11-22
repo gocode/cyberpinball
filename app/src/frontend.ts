@@ -447,6 +447,7 @@ import { centerWhenStarted, probeVr, rememberVrSettings, restoreVrTableIni, writ
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace } from './casque';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
 import { installVpxCorrige, installVpxCorrigeAtStartup } from './vpx-corrige';
+import { prepareVpxClr } from './vpx-clr';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { createAnaglyphMenu } from './anaglyph-menu';
@@ -1652,6 +1653,7 @@ let reopeningJukebox = false;
 
 // VPX corrigé posé dès le démarrage (vpx-corrige.ts), avant le premier relevé de la fiche et de la santé.
 installVpxCorrigeAtStartup(vpxInstall(loc), path.join(__dirname, '..'));
+prepareVpxClr(vpxInstall(loc)?.exe);
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
 library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing');
@@ -5954,6 +5956,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     console.log(`Casque : Air Link sur un PC en Wi-Fi (${vrFront.pcNetwork!.adapter}), avertissement donné au chargement.`); // i18n-ignore : journal
   }
   if (vrGame) vrFront.refreshVrNetwork();
+  if (simulated === undefined && !otherVpx) prepareVpxClr(install.exe);
   // Le DMD qui remplit sa fenêtre redimensionnée en partie : le plugin « CyberPinballDmd », activé dans toutes les
   // parties (components.json), remis dans VPX avant chaque partie s'il a changé (vpx-plugins.ts).
   if (simulated === undefined && !otherVpx) {

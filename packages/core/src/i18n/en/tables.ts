@@ -1,5 +1,10 @@
 // Catalogue anglais : tables. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Erreur du script pendant la dernière partie': 'Script error during the last game',
+  'Première erreur, ligne {line} : « {message} ». {count} Les erreurs suivantes peuvent en découler.':
+    'First error, line {line}: “{message}”. {count} Subsequent errors may result from it.',
+  'VPX a signalé une erreur pendant cette partie.': 'VPX reported one error during this game.',
+  'VPX a signalé {n} erreurs pendant cette partie.': 'VPX reported {n} errors during this game.',
   // packages/core/src/doctor.ts
   'Table hors de son propre dossier': 'Table outside its own folder',
   'Son coupé pour cette table': 'Sound muted for this table',

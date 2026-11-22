@@ -202,6 +202,7 @@ test('une partie avec un autre VPX ne prépare rien du VPX de Cyber Pinball et n
     ['position du DMD, réglages en partie', /const configuration = otherVpx \? undefined : loadCabinet/],
     ['réalité virtuelle', /const vrGame = [^;\n]*!otherVpx \? (vrFront\.)?prepareVr/],
     ['plugin du DMD copié dans VPX', /if \(simulated === undefined && !otherVpx\) \{\n\s*const dmdPlugin = installVpxPlugin/],
+    ['activation .NET de VPX', /if \(simulated === undefined && !otherVpx\) prepareVpxClr\(install\.exe\);/],
     ['Vision 3D', /const vision3dSource = [^;\n]*!otherVpx \? prepareVision3d/],
     ['INI de l’enregistrement', /const recordIni = [^;\n]*!otherVpx \? prepareRecordingIni/],
     ['INI de Cyber Pinball', /launchVpx\(\{ exe: install\.exe, ini: otherVpx \? undefined : /],

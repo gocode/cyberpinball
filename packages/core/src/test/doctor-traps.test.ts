@@ -562,6 +562,19 @@ const TRAPS: Trap[] = [
   },
   // Son coupé par le .ini de la table (vpxgamelog.ts) : repris d'une autre installation.
   { code: 'tableAudioMuted', arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nMusicVolume = 0\r\n') },
+  // Erreur d'initialisation, suivie d'erreurs répétées du DMD : le diagnostic ne doit pas annoncer une table saine.
+  {
+    code: 'scriptRuntimeError',
+    arm: () => {},
+    ctx: (folder) => ({
+      vpxLog: [
+        `INFO LoadGameFromFilename ${path.join(folder, `${TABLE}.vpx`)}`,
+        'INFO Starting script',
+        "ERROR Runtime error on line 199, col 1: ActiveX cannot create object: 'System.Collections.ArrayList'",
+        "ERROR Runtime error on line 291, col 1: Object required: 'UltraDMD'",
+      ].join('\r\n'),
+    }),
+  },
   // Musique que VPX n'a pas trouvée à la dernière partie (« Failed to stream music »).
   {
     code: 'musicMissing',
