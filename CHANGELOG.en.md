@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Player challenges: challenge a friend or a ranked player on the exact version of a table, with your best score or the one from the game you just played; they have 48 h, unlimited tries, and both of you can still raise your score. At the deadline, the higher score wins 40 XP, then "Rematch" in one press. The challenged player can decline.
+- Challenges travel without a server, from cabinet to cabinet, signed by each player: they arrive even if your two cabinets are never on at the same time. Only scores read by Cyber Pinball count; a blocked player, or one banned from the rooms, cannot challenge you.
+- In the Arena, the "Challenges" tab opens (your turn, sent, recent results), the "Challenge from …" card shows up in "Play now", and the dot-matrix board of the poster announces a challenge about to expire. "Challenge" now works on "Your place is taken" and on the game return screen, and a table sheet offers "Play together… › Challenge a player…".
+- Notifications: challenge received, "Nina beat your score: your turn", 6 h left, result, declined; a single line per challenge in Recent activity. A table version you do not have stays visible, greyed out, with "Get this version" from a friend who has it. None of this in local play.
 - Community: suggested players and friend requests show the tables you have in common as overlapping medallions (your favourites first), then "+2 tables in common" when there are more.
 - Community: the Players tab shows who is online right now, and "Everyone online" opens the full list.
 - Community: friends in common show on suggested players and on received friend requests as overlapping avatars, and bring those players to the top of the suggestions. You choose who sees your friends (My profile › Privacy › What others see): public (the default), your friends only, or private.

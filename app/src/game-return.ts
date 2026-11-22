@@ -4,7 +4,8 @@
 // - « +N XP » sur la barre du niveau qui vient de monter (la part gagnée en clair) et le détail du
 //   barème de levels.ts ;
 // - le joueur dépassé, la place gagnée et le prochain à battre (packages/core/src/overtakes.ts) ;
-// - « Rejouer », « Un mot à … » (phrases préparées, entre amis) et « Retour aux tables ».
+// - « Rejouer », « Défier … » (challenges-menu.ts, avec le score de la partie), « Un mot à … »
+//   (phrases préparées, entre amis) et « Retour aux tables ».
 // Rien de neuf : pas d'écran. Il se passe d'un appui (Exit, ou Start sur « Retour aux tables ») ; un
 // bouton encore tenu en sortant de la partie ne compte pas (GUARD_MS). L'animation des badges et du
 // niveau garde son moment à elle : elle attend le bilan de la partie (`holding`), puis cet écran, et se
@@ -42,6 +43,8 @@ export interface GameReturnHost {
   /** « Un mot à … » : seulement à un ami, par la messagerie (chat-service.ts). */
   friends: { isFriend(key: string): boolean; send(key: string, text: string): boolean; closed?(): string | undefined };
   play(table: TableEntry): void;
+  /** « Défier {nom} » (challenges-menu.ts) : le joueur dépassé, avec le score qu'on vient de faire ; absent : pas de bouton. */
+  challenge?(rival: DailyHolder, f: GameReturnFacts, reopen: () => void): HubButtonSpec | undefined;
   zoneKeys(): readonly string[];
   /** L'écran peut-il s'ouvrir maintenant (la roue à l'écran, pas de partie, ni jeu local ni invité) ? */
   canOpen(): boolean;
@@ -181,6 +184,8 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
           title: target ? t('Encore {gap} pour passer {name}', { gap: fmt(o!.gap ?? 0), name: target.name }) : t('Et maintenant ?'),
           buttons: [
             { label: t('Rejouer'), xp: t('+{n} XP', { n: XP.personalBest }), primary: true, key: 'replay', run: () => host.play(f.table) },
+            // Défier le joueur dépassé, avec le score de cette partie (planche validée : « Défier Léa +40 XP »).
+            ...(rival ? [host.challenge?.(rival, f, reopen)].filter((b): b is HubButtonSpec => !!b) : []),
             ...writeButton(rival, reopen),
             { label: t('Retour aux tables'), key: 'back', run: leave },
           ],

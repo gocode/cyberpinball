@@ -289,6 +289,8 @@ export type UiAction =
   | { type: 'my-profile' }
   /** Notification d'une place prise : « Reprendre ma place », la table lancée (place-taken.ts) ; `key` : la notification. */
   | { type: 'place-taken'; key?: string }
+  /** Notification d'un défi : son écran (challenges-menu.ts) ; `id` : le défi. */
+  | { type: 'challenge'; id?: string }
   /** Carte du joueur du coin d'état : Mon niveau (level-menu.ts) ; pastille des badges : Mes badges. */
   | { type: 'level' }
   | { type: 'badges' }

@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Défis entre joueurs : défiez un ami ou un joueur classé sur la version exacte d'une table, avec votre meilleur score ou celui de la partie que vous venez de jouer ; il a 48 h, essais illimités, et chacun peut encore monter son score. À l'échéance, le plus haut score gagne 40 XP, puis « Revanche » d'un geste. Le défié peut refuser.
+- Les défis passent sans serveur, de borne en borne, signés par chaque joueur : ils arrivent même si vos deux bornes ne sont jamais allumées en même temps. Seuls comptent les scores relevés par Cyber Pinball ; un joueur bloqué ou exclu des salons ne peut pas vous défier.
+- Dans l'Arène, l'onglet « Défis » s'ouvre (à jouer, envoyés, résultats récents), la carte « Défi de … » arrive dans « À jouer maintenant », et le tableau à points de l'affiche annonce un défi qui expire bientôt. « Défier » s'active sur « Votre place est prise » et au retour de partie, et la fiche d'une table propose « Jouer ensemble… › Défier un joueur… ».
+- Notifications : défi reçu, « Nina a battu votre score : à vous », plus que 6 h, résultat, refus ; une seule ligne par défi dans l'Activité récente. Une version de table que vous n'avez pas reste visible, grisée, avec « Récupérer cette version » chez un ami qui l'a. Rien de tout cela en jeu local.
 - Communauté : les joueurs suggérés et les demandes d'ami montrent les tables que vous avez en commun, en médaillons superposés (vos favorites d'abord), puis « +2 tables en commun » s'il y en a d'autres.
 - Communauté : l'onglet Joueurs montre les connectés du moment, et « Tous les connectés » ouvre la liste complète.
 - Communauté : les amis en commun s'affichent sur les joueurs suggérés et sur les demandes d'ami reçues, en pastilles superposées, et rapprochent en tête des suggestions. Vous choisissez qui voit vos amis (Mon profil › Confidentialité › Ce que voient les autres) : publics (par défaut), vos amis seulement, ou privés.

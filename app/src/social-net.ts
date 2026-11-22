@@ -150,6 +150,12 @@ import {
   type InstantGame,
   type InstantSeat,
   type LiveTable,
+  CHALLENGE_BATCH,
+  challengeSample,
+  mergeChallengeRelay,
+  verifyChallengeNote,
+  type ChallengeNote,
+  type ChallengeRelay,
   cardInvites,
   confirmInvitation,
   declareInviter,
@@ -417,6 +423,8 @@ type RoomMessage =
   | { t: 'room-typing'; typing: RoomTyping[] };
 /** Parties instantanées (instantgames.ts) : annonces signées, relayées entre toutes les bornes. */
 type InstantMessage = { t: 'instant'; games: InstantGame[] };
+/** Défis (challenges.ts) : notes signées, relayées entre toutes les bornes et gardées jusqu'à l'échéance. */
+type ChallengeMessage = { t: 'chal'; notes: ChallengeNote[] };
 /** Modération (moderation.ts) : charte et décisions entre toutes les bornes ; signalements chiffrés pour les modérateurs. */
 type ModMessage = { t: 'mod'; charter?: unknown; acts?: ModAct[] } | { t: 'report'; boxes: { to: string; box: string }[]; ttl: number };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
@@ -428,7 +436,7 @@ export type FriendMessage = LibraryMessage | LiveMessage | ChatMessage | GroupMe
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | InvitesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage | ForgetMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage | CardsMessage | LikesMessage | InvitesMessage | LiveMessage_ | RoomMessage | ModMessage | InstantMessage | ChallengeMessage | ForgetMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -553,6 +561,17 @@ export interface SocialNet {
   announceInstant(game: { id: string; title: string; table: LiveTable; max: number; seats: readonly InstantSeat[]; opened: string; state: InstantGame['state'] } | undefined): void;
   /** Les parties instantanées ouvertes par d'autres en ce moment, la plus récente d'abord. */
   instantGames(): InstantGame[];
+  /**
+   * Défis (challenges.ts) : mes notes signées, à toutes les bornes reliées, qui les gardent et les
+   * relaient jusqu'à l'échéance ; rien si le partage est coupé.
+   */
+  sendChallenges(notes: readonly ChallengeNote[]): void;
+  /** Mes notes des défis ouverts, redites à chaque bonjour (challenge-service.ts) ; et les joueurs de mes défis, rejoints par leur clé. */
+  setChallengeSource(own: () => readonly ChallengeNote[], peers: () => readonly string[]): void;
+  /** Les joueurs de mes défis ont changé : leur borne est rejointe par sa clé. */
+  challengePeersChanged(): void;
+  /** Des notes de défi nouvelles pour cette borne (vérifiées ; d'un joueur ni bloqué ni exclu). */
+  onChallenges(listener: (notes: ChallengeNote[]) => void): () => void;
   /** Morceau de fichier à un ami, en respectant le débit du flux ; false : plus relié. */
   sendChunk(key: string, frame: Buffer): Promise<boolean>;
   /**
@@ -1119,6 +1138,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         if (raw && typeof raw === 'object' && ((raw as { t?: unknown }).t === 'mod' || (raw as { t?: unknown }).t === 'report')) return receiveModeration(key, raw as Record<string, unknown>);
         // Parties instantanées : de toute borne reliée, chaque annonce vérifiée par sa signature.
         if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'instant') return receiveInstant(key, (raw as { games?: unknown }).games);
+        // Défis : de toute borne reliée, chaque note vérifiée par sa signature, gardée et relayée jusqu'à l'échéance.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'chal') return receiveChallenges(key, (raw as { notes?: unknown }).notes);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
         // Groupes : de toute borne ni bloquée ni exclue. Le service des groupes (group-service.ts) vérifie
@@ -1199,6 +1220,11 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Les parties instantanées ouvertes ; une borne d'avant ignore ce message.
     const instant = instantSample(instantBoard, ownInstant(), now());
     if (instant.length) link.send({ t: 'instant', games: instant });
+    // Les défis en route : les miens d'abord, puis ceux que je garde pour d'autres ; une borne d'avant ignore ce message.
+    if (state.enabled) {
+      const chal = challengeSample(challengeRelay, challengeOwn(), now());
+      if (chal.length) link.send({ t: 'chal', notes: chal });
+    }
     changed();
   }
 
@@ -1286,6 +1312,32 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (!fresh.length) return;
     for (const link of greetedLinks(from)) link.send({ t: 'instant', games: fresh });
     changed();
+  }
+
+  // ---------- Défis ----------
+
+  /** Notes de défis connues (challenges.ts), les miennes comprises, en mémoire : gardées et relayées jusqu'à l'échéance. */
+  const challengeRelay: ChallengeRelay = new Map();
+  /** Mes notes des défis ouverts (le service des défis) et les joueurs de mes défis, rejoints par leur clé. */
+  let challengeOwn: () => readonly ChallengeNote[] = () => [];
+  let challengePeers: () => readonly string[] = () => [];
+  const challengeListeners = new Set<(notes: ChallengeNote[]) => void>();
+
+  /** Notes reçues : vérifiées, celles d'un joueur écarté laissées ; les nouvelles gardées, relayées, puis données au service. */
+  function receiveChallenges(from: string, raw: unknown): void {
+    if (!Array.isArray(raw) || shunned(from) || !state.enabled) return;
+    const notes = raw.slice(0, CHALLENGE_BATCH).map((n) => verifyChallengeNote(n, now())).filter((n): n is ChallengeNote => !!n && !refusedPlayer(n.by));
+    if (!notes.length) return;
+    const fresh = mergeChallengeRelay(challengeRelay, notes, now());
+    if (!fresh.length) return;
+    for (const link of greetedLinks(from)) link.send({ t: 'chal', notes: fresh });
+    for (const listener of challengeListeners) {
+      try {
+        listener(fresh);
+      } catch (error) {
+        log(`Défis : notes reçues, suite en échec (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }
   }
 
   // ---------- Présence publique ----------
@@ -1909,7 +1961,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   /** Amis et demandes en cours : Hyperswarm les rejoint par leur clé ; les autres sont laissés. */
   function followPeers(): void {
     if (!swarm) return;
-    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners, ...groupPeers].filter((k) => !shunned(k))]);
+    const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key), ...[...partners, ...groupPeers].filter((k) => !shunned(k)), ...challengePeers().filter((k) => k !== state.key.publicKey && !refusedPlayer(k))]);
     for (const key of want) if (!followed.has(key)) swarm.joinPeer(Buffer.from(key, 'hex'));
     for (const key of followed) if (!want.has(key)) swarm.leavePeer(Buffer.from(key, 'hex'));
     followed.clear();
@@ -2628,6 +2680,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       }
     },
     instantGames: () => (state.enabled ? openInstant(instantBoard, state.key.publicKey, refusedPlayer, now()) : []),
+    sendChallenges(notes) {
+      if (!state.enabled || !notes.length) return;
+      const fresh = mergeChallengeRelay(challengeRelay, notes, now());
+      if (fresh.length) for (const link of greetedLinks()) link.send({ t: 'chal', notes: fresh });
+    },
+    setChallengeSource(own, peers) {
+      challengeOwn = own;
+      challengePeers = peers;
+      followPeers();
+    },
+    challengePeersChanged: () => followPeers(),
+    onChallenges(listener) {
+      challengeListeners.add(listener);
+      return () => challengeListeners.delete(listener);
+    },
     async sendChunk(key, frame) {
       const link = friendLink(key);
       if (!link) return false;

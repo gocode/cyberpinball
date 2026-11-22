@@ -49,6 +49,8 @@ export const DAYS_KEEP = 45;
 export const BADGES_XP_ALL = 15_800;
 /** XP de la vie sociale au plus par jour (hors parties en ligne, comptées dans le jeu). */
 export const DAILY_SOCIAL_CAP = 100;
+/** Défis gagnés qui rapportent au plus par jour : deux joueurs qui se laisseraient gagner tour à tour n'en tirent pas plus. */
+export const CHALLENGE_WINS_PER_DAY = 3;
 
 export const XP = {
   minute: 1,
@@ -60,6 +62,8 @@ export const XP = {
   champion: 100,
   live: 20,
   liveWin: 20,
+  /** Un défi gagné (challenges.ts, 22/11/2026) : dans le plafond du jeu, au plus CHALLENGE_WINS_PER_DAY par jour. */
+  challengeWin: 40,
   /** Une partie ouverte par le joueur et rejointe : une fois par groupe de joueurs (hostedGroups). */
   hosted: 25,
   roomDay: 10,
@@ -149,7 +153,7 @@ export function levelOf(xp: number): LevelView {
 // ---------------------------------------------------------------------------
 // État
 
-export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'hosted' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction' | 'invited' | 'invitee-tier';
+export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'hosted' | 'challenge-win' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction' | 'invited' | 'invitee-tier';
 
 export interface XpGain {
   kind: XpKind;
@@ -205,8 +209,8 @@ export interface LevelState {
   v: number;
   xp: number;
   gains: XpGain[];
-  /** Par jour local (AAAA-MM-JJ) : XP de jeu, secondes jouées, parties, XP de la vie sociale. */
-  days: Record<string, { xp: number; seconds: number; games: number; social?: number }>;
+  /** Par jour local (AAAA-MM-JJ) : XP de jeu, secondes jouées, parties, XP de la vie sociale, défis gagnés payés. */
+  days: Record<string, { xp: number; seconds: number; games: number; social?: number; challenges?: number }>;
   /** Jours où le joueur a écrit dans un salon ou un groupe ; le dernier. */
   roomDays: number;
   lastRoomDay?: string;
@@ -418,6 +422,21 @@ export function liveGains(state: LevelState, f: { done: boolean; won: boolean; t
   // Le groupe n'est compté que payé : retenu par le plafond du jour, il rapportera la prochaine fois.
   if (group && gains.some((g) => g.kind === 'hosted')) next = { ...next, hostedGroups: [...next.hostedGroups, group].slice(-HOSTED_GROUPS_MAX) };
   return { state: addGains(next, gains), gains, capped: paid < wanted.reduce((a, g) => a + g.xp, 0) };
+}
+
+/**
+ * Un défi gagné (challenges.ts) : XP.challengeWin dans le plafond du jeu, au plus CHALLENGE_WINS_PER_DAY
+ * défis payés par jour ; au-delà, le défi compte gagné mais ne rapporte rien.
+ */
+export function challengeGains(state: LevelState, f: { table: string; at: Date }): GameOutcome {
+  const day = dayKey(f.at);
+  const today = state.days[day] ?? { xp: 0, seconds: 0, games: 0 };
+  const won = today.challenges ?? 0;
+  const wanted: XpGain[] = won < CHALLENGE_WINS_PER_DAY ? [{ kind: 'challenge-win', xp: XP.challengeWin, at: f.at.toISOString(), table: f.table }] : [];
+  const gains = capGains(wanted, DAILY_PLAY_CAP - today.xp);
+  const paid = gains.reduce((a, g) => a + g.xp, 0);
+  const next = { ...state, days: pruneDays({ ...state.days, [day]: { ...today, xp: today.xp + paid, challenges: won + 1 } }, f.at) };
+  return { state: addGains(next, gains), gains, capped: paid < XP.challengeWin };
 }
 
 // ---------------------------------------------------------------------------
@@ -675,7 +694,7 @@ export function playedSpanDays(state: LevelState): number {
 const num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(max, Math.floor(v)) : 0);
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'hosted', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction', 'invited', 'invitee-tier']);
+const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'hosted', 'challenge-win', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction', 'invited', 'invitee-tier']);
 const isKey = (v: unknown): v is string => typeof v === 'string' && v.length >= 8 && v.length <= 200;
 const SCOPES = new Set<string>(['world', 'country', 'friends']);
 
@@ -713,7 +732,7 @@ export function parseLevels(raw: unknown): LevelState | undefined {
   if (r.days && typeof r.days === 'object') for (const [k, v] of Object.entries(r.days as Record<string, unknown>)) {
     if (!isDay(k) || !v || typeof v !== 'object') continue;
     const d = v as Record<string, unknown>;
-    days[k] = { xp: num(d.xp), seconds: num(d.seconds), games: num(d.games), ...(d.social !== undefined ? { social: num(d.social) } : {}) };
+    days[k] = { xp: num(d.xp), seconds: num(d.seconds), games: num(d.games), ...(d.social !== undefined ? { social: num(d.social) } : {}), ...(d.challenges !== undefined ? { challenges: num(d.challenges, 1000) } : {}) };
   }
   const record = (v: unknown, ok: (x: unknown) => boolean) => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k, x]) => k.length <= 160 && ok(x))) : {});
   const standings: LevelState['standings'] = {};
@@ -834,6 +853,8 @@ export function gainText(g: XpGain, badgeLabel: (id: string) => string): { text:
       return { text: t('Partie en direct menée au bout'), ...(table ? { detail: table } : {}) };
     case 'live-win':
       return { text: t('Partie en direct gagnée'), ...(table ? { detail: table } : {}) };
+    case 'challenge-win':
+      return { text: t('Défi gagné'), ...(table ? { detail: table } : {}) };
     case 'hosted':
       return { text: t('Votre partie a été rejointe'), ...(g.name ? { detail: table ? t('{table} · avec {names}', { table, names: g.name }) : t('Avec {names}', { names: g.name }) } : table ? { detail: table } : {}) };
     case 'ranking':

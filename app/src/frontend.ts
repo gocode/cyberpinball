@@ -291,6 +291,8 @@ import {
   intensityLabel,
   nextIntensity,
   boardKey,
+  sanctionOf,
+  lastRunOf,
   countryOfLocale,
   type PlayedScore,
   jukeboxSummary,
@@ -416,6 +418,8 @@ import { createRankingsMenu, type RemoteAllTables } from './rankings-menu';
 import { createDailyTables } from './daily-tables';
 import { createPlaceTaken } from './place-taken';
 import { createGameReturn } from './game-return';
+import { createChallengeService } from './challenge-service';
+import { createChallengesMenu, challengeTableOf, type ChallengeCandidate } from './challenges-menu';
 import { createDailyTablesMenu } from './daily-tables-menu';
 import { createTableSocial } from './table-social';
 import { loadingObjective, type LoadingObjectiveView } from './loading-objective';
@@ -2790,6 +2794,8 @@ let quietInGame = readQuietInGame(loc.dataDir);
  * entier, affichée ou retenue, gardée d'un démarrage à l'autre ; ce que Start y fait passe par les
  * écrans des amis, de la partie entre amis, des téléchargements et du menu système.
  */
+/** L'écran des défis (challenges-menu.ts), créé plus bas : Activité récente le lit ici. */
+let challengeScreens: { gone(id: string): string | undefined; open(id: string, back: () => void): void } | undefined;
 const activityMenu = createActivityMenu({
   dataDir: loc.dataDir,
   library: {
@@ -2824,6 +2830,8 @@ const activityMenu = createActivityMenu({
   threads: { pending: (kind, thread) => threadPending(kind, thread), open: (kind, thread, back) => openThread(kind, thread, back) },
   // Une place prise (place-taken.ts) : Start reprend ma place, la table lancée.
   places: { reach: (key) => placeTaken.reach(key) },
+  // Un défi (challenges-menu.ts) : Start ouvre son écran.
+  challenges: { gone: (id) => (challengeScreens ? challengeScreens.gone(id) : t('Ce défi n’est plus sur cette borne.')), open: (id, back) => challengeScreens?.open(id, back) },
   // La pastille de la roue dentée et de l'entrée suit le non lu.
   changed: () => {
     if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
@@ -3073,6 +3081,50 @@ const placeTaken = createPlaceTaken({
   play: (table) => playFromNotice(table),
   log: (line) => console.log(line),
 });
+
+// Défis asynchrones (challenge-service.ts, 22/11/2026) : mes défis, leurs notes signées par le réseau des
+// bornes, les notifications, les XP du vainqueur. Rien en jeu local ni en mode invité.
+const challengeService = createChallengeService({
+  dataDir: loc.dataDir,
+  net: socialNet,
+  refused: (key) => socialNet.state().blocked.includes(key) || sanctionOf(socialNet.moderation().acts, key, new Date())?.kind === 'ban',
+  won: (table) => levelTracker.challengeWon(table),
+  push: (events) => menuNotices.push(events),
+  closed: () => socialClosed(),
+  changed: () => (library.isActive() ? library.changed() : broadcast()),
+  log: (line) => console.log(line),
+});
+
+/** Mon meilleur score relevé par Cyber Pinball sur une version exacte : publié aux classements, ou sur une de mes tables de cette version. */
+function myVersionBest(v: { board: string; balls?: number }): number | undefined {
+  const me = socialNet.state().key.publicKey;
+  let best = 0;
+  for (const s of socialNet.rankings().scores) if (s.key === me && s.board === v.board && (s.balls ?? 0) === (v.balls ?? 0) && s.score > best) best = s.score;
+  for (const table of tables) {
+    const x = tableRankings.version(table);
+    if (x.state === 'ok' && x.board === v.board && (x.balls ?? 0) === (v.balls ?? 0)) best = Math.max(best, myTableBest(table) ?? 0);
+  }
+  return best || undefined;
+}
+
+/** Les joueurs à défier sur une version : mes amis d'abord, puis les joueurs classés dessus, du meilleur score au moins bon. */
+function challengeCandidates(v: { board: string; balls?: number }): ChallengeCandidate[] {
+  const s = socialNet.state();
+  const me = s.key.publicKey;
+  const ranked = new Map<string, { name: string; country?: string; score: number }>();
+  for (const sc of socialNet.rankings().scores) {
+    if (sc.key === me || sc.board !== v.board || (sc.balls ?? 0) !== (v.balls ?? 0)) continue;
+    const had = ranked.get(sc.key);
+    if (!had || sc.score > had.score) ranked.set(sc.key, { name: sc.name, ...(sc.country ? { country: sc.country } : {}), score: sc.score });
+  }
+  const refused = (key: string) => s.blocked.includes(key) || sanctionOf(socialNet.moderation().acts, key, new Date())?.kind === 'ban';
+  const friends: ChallengeCandidate[] = s.friends.filter((f) => !refused(f.key)).map((f) => ({ key: f.key, name: f.name, friend: true, ...(ranked.get(f.key) ? { score: ranked.get(f.key)!.score } : {}) }));
+  const others: ChallengeCandidate[] = [...ranked.entries()]
+    .filter(([key]) => !refused(key) && !s.friends.some((f) => f.key === key))
+    .sort((a, b) => b[1].score - a[1].score)
+    .map(([key, p]) => ({ key, name: p.name, ...(p.country ? { country: p.country } : {}), friend: false, score: p.score }));
+  return [...friends, ...others];
+}
 
 /** Une table lancée hors de la roue (« Reprendre ma place », « Rejouer ») : l'écran ouvert se ferme d'abord. */
 function playFromNotice(table: TableEntry): void {
@@ -3348,6 +3400,24 @@ const dailyTablesMenu = createDailyTablesMenu({
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   openSharing: (back) => library.runSystemItem('sharing', back),
 });
+// Défis (challenges-menu.ts) : l'onglet de l'Arène, « Défier un joueur… », l'écran d'un défi, défier depuis un profil.
+const challengesMenu = createChallengesMenu({
+  library,
+  service: challengeService,
+  localFor: (line) => dailyTables.localFor(line),
+  face: (p) => avatarView(p.key, p.name, socialNet.avatarFile(p.key)),
+  versionHolders: (board) => friendsMenu.versionHolders(board),
+  play: (table) => playFromNotice(table),
+  versionOf: (table) => tableRankings.version(table),
+  myBest: (v) => myVersionBest(v),
+  candidates: (v) => challengeCandidates(v),
+  recentTables: () => [...tables].filter((x) => lastRunOf(x) > 0).sort((a, b) => lastRunOf(b) - lastRunOf(a)),
+});
+// Activité récente (créée plus haut) : Start sur la ligne d'un défi ouvre son écran.
+challengeScreens = {
+  gone: (id) => challengeService.unavailable() ?? (challengeService.get(id) ? undefined : t('Ce défi n’est plus sur cette borne.')),
+  open: (id, back) => challengesMenu.openChallenge(id, back),
+};
 // La fiche d'une table côté joueurs (table-social.ts) : « Sur cette table », l'objectif, « Jouer ensemble… ».
 const tableSocial = createTableSocial({
   library,
@@ -3358,6 +3428,7 @@ const tableSocial = createTableSocial({
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
   instantGame: (table, back) => instantMenu.sheetAction(table, back),
   joinInstant: (board, back) => instantMenu.joinOn(board, back),
+  challenge: (table, back) => challengesMenu.sheetAction(table, back),
 });
 // Classements de toutes mes tables (rankings-menu.ts) : la porte « Classements » de l'accueil Communauté.
 const rankingsMenu = createRankingsMenu({
@@ -3638,6 +3709,8 @@ const arenaMenu = createArenaMenu({
   },
   // « Lui écrire » : le fil de la messagerie, entre amis seulement.
   write: (key, back) => (socialNet.state().friends.some((f) => f.key === key) ? { run: () => chatMenu.openThread(key, back) } : { off: t('Entre amis seulement') }),
+  // Les défis (challenges-menu.ts) : l'onglet « Défis », les cartes « Défi de … », la page de l'affiche, « Défier ».
+  challenges: challengesMenu,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
 });
 // Retour de partie (game-return.ts, 21/11/2026) : après une partie qui apporte du neuf, le score, les XP,
@@ -3650,6 +3723,8 @@ const gameReturn = createGameReturn({
     send: (key, text) => chatService.send(key, text),
   },
   play: (table) => playFromNotice(table),
+  // « Défier {nom} » : le joueur dépassé, avec le score de cette partie, sur sa version exacte.
+  challenge: (rival, f, reopen) => challengesMenu.button({ key: rival.key, name: rival.name, ...(rival.country ? { country: rival.country } : {}) }, f.version ? challengeTableOf(f.version, presenceTable(f.table).title, presenceTable(f.table).vpsId) : undefined, f.report.best, 'game', 'challenge', reopen),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
   log: (line) => console.log(line),
@@ -4231,6 +4306,14 @@ export function startFrontend(): void {
         else activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
       }
     }
+    // Un défi : son écran (challenges-menu.ts) ; sans défi nommé, Activité récente.
+    else if (action.type === 'challenge') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) {
+        const back = state.phase === 'menu' ? () => library.leave() : () => library.openSystem();
+        if (typeof action.id === 'string' && challengeService.get(action.id)) challengesMenu.openChallenge(action.id, back);
+        else activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
+      }
+    }
     // Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier ; Retour ramène où l'on était.
     else if (action.type === 'activity') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
@@ -4500,6 +4583,8 @@ export function startFrontend(): void {
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
   void socialNet.start().then(async () => {
     levelTracker.start();
+    // Les défis : mes notes redites à chaque bonjour, les nouvelles et les échéances (challenge-service.ts).
+    challengeService.start();
     // Les règles du pare-feu, à chaque démarrage et après une mise à jour : lues, écrites au
     // journal, reposées d'elles-mêmes par la tâche de réparation si l'une manque (firewall-guard.ts).
     // Ce qui reste à reposer reste visible : « Partage et réseau », la présence des amis ; et juste
@@ -6129,6 +6214,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         .then(async (kept) => {
           if (kept.length) broadcast();
           await publishScores(table, kept, Boolean(double && live?.multi));
+          await noteChallengeScores(table, kept, Boolean(double && live?.multi));
           levelAfterGame(kept.filter((p) => !p.of).map((p) => p.score));
         })
         .catch((error: Error) => {
@@ -6200,6 +6286,24 @@ async function publishScores(table: TableEntry, kept: readonly PlayedScore[], mu
   for (const p of solo) {
     const sent = socialNet.publishScore({ board, ...(balls ? { balls } : {}), table: presenceTable(table), score: p.score, at: p.at, how: p.how });
     if (sent) console.log(`Classements (${table.id}) : ${p.score} publié (${balls ? `${balls} billes` : 'billes inconnues'}).`); // i18n-ignore : journal
+  }
+}
+
+/**
+ * Défis (challenge-service.ts) : les scores d'une partie seul à la table, relevés par Cyber Pinball, sur
+ * sa version exacte et son nombre de billes ; mon meilleur part pour chaque défi ouvert sur cette version.
+ * Mêmes règles que les classements : ni invité, ni partie à plusieurs, ni VPX d'essai.
+ */
+async function noteChallengeScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
+  const solo = kept.filter((p) => !p.of);
+  if (guest.active || multi || !solo.length || vpxInstall(loc)?.trial) return;
+  try {
+    const board = boardKey(await liveGames.versionOf(table));
+    if (!board) return;
+    const balls = (await ballCounts.of(table))?.balls;
+    challengeService.gamePlayed({ board, ...(balls ? { balls } : {}) }, solo.map((p) => p.score));
+  } catch (error) {
+    console.log(`Défis (${table.id}) : scores non comptés (${(error as Error).message}).`); // i18n-ignore : journal
   }
 }
 

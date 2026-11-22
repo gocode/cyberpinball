@@ -109,4 +109,8 @@ test('jouer en local : chaque surface sociale du front-end le lit', () => {
   assert.match(library, /host\.playWithFriend && !localPlay\(\)/);
   assert.match(library, /host\.instantGame && !localPlay\(\)/);
   assert.match(library, /const scope = local \? 'cabinet' : s\.scope;/);
+  // Défis (22/11/2026) : le service se ferme en jeu local (ni liste, ni notification, ni envoi : defis.test.ts),
+  // la fiche ne garde que celle d'avant (tableSocial), l'onglet vit dans l'Arène, retirée elle aussi.
+  assert.match(front, /const challengeService = createChallengeService\(\{[\s\S]*?closed: \(\) => socialClosed\(\),/);
+  assert.match(front, /tableSocial: \(table: TableEntry, back: \(\) => void\) => \(socialClosed\(\) \? undefined/);
 });

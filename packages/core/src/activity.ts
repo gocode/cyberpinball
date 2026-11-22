@@ -37,6 +37,7 @@ import type { IconName } from './icons';
 import { NOTICE_RULES, noticeText, type LiveNoticeReason, type NoticeEvent, type NoticeKind, type NoticeTone } from './notices';
 import { tagId } from './livenotices';
 import type { LiveInviteEnd } from './livegame';
+import type { ChallengeStage } from './challenges';
 import { readKeptJson } from './store';
 import { writeFileAtomic } from './atomicwrite';
 import { SYSTEM_ITEM_IDS, type SystemItemId } from './systemmenu';
@@ -73,7 +74,9 @@ export type ActivityAct =
   /** Un salon (son identifiant). */
   | { type: 'room'; id: string }
   /** Une place prise (overtakes.ts) : la table, pour la reprendre ; `key` : celle de la notification (placeTakenKey). */
-  | { type: 'place'; key: string };
+  | { type: 'place'; key: string }
+  /** Un défi (challenges.ts) : son écran ; `id` : le défi. */
+  | { type: 'challenge'; id: string };
 
 /** Les messages : une ligne par conversation et par jour (repeatKey), lue avec sa conversation (markThreadRead). */
 export const ACTIVITY_MESSAGE_KINDS: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['friend-message', 'group-message', 'group-mention', 'room-mention']);
@@ -101,6 +104,8 @@ export interface ActivityFacts {
   end?: LiveInviteEnd;
   won?: true;
   place?: { rank: number; of: number };
+  /** Un défi : sa dernière étape (la ligne du défi dit où il en est). */
+  stage?: ChallengeStage;
   /** Une version (mise à jour) : celle d'avant, et celle d'après. */
   version?: string;
   previous?: string;
@@ -142,6 +147,9 @@ function repeatKey(kind: ActivityKind, f: ActivityFacts): string | undefined {
       return `${f.player ?? f.key.split('|')[0]}|${typeof f.subject === 'string' || f.subject === undefined ? (f.subject ?? '') : JSON.stringify(f.subject)}`;
     case 'download-failed':
       return f.key;
+    // Un défi : ses nouvelles rejoignent sa ligne (la dernière étape la redit, non lue).
+    case 'challenge':
+      return f.thread ?? f.key.split('|')[0];
     // Les messages d'une conversation : une ligne (sans conversation connue, l'ancien journal : le groupe ou le salon par son nom).
     case 'friend-message':
       return f.player ?? f.who ?? f.key;
@@ -164,6 +172,8 @@ export function activityDay(at: number): string {
 }
 
 function identity(kind: ActivityKind, f: ActivityFacts, at: number): string {
+  // Un défi : une seule ligne du début à la fin (48 h, souvent deux jours), jamais une par nouvelle.
+  if (kind === 'challenge') return `${kind}|${f.thread ?? f.key.split('|')[0]}`;
   return `${kind}|${repeatKey(kind, f) ?? f.key}|${activityDay(at)}`;
 }
 
@@ -181,6 +191,7 @@ export function activityFacts(e: NoticeEvent): ActivityFacts {
     ...(e.end ? { end: e.end } : {}),
     ...(e.won ? { won: true as const } : {}),
     ...(e.place ? { place: { ...e.place } } : {}),
+    ...(e.stage ? { stage: e.stage } : {}),
   };
 }
 
@@ -392,6 +403,8 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
       return { type: 'system', item: 'updates' };
     case 'place-taken':
       return { type: 'place', key: e.key };
+    case 'challenge':
+      return { type: 'challenge', id: e.thread ?? e.key.split('|')[0]! };
     default:
       return e.item ? { type: 'system', item: e.item } : undefined;
   }
@@ -401,7 +414,8 @@ export function activityAct(e: ActivityEntry): ActivityAct | undefined {
 // Le fichier
 
 const KINDS = new Set<string>([...Object.keys(NOTICE_RULES), 'update-available', 'update-installed', 'update-failed', 'note']);
-const REASONS: readonly LiveNoticeReason[] = ['missing', 'other-version', 'busy', 'expired', 'offline', 'failed'];
+const CHALLENGE_STAGES: readonly ChallengeStage[] = ['received', 'beaten', 'expiring', 'won', 'lost', 'expired', 'declined'];
+const REASONS: readonly LiveNoticeReason[] =['missing', 'other-version', 'busy', 'expired', 'offline', 'failed'];
 const ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline', 'full'];
 const isText = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max && !/[\x00-\x08\x0b-\x1f\x7f]/.test(v);
 const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
@@ -431,6 +445,7 @@ export function parseActivityEntry(raw: unknown): ActivityEntry | undefined {
     ...text('who', 80),
     ...text('player', 128),
     ...text('thread', 128),
+    ...(typeof r.stage === 'string' && CHALLENGE_STAGES.includes(r.stage as ChallengeStage) ? { stage: r.stage as ChallengeStage } : {}),
     ...stored('subject', 300),
     ...stored('extra', 300),
     ...text('from', 120),

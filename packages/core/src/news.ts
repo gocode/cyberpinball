@@ -60,6 +60,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Défis asynchrones (engagement, vague 2, 22/11/2026) ; « Collections et favoris » (0.1.8) sort de la
+    // liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'defis',
+    date: '2026-11-22',
+    version: '0.2.3',
+    get title() { return t('Les défis'); },
+    get detail() { return t('Défiez un joueur sur une table : 48 h pour battre votre score, chacun quand il veut.'); },
+    get more() {
+      return [
+        t('Sur la fiche d’une table, « Jouer ensemble… › Défier un joueur… » : un ami ou un joueur classé sur la même version. Votre meilleur score est celui à battre ; essais illimités, et chacun peut encore monter le sien.'),
+        t('À l’échéance, le plus haut score gagne 40 XP, puis « Revanche » d’un geste. Les défis arrivent même si vos bornes ne sont jamais allumées en même temps.'),
+      ];
+    },
+    get where() { return t('Arène › Défis'); },
+    reach: { kind: 'arena' },
+  },
+  {
     // Lunettes 3D (anaglyphe, 21/11/2026) ; « Le téléphone pilote tout » (0.1.8) sort de la liste pour
     // la garder à 24. « La Communauté, en un coup d'œil » (Communauté à onglets, même jour) n'y entre pas :
     // quatre nouveautés par jour au plus, choix du 21/11/2026. Date à poser au jour de la version finale.
@@ -431,21 +448,6 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D'); },
     reach: { kind: 'system', id: 'vision3d' },
     beta: true,
-  },
-  {
-    id: 'collections',
-    date: '2026-11-07',
-    version: '0.1.8',
-    get title() { return t('Collections et favoris'); },
-    get detail() { return t('Favoris, récentes, fabricants, décennies, les vôtres : la roue montre celle de votre choix.'); },
-    get more() {
-      return [
-        t('Les MagnaSave passent d’une collection à l’autre ; le médaillon Collections les montre toutes. « Ajouter aux favoris » sur la fiche d’une table pose une étoile devant son titre.'),
-        t('Créez vos propres collections, et choisissez celle qu’un invité a le droit de parcourir.'),
-      ];
-    },
-    get where() { return t('Roue › Collections'); },
-    reach: { kind: 'system', id: 'collections' },
   },
 ];
 

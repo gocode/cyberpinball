@@ -218,6 +218,7 @@ export * from './invitations';
 export * from './playerranking';
 export * from './dailytables';
 export * from './overtakes';
+export * from './challenges';
 export * from './livepresence';
 export * from './rooms';
 export * from './typing';

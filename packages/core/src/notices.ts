@@ -31,6 +31,7 @@ import type { SocialEvent, SocialState, Presence } from './social';
 import type { FriendsListSync } from './friendpresence';
 import type { UiSoundId } from './uisounds';
 import type { LiveInviteEnd } from './livegame';
+import type { ChallengeStage } from './challenges';
 
 export type NoticeKind =
   | 'live-invite'
@@ -54,6 +55,7 @@ export type NoticeKind =
   | 'group-mention'
   | 'group-invite'
   | 'place-taken'
+  | 'challenge'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
 /** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
@@ -73,7 +75,9 @@ export type NoticeAct =
   | { type: 'groups' }
   | { type: 'team-threads' }
   /** Une place prise (overtakes.ts) : « Reprendre ma place » lance la table ; `key` : la notification (placeTakenKey). */
-  | { type: 'place-taken'; key?: string };
+  | { type: 'place-taken'; key?: string }
+  /** Un défi (challenges.ts) : son écran ; `id` : le défi. */
+  | { type: 'challenge'; id?: string };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -106,6 +110,8 @@ export interface NoticeEvent {
   /** Partie entre amis finie : je la gagne (`who` : le gagnant, sinon), ou ma place au classement. */
   won?: true;
   place?: { rank: number; of: number };
+  /** Un défi (challenges.ts) : l'étape annoncée ; `thread` : le défi, une ligne d'Activité pour lui seul. */
+  stage?: ChallengeStage;
 }
 
 /** Évènement dont les textes gardés sont dits (noticeText). */
@@ -182,6 +188,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // VPX compris si le réglage le permet ; une fois par table et par jour (la clé porte le jour) ; Start sur sa
   // ligne d'Activité, ou un clic, lance la table (« Reprendre ma place »).
   'place-taken': { priority: 7, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'trophy', tone: 'warning', act: { type: 'place-taken' }, away: true, sound: 'news' },
+  // Un défi (challenges.ts, 22/11/2026) : reçu, battu par l'autre, plus que 6 h, résultat, refus. Partout, par-dessus
+  // VPX compris si le réglage le permet ; chaque étape une fois (sa clé), une seule ligne d'Activité par défi (thread).
+  challenge: { priority: 7, ttlMs: 6 * 60 * MIN, quietMs: MIN, icon: 'trophy', tone: 'warning', act: { type: 'challenge' }, away: true, sound: 'news' },
   // Un signalement reçu par un modérateur : au menu, regroupés.
   'room-report': { priority: 8, ttlMs: 60 * MIN, quietMs: MIN, icon: 'alert', tone: 'warning', act: { type: 'moderation' }, sound: 'news' },
   'player-like': { priority: 18, ttlMs: 60 * MIN, quietMs: MIN, icon: 'thumb-up', tone: 'ok', act: { type: 'my-profile' } },
@@ -457,6 +466,30 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       }
       return fit({ title: tn(n, 'On vous a dépassé sur {n} table', 'On vous a dépassé sur {n} tables'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
     }
+    case 'challenge': {
+      // `who` : l'autre joueur ; `subject` : la table ; `extra` : les scores, le temps qui reste, les XP ; `stage` : l'étape.
+      if (!one) return fit({ title: tn(n, '{n} nouvelle de vos défis', '{n} nouvelles de vos défis'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
+      const name = who(one);
+      const title = (() => {
+        switch (one.stage) {
+          case 'beaten':
+            return t('{name} a battu votre score : à vous', { name });
+          case 'expiring':
+            return t('Défi contre {name} : plus que 6 h', { name });
+          case 'won':
+            return t('Défi gagné contre {name}', { name });
+          case 'lost':
+            return t('Défi perdu contre {name}', { name });
+          case 'expired':
+            return t('Défi expiré : {name} n’a pas joué', { name });
+          case 'declined':
+            return t('{name} a refusé votre défi', { name });
+          default:
+            return t('{name} vous défie', { name });
+        }
+      })();
+      return fit({ title, detail: [subject(one), one.extra].filter(Boolean).join(' · ') });
+    }
     case 'room-report': {
       const last = events[events.length - 1]!;
       if (one) return fit({ title: t('Signalement · {room}', { room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
@@ -543,6 +576,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} signalement', '{n} signalements');
     case 'place-taken':
       return tn(n, '{n} place prise', '{n} places prises');
+    case 'challenge':
+      return tn(n, '{n} défi', '{n} défis');
     case 'group-message':
       return tn(n, '{n} message de groupe', '{n} messages de groupe');
     case 'group-mention':
@@ -705,7 +740,11 @@ export function createNoticeCenter(): NoticeCenter {
         ...noticeText(group.kind, group.events),
         ...(lone ? { player: { key: lone.player!, name: lone.who ?? '?' } } : {}),
         // Une place prise : la table de la plus récente (un clic la lance).
-        act: rule.act.type === 'place-taken' ? { type: 'place-taken', key: group.events[group.events.length - 1]!.key } : rule.act,
+        act:
+          rule.act.type === 'place-taken' ? { type: 'place-taken', key: group.events[group.events.length - 1]!.key }
+          // Un défi : celui de la plus récente nouvelle (un clic ouvre son écran).
+          : rule.act.type === 'challenge' ? { type: 'challenge', ...(group.events[group.events.length - 1]!.thread ? { id: group.events[group.events.length - 1]!.thread! } : {}) }
+          : rule.act,
         ...(rule.live ? { live: true as const } : {}),
         ...(rule.away ? { away: true as const } : {}),
         ...(rule.sound ? { sound: rule.sound } : {}),

@@ -5,8 +5,8 @@
 //   jamais un tableau vide ;
 // - mon record et mon groupe (table de la semaine) dans les statistiques ;
 // - une partie instantanée ouverte sur cette version passe avant « Jouer », qui porte l'objectif ;
-// - « Jouer ensemble… » regroupe « Jouer avec un ami » et « Partie instantanée » ; « Défier un
-//   joueur » y est, grisé avec sa raison (fonction à venir).
+// - « Jouer ensemble… » regroupe « Jouer avec un ami », « Partie instantanée » et « Défier un
+//   joueur » (challenges-menu.ts, 22/11/2026).
 //
 // Les données viennent du service des tables du jour (daily-tables.ts) ; library.ts ne fait que
 // poser ce que ce module rend.
@@ -36,6 +36,8 @@ export interface TableSocialHost {
   instantGame?(table: TableEntry, back: () => void): Action;
   /** Une partie instantanée ouverte sur cette version, à rejoindre. */
   joinInstant?(board: string, back: () => void): Action | undefined;
+  /** « Défier un joueur… » (challenges-menu.ts) ; absent : grisé « Bientôt ». */
+  challenge?(table: TableEntry, back: () => void): Action;
 }
 
 /** Ce que la fiche pose : sa section, ses statistiques, les actions avant « Jouer », le détail de « Jouer », « Jouer ensemble… ». */
@@ -174,7 +176,8 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     if (join) actions.push(join);
     if (host.playWithFriend) actions.push({ ...host.playWithFriend(table, here), label: t('Jouer avec un ami…'), icon: 'friend-list' });
     if (host.instantGame) actions.push({ ...host.instantGame(table, here), label: t('Ouvrir une partie instantanée…'), icon: 'globe' });
-    actions.push({ label: t('Défier un joueur…'), detail: t('Bientôt : 48 h pour battre votre score, chacun quand il veut'), icon: 'trophy', tone: 'quiet', run: () => undefined });
+    // Défier un joueur (challenges-menu.ts) : les amis et les joueurs classés sur cette version.
+    actions.push(host.challenge?.(table, here) ?? { label: t('Défier un joueur…'), detail: t('Bientôt : 48 h pour battre votre score, chacun quand il veut'), icon: 'trophy', tone: 'quiet', run: () => undefined });
     actions.push({ label: t('Retour à la fiche'), icon: 'back', run: back });
     const friends = host.net.state().friends.filter((f) => host.net.online(f.key));
     const sections: Section[] = friends.length

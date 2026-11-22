@@ -13,6 +13,7 @@ import {
   badgeGains,
   badgeXp,
   celebrate,
+  challengeGains,
   closedWeeks,
   emptyLevels,
   evaluateBadges,
@@ -88,6 +89,8 @@ export interface LevelTracker {
   /** Une partie finie : ce qu'elle a rapporté (l'écran de retour, game-return.ts) ; undefined : rien ne compte (invité, essai). */
   gameEnded(f: GameFacts): GameReport | undefined;
   liveFinished(entry: HistoryGame): void;
+  /** Un défi gagné (challenge-service.ts) : ses XP, une fois ; rend les XP versés (0 : plafond, invité, essai). */
+  challengeWon(table: string): number;
   /** J'ai écrit dans un salon ou un groupe. */
   roomMessage(): void;
   /** Amis, « J'aime » ou réactions ont pu changer. */
@@ -347,6 +350,12 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       const joined = hostedJoined(entry);
       const r = liveGains(state, { done: mine.state === 'done', won, table: entry.title, at: now(), ...(joined.length ? { joined } : {}) });
       apply(r.state, r.gains, `partie en ligne sur ${entry.title}`); // i18n-ignore : journal
+    },
+    challengeWon(table) {
+      if (frozen || !host.active()) return 0;
+      const r = challengeGains(state, { table, at: now() });
+      apply(r.state, r.gains, `défi gagné sur ${table}${r.capped ? ', plafond atteint' : ''}`); // i18n-ignore : journal
+      return r.gains.reduce((a, g) => a + g.xp, 0);
     },
     roomMessage() {
       if (frozen || !host.active()) return;

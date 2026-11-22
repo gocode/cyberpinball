@@ -31,6 +31,7 @@ import {
   XP,
   DAILY_PLAY_CAP,
   DAILY_SOCIAL_CAP,
+  CHALLENGE_WINS_PER_DAY,
   type IconName,
   type XpGain,
 } from '@cyberpinball/core';
@@ -90,6 +91,7 @@ const GAIN_ICON: Record<XpGain['kind'], IconName> = {
   champion: 'star',
   live: 'friends',
   'live-win': 'trophy',
+  'challenge-win': 'trophy',
   hosted: 'rocket',
   ranking: 'trophy',
   badge: 'medal',
@@ -245,6 +247,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
               row('list', t('Au tableau d’honneur'), `${XP.honor}`),
               row('star', t('Meilleur score de la table'), `${XP.champion}`),
               row('friends', t('Partie en ligne menée au bout'), `${XP.live}`, t('+{n} en cas de victoire', { n: XP.liveWin })),
+              row('trophy', t('Défi gagné'), `${XP.challengeWin}`, tn(CHALLENGE_WINS_PER_DAY, 'Au plus {n} défi par jour', 'Au plus {n} défis par jour')),
               row('rocket', t('Votre partie rejointe'), `${XP.hosted}`, t('Une fois par groupe de joueurs : rejouer avec les mêmes ne rapporte plus')),
             ],
           },

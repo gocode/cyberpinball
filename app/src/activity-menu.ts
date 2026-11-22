@@ -98,6 +98,8 @@ export interface ActivityMenuHost {
    * table absente de la borne, la ligne est grisée avec sa raison. Absent (essais) : la ligne n'ouvre rien.
    */
   places?: { reach(key: string): { run?: () => void; gone?: string; status?: string } };
+  /** Les défis (challenge-service.ts) : Start sur la ligne ouvre l'écran du défi ; plus sur la borne : grisée avec sa raison. */
+  challenges?: { gone(id: string): string | undefined; open(id: string, back: () => void): void };
   /** Le journal a changé (une ligne de plus, une ligne vue) : la pastille de la roue dentée se redessine. */
   changed?(): void;
   now?: () => number;
@@ -297,6 +299,14 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         if (!r) return {};
         if (r.gone) return { gone: r.gone };
         return { ...(r.run ? { run: r.run, label: t('reprendre ma place') } : {}), ...(r.status ? { status: r.status } : {}) };
+      }
+      // Un défi (challenges-menu.ts) : son écran, tant qu'il est sur la borne.
+      case 'challenge': {
+        const c = host.challenges;
+        if (!c) return {};
+        const off = c.gone(act.id);
+        if (off) return { gone: off };
+        return { run: () => c.open(act.id, back), label: t('voir le défi') };
       }
       case 'system':
         if (!host.library.hasSystemItem(act.item)) return {};

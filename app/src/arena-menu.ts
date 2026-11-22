@@ -7,8 +7,9 @@
 // - l'écran ouvert par Start (hub-screen.ts) : la bande « Votre niveau », des onglets (Accueil,
 //   Parties, Défis, Du jour, Ligue, Classements, Progression) et des cartes choisies aux flippers.
 //
-// Seulement des données réelles (arena.ts) : ligues, défis, missions, rendez-vous et série n'existent
-// pas encore ; leurs sections sont absentes et leurs onglets grisés, avec leur raison.
+// Seulement des données réelles (arena.ts) : ligues, missions, rendez-vous et série n'existent pas
+// encore ; leurs sections sont absentes et leurs onglets grisés, avec leur raison. Les défis
+// (challenges-menu.ts, 22/11/2026) fournissent l'onglet « Défis ».
 //
 // Sans electron à l'exécution : les tests chargent ce module avec des services d'essai.
 
@@ -54,6 +55,7 @@ import type { Built } from './library';
 import type { LevelTracker } from './level-tracker';
 import type { RankingsMenu } from './rankings-menu';
 import type { SocialNet } from './social-net';
+import type { ChallengesMenu } from './challenges-menu';
 import { createHubScreen, type HubBand, type HubCardSpec, type HubLevel, type HubSectionSpec, type HubSpec, type HubTabSpec } from './hub-screen';
 
 export interface ArenaMenuHost {
@@ -89,6 +91,11 @@ export interface ArenaMenuHost {
   places?: { current(): readonly PlaceTaken[]; retake(taken: PlaceTaken): (() => void) | undefined };
   /** Écrire à un joueur (la messagerie, entre amis) : de quoi ouvrir le fil, ou pourquoi pas. */
   write?(key: string, back: () => void): { run?: () => void; off?: string };
+  /**
+   * Les défis (challenges-menu.ts, 22/11/2026) : l'onglet « Défis », les cartes « Défi de … » de « À jouer
+   * maintenant », la page de l'affiche d'un défi qui expire bientôt, « Défier » d'un geste ; absents, l'onglet reste grisé.
+   */
+  challenges?: Pick<ChallengesMenu, 'sections' | 'playCards' | 'attention' | 'boardPage' | 'button'>;
   zoneKeys(): readonly string[];
   now?(): Date;
 }
@@ -232,16 +239,21 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const { rivals, records } = published();
     // La place qu'on vient de me prendre (place-taken.ts) : la première page, après ma partie qui attend.
     const taken = host.places?.current()[0];
-    return arenaBoardPages({
-      open: games.open.map((o) => toOpenGame(o.game, o.joinable)),
-      ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}),
-      ...(taken ? { taken } : {}),
-      rivals,
-      records,
-      ...(standing() ? { standing: standing()! } : {}),
-      ago,
-      now: now(),
-    });
+    // Un défi qui expire bientôt (challenges-menu.ts) : sa page en tête, il ne reste que quelques heures.
+    const challenge = host.challenges?.boardPage();
+    return [
+      ...(challenge ? [challenge] : []),
+      ...arenaBoardPages({
+        open: games.open.map((o) => toOpenGame(o.game, o.joinable)),
+        ...(games.mine ? { mine: { title: games.mine.title, seated: games.mine.seated, max: games.mine.max } } : {}),
+        ...(taken ? { taken } : {}),
+        rivals,
+        records,
+        ...(standing() ? { standing: standing()! } : {}),
+        ago,
+        now: now(),
+      }),
+    ];
   }
 
   function poster(): ArenaPosterView {
@@ -308,8 +320,9 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       { id: 'games', label: t('Parties'), icon: 'gamepad', ...(games.mine || games.open.some((o) => o.joinable) ? { attention: true } : {}) },
       // Les tableaux des scores, d'un onglet (demande du 22/11/2026 : « arriver directement sur les tableaux des scores »).
       ...(host.rankings.recentScores ? [{ id: 'scores', label: t('Scores'), icon: 'trophy' as const }] : []),
-      // Les flippers croisés (le trophée est aux Scores) : retenus par le mainteneur le 22/11/2026.
-      { id: 'challenges', label: t('Défis'), icon: 'crossed-flippers', disabled: t('Bientôt') },
+      // Les flippers croisés (le trophée est aux Scores) : retenus par le mainteneur le 22/11/2026. Les défis
+      // (challenges-menu.ts) l'ouvrent ; sans eux, grisé.
+      { id: 'challenges', label: t('Défis'), icon: 'crossed-flippers', ...(host.challenges ? (host.challenges.attention() ? { attention: true } : {}) : { disabled: t('Bientôt') }) },
       { id: 'daily', label: t('Du jour'), icon: 'sparkle', ...(host.daily ? {} : { disabled: t('Bientôt') }) },
       { id: 'league', label: t('Ligue'), icon: 'list', disabled: t('Bientôt') },
       { id: 'progress', label: t('Progression'), icon: 'medal' },
@@ -375,7 +388,9 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
             retake
               ? { label: t('Reprendre ma place'), xp: xpText(XP.personalBest), primary: true, key: 'retake', run: retake }
               : { label: t('Reprendre ma place'), key: 'retake', run: () => undefined, off: t('Table absente de cette borne') },
-            { label: t('Défier {name}', { name: p.rival.name }), key: 'challenge', run: () => undefined, off: t('Bientôt') },
+            host.challenges
+              ? host.challenges.button({ key: p.rival.key, name: p.rival.name, ...(p.rival.country ? { country: p.rival.country } : {}) }, { board: p.board, ...(p.balls ? { balls: p.balls } : {}), title: p.title }, p.mine.score, 'best', 'challenge', here)
+              : { label: t('Défier {name}', { name: p.rival.name }), key: 'challenge', run: () => undefined, off: t('Bientôt') },
             write?.run ? { label: t('Lui écrire'), key: 'write', run: write.run } : { label: t('Lui écrire'), key: 'write', run: () => undefined, off: write?.off ?? t('Entre amis seulement') },
           ],
         };
@@ -497,19 +512,23 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const games = host.instant.arena(here);
     const shownId = moment?.key.startsWith('moment:game:') ? moment.key.slice('moment:game:'.length) : undefined;
     const open = games.open.filter((o) => o.game.id !== shownId);
-    const play: HubCardSpec[] = open.slice(0, 3).map((o) => {
-      const g = o.game;
-      const seats: (AvatarView | null)[] = [...g.seats.map((s) => face(s.key, s.name)), ...Array.from({ length: Math.max(0, g.max - g.seats.length) }, () => null)];
-      return {
-        key: `game:${g.id}`,
-        icon: 'rocket',
-        title: g.title,
-        seats,
-        detail: o.reason ?? t('{name} attend · {free}', { name: g.name, free: tn(g.max - g.seats.length, '{n} place libre', '{n} places libres') }),
-        aside: xpText(XP.live),
-        ...(o.joinable ? { run: o.join } : { quiet: true }),
-      };
-    });
+    // Les défis qui m'attendent (« Défi de Nina ») : en tête, ils ont une échéance.
+    const play: HubCardSpec[] = [...(host.challenges?.playCards(here, 2) ?? [])];
+    play.push(
+      ...open.slice(0, 3).map((o): HubCardSpec => {
+        const g = o.game;
+        const seats: (AvatarView | null)[] = [...g.seats.map((s) => face(s.key, s.name)), ...Array.from({ length: Math.max(0, g.max - g.seats.length) }, () => null)];
+        return {
+          key: `game:${g.id}`,
+          icon: 'rocket',
+          title: g.title,
+          seats,
+          detail: o.reason ?? t('{name} attend · {free}', { name: g.name, free: tn(g.max - g.seats.length, '{n} place libre', '{n} places libres') }),
+          aside: xpText(XP.live),
+          ...(o.joinable ? { run: o.join } : { quiet: true }),
+        };
+      }),
+    );
     if (door.quiet) play.push({ key: 'instant:off', icon: 'network', title: t('Parties instantanées'), detail: door.detail, quiet: true });
     // Les entrées, sous les parties : des choix, comme dans les autres menus (21/11/2026).
     const playChoices: HubCardSpec[] = [];
@@ -666,6 +685,11 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
         return { ...spec, list: true, ...scoresTab(reopen) };
       case 'progress':
         return { ...spec, list: true, sections: progressSections(reopen) };
+      // Les défis (challenges-menu.ts) : à jouer, envoyés, résultats récents.
+      case 'challenges': {
+        const c = host.challenges?.sections(reopen);
+        return c ? { ...spec, list: true, sections: c.sections, ...(c.empty ? { empty: c.empty } : {}) } : spec;
+      }
       // Les tables du jour (daily-tables-menu.ts) : leur écran complet, d'une carte.
       case 'daily': {
         const daily = host.daily;

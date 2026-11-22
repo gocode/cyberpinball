@@ -140,13 +140,6 @@ export const messages: Record<string, string> = {
     'A webcam is enough; an Xbox 360 or Xbox One Kinect works too, and its driver installs in one click.',
   'Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision › 3D vision',
 
-  'Collections et favoris': 'Collections and favourites',
-  'Favoris, récentes, fabricants, décennies, les vôtres : la roue montre celle de votre choix.': 'Favourites, recent, manufacturers, decades, your own: the wheel shows the one you choose.',
-  'Les MagnaSave passent d’une collection à l’autre ; le médaillon Collections les montre toutes. « Ajouter aux favoris » sur la fiche d’une table pose une étoile devant son titre.':
-    'The MagnaSave buttons go from one collection to the next; the Collections medallion shows them all. “Add to favourites” on a table’s page puts a star in front of its title.',
-  'Créez vos propres collections, et choisissez celle qu’un invité a le droit de parcourir.': 'Create your own collections, and choose the one a guest may browse.',
-  'Roue › Collections': 'Wheel › Collections',
-
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 
   'La table en relief avec de simples lunettes rouge et cyan, et avec la Vision 3D si vous voulez.': 'The table in 3D with simple red and cyan glasses, and with 3D vision if you like.',
