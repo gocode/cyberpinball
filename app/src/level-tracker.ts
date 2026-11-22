@@ -18,6 +18,7 @@ import {
   evaluateBadges,
   friendsGains,
   gameGains,
+  hostedJoined,
   invitedGains,
   levelOf,
   shownLevel,
@@ -342,7 +343,9 @@ export function createLevelTracker(host: LevelTrackerHost): LevelTracker {
       const mine = entry.players.find((p) => p.key === entry.me);
       if (!mine) return;
       const won = mine.rank === 1 && entry.players.filter((p) => p.rank !== undefined).length >= 2;
-      const r = liveGains(state, { done: mine.state === 'done', won, table: entry.title, at: now() });
+      // Ma partie (je l'ai ouverte) : les joueurs qui l'ont rejointe et jouée, une fois par groupe (levels.ts).
+      const joined = hostedJoined(entry);
+      const r = liveGains(state, { done: mine.state === 'done', won, table: entry.title, at: now(), ...(joined.length ? { joined } : {}) });
       apply(r.state, r.gains, `partie en ligne sur ${entry.title}`); // i18n-ignore : journal
     },
     roomMessage() {

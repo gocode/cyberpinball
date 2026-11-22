@@ -90,6 +90,7 @@ const GAIN_ICON: Record<XpGain['kind'], IconName> = {
   champion: 'star',
   live: 'friends',
   'live-win': 'trophy',
+  hosted: 'rocket',
   ranking: 'trophy',
   badge: 'medal',
   start: 'history',
@@ -244,6 +245,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
               row('list', t('Au tableau d’honneur'), `${XP.honor}`),
               row('star', t('Meilleur score de la table'), `${XP.champion}`),
               row('friends', t('Partie en ligne menée au bout'), `${XP.live}`, t('+{n} en cas de victoire', { n: XP.liveWin })),
+              row('rocket', t('Votre partie rejointe'), `${XP.hosted}`, t('Une fois par groupe de joueurs : rejouer avec les mêmes ne rapporte plus')),
             ],
           },
           {

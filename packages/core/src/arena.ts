@@ -124,6 +124,7 @@ export function arenaXpRules(): ArenaXpRule[] {
     { icon: 'star', text: t('Meilleur score de la table'), xp: XP.champion },
     { icon: 'friends', text: t('Partie en ligne menée au bout'), xp: XP.live },
     { icon: 'trophy', text: t('Victoire en ligne'), xp: XP.liveWin },
+    { icon: 'rocket', text: t('Votre partie rejointe'), xp: XP.hosted, detail: t('Une fois par groupe de joueurs') },
   ];
 }
 

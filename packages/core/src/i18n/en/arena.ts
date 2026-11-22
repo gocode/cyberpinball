@@ -115,7 +115,18 @@ export const messages: Record<string, string> = {
   'Un médaillon pour se mesurer aux autres : parties ouvertes, places à reprendre, votre niveau.': 'A medallion to measure yourself against others: open games, places to win back, your level.',
   'Dans la roue, à côté de la Communauté. Son affiche fait tourner vos records et les places qu’on vient de vous prendre ; Start ouvre l’Arène, ses onglets se changent aux MagnaSave.':
     'On the wheel, next to Community. Its poster turns through your records and the places just taken from you; Start opens the Arena, and the MagnaSave buttons switch its tabs.',
-  'En tête, votre niveau et ce qu’une partie peut encore rapporter, puis ce qu’il y a de plus pressant : une place à reprendre, une partie instantanée qui vous attend. Chaque action dit ce qu’elle rapporte en XP.':
-    'On top, your level and what one game can still bring, then what is most pressing: a place to win back, an instant game waiting for you. Every action says how much XP it brings.',
   'Roue › Arène': 'Wheel › Arena',
+  'En tête, votre niveau et le plus pressant (une place à reprendre, une partie qui vous attend), puis le classement mondial. Une partie que vous ouvrez et que d’autres rejoignent rapporte des XP, une fois par groupe.':
+    'On top, your level and what is most pressing (a place to win back, a game waiting for you), then the world ranking. A game you open that others join brings XP, once per group.',
+  // Le classement mondial sur l'Accueil, et l'XP de la partie rejointe (22/11/2026)
+  'Retour : Arène': 'Back: Arena',
+  '1ᵉʳ · {name}': '#1 · {name}',
+  '{rank}ᵉ · {name}': '#{rank} · {name}',
+  'Tout le classement mondial': 'The whole world ranking',
+  'Monde, pays ou amis ; cette semaine ou de tout temps': 'World, country or friends; this week or all time',
+  'Classement mondial': 'World ranking',
+  '{n} joueur classé': '{n} ranked player',
+  '{n} joueurs classés': '{n} ranked players',
+  'Une fois par groupe de joueurs': 'Once per group of players',
+  'Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour · souris': 'Flippers: This week or All time · Start or MagnaSave: next scope · Exit: back · mouse',
 };

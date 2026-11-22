@@ -45,13 +45,14 @@ import {
   type IconName,
   type InstantGame,
   type OnlinePlayer,
+  type PlayerScope,
   type PlaceTaken,
   type PresenceTable,
   type TierId,
 } from '@cyberpinball/core';
 import type { Built } from './library';
 import type { LevelTracker } from './level-tracker';
-import type { PlayerStanding } from './rankings-menu';
+import type { RankingsMenu } from './rankings-menu';
 import type { SocialNet } from './social-net';
 import { createHubScreen, type HubBand, type HubCardSpec, type HubLevel, type HubSectionSpec, type HubSpec, type HubTabSpec } from './hub-screen';
 
@@ -66,8 +67,11 @@ export interface ArenaMenuHost {
     open(back: () => void): void;
     openNew(back: () => void): void;
   };
-  /** Les classements (rankings-menu.ts) : ma place chez les joueurs, et l'écran de toutes les tables. */
-  rankings: { standing(): PlayerStanding | undefined; open(back: () => void): void };
+  /**
+   * Les classements (rankings-menu.ts) : ma place chez les joueurs, l'écran de toutes les tables, et le
+   * classement des joueurs (son haut sur l'Accueil, son écran d'un Start) ; sans lui, pas de bloc mondial.
+   */
+  rankings: Pick<RankingsMenu, 'standing' | 'open'> & Partial<Pick<RankingsMenu, 'playersTop' | 'openPlayers'>>;
   /** Les tables du jour (daily-tables-menu.ts) : ce que dit leur porte, et les ouvrir ; absentes, l'onglet « Du jour » reste grisé. */
   daily?: { detail(): string; open(back: () => void): void };
   /** Mon niveau, Mes badges, le barème (level-menu.ts) ; l'historique des parties. */
@@ -138,6 +142,8 @@ export interface ArenaMenu {
 const POSTER_PLAYERS = 5;
 /** Les calculs sur les classements publiés se refont au plus toutes les deux secondes (l'affiche se redessine à chaque état). */
 const KEEP_MS = 2000;
+/** Premières places du classement mondial sur l'Accueil (ma ligne s'ajoute au-delà). */
+const WORLD_TOP = 3;
 
 export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
   const now = () => host.now?.() ?? new Date();
@@ -428,6 +434,43 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     };
   }
 
+  /** Le classement des joueurs d'un Start, à cette portée, de tout temps ; Exit revient à l'Arène. */
+  const openBoard = (here: () => void, sc: PlayerScope): (() => void) => {
+    const open = host.rankings.openPlayers;
+    return open ? () => open(here, t('Retour : Arène'), sc, 'all') : () => host.rankings.open(here);
+  };
+
+  /**
+   * Le haut du classement mondial des joueurs (demande du 22/11/2026 : « l'accès ou la visibilité hyper
+   * rapide du classement global ») : les premiers, puis moi si je n'y suis pas ; chaque ligne ouvre le
+   * classement complet d'un Start. Absent sans réseau, partage coupé ou personne de classé.
+   */
+  function worldSection(here: () => void): HubSectionSpec | undefined {
+    const top = host.rankings.playersTop?.('world', 'all', WORLD_TOP);
+    if (!top?.lines.length) return undefined;
+    const open = openBoard(here, 'world');
+    const cards: HubCardSpec[] = top.lines.map((l) => {
+      const level = levelChip(l.mine ? levelOfPlayer(l.key) : l.level);
+      const who = l.mine ? t('Vous') : l.name;
+      return {
+        key: `world:${l.key}`,
+        avatar: face(l.key, l.name, l.xp),
+        title: l.rank === 1 ? t('1ᵉʳ · {name}', { name: who }) : t('{rank}ᵉ · {name}', { rank: fmt(l.rank), name: who }),
+        ...(level ? { level } : {}),
+        ...(l.country ? { detail: countryName(l.country, locale()) } : {}),
+        aside: t('{n} XP', { n: fmt(l.xp) }),
+        run: open,
+      };
+    });
+    return {
+      title: t('Classement mondial'),
+      note: tn(top.players, '{n} joueur classé', '{n} joueurs classés', { n: fmt(top.players) }),
+      layout: 'list',
+      cards,
+      choices: [{ key: 'world-all', icon: 'globe', title: t('Tout le classement mondial'), detail: t('Monde, pays ou amis ; cette semaine ou de tout temps'), run: open }],
+    };
+  }
+
   /**
    * L'Accueil (demande du 21/11/2026 : « qu'il n'ait pas à se balader dans les onglets, sauf pour des
    * actions spécifiques ») : la carte du moment, puis un bloc par sujet, chacun ouvrant d'un Start ce
@@ -439,6 +482,10 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const out: HubSectionSpec[] = [];
     const moment = momentCard(back, here);
     if (moment) out.push({ layout: 'hero', cards: [moment] });
+
+    // Le classement mondial, juste sous le moment : à un flipper de l'arrivée.
+    const world = worldSection(here);
+    if (world) out.push(world);
 
     // Jouer : les parties ouvertes sur mes tables (celle de la carte du moment mise à part), en ouvrir une, les tables du jour.
     const door = host.instant.door();
@@ -472,8 +519,9 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     // Classements : mes places, les joueurs juste devant moi (celui de la carte du moment mis à part), tous les classements.
     const st = standing();
     const ranks: HubCardSpec[] = [];
-    if (st?.world) ranks.push({ key: 'world', icon: 'globe', title: t('{n}ᵉ au monde', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }), run: () => host.rankings.open(here) });
-    if (st?.country) ranks.push({ key: 'country', icon: 'language', title: t('{country} : {n}ᵉ', { country: st.country.name, n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: () => host.rankings.open(here) });
+    // Ma place au monde : dans le bloc mondial quand il est là.
+    if (st?.world && !world) ranks.push({ key: 'world', icon: 'globe', title: t('{n}ᵉ au monde', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }), run: openBoard(here, 'world') });
+    if (st?.country) ranks.push({ key: 'country', icon: 'language', title: t('{country} : {n}ᵉ', { country: st.country.name, n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: openBoard(here, 'country') });
     const heroRival = moment?.key.startsWith('moment:rival:') ? moment.key.slice('moment:rival:'.length) : undefined;
     ranks.push(...published().rivals.filter((r) => r.board !== heroRival).slice(0, 3).map(rivalRow));
     out.push({ title: t('Vos classements'), ...(st ? { note: t('Selon vos XP, de tout temps') } : {}), layout: 'list', cards: ranks, choices: [{ key: 'all-rankings', icon: 'list', title: t('Tous les classements'), detail: t('Chaque table, par portée et par période'), run: () => host.rankings.open(here) }] });
@@ -514,8 +562,8 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const st = standing();
     if (st) {
       const cards: HubCardSpec[] = [];
-      if (st.world) cards.push({ key: 'world', icon: 'globe', eyebrow: t('Monde'), tone: 'meta', title: t('{n}ᵉ', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }), run: () => host.rankings.open(here) });
-      if (st.country) cards.push({ key: 'country', icon: 'language', eyebrow: st.country.name, tone: 'meta', title: t('{n}ᵉ', { n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: () => host.rankings.open(here) });
+      if (st.world) cards.push({ key: 'world', icon: 'globe', eyebrow: t('Monde'), tone: 'meta', title: t('{n}ᵉ', { n: fmt(st.world.rank) }), detail: tn(st.world.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.world.players) }), run: openBoard(here, 'world') });
+      if (st.country) cards.push({ key: 'country', icon: 'language', eyebrow: st.country.name, tone: 'meta', title: t('{n}ᵉ', { n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: openBoard(here, 'country') });
       out.push({ title: t('Votre place'), note: t('Selon vos XP, de tout temps'), layout: 'cards', cards });
     }
     const { rivals } = published();

@@ -322,6 +322,41 @@ test('Accueil de l’Arène : jouer, les classements et la progression à un Sta
   assert.ok(h.built().hub.sections.find((s) => s.title === 'Vos classements')!.cards.some((c) => /Twilight Zone/.test(c.title)));
 });
 
+test('Accueil de l’Arène : le classement mondial juste sous le moment, les premiers puis moi, chacun ouvre le classement complet', () => {
+  // Demande du 22/11/2026 : « l'accès ou la visibilité hyper rapide du classement global ».
+  const asked: string[] = [];
+  const lines = [
+    { rank: 1, key: 'cle-nova-000001', name: 'Nova', xp: 91_000, level: 41, country: 'FR' },
+    { rank: 2, key: 'cle-dora-000002', name: 'Dora', xp: 88_500, level: 40 },
+    { rank: 3, key: 'cle-max-0000003', name: 'Max', xp: 80_200, level: 38, country: 'BE' },
+    { rank: 412, key: ME, name: 'Moi', xp: levelStart(12) + 270, mine: true as const },
+  ];
+  const h = arena({
+    rankings: {
+      standing: () => ({ world: { rank: 412, players: 2310 }, country: { code: 'FR', rank: 37, players: 418 } }),
+      open: () => h.events.push('classements'),
+      playersTop: (scope: string, period: string, n: number) => (asked.push(`${scope}:${period}:${n}`), { lines, players: 2310 }),
+      openPlayers: (_back: () => void, label: string, scope: string, period: string) => h.events.push(`joueurs ${scope} ${period} · ${label}`),
+    },
+  });
+  h.menu.openHome(() => undefined);
+  const sections = h.built().hub.sections;
+  assert.equal(sections[0]!.title, 'Classement mondial', 'le premier bloc sous le moment (ici, pas de moment)');
+  assert.deepEqual(asked.at(-1), 'world:all:3', 'les trois premiers du monde, de tout temps');
+  assert.deepEqual(sections[0]!.cards.map((c) => c.title), ['1ᵉʳ · Nova', '2ᵉ · Dora', '3ᵉ · Max', '412ᵉ · Vous']);
+  assert.deepEqual((sections[0] as { choices?: { title: string }[] }).choices?.map((c) => c.title), ['Tout le classement mondial'], 'en ligne d’action sous le tableau');
+  // Ma place au monde n'est pas répétée dans « Vos classements » ; celle de mon pays y reste, et ouvre son classement.
+  const mine = sections.find((s) => s.title === 'Vos classements')!.cards.map((c) => c.title);
+  assert.deepEqual(mine, ['France : 37ᵉ']);
+  for (const label of ['3ᵉ · Max', 'Tout le classement mondial']) {
+    h.item(label);
+    assert.equal(h.events.at(-1), 'joueurs world all · Retour : Arène', label);
+  }
+  // Une seule ligne dans le bloc : Start dessus la fait tout de suite.
+  h.built().actions.find((a) => a.label === 'Vos classements')!.run();
+  assert.equal(h.events.at(-1), 'joueurs country all · Retour : Arène');
+});
+
 test('écran de l’Arène : les cartes mènent aux écrans complets (parties, classements, progression)', () => {
   const h = arena();
   h.menu.openHome(() => undefined);

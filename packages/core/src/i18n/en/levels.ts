@@ -212,4 +212,9 @@ export const messages: Record<string, string> = {
   // Au téléphone (level-menu.ts, remoteSummary ; 18/11/2026)
   "Mon niveau · {tier}": "My level · {tier}",
   "+{n} XP cette semaine": "+{n} XP this week",
+  // Partie ouverte et rejointe, une fois par groupe (levels.ts, 22/11/2026)
+  'Votre partie a été rejointe': 'Your game was joined',
+  '{table} · avec {names}': '{table} · with {names}',
+  'Votre partie rejointe': 'Your game joined',
+  'Une fois par groupe de joueurs : rejouer avec les mêmes ne rapporte plus': 'Once per group of players: playing again with the same ones brings nothing more',
 };

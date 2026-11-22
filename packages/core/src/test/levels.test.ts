@@ -34,6 +34,12 @@ import {
   startXp,
   tierOf,
   weekKey,
+  dayKey,
+  gainText,
+  hostedGroup,
+  hostedJoined,
+  parseLevels,
+  XP,
   type GameFacts,
 } from '../levels';
 
@@ -94,6 +100,43 @@ test('niveaux : tableau d’honneur et meilleur score, plafond quotidien du jeu'
   assert.equal(total, DAILY_PLAY_CAP, 'jamais plus de 600 XP de jeu par jour');
   const tomorrow = gameGains(s, game({ at: at('2026-11-19T20:00:00') }));
   assert.ok(tomorrow.gains.length > 0, 'le plafond repart le lendemain');
+});
+
+test('niveaux : ma partie rejointe rapporte une fois par groupe de joueurs, pas à chaque fois avec les mêmes', () => {
+  // Demande du 22/11/2026 : « qu'une fois par couple de personnes qui jouent, ou groupe ».
+  const nova = { key: 'n'.repeat(40), name: 'Nova' }, dora = { key: 'd'.repeat(40), name: 'Dora' };
+  const play = (s: ReturnType<typeof emptyLevels>, joined: { key: string; name: string }[], when = '2026-11-18T21:00:00') => liveGains(s, { done: true, won: false, table: 'Comet Chaser', at: at(when), joined });
+  const first = play(emptyLevels(), [nova]);
+  assert.deepEqual(first.gains.map((g) => [g.kind, g.xp]), [['live', XP.live], ['hosted', XP.hosted]]);
+  assert.equal(first.gains[1]!.name, 'Nova');
+  assert.deepEqual(gainText(first.gains[1]!, (id) => id), { text: 'Votre partie a été rejointe', detail: 'Comet Chaser · avec Nova' });
+  // Les mêmes, même un autre jour : plus rien pour l'hôte.
+  const again = play(first.state, [nova], '2026-11-25T21:00:00');
+  assert.deepEqual(again.gains.map((g) => g.kind), ['live']);
+  // Un autre groupe (un joueur de plus), dans n'importe quel ordre d'arrivée : il rapporte, une fois.
+  const pair = play(again.state, [dora, nova]);
+  assert.equal(pair.gains.filter((g) => g.kind === 'hosted').length, 1);
+  assert.equal(play(pair.state, [nova, dora]).gains.filter((g) => g.kind === 'hosted').length, 0, 'le même groupe, arrivé dans l’autre ordre');
+  assert.equal(hostedGroup([nova.key, dora.key]), hostedGroup([dora.key, nova.key]));
+  // Personne n'a rejoint (ou ce n'était pas ma partie) : rien.
+  assert.deepEqual(liveGains(emptyLevels(), { done: true, won: false, table: 'Comet Chaser', at: at('2026-11-18T21:00:00') }).gains.map((g) => g.kind), ['live']);
+  // Le groupe retenu par le plafond du jour n'est pas compté : il rapportera la prochaine fois.
+  const full = { ...emptyLevels(), days: { [dayKey(at('2026-11-18T21:00:00'))]: { xp: DAILY_PLAY_CAP, seconds: 0, games: 3 } } };
+  const capped = play(full, [dora]);
+  assert.deepEqual(capped.gains, []);
+  assert.equal(play(capped.state, [dora], '2026-11-19T21:00:00').gains.filter((g) => g.kind === 'hosted').length, 1);
+  // Qui a rejoint : seulement ma partie, et ceux qui ont joué (pas l'invitation déclinée, ni la table qui n'a pas démarré).
+  const players = [
+    { key: 'm'.repeat(40), name: 'Moi', state: 'done' },
+    { key: nova.key, name: 'Nova', state: 'done', score: 120_000 },
+    { key: dora.key, name: 'Dora', state: 'left', seconds: 300 },
+    { key: 'x'.repeat(40), name: 'Xan', state: 'declined' },
+    { key: 'y'.repeat(40), name: 'Yul', state: 'failed' },
+  ];
+  assert.deepEqual(hostedJoined({ host: 'm'.repeat(40), me: 'm'.repeat(40), players }).map((p) => p.name), ['Nova', 'Dora']);
+  assert.deepEqual(hostedJoined({ host: nova.key, me: 'm'.repeat(40), players }), [], 'la partie d’un autre : rien pour moi');
+  // Les groupes payés survivent à la relecture du fichier.
+  assert.deepEqual(parseLevels(JSON.parse(JSON.stringify(pair.state)))!.hostedGroups, pair.state.hostedGroups);
 });
 
 test('niveaux : parties en ligne et vie sociale', () => {

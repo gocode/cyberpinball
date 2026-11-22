@@ -60,6 +60,8 @@ export const XP = {
   champion: 100,
   live: 20,
   liveWin: 20,
+  /** Une partie ouverte par le joueur et rejointe : une fois par groupe de joueurs (hostedGroups). */
+  hosted: 25,
   roomDay: 10,
   friend: 25,
   like: 2,
@@ -147,7 +149,7 @@ export function levelOf(xp: number): LevelView {
 // ---------------------------------------------------------------------------
 // État
 
-export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction' | 'invited' | 'invitee-tier';
+export type XpKind = 'play' | 'game' | 'first-of-day' | 'new-table' | 'personal-best' | 'honor' | 'champion' | 'live' | 'live-win' | 'hosted' | 'ranking' | 'badge' | 'start' | 'room-day' | 'friend' | 'like' | 'reaction' | 'invited' | 'invitee-tier';
 
 export interface XpGain {
   kind: XpKind;
@@ -162,7 +164,7 @@ export interface XpGain {
   rank?: number;
   /** badge : son identifiant. */
   badge?: string;
-  /** invited, invitee-tier : le pseudo de la personne invitée. */
+  /** invited, invitee-tier : le pseudo de la personne invitée ; hosted : les joueurs qui ont rejoint. */
   name?: string;
 }
 
@@ -218,6 +220,8 @@ export interface LevelState {
   seenReactions: string[];
   /** Personnes invitées déjà payées (clé → dernier palier payé, 0 : Novice). */
   invitees: Record<string, number>;
+  /** Groupes déjà payés pour une partie ouverte et rejointe (hostedGroup) : rejouer avec les mêmes ne rapporte plus. */
+  hostedGroups: string[];
   /** Meilleur score de chaque table (tableKey) relevé par Cyber Pinball. */
   bests: Record<string, number>;
   /** Dernier jour où un record personnel a rapporté, par table. */
@@ -251,6 +255,7 @@ export const emptyLevels = (): LevelState => ({
   seenLikes: [],
   seenReactions: [],
   invitees: {},
+  hostedGroups: [],
   bests: {},
   bestPaid: {},
   beaten: 0,
@@ -372,17 +377,46 @@ export function gameGains(state: LevelState, f: GameFacts): GameOutcome {
   return { state: addGains(next, gains), gains, capped: paid < wanted.reduce((a, g) => a + g.xp, 0) };
 }
 
-/** Une partie en direct finie : menée au bout, gagnée (première place, à deux classés au moins). */
-export function liveGains(state: LevelState, f: { done: boolean; won: boolean; table: string; at: Date }): GameOutcome {
+/** Groupes gardés au plus (hostedGroups). */
+export const HOSTED_GROUPS_MAX = 2000;
+/** Longueur au plus des noms gardés avec le gain « partie ouverte et rejointe ». */
+const HOSTED_NAMES_MAX = 40;
+
+/** Le groupe d'une partie ouverte : les clés des joueurs qui l'ont rejointe, triées (l'ordre d'arrivée ne compte pas). */
+export const hostedGroup = (keys: readonly string[]): string => [...new Set(keys)].sort().join('|');
+
+/**
+ * Ceux qui ont rejoint ma partie et l'ont jouée (fiche de l'historique) : vide si je ne l'ai pas ouverte.
+ * Une invitation déclinée, expirée, ou une table qui n'a pas démarré de leur côté ne comptent pas.
+ */
+export function hostedJoined(g: { host: string; me: string; players: readonly { key: string; name: string; state: string; seconds?: number; score?: number }[] }): { key: string; name: string }[] {
+  if (g.host !== g.me) return [];
+  return g.players.filter((p) => p.key !== g.me && (p.state === 'done' || p.state === 'playing' || (p.seconds ?? 0) > 0 || p.score !== undefined)).map((p) => ({ key: p.key, name: p.name }));
+}
+
+/**
+ * Une partie en direct finie : menée au bout, gagnée (première place, à deux classés au moins).
+ * `joined` : la partie était la mienne (je l'ai ouverte) et ces joueurs l'ont rejointe et jouée ; elle
+ * rapporte une fois par groupe (demande du 22/11/2026) : rejouer avec les mêmes ne rapporte plus, un
+ * autre groupe (un joueur de plus, de moins, ou d'autres) rapporte de nouveau.
+ */
+export function liveGains(state: LevelState, f: { done: boolean; won: boolean; table: string; at: Date; joined?: readonly { key: string; name: string }[] }): GameOutcome {
   const at = f.at.toISOString();
   const wanted: XpGain[] = [];
   if (f.done) wanted.push({ kind: 'live', xp: XP.live, at, table: f.table });
   if (f.done && f.won) wanted.push({ kind: 'live-win', xp: XP.liveWin, at, table: f.table });
+  const group = f.joined?.length ? hostedGroup(f.joined.map((p) => p.key)) : undefined;
+  if (group && !state.hostedGroups.includes(group)) {
+    const names = f.joined!.map((p) => p.name).join(', ');
+    wanted.push({ kind: 'hosted', xp: XP.hosted, at, table: f.table, value: f.joined!.length, name: names.length > HOSTED_NAMES_MAX ? `${names.slice(0, HOSTED_NAMES_MAX - 1)}…` : names });
+  }
   const day = dayKey(f.at);
   const today = state.days[day] ?? { xp: 0, seconds: 0, games: 0 };
   const gains = capGains(wanted, DAILY_PLAY_CAP - today.xp);
   const paid = gains.reduce((a, g) => a + g.xp, 0);
-  const next = { ...state, days: pruneDays({ ...state.days, [day]: { ...today, xp: today.xp + paid } }, f.at) };
+  let next: LevelState = { ...state, days: pruneDays({ ...state.days, [day]: { ...today, xp: today.xp + paid } }, f.at) };
+  // Le groupe n'est compté que payé : retenu par le plafond du jour, il rapportera la prochaine fois.
+  if (group && gains.some((g) => g.kind === 'hosted')) next = { ...next, hostedGroups: [...next.hostedGroups, group].slice(-HOSTED_GROUPS_MAX) };
   return { state: addGains(next, gains), gains, capped: paid < wanted.reduce((a, g) => a + g.xp, 0) };
 }
 
@@ -641,7 +675,7 @@ export function playedSpanDays(state: LevelState): number {
 const num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(max, Math.floor(v)) : 0);
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction', 'invited', 'invitee-tier']);
+const XP_KINDS = new Set<string>(['play', 'game', 'first-of-day', 'new-table', 'personal-best', 'honor', 'champion', 'live', 'live-win', 'hosted', 'ranking', 'badge', 'start', 'room-day', 'friend', 'like', 'reaction', 'invited', 'invitee-tier']);
 const isKey = (v: unknown): v is string => typeof v === 'string' && v.length >= 8 && v.length <= 200;
 const SCOPES = new Set<string>(['world', 'country', 'friends']);
 
@@ -714,6 +748,7 @@ export function parseLevels(raw: unknown): LevelState | undefined {
     seenLikes: Array.isArray(r.seenLikes) ? r.seenLikes.filter((x): x is string => typeof x === 'string' && x.length <= 300).slice(-SEEN_IDS_MAX) : [],
     seenReactions: Array.isArray(r.seenReactions) ? r.seenReactions.filter((x): x is string => typeof x === 'string' && x.length <= 300).slice(-SEEN_IDS_MAX) : [],
     invitees: record(r.invitees, (x) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < TIER_IDS.length) as Record<string, number>,
+    hostedGroups: Array.isArray(r.hostedGroups) ? r.hostedGroups.filter((x): x is string => typeof x === 'string' && x.length >= 8 && x.length <= 2000).slice(-HOSTED_GROUPS_MAX) : [],
     bests: record(r.bests, (x) => typeof x === 'number' && Number.isSafeInteger(x) && x >= 0) as Record<string, number>,
     bestPaid: record(r.bestPaid, isDay) as Record<string, string>,
     beaten: num(r.beaten),
@@ -799,6 +834,8 @@ export function gainText(g: XpGain, badgeLabel: (id: string) => string): { text:
       return { text: t('Partie en direct menée au bout'), ...(table ? { detail: table } : {}) };
     case 'live-win':
       return { text: t('Partie en direct gagnée'), ...(table ? { detail: table } : {}) };
+    case 'hosted':
+      return { text: t('Votre partie a été rejointe'), ...(g.name ? { detail: table ? t('{table} · avec {names}', { table, names: g.name }) : t('Avec {names}', { names: g.name }) } : table ? { detail: table } : {}) };
     case 'ranking':
       return { text: t('Classement de la semaine'), ...(table ? { detail: `${table} · ${placeText(g.scope, g.rank)}` } : {}) };
     case 'badge':

@@ -30,6 +30,7 @@ import {
   tn,
   type AvatarView,
   type PlayerBoard,
+  type PlayerLine,
   type PlayerPeriod,
   type PlayerScope,
   type RankedPlayer,
@@ -95,6 +96,13 @@ export interface RankingsMenu {
   detail(): string;
   /** Ma place chez les joueurs (affiche du médaillon Communauté) ; absente sans réseau ou partage coupé. */
   standing(): PlayerStanding | undefined;
+  /**
+   * Le haut d'un classement des joueurs (l'Arène, 22/11/2026 : « la visibilité hyper rapide du
+   * classement global ») : les `n` premiers, puis ma ligne si je n'y suis pas ; absent : indisponible.
+   */
+  playersTop(scope: PlayerScope, period: PlayerPeriod, n: number): { lines: PlayerLine[]; players: number } | undefined;
+  /** L'écran « Joueurs » directement, à cette portée et cette période ; son retour vers `back`, sous ce nom. */
+  openPlayers(back: () => void, backLabel: string, scope: PlayerScope, period: PlayerPeriod): void;
   /**
    * « Toutes les tables » au téléphone (lot 5) : le même calcul que l'écran « Tables », à cette portée
    * et cette période ; les portées (et pourquoi l'une est grisée), puis les tables, récentes d'abord.
@@ -508,7 +516,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       current: p === playerPeriod,
       action: actions.push({ label: t('Onglet {period}', { period: playerPeriodLabel(p) }), key: `period-${p}`, run: () => ((playerPeriod = p), here()) }) - 1,
     }));
-    actions.push({ label: t('Retour : Classements'), icon: 'back', key: 'back', run: () => home(0) });
+    const exit = playersExit ?? { label: t('Retour : Classements'), run: () => home(0) };
+    actions.push({ label: exit.label, icon: 'back', key: 'back', run: exit.run });
     const board = boards.get(playerPeriod)!;
     let view: ScoreboardView;
     if (unavailable) view = { scopes, tabs, lines: [], empty: { title: t('Classement indisponible'), detail: unavailable } };
@@ -533,8 +542,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       sections: [],
       scoreboard: view,
       actions,
-      back: () => home(0),
-      hint: t('Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris'),
+      back: exit.run,
+      hint: playersExit ? t('Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour · souris') : t('Flippers : Cette semaine ou Tout temps · Start ou MagnaSave : portée suivante · Exit : retour aux classements · souris'),
       keys: (input) => {
         const keys = host.keys?.();
         // Start : la portée suivante. Une borne dont les MagnaSave valident et reviennent dans l'OS (étape
@@ -561,12 +570,24 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   /** Le retour, dans les actions de l'écran « Joueurs » : après les trois portées et les deux périodes. */
   const PLAYERS_BACK = PLAYER_SCOPES.length + PLAYER_PERIODS.length;
 
+  /** L'écran « Joueurs » ouvert d'ailleurs (l'Arène) : son retour ; absent, celui de l'accueil des classements. */
+  let playersExit: { label: string; run: () => void } | undefined;
+
   function openPlayers(): void {
     // Mon pays d'abord ; sans pays, le monde ; la semaine d'abord : tout le monde y a sa chance.
     const s = host.players?.state();
     playerScope = s?.country ? 'country' : 'world';
     playerPeriod = 'week';
+    playersExit = undefined;
     host.library.openCustom(buildPlayers, PLAYERS_BACK);
+  }
+
+  function playersTop(sc: PlayerScope, p: PlayerPeriod, n: number): { lines: PlayerLine[]; players: number } | undefined {
+    if (!host.players || playersUnavailable(sc)) return undefined;
+    const board = playersOf(sc, p);
+    const top = board.lines.slice(0, n);
+    const mine = top.some((l) => l.mine) ? undefined : board.lines.find((l) => l.mine);
+    return { lines: mine ? [...top, mine] : top, players: board.players };
   }
 
   // ---------- Accueil ----------
@@ -643,5 +664,12 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     },
     detail: () => t('Joueurs par XP, et les scores de chaque table'),
     standing,
+    playersTop,
+    openPlayers(to, label, sc, p) {
+      playerScope = sc;
+      playerPeriod = p;
+      playersExit = { label, run: to };
+      host.library.openCustom(buildPlayers, PLAYERS_BACK);
+    },
   };
 }

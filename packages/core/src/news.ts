@@ -89,7 +89,7 @@ export const NEWS: readonly NewsItem[] = [
     get more() {
       return [
         t('Dans la roue, à côté de la Communauté. Son affiche fait tourner vos records et les places qu’on vient de vous prendre ; Start ouvre l’Arène, ses onglets se changent aux MagnaSave.'),
-        t('En tête, votre niveau et ce qu’une partie peut encore rapporter, puis ce qu’il y a de plus pressant : une place à reprendre, une partie instantanée qui vous attend. Chaque action dit ce qu’elle rapporte en XP.'),
+        t('En tête, votre niveau et le plus pressant (une place à reprendre, une partie qui vous attend), puis le classement mondial. Une partie que vous ouvrez et que d’autres rejoignent rapporte des XP, une fois par groupe.'),
       ];
     },
     get where() { return t('Roue › Arène'); },
