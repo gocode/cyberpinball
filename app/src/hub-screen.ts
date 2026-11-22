@@ -547,7 +547,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     };
     const navHint = (): string | undefined => {
       if (spec.hint || spec.flat) return undefined;
-      if (inside === 'tabs' && options.backNotWheel) return t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour');
+      if (inside === 'tabs' && options.backNotWheel) return options.menuFirst ? t('Flippers : changer d’onglet · Start : y entrer · Exit : retour') : t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour');
       if (inside === 'tabs') return options.menuFirst ? t('Flippers : changer d’onglet · Start : y entrer · Exit : retour à la roue') : t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour à la roue');
       if (origin && (enteredAt < 0 || enteredAt === firstContent))
         return enteredAt >= 0 || spec.list ? t('Flippers : choisir · Start : valider · Exit : retour à l’accueil') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à l’accueil');

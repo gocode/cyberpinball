@@ -110,6 +110,8 @@ export interface ProfileMenuHost {
   invite?: { asked(): boolean; chosen(): string | undefined; open(back: () => void): void };
   /** MagnaSave (la gauche d'abord) : l'onglet suivant du profil. */
   zoneKeys?(): readonly string[];
+  /** Flippers : changer d'onglet dans la barre, contenu affiché immédiatement. */
+  navKeys?(): { previous: readonly string[]; next: readonly string[] };
   /** Mon niveau (level-tracker.ts) : l'anneau de ma pastille, même quand mon profil public est coupé. */
   myLevel?(): number;
   /** Mon profil : Modifier mon profil, Confidentialité, Mon compte (les rubriques du Menu système). */
@@ -244,7 +246,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
    * chaque profil ouvert depuis un autre garde son onglet et son retour.
    */
   function openProfile(key: string, back: () => void, tab: ProfileTab = 'activity'): void {
-    const screen = createHubScreen({ library: lib, zoneKeys: () => host.zoneKeys?.() ?? [] }, (current, reopen) => describe(key, current as ProfileTab, reopen, (to) => screen.open(back, to), back), { backNotWheel: true });
+    const screen = createHubScreen({ library: lib, zoneKeys: () => host.zoneKeys?.() ?? [], navKeys: () => host.navKeys?.() ?? { previous: [], next: [] } }, (current, reopen) => describe(key, current as ProfileTab, reopen, (to) => screen.open(back, to), back), { backNotWheel: true, menuFirst: true });
     screen.open(back, tab);
   }
 

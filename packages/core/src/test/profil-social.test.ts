@@ -66,6 +66,7 @@ interface Built {
   heading: string;
   hub: Hub;
   hint?: string;
+  keys?(input: { code: string }): boolean;
   actions: { label: string; key?: string; run(): void }[];
   back(): void;
 }
@@ -102,6 +103,7 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean } = 
     likers: () => [{ from: THEO, name: 'Théo', at: ago(3) }],
   });
   const menu = createProfileMenu({
+    navKeys: () => ({ previous: ['FlipLeft'], next: ['FlipRight'] }),
     library: { openCustom: (build: () => Built, at?: number) => (opened = { build, at }), openSystem: () => undefined },
     net,
     relation: (key: string, name: string) =>
@@ -122,19 +124,27 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean } = 
   if (opts.mine) menu.openMine(() => events.push('back'));
   else menu.openProfile(THEO, () => events.push('back'));
   const built = () => opened!.build();
+  const enterContent = () => {
+    if (built().actions.some((a) => a.key?.startsWith('tab:'))) {
+      const current = built().hub.tabs.find((t) => t.current)!;
+      built().actions.find((a) => a.label === current.label)!.run();
+    }
+  };
   const press = (label: string) => {
+    enterContent();
     const b = built().hub.person.buttons.find((x) => x.label === label);
     assert.ok(b?.action !== undefined, `« ${label} » : un arrêt de l’en-tête`);
     built().actions[b.action]!.run();
   };
   // Un onglet : Exit remonte à la barre d'onglets (règle du 22/11/2026), Start sur l'onglet.
   const tab = (label: string) => {
-    built().back();
+    if (!built().actions.some((a) => a.key?.startsWith('tab:'))) built().back();
     built().actions.find((a) => a.label === label)!.run();
     return built();
   };
   /** Start sur un élément d'un onglet en liste (un arrêt direct des flippers), par sa clé. */
   const pick = (key: string) => {
+    enterContent();
     const a = built().actions.find((x) => x.key?.endsWith(`:${key}`));
     assert.ok(a, `« ${key} » : un arrêt de la liste`);
     a.run();
@@ -150,21 +160,19 @@ test('profil : un écran à onglets, l’en-tête du joueur, quatre onglets et j
   assert.deepEqual(b.hub.tabs.map((x) => x.label), ['Activité', 'Records', 'Badges', 'À propos']);
   assert.ok(b.hub.tabs.find((x) => x.label === 'Activité')!.current, 'ouvert sur Activité');
   assert.ok(!/retour à la roue/.test(b.hint ?? ''), 'Exit revient d’où l’on vient, pas à la roue');
-  // Exit : d'abord la barre d'onglets, puis le retour demandé (pas la roue).
+  // À l'arrivée, déjà dans la barre : Exit revient directement d'où l'on vient.
+  assert.match(b.hint ?? '', /changer d’onglet.*Exit : retour$/);
   b.back();
-  assert.deepEqual(p.events, [], 'premier Exit : la barre d’onglets');
-  assert.match(p.built().hint ?? '', /Exit : retour$/);
-  p.built().back();
   assert.deepEqual(p.events, ['back']);
 });
 
-test('profil d’un autre joueur : « Ajouter +25 XP » d’abord, le curseur dessus ; « Écrire » grisé, sa raison, jamais un arrêt', () => {
+test('profil d’un autre joueur : « Ajouter +25 XP » en tête des actions, curseur dans les onglets ; « Écrire » grisé, sa raison, jamais un arrêt', () => {
   const p = profile();
   const buttons = p.built().hub.person.buttons;
   assert.equal(buttons[0]!.label, 'Ajouter');
   assert.equal(buttons[0]!.primary, true);
   assert.equal(buttons[0]!.xp, '+25 XP');
-  assert.equal(p.at(), 0, 'le curseur sur l’action principale');
+  assert.equal(p.built().actions[p.at()!]!.key, 'tab:activity', 'le curseur dans la barre d’onglets');
   const write = buttons.find((x) => x.label === 'Écrire')!;
   assert.equal(write.off, 'Entre amis seulement');
   assert.equal(write.action, undefined);
@@ -219,4 +227,27 @@ test('mon profil : Modifier mon profil, Confidentialité, Mon compte ; Start sur
   assert.ok(p.events.includes('system:confidentialite'));
   p.pick('event:ev-a');
   assert.equal(p.built().heading, 'Ont aimé');
+});
+
+for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un joueur'} : onglets immédiats aux flippers, Start entre, Exit remonte puis revient`, () => {
+  const p = profile({ mine });
+  const current = () => p.built().hub.tabs.find((t) => t.current)!.label;
+  const focused = () => p.built().actions[p.at()!]!.key;
+  assert.equal(current(), 'Activité');
+  assert.equal(focused(), 'tab:activity');
+  for (const [label, key] of [['Records', 'records'], ['Badges', 'badges'], ['À propos', 'about'], ['Activité', 'activity']]) {
+    assert.ok(p.built().keys?.({ code: 'FlipRight' }));
+    assert.equal(current(), label, 'contenu changé sans Start');
+    assert.equal(focused(), `tab:${key}`, 'le curseur reste dans la barre');
+  }
+  assert.ok(p.built().keys?.({ code: 'FlipLeft' }));
+  assert.equal(current(), 'À propos');
+  assert.ok(p.built().hub.sections.some((s) => s.choices?.length), 'la section est déjà affichée');
+  p.built().actions[p.at()!]!.run();
+  assert.ok(!p.built().actions.some((a) => a.key?.startsWith('tab:')), 'Start entre dans le contenu');
+  p.built().back();
+  assert.equal(focused(), 'tab:about');
+  assert.deepEqual(p.events, []);
+  p.built().back();
+  assert.deepEqual(p.events, ['back']);
 });

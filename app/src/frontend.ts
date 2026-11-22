@@ -3331,6 +3331,7 @@ const wheelTable = {
   },
 };
 const profileMenu = createProfileMenu({
+  navKeys: () => KEYS,
   library,
   net: socialNet,
   // Le profil en écran à onglets (22/11/2026) : MagnaSave change d'onglet ; mon profil ouvre les rubriques du Menu système.

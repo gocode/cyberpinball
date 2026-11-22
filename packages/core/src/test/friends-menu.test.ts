@@ -236,6 +236,8 @@ test('le message d’un geste reste aux redessins (changement du profil, 250 ms 
 async function friendPage(menu: ReturnType<typeof setup>['menu'], last: ReturnType<typeof setup>['last']): Promise<Built> {
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
+  // Start depuis la barre d'onglets avant de tester les actions de relation.
+  await last().build().actions.find((a) => a.label === 'Activité')!.run();
   return last().build();
 }
 
@@ -255,7 +257,7 @@ async function pressButton(b: Built, label: string): Promise<void> {
 }
 /** Un onglet du profil : Exit remonte à la barre d'onglets, puis Start sur l'onglet. */
 async function openTab(last: () => { build: Build }, label: string): Promise<Built> {
-  (last().build() as Built & { back(): void }).back();
+  if (!last().build().actions.some((a) => a.label === 'Activité')) (last().build() as Built & { back(): void }).back();
   await last().build().actions.find((a) => a.label === label)!.run();
   return last().build();
 }
@@ -272,7 +274,7 @@ test('profil d’un ami : l’invitation toujours là, grisée hors ligne avec s
   const playing = setup(undefined, 'playing');
   const busy = await friendPage(playing.menu, playing.last);
   assert.match(hubOf(busy).person.status?.text ?? '', /^En partie sur Glass Lagoon · depuis /, 'entre amis, sa table');
-  // À l'ouverture, le curseur est sur l'action principale.
+  // Après Start dans Activité, le curseur est sur l'action principale.
   assert.equal(playing.last().at, 0);
   await pressButton(busy, 'Inviter à jouer');
   assert.equal(playing.last().build().heading, 'Partie en direct avec Bruno');
@@ -459,6 +461,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   const { menu, last, manager } = setup(content);
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
+  await last().build().actions.find((a) => a.label === 'Activité')!.run();
   await pressButton(last().build(), 'Sa bibliothèque');
   await last().build().actions.find((a) => a.label.startsWith('Bride of Pin-bot'))!.run();
   await last().build().actions.find((a) => a.label === 'Récupérer toute la table')!.run();

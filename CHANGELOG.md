@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Profil : la barre d’onglets reçoit le focus à l’ouverture, comme dans l’Arène et la Communauté. Les flippers affichent immédiatement chaque section ; Start entre dans son contenu et Exit revient aux onglets.
 - Communauté : les connectés apparaissent en premier dans Joueurs ; la bande de découverte porte un intitulé adapté.
 - Arène : accès aux classements des scores en tête, et badges de position par pays et dans le monde sur les tables récentes.
 - VPX : le préréglage actif est marqué par une coche et un badge contrasté.
