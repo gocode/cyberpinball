@@ -46,6 +46,7 @@ export * from './importspace';
 export * from './transfer';
 export * from './ratelimit';
 export * from './tablefiles';
+export * from './povview';
 export * from './tablecontents';
 export * from './doctor';
 export * from './playable';

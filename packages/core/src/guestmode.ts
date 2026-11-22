@@ -71,6 +71,7 @@ export const GUEST_DOORS = {
   'sheet.files': false, // Fichiers de la table
   'sheet.pup': false, // Options du PuP-Pack
   'sheet.display': false, // Régler l’affichage en partie
+  'sheet.pov': false, // Point de vue de la table (cadrage de la borne, POV fourni, import d'un POV)
   'sheet.menu-dmd': false, // DMD sur la roue (affiché ou masqué, sa place)
   'sheet.record': false, // Jouer et enregistrer (vidéo de présentation de la table sur la roue)
   'sheet.table-settings': false, // Réglages de cette table

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Point of view (beta): a table's sheet, under "Manage the table…", says what frames it and lets you choose: the cabinet framing (the same for every table), the POV supplied with the table, or "Import a POV…" (a .pov, or the .ini of a POV for VPX 10.8, from Downloads, a USB stick or a drive). The imported POV is stored with the table and applied to it only; a POV that would turn it the wrong way on the cabinet is refused, with the reason.
 - Arena: the world player ranking is on Home, right under the card of the moment. It shows the top three and your place, and Start opens the full ranking (Exit returns to the Arena). Your world and country places also open their ranking directly.
 - Levels: a game you open that others join brings 25 XP, once per group of players. Playing again with the same people brings nothing more; a different group (one more player, one less, or others) brings it again.
 - Arena and Community: the entries at the bottom of the sections (open a game, all games, all rankings, my badges, see everything…) look like the other menus, as action lines with no box around them; the flippers reach them and Start confirms.

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Point de vue (bêta) : la fiche d'une table, dans « Gérer la table… », dit ce qui la cadre et laisse choisir : le cadrage de la borne (le même pour toutes les tables), le POV fourni avec la table, ou « Importer un POV… » (un .pov, ou le .ini d'un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque). Le POV importé est rangé avec la table et appliqué à elle seule ; un POV qui la mettrait de travers sur la borne est refusé, avec la raison.
 - Arène : le classement mondial des joueurs est sur l'Accueil, juste sous la carte du moment. On y voit les trois premiers et votre place, et un Start ouvre le classement complet (Exit revient à l'Arène). Vos places au monde et dans votre pays ouvrent aussi directement leur classement.
 - Niveaux : une partie que vous ouvrez et que d'autres rejoignent rapporte 25 XP, une fois par groupe de joueurs. Rejouer avec les mêmes ne rapporte plus rien ; un groupe différent (un joueur de plus, de moins, ou d'autres) rapporte de nouveau.
 - Arène et Communauté : les entrées du bas des sections (ouvrir une partie, toutes les parties, tous les classements, mes badges, tout voir…) s'affichent comme dans les autres menus, en lignes d'actions sans encart ; le curseur y arrive aux flippers et Start valide.

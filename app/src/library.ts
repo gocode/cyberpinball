@@ -312,6 +312,7 @@ import type { EdgeSession } from './edge-login';
 import { joystickStatus, watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
+import { createTablePov } from './table-pov';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
 import { qrRows } from './remote-qr';
@@ -1813,6 +1814,15 @@ export function createLibrary(host: LibraryHost) {
     reload: (file) => reloadTables(file),
   });
 
+  // « Point de vue » de la fiche (bêta) : cadrage de la borne, POV fourni avec la table, import d'un POV (table-pov.ts).
+  const tablePov = createTablePov({
+    show: (build, at) => openCustom(build, at),
+    pick: (request) => pickPaths(request),
+    orientation: () => host.playfieldOrientation?.(),
+    apply: (ops) => applyOps(ops, { trashDir: trashDirFor(layout()!.trash, 'Point de vue') }), // i18n-ignore : nom de dossier
+    back: (table) => openSheet(find(table.file) ?? table),
+  });
+
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
   const gameParts = createGameParts({
     layout,
@@ -2647,6 +2657,10 @@ export function createLibrary(host: LibraryHost) {
       ...(host.adjustDisplay && (fx || kept('vpx', () => host.vpxExe())) && !otherVpxFor(table.info, otherVpxMenu.list())
         ? [notFx({ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }, t('Écrans et cadrage : dans le mode borne de {game}', { game: zenName }), t('Écrans et cadrage : dans les préférences de {game} (Vidéo)', { game: zenName }))]
         : []),
+      // Point de vue (bêta) : le cadrage de la borne, le POV fourni avec la table, ou un POV à importer (table-pov.ts).
+      ...(fx || fp || otherVpxFor(table.info, otherVpxMenu.list())
+        ? []
+        : [{ label: t('Point de vue'), detail: kept(`pov:${table.file}`, () => tablePov.detail(table)), icon: 'crop' as const, badge: 'beta' as const, door: 'sheet.pov' as const, run: () => tablePov.open(table) }]),
       ...(host.menuDmd
         ? [notFx({ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }, t('Tables VPX seulement : {game} ne donne pas son DMD', { game: zenName }))]
         : []),

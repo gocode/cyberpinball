@@ -13,12 +13,13 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { classifyContent } from '../acquisition';
 import { diagnose, pupPlayRepairs, repairPupForPlay, scriptFacts, type DoctorContext } from '../doctor';
-import { applyOps } from '../fileops';
+import { applyOps, type FileOp } from '../fileops';
 import { IniDocument } from '../ini';
-import { parsePovIni, parsePovXml } from '../povview';
+import { importPovOps, parsePovIni, parsePovXml, tablePovState } from '../povview';
 import { classifyFile, isPovIniName } from '../tablefiles';
-import { scanTables } from '../tables';
+import { scanTables, type TableEntry } from '../tables';
 import { devPcDisplays, vpxWithScript } from './fixtures';
+import { REPO_ROOT } from './i18n-scan';
 
 const TABLE = 'Hellboy (Original 2021)';
 const SCRIPT = 'Sub Table1_Init\r\nEnd Sub\r\n';
@@ -149,5 +150,84 @@ test('.ini écrit par le menu de VPX en passant en manuel, sans vue réglée (Th
   // Rendu au cadrage de la borne, et rien ne le repasse en manuel avant la partie.
   assert.deepEqual(s.views(), []);
   assert.deepEqual(pupPlayRepairs(s.entry(), s.ctx()), []);
+  s.done();
+});
+
+test('fiche > Point de vue : le cadrage choisi pour la table, le retour à celui de la borne, l’import d’un POV', () => {
+  const s = setup({});
+  const orientation = landscape();
+  // Rien de fourni : le cadrage de la borne, rien à rendre.
+  assert.deepEqual(tablePovState(s.entry().file, orientation), { framing: 'cabinet' });
+  // Import d'un POV trouvé ailleurs : rangé sous un nom de POV, jamais à la place du .ini de la table.
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-pov-source-'));
+  const source = path.join(elsewhere, 'Hellboy cabinet.pov');
+  fs.writeFileSync(source, POV);
+  const plan = importPovOps(s.entry().file, source);
+  assert.ok('ops' in plan);
+  applyOps(plan.ops, { trashDir: s.trashDir });
+  assert.ok(fs.existsSync(path.join(path.dirname(s.ini), `${TABLE}.pov`)));
+  // Pas encore appliqué, rien de choisi : il cadrera la table à la prochaine partie, et la fiche le dit.
+  const pending = tablePovState(s.entry().file, orientation);
+  assert.equal(pending.framing, 'pov');
+  applyOps(pending.applyOps!, { trashDir: s.trashDir });
+  const applied = tablePovState(s.entry().file, orientation);
+  assert.equal(applied.framing, 'pov');
+  assert.equal(applied.applyOps, undefined, 'déjà appliqué');
+  // Retour au cadrage de la borne, avec son mode (« Remplir » ici) : il tient, le POV n'est pas repris avant la partie.
+  const fill = { ...orientation, globalIni: '[Player]\nBGSet = 1\nCabinetAutofitMode = 2\n' };
+  applyOps(tablePovState(s.entry().file, fill).cabinetOps!, { trashDir: s.trashDir });
+  assert.equal(IniDocument.parse(fs.readFileSync(s.ini, 'utf8')).get('Player', 'CabinetAutofitMode'), '2');
+  assert.equal(tablePovState(s.entry().file, fill).framing, 'cabinet');
+  assert.deepEqual(pupPlayRepairs(s.entry(), s.ctx()), []);
+  // Un .ini de POV importé remplace le .pov de la table (à la corbeille).
+  const ini = path.join(elsewhere, 'Hellboy.ini');
+  fs.writeFileSync(ini, '[TableOverride]\r\nViewCabMode = 2\r\nViewCabRotation = 0\r\nViewCabScaleX = 1.3\r\n');
+  const second = importPovOps(s.entry().file, ini);
+  assert.ok('ops' in second);
+  applyOps(second.ops, { trashDir: s.trashDir });
+  assert.deepEqual(fs.readdirSync(path.dirname(s.ini)).filter((n) => /pov/i.test(n)), [`${TABLE} POV.ini`]);
+  assert.equal(tablePovState(s.entry().file, orientation).pov?.values.find((v) => v.key === 'ViewCabScaleX')?.value, '1.3');
+  // Refusés : pas un POV, ou pas de vue borne.
+  fs.writeFileSync(path.join(elsewhere, 'rien.ini'), '[TableOption]\r\nVR Room = 1\r\n');
+  assert.match(String((importPovOps(s.entry().file, path.join(elsewhere, 'rien.ini')) as { error: string }).error), /ne contient pas de point de vue de borne/);
+  assert.match(String((importPovOps(s.entry().file, path.join(elsewhere, 'a.txt')) as { error: string }).error), /n’est pas un fichier de point de vue/);
+  // Sans le sens de la borne : jamais appliqué.
+  assert.match(tablePovState(s.entry().file).refused ?? '', /relancez l’assistant d’écrans/);
+  fs.rmSync(elsewhere, { recursive: true, force: true });
+  s.done();
+});
+
+test('écran « Point de vue » : choisir le POV, revenir à la borne, importer (sans Electron)', async () => {
+  type Shown = { heading: string; actions: { label: string; detail?: string; badge?: string; run(): void }[]; sections: { rows: { text: string }[] }[] };
+  const mod = require(path.join(REPO_ROOT, 'app', 'dist', 'table-pov.js')) as {
+    createTablePov(ctx: { show(build: () => Shown): void; pick(): Promise<string[] | undefined>; orientation(): DoctorContext['orientation']; apply(ops: FileOp[]): void; back(): void }): { detail(table: TableEntry): string; open(table: TableEntry): void };
+  };
+  const s = setup({ [`${TABLE}.pov`]: POV, [`${TABLE}.ini`]: '[Player]\r\nCabinetAutofitMode = 1\r\n' });
+  let shown: Shown | undefined;
+  let picked: string[] | undefined;
+  let backs = 0;
+  const pov = mod.createTablePov({
+    show: (build) => (shown = build()),
+    pick: async () => picked,
+    orientation: () => landscape(),
+    apply: (ops) => applyOps(ops, { trashDir: s.trashDir }),
+    back: () => backs++,
+  });
+  const table = s.entry();
+  assert.equal(pov.detail(table), 'Cadrage de la borne');
+  pov.open(table);
+  assert.deepEqual(shown!.actions.map((a) => [a.label, a.badge ?? '']), [['Cadrage de la borne', ''], [`POV « ${TABLE}.pov »`, 'beta'], ['Importer un POV…', 'beta'], ['Retour', '']]);
+  assert.match(shown!.actions[0]!.detail!, /choix actuel/);
+  shown!.actions[1]!.run();
+  assert.equal(pov.detail(s.entry()), `POV « ${TABLE}.pov »`);
+  assert.match(shown!.sections[0]!.rows[0]!.text, /appliqué à cette table/);
+  shown!.actions[0]!.run();
+  assert.equal(pov.detail(s.entry()), 'Cadrage de la borne');
+  // Import annulé : l'écran revient tel quel.
+  shown!.actions[2]!.run();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(shown!.heading, 'Point de vue');
+  shown!.actions[3]!.run();
+  assert.equal(backs, 1);
   s.done();
 });
