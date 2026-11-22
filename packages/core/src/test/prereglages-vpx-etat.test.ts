@@ -8,7 +8,7 @@ import { IniDocument, initialQuality, QUALITY_AUTO, QUALITY_KEYS, qualitySetting
 import { REPO_ROOT } from './i18n-scan';
 
 interface PresetsView {
-  actions: { label: string; tone?: string; run(): void }[];
+  actions: { label: string; tone?: string; activeChoice?: string; run(): void }[];
 }
 interface PresetsHost {
   library: { openCustom(build: () => PresetsView, at?: number): void; openSystem(): void };
@@ -247,6 +247,9 @@ test('bouton Personnalisé toujours présent et sélectionnable, selon la config
   const ui = menu(b.dataDir, () => current);
   for (const choice of ['auto', 'performance', 'equilibre', 'qualite', 'ultra', 'custom'] as const) {
     app.chooseQuality(b.dataDir, b.a, choice);
+    const marked = ui.view().actions.filter((a) => a.activeChoice);
+    assert.equal(marked.length, 1, 'exactement un choix actif, même quand le curseur est ailleurs');
+    assert.equal(marked[0]!.activeChoice, t('Choix actuel'));
     const actions = ui.view().actions.filter((a) => a.label === t('Personnalisé'));
     assert.equal(actions.length, 1);
     assert.equal(actions[0]!.tone, choice === 'custom' ? 'ok' : undefined);

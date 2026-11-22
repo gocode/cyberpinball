@@ -80,6 +80,7 @@ export interface HubCardSpec {
   asideIcon?: IconName;
   /** Des badges, dessinés comme partout (la rangée de médailles des autres menus). */
   medals?: HubMedal[];
+  ranks?: { label: string; icon?: IconName; flag?: FlagView; place: string }[];
   /** Barre de progression sous le texte, de 0 à 1. */
   progress?: number;
   /** Le dernier message, en bulle sous le titre (« <Bruno> » en tête pour un groupe). */
@@ -210,6 +211,7 @@ export interface HubSpec {
    * pour l'accueil : résumés et accès rapides.
    */
   list?: true;
+  singleColumn?: true;
   /** Une touche, avant les MagnaSave : vrai si elle est prise (un écran qui ignore un bouton encore tenu). */
   keys?: (input: { code: string }) => boolean;
 }
@@ -230,6 +232,7 @@ export interface HubCardView {
   asideTone?: 'warning';
   asideIcon?: IconName;
   medals?: HubMedal[];
+  ranks?: { label: string; icon?: IconName; flag?: FlagView; place: string }[];
   progress?: number;
   bubble?: { text: string; who?: string; group?: boolean };
   lines?: HubLogLine[];
@@ -256,6 +259,7 @@ export interface HubButtonView {
 }
 
 export interface HubView {
+  singleColumn?: true;
   medallion: string;
   /** Le nom de la touche Start, cerclé sur le bouton choisi (comme la maquette : « START Reprendre ma place »). */
   start: string;
@@ -560,6 +564,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       ...(person ? { person } : {}),
       tabs,
       ...(tabsBlock ? { tabsBlock } : {}),
+      ...(spec.singleColumn ? { singleColumn: true as const } : {}),
       ...(inside && !spec.flat ? { inside: true } : {}),
       sections,
       ...(spec.empty && !sections.length ? { empty: spec.empty } : {}),

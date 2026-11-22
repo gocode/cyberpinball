@@ -29,6 +29,7 @@ import {
   t,
   tn,
   type AvatarView,
+  type FlagView,
   type PlayerBoard,
   type PlayerLine,
   type PlayerPeriod,
@@ -131,7 +132,7 @@ export interface RemoteAllTables {
 export interface RecentScores {
   /** « Mondial · Tout temps », ou « Cette borne · Tout temps » sans réseau. */
   where: string;
-  rows: { table: TableEntry; lead?: string; count?: string; mine?: string; first?: true; reason?: string; ago?: string }[];
+  rows: { table: TableEntry; lead?: string; count?: string; mine?: string; first?: true; reason?: string; ago?: string; ranks?: { label: string; icon?: 'globe'; flag?: FlagView; place: string }[] }[];
 }
 
 /** Ma place dans un classement des joueurs, de tout temps et de la semaine. */
@@ -477,12 +478,22 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       .filter((x) => lastRunOf(x) > 0)
       .sort((a, b) => lastRunOf(b) - lastRunOf(a))
       .slice(0, n);
+    const country = host.players?.state().country;
     const rows = recent.map((table) => {
+      const ranks: NonNullable<RecentScores['rows'][number]['ranks']> = [];
+      if (sc === 'world') {
+        for (const scope of ['country', 'world'] as const) {
+          if (scope === 'country' && !country) continue;
+          const view = host.network(table, scope, 'all');
+          const flag = scope === 'country' ? playerFlag(country, locale()) : undefined;
+          ranks.push({ label: scopeLabel(scope), ...(flag ? { flag } : { icon: 'globe' as const }), place: view.me ? `${view.me.beyond ? '>' : '#'}${formatNumber(view.me.beyond ?? view.me.rank)}` : '—' });
+        }
+      }
       const state = board.states.get(table.file);
       const ago = agoLabel(lastRunOf(table));
       if (state?.kind === 'ranked')
-        return { table, ago, lead: t('1. {name} · {score}', { name: state.leader.name, score: formatNumber(state.leader.score) }), count: state.count, ...(state.mine ? { mine: state.mine } : {}), ...(state.first ? { first: true as const } : {}) };
-      return { table, ago, reason: state?.kind === 'pending' ? t('Empreinte de la table en calcul…') : (state?.reason ?? t('Aucun score {period}', { period: periodLabel('all').toLowerCase() })) };
+        return { table, ago, ranks, lead: t('1. {name} · {score}', { name: state.leader.name, score: formatNumber(state.leader.score) }), count: state.count, ...(state.mine ? { mine: state.mine } : {}), ...(state.first ? { first: true as const } : {}) };
+      return { table, ago, ranks, reason: state?.kind === 'pending' ? t('Empreinte de la table en calcul…') : (state?.reason ?? t('Aucun score {period}', { period: periodLabel('all').toLowerCase() })) };
     });
     return { where: t('{scope} · {period}', { scope: scopeLabel(sc), period: periodLabel('all') }), rows };
   }

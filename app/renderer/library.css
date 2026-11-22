@@ -5965,3 +5965,8 @@ body.mouse .lib-row.news-react-tile.pick:not(.selected):hover {
   color: var(--halo);
   filter: brightness(1.35);
 }
+
+.lib-action.active-choice { border-left:0.3em solid var(--signal); }
+.lib-action.active-choice:not(.current) { background:var(--signal-wash); }
+.active-choice-badge { display:inline-flex; align-items:center; gap:.4em; margin-left:1em; padding:.2em .6em; border-radius:.4em; background:#8be23a; color:#10170b; font-size:.8em; font-weight:800; vertical-align:middle; }
+.active-choice-check { width:1.2em; height:1.2em; }

@@ -173,12 +173,12 @@ test('Accueil : un récapitulatif par onglet ; Start ouvre l’onglet sur la mê
   h.run('tab:home');
   const titles = h.built().hub.sections.map((s) => s.title);
   // Dans l'ordre des onglets : Messages, Joueurs, Groupes, Salons, Profil ; « Ça bouge » à part.
-  assert.deepEqual(titles.slice(0, 5), ['Ils vous attendent', 'En ligne', 'Mes groupes', 'Salon France', 'Mon profil']);
+  assert.deepEqual(titles.slice(0, 5), ['Ils vous attendent', 'Joueurs à découvrir', 'Mes groupes', 'Salon France', 'Mon profil']);
   assert.ok(!titles.includes('Faites découvrir Cyber Pinball'), 'l’invitation est dans l’onglet Joueurs');
   // Start sur « En ligne » : l'onglet Joueurs, le curseur dans sa première bande, la même.
-  h.enter('En ligne');
+  h.enter('Joueurs à découvrir');
   assert.equal(h.current(), 'players');
-  assert.equal(h.built().hub.sections[0]!.title, 'En ligne');
+  assert.equal(h.built().hub.sections[1]!.title, 'Joueurs à découvrir');
   assert.ok(h.inList() && !h.inTabs(), 'dans la liste de l’onglet');
   assert.equal(h.at(), 0, 'le curseur sur le premier élément de la bande');
   assert.ok(h.built().actions.some((a) => a.label === 'Ajouter'), 'on y ajoute un joueur d’un appui');
@@ -210,7 +210,7 @@ test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui
   const h = hub();
   h.menu.openHome(() => undefined);
   h.run('tab:home');
-  const sec = h.built().hub.sections.find((s) => s.title === 'En ligne')!;
+  const sec = h.built().hub.sections.find((s) => s.title === 'Joueurs à découvrir')!;
   assert.equal(sec.layout, 'people');
   assert.equal(sec.note, `+${XP.friend} XP par nouvel ami`);
   // Les joueurs, puis « Tous les joueurs » : la liste complète d'un appui.
@@ -226,7 +226,7 @@ test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui
   const labels = h.built().hub.sections.flatMap((s) => s.cards.flatMap((c) => (c.buttons ?? []).map((x) => x.label)));
   assert.ok(!labels.some((l) => /Regarder/i.test(l)), labels.join(', '));
   // Dans la bande : un ami ouvre son profil (un seul écran par joueur), « Ajouter », « Tous les joueurs ».
-  h.enter('En ligne');
+  h.enter('Joueurs à découvrir');
   h.built().actions.find((a) => a.label === 'Alto')!.run();
   h.built().actions.find((a) => a.label === 'Ajouter')!.run();
   h.built().actions.find((a) => a.label === 'Tous les joueurs')!.run();
@@ -238,7 +238,7 @@ test('Peu de monde en ligne : les suggestions remplacent les amis, jamais une se
   const nobody = hub({ online: [], everyone: [{ key: 'ines', name: 'Inès', country: 'FR', status: 'offline', friend: false, commonTables: 2 }, { key: 'theo', name: 'Théo', status: 'offline', friend: false, commonTables: 1 }] });
   nobody.menu.openHome(() => undefined);
   nobody.run('tab:home');
-  const sec = nobody.built().hub.sections.find((s) => s.title === 'En ligne')!;
+  const sec = nobody.built().hub.sections.find((s) => s.title === 'Joueurs à découvrir')!;
   const people = sec.cards.filter((c) => c.title !== 'Tous les joueurs');
   assert.ok(people.length >= 2);
   assert.ok(people.every((c) => c.ring === 'suggested'));
@@ -251,7 +251,10 @@ test('Joueurs : la bande « En ligne » d’abord, puis les demandes reçues, l�
   h.tab('players');
   const titles = h.built().hub.sections.map((s) => s.title);
   // « Connectés en ce moment » : ceux que la bande ne montre pas, et la liste complète d'un appui.
-  assert.deepEqual(titles, ['En ligne', 'Connectés en ce moment', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
+  assert.deepEqual(titles, ['Connectés en ce moment', 'Joueurs à découvrir', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
+  assert.deepEqual(h.built().hub.sections[0]!.cards.map((c) => c.title), ['Alto'], 'les connectés restent visibles même si déjà suggérés');
+  h.built().actions.find((a) => a.label === 'Tous les connectés')!.run();
+  assert.deepEqual(h.events.splice(0), ['joueurs:all']);
   // Les entrées du bas : des lignes d'actions, chacune un arrêt au premier niveau.
   h.built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === 'Mes amis')!.run();
   assert.deepEqual(h.events, ['joueurs:friends']);

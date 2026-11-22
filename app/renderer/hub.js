@@ -228,6 +228,17 @@
     // Des badges (profil d'un joueur) : la rangée de médailles des autres menus (library.js, rowMedals).
     if (c.medals?.length && typeof rowMedals === 'function') main.append(rowMedals(c.medals));
     node.append(main);
+    if (c.ranks?.length) {
+      const ranks = el('span', 'hub-ranks');
+      for (const r of c.ranks) {
+        const badge = el('span', 'hub-rank');
+        badge.title = r.label;
+        badge.setAttribute('aria-label', `${r.label} : ${r.place}`);
+        badge.append(r.flag ? flagNode(r.flag.code, r.flag.src, r.flag.name, 'hub-rank-flag') : icon(r.icon, 'hub-rank-icon'), el('b', '', r.place));
+        ranks.append(badge);
+      }
+      node.append(ranks);
+    }
     if (c.aside) {
       const aside = el('span', `hub-card-aside${c.asideTone ? ` hub-tone-${c.asideTone}` : ''}${c.asideIcon ? ' hub-card-aside-ic' : ''}`);
       // Le pouce devant le nombre de « J'aime » (rempli quand on aime, theme.css).
@@ -414,7 +425,7 @@
       const empty = el('div', 'hub-empty');
       empty.append(el('b', '', h.empty.title), el('span', '', h.empty.detail));
       body.append(empty);
-    } else if (desk && h.sections.length > 1) {
+    } else if (desk && !h.singleColumn && h.sections.length > 1) {
       // Au bureau, deux colonnes : la carte du moment et la suivante à gauche, le reste à droite.
       body.classList.add('hub-cols');
       const left = el('div', 'hub-col');

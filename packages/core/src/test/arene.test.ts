@@ -175,7 +175,7 @@ interface HubBuilt {
   back: () => void;
   hint?: string;
   keys?: (input: { code: string }) => boolean;
-  hub: { tabs: { label: string; current: boolean; disabled?: string; action?: number }[]; sections: { title?: string; cards: { title: string; action?: number; buttons?: { action: number }[] }[] }[] };
+  hub: { tabs: { label: string; current: boolean; disabled?: string; action?: number }[]; sections: { title?: string; cards: { title: string; ranks?: { place: string }[]; action?: number; buttons?: { action: number }[] }[] }[] };
 }
 
 function arena(overrides: Record<string, unknown> = {}) {
@@ -424,7 +424,7 @@ test('onglet Scores : les tables jouées récemment, Start ouvre leur tableau ; 
       recentScores: () => ({
         where: 'Mondial · Tout temps',
         rows: [
-          { table: reef, ago: 'hier', lead: '1. Paul · 698 400 120', count: '14 joueurs', mine: 'vous êtes 2ᵉ' },
+          { table: reef, ago: 'hier', lead: '1. Paul · 698 400 120', count: '14 joueurs', mine: 'vous êtes 2ᵉ', ranks: [{ label: 'France', place: '#1' }, { label: 'Mondial', icon: 'globe', place: '#2' }] },
           { table: abyss, ago: 'il y a 3 j', reason: 'Aucun score de tout temps' },
         ],
       }),
@@ -436,14 +436,18 @@ test('onglet Scores : les tables jouées récemment, Start ouvre leur tableau ; 
   h.menu.openHome(() => undefined);
   assert.deepEqual(h.built().hub.tabs.map((t) => t.label), ['Accueil', 'Parties', 'Scores', 'Défis', 'Du jour', 'Ligue', 'Progression']);
   h.tab('scores');
-  const s = h.built().hub.sections[0]!;
+  assert.equal(h.built().hub.sections[0]!.title, 'Classement des scores');
+  const s = h.built().hub.sections[1]!;
   assert.equal(s.title, 'Jouées récemment');
   assert.deepEqual(s.cards.map((c) => c.title), ['Thunder Reef', 'Neon Abyss']);
-  // Le premier élément est sous le curseur : un Start, et c'est le tableau.
+  assert.deepEqual(s.cards[0]!.ranks?.map((r) => r.place), ['#1', '#2']);
+  // Le premier élément ouvre les classements complets ; les tables suivent.
   assert.equal(h.at(), 0);
   h.built().actions[h.at()!]!.run();
+  assert.equal(h.events.at(-1), 'tables · Retour : Arène');
+  h.built().actions.find((a) => a.label === 'Thunder Reef')!.run();
   assert.equal(h.events.at(-1), 'tableau Thunder Reef');
-  for (const [label, event] of [['Toutes les tables', 'tables · Retour : Arène'], ['Classement des joueurs', 'joueurs world · Retour : Arène']] as const) {
+  for (const [label, event] of [['Classement des scores', 'tables · Retour : Arène'], ['Classement des joueurs', 'joueurs world · Retour : Arène']] as const) {
     h.built().actions.find((a) => a.label === label)!.run();
     assert.equal(h.events.at(-1), event, label);
   }

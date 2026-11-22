@@ -323,6 +323,10 @@ function renderLibrary(v) {
     const li = actOn(libEl('li', `lib-action tone-${a.tone ?? 'none'}${i === v.cursor && !v.pages ? ' current' : ''}`), { type: 'activate', index: i });
     // Libellé en attribut : une démonstration clique une action par son nom, pas par son rang.
     li.dataset.label = a.label;
+    if (a.activeChoice) {
+      li.classList.add('active-choice');
+      li.setAttribute('aria-current', 'true');
+    }
     const label = libEl('span', 'label', a.label);
     // Pastille rouge : cette entrée attend l'utilisateur (une mise à jour disponible…). En haut
     // à droite de son icône, sinon après le libellé.
@@ -345,6 +349,11 @@ function renderLibrary(v) {
       tail.append(libEl('span', 'lib-badge', a.badge));
       label.firstChild.textContent = cut >= 0 ? text.slice(0, cut + 1) : '';
       label.insertBefore(tail, label.firstChild.nextSibling);
+    }
+    if (a.activeChoice) {
+      const badge = libEl('span', 'active-choice-badge', a.activeChoice);
+      badge.prepend(cyberIcon('check', 'active-choice-check'));
+      label.append(badge);
     }
     li.append(label);
     // Raccourci clavier de l'entrée, à droite : une touche cerclée par touche, comme le bandeau d'aide.

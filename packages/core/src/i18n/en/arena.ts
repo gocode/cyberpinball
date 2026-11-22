@@ -1,6 +1,7 @@
 // Catalogue anglais : l'Arène (médaillon, affiche, écran à onglets), sa rubrique du Menu système et
 // son réglage dans la roue. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Classement des scores': 'Score rankings',
   // packages/core/src/arena.ts
   'Une partie peut suffire': 'One game may be enough',
   'Environ {n} parties': 'About {n} games',

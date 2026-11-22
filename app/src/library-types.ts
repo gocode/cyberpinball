@@ -449,6 +449,8 @@ export interface Section {
   side?: boolean;
 }
 export interface Action {
+  /** Libellé du choix appliqué, distinct du curseur de navigation. */
+  activeChoice?: string;
   label: string;
   detail?: string;
   tone?: Tone;

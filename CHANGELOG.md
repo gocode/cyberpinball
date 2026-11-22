@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Communauté : les connectés apparaissent en premier dans Joueurs ; la bande de découverte porte un intitulé adapté.
+- Arène : accès aux classements des scores en tête, et badges de position par pays et dans le monde sur les tables récentes.
+- VPX : le préréglage actif est marqué par une coche et un badge contrasté.
 - Dans Menu système > Ma borne > VPX > Pré-réglages, choisissez Auto, Performance, Équilibré, Qualité, Ultra ou Personnalisé. Les bornes existantes conservent leurs réglages en Personnalisé après la mise à jour ; aucun pré-réglage ne s'applique sans votre choix.
 - Auto démarre prudemment selon la carte graphique et le playfield, puis ajuste la qualité entre les parties selon le temps de rendu réellement mesuré. Les profils VR, les réglages propres à une table et les configurations de borne gardent leur indépendance.
 - Personnalisé reste toujours accessible et retrouve les réglages conservés avant le choix d'un pré-réglage. Un réglage graphique changé à la main désactive aussi l'adaptation automatique.

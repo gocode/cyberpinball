@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Community: online players appear first in Players; the discovery strip has a clearer heading.
+- Arena: score rankings come first, with country and worldwide position badges on recently played tables.
+- VPX: the active preset has a checkmark and a contrasting badge.
 - In System menu > My cabinet > VPX > Presets, choose Auto, Performance, Balanced, Quality, Ultra or Custom. Existing cabinets keep their current settings in Custom after updating; no preset applies without your choice.
 - Auto starts conservatively from the graphics card and playfield, then adjusts quality between games using measured GPU rendering times. VR profiles, table-specific settings and cabinet configurations remain independent.
 - Custom is always available and restores the settings saved before choosing a preset. Manually changing a graphics setting also disables automatic adaptation.

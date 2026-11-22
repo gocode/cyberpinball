@@ -188,7 +188,7 @@ const TAB_THREADS = 4;
 const HOME_PEOPLE = 5;
 const TAB_PEOPLE = 10;
 /** Connectés montrés dans l'onglet Joueurs, en plus de la bande. */
-const CONNECTED_SHOWN = 8;
+const CONNECTED_SHOWN = 4;
 /** Lignes du salon : quatre sur l'accueil, six dans l'onglet Salons. */
 const HOME_LINES = 4;
 const TAB_LINES = 6;
@@ -323,7 +323,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     }
     if (!cards.length) return undefined;
     const note = said?.section === 'people' ? said.text : t('{xp} par nouvel ami', { xp: xpText(XP.friend) });
-    return { title: t('En ligne'), note, layout: 'people', column: 'left', cards };
+    return { title: t('Joueurs à découvrir'), note, layout: 'people', column: 'left', cards };
   }
 
   // ---------- Conversations ----------
@@ -598,22 +598,20 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
 
   function playersSections(here: () => void): HubSectionSpec[] {
     const s = net.state();
-    // La bande d'abord, la même que sur l'accueil (+25 XP par nouvel ami, « Tous les joueurs ») ; puis les demandes reçues.
+    // Présence réelle d'abord, puis découverte des joueurs et demandes reçues.
     const out: HubSectionSpec[] = [];
     const people = peopleSection(TAB_PEOPLE, here, true);
-    if (people) out.push(people);
-    // Tous les connectés, d'un coup d'œil (22/11/2026) : ceux que la bande ne montre pas déjà.
-    const shownKeys = new Set((people?.cards ?? []).map((x) => x.key.replace(/^(friend|suggest):/, '')));
+    // Tous les connectés, y compris ceux que la bande de découverte montre aussi.
     const online = host.players.online();
-    const others = online.filter((p) => !shownKeys.has(p.key));
     const crowd = shownCrowd(online.length);
     out.push({
       title: crowd ? tn(crowd, '{n} connecté en ce moment', '{n} connectés en ce moment') : t('Connectés en ce moment'),
       layout: 'people',
       column: 'left',
-      cards: others.slice(0, CONNECTED_SHOWN).map((p) => (p.friend ? friendTile(p, here) : suggestedTile(p, 'online', here, 'people'))),
-      choices: [{ key: 'connected', icon: 'globe', title: t('Tous les connectés'), detail: others.length > CONNECTED_SHOWN ? tn(others.length - CONNECTED_SHOWN, 'Et {n} autre', 'Et {n} autres') : t('La liste complète, par pays et par tables en commun'), run: () => host.players.open(here, 'all') }],
+      cards: online.slice(0, CONNECTED_SHOWN).map((p) => (p.friend ? friendTile(p, here) : suggestedTile(p, 'online', here, 'people'))),
+      choices: [{ key: 'connected', icon: 'globe', title: t('Tous les connectés'), detail: online.length > CONNECTED_SHOWN ? tn(online.length - CONNECTED_SHOWN, 'Et {n} autre', 'Et {n} autres') : t('La liste complète, par pays et par tables en commun'), run: () => host.players.open(here, 'all') }],
     });
+    if (people) out.push(people);
     if (s.incoming.length)
       out.push({
         title: t('Demandes d’ami'),

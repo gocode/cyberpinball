@@ -615,18 +615,19 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       key: `scores:${row.table.file}`,
       icon: row.first ? 'star' : 'trophy',
       title: row.table.title,
-      detail: [row.ago ? cap(row.ago) : '', row.reason ?? row.lead, row.mine ?? row.count].filter(Boolean).join(' · '),
+      ranks: row.ranks,
+      detail: [row.ago ? cap(row.ago) : '', row.reason ?? row.lead, row.count].filter(Boolean).join(' · '),
       run: () => r.openTableScores!(row.table, here),
     }));
     return {
       sections: [
+        { title: t('Classement des scores'), layout: 'list', cards: [], choices: [{ key: 'score-rankings', icon: 'trophy', title: t('Classement des scores'), detail: t('Recherche, portée et période ; Start sur une table : son tableau des scores'), run: () => (r.openTables ? r.openTables(here, t('Retour : Arène')) : r.open(here)) }] },
         {
           title: t('Jouées récemment'),
           note: recent.where,
           layout: 'list',
           cards,
           choices: [
-            { key: 'all-tables', icon: 'list', title: t('Toutes les tables'), detail: t('Recherche, portée et période ; Start sur une table : son tableau des scores'), run: () => (r.openTables ? r.openTables(here, t('Retour : Arène')) : r.open(here)) },
             { key: 'players', icon: 'gauge', title: t('Classement des joueurs'), detail: t('Les joueurs classés par leurs XP : monde, pays, amis'), run: openBoard(here, 'world') },
           ],
         },
@@ -683,7 +684,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
         return { ...spec, list: true, sections: g.sections };
       }
       case 'scores':
-        return { ...spec, list: true, ...scoresTab(reopen) };
+        return { ...spec, list: true, singleColumn: true, ...scoresTab(reopen) };
       case 'progress':
         return { ...spec, list: true, sections: progressSections(reopen) };
       // Les défis (challenges-menu.ts) : à jouer, envoyés, résultats récents.

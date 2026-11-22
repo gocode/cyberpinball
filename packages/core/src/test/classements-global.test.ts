@@ -27,7 +27,7 @@ interface Built {
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { createRankingsMenu, matchesSearch } = require(path.join(REPO_ROOT, 'app', 'dist', 'rankings-menu.js')) as {
-  createRankingsMenu(host: object): { open(back: () => void): void; detail(): string };
+  createRankingsMenu(host: object): { open(back: () => void): void; detail(): string; recentScores(n: number): { rows: { ranks?: { label: string; place: string; flag?: { code: string }; icon?: string }[] }[] } };
   matchesSearch(title: string, query: string): boolean;
 };
 
@@ -250,4 +250,21 @@ test('« Classements » : en anglais', () => {
   } finally {
     setLanguage('fr');
   }
+});
+
+test('tables récentes : positions du pays et du monde distinctes, sans inventer de rang absent', () => {
+  const recent = table('Atlas Rising', 'atlas.vpx', '2026-11-16T21:00:00');
+  const host = {
+    library: { openCustom() {}, openScores() {} }, tables: () => [recent],
+    local: () => ({ lines: [], games: 0 }),
+    network: (_table: TableEntry, scope: RankingScope) => ({ lines: [{ rank: 1, name: 'Alto', score: 100 }], players: 12, me: scope === 'country' ? { rank: 2 } : { rank: 7 } }),
+    players: { state: () => ({ enabled: true, country: 'DE', friends: new Set<string>() }), cards: () => [] },
+    zoneKeys: () => [], openSharing() {}, now: () => NOW.getTime(),
+  };
+  const ranks = createRankingsMenu(host).recentScores(5).rows[0]!.ranks!;
+  assert.deepEqual(ranks.map((r) => [r.flag?.code, r.icon, r.place]), [['DE', undefined, '#2'], [undefined, 'globe', '#7']]);
+  const missing = createRankingsMenu({ ...host, network: () => ({ lines: [], players: 0 }) }).recentScores(5).rows[0]!.ranks!;
+  assert.deepEqual(missing.map((r) => r.place), ['—', '—']);
+  const beyond = createRankingsMenu({ ...host, network: () => ({ lines: [], players: 100, me: { rank: 101, beyond: 100 } }) }).recentScores(5).rows[0]!.ranks!;
+  assert.deepEqual(beyond.map((r) => r.place), ['>100', '>100']);
 });

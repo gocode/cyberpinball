@@ -51,6 +51,7 @@ export const messages: Record<string, string> = {
   'en commun': 'in common',
   '+{n} table en commun': '+{n} table in common',
   '+{n} tables en commun': '+{n} tables in common',
+  'Joueurs à découvrir': 'Players to discover',
   'Connectés en ce moment': 'Online right now',
   '{n} connecté en ce moment': '{n} player online right now',
   '{n} connectés en ce moment': '{n} players online right now',

@@ -6011,7 +6011,7 @@ export function createLibrary(host: LibraryHost) {
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
       backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
-      actions: built.actions.map(({ label, detail, tone, icon, flag, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, flag, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      actions: built.actions.map(({ label, detail, tone, icon, flag, web, attention, activeChoice, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, flag, activeChoice, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       // La page web de l'élément choisi (une ligne des crédits) : son QR code sous les actions.
       actionQr: actionQrView(built.actions[cursor]?.qr),
       media: markAnimated(built.media),
