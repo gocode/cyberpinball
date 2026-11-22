@@ -14,6 +14,7 @@
 // - les réglages de la communauté restent au Menu système (aucun onglet ni carte ici).
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { createPlayerKey, newSocialState, setLanguage, XP } from '../index';
@@ -41,7 +42,7 @@ interface Built {
   actions: { label: string; key?: string; run: () => void }[];
   back: () => void;
   keys?: (input: { code: string }) => boolean;
-  hub: { facts: string[]; tabs: { label: string; current: boolean; attention?: boolean }[]; sections: { title?: string; note?: string; layout: string; cards: Card[] }[] };
+  hub: { facts: string[]; tabs: { label: string; current: boolean; attention?: boolean }[]; sections: { title?: string; note?: string; layout: string; cards: Card[]; choices?: Card[] }[] };
 }
 
 type Player = { key: string; name: string; country?: string; status: 'online' | 'playing' | 'offline'; friend: boolean; commonTables?: number };
@@ -234,8 +235,8 @@ test('Joueurs : la bande « En ligne » d’abord, puis les demandes reçues, l�
   h.tab('players');
   const titles = h.built().hub.sections.map((s) => s.title);
   assert.deepEqual(titles, ['En ligne', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
-  h.enter('Tout voir');
-  h.built().actions.find((a) => a.label === 'Mes amis')!.run();
+  // Les entrées du bas : des lignes d'actions, chacune un arrêt au premier niveau.
+  h.built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === 'Mes amis')!.run();
   assert.deepEqual(h.events, ['joueurs:friends']);
 });
 
@@ -243,7 +244,18 @@ test('Profil : mon profil et ce qui me concerne ; les réglages de la communaut�
   const h = hub();
   h.menu.openHome(() => undefined);
   h.tab('profile');
-  const all = h.built().hub.sections.flatMap((s) => s.cards.map((c) => c.title));
+  const all = h.built().hub.sections.flatMap((s) => [...s.cards, ...(s.choices ?? [])].map((c) => c.title));
   assert.ok(all.includes('Modifier mon profil') && all.includes('Mon compte'));
   for (const off of ['Réglages de la communauté', 'Partage et réseau', 'Présence et salons', 'Jouer en local']) assert.ok(!all.includes(off), off);
+  // Une liste de choix : pas d'encart (aucune carte), chaque entrée est un arrêt du premier niveau que Start valide,
+  // dessinée comme les lignes d'actions des autres menus (retour du mainteneur, 21/11/2026).
+  const sec = h.built().hub.sections.find((s) => s.title === 'Pseudo, confidentialité, compte')!;
+  assert.deepEqual([sec.cards.length, sec.choices?.map((c) => c.title)], [0, ['Modifier mon profil', 'Confidentialité', 'Mon compte']]);
+  h.built().back();
+  h.run('tab:profile');
+  h.built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === 'Mon compte')!.run();
+  assert.deepEqual(h.events, ['groupe:compte'], 'Start sur l’entrée l’ouvre, sans bloc où entrer');
+  const js = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'hub.js'), 'utf8');
+  assert.match(js, /el\('ol', 'lib-actions with-icons hub-choices'\)/);
+  assert.match(js, /el\('li', `lib-action tone-/);
 });

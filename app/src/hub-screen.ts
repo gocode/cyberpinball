@@ -99,6 +99,13 @@ export interface HubSectionSpec {
   /** Au bureau, sa colonne (sinon : la carte du moment et la suivante à gauche, le reste partagé). */
   column?: 'left' | 'right';
   /**
+   * Ses choix (portes, écrans complets, actions), sous ses cartes : les lignes d'actions des autres menus
+   * (icône, libellé, détail, aplat vert sur le choix courant), hors de l'encart ; chacun est un arrêt des
+   * flippers au premier niveau et Start le valide, sans bloc où entrer (retour du mainteneur, 21/11/2026 :
+   * « comme dans le reste de la plateforme »). Une section peut n'avoir que des choix (« Tout voir »).
+   */
+  choices?: HubCardSpec[];
+  /**
    * Récapitulatif d'un onglet (accueil de la Communauté, 21/11/2026) : Start sur ce bloc ouvre l'onglet
    * nommé, le curseur dans son premier bloc (la même bande, l'œil n'est pas perdu) ; Exit y ramène.
    */
@@ -199,7 +206,7 @@ export interface HubView {
   tabsBlock?: HubBlockView;
   /** On est entré dans un bloc : les autres s'éteignent un peu. */
   inside?: true;
-  sections: { title?: string; note?: string; layout: HubLayout; column?: 'left' | 'right'; block?: HubBlockView; cards: HubCardView[] }[];
+  sections: { title?: string; note?: string; layout: HubLayout; column?: 'left' | 'right'; block?: HubBlockView; cards: HubCardView[]; choices?: HubCardView[] }[];
   empty?: { title: string; detail: string };
 }
 
@@ -292,6 +299,8 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       }
       // Un récapitulatif est un bloc même sans action : Start ouvre son onglet.
       if (s.cards.length && (items.length || s.opens)) out.push({ key: `section:${i}`, label: s.title ?? s.cards[0]?.title ?? '', items, ...(s.opens ? { opens: s.opens } : {}) });
+      // Ses choix, sous elle : un bloc d'une seule action chacun (Start la fait tout de suite).
+      for (const c of s.choices ?? []) if (c.run) out.push({ key: `choice:${i}:${c.key}`, label: c.title, items: [{ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run }] });
     });
     // Un écran à plat : un seul bloc, tout ce qui se choisit, sans liseré ni entrée.
     if (spec.flat) return [{ key: FLAT, label: spec.title, items: out.flatMap((b) => b.items) }];
@@ -382,7 +391,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       return action === undefined ? view : { ...view, action };
     });
     const sections = spec.sections.flatMap((s, i) => {
-      if (!s.cards.length) return [];
+      if (!s.cards.length && !s.choices?.length) return [];
       const block = blockView(`section:${i}`);
       return [
         {
@@ -391,6 +400,15 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
           layout: s.layout,
           ...(s.column ? { column: s.column } : {}),
           ...(block ? { block } : {}),
+          ...(s.choices?.length
+            ? {
+                choices: s.choices.map((c): HubCardView => {
+                  const { key, run: _run, buttons: _buttons, ...shown } = c;
+                  const own = blockAction.get(`choice:${i}:${key}`);
+                  return { ...shown, ...(own !== undefined ? { action: own } : {}) };
+                }),
+              }
+            : {}),
           cards: s.cards.map((c): HubCardView => {
             const { key, run: _run, buttons, ...shown } = c;
             const out: HubCardView = { ...shown };

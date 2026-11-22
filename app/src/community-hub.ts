@@ -540,7 +540,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const shown = new Set(out[0]!.cards.map((c) => c.key.replace(/^(thread|recent):/, '')));
     const recent = host.messages.recent(6).filter((x) => !shown.has(`${x.kind}:${x.id}`));
     if (recent.length) out.push({ title: t('Conversations récentes'), layout: 'list', column: 'right', cards: recent.map((x) => recentCard(x, here)) });
-    out.push({ title: t('Tout voir'), layout: 'list', column: 'right', cards: [{ key: 'all', icon: 'message', title: t('Toutes les conversations'), detail: host.messages.detail(), run: () => host.messages.open(here) }] });
+    out.push({ title: t('Tout voir'), layout: 'list', column: 'right', cards: [], choices: [{ key: 'all', icon: 'message', title: t('Toutes les conversations'), detail: host.messages.detail(), run: () => host.messages.open(here) }] });
     return out;
   }
 
@@ -577,7 +577,8 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
       title: t('Tout voir'),
       layout: 'list',
       column: 'right',
-      cards: [
+      cards: [],
+      choices: [
         { key: 'friends', icon: 'friend-list', title: t('Mes amis'), detail: tn(s.friends.length, '{n} ami', '{n} amis'), run: () => host.players.open(here, 'friends') },
         { key: 'find', icon: 'search', title: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), run: () => host.friends.find() },
         { key: 'requests', icon: 'friend-request', title: t('Demandes d’amis'), detail: t('Reçues et envoyées'), run: () => host.friends.requests(here) },
@@ -590,7 +591,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const door = host.groups.door();
     return [
       groupsBand(6, here),
-      { title: t('Tout voir'), layout: 'list', column: 'right', cards: [{ key: 'all', icon: 'group', title: t('Groupes'), detail: door.detail, ...(door.quiet ? { quiet: true } : {}), run: () => host.groups.open(here) }] },
+      { title: t('Tout voir'), layout: 'list', column: 'right', cards: [], choices: [{ key: 'all', icon: 'group', title: t('Groupes'), detail: door.detail, ...(door.quiet ? { quiet: true } : {}), run: () => host.groups.open(here) }] },
     ];
   }
 
@@ -602,7 +603,8 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
         title: t('Autres salons'),
         layout: 'list',
         column: 'right',
-        cards: peek.others.map((r) => ({ key: `room-other:${r.id}`, icon: 'globe' as const, title: r.name, ...(r.present ? { detail: tn(r.present, '{n} présent', '{n} présents') } : {}), run: () => host.room.openRoom(r.id, here) })),
+        cards: [],
+        choices: peek.others.map((r) => ({ key: `room-other:${r.id}`, icon: 'globe' as const, title: r.name, ...(r.present ? { detail: tn(r.present, '{n} présent', '{n} présents') } : {}), run: () => host.room.openRoom(r.id, here) })),
       });
     return out;
   }
@@ -614,7 +616,8 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
         title: t('Pseudo, confidentialité, compte'),
         layout: 'list',
         column: 'right',
-        cards: [
+        cards: [],
+        choices: [
           { key: 'edit', icon: 'edit', title: t('Modifier mon profil'), detail: t('Pseudo, avatar, pays'), run: () => host.library.openSystemGroupFrom('modifier-profil', here) },
           { key: 'privacy', icon: 'eye', title: t('Confidentialité'), detail: t('Profil public, ce que voient les autres'), run: () => host.library.openSystemGroupFrom('confidentialite', here) },
           { key: 'account', icon: 'account', title: t('Mon compte'), detail: t('Protéger, transférer ou supprimer mon compte'), run: () => host.library.openSystemGroupFrom('compte', here) },

@@ -954,6 +954,31 @@
   --ring: var(--meta);
 }
 
+/*
+ * Liste de choix (hub.js, choices) : les lignes d'actions des autres menus (library.css, .lib-action),
+ * sans encart ; ici seulement ce que l'écran à onglets change : la liste ne défile pas d'elle-même (le
+ * corps défile), et quand on est entré dans un bloc, elle s'éteint un peu comme les autres.
+ */
+.lib-hub .hub-choices {
+  overflow: visible;
+}
+
+/* Une section et ses choix dessous (ou un titre et ses choix) : l'écart d'une section à ses cartes. */
+.hub-group {
+  display: grid;
+  gap: calc(16 * var(--u));
+  min-width: 0;
+}
+
+/* Le titre d'une section qui n'a que des choix : aligné sur celui des encarts (bord et marge d'un bloc). */
+.hub-group > .hub-eyebrow {
+  padding-inline: calc(19.5 * var(--u));
+}
+
+.lib-hub.hub-inside .hub-choices {
+  opacity: 0.5;
+}
+
 /* ---------- Pied : les commandes ---------- */
 
 .hub-foot {

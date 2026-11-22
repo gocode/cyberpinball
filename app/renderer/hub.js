@@ -223,18 +223,53 @@
     return node;
   }
 
+  function eyebrow(s) {
+    const head = el('div', 'hub-eyebrow');
+    head.append(el('span', '', s.title));
+    if (s.note) head.append(el('em', '', s.note));
+    return head;
+  }
+
+  /**
+   * Une section : ses cartes dans leur encart (le bloc), puis ses choix dessous, en lignes d'actions
+   * hors de l'encart ; une section sans carte n'a que son titre et ses choix (« Tout voir »).
+   */
   function section(s, cursor, start) {
-    const box = blockify(el('section', `hub-sec hub-layout-${s.layout}`), s.block, cursor);
-    if (s.title) {
-      const head = el('div', 'hub-eyebrow');
-      head.append(el('span', '', s.title));
-      if (s.note) head.append(el('em', '', s.note));
-      box.append(head);
+    const box = s.cards.length ? blockify(el('section', `hub-sec hub-layout-${s.layout}`), s.block, cursor) : undefined;
+    if (box) {
+      if (s.title) box.append(eyebrow(s));
+      const list = el('div', `hub-cards hub-layout-${s.layout}`);
+      for (const c of s.cards) list.append(card(c, s.layout, cursor, start));
+      box.append(list);
+      if (!s.choices?.length) return box;
     }
-    const list = el('div', `hub-cards hub-layout-${s.layout}`);
-    for (const c of s.cards) list.append(card(c, s.layout, cursor, start));
-    box.append(list);
-    return box;
+    const group = el('section', 'hub-group');
+    if (box) group.append(box);
+    else if (s.title) group.append(eyebrow(s));
+    group.append(choices(s.choices, cursor));
+    return group;
+  }
+
+  /**
+   * Une liste de choix : les lignes d'actions des autres menus (library.js, lib-action), icône, libellé,
+   * détail, l'aplat vert sur le choix courant ; sans encart, chaque ligne s'atteint aux flippers.
+   */
+  function choices(cards, cursor) {
+    const ol = el('ol', 'lib-actions with-icons hub-choices');
+    ol.dataset.iconMenu = '';
+    for (const c of cards) {
+      const li = el('li', `lib-action tone-${c.quiet ? 'quiet' : 'none'}${c.action !== undefined && c.action === cursor ? ' current' : ''}`);
+      li.dataset.label = c.title;
+      const glyph = el('span', 'lib-action-glyph');
+      glyph.append(icon(c.icon || 'list', 'lib-action-icon'));
+      // Quelque chose attend derrière ce choix : la pastille rouge, comme dans les autres menus.
+      if (c.count) glyph.append(el('span', 'lib-attention'));
+      li.append(glyph, el('span', 'label', c.title));
+      if (c.detail) li.append(el('span', 'detail', c.detail));
+      if (c.action !== undefined) act(li, c.action);
+      ol.append(li);
+    }
+    return ol;
   }
 
   /** Le pied : « Flippers : choisir · Start : valider… », la touche en vert. */

@@ -209,6 +209,9 @@ function arena(overrides: Record<string, unknown> = {}) {
   const item = (label: string) => {
     // Resté dans un bloc (l'écran ouvert de là n'est pas revenu) : on en ressort d'abord.
     if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
+    // Une entrée du bas d'une section (choix) : un arrêt direct au premier niveau, Start la fait.
+    const choice = built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === label);
+    if (choice) return choice.run();
     for (const key of built().actions.map((a) => a.key!).filter((k) => k.startsWith('block:section:'))) {
       run(key);
       const found = built().actions.find((a) => a.label === label);
@@ -260,9 +263,10 @@ test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exi
   assert.ok(b.actions.every((a) => a.key!.startsWith('block:')), b.actions.map((a) => a.key).join(', '));
   assert.equal(b.actions[0]!.key, 'block:tabs');
   assert.equal(h.at(), 1, 'à l’ouverture, le curseur sur le premier bloc du contenu');
-  // Les blocs de l'Accueil : la barre d'onglets, la carte du moment, jouer, classements, progression ;
-  // le barème des XP se lit seulement : ce n'est pas un bloc (aucun arrêt pour rien).
-  assert.equal(b.actions.length, 5, b.actions.map((a) => a.label).join(', '));
+  // Les blocs de l'Accueil : la barre d'onglets, la carte du moment, jouer, classements, progression, et
+  // sous chacune ses entrées, en lignes d'actions (un arrêt chacune, 21/11/2026) ; le barème des XP se lit
+  // seulement : ce n'est pas un bloc (aucun arrêt pour rien).
+  assert.deepEqual(b.actions.map((a) => a.label), ['Onglets', 'vous a dépassé sur Attack from Mars', 'Ouvrir une partie instantanée', 'Toutes les parties instantanées', 'Vos classements', 'Tous les classements', 'Votre progression', 'Mes badges']);
   // Start sur un bloc à plusieurs actions : on y entre ; seules ses actions se choisissent.
   h.run('block:section:0');
   const inside = h.built();
@@ -295,8 +299,8 @@ test('écran de l’Arène : l’onglet « Du jour » s’ouvre dès que les tab
   h.menu.openHome(() => undefined);
   assert.equal(h.built().hub.tabs.find((t) => t.label === 'Du jour')!.disabled, undefined);
   h.tab('daily');
-  h.run('block:section:0');
-  assert.equal(h.events.at(-1), 'du jour', 'Start sur le bloc : sa seule action, sans y entrer');
+  h.item('Les plus jouées aujourd’hui');
+  assert.equal(h.events.at(-1), 'du jour', 'Start sur l’entrée : son écran, sans bloc où entrer');
 });
 
 test('Accueil de l’Arène : jouer, les classements et la progression à un Start, sans passer par les autres onglets', () => {

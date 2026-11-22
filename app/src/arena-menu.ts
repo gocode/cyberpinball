@@ -459,13 +459,15 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       };
     });
     if (door.quiet) play.push({ key: 'instant:off', icon: 'network', title: t('Parties instantanées'), detail: door.detail, quiet: true });
-    else if (!games.mine) play.push({ key: 'new', icon: 'plus', title: t('Ouvrir une partie instantanée'), detail: t('La table et le nombre de joueurs : elle part dès qu’elle est complète'), aside: xpText(XP.live), run: () => host.instant.openNew(here) });
+    // Les entrées, sous les parties : des choix, comme dans les autres menus (21/11/2026).
+    const playChoices: HubCardSpec[] = [];
+    if (!door.quiet && !games.mine) playChoices.push({ key: 'new', icon: 'plus', title: t('Ouvrir une partie instantanée'), detail: t('La table et le nombre de joueurs : elle part dès qu’elle est complète'), run: () => host.instant.openNew(here) });
     if (host.daily) {
       const daily = host.daily;
-      play.push({ key: 'daily', icon: 'sparkle', title: t('Les tables du jour'), detail: daily.detail(), run: () => daily.open(here) });
+      playChoices.push({ key: 'daily', icon: 'sparkle', title: t('Les tables du jour'), detail: daily.detail(), run: () => daily.open(here) });
     }
-    if (!door.quiet) play.push({ key: 'all-games', icon: 'gamepad', title: t('Toutes les parties instantanées'), detail: door.detail, run: () => host.instant.open(here) });
-    out.push({ title: t('À jouer maintenant'), ...(open.length ? { note: tn(open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') } : {}), layout: 'list', cards: play });
+    if (!door.quiet) playChoices.push({ key: 'all-games', icon: 'gamepad', title: t('Toutes les parties instantanées'), detail: door.detail, run: () => host.instant.open(here) });
+    out.push({ title: t('À jouer maintenant'), ...(open.length ? { note: tn(open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') } : {}), layout: 'list', cards: play, choices: playChoices });
 
     // Classements : mes places, les joueurs juste devant moi (celui de la carte du moment mis à part), tous les classements.
     const st = standing();
@@ -474,8 +476,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     if (st?.country) ranks.push({ key: 'country', icon: 'language', title: t('{country} : {n}ᵉ', { country: st.country.name, n: fmt(st.country.rank) }), detail: tn(st.country.players, 'sur {n} joueur', 'sur {n} joueurs', { n: fmt(st.country.players) }), run: () => host.rankings.open(here) });
     const heroRival = moment?.key.startsWith('moment:rival:') ? moment.key.slice('moment:rival:'.length) : undefined;
     ranks.push(...published().rivals.filter((r) => r.board !== heroRival).slice(0, 3).map(rivalRow));
-    ranks.push({ key: 'all-rankings', icon: 'list', title: t('Tous les classements'), detail: t('Chaque table, par portée et par période'), run: () => host.rankings.open(here) });
-    out.push({ title: t('Vos classements'), ...(st ? { note: t('Selon vos XP, de tout temps') } : {}), layout: 'list', cards: ranks });
+    out.push({ title: t('Vos classements'), ...(st ? { note: t('Selon vos XP, de tout temps') } : {}), layout: 'list', cards: ranks, choices: [{ key: 'all-rankings', icon: 'list', title: t('Tous les classements'), detail: t('Chaque table, par portée et par période'), run: () => host.rankings.open(here) }] });
 
     // Progression : le niveau, le badge le plus proche, les derniers records, mes badges.
     const b = band();
@@ -483,8 +484,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const near = nearestBadges(net.state().badges, facts(), 1)[0];
     if (near) progress.push({ key: `badge:${near.badge.id}`, icon: near.badge.icon, title: near.badge.label, detail: near.badge.detail, aside: `${fmt(near.value)} / ${fmt(near.badge.target)}`, progress: near.progress, run: () => host.level.openBadges(here) });
     for (const r of published().records.slice(0, 2)) progress.push({ key: `record:${r.table.title}:${r.at}`, icon: 'star', title: r.table.title, detail: t('{rank}ᵉ sur {n} · {ago}', { rank: r.rank, n: r.players, ago: ago(r.at) }), aside: fmt(r.score), ...(reachable(r.table) ? { run: reachable(r.table)! } : {}) });
-    progress.push({ key: 'badges', icon: 'medal', title: t('Mes badges'), detail: t('{n} reçus', { n: net.state().badges.length }), run: () => host.level.openBadges(here) });
-    out.push({ title: t('Votre progression'), layout: 'list', cards: progress });
+    out.push({ title: t('Votre progression'), layout: 'list', cards: progress, choices: [{ key: 'badges', icon: 'medal', title: t('Mes badges'), detail: t('{n} reçus', { n: net.state().badges.length }), run: () => host.level.openBadges(here) }] });
 
     out.push({ title: t('Ce que rapportent les XP'), note: t('Le barème du niveau'), layout: 'chips', cards: arenaXpRules().map((r) => ({ key: `rule:${r.text}`, icon: r.icon, title: r.text, aside: xpText(r.xp) })) });
     return out;
@@ -500,8 +500,9 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     sections.push({
       title: t('Jouer contre les autres'),
       layout: 'list',
-      cards: [
-        ...(games.mine ? [] : [{ key: 'new', icon: 'plus' as const, title: t('Ouvrir une partie instantanée'), detail: t('La table et le nombre de joueurs : elle part dès qu’elle est complète'), aside: xpText(XP.live), run: () => host.instant.openNew(here) }]),
+      cards: [],
+      choices: [
+        ...(games.mine ? [] : [{ key: 'new', icon: 'plus' as const, title: t('Ouvrir une partie instantanée'), detail: t('La table et le nombre de joueurs : elle part dès qu’elle est complète'), run: () => host.instant.openNew(here) }]),
         { key: 'all', icon: 'list', title: t('Toutes les parties instantanées'), detail: door.detail, run: () => host.instant.open(here) },
       ],
     });
@@ -549,7 +550,8 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     out.push({
       title: t('Tout voir'),
       layout: 'list',
-      cards: [
+      cards: [],
+      choices: [
         { key: 'level', icon: 'gauge', title: t('Mon niveau'), detail: t('Barre, gains de la semaine, classements à venir'), run: () => host.level.open(here) },
         { key: 'rankings', icon: 'list', title: t('Tous les classements'), detail: t('Chaque table, par portée et par période'), run: () => host.rankings.open(here) },
         { key: 'badges', icon: 'medal', title: t('Mes badges'), detail: t('{n} reçus', { n: net.state().badges.length }), run: () => host.level.openBadges(here) },
@@ -581,7 +583,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
         if (!daily) return spec;
         return {
           ...spec,
-          sections: [{ title: t('Les tables du jour'), layout: 'list', cards: [{ key: 'daily', icon: 'sparkle', title: t('Les plus jouées aujourd’hui'), detail: daily.detail(), run: () => daily.open(reopen) }] }],
+          sections: [{ title: t('Les tables du jour'), layout: 'list', cards: [], choices: [{ key: 'daily', icon: 'sparkle', title: t('Les plus jouées aujourd’hui'), detail: daily.detail(), run: () => daily.open(reopen) }] }],
         };
       }
       default:
