@@ -84,6 +84,11 @@ export interface HubCardSpec {
   ring?: HubRing;
   /** Messages non lus : le nombre en pastille, après le titre. */
   count?: number;
+  /** Des tables en médaillons superposés (tables en commun), et ce qui les suit (« +3 tables en commun »). */
+  tables?: { title: string; src?: string }[];
+  tablesNote?: string;
+  /** Des joueurs en pastilles superposées (amis en commun), et ce qui les suit (« 4 amis en commun »). */
+  mutual?: { avatars: AvatarView[]; note: string };
   /** Ce que Start fait sur la carte ; absent avec des boutons (chacun est un arrêt des flippers), ou pour une carte à lire. */
   run?: () => void;
   buttons?: HubButtonSpec[];
@@ -194,6 +199,9 @@ export interface HubCardView {
   lines?: HubLogLine[];
   ring?: HubRing;
   count?: number;
+  tables?: { title: string; src?: string }[];
+  tablesNote?: string;
+  mutual?: { avatars: AvatarView[]; note: string };
   quiet?: boolean;
   /** La carte elle-même se choisit (absent : elle a des boutons, ou se lit seulement). */
   action?: number;

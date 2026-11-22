@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Community: suggested players and friend requests show the tables you have in common as overlapping medallions (your favourites first), then "+2 tables in common" when there are more.
+- Community: the Players tab shows who is online right now, and "Everyone online" opens the full list.
+- Community: friends in common show on suggested players and on received friend requests as overlapping avatars, and bring those players to the top of the suggestions. You choose who sees your friends (My profile › Privacy › What others see): public (the default), your friends only, or private.
 - Arena: a Scores tab leads straight to the scoreboards. It lists the tables you played recently, with the leader of each and your place; Start opens a table's scoreboard. Below come all tables (search, scope, period) and the player ranking.
 - Arena: outside Home, each tab reads as a list. The flippers move from one line to the next and Start confirms it, with no block to enter; Home keeps its blocks for its summaries and shortcuts.
 - Arena and Community: in a tab, Exit puts the cursor back on the tab bar, on the open tab; a second Exit returns to the wheel. The help bar says so.

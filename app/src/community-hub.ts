@@ -22,6 +22,7 @@ import {
   badgeLabel,
   downloadPage,
   eventText,
+  mutualFriends,
   language,
   quickReplies,
   shownCrowd,
@@ -76,13 +77,15 @@ export interface CommunityRoomPeek {
 export interface CommunityHubHost {
   library: { openCustom(build: () => Built, at?: number): void; openSystemGroupFrom(group: 'modifier-profil' | 'confidentialite' | 'compte', back: () => void): void };
   zoneKeys(): readonly string[];
-  net: Pick<SocialNet, 'state' | 'status' | 'publicCard' | 'cardFirstSeen' | 'avatarFile' | 'request' | 'accept' | 'decline' | 'presenceOf' | 'like' | 'likedByMe' | 'country'>;
+  net: Pick<SocialNet, 'state' | 'status' | 'publicCard' | 'friendsOf' | 'cardFirstSeen' | 'avatarFile' | 'request' | 'accept' | 'decline' | 'presenceOf' | 'like' | 'likedByMe' | 'country'>;
   /** Mon niveau (level-tracker.ts). */
   myLevel(): number;
   /** Les joueurs en ligne, amis compris (community-menu.ts), et tous les joueurs connus. */
   players: {
     online(): readonly OnlinePlayer[];
     everyone(): readonly OnlinePlayer[];
+    /** Les tables en commun avec ce joueur, mes favorites d'abord, avec leur logo de roue. */
+    sharedTables(key: string): readonly { title: string; src?: string }[];
     /** L'écran « Joueurs » complet, sur l'onglet des amis ou sur tous les joueurs. */
     open(back: () => void, tab: 'friends' | 'all'): void;
     detail(): string;
@@ -112,12 +115,21 @@ export interface CommunityHub {
 export type CommunityTab = 'home' | 'messages' | 'players' | 'groups' | 'rooms' | 'profile';
 
 /**
+ * La liste d'amis d'un joueur : celle de sa carte publique (amis publics), sinon celle qu'il m'a envoyée en
+ * ami (amis réservés à ses amis) ; rien s'il les garde privés.
+ */
+export function theirFriends(net: Pick<SocialNet, 'publicCard' | 'friendsOf'>, key: string): { friendKeys?: readonly string[] } {
+  const list = net.publicCard(key)?.friendKeys ?? net.friendsOf(key);
+  return list ? { friendKeys: list } : {};
+}
+
+/**
  * Qui montrer dans « En ligne » (écran et affiche) : mes amis en ligne, en partie d'abord, puis les
  * joueurs suggérés (suggestPlayers) qui complètent jusqu'à `max` ; `reason` dit pourquoi un joueur est
  * suggéré (absente : un ami). Jamais moi, un ami hors ligne, un joueur bloqué ou dont la demande attend.
  */
 export function communityPeople(
-  d: { net: Pick<SocialNet, 'state' | 'country'>; players: { online(): readonly OnlinePlayer[]; everyone(): readonly OnlinePlayer[] }; levelOf(key: string): number | undefined; myLevel: number },
+  d: { net: Pick<SocialNet, 'state' | 'country' | 'publicCard' | 'friendsOf'>; players: { online(): readonly OnlinePlayer[]; everyone(): readonly OnlinePlayer[] }; levelOf(key: string): number | undefined; myLevel: number },
   max: number,
 ): { player: OnlinePlayer; reason?: SuggestReason }[] {
   const s = d.net.state();
@@ -132,10 +144,12 @@ export function communityPeople(
   const list = d.players.everyone();
   const byKey = new Map(list.map((p) => [p.key, p]));
   const country = d.net.country();
+  const myFriends = s.friends.map((f) => f.key);
   const picks = suggestPlayers(
     list.map((p) => {
       const level = d.levelOf(p.key);
-      return { key: p.key, name: p.name, ...(p.country ? { country: p.country } : {}), ...(level ? { level } : {}), commonTables: p.commonTables ?? 0, online: p.status !== 'offline', ...(p.nearby ? { nearby: true } : {}) };
+      const mutual = mutualFriends(myFriends, theirFriends(d.net, p.key)).length;
+      return { key: p.key, name: p.name, ...(p.country ? { country: p.country } : {}), ...(level ? { level } : {}), commonTables: p.commonTables ?? 0, online: p.status !== 'offline', ...(p.nearby ? { nearby: true } : {}), ...(mutual ? { mutual } : {}) };
     }),
     { ...(country ? { country } : {}), level: d.myLevel },
     skip,
@@ -150,6 +164,8 @@ export function suggestReasonText(reason: SuggestReason, commonTables: number): 
   switch (reason) {
     case 'newcomer':
       return t('Nouveau venu');
+    case 'mutual':
+      return t('Amis en commun');
     case 'nearby':
       return t('Réseau local');
     case 'tables':
@@ -171,6 +187,8 @@ const TAB_THREADS = 4;
 /** Joueurs en cartouches, deux par rangée : cinq et « Tous les joueurs » sur l'accueil, dix dans l'onglet Joueurs. */
 const HOME_PEOPLE = 5;
 const TAB_PEOPLE = 10;
+/** Connectés montrés dans l'onglet Joueurs, en plus de la bande. */
+const CONNECTED_SHOWN = 8;
 /** Lignes du salon : quatre sur l'accueil, six dans l'onglet Salons. */
 const HOME_LINES = 4;
 const TAB_LINES = 6;
@@ -221,15 +239,49 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     };
   }
 
+  /** Tables en médaillons sur une cartouche (22/11/2026). */
+  const SHARED_SHOWN = 3;
+
+  /**
+   * Les tables en commun d'un joueur, en médaillons : mes favorites d'abord, trois au plus, puis
+   * « +2 tables en commun » ; trois ou moins, « en commun ». Aucune : rien.
+   */
+  function sharedStrip(key: string): { tables?: { title: string; src?: string }[]; tablesNote?: string } {
+    const all = host.players.sharedTables(key);
+    if (!all.length) return {};
+    const shown = all.slice(0, SHARED_SHOWN).map((x) => ({ title: x.title, ...(x.src ? { src: x.src } : {}) }));
+    const more = all.length - shown.length;
+    return { tables: shown, tablesNote: more ? tn(more, '+{n} table en commun', '+{n} tables en commun') : t('en commun') };
+  }
+  /** Amis en commun en pastilles sur une cartouche (22/11/2026). */
+  const MUTUAL_SHOWN = 3;
+
+  /**
+   * Les amis que j'ai en commun avec ce joueur (sa carte publique les cite) : leurs pastilles superposées,
+   * trois au plus, et « 4 amis en commun ». Aucun, ou amis cachés par le joueur : rien.
+   */
+  function mutualStrip(key: string): { mutual?: { avatars: AvatarView[]; note: string } } {
+    const s = net.state();
+    const keys = mutualFriends(s.friends.map((f) => f.key), theirFriends(net, key));
+    if (!keys.length) return {};
+    const avatars = keys.slice(0, MUTUAL_SHOWN).map((k) => face(k, s.friends.find((f) => f.key === k)?.name ?? '?'));
+    return { mutual: { avatars, note: tn(keys.length, '{n} ami en commun', '{n} amis en commun') } };
+  }
   /** Un joueur suggéré en tuile : pourquoi, et « Ajouter » d'un appui (+25 XP à l'amitié acceptée). */
   function suggestedTile(p: OnlinePlayer, reason: SuggestReason, here: () => void, section: string): HubCardSpec {
     const lv = levelChip(levelOf(p.key));
     const sent = net.state().outgoing.some((r) => r.key === p.key);
-    const base = { key: `suggest:${p.key}`, avatar: face(p.key, p.name), ring: 'suggested' as const, title: p.name, ...(lv ? { level: lv } : {}) };
+    const shared = sharedStrip(p.key);
+    const friends = mutualStrip(p.key);
+    const base = { key: `suggest:${p.key}`, avatar: face(p.key, p.name), ring: 'suggested' as const, title: p.name, ...(lv ? { level: lv } : {}), ...friends, ...shared };
     if (sent) return { ...base, detail: t('Demande envoyée'), run: () => host.profile.open(p.key, here) };
+    // Les tables en commun se voient à leurs médaillons : la raison dit autre chose (en ligne, pays…).
+    // Les amis en commun aussi se voient à leurs pastilles.
+    const shown = (reason === 'tables' && shared.tables) || (reason === 'mutual' && friends.mutual);
+    const why = shown ? (p.status === 'offline' ? undefined : t('En ligne')) : reasonText(reason, p);
     return {
       ...base,
-      detail: reasonText(reason, p),
+      ...(why ? { detail: why } : {}),
       buttons: [
         {
           label: t('Ajouter'),
@@ -550,6 +602,18 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const out: HubSectionSpec[] = [];
     const people = peopleSection(TAB_PEOPLE, here, true);
     if (people) out.push(people);
+    // Tous les connectés, d'un coup d'œil (22/11/2026) : ceux que la bande ne montre pas déjà.
+    const shownKeys = new Set((people?.cards ?? []).map((x) => x.key.replace(/^(friend|suggest):/, '')));
+    const online = host.players.online();
+    const others = online.filter((p) => !shownKeys.has(p.key));
+    const crowd = shownCrowd(online.length);
+    out.push({
+      title: crowd ? tn(crowd, '{n} connecté en ce moment', '{n} connectés en ce moment') : t('Connectés en ce moment'),
+      layout: 'people',
+      column: 'left',
+      cards: others.slice(0, CONNECTED_SHOWN).map((p) => (p.friend ? friendTile(p, here) : suggestedTile(p, 'online', here, 'people'))),
+      choices: [{ key: 'connected', icon: 'globe', title: t('Tous les connectés'), detail: others.length > CONNECTED_SHOWN ? tn(others.length - CONNECTED_SHOWN, 'Et {n} autre', 'Et {n} autres') : t('La liste complète, par pays et par tables en commun'), run: () => host.players.open(here, 'all') }],
+    });
     if (s.incoming.length)
       out.push({
         title: t('Demandes d’ami'),
@@ -564,6 +628,8 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
             title: r.name,
             ...(lv ? { level: lv } : {}),
             detail: t('Demande reçue {ago}', { ago: socialAgo(r.at, now()) }),
+            ...mutualStrip(r.key),
+            ...sharedStrip(r.key),
             buttons: [
               { label: t('Accepter'), key: 'accept', xp: xpText(XP.friend), primary: true, run: () => { net.accept(r.key); said = { section: 'requests', text: t('{name} est maintenant votre ami', { name: r.name }) }; here(); } },
               { label: t('Son profil'), key: 'profile', run: () => host.profile.open(r.key, here) },
@@ -661,17 +727,19 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const spec: HubSpec = { heading: t('Communauté'), icon: 'friends', medallion: 'communaute', title: t('COMMUNAUTÉ'), facts: facts(), tabs: TABS(), sections: [] };
     if (!net.state().enabled)
       return { ...spec, sections: [], empty: { title: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Le réactiver : Menu système › Communauté › Réglages de la communauté › Partage et réseau') } };
+    // Hors Accueil, une liste parcourue aux flippers, sans blocs (règle du mainteneur, 22/11/2026) : les blocs
+    // restent aux récapitulatifs de l'Accueil.
     switch (tab) {
       case 'messages':
-        return { ...spec, sections: messagesSections(reopen) };
+        return { ...spec, list: true, sections: messagesSections(reopen) };
       case 'players':
-        return { ...spec, sections: playersSections(reopen) };
+        return { ...spec, list: true, sections: playersSections(reopen) };
       case 'groups':
-        return { ...spec, sections: groupsSections(reopen) };
+        return { ...spec, list: true, sections: groupsSections(reopen) };
       case 'rooms':
-        return { ...spec, sections: roomsSections(reopen) };
+        return { ...spec, list: true, sections: roomsSections(reopen) };
       case 'profile':
-        return { ...spec, sections: profileSections(reopen) };
+        return { ...spec, list: true, sections: profileSections(reopen) };
       default:
         return { ...spec, sections: homeSections(reopen) };
     }

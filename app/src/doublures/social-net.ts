@@ -78,6 +78,8 @@ export function fakeSocialNet(over?: Partial<SocialNet>): SocialNet {
       setPublicProfile: noop,
       livePlayers: () => [],
       setPublicPresence: noop,
+      setFriendsVisibility: noop,
+      friendsOf: () => undefined,
       rooms: () => rooms,
       roomSend: () => ({ reason: 'disabled' }),
       roomRetract: () => false,

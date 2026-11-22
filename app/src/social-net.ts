@@ -230,6 +230,8 @@ import {
   type Reply,
   type SocialEvent,
   type SocialMessage,
+  type FriendsVisibility,
+  FRIENDS_SHARED_MAX,
   type SocialNetMode,
   type SocialState,
   type Step,
@@ -614,6 +616,13 @@ export interface SocialNet {
   livePlayers(): LiveBeacon[];
   /** « Apparaître en ligne pour tous » (activé par défaut) ; mes amis voient toujours ma présence. */
   setPublicPresence(on: boolean): void;
+  /**
+   * Qui voit la liste de mes amis (les amis en commun) : tous (jointe à ma carte publique, le défaut), mes
+   * amis seulement (envoyée à chacun par sa liaison), personne.
+   */
+  setFriendsVisibility(v: FriendsVisibility): void;
+  /** La liste d'amis qu'un ami m'a envoyée (mode « mes amis seulement ») ; undefined : rien reçu. */
+  friendsOf(key: string): readonly string[] | undefined;
   /** Salons par pays (rooms.ts) : lignes gardées sur la borne, règles acceptées, joueurs ignorés, réglages. */
   rooms(): RoomsState;
   /**
@@ -986,8 +995,14 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (traced(key)) log(`Réseau des bornes : avatar de ${nameOf(key)} reçu (${Math.round(image.bytes.length / 1024)} Ko).`); // i18n-ignore : journal
   }
 
+  /** Mes amis pour mes amis : la liste, sauf si je la cache (vide alors, pour qu'ils l'oublient). */
+  function friendsOfMessage(): SocialMessage {
+    return { t: 'friends-of', keys: state.friendsVisibility === 'private' ? [] : state.friends.map((f) => f.key).slice(0, FRIENDS_SHARED_MAX) };
+  }
+
   function greetFriend(key: string): void {
     sendTo(key, { t: 'presence', presence });
+    sendTo(key, friendsOfMessage());
     sendTo(key, { t: 'events', events: state.events.slice(0, EVENTS_ON_CONNECT) });
   }
 
@@ -1658,7 +1673,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const avatar = ownAvatarHash();
     const records = rankings.scores.filter((s) => s.key === state.key.publicKey).length;
     const invited = invitations.received.filter((i) => !shunned(i.me));
-    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), ...(myWeek ? { week: myWeek } : {}), friends: state.friends.length, ...(invited.length ? { invited: { list: cardInvites({ ...invitations, received: invited }), total: invited.length } } : {}), ...(myPlays ? { plays: myPlays } : {}) }, now());
+    return makeCard(state, profiles, { ...(country ? { country } : {}), ...(avatar ? { avatar } : {}), records, ...(myXp !== undefined ? { xp: myXp } : {}), ...(myWeek ? { week: myWeek } : {}), friends: state.friends.length, ...(invited.length ? { invited: { list: cardInvites({ ...invitations, received: invited }), total: invited.length } } : {}), ...(myPlays ? { plays: myPlays } : {}), ...(state.friendsVisibility ? {} : { friendKeys: state.friends.map((f) => f.key) }) }, now());
   }
 
   const greetedLinks = (except?: string) => [...peers.values()].filter((p) => p.key !== except).map((p) => bestLink(p.key)).filter((l): l is Link => !!l?.greeted);
@@ -1845,6 +1860,13 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       case 'presence':
         if (relationOf(state, key) !== 'friend') return;
         peer.presence = message.presence;
+        changed();
+        return;
+      case 'friends-of':
+        // Seul un ami me confie sa liste (amis en commun sur son profil et nos suggestions).
+        if (relationOf(state, key) !== 'friend') return;
+        if (message.keys.length) friendLists.set(key, message.keys);
+        else friendLists.delete(key);
         changed();
         return;
       case 'events':
@@ -2195,6 +2217,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   const chunkListeners = new Set<(key: string, frame: Buffer) => void>();
   const friendLink = (key: string) => (relationOf(state, key) === 'friend' ? bestLink(key) : undefined);
 
+  /** Les listes d'amis que mes amis m'ont confiées (mode « mes amis seulement ») : en mémoire, renvoyées à chaque liaison. */
+  const friendLists = new Map<string, string[]>();
+
   function broadcastFriends(message: SocialMessage): void {
     for (const f of state.friends) sendTo(f.key, message);
   }
@@ -2460,6 +2485,14 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       return () => roomListeners.delete(listener);
     },
     livePlayers: () => liveNow(liveBoard, now()).filter((b: LiveBeacon) => !shunned(b.key)),
+    setFriendsVisibility(v) {
+      const { friendsVisibility: _, ...rest } = state;
+      commit(v === 'public' ? rest : { ...rest, friendsVisibility: v });
+      // La carte suit (avec ou sans la liste) ; mes amis reçoivent la liste, ou une liste vide pour l'oublier.
+      announceCard();
+      broadcastFriends(friendsOfMessage());
+    },
+    friendsOf: (key) => friendLists.get(key),
     setPublicPresence(on) {
       const { publicPresence: _, ...rest } = state;
       commit(on ? rest : { ...rest, publicPresence: false });

@@ -25,7 +25,7 @@ import { isAvatarHash } from './avatar';
 import { cardPlaysText, parseCardPlays, type CardPlays } from './dailytables';
 import { INVITES_IN_CARD, INVITES_MAX, isCardInvite, type CardInvite } from './invitations';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
-import { normalizeName, type PresenceTable, type SocialEvent, type SocialState } from './social';
+import { FRIENDS_SHARED_MAX, normalizeName, type PresenceTable, type SocialEvent, type SocialState } from './social';
 
 export const PUBLIC_EVENTS_MAX = 20;
 export const PUBLIC_EVENTS_DAYS = 30;
@@ -68,8 +68,13 @@ export interface PublicCard {
    * une semaine passée ne compte plus.
    */
   week?: CardWeek;
-  /** Nombre de ses amis (jamais la liste). */
+  /** Nombre de ses amis. */
   friends?: number;
+  /**
+   * Ses amis (leurs clés, FRIENDS_IN_CARD au plus), pour les « amis en commun » (décision du 22/11/2026) :
+   * absents si le joueur les cache (« Ce que voient les autres »), ou d'une carte d'avant.
+   */
+  friendKeys?: string[];
   /**
    * Les personnes qu'il a invitées (invitations.ts) : les attestations signées par chacune, les
    * INVITES_IN_CARD plus récentes, et le total. Absents d'une carte d'avant ou sans personne invitée.
@@ -129,12 +134,25 @@ const isCountry = (v: unknown): v is string => typeof v === 'string' && /^[A-Z]{
 const isDayKey = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 const DAY = 86_400_000;
 
+/** Amis joints au plus à une carte publique (les amis en commun). */
+export const FRIENDS_IN_CARD = FRIENDS_SHARED_MAX;
+
+/**
+ * Les amis que j'ai en commun avec un joueur : mes amis que cite sa liste (celle de sa carte publique,
+ * ou celle qu'il m'a envoyée en ami). Rien sans liste (cachée, réservée à ses amis, ou carte d'avant).
+ */
+export function mutualFriends(mine: readonly string[], card: { friendKeys?: readonly string[] } | undefined): string[] {
+  if (!card?.friendKeys?.length) return [];
+  const theirs = new Set(card.friendKeys);
+  return mine.filter((k) => theirs.has(k));
+}
+
 // ---------------------------------------------------------------------------
 // Carte : faire, signer, vérifier
 
 function cardText(c: Omit<PublicCard, 'sig'>): string {
   // Niveau, semaine et amis n'entrent au texte que s'ils y sont : les cartes d'avant se vérifient toujours.
-  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}), ...(c.week ? { week: { of: c.week.of, xp: c.week.xp } } : {}), ...(c.invited ? { invited: c.invited.map((i) => ({ me: i.me, name: i.name, machine: i.machine, at: i.at, sig: i.sig })), invitedTotal: c.invitedTotal ?? c.invited.length } : {}), ...(c.plays ? { plays: cardPlaysText(c.plays) } : {}) });
+  return JSON.stringify({ app: 'cyberpinball', kind: 'card', key: c.key, name: c.name, country: c.country ?? null, avatar: c.avatar ?? null, badges: c.badges, records: c.records, events: c.events, likes: c.likes, at: c.at, ...(c.xp !== undefined ? { xp: c.xp } : {}), ...(c.friends !== undefined ? { friends: c.friends } : {}), ...(c.week ? { week: { of: c.week.of, xp: c.week.xp } } : {}), ...(c.invited ? { invited: c.invited.map((i) => ({ me: i.me, name: i.name, machine: i.machine, at: i.at, sig: i.sig })), invitedTotal: c.invitedTotal ?? c.invited.length } : {}), ...(c.plays ? { plays: cardPlaysText(c.plays) } : {}), ...(c.friendKeys ? { friendKeys: c.friendKeys } : {}) });
 }
 
 /** Mes évènements publics : records et badges des derniers jours, du plus récent au plus ancien. */
@@ -147,14 +165,14 @@ export function publicEvents(events: readonly SocialEvent[], now = new Date()): 
 }
 
 /** Ma carte, signée : les « J'aime » reçus sur ses évènements comptés à l'instant. */
-export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; week?: CardWeek; friends?: number; invited?: { list: CardInvite[]; total: number }; plays?: CardPlays }, now = new Date()): PublicCard {
+export function makeCard(state: Pick<SocialState, 'key' | 'name' | 'events' | 'badges'>, store: ProfileStore, extra: { country?: string; avatar?: string; records: number; xp?: number; week?: CardWeek; friends?: number; invited?: { list: CardInvite[]; total: number }; plays?: CardPlays; friendKeys?: readonly string[] }, now = new Date()): PublicCard {
   const events = publicEvents(state.events, now);
   const likes: Record<string, number> = {};
   for (const e of events) {
     const n = store.received.filter((l) => l.event === e.id && l.on && !store.hidden.includes(l.from)).length;
     if (n) likes[e.id] = n;
   }
-  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}), ...(extra.week && isDayKey(extra.week.of) ? { week: { of: extra.week.of, xp: Math.max(0, Math.min(Math.floor(extra.week.xp), extra.xp ?? Infinity)) } } : {}), ...(extra.invited?.list.length ? { invited: extra.invited.list.slice(-INVITES_IN_CARD), invitedTotal: Math.max(extra.invited.list.length, Math.floor(extra.invited.total)) } : {}), ...(extra.plays ? { plays: extra.plays } : {}) };
+  const base: Omit<PublicCard, 'sig'> = { key: state.key.publicKey, name: state.name, ...(extra.country ? { country: extra.country } : {}), ...(extra.avatar ? { avatar: extra.avatar } : {}), badges: state.badges.map((b) => b.id), records: extra.records, events, likes, at: now.toISOString(), ...(extra.xp !== undefined ? { xp: Math.max(0, Math.floor(extra.xp)) } : {}), ...(extra.friends !== undefined ? { friends: extra.friends } : {}), ...(extra.week && isDayKey(extra.week.of) ? { week: { of: extra.week.of, xp: Math.max(0, Math.min(Math.floor(extra.week.xp), extra.xp ?? Infinity)) } } : {}), ...(extra.invited?.list.length ? { invited: extra.invited.list.slice(-INVITES_IN_CARD), invitedTotal: Math.max(extra.invited.list.length, Math.floor(extra.invited.total)) } : {}), ...(extra.plays ? { plays: extra.plays } : {}), ...(extra.friendKeys?.length ? { friendKeys: [...new Set(extra.friendKeys)].slice(0, FRIENDS_IN_CARD) } : {}) };
   return { ...base, sig: signText(cardText(base), state.key) };
 }
 
@@ -223,7 +241,9 @@ export function verifyCard(raw: unknown, now = new Date()): PublicCard | undefin
     plays = parseCardPlays(r.plays);
     if (!plays) return undefined;
   }
-  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), ...(week ? { week } : {}), ...(invited ? { invited, invitedTotal: r.invitedTotal as number } : {}), ...(plays ? { plays } : {}), sig: r.sig };
+  // Ses amis : des clés de joueurs, sans doublon, FRIENDS_IN_CARD au plus.
+  if (r.friendKeys !== undefined && (!Array.isArray(r.friendKeys) || r.friendKeys.length > FRIENDS_IN_CARD || !r.friendKeys.every(isPlayerPublicKey) || new Set(r.friendKeys).size !== r.friendKeys.length)) return undefined;
+  const card: PublicCard = { key: r.key, name, ...(r.country ? { country: r.country as string } : {}), ...(r.avatar ? { avatar: r.avatar as string } : {}), badges: r.badges as string[], records: r.records, events: events as PublicEvent[], likes, at: r.at, ...(r.xp !== undefined ? { xp: r.xp as number } : {}), ...(r.friends !== undefined ? { friends: r.friends as number } : {}), ...(week ? { week } : {}), ...(invited ? { invited, invitedTotal: r.invitedTotal as number } : {}), ...(plays ? { plays } : {}), ...(r.friendKeys !== undefined ? { friendKeys: [...(r.friendKeys as string[])] } : {}), sig: r.sig };
   const { sig, ...base } = card;
   return verifyText(cardText(base), sig, card.key) ? card : undefined;
 }

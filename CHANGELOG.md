@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.3
 
+- Communauté : les joueurs suggérés et les demandes d'ami montrent les tables que vous avez en commun, en médaillons superposés (vos favorites d'abord), puis « +2 tables en commun » s'il y en a d'autres.
+- Communauté : l'onglet Joueurs montre les connectés du moment, et « Tous les connectés » ouvre la liste complète.
+- Communauté : les amis en commun s'affichent sur les joueurs suggérés et sur les demandes d'ami reçues, en pastilles superposées, et rapprochent en tête des suggestions. Vous choisissez qui voit vos amis (Mon profil › Confidentialité › Ce que voient les autres) : publics (par défaut), vos amis seulement, ou privés.
 - Arène : un onglet Scores mène directement aux tableaux des scores. On y trouve les tables jouées récemment, avec le premier de chacune et votre place ; Start ouvre le tableau d'une table. Dessous, toutes les tables (recherche, portée, période) et le classement des joueurs.
 - Arène : hors de l'Accueil, chaque onglet se parcourt comme une liste. Les flippers vont d'une ligne à l'autre et Start la valide, sans bloc où entrer ; l'Accueil garde ses blocs pour ses résumés et ses accès rapides.
 - Arène et Communauté : dans un onglet, Exit remet le curseur sur la barre d'onglets, sur l'onglet ouvert ; un second Exit revient à la roue. Le bandeau d'aide le dit.

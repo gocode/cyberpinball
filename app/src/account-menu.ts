@@ -50,7 +50,7 @@ export interface AccountMenuHost {
     openSystem(): void;
   };
   net: {
-    state(): { key: { publicKey: string }; name: string; avatar?: string; badges: unknown[]; friends: unknown[]; shareScores?: boolean; publicProfile?: boolean; publicPresence?: boolean; country?: string };
+    state(): { key: { publicKey: string }; name: string; avatar?: string; badges: unknown[]; friends: unknown[]; shareScores?: boolean; publicProfile?: boolean; publicPresence?: boolean; friendsVisibility?: 'friends' | 'private'; country?: string };
     rename(name: string): boolean;
     avatarFile(key: string): string | undefined;
     country(): string | undefined;
@@ -58,6 +58,7 @@ export interface AccountMenuHost {
     setShareScores(on: boolean): void;
     setPublicProfile(on: boolean): void;
     setPublicPresence(on: boolean): void;
+  setFriendsVisibility(v: 'public' | 'friends' | 'private'): void;
   };
   service: AccountService;
   /** Niveau du joueur : niveau, XP. */
@@ -578,6 +579,11 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
             s.publicProfile === false ? { text: t('Profil public : désactivé'), detail: t('Les autres ne voient que votre pseudo dans l’annuaire'), tone: 'quiet', icon: 'eye' } : { text: t('Profil public : visible de tous'), detail: t('Pays, badges, records et activité récente'), tone: 'ok', icon: 'eye' },
             s.shareScores === false ? { text: t('Scores : pas publiés'), detail: t('Vous voyez les classements ; vos parties n’y entrent pas'), tone: 'quiet', icon: 'trophy' } : { text: t('Scores : publiés aux classements'), detail: t('Amis, national et mondial ; jamais en mode invité'), tone: 'ok', icon: 'trophy' },
             s.publicPresence === false ? { text: t('Présence : vos amis seulement'), detail: t('Les autres ne vous voient pas dans « Joueurs en ligne »'), tone: 'quiet', icon: 'pulse' } : { text: t('Présence : en ligne pour tous'), detail: t('« En ligne » ou « En partie », jamais la table'), tone: 'ok', icon: 'pulse' },
+            s.friendsVisibility === 'private'
+              ? { text: t('Amis : privés'), detail: t('Personne ne voit vos amis en commun'), tone: 'quiet', icon: 'friend-list' }
+              : s.friendsVisibility === 'friends'
+                ? { text: t('Amis : vos amis seulement'), detail: t('Vos amis voient vos amis en commun ; les autres, non'), tone: 'ok', icon: 'friend-list' }
+                : { text: t('Amis : publics'), detail: t('Les joueurs voient les amis que vous avez en commun avec eux'), tone: 'ok', icon: 'friend-list' },
           ],
         },
       ],
@@ -591,6 +597,12 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         s.publicPresence === false
           ? { label: t('Apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(true), t('Vous apparaissez en ligne pour tous')) }
           : { label: t('Ne plus apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(false), t('Vous n’apparaissez plus en ligne pour les autres joueurs')) },
+        // Qui voit mes amis : Start passe au choix suivant (publics, amis seulement, privés), le curseur reste dessus.
+        s.friendsVisibility === 'private'
+          ? { label: t('Mes amis : privés'), detail: t('Start : publics'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('public'), t('Vos amis sont publics')) }
+          : s.friendsVisibility === 'friends'
+            ? { label: t('Mes amis : vos amis seulement'), detail: t('Start : privés'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('private'), t('Vos amis sont privés')) }
+            : { label: t('Mes amis : publics'), detail: t('Start : vos amis seulement'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('friends'), t('Vos amis ne sont visibles que de vos amis')) },
         backAction(itemBack),
       ],
       back: itemBack,
@@ -627,7 +639,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       'account-privacy': {
         get detail() {
           const s = me();
-          const hidden = [s.publicProfile === false, s.shareScores === false, s.publicPresence === false].filter(Boolean).length;
+          const hidden = [s.publicProfile === false, s.shareScores === false, s.publicPresence === false, s.friendsVisibility === 'private'].filter(Boolean).length;
           return hidden ? tn(hidden, '{n} élément réservé aux amis', '{n} éléments réservés aux amis') : t('Profil public, scores publiés, présence en ligne');
         },
         run: () => host.library.openCustom(buildPrivacy, 0),

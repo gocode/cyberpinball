@@ -22,10 +22,12 @@ export interface SuggestCandidate {
   online: boolean;
   /** Sur le même réseau local que ma borne. */
   nearby?: boolean;
+  /** Amis que nous avons en commun (sa carte publique les cite, publicprofile.ts, mutualFriends). */
+  mutual?: number;
 }
 
 /** Pourquoi un joueur est suggéré : la raison la plus forte, montrée sous son nom. */
-export type SuggestReason = 'newcomer' | 'tables' | 'nearby' | 'country' | 'level' | 'online';
+export type SuggestReason = 'newcomer' | 'mutual' | 'tables' | 'nearby' | 'country' | 'level' | 'online';
 
 export interface Suggestion {
   candidate: SuggestCandidate;
@@ -39,7 +41,7 @@ export const NEWCOMER_MAX_LEVEL = 3;
 export const LEVEL_CLOSE = 3;
 
 /**
- * Les joueurs à suggérer, les plus proches d'abord : tables en commun (le plus fort lien), même
+ * Les joueurs à suggérer, les plus proches d'abord : amis en commun (le plus fort lien), tables en commun, même
  * réseau local, même pays, niveau proche, nouveau venu (qu'on accueille), puis ceux en ligne. Jamais
  * un ami, un joueur bloqué ou à qui j'ai déjà écrit une demande : `skip` les écarte.
  */
@@ -51,9 +53,11 @@ export function suggestPlayers(candidates: readonly SuggestCandidate[], me: { co
     const sameCountry = Boolean(me.country && c.country === me.country);
     const closeLevel = c.level !== undefined && me.level !== undefined && Math.abs(c.level - me.level) <= LEVEL_CLOSE;
     const tables = Math.min(c.commonTables, 5);
-    const score = tables * 3 + (c.nearby ? 6 : 0) + (sameCountry ? 4 : 0) + (closeLevel ? 3 : 0) + (newcomer ? 3 : 0) + (c.online ? 5 : 0);
+    // Un ami en commun rapproche plus que tout (22/11/2026 : développer le réseau d'amis).
+    const mutual = Math.min(c.mutual ?? 0, 5);
+    const score = mutual * 5 + tables * 3 + (c.nearby ? 6 : 0) + (sameCountry ? 4 : 0) + (closeLevel ? 3 : 0) + (newcomer ? 3 : 0) + (c.online ? 5 : 0);
     // La raison dite : celle qui pèse le plus, un nouveau venu toujours dit comme tel (on l'accueille).
-    const reason: SuggestReason = newcomer ? 'newcomer' : c.nearby ? 'nearby' : tables >= 2 ? 'tables' : sameCountry ? 'country' : tables ? 'tables' : closeLevel ? 'level' : 'online';
+    const reason: SuggestReason = newcomer ? 'newcomer' : mutual ? 'mutual' : c.nearby ? 'nearby' : tables >= 2 ? 'tables' : sameCountry ? 'country' : tables ? 'tables' : closeLevel ? 'level' : 'online';
     if (!score) continue;
     out.push({ candidate: c, reason, score });
   }

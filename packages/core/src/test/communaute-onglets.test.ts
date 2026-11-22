@@ -33,6 +33,8 @@ interface Card {
   level?: { text: string };
   avatar?: { level?: number };
   bubble?: { text: string };
+  tables?: { title: string }[];
+  tablesNote?: string;
   lines?: unknown[];
   action?: number;
   buttons?: { label: string; quick?: boolean; action?: number }[];
@@ -81,7 +83,14 @@ function hub(opts: { online?: Player[]; everyone?: Player[]; incoming?: boolean 
       likedByMe: () => false,
     }),
     myLevel: () => 12,
-    players: { online: () => online, everyone: () => everyone, open: (_b: unknown, tab: string) => events.push(`joueurs:${tab}`), detail: () => '' },
+    players: {
+      online: () => online,
+      everyone: () => everyone,
+      // Inès a quatre tables en commun avec moi (la première est une de mes favorites).
+      sharedTables: (k: string) => (k === 'ines' ? ['Star Courier', 'Neon Abyss', 'Thunder Reef', 'Atlas Rising'].map((title) => ({ title, src: `cyber-media://${title}` })) : []),
+      open: (_b: unknown, tab: string) => events.push(`joueurs:${tab}`),
+      detail: () => '',
+    },
     profile: { open: (k: string) => events.push(`profil:${k}`), openMine: () => events.push('mon-profil') },
     friends: { find: () => events.push('trouver'), requests: () => events.push('demandes') },
     messages: {
@@ -105,7 +114,9 @@ function hub(opts: { online?: Player[]; everyone?: Player[]; incoming?: boolean 
   const built = () => opened!();
   const run = (k: string) => built().actions.find((a) => a.key === k)!.run();
   const inTabs = () => built().actions.some((a) => a.key!.startsWith('tab:'));
-  const atBlocks = () => built().actions.some((a) => a.key!.startsWith('block:'));
+  const atBlocks = () => built().actions.some((a) => a.key!.startsWith('block:section:') || a.key === 'block:tabs');
+  /** Un onglet en liste (hors Accueil) : ses éléments sont des arrêts directs. */
+  const inList = () => built().actions.some((a) => a.key!.startsWith('block:item:'));
   const current = () => TAB_IDS[built().hub.tabs.find((x) => x.current)!.label]!;
   /** Un onglet : remonter jusqu'à la barre d'onglets, puis Start sur lui (son contenu, au choix des blocs). */
   const tab = (id: string) => {
@@ -119,7 +130,7 @@ function hub(opts: { online?: Player[]; everyone?: Player[]; incoming?: boolean 
     assert.ok(i >= 0, `section « ${title} »`);
     built().actions.find((a) => a.key === `block:section:${i}`)!.run();
   };
-  return { menu, events, sent, built, at: () => at, run, tab, enter, inTabs, atBlocks, current };
+  return { menu, events, sent, built, at: () => at, run, tab, enter, inTabs, atBlocks, inList, current };
 }
 
 const TAB_IDS: Record<string, string> = { Accueil: 'home', Messages: 'messages', Joueurs: 'players', Groupes: 'groups', Salons: 'rooms', Profil: 'profile' };
@@ -144,10 +155,11 @@ test('Communauté à onglets : le curseur dans la barre d’onglets, les flipper
   h.built().keys!({ code: 'FlipperLeft' });
   h.built().keys!({ code: 'FlipperLeft' });
   assert.equal(h.current(), 'profile', 'la barre boucle');
-  // Start : dans le contenu, le curseur sur son premier bloc ; Exit remonte à la barre, puis à la roue.
+  // Start : dans le contenu, une liste sans blocs (hors Accueil, règle du 22/11/2026), le curseur sur son
+  // premier élément ; Exit remonte à la barre, puis à la roue.
   h.run('tab:profile');
-  assert.ok(h.atBlocks());
-  assert.equal(h.at(), 1);
+  assert.ok(h.inList(), h.built().actions.map((a) => a.key).join(', '));
+  assert.equal(h.at(), 0);
   h.built().back();
   assert.ok(h.inTabs(), 'Exit remonte à la barre d’onglets');
   assert.deepEqual(h.events, []);
@@ -167,7 +179,8 @@ test('Accueil : un récapitulatif par onglet ; Start ouvre l’onglet sur la mê
   h.enter('En ligne');
   assert.equal(h.current(), 'players');
   assert.equal(h.built().hub.sections[0]!.title, 'En ligne');
-  assert.ok(!h.atBlocks() && !h.inTabs(), 'dans la bande');
+  assert.ok(h.inList() && !h.inTabs(), 'dans la liste de l’onglet');
+  assert.equal(h.at(), 0, 'le curseur sur le premier élément de la bande');
   assert.ok(h.built().actions.some((a) => a.label === 'Ajouter'), 'on y ajoute un joueur d’un appui');
   // Exit : retour à l'accueil, le curseur sur ce récapitulatif (la barre d'onglets, puis Messages, puis En ligne).
   h.built().back();
@@ -206,6 +219,9 @@ test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui
     assert.match(c.level?.text ?? '', /^Niv\. \d+$/, `« Niv. N » sur ${c.title}`);
     assert.ok(c.avatar?.level, `l’anneau du palier sur ${c.title}`);
   }
+  // Les tables en commun en médaillons, trois au plus, puis « +1 table en commun » (22/11/2026).
+  const ines = sec.cards.find((c) => c.title === 'Inès')!;
+  assert.deepEqual([ines.tables?.map((x) => x.title), ines.tablesNote], [['Star Courier', 'Neon Abyss', 'Thunder Reef'], '+1 table en commun']);
   // Pas de « Regarder » : regarder un ami en direct n'existe pas encore.
   const labels = h.built().hub.sections.flatMap((s) => s.cards.flatMap((c) => (c.buttons ?? []).map((x) => x.label)));
   assert.ok(!labels.some((l) => /Regarder/i.test(l)), labels.join(', '));
@@ -234,7 +250,8 @@ test('Joueurs : la bande « En ligne » d’abord, puis les demandes reçues, l�
   h.menu.openHome(() => undefined);
   h.tab('players');
   const titles = h.built().hub.sections.map((s) => s.title);
-  assert.deepEqual(titles, ['En ligne', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
+  // « Connectés en ce moment » : ceux que la bande ne montre pas, et la liste complète d'un appui.
+  assert.deepEqual(titles, ['En ligne', 'Connectés en ce moment', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
   // Les entrées du bas : des lignes d'actions, chacune un arrêt au premier niveau.
   h.built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === 'Mes amis')!.run();
   assert.deepEqual(h.events, ['joueurs:friends']);

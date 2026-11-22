@@ -114,6 +114,30 @@
     return box;
   }
 
+  /**
+   * Des tables en médaillons superposés (tables en commun avec un joueur) : le logo de roue de chacune,
+   * son initiale faute de logo, son titre au survol ; puis ce qui suit (« +3 tables en commun »).
+   */
+  function tableStack(tables, note) {
+    const box = el('div', 'hub-tables');
+    const stack = el('span', 'hub-tables-stack');
+    for (const tb of tables) {
+      const disc = el('span', 'hub-table-disc');
+      disc.title = tb.title;
+      if (tb.src) {
+        const img = el('img', 'hub-table-logo');
+        img.src = tb.src;
+        img.alt = '';
+        img.addEventListener('error', () => img.replaceWith(el('span', 'hub-table-initial', tb.title.charAt(0).toUpperCase())));
+        disc.append(img);
+      } else disc.append(el('span', 'hub-table-initial', tb.title.charAt(0).toUpperCase()));
+      stack.append(disc);
+    }
+    box.append(stack);
+    if (note) box.append(el('span', 'hub-tables-note', note));
+    return box;
+  }
+
   /** La bulle du dernier message : « <Bruno> » en tête pour un groupe. */
   function bubble(b) {
     const node = el('p', `hub-bubble${b.group ? ' hub-bubble-group' : ''}`);
@@ -171,6 +195,15 @@
     if (c.count) title.append(el('em', 'hub-count', String(c.count)));
     main.append(title);
     if (c.seats?.length) main.append(seats(c.seats));
+    if (c.mutual?.avatars?.length) {
+      // Les amis en commun : leurs pastilles superposées, puis « 4 amis en commun ».
+      const box = el('div', 'hub-mutual');
+      const stack = el('span', 'hub-mutual-stack');
+      for (const a of c.mutual.avatars) stack.append(face(a, 'hub-mutual-face'));
+      box.append(stack, el('span', 'hub-tables-note', c.mutual.note));
+      main.append(box);
+    }
+    if (c.tables?.length) main.append(tableStack(c.tables, c.tablesNote));
     if (c.bubble) main.append(bubble(c.bubble));
     if (c.lines?.length) main.append(log(c.lines));
     if (c.detail) main.append(el('p', 'hub-card-detail', c.detail));

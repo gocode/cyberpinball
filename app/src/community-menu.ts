@@ -17,6 +17,7 @@ import {
   avatarView,
   type AvatarView,
   commonTables,
+  isFavorite,
   countryName,
   flagView,
   formatNumber,
@@ -63,6 +64,8 @@ export interface CommunityMenuHost {
   zoneKeys(): readonly string[];
   /** Les tables de la borne : « tables en commun » avec les joueurs classés. */
   tables(): readonly TableEntry[];
+  /** Le logo de roue d'une table (médaillon des tables en commun) ; absent : son initiale. */
+  wheel?(table: TableEntry): string | undefined;
   openProfile(key: string, back: () => void): void;
   /**
    * Mes amis (friends-menu.ts) : leur état en une ligne (en ligne, demandes reçues), « Trouver un
@@ -105,6 +108,8 @@ export interface CommunityMenu {
   players(): OnlinePlayer[];
   /** Tous les joueurs connus de la borne, ceux en ligne d'abord (joueurs suggérés). */
   everyone(): OnlinePlayer[];
+  /** Les tables que ce joueur et moi avons en commun : mes favorites d'abord, chacune avec son logo de roue. */
+  sharedTables(key: string): SharedTable[];
   /** « Joueurs » au téléphone : demandes reçues, filtres et groupes de la borne, `max` joueurs au plus par filtre. */
   remotePeople(max: number): RemotePeople;
   /** L'affiche du médaillon choisi dans la roue (plateau, fronton), comme celle du Juke-box. */
@@ -144,6 +149,13 @@ export interface CommunityPosterView extends MedallionPosterView {
   room?: { name: string; flag?: FlagView; present?: string; lines: { time: string; nick: string; hue: number; text: string }[]; problem?: string; quiet?: string };
   /** Les groupes et les demandes d'ami, en puces. */
   chips: { icon: IconName; text: string; hot?: boolean }[];
+}
+
+/** Une table en commun avec un joueur : son titre, son logo de roue, si c'est une de mes favorites. */
+export interface SharedTable {
+  title: string;
+  src?: string;
+  favorite?: true;
 }
 
 export interface PosterPerson {
@@ -230,6 +242,21 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     return [...out.values()];
   }
 
+  /**
+   * Les tables en commun avec un joueur (22/11/2026 : « qu'on sache de quelle table il s'agit sans être
+   * obligé de marquer leur nom ») : ses tables classées que j'ai aussi, mes favorites d'abord, avec leur logo.
+   */
+  function sharedTables(key: string): SharedTable[] {
+    const mine = host.tables();
+    const titles = commonTables(mine.map(presenceTable), net.rankings().scores).get(key) ?? [];
+    const out: SharedTable[] = [];
+    for (const title of titles) {
+      const table = mine.find((t) => presenceTable(t).title.trim().toLowerCase() === title.toLowerCase());
+      const src = table ? host.wheel?.(table) : undefined;
+      out.push({ title, ...(src ? { src } : {}), ...(table && isFavorite(table.info) ? { favorite: true } : {}) });
+    }
+    return out.sort((a, b) => Number(Boolean(b.favorite)) - Number(Boolean(a.favorite)));
+  }
   const myCountry = () => net.country();
   const avatar = (key: string, name: string) => avatarView(key, name, net.avatarFile(key));
   const countryLabel = (code: string | undefined) => (code ? countryName(code, locale()) : undefined);
@@ -704,6 +731,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     poster,
     players: () => onlineGroups(players(), myCountry(), 'all').flatMap((g) => g.players),
     everyone,
+    sharedTables,
     remotePeople,
   };
 }

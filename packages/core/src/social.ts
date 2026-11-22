@@ -157,6 +157,12 @@ export interface SocialState {
    */
   publicPresence?: boolean;
   /**
+   * Qui voit la liste de mes amis, pour les amis en commun (décision du mainteneur, 22/11/2026) : absent, tous (jointe
+   * à ma carte publique, le défaut) ; « friends », mes amis seulement (envoyée à chacun par sa liaison,
+   * jamais dans la carte) ; « private », personne.
+   */
+  friendsVisibility?: Exclude<FriendsVisibility, 'public'>;
+  /**
    * « Jouer en local » (localplay.ts) : toute la partie sociale retirée, niveaux compris ; le partage
    * (`enabled`) est alors coupé. Absent : la communauté est là.
    */
@@ -320,6 +326,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     ...(s.shareScores === false ? { shareScores: false } : {}),
     ...(s.publicProfile === false ? { publicProfile: false } : {}),
     ...(s.publicPresence === false ? { publicPresence: false } : {}),
+    ...(s.friendsVisibility === 'friends' || s.friendsVisibility === 'private' ? { friendsVisibility: s.friendsVisibility } : {}),
     ...(s.localPlay === true ? { localPlay: true as const } : {}),
     ...(typeof s.country === 'string' && /^[A-Z]{2}$/.test(s.country) ? { country: s.country } : {}),
     ...(isIso(s.profileOffered) ? { profileOffered: s.profileOffered } : {}),
@@ -403,6 +410,8 @@ export type SocialMessage =
   | { t: 'decline' }
   | { t: 'unfriend' }
   | { t: 'presence'; presence: Presence }
+  /** Mes amis (leurs clés), pour nos amis en commun : envoyé à mes seuls amis ; vide, je les cache. */
+  | { t: 'friends-of'; keys: string[] }
   | { t: 'events'; events: SocialEvent[] }
   /** Mon avatar a changé (absent : retiré) ; ceux qui le suivent le redemandent. */
   | { t: 'avatar'; avatar?: string }
@@ -410,6 +419,11 @@ export type SocialMessage =
   | { t: 'avatar-get'; avatar: string }
   /** L'image d'un avatar, en base64, contrôlée à la réception (decodeAvatarData). */
   | { t: 'avatar-data'; avatar: string; data: string };
+
+/** Qui voit la liste de mes amis (SocialState.friendsVisibility) ; « public » : tous. */
+export type FriendsVisibility = 'public' | 'friends' | 'private';
+/** Amis partagés au plus (carte publique, message à mes amis). */
+export const FRIENDS_SHARED_MAX = 300;
 
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : undefined);
 
@@ -491,6 +505,9 @@ export function parseSocialMessage(raw: unknown, now = new Date()): SocialMessag
       const presence = parsePresence(m.presence);
       return presence ? { t: 'presence', presence } : undefined;
     }
+    case 'friends-of':
+      // Des clés de joueurs, sans doublon, FRIENDS_SHARED_MAX au plus : sinon rien n'entre.
+      return Array.isArray(m.keys) && m.keys.length <= FRIENDS_SHARED_MAX && m.keys.every(isPlayerPublicKey) && new Set(m.keys).size === m.keys.length ? { t: 'friends-of', keys: [...(m.keys as string[])] } : undefined;
     case 'events':
       return Array.isArray(m.events) ? { t: 'events', events: m.events.slice(0, EVENTS_MAX).map(parseEvent).filter((e): e is SocialEvent => !!e) } : undefined;
     case 'avatar':

@@ -3468,6 +3468,8 @@ const communityMenu = createCommunityMenu({
   net: socialNet,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   tables: () => tables,
+  // Le logo de roue d'une table : les médaillons des tables en commun avec un joueur.
+  wheel: (table) => medias?.wheel(table),
   openProfile: (key, back) => profileMenu.openProfile(key, back),
   messages: {
     detail: () => chatMenu.item.detail ?? '',
@@ -3569,6 +3571,7 @@ const communityHub = createCommunityHub({
   players: {
     online: () => communityMenu.players(),
     everyone: () => communityMenu.everyone(),
+    sharedTables: (key) => communityMenu.sharedTables(key),
     open: (back, tab) => communityMenu.openPlayers(back, tab),
     detail: () => communityMenu.item.detail ?? '',
   },
