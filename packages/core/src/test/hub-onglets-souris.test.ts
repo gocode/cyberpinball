@@ -74,6 +74,12 @@ test('rendu : chaque onglet disponible envoie son identité au clic, même sans 
     vm.runInContext("document.body.append(CyberHub.render({ hub: hubView, cursor: 0, hint: '' }))", p.window);
     const tabs = p.document.querySelectorAll('.lib-hub:last-child .hub-tab');
     assert.equal(tabs.length, 4);
+    vm.runInContext("CyberHub.render({ hub: hubView, cursor: 1, hint: '' })", p.window);
+    const redrawn = p.document.querySelectorAll('.lib-hub:last-child .hub-tab');
+    for (const [i, tab] of [...tabs].entries()) {
+      assert.equal(tab, redrawn[i], 'le bouton reste en place pendant un rafraîchissement');
+      assert.equal(tab.tagName, 'BUTTON');
+    }
     for (const [i, tab] of [...tabs].entries()) {
       assert.equal(h.built().hub.tabs[i]!.action, undefined, 'le curseur est dans le contenu');
       const event = new (p.document.defaultView as unknown as { Event: new (t: string, o: object) => object }).Event('click', { bubbles: true });

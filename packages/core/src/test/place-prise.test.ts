@@ -215,6 +215,7 @@ test('Arène : « Reprendre ma place » lance la table, « Défier » grisé, «
     now: () => NOW,
   });
   menu.openHome(() => undefined);
+  built!().actions.find((a) => a.key === 'tab:home')!.run();
   const b = built!();
   const hero = b.hub.sections[0]!.cards[0]!;
   assert.equal(hero.title, 'vous a dépassé sur Attack from Mars');

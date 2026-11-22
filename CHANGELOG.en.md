@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Arena opens with the tab bar selected, so the flippers switch tabs immediately. In Arena and Community, the entire tab responds to clicks, even during a refresh.
 - A player's profile is redesigned like a social network profile, in the spirit of the tabbed Community: at the top, their large avatar (ring of their level, green ring when online), their flag, name and level, what they are doing right now and their numbers (friends, records, badges, groups, tables in common).
 - The actions of your relationship sit at the top of the profile, the main one first and selected on opening: Invite to play, Write and Their library for a friend; Add (+25 XP), Accept or Decline, Cancel the request for another player; Welcome them for a newcomer. An unavailable action stays visible, greyed out, with its reason ("Offline", "Friends only").
 - Four tabs, MagnaSave switches between them: Activity (their records, badges and games, each with its thumb; their tables of the week; their level and rarest badges), Records (their published scores, your tables first, with what you still have to catch up; Start puts the wheel on the table), Badges (all of theirs, by rarity) and About (country, friendship, library, identifier, invited players, public groups, then Hide their activity, Remove from my friends and Block).

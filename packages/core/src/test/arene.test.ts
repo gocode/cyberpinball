@@ -194,6 +194,7 @@ function arena(overrides: Record<string, unknown> = {}) {
     history: { open: () => events.push('historique') },
     players: () => [],
     zoneKeys: () => ['MagnaLeft', 'MagnaRight'],
+    navKeys: () => ({ previous: ['FlipLeft'], next: ['FlipRight'] }),
     now: () => NOW,
     ...overrides,
   });
@@ -213,6 +214,7 @@ function arena(overrides: Record<string, unknown> = {}) {
   };
   /** Un élément nommé, où qu'il soit : chaque bloc à tour de rôle, on y entre, on le cherche, on ressort. */
   const item = (label: string) => {
+    if (built().actions.some((a) => a.key!.startsWith('tab:'))) built().actions[opened!.at!]!.run();
     // Resté dans un bloc (l'écran ouvert de là n'est pas revenu) : on en ressort d'abord.
     if (!built().actions.some((a) => a.key!.startsWith('block:'))) built().back();
     // Une entrée du bas d'une section (choix), ou un élément d'un onglet en liste : un arrêt direct au premier niveau.
@@ -239,9 +241,13 @@ test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encor
   for (const id of ['Défis', 'Du jour', 'Ligue']) assert.equal(b.hub.tabs.find((t) => t.label === id)!.disabled, 'Bientôt', `${id} : grisé avec sa raison`);
   assert.equal(b.hub.tabs[0]!.current, true);
   // Dans la barre d'onglets : seulement ceux qui s'ouvrent, le curseur sur l'onglet ouvert.
-  h.run('block:tabs');
   assert.deepEqual(h.built().actions.map((a) => a.key), ['tab:home', 'tab:games', 'tab:progress'], 'Défis, Du jour et Ligue : ni flipper ni clic ne les ouvrent');
   assert.equal(h.at(), 0);
+  for (const [code, key, label] of [['FlipRight', 'tab:games', 'Parties'], ['FlipRight', 'tab:progress', 'Progression'], ['FlipLeft', 'tab:games', 'Parties'], ['FlipLeft', 'tab:home', 'Accueil']] as const) {
+    assert.ok(h.built().keys!({ code }));
+    assert.equal(h.built().actions[h.at()!]!.key, key);
+    assert.equal(h.built().hub.tabs.find((tab) => tab.current)?.label, label);
+  }
   // Exit depuis la barre d'onglets : la roue (règle du 22/11/2026, « exit à nouveau : on sort de l'écran »).
   h.built().back();
   assert.deepEqual(h.events, ['roue']);
@@ -272,11 +278,12 @@ test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exi
   // Léa vient de me passer devant sur Attack from Mars : la carte du moment a deux boutons.
   const h = arena({ net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }), rankings: () => store() }), table: { has: () => true, go: () => h.events.push('table') } });
   h.menu.openHome(() => h.events.push('roue'));
+  h.run('tab:home');
   const b = h.built();
   // Premier niveau : une action par bloc, la barre d'onglets d'abord, puis chaque section qui a de quoi agir.
   assert.ok(b.actions.every((a) => a.key!.startsWith('block:')), b.actions.map((a) => a.key).join(', '));
   assert.equal(b.actions[0]!.key, 'block:tabs');
-  assert.equal(h.at(), 1, 'à l’ouverture, le curseur sur le premier bloc du contenu');
+  assert.equal(h.at(), 1, 'Start place le curseur sur le premier bloc du contenu');
   // Les blocs de l'Accueil : la barre d'onglets, la carte du moment, jouer, classements, progression, et
   // sous chacune ses entrées, en lignes d'actions (un arrêt chacune, 21/11/2026) ; le barème des XP se lit
   // seulement : ce n'est pas un bloc (aucun arrêt pour rien).
@@ -403,6 +410,7 @@ test('onglets hors Accueil : en liste, chaque élément est un arrêt direct des
   assert.equal(h.events.at(-1), 'roue');
   // L'Accueil garde ses blocs (résumés, accès rapides).
   h.menu.openHome(() => undefined);
+  h.run('tab:home');
   assert.ok(h.built().actions.some((a) => a.key!.startsWith('block:section:')));
 });
 

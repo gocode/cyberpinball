@@ -92,20 +92,30 @@
     return box;
   }
 
-  function tabs(list, cursor) {
-    const bar = el('nav', 'hub-tabs');
-    for (const tab of list) {
-      const node = el('div', `hub-tab${tab.current ? ' hub-on' : ''}${tab.disabled ? ' hub-off' : ''}${tab.action !== undefined && tab.action === cursor ? ' selected' : ''}`);
-      node.append(icon(tab.icon, 'hub-tab-icon'), el('span', 'hub-tab-label', tab.label));
+  function tabs(bar, list, cursor) {
+    bar.className = 'hub-tabs';
+    delete bar.dataset.act;
+    const previous = new Map([...bar.children].map((node) => [node.dataset.tab, node]));
+    const nodes = list.map((tab) => {
+      const node = previous.get(tab.id) ?? el('button');
+      node.type = 'button';
+      node.tabIndex = -1;
+      node.dataset.tab = tab.id;
+      node.disabled = Boolean(tab.disabled);
+      node.setAttribute('aria-pressed', String(tab.current));
+      node.className = `hub-tab${tab.current ? ' hub-on' : ''}${tab.disabled ? ' hub-off' : ''}${tab.action !== undefined && tab.action === cursor ? ' selected' : ''}`;
+      node.replaceChildren(icon(tab.icon, 'hub-tab-icon'), el('span', 'hub-tab-label', tab.label));
+      node.title = tab.disabled ?? '';
+      delete node.dataset.act;
       if (tab.disabled) {
         node.append(el('span', 'hub-tab-why', tab.disabled));
-        node.title = tab.disabled;
       }
       if (tab.attention) node.append(el('span', 'hub-dot'));
       // Le clic reste disponible, même quand les flippers parcourent le contenu.
       if (!tab.disabled) actOn(node, { type: 'hub-tab', tab: tab.id });
-      bar.append(node);
-    }
+      return node;
+    });
+    placeInto(bar, nodes);
     return bar;
   }
 
@@ -365,13 +375,21 @@
     return box;
   }
 
+  let rendered;
+
   /** L'écran entier (renderLibrary le renvoie à la place de l'écran de menu). */
   function render(v) {
     const h = v.hub;
     const desk = document.documentElement.classList.contains('menu-desktop');
-    const o = el('section', `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}${h.person ? ' hub-profile' : ''}`);
+    // Un rafraîchissement entre l’appui et le relâchement ne doit pas retirer le bouton du document.
+    const same = rendered?.root.isConnected && rendered.medallion === h.medallion;
+    const o = same ? rendered.root : el('section');
+    const bar = same ? rendered.bar : el('nav');
+    rendered = { root: o, medallion: h.medallion, bar };
+    o.className = `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}${h.person ? ' hub-profile' : ''}`;
     o.dataset.navOrder = (v.order ?? []).join(',');
-    if (h.person) o.append(person(h.person, h.facts, v.cursor, h.start));
+    const top = [];
+    if (h.person) top.push(person(h.person, h.facts, v.cursor, h.start));
     else {
       const head = el('header', 'hub-head');
       const titles = el('div', 'hub-titles');
@@ -383,10 +401,10 @@
       }
       head.append(medal(h.medallion), titles);
       if (h.band) head.append(band(h.band));
-      o.append(head);
+      top.push(head);
     }
     // Un écran sans onglets (le retour de partie) : pas de barre vide.
-    if (h.tabs.length) o.append(blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
+    if (h.tabs.length) top.push(blockify(tabs(bar, h.tabs, v.cursor), h.tabsBlock, v.cursor));
     else o.classList.add('hub-no-tabs');
     const body = el('div', 'hub-body');
     // Les blocs du contenu s'atteignent aux flippers (le choix d'un bloc l'amène dans la vue) ; depuis
@@ -407,7 +425,7 @@
       h.sections.forEach((s, i) => (leftSide(s, i) ? left : right).append(section(s, v.cursor, h.start)));
       body.append(left, right);
     } else for (const s of h.sections) body.append(section(s, v.cursor, h.start));
-    o.append(body, foot(v.hint));
+    placeInto(o, [...top, body, foot(v.hint)]);
     return o;
   }
 

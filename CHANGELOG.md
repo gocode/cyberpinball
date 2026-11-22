@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Arène : les flippers changent d’onglet dès l’ouverture. Dans l’Arène et la Communauté, chaque onglet répond au clic sur toute sa surface, même pendant un rafraîchissement.
 - Le profil d'un joueur est refait comme celui d'un réseau social, dans l'esprit de la Communauté à onglets : en tête, sa pastille en grand (anneau de son niveau, anneau vert quand il est en ligne), son drapeau, son nom et son niveau, ce qu'il fait en ce moment et ses chiffres (amis, records, badges, groupes, tables en commun).
 - Les actions de votre relation sont en tête du profil, la principale d'abord et choisie à l'ouverture : Inviter à jouer, Écrire et Sa bibliothèque pour un ami ; Ajouter (+25 XP), Accepter ou Refuser, Annuler la demande pour un autre joueur ; Lui souhaiter la bienvenue pour un nouveau venu. Une action indisponible reste visible, grisée, avec sa raison (« Hors ligne », « Entre amis seulement »).
 - Quatre onglets, MagnaSave passe de l'un à l'autre : Activité (ses records, badges et parties, chacun avec son pouce ; ses tables de la semaine ; son niveau et ses badges les plus rares), Records (ses scores publiés, d'abord sur vos tables, avec ce qu'il vous reste à rattraper ; Start met la roue sur la table), Badges (tous les siens, par rareté) et À propos (pays, amitié, bibliothèque, identifiant, personnes invitées, groupes publics, puis Masquer son activité, Retirer de mes amis et Bloquer).

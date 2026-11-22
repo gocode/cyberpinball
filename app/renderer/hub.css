@@ -220,10 +220,15 @@
   border-radius: calc(14 * var(--u));
   border: calc(1.5 * var(--u)) solid var(--line-soft);
   background: color-mix(in oklab, var(--surface) 70%, transparent);
+  font-family: inherit;
   font-size: calc(21 * var(--u));
   font-weight: 600;
   color: var(--ink-muted);
   text-align: center;
+}
+
+.hub-tab > * {
+  pointer-events: none;
 }
 
 .hub-tab-label {

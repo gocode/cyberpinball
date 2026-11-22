@@ -97,6 +97,7 @@ export interface ArenaMenuHost {
    */
   challenges?: Pick<ChallengesMenu, 'sections' | 'playCards' | 'attention' | 'boardPage' | 'button'>;
   zoneKeys(): readonly string[];
+  navKeys(): { previous: readonly string[]; next: readonly string[] };
   now?(): Date;
 }
 
@@ -667,7 +668,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
   }
 
   let home: () => void = () => undefined;
-  const hub = createHubScreen({ library: host.library, zoneKeys: host.zoneKeys }, (tab, reopen): HubSpec => {
+  const hub = createHubScreen({ library: host.library, zoneKeys: host.zoneKeys, navKeys: host.navKeys }, (tab, reopen): HubSpec => {
     const b = band();
     const live = playing();
     const week = weekXp(host.levels.state(), now());
@@ -703,7 +704,7 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       default:
         return { ...spec, sections: homeSections(back, reopen) };
     }
-  });
+  }, { menuFirst: true });
 
   return {
     openHome(back) {

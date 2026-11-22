@@ -3721,6 +3721,7 @@ const arenaMenu = createArenaMenu({
   write: (key, back) => (socialNet.state().friends.some((f) => f.key === key) ? { run: () => chatMenu.openThread(key, back) } : { off: t('Entre amis seulement') }),
   // Les défis (challenges-menu.ts) : l'onglet « Défis », les cartes « Défi de … », la page de l'affiche, « Défier ».
   challenges: challengesMenu,
+  navKeys: () => KEYS,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
 });
 // Retour de partie (game-return.ts, 21/11/2026) : après une partie qui apporte du neuf, le score, les XP,
