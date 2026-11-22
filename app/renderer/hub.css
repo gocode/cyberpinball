@@ -1092,6 +1092,227 @@
   opacity: 0.5;
 }
 
+/*
+ * ---------- Profil d'un joueur (22/11/2026) ----------
+ * L'en-tête d'un réseau social : la pastille en grand (l'anneau du palier, celui de la présence autour),
+ * ce que la relation dit de lui, le drapeau, le nom et le niveau, ce qu'il fait, ses chiffres ; dessous
+ * (au bureau : à droite), les actions de la relation, chacune un arrêt des flippers.
+ */
+.hub-head.hub-person {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: calc(34 * var(--u));
+  row-gap: calc(22 * var(--u));
+}
+
+.hub-person-face {
+  /* La lueur et l'anneau de présence débordent de la pastille : la marge les garde loin du bord. */
+  margin: calc(14 * var(--u));
+  width: calc(150 * var(--u));
+  height: calc(150 * var(--u));
+  font-size: calc(60 * var(--u));
+}
+
+.hub-person-face.hub-ring.hub-ring-online,
+.hub-person-face.hub-ring.hub-ring-playing {
+  --ring: var(--signal);
+  box-shadow: 0 0 0 0.05em var(--void), 0 0 0 0.11em var(--tier, var(--line-strong)), 0 0 0 0.17em var(--void), 0 0 0 0.24em var(--ring);
+}
+
+.hub-person-face.hub-ring.hub-ring-playing {
+  box-shadow: 0 0 0 0.05em var(--void), 0 0 0 0.11em var(--tier, var(--line-strong)), 0 0 0 0.17em var(--void), 0 0 0 0.24em var(--ring), 0 0 0.4em var(--signal-haze, rgba(139, 226, 58, 0.35));
+}
+
+.hub-person .hub-titles {
+  display: grid;
+  gap: calc(6 * var(--u));
+  min-width: 0;
+}
+
+.hub-person-eyebrow {
+  font-size: calc(20 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+
+.hub-person-eyebrow.hub-tone-signal {
+  color: var(--signal);
+}
+
+.hub-person-eyebrow.hub-tone-warning {
+  color: var(--warning);
+}
+
+/* Le drapeau, le nom (coupé sur une ligne), le niveau : sur la même ligne de base. */
+.hub-title.hub-person-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(10 * var(--u)) calc(14 * var(--u));
+  min-width: 0;
+  font-size: calc(62 * var(--u));
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+}
+
+.hub-person-flag {
+  width: calc(44 * var(--u));
+  height: calc(33 * var(--u));
+  border-radius: calc(4 * var(--u));
+}
+
+/* Un nom long passe à la ligne plutôt que d'être coupé : c'est l'identité du joueur. */
+.hub-person-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.hub-person-name .hub-lv {
+  flex: none;
+  margin: 0;
+  font-size: calc(24 * var(--u));
+  padding: calc(3 * var(--u)) calc(14 * var(--u));
+  letter-spacing: 0.04em;
+}
+
+.hub-person-status {
+  margin: 0;
+  font-size: calc(24 * var(--u));
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.hub-person-status.hub-tone-signal {
+  color: var(--signal);
+}
+
+.hub-person-status.hub-tone-meta {
+  color: var(--meta);
+}
+
+.hub-person-status.hub-tone-warning {
+  color: var(--warning);
+}
+
+.hub-person .hub-facts {
+  margin-top: calc(4 * var(--u));
+  font-size: calc(23 * var(--u));
+  gap: calc(6 * var(--u)) calc(18 * var(--u));
+}
+
+/* Les actions de la relation, en pied de l'en-tête : à la taille des boutons des cartes, un peu plus grands. */
+.hub-person-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(12 * var(--u));
+  min-width: 0;
+}
+
+.hub-person-actions .hub-button {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: calc(60 * var(--u));
+  padding: calc(12 * var(--u)) calc(22 * var(--u));
+  font-size: calc(24 * var(--u));
+  line-height: 1.25;
+}
+
+/* La touche Start n'est pas cerclée dans l'en-tête (le pied la nomme) : le bouton choisi ne s'élargit pas, rien ne passe à la ligne. */
+.hub-person-actions .hub-button-key {
+  display: none;
+}
+
+.hub-person-actions .hub-button-xp {
+  font-size: max(calc(20 * var(--u)), 0.9em);
+}
+
+/* Indisponible : gris lisible et pointillés, sans voile qui le fonde dans le fond ; sa raison à 20 unités. */
+.hub-person-actions .hub-button.hub-off {
+  opacity: 1;
+  color: #91a7a0;
+  background: var(--surface-sunken);
+  border-color: var(--line-strong);
+}
+
+.hub-profile .hub-tab-why,
+.hub-person-actions .hub-button-why {
+  font-size: calc(20 * var(--u));
+  line-height: 1.25;
+}
+
+/* Une liste déjà dans son bloc : le liseré du bloc suffit, pas de second cadre autour de ses lignes. */
+.lib-hub.hub-profile .hub-block .hub-cards.hub-layout-list {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.lib-hub.hub-profile .hub-body {
+  row-gap: calc(32 * var(--u));
+}
+
+.lib-hub.hub-profile .hub-col {
+  gap: calc(28 * var(--u));
+}
+
+/* L'écart à rattraper, écrit en toutes lettres : sur deux lignes au besoin, chiffres alignés. */
+.lib-hub.hub-profile .hub-card-aside.hub-tone-warning {
+  max-width: calc(240 * var(--u));
+  /* Le nombre, puis « à rattraper » dessous (un retour à la ligne dans le texte). */
+  white-space: pre-line;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.hub-button-icon {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+  flex: none;
+}
+
+/* Le pouce devant le nombre de « J'aime » d'une carte. */
+.hub-card-aside.hub-card-aside-ic {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  color: var(--ink-muted);
+}
+
+.hub-aside-icon {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-head.hub-person {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.lib-hub.hub-desk .hub-person-face {
+  width: calc(120 * var(--u));
+  height: calc(120 * var(--u));
+  font-size: calc(48 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-title.hub-person-name {
+  font-size: calc(52 * var(--u));
+}
+
+.lib-hub.hub-desk .hub-person-actions {
+  grid-column: 3;
+  justify-content: flex-end;
+  align-self: center;
+  max-width: calc(720 * var(--u));
+}
+
+.lib-hub.hub-desk.hub-profile .hub-body {
+  row-gap: calc(26 * var(--u));
+}
+
 /* ---------- Pied : les commandes ---------- */
 
 .hub-foot {

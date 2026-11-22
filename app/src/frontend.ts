@@ -309,6 +309,7 @@ import {
   tn,
   shownCrowd,
   invitedOf,
+  welcomeLine,
   type RoomId,
   REMOTE_ENTRIES_MAX,
   isJukeboxAction,
@@ -3312,9 +3313,30 @@ function blockPlayer(key: string): void {
   socialNet.block(key);
   chatService.clear(key);
 }
+/** La roue sur une table (un rival de l'Arène, un record d'un profil) : comme une table touchée au téléphone. */
+const wheelTable = {
+  has: (table: PresenceTable) => Boolean(shelfTableOf(table)),
+  go: (table: PresenceTable) => {
+    const entry = shelfTableOf(table);
+    if (!entry) return;
+    const shelf = collections.shelf();
+    const picked = collections.move(shelf.tables.indexOf(entry) - shelf.index);
+    pointAtTable(picked ?? entry);
+    library.leave();
+    playUiSound('solenoid');
+    broadcast();
+  },
+};
 const profileMenu = createProfileMenu({
   library,
   net: socialNet,
+  // Le profil en écran à onglets (22/11/2026) : MagnaSave change d'onglet ; mon profil ouvre les rubriques du Menu système.
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  myLevel: () => levelTracker.view().level,
+  system: { open: (group, back) => library.openSystemGroupFrom(group, back) },
+  table: wheelTable,
+  commonTables: (key) => communityMenu.everyone().find((p) => p.key === key)?.commonTables,
+  welcome: (name) => roomsMenu.write(roomsMenu.defaultRoom(), welcomeLine(name)),
   // Le seul écran d'un joueur (17/11/2026) : la relation y ajoute présence, bibliothèque et demandes d'ami.
   relation: (key, name, ctx) => friendsMenu.playerPart(key, name, ctx),
   writeDetail: (key) => chatMenu.writeDetail(key),
@@ -3686,19 +3708,7 @@ const arenaMenu = createArenaMenu({
   history: { open: (back) => library.runSystemItem('game-history', back) },
   players: () => communityMenu.players(),
   // La roue sur la table d'un rival ou d'un record : comme une table touchée au téléphone.
-  table: {
-    has: (table) => Boolean(shelfTableOf(table)),
-    go: (table) => {
-      const entry = shelfTableOf(table);
-      if (!entry) return;
-      const shelf = collections.shelf();
-      const picked = collections.move(shelf.tables.indexOf(entry) - shelf.index);
-      pointAtTable(picked ?? entry);
-      library.leave();
-      playUiSound('solenoid');
-      broadcast();
-    },
-  },
+  table: wheelTable,
   // La place qu'on vient de me prendre (place-taken.ts) : l'action du moment ; « Reprendre ma place » lance la table.
   places: {
     current: () => placeTaken.current(),

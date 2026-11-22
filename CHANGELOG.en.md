@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- A player's profile is redesigned like a social network profile, in the spirit of the tabbed Community: at the top, their large avatar (ring of their level, green ring when online), their flag, name and level, what they are doing right now and their numbers (friends, records, badges, groups, tables in common).
+- The actions of your relationship sit at the top of the profile, the main one first and selected on opening: Invite to play, Write and Their library for a friend; Add (+25 XP), Accept or Decline, Cancel the request for another player; Welcome them for a newcomer. An unavailable action stays visible, greyed out, with its reason ("Offline", "Friends only").
+- Four tabs, MagnaSave switches between them: Activity (their records, badges and games, each with its thumb; their tables of the week; their level and rarest badges), Records (their published scores, your tables first, with what you still have to catch up; Start puts the wheel on the table), Badges (all of theirs, by rarity) and About (country, friendship, library, identifier, invited players, public groups, then Hide their activity, Remove from my friends and Block).
+- My profile is the same screen: what other players see, with Edit my profile, Privacy and My account at the top; Start on one of my posts shows who liked it.
 - An interrupted prerelease can be resumed through grouped publishing without changing its version number.
 - Community and Arena: the top tabs remain clickable with the mouse from every navigation state, without having to press Exit.
 - Player challenges: challenge a friend or a ranked player on the exact version of a table, with your best score or the one from the game you just played; they have 48 h, unlimited tries, and both of you can still raise your score. At the deadline, the higher score wins 40 XP, then "Rematch" in one press. The challenged player can decline.

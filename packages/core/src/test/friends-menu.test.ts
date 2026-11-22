@@ -232,29 +232,49 @@ test('le message d’un geste reste aux redessins (changement du profil, 250 ms 
   assert.ok(!rows().includes('Bibliothèque plus partagée'), 'effacé au geste suivant');
 });
 
-/** La fiche de Bruno. */
+/** Le profil de Bruno (écran à onglets, profile-menu.ts). */
 async function friendPage(menu: ReturnType<typeof setup>['menu'], last: ReturnType<typeof setup>['last']): Promise<Built> {
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
   return last().build();
 }
 
-test('fiche d’un ami : l’invitation toujours là, grisée hors ligne, active en partie avec la notification annoncée', async () => {
+/** Ce que le profil à onglets montre : l'en-tête du joueur, ses onglets, ses sections. */
+interface ProfileHub {
+  person: { name: string; eyebrow?: string; status?: { text: string }; buttons: { label: string; off?: string; primary?: boolean; action?: number }[] };
+  tabs: { label: string; current: boolean; disabled?: string }[];
+  sections: { title?: string; cards: { title: string; detail?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
+}
+const hubOf = (b: Built) => (b as Built & { hub: ProfileHub }).hub;
+const headButton = (b: Built, label: string) => hubOf(b).person.buttons.find((x) => x.label === label);
+/** Start sur une action de l'en-tête (un bloc d'une seule action). */
+async function pressButton(b: Built, label: string): Promise<void> {
+  const button = headButton(b, label);
+  assert.ok(button?.action !== undefined, `« ${label} » : une action de l’en-tête`);
+  await b.actions[button.action]!.run();
+}
+/** Un onglet du profil : Exit remonte à la barre d'onglets, puis Start sur l'onglet. */
+async function openTab(last: () => { build: Build }, label: string): Promise<Built> {
+  (last().build() as Built & { back(): void }).back();
+  await last().build().actions.find((a) => a.label === label)!.run();
+  return last().build();
+}
+
+test('profil d’un ami : l’invitation toujours là, grisée hors ligne avec sa raison, active en ligne et en partie', async () => {
   const offline = setup();
-  const invite = (b: Built) => b.actions.find((a) => a.label === 'Inviter à une partie en direct');
-  const grey = invite(await friendPage(offline.menu, offline.last));
-  assert.equal(grey?.tone, 'quiet');
-  assert.equal(grey?.detail, 'Hors ligne : invitez-le quand il sera connecté');
-  const before = offline.opened.length;
-  await grey!.run();
-  assert.equal(offline.opened.length, before, 'grisée : Start n’ouvre rien');
+  const page = await friendPage(offline.menu, offline.last);
+  assert.equal(headButton(page, 'Inviter à jouer')?.off, 'Hors ligne', 'grisée, sa raison');
+  assert.equal(headButton(page, 'Inviter à jouer')?.action, undefined, 'grisée : jamais un arrêt des flippers');
   const menu = setup(undefined, 'menu');
-  assert.equal(invite(await friendPage(menu.menu, menu.last))?.detail, 'Chacun sur sa borne, au même moment');
+  const online = await friendPage(menu.menu, menu.last);
+  assert.equal(headButton(online, 'Inviter à jouer')?.primary, true, 'en ligne : l’action principale');
+  assert.equal(hubOf(online).person.status?.text, 'En ligne');
   const playing = setup(undefined, 'playing');
-  const active = invite(await friendPage(playing.menu, playing.last));
-  assert.equal(active?.tone, 'ok');
-  assert.equal(active?.detail, 'En partie : il recevra une notification discrète sur sa table');
-  await active!.run();
+  const busy = await friendPage(playing.menu, playing.last);
+  assert.match(hubOf(busy).person.status?.text ?? '', /^En partie sur Glass Lagoon · depuis /, 'entre amis, sa table');
+  // À l'ouverture, le curseur est sur l'action principale.
+  assert.equal(playing.last().at, 0);
+  await pressButton(busy, 'Inviter à jouer');
   assert.equal(playing.last().build().heading, 'Partie en direct avec Bruno');
 });
 
@@ -267,21 +287,24 @@ test('un seul écran par joueur : le profil, enrichi pour un ami ; plus de « Vo
   const played = { id: 'p1', kind: 'played', at: new Date().toISOString(), table: { title: 'Glass Lagoon' }, seconds: 600 };
   const { menu, last } = setup(undefined, undefined, undefined, { events: [played] });
   const friend = await friendPage(menu, last);
-  assert.match(friend.subheading ?? '', /Votre ami$/);
-  const labels = friend.actions.map((a) => a.label);
-  for (const want of ['Inviter à une partie en direct', 'Voir sa bibliothèque', 'Écrire un message', 'Retirer de mes amis', 'Retour']) assert.ok(labels.includes(want), `profil d’un ami : « ${want} »`);
-  for (const gone of ['Voir sa fiche', 'Voir son profil public', 'Envoyer une demande d’ami']) assert.ok(!labels.includes(gone), `profil d’un ami : pas de « ${gone} »`);
-  const activity = friend.sections.find((x) => x.title?.startsWith('Activité récente'));
-  assert.ok(activity?.rows.some((r) => r.text.startsWith('A joué à Glass Lagoon')), 'ses parties jouées dans la liste d’activité');
-  assert.ok(!friend.sections.some((x) => x.title === 'Derniers évènements'), 'plus de seconde liste');
-  // Retirer de mes amis : le même écran, devenu celui d'un joueur qui n'est pas un ami.
-  await friend.actions.find((a) => a.label === 'Retirer de mes amis')!.run();
+  assert.match(hubOf(friend).person.eyebrow ?? '', /^Amis depuis /);
+  const labels = hubOf(friend).person.buttons.map((b) => b.label);
+  for (const want of ['Inviter à jouer', 'Sa bibliothèque']) assert.ok(labels.includes(want), `profil d’un ami : « ${want} »`);
+  for (const gone of ['Voir sa fiche', 'Voir son profil public', 'Ajouter']) assert.ok(!labels.includes(gone), `profil d’un ami : pas de « ${gone} »`);
+  const activity = hubOf(friend).sections.filter((x) => x.title === 'Activité');
+  assert.equal(activity.length, 1, 'une seule liste d’activité');
+  assert.ok(activity[0]!.cards.some((c) => c.title.startsWith('A joué à Glass Lagoon')), 'ses parties jouées dans la liste d’activité');
+  // Retirer de mes amis (onglet À propos, ligne de menu) : le même écran, devenu celui d'un joueur qui n'est pas un ami.
+  const about = await openTab(last, 'À propos');
+  const remove = about.actions.find((a) => a.label === 'Retirer de mes amis');
+  assert.ok(remove, 'À propos : « Retirer de mes amis »');
+  await remove.run();
   await last().build().actions.find((a) => a.label === 'Retirer')!.run();
   const after = last().build();
   assert.equal(after.heading, 'Bruno');
-  assert.match(after.subheading ?? '', /pas votre ami$/);
-  assert.ok(after.sections.some((x) => x.rows.some((r) => r.text === 'Bruno retiré de vos amis')));
-  assert.ok(after.actions.some((a) => a.label === 'Envoyer une demande d’ami'));
+  assert.equal(hubOf(after).person.eyebrow, 'Bruno retiré de vos amis', 'le constat, en tête');
+  assert.equal(headButton(after, 'Ajouter')?.off, undefined, 'la demande d’ami, possible');
+  assert.equal(headButton(after, 'Écrire')?.off, 'Entre amis seulement', 'Écrire grisé, sa raison');
   // Aucun écran ne renvoie plus vers un second écran du même joueur.
   const src = path.join(REPO_ROOT, 'app', 'src');
   for (const file of fs.readdirSync(src).filter((f) => f.endsWith('.ts'))) {
@@ -311,18 +334,18 @@ test('« Jouer avec un ami » : grisée sans ami en ligne ; sinon le choix de l�
   uniqueIcons(choose, 'Jouer avec un ami');
 });
 
-test('fiche d’un ami et sa bibliothèque : actions uniques, Retour en dernier', async () => {
+test('profil d’un ami et sa bibliothèque : le nom seul, l’identifiant dans À propos', async () => {
   const { menu, last } = setup();
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
   const friend = last().build();
   assert.equal(friend.heading, 'Bruno', 'le nom seul');
-  noTag(friend, 'fiche d’un ami');
-  // L'identifiant unique : sur la fiche seulement.
-  assert.ok(friend.sections.some((x) => x.rows.some((r) => /^Identifiant : [0-9A-F]{4}(-[0-9A-F]{4}){3}$/.test(r.text))));
-  assert.equal(friend.actions.at(-1)!.label, 'Retour');
-  uniqueIcons(friend, 'fiche d’un ami');
-  await friend.actions.find((a) => a.label === 'Voir sa bibliothèque')!.run();
+  assert.equal(hubOf(friend).person.name, 'Bruno');
+  noTag(friend, 'profil d’un ami');
+  // L'identifiant unique : sur son profil seulement, dans À propos.
+  const about = await openTab(last, 'À propos');
+  assert.ok(hubOf(about).sections.some((x) => x.cards.some((c) => /^Identifiant : [0-9A-F]{4}(-[0-9A-F]{4}){3}$/.test(c.title))));
+  await pressButton(about, 'Sa bibliothèque');
   const library = last().build();
   assert.equal(library.heading, 'Bibliothèque de Bruno');
   assert.ok(library.sections.some((s) => s.rows.some((r) => r.text === 'Bruno n’est pas en ligne')));
@@ -436,7 +459,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   const { menu, last, manager } = setup(content);
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
-  await last().build().actions.find((a) => a.label === 'Voir sa bibliothèque')!.run();
+  await pressButton(last().build(), 'Sa bibliothèque');
   await last().build().actions.find((a) => a.label.startsWith('Bride of Pin-bot'))!.run();
   await last().build().actions.find((a) => a.label === 'Récupérer toute la table')!.run();
   await new Promise((r) => setImmediate(r));

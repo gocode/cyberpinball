@@ -227,6 +227,38 @@ export function arenaRecords(store: RankingStore, me: string, max = 3): ArenaRec
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, max);
 }
 
+/** Un record publié d'un joueur, vu de son profil : sa place, et mon meilleur score sur la même version. */
+export interface PlayerRecord {
+  board: string;
+  table: PresenceTable;
+  score: number;
+  at: string;
+  rank: number;
+  players: number;
+  /** Mon meilleur score sur cette version ; absent : je n'y ai rien publié. */
+  mine?: number;
+}
+
+/**
+ * Les records publiés d'un joueur (son profil, onglet Records, 22/11/2026) : son meilleur score sur
+ * chaque version, sa place, et le mien quand j'en ai un. D'abord les versions où il me devance (le plus
+ * petit écart d'abord : le plus à portée), puis celles où je mène, puis les autres par sa meilleure place.
+ */
+export function playerRecords(store: RankingStore, key: string, me: string, max = 12): PlayerRecord[] {
+  const out: PlayerRecord[] = [];
+  for (const [board, players] of bestByBoard(store)) {
+    const his = players.get(key);
+    if (!his) continue;
+    const rank = 1 + [...players.values()].filter((s) => s.score > his.score).length;
+    const mine = key === me ? undefined : players.get(me)?.score;
+    out.push({ board, table: his.table, score: his.score, at: his.at, rank, players: players.size, ...(mine !== undefined ? { mine } : {}) });
+  }
+  const group = (r: PlayerRecord) => (r.mine === undefined ? 2 : r.mine < r.score ? 0 : 1);
+  return out
+    .sort((a, b) => group(a) - group(b) || (group(a) === 0 ? a.score - a.mine! - (b.score - b.mine!) : a.rank - b.rank || Date.parse(b.at) - Date.parse(a.at)))
+    .slice(0, max);
+}
+
 // ---------------------------------------------------------------------------
 // L'action du moment
 

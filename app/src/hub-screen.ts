@@ -14,7 +14,7 @@
 //
 // Sans electron à l'exécution : les tests chargent ce module.
 
-import { t, type AvatarView, type IconName, type TierId } from '@cyberpinball/core';
+import { t, type AvatarView, type BadgeRarity, type FlagView, type IconName, type TierId } from '@cyberpinball/core';
 import type { Action, Built } from './library';
 
 /**
@@ -44,6 +44,8 @@ export interface HubLevel {
 
 export interface HubButtonSpec {
   label: string;
+  /** Son icône, devant le libellé (les actions de l'en-tête d'un joueur). */
+  icon?: IconName;
   /** XP que l'action rapporte, déjà dits (« +25 XP »). */
   xp?: string;
   /** L'action principale : pleine, en vert. */
@@ -71,9 +73,13 @@ export interface HubCardSpec {
   avatar?: AvatarView;
   /** Places d'une partie : les joueurs assis, puis des places libres (null). */
   seats?: (AvatarView | null)[];
-  /** Valeur à droite (XP, score, place) ; en ambre pour un écart à combler (vert : ce qui se gagne). */
+  /** Valeur à droite (XP, score, place) ; en ambre pour un écart à combler (vert : ce qui se gagne). Un retour à la ligne la coupe en deux lignes. */
   aside?: string;
   asideTone?: 'warning';
+  /** Icône devant la valeur : le pouce d'un « J'aime » (rempli quand on aime). */
+  asideIcon?: IconName;
+  /** Des badges, dessinés comme partout (la rangée de médailles des autres menus). */
+  medals?: HubMedal[];
   /** Barre de progression sous le texte, de 0 à 1. */
   progress?: number;
   /** Le dernier message, en bulle sous le titre (« <Bruno> » en tête pour un groupe). */
@@ -94,6 +100,32 @@ export interface HubCardSpec {
   buttons?: HubButtonSpec[];
   /** Indisponible : grisée, son détail dit pourquoi. */
   quiet?: boolean;
+}
+
+/** Un badge dans une carte : son dessin (icône, rareté) et son nom. */
+export interface HubMedal {
+  icon: IconName;
+  rarity: BadgeRarity;
+  label: string;
+}
+
+/**
+ * L'en-tête d'un joueur (son profil, 22/11/2026), à la place du médaillon et du grand titre : sa pastille
+ * (l'anneau de son palier, celui de sa présence autour), ce que la relation dit de lui, son drapeau, son
+ * nom et son niveau, ce qu'il fait ; puis les actions de la relation, chacune un arrêt des flippers.
+ */
+export interface HubPersonSpec {
+  avatar: AvatarView;
+  ring?: 'online' | 'playing';
+  flag?: FlagView;
+  name: string;
+  level?: HubLevel;
+  /** Au-dessus du nom : « Amis depuis… », « Vous a demandé en ami », ou le constat du dernier geste. */
+  eyebrow?: string;
+  eyebrowTone?: 'signal' | 'warning';
+  /** Sous le nom : ce qu'il fait (« En partie sur… », « Vu il y a 3 h »). */
+  status?: { text: string; tone?: 'signal' | 'meta' | 'quiet' | 'warning' };
+  buttons: HubButtonSpec[];
 }
 
 export interface HubSectionSpec {
@@ -156,6 +188,8 @@ export interface HubSpec {
   /** Sous le titre : des chiffres, leurs nombres en gras. */
   facts: string[];
   band?: HubBand;
+  /** Le profil d'un joueur : son en-tête à la place du médaillon ; ses actions sont les premiers arrêts des flippers. */
+  person?: HubPersonSpec;
   tabs: HubTabSpec[];
   sections: HubSectionSpec[];
   /** L'onglet n'a rien à montrer : ce qu'il dit à la place. */
@@ -194,6 +228,8 @@ export interface HubCardView {
   seats?: (AvatarView | null)[];
   aside?: string;
   asideTone?: 'warning';
+  asideIcon?: IconName;
+  medals?: HubMedal[];
   progress?: number;
   bubble?: { text: string; who?: string; group?: boolean };
   lines?: HubLogLine[];
@@ -206,7 +242,17 @@ export interface HubCardView {
   /** La carte elle-même se choisit (absent : elle a des boutons, ou se lit seulement). */
   action?: number;
   /** Les boutons ; `action` seulement quand on est entré dans le bloc de la carte ; `off` : grisé, sa raison, jamais d'action. */
-  buttons?: { label: string; xp?: string; primary?: boolean; quick?: boolean; action?: number; off?: string }[];
+  buttons?: HubButtonView[];
+}
+
+export interface HubButtonView {
+  label: string;
+  icon?: IconName;
+  xp?: string;
+  primary?: boolean;
+  quick?: boolean;
+  action?: number;
+  off?: string;
 }
 
 export interface HubView {
@@ -216,6 +262,8 @@ export interface HubView {
   title: string;
   facts: string[];
   band?: HubBand;
+  /** L'en-tête d'un joueur ; ses boutons portent leur action au premier niveau (chacun est un bloc d'une seule action). */
+  person?: Omit<HubPersonSpec, 'buttons'> & { buttons: HubButtonView[] };
   /** Les onglets ; `id` pour le clic direct, `action` pour le curseur dans leur barre. */
   tabs: { id: string; label: string; icon: IconName; current: boolean; attention?: boolean; disabled?: string; action?: number }[];
   /** La barre d'onglets en bloc : `action` au premier niveau (se choisit comme un bloc), `entered` quand on y est. */
@@ -247,6 +295,11 @@ export interface HubOptions {
    * Start entre dans le contenu, Exit y remonte (puis, de la barre, revient à la roue).
    */
   menuFirst?: boolean;
+  /**
+   * Exit ne revient pas à la roue mais à l'écran d'où l'on vient (le profil d'un joueur, ouvert de la
+   * Communauté, d'un salon, d'une notification) : le pied dit « retour ».
+   */
+  backNotWheel?: boolean;
 }
 
 export interface HubScreen {
@@ -305,6 +358,8 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
   function blocksOf(spec: HubSpec): Block[] {
     const tabs = usable(spec);
     const out: Block[] = [];
+    // Les actions de l'en-tête d'un joueur, d'abord : chacune un bloc d'une seule action (Start la fait tout de suite).
+    for (const b of spec.person?.buttons ?? []) if (!b.off) out.push({ key: `person:${b.key}`, label: b.label, items: [{ label: b.label, key: `person:${b.key}`, run: b.run }] });
     if (tabs.length > 1) out.push({ key: 'tabs', label: t('Onglets'), items: tabs.map((tab) => ({ label: tab.label, key: `tab:${tab.id}`, run: () => go(tab.id) })) });
     spec.sections.forEach((s, i) => {
       const items: BlockItem[] = [];
@@ -331,8 +386,12 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
    */
   const topOf = (spec: HubSpec, blocks: Block[]): Block[] => (spec.list ? blocks.filter((b) => b.key !== 'tabs') : blocks);
 
-  /** Le rang, au premier niveau, du premier bloc du contenu (après la barre d'onglets). */
-  const firstContentAt = (spec: HubSpec): number => Math.max(0, topOf(spec, blocksOf(spec)).findIndex((b) => b.key !== 'tabs'));
+  /** Le rang, au premier niveau, du premier bloc du contenu (après la barre d'onglets et les actions de l'en-tête d'un joueur). */
+  const firstContentAt = (spec: HubSpec): number => {
+    const top = topOf(spec, blocksOf(spec));
+    const at = top.findIndex((b) => b.key !== 'tabs' && !b.key.startsWith('person:'));
+    return at >= 0 ? at : Math.max(0, top.findIndex((b) => b.key === 'tabs'));
+  };
 
   /** Le curseur dans la barre d'onglets, sur l'onglet ouvert (menuFirst). */
   function toTabs(): void {
@@ -373,8 +432,11 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     host.library.openCustom(build, o.block);
   }
 
-  /** Onglet choisi : son contenu, le curseur sur son premier bloc (après la barre d'onglets). */
-  function go(tab: string): void {
+  /**
+   * Onglet choisi : son contenu, le curseur sur son premier bloc (après la barre d'onglets). `opening` :
+   * l'écran s'ouvre, le curseur sur la première action de l'en-tête d'un joueur quand il y en a une.
+   */
+  function go(tab: string, opening = false): void {
     current = tab;
     inside = undefined;
     origin = undefined;
@@ -386,6 +448,8 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       const at = blocks[0]?.items.findIndex((item) => item.key === spec.focus) ?? -1;
       return void host.library.openCustom(build, Math.max(0, at));
     }
+    // À l'ouverture d'un profil : le curseur sur l'action principale de l'en-tête.
+    if (opening && blocks[0]?.key.startsWith('person:')) return void host.library.openCustom(build, 0);
     host.library.openCustom(build, firstContentAt(spec));
   }
 
@@ -424,6 +488,14 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       const action = itemAction.get(`tab:${tab.id}`);
       return action === undefined ? view : { ...view, action };
     });
+    const buttonView = (b: HubButtonSpec, action: number | undefined): HubButtonView => ({
+      label: b.label,
+      ...(b.icon ? { icon: b.icon } : {}),
+      ...(b.xp ? { xp: b.xp } : {}),
+      ...(b.primary ? { primary: true } : {}),
+      ...(b.quick ? { quick: true } : {}),
+      ...(b.off ? { off: b.off } : action !== undefined ? { action } : {}),
+    });
     const sections = spec.sections.flatMap((s, i) => {
       if (!s.cards.length && !s.choices?.length) return [];
       const block = blockView(`section:${i}`);
@@ -448,17 +520,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
             const out: HubCardView = { ...shown };
             // Dans le bloc où l'on est entré, ou, dans un onglet en liste, l'arrêt de l'élément lui-même.
             const own = (k: string) => itemAction.get(k) ?? blockAction.get(`item:${i}:${k}`);
-            if (buttons?.length)
-              out.buttons = buttons.map((b) => {
-                const action = own(`${key}:${b.key}`);
-                return {
-                  label: b.label,
-                  ...(b.xp ? { xp: b.xp } : {}),
-                  ...(b.primary ? { primary: true } : {}),
-                  ...(b.quick ? { quick: true } : {}),
-                  ...(b.off ? { off: b.off } : action !== undefined ? { action } : {}),
-                };
-              });
+            if (buttons?.length) out.buttons = buttons.map((b) => buttonView(b, own(`${key}:${b.key}`)));
             else if (own(key) !== undefined) out.action = own(key)!;
             return out;
           }),
@@ -466,11 +528,12 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       ];
     });
     const tabsBlock = blockView('tabs');
+    const person = spec.person ? { ...spec.person, buttons: spec.person.buttons.map((b) => buttonView(b, blockAction.get(`person:${b.key}`))) } : undefined;
     // Exit (règle du mainteneur, 22/11/2026 : « exit sélectionne la barre de menu, exit à nouveau : on sort
     // de l'écran ») : d'un bloc ouvert par un récapitulatif (la même bande), à l'accueil ; d'un autre bloc,
     // on en ressort ; au premier niveau, à l'accueil (récapitulatif), sinon à la barre d'onglets, le curseur
-    // sur l'onglet ouvert ; de la barre d'onglets, à la roue.
-    const firstContent = blocks.findIndex((b) => b.key !== 'tabs');
+    // sur l'onglet ouvert ; de la barre d'onglets, à la roue (au profil d'un joueur : d'où l'on vient).
+    const firstContent = blocks.findIndex((b) => b.key !== 'tabs' && !b.key.startsWith('person:'));
     const hasTabs = blocks.some((b) => b.key === 'tabs');
     const exit = (): (() => void) => {
       if (spec.flat || inside === 'tabs') return back;
@@ -480,6 +543,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     };
     const navHint = (): string | undefined => {
       if (spec.hint || spec.flat) return undefined;
+      if (inside === 'tabs' && options.backNotWheel) return t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour');
       if (inside === 'tabs') return options.menuFirst ? t('Flippers : changer d’onglet · Start : y entrer · Exit : retour à la roue') : t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour à la roue');
       if (origin && (enteredAt < 0 || enteredAt === firstContent))
         return enteredAt >= 0 || spec.list ? t('Flippers : choisir · Start : valider · Exit : retour à l’accueil') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à l’accueil');
@@ -493,6 +557,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       title: spec.title,
       facts: spec.facts,
       ...(spec.band ? { band: spec.band } : {}),
+      ...(person ? { person } : {}),
       tabs,
       ...(tabsBlock ? { tabsBlock } : {}),
       ...(inside && !spec.flat ? { inside: true } : {}),
@@ -545,7 +610,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
         if (!describe(current, reopen).tabs.some((x) => x.id === current && !x.disabled)) current = usable(describe(current, reopen))[0]?.id ?? current;
         return toTabs();
       }
-      go(tab ?? '');
+      go(tab ?? '', true);
     },
     current: () => current,
   };

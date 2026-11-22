@@ -59,7 +59,7 @@ import { createGameHistoryMenu } from './game-history-menu';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import { askElevation } from './uac-confirm';
 import type { LiveGames } from './live-game';
-import type { PlayerContext, PlayerPart } from './profile-menu';
+import type { PlayerContext, PlayerHead, PlayerPart } from './profile-menu';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
 import { onGesture } from './gesture-flash';
@@ -388,7 +388,22 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       const online = net.online(key);
       const p = net.presenceOf(key);
       const state = online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne');
+      const playing = online && p?.status === 'playing';
+      const status = playing && p?.table
+        ? t('En partie sur {table} · depuis {duration}', { table: p.table.title, duration: playDuration((now().getTime() - Date.parse(p.since)) / 1000) })
+        : online
+          ? playing
+            ? t('En partie')
+            : t('En ligne')
+          : presenceText(p, false, f);
       return {
+        head: {
+          eyebrow: t('Amis depuis {date}', { date: new Date(f.since).toLocaleDateString(locale(), { month: 'long', year: 'numeric' }) }),
+          status: { text: status, tone: online ? 'signal' : 'quiet' },
+          ...(online ? { ring: playing ? ('playing' as const) : ('online' as const) } : {}),
+          since: t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' }) }),
+          library: libraryMenu.detail(key),
+        },
         rows: [
           { text: presenceText(p, online, f), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), icon: 'friend-list', tone: online ? 'ok' : 'quiet', badges: [state] },
           { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: host.content.library(key).state === 'ready' ? 'ok' : 'quiet' },
@@ -428,7 +443,14 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       rows.push({ text: t('Demande d’amitié reçue'), tone: 'ok', icon: 'friend-request' });
       actions.push(...requestActions(key, plain, () => ctx.here(), ctx.flash));
     }
-    return { rows, id, actions };
+    // L'en-tête : sa présence publique (« En ligne », « En partie » : jamais sa table, réservée aux amis), où on l'a vu, la demande en cours.
+    const beacon = net.livePlayers().find((b) => b.key === key);
+    const incoming = s.incoming.find((r) => r.key === key);
+    const head: PlayerHead = {
+      ...(beacon ? { ring: beacon.status === 'playing' ? ('playing' as const) : ('online' as const), status: { text: beacon.status === 'playing' ? t('En partie') : t('En ligne'), tone: 'signal' as const } } : entry ? { status: { text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: 'quiet' as const } } : {}),
+      ...(incoming ? { eyebrow: t('Vous a demandé en ami · {ago}', { ago: socialAgo(incoming.at, now()) }), eyebrowTone: 'signal' as const } : outgoing ? { eyebrow: t('Demande envoyée {ago} · en attente de réponse', { ago: socialAgo(outgoing.at, now()) }) } : {}),
+    };
+    return { head, rows, id, actions };
   }
 
   function requestActions(key: string, plain: string, after: () => void, say: (row: Row) => void): Action[] {

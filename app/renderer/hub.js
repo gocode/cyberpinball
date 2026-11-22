@@ -215,31 +215,76 @@
       bar.append(fill);
       main.append(bar);
     }
+    // Des badges (profil d'un joueur) : la rangée de médailles des autres menus (library.js, rowMedals).
+    if (c.medals?.length && typeof rowMedals === 'function') main.append(rowMedals(c.medals));
     node.append(main);
-    if (c.aside) node.append(el('span', `hub-card-aside${c.asideTone ? ` hub-tone-${c.asideTone}` : ''}`, c.aside));
+    if (c.aside) {
+      const aside = el('span', `hub-card-aside${c.asideTone ? ` hub-tone-${c.asideTone}` : ''}${c.asideIcon ? ' hub-card-aside-ic' : ''}`);
+      // Le pouce devant le nombre de « J'aime » (rempli quand on aime, theme.css).
+      if (c.asideIcon) aside.append(icon(c.asideIcon, 'hub-aside-icon'));
+      aside.append(el('span', '', c.aside));
+      node.append(aside);
+    }
     if (c.buttons?.length) {
       const row = el('div', 'hub-buttons');
-      for (const b of c.buttons) {
-        // Pas encore possible : grisé, sa raison à la suite (« Bientôt »), sans action.
-        if (b.off) {
-          const off = el('span', 'hub-button hub-off');
-          off.append(el('span', '', b.label));
-          off.append(el('span', 'hub-button-why', b.off));
-          off.title = b.off;
-          row.append(off);
-          continue;
-        }
-        const btn = el('span', `hub-button${b.primary ? ' hub-go' : ''}${b.quick ? ' hub-quick' : ''}${b.action !== undefined && b.action === cursor ? ' selected' : ''}`);
-        // Le bouton choisi porte la touche qui le valide.
-        if (b.action === cursor && start) btn.append(el('kbd', 'hub-button-key', start));
-        btn.append(el('span', '', b.label));
-        if (b.xp) btn.append(el('span', 'hub-button-xp', b.xp));
-        if (b.action !== undefined) act(btn, b.action);
-        row.append(btn);
-      }
+      for (const b of c.buttons) row.append(button(b, cursor, start));
       node.append(row);
     }
     return node;
+  }
+
+  /** Un bouton : plein en vert quand il est choisi, la touche Start cerclée ; grisé avec sa raison s'il n'est pas encore possible. */
+  function button(b, cursor, start) {
+    // Pas encore possible : grisé, sa raison à la suite (« Bientôt »), sans action.
+    if (b.off) {
+      const off = el('span', 'hub-button hub-off');
+      if (b.icon) off.append(icon(b.icon, 'hub-button-icon'));
+      off.append(el('span', '', b.label));
+      off.append(el('span', 'hub-button-why', b.off));
+      off.title = b.off;
+      return off;
+    }
+    const btn = el('span', `hub-button${b.primary ? ' hub-go' : ''}${b.quick ? ' hub-quick' : ''}${b.action !== undefined && b.action === cursor ? ' selected' : ''}`);
+    // Le bouton choisi porte la touche qui le valide.
+    if (b.action === cursor && start) btn.append(el('kbd', 'hub-button-key', start));
+    if (b.icon) btn.append(icon(b.icon, 'hub-button-icon'));
+    btn.append(el('span', '', b.label));
+    if (b.xp) btn.append(el('span', 'hub-button-xp', b.xp));
+    if (b.action !== undefined) act(btn, b.action);
+    return btn;
+  }
+
+  /**
+   * L'en-tête d'un joueur (son profil, 22/11/2026), à la place du médaillon et du grand titre : sa pastille
+   * en grand (l'anneau de son palier, et autour celui de sa présence), ce que la relation dit de lui
+   * (« Votre ami depuis… », « Vous a demandé en ami »), son drapeau, son nom et son niveau, ce qu'il fait,
+   * ses chiffres, puis les actions de la relation (ajouter, inviter, écrire), chacune un arrêt des flippers.
+   */
+  function person(p, facts, cursor, start) {
+    const head = el('header', `hub-head hub-person${p.buttons?.length ? '' : ' hub-person-bare'}`);
+    head.append(face(p.avatar, `hub-person-face${p.ring ? ` hub-ring hub-ring-${p.ring}` : ''}`));
+    const titles = el('div', 'hub-titles');
+    if (p.eyebrow) titles.append(el('small', `hub-person-eyebrow${p.eyebrowTone ? ` hub-tone-${p.eyebrowTone}` : ''}`, p.eyebrow));
+    const name = el('h1', 'hub-title hub-person-name');
+    if (p.flag && typeof flagNode === 'function') name.append(flagNode(p.flag.code, p.flag.src, p.flag.name, 'hub-person-flag'));
+    const text = el('span', 'hub-person-text', p.name);
+    text.title = p.name;
+    name.append(text);
+    if (p.level) name.append(levelChip(p.level));
+    titles.append(name);
+    if (p.status) titles.append(el('p', `hub-person-status hub-tone-${p.status.tone || 'quiet'}`, p.status.text));
+    if (facts.length) {
+      const line = el('p', 'hub-facts');
+      for (const f of facts) line.append(strongNumbers(f, 'hub-fact'));
+      titles.append(line);
+    }
+    head.append(titles);
+    if (p.buttons?.length) {
+      const row = el('div', 'hub-person-actions');
+      for (const b of p.buttons) row.append(button(b, cursor, start));
+      head.append(row);
+    }
+    return head;
   }
 
   /**
@@ -310,9 +355,10 @@
   function foot(hint) {
     const box = el('footer', 'hub-foot');
     for (const part of String(hint ?? '').split(' · ')) {
-      const at = part.indexOf(' : ');
+      // « Start : valider » en français, « Start: confirm » en anglais : la touche, puis ce qu'elle fait.
+      const m = part.match(/^(.+?) ?: (.*)$/);
       const item = el('span');
-      if (at > 0) item.append(el('kbd', '', part.slice(0, at)), document.createTextNode(part.slice(at + 3)));
+      if (m) item.append(el('kbd', '', m[1]), document.createTextNode(m[2]));
       else item.textContent = part;
       box.append(item);
     }
@@ -323,20 +369,23 @@
   function render(v) {
     const h = v.hub;
     const desk = document.documentElement.classList.contains('menu-desktop');
-    const o = el('section', `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}`);
+    const o = el('section', `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}${h.person ? ' hub-profile' : ''}`);
     o.dataset.navOrder = (v.order ?? []).join(',');
-    const head = el('header', 'hub-head');
-    const titles = el('div', 'hub-titles');
-    titles.append(el('h1', 'hub-title', h.title));
-    if (h.facts.length) {
-      const facts = el('p', 'hub-facts');
-      for (const f of h.facts) facts.append(strongNumbers(f, 'hub-fact'));
-      titles.append(facts);
+    if (h.person) o.append(person(h.person, h.facts, v.cursor, h.start));
+    else {
+      const head = el('header', 'hub-head');
+      const titles = el('div', 'hub-titles');
+      titles.append(el('h1', 'hub-title', h.title));
+      if (h.facts.length) {
+        const facts = el('p', 'hub-facts');
+        for (const f of h.facts) facts.append(strongNumbers(f, 'hub-fact'));
+        titles.append(facts);
+      }
+      head.append(medal(h.medallion), titles);
+      if (h.band) head.append(band(h.band));
+      o.append(head);
     }
-    head.append(medal(h.medallion), titles);
-    if (h.band) head.append(band(h.band));
     // Un écran sans onglets (le retour de partie) : pas de barre vide.
-    o.append(head);
     if (h.tabs.length) o.append(blockify(tabs(h.tabs, v.cursor), h.tabsBlock, v.cursor));
     else o.classList.add('hub-no-tabs');
     const body = el('div', 'hub-body');
