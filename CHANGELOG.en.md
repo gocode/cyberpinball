@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- An interrupted prerelease can be resumed through grouped publishing without changing its version number.
+- Community and Arena: the top tabs remain clickable with the mouse from every navigation state, without having to press Exit.
 - Player challenges: challenge a friend or a ranked player on the exact version of a table, with your best score or the one from the game you just played; they have 48 h, unlimited tries, and both of you can still raise your score. At the deadline, the higher score wins 40 XP, then "Rematch" in one press. The challenged player can decline.
 - Challenges travel without a server, from cabinet to cabinet, signed by each player: they arrive even if your two cabinets are never on at the same time. Only scores read by Cyber Pinball count; a blocked player, or one banned from the rooms, cannot challenge you.
 - In the Arena, the "Challenges" tab opens (your turn, sent, recent results), the "Challenge from …" card shows up in "Play now", and the dot-matrix board of the poster announces a challenge about to expire. "Challenge" now works on "Your place is taken" and on the game return screen, and a table sheet offers "Play together… › Challenge a player…".

@@ -216,8 +216,8 @@ export interface HubView {
   title: string;
   facts: string[];
   band?: HubBand;
-  /** Les onglets ; `action` seulement quand on est entré dans leur barre. */
-  tabs: { label: string; icon: IconName; current: boolean; attention?: boolean; disabled?: string; action?: number }[];
+  /** Les onglets ; `id` pour le clic direct, `action` pour le curseur dans leur barre. */
+  tabs: { id: string; label: string; icon: IconName; current: boolean; attention?: boolean; disabled?: string; action?: number }[];
   /** La barre d'onglets en bloc : `action` au premier niveau (se choisit comme un bloc), `entered` quand on y est. */
   tabsBlock?: HubBlockView;
   /** On est entré dans un bloc : les autres s'éteignent un peu. */
@@ -420,7 +420,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     else for (const block of topOf(spec, blocks)) blockAction.set(block.key, actions.push({ label: block.label, key: `block:${block.key}`, run: () => enter(block, spec) }) - 1);
     const blockView = (key: string): HubBlockView | undefined => (blockAction.has(key) ? { action: blockAction.get(key)! } : inside === key ? { entered: true } : blocks.some((b) => b.key === key) ? {} : undefined);
     const tabs = spec.tabs.map((tab) => {
-      const view = { label: tab.label, icon: tab.icon, current: tab.id === current, ...(tab.attention ? { attention: true } : {}), ...(tab.disabled ? { disabled: tab.disabled } : {}) };
+      const view = { id: tab.id, label: tab.label, icon: tab.icon, current: tab.id === current, ...(tab.attention ? { attention: true } : {}), ...(tab.disabled ? { disabled: tab.disabled } : {}) };
       const action = itemAction.get(`tab:${tab.id}`);
       return action === undefined ? view : { ...view, action };
     });
@@ -507,6 +507,9 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       // À plat, Exit quitte l'écran d'un appui ; dans un bloc, il en ressort.
       back: exit(),
       hub,
+      selectHubTab: (tab) => {
+        if (usable(spec).some((item) => item.id === tab)) go(tab);
+      },
       hint: navHint() ?? spec.hint ?? (enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue')),
       keys: (input) => {
         if (spec.keys?.(input)) return true;

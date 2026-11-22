@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.3
 
+- Une préversion interrompue peut être relancée par la publication groupée sans changer de numéro.
+- Communauté et Arène : les onglets du haut restent cliquables à la souris depuis tout état de navigation, sans devoir appuyer sur Exit.
 - Défis entre joueurs : défiez un ami ou un joueur classé sur la version exacte d'une table, avec votre meilleur score ou celui de la partie que vous venez de jouer ; il a 48 h, essais illimités, et chacun peut encore monter son score. À l'échéance, le plus haut score gagne 40 XP, puis « Revanche » d'un geste. Le défié peut refuser.
 - Les défis passent sans serveur, de borne en borne, signés par chaque joueur : ils arrivent même si vos deux bornes ne sont jamais allumées en même temps. Seuls comptent les scores relevés par Cyber Pinball ; un joueur bloqué ou exclu des salons ne peut pas vous défier.
 - Dans l'Arène, l'onglet « Défis » s'ouvre (à jouer, envoyés, résultats récents), la carte « Défi de … » arrive dans « À jouer maintenant », et le tableau à points de l'affiche annonce un défi qui expire bientôt. « Défier » s'active sur « Votre place est prise » et au retour de partie, et la fiche d'une table propose « Jouer ensemble… › Défier un joueur… ».

@@ -263,6 +263,8 @@ export type UiAction =
   | { type: 'activate'; index: number; id?: string }
   /** Le curseur posé sur cet élément sans l'activer (téléphone : les actions d'une playlist de la gestion). */
   | { type: 'focus'; index: number; id?: string }
+  /** Onglet du haut d'un écran Communauté ou Arène, accessible à la souris depuis tout bloc. */
+  | { type: 'hub-tab'; tab: string }
   | { type: 'editor'; index: number }
   /** Texte arrivé sans touche dans la page (panneau des emojis de Windows, méthode de saisie) : au point d'insertion. */
   | { type: 'editor-text'; text: string }
@@ -533,6 +535,8 @@ export interface Built {
    * sections et de la colonne des actions (app/renderer/hub.js) ; ses onglets et ses cartes sont les actions.
    */
   hub?: HubView;
+  /** Clic direct dans la barre d’onglets, indépendant du parcours des flippers. */
+  selectHubTab?: (tab: string) => void;
   /**
    * Onglets en tête de la liste (Joueurs en ligne : les filtres) : chacun ouvre son action, qui n'est
    * pas répétée dans la colonne des actions. L'onglet ouvert en bleu (le vert reste au choix) ; un

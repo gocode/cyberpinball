@@ -21,6 +21,7 @@
 
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BASE, IMMINENT_MS, coordinationDir, currentBranch, git, imminent, lockHolder, mainDir, readJson, readQueue, sleep, tryLock, writeJson,
@@ -52,6 +53,19 @@ export function requestLeger(branche, dir = coordinationDir()) {
   if (!list.includes(branche)) writeJson(legerFile(dir), [...list, branche]);
 }
 
+/** Une publication interrompue reprend le même numéro ; de nouveaux commits demandent une préversion. */
+export function publicationPlan({ pending, retry = false, leger = false }) {
+  if (!pending && !retry) return undefined;
+  const reprendre = !pending && retry;
+  return { reprendre, args: [leger ? '--leger' : '--rapide', ...(reprendre ? [] : ['--essai'])] };
+}
+
+/** Un échec avant le commit de préversion ne doit pas republier la version précédente. */
+export function publicationRetry({ before, head, subject, reprendre, leger }) {
+  if (!/^Version [0-9]+[.][0-9]+[.][0-9]+-essai[.][0-9]+$/.test(subject) || (!reprendre && before === head)) return undefined;
+  return { head, leger };
+}
+
 /** Lance publier.mjs en recopiant sa sortie ; rend { code, out }. */
 function publish(main, args, say) {
   return new Promise((resolve) => {
@@ -77,6 +91,7 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, b
   const main = mainDir(cwd);
   const me = branche ?? currentBranch(cwd);
   const leaderFile = path.join(dir, 'chef-publication.lock');
+  const retryFile = path.join(dir, 'publication-a-reprendre.json');
   let release;
   // Une autre publication groupée en attente emporte nos fusions ; si elle est déjà en train de
   // publier, on attend sa fin pour reprendre la main (ce qu'elle publie ne contient peut-être pas tout).
@@ -112,24 +127,32 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, b
         await sleep(15_000);
       }
       const pending = pendingCommits(main);
-      if (!pending) {
+      const previous = readJson(retryFile);
+      const before = git(['rev-parse', 'HEAD'], main);
+      const retry = previous?.head === before;
+      const leger = readJson(legerFile(dir), []);
+      const plan = publicationPlan({ pending, retry, leger: leger.length > 0 || (retry && previous.leger) });
+      if (!plan) {
         say(round === 1 ? 'Rien de neuf sur proto/ecrans depuis la dernière préversion : rien à publier.' : 'Plus rien de neuf : publication groupée terminée.');
         return 0;
       }
       setState('publication');
-      const leger = readJson(legerFile(dir), []);
-      let args = leger.length ? ['--leger', '--essai'] : ['--rapide', '--essai'];
+      let args = plan.args;
       say(`Publication groupée : ${pending} commit(s) de proto/ecrans à publier${leger.length ? ` ; publication légère demandée par ${leger.join(', ')}` : ''}.`);
+      if (plan.reprendre) say('Reprise de la préversion interrompue, sans changer son numéro.');
       let result = await publish(main, args, say);
       if (result.code !== 0 && args[0] === '--rapide' && /le socle a changé/.test(result.out)) {
         say('Le socle a changé : reprise en publication légère (installeurs refaits).');
-        args = ['--leger', '--essai'];
+        args = publicationPlan({ pending, retry, leger: true }).args;
         result = await publish(main, args, say);
       }
       if (result.code !== 0) {
+        const interrupted = publicationRetry({ before, head: git(['rev-parse', 'HEAD'], main), subject: git(['log', '-1', '--format=%s'], main), reprendre: plan.reprendre, leger: args[0] === '--leger' });
+        if (interrupted) writeJson(retryFile, interrupted);
         say('\nPublication groupée en échec : voir la sortie ci-dessus. Elle se relance telle quelle par npm run publication-groupee.');
         return 1;
       }
+      fs.rmSync(retryFile, { force: true });
       if (leger.length) writeJson(legerFile(dir), readJson(legerFile(dir), []).filter((b) => !leger.includes(b)));
       say(`Préversion publiée (${git(['log', '-1', '--format=%s', BASE], main)}).`);
     }

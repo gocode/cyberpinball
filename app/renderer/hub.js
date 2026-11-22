@@ -102,7 +102,8 @@
         node.title = tab.disabled;
       }
       if (tab.attention) node.append(el('span', 'hub-dot'));
-      if (tab.action !== undefined) act(node, tab.action);
+      // Le clic reste disponible, même quand les flippers parcourent le contenu.
+      if (!tab.disabled) actOn(node, { type: 'hub-tab', tab: tab.id });
       bar.append(node);
     }
     return bar;

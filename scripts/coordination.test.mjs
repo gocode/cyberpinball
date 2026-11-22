@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, expectedSuiteMs, imminent, liveEntries, readJson, tryLock, writeJson } from './coordination.mjs';
-import { ATTENTE_MAX_MS, worthWaiting } from './publication-groupee.mjs';
+import { ATTENTE_MAX_MS, publicationPlan, publicationRetry, worthWaiting } from './publication-groupee.mjs';
 import { failedFiles, failureDetails, totals } from './sortie-tests.mjs';
 import { problemLines } from './controles.mjs';
 
@@ -39,6 +39,23 @@ test('publication groupée : elle n’attend que les fusions prévues dans les 2
   assert.deepEqual(imminent(entries, { now: T0, except: 'moi' }).map((e) => e.branche), ['bientot', 'plus-tard', 'en-retard', 'un-peu-en-retard']);
   // Une fusion prévue au-delà du plafond, ou déjà en retard, n'est pas attendue : la publication part.
   assert.deepEqual(worthWaiting(entries, { now: T0, except: 'moi' }).map((e) => e.branche), ['bientot', 'un-peu-en-retard']);
+});
+
+test('publication interrompue : la relance reprend le numéro malgré le commit Version, puis garde le mode léger', () => {
+  assert.equal(publicationPlan({ pending: 0 }), undefined);
+  assert.deepEqual(publicationPlan({ pending: 0, retry: true }), { reprendre: true, args: ['--rapide'] });
+  assert.deepEqual(publicationPlan({ pending: 0, retry: true, leger: true }), { reprendre: true, args: ['--leger'] });
+  assert.deepEqual(publicationPlan({ pending: 1, retry: true }), { reprendre: false, args: ['--rapide', '--essai'] });
+  assert.deepEqual(publicationPlan({ pending: 2, leger: true }), { reprendre: false, args: ['--leger', '--essai'] });
+});
+
+test('reprise : seulement une préversion effectivement préparée, jamais une finale ni la version précédente', () => {
+  const attempt = { before: 'old', head: 'new', subject: 'Version 0.2.3-essai.46', reprendre: false, leger: true };
+  assert.deepEqual(publicationRetry(attempt), { head: 'new', leger: true });
+  assert.equal(publicationRetry({ ...attempt, head: 'old' }), undefined, 'échec avant le commit de version');
+  assert.equal(publicationRetry({ ...attempt, subject: 'Version 0.2.3' }), undefined, 'aucune finale automatique');
+  assert.equal(publicationRetry({ ...attempt, subject: 'Autre correction' }), undefined);
+  assert.deepEqual(publicationRetry({ ...attempt, head: 'old', reprendre: true }), { head: 'old', leger: true }, 'une reprise peut échouer avant de refabriquer');
 });
 
 test('durée prévue d’une suite : médiane des dernières mesures, sinon la valeur par défaut', () => {

@@ -5934,6 +5934,10 @@ export function createLibrary(host: LibraryHost) {
       const ids = actionIds(built.actions);
       cursor = switchZone(zones, ids, followCursor(ids, cursor, screen, anchor), zonesMemory(), backIndex(built));
       host.broadcast();
+    } else if (action.type === 'hub-tab') {
+      userGesture();
+      build().selectHubTab?.(action.tab);
+      host.broadcast();
     } else if (action.type === 'focus') {
       const built = build();
       const index = resolveActivation(actionIds(built.actions), action.index, action.id);
