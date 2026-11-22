@@ -1010,6 +1010,60 @@ html[data-menu-band='arche'] #root {
   z-index: 1;
 }
 
+/*
+ * Roue en relief (relief-roue.js, prototype des lunettes 3D) : le verre du bandeau quitte le fond de la
+ * roue pour deux couches à lui (.relief-verre : son ombre, puis lui), sous la lumière et le dessus ;
+ * ceux-ci, et la lueur derrière la roue, reçoivent le filtre du bandeau (--relief-band), mélangés en
+ * « écran » comme les médaillons. Les filtres eux-mêmes sont dans .relief-defs, sans taille.
+ */
+.relief-defs,
+.relief-defs-svg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+html.relief .wheel-stage {
+  background-image: none;
+}
+
+.relief-verre {
+  display: none;
+}
+
+html.relief .relief-verre {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: center / 100% 100% no-repeat;
+}
+
+html.relief .wheel-stage.roue-medaillons > .relief-verre {
+  background-image: url('roues/medaillons.svg');
+}
+
+html.relief .wheel-stage.roue-bandeau > .relief-verre {
+  background-image: url('roues/bandeau.svg');
+}
+
+html.relief .wheel-stage.roue-minimal > .relief-verre {
+  background-image: url('roues/minimal.svg');
+}
+
+html.relief .wheel-stage.roue-arche > .relief-verre {
+  background-image: url('roues/arche.svg');
+}
+
+html.relief .menu-band .wheel-stage::before,
+html.relief .menu-band .wheel-stage::after,
+html.relief .menu-nav::before {
+  filter: var(--relief-band, none);
+  mix-blend-mode: screen;
+}
+
 /* Zones cliquables des flèches dessinées sur le bandeau (souris-roue.js) : invisibles, au-dessus de tout. */
 .wheel-arrow {
   position: absolute;

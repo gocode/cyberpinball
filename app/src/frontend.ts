@@ -7011,6 +7011,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     menuLayout: mediaSettings.menuLayout,
     // Logos animés de la roue : seul celui de la table choisie s'anime (« selected »), ou tous.
     wheelMotion: mediaSettings.wheelMotion,
+    // Roue en relief avec les lunettes 3D (anaglyph-menu.ts, app/renderer/relief-roue.js) : les lunettes, ou rien.
+    relief: role === 'playfield' ? anaglyphMenu.wheelRelief() : undefined,
     // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
     dmdColor: menuDmdColor(),
     // Couleur de la table montrée (table-tint.ts) : l'ambiance du menu ; absente, la sarcelle de la marque.

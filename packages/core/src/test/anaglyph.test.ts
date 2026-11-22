@@ -15,6 +15,7 @@ import {
   anaglyphFilters,
   anaglyphGameSettings,
   anaglyphMenuText,
+  anaglyphWheelRelief,
   calibrationLevel,
   calibrationStepOf,
   DEFAULT_ANAGLYPH,
@@ -152,6 +153,22 @@ test('le visage du calibrage : 13 polygones, tous dans leur carré de 160 × 320
       const [x, y] = point.split(',').map(Number) as [number, number];
       assert.ok(x > 0 && x < 160 && y > 0 && y < 320, point);
     }
+  }
+});
+
+test('roue en relief : activée d’office avec les lunettes, verres inversés d’après le calibrage', () => {
+  assert.equal(parseAnaglyphSetting(undefined).wheel, true);
+  assert.equal(parseAnaglyphSetting({ wheel: false }).wheel, false);
+  assert.equal(anaglyphWheelRelief(DEFAULT_ANAGLYPH), undefined, 'lunettes désactivées : roue à plat');
+  assert.equal(anaglyphWheelRelief({ ...ON, wheel: false }), undefined);
+  assert.deepEqual(anaglyphWheelRelief(ON), { glasses: 'red-cyan', swapped: false });
+  // Le calibrage mesure ce que chaque œil voit : le rouge vu surtout de l'œil droit, verres à l'envers.
+  const reversed = { left: GLASSES_PRESETS['red-cyan'].right, right: GLASSES_PRESETS['red-cyan'].left };
+  assert.deepEqual(anaglyphWheelRelief({ ...ON, calibration: reversed }), { glasses: 'red-cyan', swapped: true });
+  for (const glasses of ['green-magenta', 'amber-blue'] as const) {
+    assert.equal(anaglyphWheelRelief({ ...ON, glasses, calibration: GLASSES_PRESETS[glasses] })!.swapped, false, glasses);
+    const p = GLASSES_PRESETS[glasses];
+    assert.equal(anaglyphWheelRelief({ ...ON, glasses, calibration: { left: p.right, right: p.left } })!.swapped, true, glasses);
   }
 });
 

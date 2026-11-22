@@ -5,6 +5,8 @@
 import * as path from 'node:path';
 import {
   adjustCalibration,
+  anaglyphWheelRelief,
+  wheelReliefLabel,
   anaglyphCalibrationView,
   anaglyphFilters,
   anaglyphMenuText,
@@ -117,6 +119,15 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
           icon: 'eye' as const,
           run: () => {
             save({ colors: nextColors(setting.colors) }, `couleurs ${nextColors(setting.colors)}`);
+            openScreen(library.cursor());
+          },
+        },
+        {
+          label: t('Roue en relief : {v}', { v: wheelReliefLabel(setting.wheel) }),
+          detail: t('La roue, ses médaillons et la navigation sortent de l’écran ; le fond de la table reste à plat'),
+          icon: 'layers' as const,
+          run: () => {
+            save({ wheel: !setting.wheel }, `roue en relief ${setting.wheel ? 'désactivée' : 'activée'}`); // i18n-ignore : journal
             openScreen(library.cursor());
           },
         },
@@ -248,6 +259,8 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
   return {
     /** Le réglage en vigueur (relu à chaque changement). */
     setting: () => setting,
+    /** La roue en relief, pour l'état du playfield : les lunettes et le côté de leurs verres, ou undefined. */
+    wheelRelief: () => anaglyphWheelRelief(setting),
     prepareGame,
     restoreGame,
   };

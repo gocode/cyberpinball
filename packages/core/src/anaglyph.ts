@@ -45,6 +45,8 @@ export interface AnaglyphSetting {
   /** Profondeur : la distance réelle entre les yeux (63 mm) multipliée par elle. 1 : physiquement juste en borne. */
   depth: number;
   colors: AnaglyphColors;
+  /** La roue et la navigation du front-end en relief aussi (22/11/2026) ; activée d'office avec les lunettes. */
+  wheel: boolean;
   /** Mesuré avec ces lunettes sur cet écran ; absent : valeurs d'usine de VPX pour ces lunettes. */
   calibration?: AnaglyphCalibration;
 }
@@ -74,7 +76,7 @@ export const GLASSES_PRESETS: Readonly<Record<AnaglyphGlasses, AnaglyphCalibrati
   'amber-blue': { left: [0.61, 0.66, 0.09], right: [0.05, 0.16, 0.96] },
 };
 
-export const DEFAULT_ANAGLYPH: AnaglyphSetting = { mode: 'off', glasses: 'red-cyan', depth: 1, colors: 'comfort' };
+export const DEFAULT_ANAGLYPH: AnaglyphSetting = { mode: 'off', glasses: 'red-cyan', depth: 1, colors: 'comfort', wheel: true };
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -99,8 +101,27 @@ export function parseAnaglyphSetting(raw: unknown): AnaglyphSetting {
     glasses,
     depth: finite(r.depth) && r.depth >= 0.25 && r.depth <= 2 ? r.depth : DEFAULT_ANAGLYPH.depth,
     colors: ANAGLYPH_COLORS.includes(r.colors as AnaglyphColors) ? (r.colors as AnaglyphColors) : DEFAULT_ANAGLYPH.colors,
+    wheel: r.wheel !== false,
     ...(left && right ? { calibration: { left, right } } : {}),
   };
+}
+
+/**
+ * Ce que le rendu de la roue en relief reçoit (app/renderer/relief-roue.js) : les lunettes, et si leurs
+ * verres sont portés à l'envers de l'ordinaire (rouge, vert ou ambre à droite), d'après le calibrage, qui
+ * mesure ce que chaque œil voit vraiment. Absent : lunettes désactivées, ou roue en relief désactivée.
+ */
+export interface AnaglyphWheelRelief {
+  glasses: AnaglyphGlasses;
+  swapped: boolean;
+}
+
+export function anaglyphWheelRelief(s: AnaglyphSetting): AnaglyphWheelRelief | undefined {
+  if (s.mode !== 'on' || !s.wheel) return undefined;
+  const c = s.calibration;
+  // Le verre de gauche, d'ordinaire : rouge (il voit le rouge), vert (le vert), ambre (il voit peu le bleu).
+  const swapped = !c ? false : s.glasses === 'red-cyan' ? c.left[0] < c.right[0] : s.glasses === 'green-magenta' ? c.left[1] < c.right[1] : c.left[2] > c.right[2];
+  return { glasses: s.glasses, swapped };
 }
 
 /** Les mesures en vigueur : le calibrage, sinon les valeurs d'usine des lunettes choisies. */
@@ -127,6 +148,10 @@ export function glassesLabel(g: AnaglyphGlasses): string {
 
 export function depthLabel(d: number): string {
   return `${Math.round(d * 100)} %`;
+}
+
+export function wheelReliefLabel(on: boolean): string {
+  return on ? t('activée') : t('désactivée');
 }
 
 export function colorsLabel(c: AnaglyphColors): string {

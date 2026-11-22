@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.3
 
+- Lunettes 3D : la roue est en relief elle aussi. Ses médaillons sortent de l'écran (le choisi devant ses voisins), avec le bandeau, le cartouche, le compteur, le bandeau d'aide, la marque et la roue dentée ; le fond de la table et, au bureau, les cadres chromés restent à plat. Réglage « Roue en relief » dans Menu système > Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D, activé d'office avec les lunettes.
 - Point de vue (bêta) : la fiche d'une table, dans « Gérer la table… », dit ce qui la cadre et laisse choisir : le cadrage de la borne (le même pour toutes les tables), le POV fourni avec la table, ou « Importer un POV… » (un .pov, ou le .ini d'un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque). Le POV importé est rangé avec la table et appliqué à elle seule ; un POV qui la mettrait de travers sur la borne est refusé, avec la raison.
 - Arène : le classement mondial des joueurs est sur l'Accueil, juste sous la carte du moment. On y voit les trois premiers et votre place, et un Start ouvre le classement complet (Exit revient à l'Arène). Vos places au monde et dans votre pays ouvrent aussi directement leur classement.
 - Niveaux : une partie que vous ouvrez et que d'autres rejoignent rapporte 25 XP, une fois par groupe de joueurs. Rejouer avec les mêmes ne rapporte plus rien ; un groupe différent (un joueur de plus, de moins, ou d'autres) rapporte de nouveau.

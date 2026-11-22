@@ -362,6 +362,8 @@ function placeWheelItem(item, style, hidden = item.leaving) {
   const p = wheelPose(style, item.offset, item.ratio);
   // Médaillon et jumeau du halo reçoivent la même place dans le même appel : leurs transitions
   // partent ensemble du même point, ils ne se séparent jamais (13/11/2026, médaillons dédoublés).
+  // Sa place, pour la roue en relief (relief-roue.js : le médaillon choisi devant, ses voisins un peu moins).
+  item.node.dataset.place = item.halo.node.dataset.place = String(item.offset);
   for (const st of [item.node.style, item.halo.node.style]) {
     st.setProperty('--x', String(p.x));
     st.setProperty('--y', String(p.y));
@@ -2283,6 +2285,8 @@ window.cyber.onState((s) => {
     // Écran des tables : en rafale d'appuis, la vidéo de la table attend l'arrêt (media.js, settle).
     background.show(backdrop, { settle: burst });
     background.setActive(Boolean(loadingVideo) || backgroundVisible(s));
+    // Roue en relief, avec des lunettes 3D (relief-roue.js) : chaque couche à sa profondeur.
+    window.CyberRelief?.apply(s);
   } else root.replaceChildren();
   renderZones(s, burst);
   pauseUnderVeil();

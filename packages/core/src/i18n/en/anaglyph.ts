@@ -33,6 +33,10 @@ export const messages: Record<string, string> = {
   'Choisir pour la changer, de 50 % (douce) à 150 % (marquée) ; 100 % : l’écart réel entre vos yeux': 'Choose to change it, from 50% (gentle) to 150% (strong); 100%: the real distance between your eyes',
   'Couleurs : {v}': 'Colours: {v}',
   'Confortables : ce qu’un seul œil verrait passe en gris, moins de fatigue ; vives : toutes les couleurs, plus d’images fantômes': 'Comfortable: what only one eye would see turns grey, less eye strain; vivid: all the colours, more ghosting',
+  'Roue en relief : {v}': 'Wheel in 3D: {v}',
+  activée: 'on',
+  désactivée: 'off',
+  'La roue, ses médaillons et la navigation sortent de l’écran ; le fond de la table reste à plat': 'The wheel, its medallions and the navigation come out of the screen; the table background stays flat',
   'Revenir aux réglages d’usine': 'Back to factory settings',
   'Oublie le calibrage de ces lunettes': 'Forgets the calibration of these glasses',
   'La table en relief avec des lunettes à filtres colorés. Avec la Vision 3D, le relief suit aussi votre tête. Seul le plateau est en relief : le fronton et le DMD restent à plat.':
