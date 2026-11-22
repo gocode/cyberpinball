@@ -23,11 +23,13 @@ import {
   vrCarriedSettings,
   windowsVk,
   vrReadiness,
+  withoutQualityPreset,
   writeFileAtomic,
   type VpxSetting,
   type VrMode,
   type VrReadiness,
 } from '@cyberpinball/core';
+import { readQualityState } from './qualite-vpx';
 import { foregroundWindow, openXrActiveRuntime, tapKey } from '@cyberpinball/win-displays';
 
 const folder = (dataDir: string) => path.join(dataDir, 'vr');
@@ -125,7 +127,7 @@ export interface VrGame {
  * double d'une partie entre amis). Le double est déjà une copie à part : il est réécrit sur place
  * (`inPlace`). Sinon, l'INI de la partie est <données>\vr\VPinballX.ini.
  */
-export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFile: string; inPlace: boolean; mirror?: boolean }): VrGame {
+export function prepareVrGame(opts: { dataDir: string; baseIni: string; qualityIni?: string; tableFile: string; inPlace: boolean; mirror?: boolean }): VrGame {
   const target = opts.inPlace ? opts.baseIni : vrIniFile(opts.dataDir);
   const previous = readTextIfExists(vrIniFile(opts.dataDir)) || undefined;
   const script = readVpxScript(opts.tableFile);
@@ -136,7 +138,8 @@ export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFil
   const backglassDisplays = readVpxBackglassDisplays(opts.tableFile);
   const addBackglass = vrNeedsVpxBackglass({ room, backglassDisplays, pupCapture: tableUsesPupCapture(script) });
   const base = readTextIfExists(opts.baseIni);
-  const plan = planVrIni(base, previous, { addBackglass, mirror: Boolean(opts.mirror) });
+  // Les valeurs d'un pré-réglage de qualité (qualite-vpx.ts) restent sur les écrans : le casque a son profil (vr-profil.ts).
+  const plan = planVrIni(withoutQualityPreset(base, readQualityState(opts.dataDir, opts.qualityIni ?? opts.baseIni)?.written), previous, { addBackglass, mirror: Boolean(opts.mirror) });
   fs.mkdirSync(path.dirname(target), { recursive: true });
   writeFileAtomic(target, plan.text);
   return { ini: target, room, backglassDisplays, addBackglass, changes: formatChanges(plan.changes), carried: plan.carried, baseText: base };

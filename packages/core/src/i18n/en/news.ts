@@ -5,6 +5,13 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
 
   // packages/core/src/news.ts : les nouveautés
+  'Pré-réglages de qualité': 'Quality presets',
+  'Une belle image sans régler VPX : le mode Auto choisit la qualité qui convient à votre machine.': 'A beautiful image without tuning VPX: Auto mode picks the quality that suits your machine.',
+  'Auto part de votre carte graphique et de votre playfield, puis s’ajuste après chaque partie d’après le temps que la carte graphique met à dessiner une image : plus beau s’il reste de la marge, plus léger si elle peine.':
+    'Auto starts from your graphics card and your playfield, then adjusts after each game from how long the graphics card takes to draw a frame: more beautiful when there is headroom, lighter when it struggles.',
+  'Ou choisissez vous-même : Performance, Équilibré, Qualité ou Ultra. Un réglage changé à la main dans Réglages de VPX passe en Personnalisé : Cyber Pinball n’y touche plus.':
+    'Or choose yourself: Performance, Balanced, Quality or Ultra. A setting changed by hand in VPX settings switches to Custom: Cyber Pinball leaves it alone.',
+  'Menu système › Ma borne › VPX › Pré-réglages': 'System menu › My cabinet › VPX › Presets',
   'Un échange avec l’équipe': 'A conversation with the team',
   'Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.': 'Send a report: the team replies on your cabinet, and you can reply back.',
   'Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.':
@@ -132,13 +139,6 @@ export const messages: Record<string, string> = {
   '« Caler la borne » pose la borne du casque exactement sur la vraie : vous jouez avec les boutons de votre borne, sous vos mains.':
     '“Line up the cabinet” sets the headset’s cabinet exactly on the real one: you play with your cabinet’s buttons, under your hands.',
   'Menu système › Ma borne › Réalité virtuelle et vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision',
-
-  'La perspective de la table suit votre tête, avec une webcam ou une Kinect.': 'The table’s perspective follows your head, with a webcam or a Kinect.',
-  'La table se voit comme par une fenêtre : penchez-vous, elle change de perspective, sans casque ni lunettes.':
-    'You see the table as through a window: lean over, its perspective changes, with no headset or glasses.',
-  'Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.':
-    'A webcam is enough; an Xbox 360 or Xbox One Kinect works too, and its driver installs in one click.',
-  'Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D': 'System menu › My cabinet › Virtual reality and 3D vision › 3D vision',
 
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 

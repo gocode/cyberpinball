@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Dans Menu système > Ma borne > VPX > Pré-réglages, choisissez Auto, Performance, Équilibré, Qualité, Ultra ou Personnalisé. Les bornes existantes conservent leurs réglages en Personnalisé après la mise à jour ; aucun pré-réglage ne s'applique sans votre choix.
+- Auto démarre prudemment selon la carte graphique et le playfield, puis ajuste la qualité entre les parties selon le temps de rendu réellement mesuré. Les profils VR, les réglages propres à une table et les configurations de borne gardent leur indépendance.
+- Personnalisé reste toujours accessible et retrouve les réglages conservés avant le choix d'un pré-réglage. Un réglage graphique changé à la main désactive aussi l'adaptation automatique.
+- VPX 10.8.1-5436 patched Cyber Pinball 4 relève le temps de rendu GPU dans son journal pour alimenter cette adaptation ; les correctifs précédents sont conservés.
 - Arène : les flippers changent d’onglet dès l’ouverture. Dans l’Arène et la Communauté, chaque onglet répond au clic sur toute sa surface, même pendant un rafraîchissement.
 - Le profil d'un joueur est refait comme celui d'un réseau social, dans l'esprit de la Communauté à onglets : en tête, sa pastille en grand (anneau de son niveau, anneau vert quand il est en ligne), son drapeau, son nom et son niveau, ce qu'il fait en ce moment et ses chiffres (amis, records, badges, groupes, tables en commun).
 - Les actions de votre relation sont en tête du profil, la principale d'abord et choisie à l'ouverture : Inviter à jouer, Écrire et Sa bibliothèque pour un ami ; Ajouter (+25 XP), Accepter ou Refuser, Annuler la demande pour un autre joueur ; Lui souhaiter la bienvenue pour un nouveau venu. Une action indisponible reste visible, grisée, avec sa raison (« Hors ligne », « Entre amis seulement »).

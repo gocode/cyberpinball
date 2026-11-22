@@ -127,6 +127,7 @@ export * from './vpxfailure';
 export * from './vpxgamelog';
 export * from './fileerror';
 export * from './vpxcadence';
+export * from './vpxquality';
 export * from './dmdvideos';
 export * from './webmfile';
 export * from './mp4track';

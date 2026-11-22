@@ -1,0 +1,89 @@
+diff --git a/src/renderer/RenderDevice.cpp b/src/renderer/RenderDevice.cpp
+index 1fedf4e..0729196 100644
+--- a/src/renderer/RenderDevice.cpp
++++ b/src/renderer/RenderDevice.cpp
+@@ -603,8 +603,56 @@ void RenderDevice::BGFXOpenXRRenderLoop(const bgfx::Init& init)
+ }
+ #endif
+ 
++// Modified by Cyber Pinball, 2026-11-22 (patched Cyber Pinball 4): summary of the GPU frame lengths in the log,
++// every minute ("running") and when the render loop ends ("end", whole game), with the playfield frame budget, so a
++// frontend can fit the graphics settings to what the GPU actually does.
++namespace
++{
++struct GpuFrameSummary
++{
++   std::array<uint32_t, 401> buckets {}; // 0.25 ms buckets up to 100 ms, the last one for longer frames
++   uint64_t count = 0;
++   uint64_t total = 0;
++   uint64_t longest = 0;
++
++   void Add(const uint64_t us)
++   {
++      buckets[std::min<uint64_t>(us / 250, buckets.size() - 1)]++;
++      count++;
++      total += us;
++      longest = std::max(longest, us);
++   }
++
++   double Percentile(const double p) const
++   {
++      const uint64_t rank = static_cast<uint64_t>(p * static_cast<double>(count - 1));
++      uint64_t seen = 0;
++      for (size_t i = 0; i < buckets.size(); i++)
++      {
++         seen += buckets[i];
++         if (seen > rank)
++            return (static_cast<double>(i) + 0.5) * 0.25;
++      }
++      return static_cast<double>(longest) / 1000.0;
++   }
++
++   void Log(const char* const what, const float refreshRate)
++   {
++      if (count == 0)
++         return;
++      PLOGI << std::format("GPU frame {}: frames={} mean={:.2f}ms p50={:.2f}ms p95={:.2f}ms max={:.2f}ms budget={:.2f}ms", what, count,
++         static_cast<double>(total) / static_cast<double>(count) / 1000.0, Percentile(0.50), Percentile(0.95), static_cast<double>(longest) / 1000.0,
++         refreshRate > 0.f ? 1000.0 / refreshRate : 0.0);
++   }
++};
++}
++
+ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+ {
++   GpuFrameSummary gpuMinute; // Modified by Cyber Pinball (patched Cyber Pinball 4)
++   GpuFrameSummary gpuGame;
++   uint64_t gpuMinuteStart = usec();
++   const float gpuRefreshRate = g_pplayer && g_pplayer->m_playfieldWnd ? g_pplayer->m_playfieldWnd->GetRefreshRate() : 0.f;
+    uint64_t lastSubmitTimestamp = 0;
+    uint64_t lastSyncTimestamp = 0;
+    bool bgfxVSync = false; // Is VSync requested on BGFX's Present operation (note that the VSync on Present will only block if the present queue is filled)
+@@ -921,6 +969,18 @@ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+             for (const uint64_t length : gpuLengths)
+                avg += length;
+             avgGPUFrameLength = avg / gpuLengths.size();
++            // Modified by Cyber Pinball (patched Cyber Pinball 4): GPU frame summary, see GpuFrameSummary
++            if (stats->gpuTimerFreq != 0)
++            {
++               gpuMinute.Add(m_lastGPUFrameLength);
++               gpuGame.Add(m_lastGPUFrameLength);
++            }
++            if (lastSyncTimestamp - gpuMinuteStart >= 60000000ull)
++            {
++               gpuMinute.Log("running", gpuRefreshRate);
++               gpuMinute = GpuFrameSummary();
++               gpuMinuteStart = lastSyncTimestamp;
++            }
+          }
+       }
+ 
+@@ -944,6 +1004,8 @@ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+       }
+    }
+ 
++   gpuGame.Log("end", gpuRefreshRate); // Modified by Cyber Pinball (patched Cyber Pinball 4)
++
+ #if BX_PLATFORM_WINDOWS
+    if (m_presentMonProvider)
+    {

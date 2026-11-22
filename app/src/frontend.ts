@@ -367,6 +367,7 @@ import { onKeyInput } from './key-input';
 import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
+import { createVpxPresetsMenu, prepareQuality, qualityAfterGame } from './qualite-vpx';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
@@ -2456,6 +2457,8 @@ function jukeboxOutputPlace(name: string): string | undefined {
   if (audioOutputs()?.find((o) => o.friendlyName === name)?.isDefault) places.push(t('sortie par défaut de Windows'));
   return places.length ? places.join(', ') : undefined;
 }
+// Pré-réglages de qualité de VPX (qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.
+library.provideSystemItem('vpx-presets', createVpxPresetsMenu({ library, dataDir: () => loc.dataDir, iniPath: () => activeVpxIni(loc) }).item);
 // VPX d'essai (vpx-essai.ts) : seulement avec la clé développeur de cette machine, sinon l'entrée n'existe pas.
 if (trialVpxAllowedHere()) {
   library.provideSystemItem('vpx-trial', createVpxTrialMenu({ library, root: () => loc.root, dataDir: () => loc.dataDir, relaunch: () => relaunchMenu() }).item);
@@ -5925,6 +5928,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode && !otherVpx ? vrFront.prepareVr(played.file, double?.ini) : undefined;
+  let qualityPrepared = false;
   vrFront.headsetExitHint = vrGame && vrFront.headset?.inUse ? vrFront.exitHintText() : undefined;
   // Casque pas sur la tête (le compagnon le dit, ou il ne tourne pas) : la borne dit de le mettre.
   vrFront.vrWearHint =
@@ -5955,6 +5959,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (corrige === 'installed' || corrige === 'busy' || corrige === 'restored') console.log(`VPX corrigé : ${corrige === 'installed' ? 'exécutable posé' : corrige === 'restored' ? 'plus livré, exécutable officiel remis' : 'VPX ouvert, à la partie suivante'}.`); // i18n-ignore : journal
     // L'exécutable a changé : la fiche technique (et la santé) seront relevées de nouveau après la partie.
     if (corrige === 'installed' || corrige === 'restored') library.techFactsChanged();
+    // Pré-réglages de qualité (qualite-vpx.ts) : le mode choisi dans l'INI de la borne ; la VR a son propre profil.
+    if (!vrGame && !displayMode) {
+      try {
+        const quality = prepareQuality(loc.dataDir, activeVpxIni(loc), double?.ini);
+        qualityPrepared = true;
+        if (quality) console.log(quality);
+      } catch (error) {
+        console.warn(`Pré-réglages de VPX : non appliqués (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }
   }
   // Vision 3D (vision3d.ts) : le capteur, allumé dès le Start, suit la tête pour VPX quand la table est à l'écran.
   const vision3dSource = simulated === undefined && !displayMode && !otherVpx ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
@@ -6123,7 +6137,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrFront.headsetExitNote = undefined;
   vrFront.vrWearHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
-  if (cadenceLogFrom !== undefined) noteGameCadence({ logsDir: path.join(loc.dataDir, 'logs'), tableFile: played.file, tableId: table.id, vpxLog, from: cadenceLogFrom, vr: playedVr, others: openDuringGame });
+  if (cadenceLogFrom !== undefined) {
+    const gameLines = noteGameCadence({ logsDir: path.join(loc.dataDir, 'logs'), tableFile: played.file, tableId: table.id, vpxLog, from: cadenceLogFrom, vr: playedVr, others: openDuringGame });
+    // Pré-réglages (mode Auto) : le temps de rendu de la carte graphique, seulement d'une partie sur les écrans sans lunettes 3D.
+    if (qualityPrepared && !playedVr && !vrGame && !anaglyphGame) {
+      const quality = qualityAfterGame(loc.dataDir, gameLines, activeVpxIni(loc), played.file);
+      if (quality) console.log(quality);
+    }
+  }
   if (playedVr && vrGame) vrFront.noteVrMeasures();
   // Gardé allumé deux minutes : la partie suivante a le joueur déjà repéré (partie dans le casque : éteint).
   if (vision3dSource && !playedVr) headTracker.release();

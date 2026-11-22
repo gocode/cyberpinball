@@ -32,8 +32,8 @@ function linesSince(file: string, from: number): string[] {
   }
 }
 
-/** Après la partie : la cadence au journal, et dans le relevé de la table. */
-export function noteGameCadence(opts: { logsDir: string; tableFile: string; tableId: string; vpxLog: string; from: number; vr: boolean; others?: string[] }): void {
+/** Après la partie : la cadence au journal, et dans le relevé de la table. Rend les lignes de la partie (pré-réglages). */
+export function noteGameCadence(opts: { logsDir: string; tableFile: string; tableId: string; vpxLog: string; from: number; vr: boolean; others?: string[] }): string[] {
   const lines = linesSince(opts.vpxLog, opts.from);
   // Erreurs du script pendant la partie, regroupées : une erreur répétée à chaque tour d'une minuterie tient en une ligne.
   const errors = scriptErrorsJournal(opts.tableId, lines);
@@ -46,7 +46,7 @@ export function noteGameCadence(opts: { logsDir: string; tableFile: string; tabl
   const cadence = readVpxCadence(lines);
   if (!cadence) {
     console.log(`Cadence de la partie (${opts.tableId}) : aucun bilan dans vpinball.log (plugin du DMD absent ou partie trop courte).`); // i18n-ignore : journal
-    return;
+    return lines;
   }
   const target = readVpxTargetFps(lines);
   // Backglass ou autre écran annexe plus lent que le playfield : VPX 10.8.1 cale toute la partie dessus.
@@ -60,4 +60,5 @@ export function noteGameCadence(opts: { logsDir: string; tableFile: string; tabl
   } catch (error) {
     console.warn(`Cadence de la partie (${opts.tableId}) : relevé pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
   }
+  return lines;
 }

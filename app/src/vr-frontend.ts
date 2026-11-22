@@ -1997,7 +1997,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
       return undefined;
     }
     try {
-      const vr = prepareVrGame({ dataDir: loc.dataDir, baseIni: doubleIni ?? activeVpxIni(loc), tableFile, inPlace: Boolean(doubleIni), mirror: vrMirror });
+      const vr = prepareVrGame({ dataDir: loc.dataDir, baseIni: doubleIni ?? activeVpxIni(loc), qualityIni: activeVpxIni(loc), tableFile, inPlace: Boolean(doubleIni), mirror: vrMirror });
       const backglass = !vr.room ? 'fronton ajouté par VPX' : vr.addBackglass ? 'pièce VR de la table, fronton capté par PuP sans flasher du fronton : fronton ajouté par VPX' : `pièce VR de la table, ${vr.backglassDisplays ?? '?'} flasher(s) du fronton`; // i18n-ignore : journal
       const details = [backglass, ...(vr.carried ? [`${vr.carried} réglage(s) de la VR repris`] : []), ...vr.changes]; // i18n-ignore : journal
       // L'INI propre à la table prime sur celui de la partie : ce qu'il impose et que VPX refuse en stéréo est neutralisé dans

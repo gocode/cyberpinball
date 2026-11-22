@@ -60,6 +60,24 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Pré-réglages de qualité de VPX (22/11/2026) ; « Vision 3D » (0.1.9) sort de la
+    // liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'prereglages-vpx',
+    date: '2026-11-22',
+    version: '0.2.3',
+    get title() { return t('Pré-réglages de qualité'); },
+    get detail() { return t('Une belle image sans régler VPX : le mode Auto choisit la qualité qui convient à votre machine.'); },
+    get more() {
+      return [
+        t('Auto part de votre carte graphique et de votre playfield, puis s’ajuste après chaque partie d’après le temps que la carte graphique met à dessiner une image : plus beau s’il reste de la marge, plus léger si elle peine.'),
+        t('Ou choisissez vous-même : Performance, Équilibré, Qualité ou Ultra. Un réglage changé à la main dans Réglages de VPX passe en Personnalisé : Cyber Pinball n’y touche plus.'),
+      ];
+    },
+    get where() { return t('Menu système › Ma borne › VPX › Pré-réglages'); },
+    reach: { kind: 'system', id: 'vpx-presets' },
+    beta: true,
+  },
+  {
     // Défis asynchrones (engagement, vague 2, 22/11/2026) ; « Collections et favoris » (0.1.8) sort de la
     // liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'defis',
@@ -433,22 +451,7 @@ export const NEWS: readonly NewsItem[] = [
     reach: { kind: 'system', id: 'realite-virtuelle' },
     beta: true,
   },
-  {
-    id: 'vision-3d',
-    date: '2026-11-11',
-    version: '0.1.9',
-    get title() { return t('Vision 3D'); },
-    get detail() { return t('La perspective de la table suit votre tête, avec une webcam ou une Kinect.'); },
-    get more() {
-      return [
-        t('La table se voit comme par une fenêtre : penchez-vous, elle change de perspective, sans casque ni lunettes.'),
-        t('Une webcam suffit ; une Kinect de Xbox 360 ou de Xbox One marche aussi, et son pilote s’installe en un clic.'),
-      ];
-    },
-    get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D › Vision 3D'); },
-    reach: { kind: 'system', id: 'vision3d' },
-    beta: true,
-  },
+
 ];
 
 /** Ce que la borne garde : les nouveautés déjà vues. */

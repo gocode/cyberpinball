@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- In System menu > My cabinet > VPX > Presets, choose Auto, Performance, Balanced, Quality, Ultra or Custom. Existing cabinets keep their current settings in Custom after updating; no preset applies without your choice.
+- Auto starts conservatively from the graphics card and playfield, then adjusts quality between games using measured GPU rendering times. VR profiles, table-specific settings and cabinet configurations remain independent.
+- Custom is always available and restores the settings saved before choosing a preset. Manually changing a graphics setting also disables automatic adaptation.
+- VPX 10.8.1-5436 patched Cyber Pinball 4 records GPU rendering times in its log for this adaptation; previous fixes remain included.
 - Arena opens with the tab bar selected, so the flippers switch tabs immediately. In Arena and Community, the entire tab responds to clicks, even during a refresh.
 - A player's profile is redesigned like a social network profile, in the spirit of the tabbed Community: at the top, their large avatar (ring of their level, green ring when online), their flag, name and level, what they are doing right now and their numbers (friends, records, badges, groups, tables in common).
 - The actions of your relationship sit at the top of the profile, the main one first and selected on opening: Invite to play, Write and Their library for a friend; Add (+25 XP), Accept or Decline, Cancel the request for another player; Welcome them for a newcomer. An unavailable action stays visible, greyed out, with its reason ("Offline", "Friends only").
