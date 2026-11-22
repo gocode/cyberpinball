@@ -71,7 +71,7 @@ export interface ArenaMenuHost {
    * Les classements (rankings-menu.ts) : ma place chez les joueurs, l'écran de toutes les tables, et le
    * classement des joueurs (son haut sur l'Accueil, son écran d'un Start) ; sans lui, pas de bloc mondial.
    */
-  rankings: Pick<RankingsMenu, 'standing' | 'open'> & Partial<Pick<RankingsMenu, 'playersTop' | 'openPlayers'>>;
+  rankings: Pick<RankingsMenu, 'standing' | 'open'> & Partial<Pick<RankingsMenu, 'playersTop' | 'openPlayers' | 'recentScores' | 'openTableScores' | 'openTables'>>;
   /** Les tables du jour (daily-tables-menu.ts) : ce que dit leur porte, et les ouvrir ; absentes, l'onglet « Du jour » reste grisé. */
   daily?: { detail(): string; open(back: () => void): void };
   /** Mon niveau, Mes badges, le barème (level-menu.ts) ; l'historique des parties. */
@@ -144,6 +144,8 @@ const POSTER_PLAYERS = 5;
 const KEEP_MS = 2000;
 /** Premières places du classement mondial sur l'Accueil (ma ligne s'ajoute au-delà). */
 const WORLD_TOP = 3;
+/** Tables jouées récemment dans l'onglet Scores. */
+const RECENT_SCORES = 8;
 
 export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
   const now = () => host.now?.() ?? new Date();
@@ -304,7 +306,10 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
       // Les six onglets et les icônes de la planche validée. Les classements (place, rivaux, records) sont
       // dans Progression : un septième onglet ne tenait plus en borne (« Classeme… », 21/11/2026).
       { id: 'games', label: t('Parties'), icon: 'gamepad', ...(games.mine || games.open.some((o) => o.joinable) ? { attention: true } : {}) },
-      { id: 'challenges', label: t('Défis'), icon: 'trophy', disabled: t('Bientôt') },
+      // Les tableaux des scores, d'un onglet (demande du 22/11/2026 : « arriver directement sur les tableaux des scores »).
+      ...(host.rankings.recentScores ? [{ id: 'scores', label: t('Scores'), icon: 'trophy' as const }] : []),
+      // Les flippers croisés (le trophée est aux Scores) : retenus par le mainteneur le 22/11/2026.
+      { id: 'challenges', label: t('Défis'), icon: 'crossed-flippers', disabled: t('Bientôt') },
       { id: 'daily', label: t('Du jour'), icon: 'sparkle', ...(host.daily ? {} : { disabled: t('Bientôt') }) },
       { id: 'league', label: t('Ligue'), icon: 'list', disabled: t('Bientôt') },
       { id: 'progress', label: t('Progression'), icon: 'medal' },
@@ -577,6 +582,38 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     return out;
   }
 
+  /**
+   * Scores (demande du 22/11/2026 : « un onglet de score, tout simplement, pour arriver directement sur
+   * les tableaux des scores ») : les tables jouées récemment, le premier de chacune et ma place ; Start
+   * ouvre le tableau d'une table. Dessous : toutes les tables (recherche, portées, périodes), et le
+   * classement des joueurs, qui reste aussi sur l'Accueil.
+   */
+  function scoresTab(here: () => void): { sections: HubSectionSpec[] } {
+    const r = host.rankings;
+    const recent = r.recentScores!(RECENT_SCORES);
+    const cards: HubCardSpec[] = recent.rows.map((row) => ({
+      key: `scores:${row.table.file}`,
+      icon: row.first ? 'star' : 'trophy',
+      title: row.table.title,
+      detail: [row.ago ? cap(row.ago) : '', row.reason ?? row.lead, row.mine ?? row.count].filter(Boolean).join(' · '),
+      run: () => r.openTableScores!(row.table, here),
+    }));
+    return {
+      sections: [
+        {
+          title: t('Jouées récemment'),
+          note: recent.where,
+          layout: 'list',
+          cards,
+          choices: [
+            { key: 'all-tables', icon: 'list', title: t('Toutes les tables'), detail: t('Recherche, portée et période ; Start sur une table : son tableau des scores'), run: () => (r.openTables ? r.openTables(here, t('Retour : Arène')) : r.open(here)) },
+            { key: 'players', icon: 'gauge', title: t('Classement des joueurs'), detail: t('Les joueurs classés par leurs XP : monde, pays, amis'), run: openBoard(here, 'world') },
+          ],
+        },
+      ],
+    };
+  }
+
   /** Progression : ma place et mes rivaux (les classements), les badges les plus proches, mes records, et les écrans complets. */
   function progressSections(here: () => void): HubSectionSpec[] {
     const out: HubSectionSpec[] = rankingsSections(here);
@@ -618,19 +655,24 @@ export function createArenaMenu(host: ArenaMenuHost): ArenaMenu {
     const facts = [...(live ? [live.text] : []), week > 0 ? t('Cette semaine : {xp}', { xp: xpText(week) }) : t('Parties instantanées, classements, progression')];
     const spec: HubSpec = { heading: t('Arène'), icon: 'trophy', medallion: 'arene', title: t('ARÈNE'), facts, band: hubBand(b), tabs: TABS(), sections: [] };
     const back = () => home();
+    // Hors de l'Accueil, le contenu se parcourt en liste, sans bloc à traverser (règle du 22/11/2026) :
+    // les blocs restent à l'Accueil, pour ses résumés et ses accès rapides.
     switch (tab) {
       case 'games': {
         const g = gamesSections(reopen);
-        return { ...spec, sections: g.sections };
+        return { ...spec, list: true, sections: g.sections };
       }
+      case 'scores':
+        return { ...spec, list: true, ...scoresTab(reopen) };
       case 'progress':
-        return { ...spec, sections: progressSections(reopen) };
+        return { ...spec, list: true, sections: progressSections(reopen) };
       // Les tables du jour (daily-tables-menu.ts) : leur écran complet, d'une carte.
       case 'daily': {
         const daily = host.daily;
         if (!daily) return spec;
         return {
           ...spec,
+          list: true,
           sections: [{ title: t('Les tables du jour'), layout: 'list', cards: [], choices: [{ key: 'daily', icon: 'sparkle', title: t('Les plus jouées aujourd’hui'), detail: daily.detail(), run: () => daily.open(reopen) }] }],
         };
       }

@@ -117,6 +117,7 @@ export const ICON_NAMES = [
   'bell',
   'trophy',
   'medal',
+  'crossed-flippers',
   'network',
   // Gestionnaire de téléchargements
   'pause',

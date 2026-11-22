@@ -104,6 +104,15 @@ export interface RankingsMenu {
   /** L'écran « Joueurs » directement, à cette portée et cette période ; son retour vers `back`, sous ce nom. */
   openPlayers(back: () => void, backLabel: string, scope: PlayerScope, period: PlayerPeriod): void;
   /**
+   * Les tableaux des scores (onglet « Scores » de l'Arène, 22/11/2026) : les tables jouées récemment, le
+   * premier de chacune et ma place, au classement mondial de tout temps (celui de cette borne sans réseau).
+   */
+  recentScores(n: number): RecentScores;
+  /** Le tableau des scores de cette table, à la portée de recentScores ; son retour vers `back`. */
+  openTableScores(table: TableEntry, back: () => void): void;
+  /** L'écran « Tables » directement (recherche, portées, périodes) ; son retour vers `back`, sous ce nom. */
+  openTables(back: () => void, backLabel: string): void;
+  /**
    * « Toutes les tables » au téléphone (lot 5) : le même calcul que l'écran « Tables », à cette portée
    * et cette période ; les portées (et pourquoi l'une est grisée), puis les tables, récentes d'abord.
    */
@@ -116,6 +125,13 @@ export interface RemoteAllTables {
   periods: { period: ScorePeriod; label: string; current: boolean }[];
   unavailable?: string;
   sections: { title: string; rows: { file: string; title: string; lead?: string; flag?: string; count?: string; mine?: string; first?: true; reason?: string; aside?: string }[] }[];
+}
+
+/** Les tables jouées récemment et leur tableau (recentScores). */
+export interface RecentScores {
+  /** « Mondial · Tout temps », ou « Cette borne · Tout temps » sans réseau. */
+  where: string;
+  rows: { table: TableEntry; lead?: string; count?: string; mine?: string; first?: true; reason?: string; ago?: string }[];
 }
 
 /** Ma place dans un classement des joueurs, de tout temps et de la semaine. */
@@ -422,7 +438,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       key: 'period',
       run: () => ((period = SCORE_PERIODS[(SCORE_PERIODS.indexOf(period) + 1) % SCORE_PERIODS.length]!), here()),
     });
-    actions.push({ label: t('Retour : Classements'), icon: 'back', run: () => home(1) });
+    const exit = tablesExit ?? { label: t('Retour : Classements'), run: () => home(1) };
+    actions.push({ label: exit.label, icon: 'back', run: exit.run });
     return {
       heading: t('Tables'),
       icon: 'trophy',
@@ -431,7 +448,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       tabs,
       sections,
       actions,
-      back: () => home(1),
+      back: exit.run,
       hint: t('Flippers : choisir · Start : le tableau des scores · MagnaSave : portée suivante · Exit : retour'),
       listHint: t('Flippers : parcourir · Start : le tableau des scores · MagnaSave : portée suivante · Exit : sortir de la liste'),
       keys: (input) => {
@@ -446,7 +463,32 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     };
   }
 
+  /** L'écran « Tables » ouvert d'ailleurs (l'Arène) : son retour ; absent, celui de l'accueil des classements. */
+  let tablesExit: { label: string; run: () => void } | undefined;
+
+  /** La portée des tableaux montrés hors de l'écran « Tables » : le monde, ou cette borne sans réseau. */
+  const outsideScope = (): RankingScope => (freshBoard('world', 'all').unavailable ? 'cabinet' : 'world');
+
+  function recentScores(n: number): RecentScores {
+    const sc = outsideScope();
+    const board = freshBoard(sc, 'all');
+    const recent = host
+      .tables()
+      .filter((x) => lastRunOf(x) > 0)
+      .sort((a, b) => lastRunOf(b) - lastRunOf(a))
+      .slice(0, n);
+    const rows = recent.map((table) => {
+      const state = board.states.get(table.file);
+      const ago = agoLabel(lastRunOf(table));
+      if (state?.kind === 'ranked')
+        return { table, ago, lead: t('1. {name} · {score}', { name: state.leader.name, score: formatNumber(state.leader.score) }), count: state.count, ...(state.mine ? { mine: state.mine } : {}), ...(state.first ? { first: true as const } : {}) };
+      return { table, ago, reason: state?.kind === 'pending' ? t('Empreinte de la table en calcul…') : (state?.reason ?? t('Aucun score {period}', { period: periodLabel('all').toLowerCase() })) };
+    });
+    return { where: t('{scope} · {period}', { scope: scopeLabel(sc), period: periodLabel('all') }), rows };
+  }
+
   function openTables(): void {
+    tablesExit = undefined;
     // Le classement mondial d'abord ; sans réseau (partage désactivé), celui de cette borne.
     scope = boardOf('world', period).unavailable ? 'cabinet' : 'world';
     // Le curseur sur la recherche (juste après les onglets), ou sur la première table sans recherche.
@@ -665,6 +707,15 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     detail: () => t('Joueurs par XP, et les scores de chaque table'),
     standing,
     playersTop,
+    recentScores,
+    openTableScores: (table, to) => host.library.openScores(table, outsideScope(), 'all', to),
+    openTables(to, label) {
+      period = 'all';
+      query = '';
+      scope = outsideScope();
+      tablesExit = { label, run: to };
+      host.library.openCustom(buildTables, RANKING_SCOPES.length);
+    },
     openPlayers(to, label, sc, p) {
       playerScope = sc;
       playerPeriod = p;

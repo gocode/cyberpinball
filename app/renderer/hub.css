@@ -268,10 +268,24 @@
 }
 
 .hub-tab-why {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: calc(20 * var(--u));
   font-weight: 500;
   color: var(--ink-faint);
   line-height: 1;
+}
+
+/* Sept onglets en borne (Arène, onglet Scores du 22/11/2026) : un peu plus serrés, pour que chaque nom tienne en entier. */
+.lib-hub:not(.hub-desk) .hub-tabs:has(> .hub-tab:nth-child(7)) {
+  gap: calc(4 * var(--u));
+}
+
+.lib-hub:not(.hub-desk) .hub-tabs:has(> .hub-tab:nth-child(7)) .hub-tab {
+  padding-inline: 0;
+  font-size: calc(20 * var(--u));
 }
 
 .hub-dot {

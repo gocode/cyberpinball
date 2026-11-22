@@ -120,6 +120,13 @@ export const messages: Record<string, string> = {
     'On top, your level and what is most pressing (a place to win back, a game waiting for you), then the world ranking. A game you open that others join brings XP, once per group.',
   // Le classement mondial sur l'Accueil, et l'XP de la partie rejointe (22/11/2026)
   'Retour : Arène': 'Back: Arena',
+  // Onglets en liste, onglet Scores (22/11/2026)
+  'Flippers : choisir · Start : valider · Exit : retour aux onglets': 'Flippers: choose · Start: confirm · Exit: back to the tabs',
+  'Flippers : choisir · Start : valider · Exit : retour à la roue': 'Flippers: choose · Start: confirm · Exit: back to the wheel',
+  'Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour à la roue': 'Flippers: choose a tab · Start: open it · Exit: back to the wheel',
+  'Recherche, portée et période ; Start sur une table : son tableau des scores': 'Search, scope and period; Start on a table: its scoreboard',
+  'Classement des joueurs': 'Player ranking',
+  'Les joueurs classés par leurs XP : monde, pays, amis': 'Players ranked by their XP: world, country, friends',
   '1ᵉʳ · {name}': '#1 · {name}',
   '{rank}ᵉ · {name}': '#{rank} · {name}',
   'Tout le classement mondial': 'The whole world ranking',

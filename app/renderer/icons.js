@@ -125,6 +125,7 @@ const CYBER_ICONS = {
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>', // Cloche : notifications du menu des tables.
   trophy: '<path d="M7 4h10v6a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 15v3M8 21h8M9 18h6v3H9z"/>', // Coupe à deux anses : tableau des scores d’une table.
   medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2 5 3h4l3 6 3-6h4l-3.5 7.2M12 13v4"/>', // Médaille à ruban : badges.
+  'crossed-flippers': '<path d="M3.7 16.7 16.7 5.7a1.2 1.2 0 0 1 1.7 1.7L7.3 20.3a2.5 2.5 0 0 1-3.6-3.6zM20.3 16.7 7.3 5.7a1.2 1.2 0 0 0-1.7 1.7l11.1 12.9a2.5 2.5 0 0 0 3.6-3.6zM5.5 18.5h.01M18.5 18.5h.01"/>', // Deux batteurs en X, comme deux épées : les défis entre joueurs (onglet Défis de l'Arène, 22/11/2026).
   network: '<path d="M14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM11.1 7.8 6.9 16.2M12.9 7.8l4.2 8.4M8 18h8"/>', // Trois bornes reliées sans centre : partage et réseau.
   // Gestionnaire de téléchargements
   pause: '<path d="M8 5v14M16 5v14"/>', // Deux barres : mettre un téléchargement en pause.

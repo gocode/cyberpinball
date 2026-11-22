@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.3
 
+- Arène : un onglet Scores mène directement aux tableaux des scores. On y trouve les tables jouées récemment, avec le premier de chacune et votre place ; Start ouvre le tableau d'une table. Dessous, toutes les tables (recherche, portée, période) et le classement des joueurs.
+- Arène : hors de l'Accueil, chaque onglet se parcourt comme une liste. Les flippers vont d'une ligne à l'autre et Start la valide, sans bloc où entrer ; l'Accueil garde ses blocs pour ses résumés et ses accès rapides.
+- Arène et Communauté : dans un onglet, Exit remet le curseur sur la barre d'onglets, sur l'onglet ouvert ; un second Exit revient à la roue. Le bandeau d'aide le dit.
+- Arène : l'onglet Défis prend l'icône des flippers croisés, et le trophée passe aux Scores.
 - Lunettes 3D : la roue est en relief elle aussi. Ses médaillons sortent de l'écran (le choisi devant ses voisins), avec le bandeau, le cartouche, le compteur, le bandeau d'aide, la marque et la roue dentée ; le fond de la table et, au bureau, les cadres chromés restent à plat. Réglage « Roue en relief » dans Menu système > Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D, activé d'office avec les lunettes.
 - Point de vue (bêta) : la fiche d'une table, dans « Gérer la table… », dit ce qui la cadre et laisse choisir : le cadrage de la borne (le même pour toutes les tables), le POV fourni avec la table, ou « Importer un POV… » (un .pov, ou le .ini d'un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque). Le POV importé est rangé avec la table et appliqué à elle seule ; un POV qui la mettrait de travers sur la borne est refusé, avec la raison.
 - Arène : le classement mondial des joueurs est sur l'Accueil, juste sous la carte du moment. On y voit les trois premiers et votre place, et un Start ouvre le classement complet (Exit revient à l'Arène). Vos places au monde et dans votre pays ouvrent aussi directement leur classement.

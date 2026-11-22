@@ -163,6 +163,14 @@ export interface HubSpec {
    */
   flat?: true;
   focus?: string;
+  /**
+   * Un onglet en liste (22/11/2026, règle du mainteneur : « les onglets autres que l'accueil doivent
+   * éviter les navigations par bloc et privilégier les navigations par liste ou affichage direct ») :
+   * la barre d'onglets reste un bloc, mais chaque carte (ou chacun de ses boutons) et chaque choix est un
+   * arrêt direct des flippers, que Start valide ; les sections n'ont pas de liseré. Les blocs restent
+   * pour l'accueil : résumés et accès rapides.
+   */
+  list?: true;
   /** Une touche, avant les MagnaSave : vrai si elle est prise (un écran qui ignore un bouton encore tenu). */
   keys?: (input: { code: string }) => boolean;
 }
@@ -297,8 +305,10 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
         if (c.buttons?.length) for (const b of c.buttons) !b.off && items.push({ label: b.label, key: `${c.key}:${b.key}`, run: b.run });
         else if (c.run) items.push({ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run });
       }
+      // Un onglet en liste : chaque élément est un arrêt à lui seul (un bloc d'une action, sans liseré).
+      if (spec.list && !spec.flat) for (const item of items) out.push({ key: `item:${i}:${item.key}`, label: item.label, items: [item] });
       // Un récapitulatif est un bloc même sans action : Start ouvre son onglet.
-      if (s.cards.length && (items.length || s.opens)) out.push({ key: `section:${i}`, label: s.title ?? s.cards[0]?.title ?? '', items, ...(s.opens ? { opens: s.opens } : {}) });
+      else if (s.cards.length && (items.length || s.opens)) out.push({ key: `section:${i}`, label: s.title ?? s.cards[0]?.title ?? '', items, ...(s.opens ? { opens: s.opens } : {}) });
       // Ses choix, sous elle : un bloc d'une seule action chacun (Start la fait tout de suite).
       for (const c of s.choices ?? []) if (c.run) out.push({ key: `choice:${i}:${c.key}`, label: c.title, items: [{ label: c.title, key: c.key, ...(c.quiet ? { tone: 'quiet' as const } : {}), run: c.run }] });
     });
@@ -306,6 +316,15 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     if (spec.flat) return [{ key: FLAT, label: spec.title, items: out.flatMap((b) => b.items) }];
     return out;
   }
+
+  /**
+   * Ce que les flippers parcourent au premier niveau : les blocs, sauf la barre d'onglets d'un onglet en
+   * liste (elle n'est pas un élément de la liste : Exit y mène, 22/11/2026).
+   */
+  const topOf = (spec: HubSpec, blocks: Block[]): Block[] => (spec.list ? blocks.filter((b) => b.key !== 'tabs') : blocks);
+
+  /** Le rang, au premier niveau, du premier bloc du contenu (après la barre d'onglets). */
+  const firstContentAt = (spec: HubSpec): number => Math.max(0, topOf(spec, blocksOf(spec)).findIndex((b) => b.key !== 'tabs'));
 
   /** Le curseur dans la barre d'onglets, sur l'onglet ouvert (menuFirst). */
   function toTabs(): void {
@@ -325,7 +344,14 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
   function shortcut(tab: string, from: number): void {
     origin = { tab: current, block: from };
     current = tab;
-    const first = blocksOf(describe(tab, reopen)).find((b) => b.key !== 'tabs');
+    const spec = describe(tab, reopen);
+    const blocks = blocksOf(spec);
+    // Un onglet en liste : le curseur sur son premier élément, au premier niveau (Exit ramène ici).
+    if (spec.list) {
+      inside = undefined;
+      return void host.library.openCustom(build, firstContentAt(spec));
+    }
+    const first = blocks.find((b) => b.key !== 'tabs');
     inside = first?.items.length ? first.key : undefined;
     host.library.openCustom(build, first?.items.length ? 0 : 1);
   }
@@ -352,7 +378,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       const at = blocks[0]?.items.findIndex((item) => item.key === spec.focus) ?? -1;
       return void host.library.openCustom(build, Math.max(0, at));
     }
-    host.library.openCustom(build, blocks[0]?.key === 'tabs' && blocks.length > 1 ? 1 : 0);
+    host.library.openCustom(build, firstContentAt(spec));
   }
 
   /** Start sur un bloc : sa seule action tout de suite, sinon on y entre, le curseur sur son premier élément (l'onglet ouvert pour la barre). */
@@ -383,7 +409,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
     const blockAction = new Map<string, number>();
     const itemAction = new Map<string, number>();
     if (enteredAt >= 0) for (const item of blocks[enteredAt]!.items) itemAction.set(item.key, actions.push({ label: item.label, key: item.key, ...(item.tone ? { tone: item.tone } : {}), run: item.run }) - 1);
-    else for (const block of blocks) blockAction.set(block.key, actions.push({ label: block.label, key: `block:${block.key}`, run: () => enter(block, spec) }) - 1);
+    else for (const block of topOf(spec, blocks)) blockAction.set(block.key, actions.push({ label: block.label, key: `block:${block.key}`, run: () => enter(block, spec) }) - 1);
     const blockView = (key: string): HubBlockView | undefined => (blockAction.has(key) ? { action: blockAction.get(key)! } : inside === key ? { entered: true } : blocks.some((b) => b.key === key) ? {} : undefined);
     const tabs = spec.tabs.map((tab) => {
       const view = { label: tab.label, icon: tab.icon, current: tab.id === current, ...(tab.attention ? { attention: true } : {}), ...(tab.disabled ? { disabled: tab.disabled } : {}) };
@@ -412,39 +438,46 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
           cards: s.cards.map((c): HubCardView => {
             const { key, run: _run, buttons, ...shown } = c;
             const out: HubCardView = { ...shown };
+            // Dans le bloc où l'on est entré, ou, dans un onglet en liste, l'arrêt de l'élément lui-même.
+            const own = (k: string) => itemAction.get(k) ?? blockAction.get(`item:${i}:${k}`);
             if (buttons?.length)
-              out.buttons = buttons.map((b) => ({
-                label: b.label,
-                ...(b.xp ? { xp: b.xp } : {}),
-                ...(b.primary ? { primary: true } : {}),
-                ...(b.quick ? { quick: true } : {}),
-                ...(b.off ? { off: b.off } : itemAction.has(`${key}:${b.key}`) ? { action: itemAction.get(`${key}:${b.key}`)! } : {}),
-              }));
-            else if (itemAction.has(key)) out.action = itemAction.get(key)!;
+              out.buttons = buttons.map((b) => {
+                const action = own(`${key}:${b.key}`);
+                return {
+                  label: b.label,
+                  ...(b.xp ? { xp: b.xp } : {}),
+                  ...(b.primary ? { primary: true } : {}),
+                  ...(b.quick ? { quick: true } : {}),
+                  ...(b.off ? { off: b.off } : action !== undefined ? { action } : {}),
+                };
+              });
+            else if (own(key) !== undefined) out.action = own(key)!;
             return out;
           }),
         },
       ];
     });
     const tabsBlock = blockView('tabs');
-    // Exit : d'un bloc ouvert par un récapitulatif (la même bande), à l'accueil ; d'un autre bloc, on en
-    // ressort ; au premier niveau, à l'accueil (récapitulatif), à la barre d'onglets (menuFirst), sinon à la roue.
+    // Exit (règle du mainteneur, 22/11/2026 : « exit sélectionne la barre de menu, exit à nouveau : on sort
+    // de l'écran ») : d'un bloc ouvert par un récapitulatif (la même bande), à l'accueil ; d'un autre bloc,
+    // on en ressort ; au premier niveau, à l'accueil (récapitulatif), sinon à la barre d'onglets, le curseur
+    // sur l'onglet ouvert ; de la barre d'onglets, à la roue.
     const firstContent = blocks.findIndex((b) => b.key !== 'tabs');
+    const hasTabs = blocks.some((b) => b.key === 'tabs');
     const exit = (): (() => void) => {
-      if (spec.flat) return back;
-      // Menu d'abord : la barre d'onglets est le haut de l'écran, Exit y revient à la roue ; sinon on en ressort.
-      if (inside === 'tabs' && options.menuFirst) return back;
+      if (spec.flat || inside === 'tabs') return back;
       if (enteredAt >= 0) return origin && enteredAt === firstContent ? backToOrigin : () => leave(enteredAt);
       if (origin) return backToOrigin;
-      if (options.menuFirst && blocks.some((b) => b.key === 'tabs')) return toTabs;
-      return back;
+      return hasTabs ? toTabs : back;
     };
-    const menuHint = (): string | undefined => {
-      if (!options.menuFirst || spec.hint) return undefined;
-      if (inside === 'tabs') return t('Flippers : changer d’onglet · Start : y entrer · Exit : retour à la roue');
-      if (origin && (enteredAt < 0 || enteredAt === firstContent)) return enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : retour à l’accueil') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à l’accueil');
-      if (enteredAt < 0) return t('Flippers : choisir un bloc · Start : y entrer · Exit : retour aux onglets');
-      return undefined;
+    const navHint = (): string | undefined => {
+      if (spec.hint || spec.flat) return undefined;
+      if (inside === 'tabs') return options.menuFirst ? t('Flippers : changer d’onglet · Start : y entrer · Exit : retour à la roue') : t('Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour à la roue');
+      if (origin && (enteredAt < 0 || enteredAt === firstContent))
+        return enteredAt >= 0 || spec.list ? t('Flippers : choisir · Start : valider · Exit : retour à l’accueil') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à l’accueil');
+      if (enteredAt >= 0) return undefined;
+      if (hasTabs) return spec.list ? t('Flippers : choisir · Start : valider · Exit : retour aux onglets') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour aux onglets');
+      return spec.list ? t('Flippers : choisir · Start : valider · Exit : retour à la roue') : undefined;
     };
     const hub: HubView = {
       medallion: spec.medallion,
@@ -466,7 +499,7 @@ export function createHubScreen(host: HubScreenHost, describe: (tab: string, reo
       // À plat, Exit quitte l'écran d'un appui ; dans un bloc, il en ressort.
       back: exit(),
       hub,
-      hint: menuHint() ?? spec.hint ?? (enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue')),
+      hint: navHint() ?? spec.hint ?? (enteredAt >= 0 ? t('Flippers : choisir · Start : valider · Exit : sortir du bloc') : t('Flippers : choisir un bloc · Start : y entrer · Exit : retour à la roue')),
       keys: (input) => {
         if (spec.keys?.(input)) return true;
         // Dans la barre d'onglets (menuFirst) : les flippers changent d'onglet, son contenu tout de suite.

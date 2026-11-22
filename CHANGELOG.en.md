@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.3
 
+- Arena: a Scores tab leads straight to the scoreboards. It lists the tables you played recently, with the leader of each and your place; Start opens a table's scoreboard. Below come all tables (search, scope, period) and the player ranking.
+- Arena: outside Home, each tab reads as a list. The flippers move from one line to the next and Start confirms it, with no block to enter; Home keeps its blocks for its summaries and shortcuts.
+- Arena and Community: in a tab, Exit puts the cursor back on the tab bar, on the open tab; a second Exit returns to the wheel. The help bar says so.
+- Arena: the Challenges tab gets the crossed flippers icon, and the trophy moves to Scores.
 - 3D glasses: the wheel is in 3D too. Its medallions come out of the screen (the selected one in front of its neighbours), along with the band, the title plate, the counter, the help bar, the logo and the gear button; the table background and, on a desktop, the chrome frames stay flat. "Wheel in 3D" setting in System menu > My cabinet > Virtual reality and 3D vision > 3D glasses, on by default with the glasses.
 - Point of view (beta): a table's sheet, under "Manage the table…", says what frames it and lets you choose: the cabinet framing (the same for every table), the POV supplied with the table, or "Import a POV…" (a .pov, or the .ini of a POV for VPX 10.8, from Downloads, a USB stick or a drive). The imported POV is stored with the table and applied to it only; a POV that would turn it the wrong way on the cabinet is refused, with the reason.
 - Arena: the world player ranking is on Home, right under the card of the moment. It shows the top three and your place, and Start opens the full ranking (Exit returns to the Arena). Your world and country places also open their ranking directly.
