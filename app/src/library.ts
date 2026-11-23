@@ -69,6 +69,8 @@ import {
   tooNewAdvice,
   tooNewReason,
   withVpxChoice,
+  IniDocument,
+  isVpxCabinetView,
   PINBALLFX_TABLES,
   PINBALLFX3_CABINET_HELP_URL,
   pinballFx3GameIn,
@@ -314,7 +316,7 @@ import { joystickStatus, watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import { createTablePov } from './table-pov';
-import { freezeOriginFraming } from './origin-framing';
+import { findOriginTable, freezeOriginFraming } from './origin-framing';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
 import { qrRows } from './remote-qr';
@@ -1411,6 +1413,11 @@ export function createLibrary(host: LibraryHost) {
   const journeyUi = createJourney({
     host,
     find,
+    cabinetView: () => {
+      const orientation = host.playfieldOrientation?.();
+      return Boolean(orientation && isVpxCabinetView(IniDocument.parse(orientation.globalIni).get('Player', 'BGSet')));
+    },
+    framing: (table, back) => tablePov.open(table, back),
     show: (build, at, table) => openCustom(build, at, table),
     cursor: () => cursor,
     task: (message, work) => task(message, work),
@@ -1821,8 +1828,16 @@ export function createLibrary(host: LibraryHost) {
     show: (build, at) => openCustom(build, at),
     pick: (request) => pickPaths(request),
     orientation: () => host.playfieldOrientation?.(),
-    apply: (ops) => applyOps(ops, { trashDir: trashDirFor(layout()!.trash, 'Point de vue') }), // i18n-ignore : nom de dossier
+    apply: (ops) => {
+      applyOps(ops, { trashDir: trashDirFor(layout()!.trash, 'Point de vue') }); // i18n-ignore : nom de dossier
+      // Un .info réécrit (cadrage d'origine noté ou retiré) : la liste des tables le relit.
+      if (ops.some((o) => 'path' in o && /\.info$/i.test(o.path))) host.reload();
+    },
     back: (table) => openSheet(find(table.file) ?? table),
+    fresh: (table) => find(table.file) ?? table,
+    dataDir: () => host.dataDir,
+    framing: () => host.framing?.(),
+    findOrigin: (file) => findOriginTable(file, host.root ? [host.root] : []),
   });
 
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.

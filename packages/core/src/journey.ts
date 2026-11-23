@@ -96,6 +96,8 @@ export type JourneyAction =
   | { kind: 'search'; text: string }
   /** Le fichier est déjà là : glisser sur l'écran, ou le choisir sur ce PC. */
   | { kind: 'addFile' }
+  /** Le cadrage de la table, choisi sur des images rendues par VPX (Point de vue, app/src/table-pov.ts). */
+  | { kind: 'framing' }
   | { kind: 'play' };
 
 export interface JourneyChoice {
@@ -154,6 +156,8 @@ export interface JourneyInput {
   waitList?: WaitList;
   /** Étapes déjà montrées pour cette table (parcours repris). */
   seen?: readonly JourneyStepId[];
+  /** Table VPX jouée en vue borne (playfield à part) : son cadrage se choisit, POV de la communauté compris. */
+  cabinetView?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +200,7 @@ export function romSources(vps: VpsDb | undefined, roms: string[], vpsId?: strin
 }
 
 /** Fichiers d'une sorte (table, fronton, PuP-Pack) pour le jeu de la table, le plus adapté à la borne d'abord. */
-export function gameSources(vps: VpsDb | undefined, vpsId: string | undefined, kind: 'table' | 'b2s' | 'pup', screens: CabinetScreens, sourceFileId?: string): FileSource[] {
+export function gameSources(vps: VpsDb | undefined, vpsId: string | undefined, kind: 'table' | 'b2s' | 'pup' | 'pov', screens: CabinetScreens, sourceFileId?: string): FileSource[] {
   const game = vpsId ? vps?.games.find((g) => g.id === vpsId) : undefined;
   if (!game) return [];
   const versions = vpxVersions(game);
@@ -499,15 +503,23 @@ function pupStep(input: JourneyInput): JourneyStep | undefined {
 }
 
 function displayStep(input: JourneyInput): JourneyStep | undefined {
-  const found = input.findings.filter((f) => ['originFraming', 'tableOrientation', 'manualView','importedView', 'povView', 'povOffered', 'tableWindows', 'fullDmdHidden'].includes(f.code) && f.fix);
-  if (!found.length) return input.seen?.includes('display') ? { id: 'display', title: t('Affichage'), state: 'done', required: false, detail: t('Cadrage et écrans de la configuration de la borne.'), choices: [] } : undefined;
+  const found = input.findings.filter((f) => ['originFraming', 'tableOrientation', 'manualView', 'importedView', 'povView', 'povOffered', 'tableWindows', 'fullDmdHidden'].includes(f.code) && f.fix);
+  // En vue borne, le cadrage se choisit sur des images de la table (23/11/2026), comme les médias ; un POV de la
+  // communauté (base VPS) est proposé quand la table n'en a pas.
+  const framing: JourneyChoice[] = input.cabinetView ? [{ action: { kind: 'framing' }, label: t('Choisir le cadrage'), detail: t('Chaque cadrage rendu sur cette table par VPX, au choix') }] : [];
+  const hasPov = input.findings.some((f) => ['povView', 'povOffered', 'povWrongWay'].includes(f.code));
+  const povs = input.cabinetView && !hasPov ? gameSources(input.vps, input.vpsId, 'pov', input.screens, input.sourceFileId) : [];
+  const community = povs.length ? [fetchChoice(povs[0]!, t('Récupérer un POV de la communauté : {label}', { label: versionLabel(povs[0]!.file) })), ...chooseChoice(povs)] : [];
+  if (!found.length && !framing.length) return input.seen?.includes('display') ? { id: 'display', title: t('Affichage'), state: 'done', required: false, detail: t('Cadrage et écrans de la configuration de la borne.'), choices: [] } : undefined;
+  const choices = [...found.map((f) => repairChoice(f)), ...framing, ...community];
+  choices[0]!.primary = true;
   return {
     id: 'display',
     title: t('Affichage'),
     state: found.some((f) => f.severity === 'warning') ? 'todo' : 'optional',
     required: false,
-    detail: `${found[0]!.title}. ${found[0]!.detail}`,
-    choices: found.map((f, i) => repairChoice(f, i === 0)),
+    detail: found[0] ? `${found[0].title}. ${found[0].detail}` : t('Le cadrage de la borne, un autre pour cette table seule, ou un POV de la communauté.'),
+    choices,
   };
 }
 

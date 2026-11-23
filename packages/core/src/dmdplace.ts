@@ -250,7 +250,7 @@ export interface DmdMenuHost {
 }
 
 /** Lignes du menu, dans l'ordre. */
-export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'width' | 'height' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'intensity3d' | 'vpx' | 'resume';
+export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'width' | 'height' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'intensity3d' | 'framing' | 'vpx' | 'resume';
 
 const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'screen', label: () => t('Écran') },
@@ -264,6 +264,9 @@ const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'general', label: () => t('Revenir à la position générale') },
   { id: 'recenter3d', label: () => t('Recentrer la vue 3D') },
   { id: 'intensity3d', label: () => t('Intensité de la vue 3D') },
+  // Retouche du cadrage sur la table lancée (23/11/2026) : la page « Point of View » du menu de VPX règle en direct le
+  // mode (Ajuster, Remplir), « garder le haut » et l'étirement (correctif 02), et l'enregistre pour cette table.
+  { id: 'framing', label: () => t('Cadrage de cette table (menu de VPX › Point of View)') },
   { id: 'vpx', label: () => t('Tous les réglages de VPX') },
   { id: 'resume', label: () => t('Reprendre la partie') },
 ];
@@ -358,7 +361,7 @@ const boundsOf = (host: DmdMenuHost, s: DmdMenuState) => host.screens[s.spot.scr
 
 function itemBlocked(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string | undefined {
   if (id === 'general' && !host.ownPlace) return t('Cette table n’a pas de position à elle : elle suit déjà la position générale.');
-  if (id === 'vpx') return host.vpxMenuBlocked;
+  if (id === 'vpx' || id === 'framing') return host.vpxMenuBlocked;
   if (id === 'recenter3d' && typeof host.vision3d === 'string') return host.vision3d;
   if (id === 'screen' && host.screens.length < 2) return t('Un seul écran branché.');
   if (['moveX', 'moveY', 'width', 'height', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD »).');
@@ -448,6 +451,7 @@ function open(host: DmdMenuHost, s: DmdMenuState): DmdMenuOutcome {
       return { recenter3d: true };
     case 'intensity3d':
       return { intensity3d: true };
+    case 'framing':
     case 'vpx':
       return leave(s, 'vpx');
     case 'resume':
@@ -702,7 +706,7 @@ export function dmdMenuPanel(host: DmdMenuHost, s: DmdMenuState, keyLabel: (code
         items: indices(PLACE_ITEMS).map(line),
       },
       { title: '', items: indices(['save', 'general']).map(line) },
-      { title: t('Partie'), items: indices(shown(host, 'recenter3d') ? ['recenter3d', 'intensity3d', 'vpx', 'resume'] : ['vpx', 'resume']).map(line) },
+      { title: t('Partie'), items: indices(shown(host, 'recenter3d') ? ['recenter3d', 'intensity3d', 'framing', 'vpx', 'resume'] : ['framing', 'vpx', 'resume']).map(line) },
     ],
     ...(s.mode === 'choice' && { choices: choices.map((c, i) => ({ label: c.label, selected: i === s.choice })) }),
     ...(s.leaving && {

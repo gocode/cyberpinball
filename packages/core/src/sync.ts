@@ -6,6 +6,7 @@ import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxDmdShutdownWait, vpxFolderDefaul
 import { detectDofControllers, dmdPortHints, VPX_DOF_OWNED_KEYS, vpxDofSettings, type DetectedDofController, type DofSetup, type HidName } from './dof';
 import { t } from './i18n';
 import { IniDocument } from './ini';
+import { framingStyles, framingStyleSettings } from './framing-styles';
 import { loadOwnedMemory, readTextIfExists, saveOwnedMemory, writeWithBackup, type WriteReport } from './store';
 import { currentFlipperEdge, EDGE_LABELS, playfieldSize } from './layout';
 import { matchScreens } from './match';
@@ -256,9 +257,15 @@ export function planVpxSync(
     const settings = vpxLayoutSettings(playfield, edge, size);
     applyOwned(settings.settings);
     if (settings.autofit && !outside(settings.autofit)) {
-      findings.push(...requireAutofit(doc, settings.autofit, kept, changes));
-      // VPX corrigé : « Ajuster la table » garde le haut de la table (valeurs proposées, VPX_KEEP_TOP_FRAMING).
-      if (profile.keepTopFraming) changes.push(...applyVpxDefaults(doc, [...VPX_KEEP_TOP_FRAMING]));
+      const keepTop = Boolean(profile.keepTopFraming);
+      if (cabinet.framing && framingStyles(keepTop).includes(cabinet.framing)) {
+        // Style choisi par le joueur sur une image de sa table (framing-styles.ts) : écrit comme une clé gérée.
+        applyOwned(framingStyleSettings(cabinet.framing, keepTop));
+      } else {
+        findings.push(...requireAutofit(doc, settings.autofit, kept, changes));
+        // VPX corrigé : « Ajuster la table » garde le haut de la table (valeurs proposées, VPX_KEEP_TOP_FRAMING).
+        if (keepTop) changes.push(...applyVpxDefaults(doc, [...VPX_KEEP_TOP_FRAMING]));
+      }
     }
     if (!size) {
       findings.push({

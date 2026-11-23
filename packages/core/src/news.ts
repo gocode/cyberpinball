@@ -60,6 +60,24 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Cadrage des tables choisi sur une image (23/11/2026) ; « Le Juke-box » (0.1.9) sort de la liste pour la garder
+    // à 24. Date à poser au jour de la version finale.
+    id: 'cadrage-des-tables',
+    date: '2026-11-23',
+    version: '0.2.4',
+    get title() { return t('Le cadrage des tables, choisi sur ta table'); },
+    get detail() { return t('Choisis comment les tables remplissent l’écran, en voyant ta propre table rendue par VPX.'); },
+    get more() {
+      return [
+        t('Plein écran avec l’apron rogné, table entière avec des bandes, ou table élargie : chaque cadrage est montré sur une de tes tables, rendue par VPX sans rien afficher sur la borne.'),
+        t('Chaque table peut aussi avoir le sien : un autre style, le POV fourni ou celui de la communauté, et un retour arrière. Les tables reprises d’une autre installation gardent le cadrage qu’elles avaient.'),
+      ];
+    },
+    get where() { return t('Menu système › Ma borne › VPX › Cadrage des tables'); },
+    reach: { kind: 'system', id: 'vpx-framing' },
+    beta: true,
+  },
+  {
     id: 'point-de-vue',
     date: '2026-11-22',
     version: '0.2.3',
@@ -435,22 +453,6 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Fiche d’une table › Crédits'); },
     reach: { kind: 'sheet', part: 'credits' },
   },
-  {
-    id: 'juke-box',
-    date: '2026-11-11',
-    version: '0.1.9',
-    get title() { return t('Le Juke-box'); },
-    get detail() { return t('Vos playlists YouTube et vos fichiers sur la borne, le clip au fronton, le spectre au DMD.'); },
-    get more() {
-      return [
-        t('Un médaillon en tête de la roue joue vos playlists : importées de YouTube, ou vos propres fichiers. Le fronton montre le clip ou la pochette, le DMD un spectre aux couleurs de la pochette.'),
-        t('Tout se pilote aux boutons de la borne, ou au téléphone. Le son peut sortir sur plusieurs haut-parleurs à la fois, chacun avec son volume.'),
-      ];
-    },
-    get where() { return t('Roue › Juke-box'); },
-    reach: { kind: 'jukebox' },
-  },
-
 ];
 
 /** Ce que la borne garde : les nouveautés déjà vues. */

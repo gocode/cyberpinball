@@ -28,49 +28,56 @@ const CADRAGES = [
   { nom: 'garde-le-haut', titre: 'Garder le haut (défaut)', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.15', CabinetAutofitPos: '0.05' } },
 ];
 
+/**
+ * Étude du cadrage (23/11/2026, --etude) : la vue de l'auteur (cadrage manuel), les cadrages de VPX, celui de Cyber
+ * Pinball, et deux vues « relief » où VPX place l'œil du joueur comme sur une vraie borne (mode Window : position des
+ * yeux par rapport au bas de l'écran, inclinaison de l'écran).
+ */
+const ETUDE = [
+  { nom: 'auteur', titre: 'Vue de l’auteur (manuel)', reglages: { CabinetAutofitMode: '0' } },
+  CADRAGES[0],
+  CADRAGES[1],
+  CADRAGES[3],
+  { nom: 'relief', titre: 'Relief (œil à 20 cm, 50 cm au-dessus)', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.15', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '50' } },
+  { nom: 'relief-incline', titre: 'Relief, écran incliné de 6°', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.15', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '50', ScreenInclination: '6' } },
+];
+
+/**
+ * Mesures d'une image : bandes noires à gauche et à droite, vide en haut et en bas (colonnes ou lignes dont moins de
+ * 2 % des pixels sont éclairés), surface utilisée (le reste), en pourcentage de l'image.
+ */
+export function mesures(img) {
+  const { width: w, height: h, data } = img;
+  const lit = (x, y) => {
+    const o = (y * w + x) * 4;
+    return Math.max(data[o], data[o + 1], data[o + 2]) > 14;
+  };
+  const colonne = (x) => {
+    let n = 0;
+    for (let y = 0; y < h; y++) if (lit(x, y)) n++;
+    return n / h;
+  };
+  const ligne = (y) => {
+    let n = 0;
+    for (let x = 0; x < w; x++) if (lit(x, y)) n++;
+    return n / w;
+  };
+  let g = 0;
+  while (g < w && colonne(g) < 0.02) g++;
+  let d = 0;
+  while (d < w - g && colonne(w - 1 - d) < 0.02) d++;
+  let haut = 0;
+  while (haut < h && ligne(haut) < 0.02) haut++;
+  let bas = 0;
+  while (bas < h - haut && ligne(h - 1 - bas) < 0.02) bas++;
+  const pc = (v) => Math.round(v * 1000) / 10;
+  return { bandeGauche: pc(g / w), bandeDroite: pc(d / w), videHaut: pc(haut / h), videBas: pc(bas / h), surface: pc(((w - g - d) * (h - haut - bas)) / (w * h)) };
+}
+
 function args(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) out[argv[i].slice(2)] = argv[i + 1];
   return out;
-}
-
-/** Image QOI (format de capture de VPX) en RGBA. */
-function decodeQoi(buf) {
-  if (buf.toString('latin1', 0, 4) !== 'qoif') throw new Error('pas une image QOI');
-  const width = buf.readUInt32BE(4);
-  const height = buf.readUInt32BE(8);
-  const data = Buffer.alloc(width * height * 4);
-  const index = new Uint8Array(64 * 4);
-  let [r, g, b, a] = [0, 0, 0, 255];
-  let p = 14;
-  let run = 0;
-  for (let o = 0; o < data.length; o += 4) {
-    if (run > 0) run--;
-    else {
-      const b1 = buf[p++];
-      if (b1 === 0xfe) [r, g, b] = [buf[p++], buf[p++], buf[p++]];
-      else if (b1 === 0xff) [r, g, b, a] = [buf[p++], buf[p++], buf[p++], buf[p++]];
-      else if ((b1 & 0xc0) === 0x00) [r, g, b, a] = index.slice((b1 & 0x3f) * 4, (b1 & 0x3f) * 4 + 4);
-      else if ((b1 & 0xc0) === 0x40) {
-        r = (r + ((b1 >> 4) & 3) - 2) & 255;
-        g = (g + ((b1 >> 2) & 3) - 2) & 255;
-        b = (b + (b1 & 3) - 2) & 255;
-      } else if ((b1 & 0xc0) === 0x80) {
-        const b2 = buf[p++];
-        const vg = (b1 & 0x3f) - 32;
-        r = (r + vg - 8 + ((b2 >> 4) & 15)) & 255;
-        g = (g + vg) & 255;
-        b = (b + vg - 8 + (b2 & 15)) & 255;
-      } else run = b1 & 0x3f;
-      const h = ((r * 3 + g * 5 + b * 7 + a * 11) % 64) * 4;
-      index.set([r, g, b, a], h);
-    }
-    data[o] = r;
-    data[o + 1] = g;
-    data[o + 2] = b;
-    data[o + 3] = 255;
-  }
-  return { width, height, data };
 }
 
 /** Une image du playfield dans un cadrage, sur des copies (dossier du banc). */
@@ -117,6 +124,8 @@ async function rendu({ cadrage, vpx, table, roms, core }) {
     { section: 'Plugin.PinMAME', key: 'PinMAMEPath', value: pinmame },
     core.PINMAME_FAST_BOOT,
     { section: 'Plugin.B2S', key: 'Enable', value: '1' },
+    // Tables dont le script crée PinUpPlayer.PinDisplay (JP's Space Cadet GE) : sans le plugin, erreur de script.
+    { section: 'Plugin.PUP', key: 'Enable', value: '1' },
   ];
   const ini = path.join(dir, `VPinballX-${cadrage.nom}.ini`);
   const doc = core.IniDocument.parse('');
@@ -132,7 +141,7 @@ async function rendu({ cadrage, vpx, table, roms, core }) {
     const erreurs = log ? fs.readFileSync(log, 'utf8').split(/\r?\n/).filter((l) => / (ERROR|FATAL) /.test(l)).slice(0, 5) : ['journal absent'];
     throw new Error(`${cadrage.nom} : aucune image (VPX ${code}) ${erreurs.join(' | ')}`);
   }
-  return decodeQoi(fs.readFileSync(path.join(capture, image)));
+  return core.decodeQoi(fs.readFileSync(path.join(capture, image)));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -148,11 +157,28 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const roms = a.roms ?? path.join(path.dirname(a.table), 'pinmame', 'roms');
   const images = [];
-  for (const cadrage of CADRAGES) {
-    const img = await rendu({ cadrage, vpx: a.vpx, table: a.table, roms, core });
-    console.log(`${cadrage.titre} : ${img.width} × ${img.height}`);
+  const liste = a.etude ? ETUDE : CADRAGES;
+  const releves = [];
+  for (const cadrage of liste) {
+    let img;
+    try {
+      img = await rendu({ cadrage, vpx: a.vpx, table: a.table, roms, core });
+    } catch (error) {
+      console.log(`${cadrage.titre} : ${error.message}`);
+      releves.push({ cadrage: cadrage.nom, erreur: error.message });
+      continue;
+    }
+    const m = mesures(img);
+    console.log(`${cadrage.titre} : ${img.width} × ${img.height} ; ${JSON.stringify(m)}`);
+    releves.push({ cadrage: cadrage.nom, titre: cadrage.titre, ...m });
     images.push(img);
+    if (a.images) {
+      fs.mkdirSync(a.images, { recursive: true });
+      fs.writeFileSync(path.join(a.images, `${cadrage.nom}.png`), core.encodePng(img));
+    }
   }
+  if (a.images) fs.mkdirSync(a.images, { recursive: true });
+  if (a.images) fs.writeFileSync(path.join(a.images, 'mesures.json'), JSON.stringify({ table: path.basename(a.table), releves }, null, 2));
   // Planche : les rendus côte à côte, séparés de 20 px, sur fond gris foncé.
   const marge = 20;
   const w = images.reduce((s, i) => s + i.width, 0) + marge * (images.length + 1);
@@ -167,5 +193,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const sortie = a.sortie ?? path.join(repo, 'tmp', 'banc-cadrage.png');
   fs.mkdirSync(path.dirname(sortie), { recursive: true });
   fs.writeFileSync(sortie, core.encodePng(planche));
-  console.log(`Planche (${CADRAGES.map((c) => c.titre).join(', ')}) : ${sortie}`);
+  console.log(`Planche (${liste.map((c) => c.titre).join(', ')}) : ${sortie}`);
 }

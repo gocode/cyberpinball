@@ -9,6 +9,9 @@ import {
   checkOtherVpx,
   findTableIni,
   iniMatchesVersion,
+  knownTableInstallations,
+  listInstallationTables,
+  type InstallationTable,
   originIniCandidates,
   parsePovXml,
   planOriginFraming,
@@ -22,6 +25,7 @@ import {
   type OriginVpx,
   type PlayfieldOrientation,
 } from '@cyberpinball/core';
+import { installationHints } from './installation-hints';
 
 /** Où VPX 10.7 et avant rangeaient leurs réglages (le cadrage compris). */
 const VP10_PLAYER_KEY = 'HKCU\\Software\\Visual Pinball\\VP10\\Player';
@@ -63,6 +67,44 @@ export function readOriginVpx(exe: string): OriginVpx {
   return origin;
 }
 
+/** Le cadrage que le VPX d'origine (`exe`) appliquait à `originVpx`, d'après ses réglages, son .ini et son .pov. */
+export function originPlan(originVpx: string, exe: string, orientation: PlayfieldOrientation): OriginFramingPlan {
+  const originIni = findTableIni(originVpx);
+  const povText = readText(originVpx.replace(/\.[^.\\/]+$/, '') + '.pov');
+  const pov = povText === undefined ? undefined : parsePovXml(povText);
+  return planOriginFraming({ origin: readOriginVpx(exe), tableIni: originIni.exists ? readText(originIni.path) : undefined, pov, orientation });
+}
+
+/** Tables des autres installations du PC, lues une fois par session (« Point de vue » d'une table reprise avant). */
+let installed: InstallationTable[] | undefined;
+
+/**
+ * La table d'une autre installation dont `tableFile` est la copie, et le VPX qui l'y jouait : même nom de fichier, ou
+ * même taille et même titre. Pour les tables reprises avant que l'origine soit notée (0.2.4-essai.9) ; undefined :
+ * introuvable, ou sans VPX connu.
+ */
+export function findOriginTable(tableFile: string, exclude: string[]): { vpx: string; exe: string } | undefined {
+  installed ??= knownTableInstallations(['C:', 'D:', 'E:', 'F:'], exclude, installationHints()).flatMap((layout) => listInstallationTables(layout));
+  const name = path.basename(tableFile).toLowerCase();
+  let size = -1;
+  try {
+    size = fs.statSync(tableFile).size;
+  } catch {
+    return undefined;
+  }
+  const same = (vpx: string) => {
+    if (path.resolve(vpx).toLowerCase() === path.resolve(tableFile).toLowerCase()) return false;
+    if (path.basename(vpx).toLowerCase() === name) return true;
+    try {
+      return fs.statSync(vpx).size === size;
+    } catch {
+      return false;
+    }
+  };
+  const found = installed.find((t) => t.vpxExe && same(t.vpx));
+  return found ? { vpx: found.vpx, exe: found.vpxExe! } : undefined;
+}
+
 /**
  * Le cadrage de `originVpx` (la table dans l'installation d'origine, jouée par `exe`) appliqué à sa copie `tableFile` :
  * .ini de la copie réécrit si besoin, note dans son .info. Rien sans `orientation` (borne pas décrite : le sens ne se
@@ -70,11 +112,8 @@ export function readOriginVpx(exe: string): OriginVpx {
  */
 export function freezeOriginFraming(tableFile: string, infoFile: string, originVpx: string, exe: string, orientation: PlayfieldOrientation | undefined): OriginFramingPlan {
   if (!orientation) return { summary: 'borne pas décrite (assistant d’écrans) : cadrage d’origine non figé' }; // i18n-ignore : journal
-  const origin = readOriginVpx(exe);
+  const plan = originPlan(originVpx, exe, orientation);
   const originIni = findTableIni(originVpx);
-  const povText = readText(originVpx.replace(/\.[^.\\/]+$/, '') + '.pov');
-  const pov = povText === undefined ? undefined : parsePovXml(povText);
-  const plan = planOriginFraming({ origin, tableIni: originIni.exists ? readText(originIni.path) : undefined, pov, orientation });
   if (!plan.note) return plan;
   const own = findTableIni(tableFile);
   // La copie de la table vient d'être faite : son .ini est celui de l'origine (ou absent). Un .ini qui en diffère a été

@@ -55,6 +55,7 @@ import { type ScriptResult } from './vbs';
 import type { JukeboxPreview } from './jukebox-menu';
 import { type MediaDbGameOffer } from './media-download';
 import { type MediaView } from './library-medias';
+import type { FramingSupport } from './cadrage-menu';
 import type { RomMusic } from './rom-music';
 import { type HealthView } from './health';
 import { type DisplayLinkFacts } from './tech-facts';
@@ -147,6 +148,8 @@ export interface LibraryHost {
   pupFolder?(): string | undefined;
   /** Playfield de la borne et VPinballX.ini actif : le médecin y juge le sens d'une table. */
   playfieldOrientation?(): PlayfieldOrientation | undefined;
+  /** Aperçus du cadrage rendus par VPX et style de la borne (cadrage-menu.ts) ; absent : pas d'images. */
+  framing?(): FramingSupport | undefined;
   quit(): void;
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;

@@ -128,13 +128,13 @@ export const messages: Record<string, string> = {
     'The wheel credits each table’s main author, and “The community” gathers the authors of all your tables.',
   'Fiche d’une table › Crédits': 'Table page › Credits',
 
-  'Le Juke-box': 'The Juke-box',
-  'Vos playlists YouTube et vos fichiers sur la borne, le clip au fronton, le spectre au DMD.': 'Your YouTube playlists and your own files on the cabinet, the video on the backglass, the spectrum on the DMD.',
-  'Un médaillon en tête de la roue joue vos playlists : importées de YouTube, ou vos propres fichiers. Le fronton montre le clip ou la pochette, le DMD un spectre aux couleurs de la pochette.':
-    'A medallion at the head of the wheel plays your playlists: imported from YouTube, or your own files. The backglass shows the video or the cover, the DMD a spectrum in the cover’s colours.',
-  'Tout se pilote aux boutons de la borne, ou au téléphone. Le son peut sortir sur plusieurs haut-parleurs à la fois, chacun avec son volume.':
-    'Everything is driven with the cabinet’s buttons, or your phone. Sound can play on several speakers at once, each with its own volume.',
-  'Roue › Juke-box': 'Wheel › Juke-box',
+  'Le cadrage des tables, choisi sur ta table': 'Table framing, chosen on your own table',
+  'Choisis comment les tables remplissent l’écran, en voyant ta propre table rendue par VPX.': 'Choose how tables fill the screen, while seeing your own table rendered by VPX.',
+  'Plein écran avec l’apron rogné, table entière avec des bandes, ou table élargie : chaque cadrage est montré sur une de tes tables, rendue par VPX sans rien afficher sur la borne.':
+    'Full screen with the apron cropped, whole table with bands, or widened table: each framing is shown on one of your tables, rendered by VPX without anything appearing on the cabinet.',
+  'Chaque table peut aussi avoir le sien : un autre style, le POV fourni ou celui de la communauté, et un retour arrière. Les tables reprises d’une autre installation gardent le cadrage qu’elles avaient.':
+    'Each table can also have its own: another style, the supplied POV or a community one, and a way back. Tables taken over from another installation keep the framing they had.',
+  'Menu système › Ma borne › VPX › Cadrage des tables': 'System menu › My cabinet › VPX › Table framing',
 
   'Menu système › Ma borne › Télécommande du téléphone': 'System menu › My cabinet › Phone remote',
 

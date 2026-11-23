@@ -200,9 +200,18 @@ test('fiche > Point de vue : le cadrage choisi pour la table, le retour à celui
 test('écran « Point de vue » : choisir le POV, revenir à la borne, importer (sans Electron)', async () => {
   type Shown = { heading: string; actions: { label: string; detail?: string; badge?: string; run(): void }[]; sections: { rows: { text: string }[] }[] };
   const mod = require(path.join(REPO_ROOT, 'app', 'dist', 'table-pov.js')) as {
-    createTablePov(ctx: { show(build: () => Shown): void; pick(): Promise<string[] | undefined>; orientation(): DoctorContext['orientation']; apply(ops: FileOp[]): void; back(): void }): { detail(table: TableEntry): string; open(table: TableEntry, back?: () => void): void };
+    createTablePov(ctx: {
+      show(build: () => Shown): void;
+      pick(): Promise<string[] | undefined>;
+      orientation(): DoctorContext['orientation'];
+      apply(ops: FileOp[]): void;
+      back(): void;
+      fresh(table: TableEntry): TableEntry;
+      dataDir(): string;
+    }): { detail(table: TableEntry): string; open(table: TableEntry, back?: () => void): void };
   };
   const s = setup({ [`${TABLE}.pov`]: POV, [`${TABLE}.ini`]: '[Player]\r\nCabinetAutofitMode = 1\r\n' });
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cadrage-pov-donnees-'));
   let shown: Shown | undefined;
   let picked: string[] | undefined;
   let backs = 0;
@@ -212,34 +221,43 @@ test('écran « Point de vue » : choisir le POV, revenir à la borne, importer 
     orientation: () => landscape(),
     apply: (ops) => applyOps(ops, { trashDir: s.trashDir }),
     back: () => backs++,
+    fresh: () => s.entry(),
+    dataDir: () => dataDir,
   });
+  const action = (label: string | RegExp) => shown!.actions.find((a) => (typeof label === 'string' ? a.label === label : label.test(a.label)))!;
   const table = s.entry();
   assert.equal(pov.detail(table), 'Cadrage de la borne');
   pov.open(table);
   assert.deepEqual(shown!.actions.map((a) => [a.label, a.badge ?? '']), [['Cadrage de la borne', ''], [`POV « ${TABLE}.pov »`, 'beta'], ['Importer un POV…', 'beta'], ['Retour', '']]);
   assert.match(shown!.actions[0]!.detail!, /choix actuel/);
-  shown!.actions[1]!.run();
+  action(/^POV/).run();
   assert.equal(pov.detail(s.entry()), `POV « ${TABLE}.pov »`);
-  assert.match(shown!.sections[0]!.rows[0]!.text, /appliqué à cette table/);
-  shown!.actions[0]!.run();
+  assert.match(shown!.sections[0]!.rows[0]!.text, /choisi pour cette table/);
+  // Retour arrière : le cadrage d'avant (celui de la borne) rétabli.
+  action('Rétablir le cadrage précédent').run();
+  assert.equal(pov.detail(s.entry()), 'Cadrage de la borne');
+  assert.equal(fs.readFileSync(path.join(path.dirname(table.file), `${TABLE}.ini`), 'utf8'), '[Player]\r\nCabinetAutofitMode = 1\r\n');
+  action(/^POV/).run();
+  action('Cadrage de la borne').run();
   assert.equal(pov.detail(s.entry()), 'Cadrage de la borne');
   // Import annulé : l'écran revient tel quel.
-  shown!.actions[2]!.run();
+  action('Importer un POV…').run();
   await new Promise((r) => setImmediate(r));
   assert.equal(shown!.heading, 'Point de vue');
-  shown!.actions[3]!.run();
+  action('Retour').run();
   assert.equal(backs, 1);
   // Une entrée depuis une autre fonction garde son retour après une action et un import annulé.
   let origin = 0;
   pov.open(table, () => origin++);
-  shown!.actions[1]!.run();
-  shown!.actions[2]!.run();
+  action(/^POV/).run();
+  action('Importer un POV…').run();
   await new Promise((r) => setImmediate(r));
-  shown!.actions[3]!.run();
+  action('Retour').run();
   assert.equal(origin, 1);
   assert.equal(backs, 1);
   pov.open(table);
-  shown!.actions[3]!.run();
+  action('Retour').run();
   assert.equal(backs, 2, 'ouvrir depuis la fiche oublie le retour externe');
+  fs.rmSync(dataDir, { recursive: true, force: true });
   s.done();
 });

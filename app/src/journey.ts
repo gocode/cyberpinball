@@ -65,6 +65,10 @@ export interface JourneyContext {
   install(paths: string[], acquisition: { gameId: string; items: WaitItem[] }, journey: string): void;
   /** Fichiers glissés sur l'écran : plan d'import, puis retour ici. */
   drop(paths: string[], journey: string): void;
+  /** La borne joue en vue borne (playfield à part) : le cadrage s'y choisit. */
+  cabinetView?(): boolean;
+  /** Point de vue de la table (cadrage au choix, sur images), puis retour au parcours. */
+  framing?(table: TableEntry, back: () => void): void;
 }
 
 /** Mot et signe de chaque état (design system : jamais la couleur seule). */
@@ -112,6 +116,7 @@ export function createJourney(ctx: JourneyContext) {
         vps,
         waitList: ctx.catalog.waitList(),
         seen: journeyRecord(mem, table.file)?.steps,
+        cabinetView: table.emulator === 'vpx' && Boolean(ctx.cabinetView?.()),
       });
       rememberJourney(mem, table.file, table.title, journey);
       saveOrWarn(journeysFile(host.dataDir), () => saveJourneys(host.dataDir, mem));
@@ -175,6 +180,8 @@ export function createJourney(ctx: JourneyContext) {
         return ctx.catalog.openSearch(action.text);
       case 'addFile':
         return ctx.pickFiles(table.file);
+      case 'framing':
+        return ctx.framing?.(table, back);
       case 'installVpx':
         ctx.catalog.setRefresh(undefined);
         open = undefined;

@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- Cadrage des tables (bêta) : Menu système › Ma borne › VPX › Cadrage des tables. Sur une borne, une table ne remplit pas un écran 16:9 sans compromis : tu choisis entre « Plein écran, apron rogné » (par défaut), « Table entière » et « Plein écran, table élargie », chacun montré sur ta propre table, rendue par VPX sans rien afficher sur la borne.
+- Point de vue d'une table : chaque cadrage y est montré sur une image de la table, un autre style peut être choisi pour elle seule, et « Rétablir le cadrage précédent » revient en arrière. Une table reprise avant cette version retrouve le cadrage de son installation d'origine si celle-ci est encore sur le disque.
+- Le parcours d'une table propose « Choisir le cadrage » et, quand la base VPS en connaît, un POV de la communauté.
+- En partie, les réglages des MagnaSave ont une ligne « Cadrage de cette table », qui ouvre la page « Point of View » du menu de VPX : le cadrage s'y retouche en direct et s'enregistre pour la table.
 - Profil, Communauté et Arène : dans la barre d'onglets, Exit ne quitte plus l'écran d'un coup. Il te rend la main sur le contenu de l'onglet affiché, et un second Exit quitte l'écran. Depuis le contenu, la barre d'onglets se rejoint aux flippers, à sa place sous l'en-tête.
 - Dans la barre d'onglets, Tab et Maj+Tab au clavier changent d'onglet comme les flippers : l'onglet allumé est toujours celui que tu vois, jamais un onglet survolé sans son contenu.
 - Réalité virtuelle activée mais casque débranché ou retiré : Cyber Pinball ne cherche plus le casque pendant une partie sur les écrans. Ces essais, toutes les 15 secondes, faisaient sauter des images à VPX sur toutes les tables (environ 115 images/s au lieu de 120, avec des saccades régulières).

@@ -67,6 +67,7 @@ export const SYSTEM_ITEM_IDS = [
   'tech-sheet',
   'cabinet',
   'vpx-presets',
+  'vpx-framing',
   'vpx-settings',
   'other-vpx',
   'vpx-trial',
@@ -197,7 +198,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     label: 'VPX', // i18n-ignore : le nom du logiciel
     get detail() { return t('Réglages de VPX pour toutes les tables, autres versions installées'); },
     // Les pré-réglages (qualite-vpx.ts, 22/11/2026) en tête : un choix d'ensemble, puis les réglages un par un.
-    entries: ['vpx-presets', 'vpx-settings', 'other-vpx', 'vpx-trial'],
+    // Puis le cadrage des tables (app/src/cadrage-menu.ts, 23/11/2026), choisi lui aussi d'un coup, sur une image.
+    entries: ['vpx-presets', 'vpx-framing', 'vpx-settings', 'other-vpx', 'vpx-trial'],
   },
   // Tous les réglages du DMD ensemble (16/11/2026), et les LED (DOF) qui l'accompagnent sur la borne (20/11/2026).
   // Le DMD sur la roue reste sur la fiche de chaque table.
@@ -378,6 +380,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   // Qualité de l'image et fluidité en un choix (app/src/qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.
   'vpx-presets': { icon: 'gauge', get label() { return t('Pré-réglages'); } },
+  // Le cadrage de toutes les tables en vue borne, choisi sur une image de sa table (app/src/cadrage-menu.ts).
+  'vpx-framing': { icon: 'crop', get label() { return t('Cadrage des tables'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
   // Un VPX déjà installé sur le PC (10.8.0…), pour les tables qui le choisissent (autres-vpx.ts).
   'other-vpx': { icon: 'layers', get label() { return t('Autres versions de VPX'); } },

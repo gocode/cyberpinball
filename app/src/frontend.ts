@@ -105,6 +105,8 @@ import {
   loadCabinet,
   joystickButtonsUnrecorded,
   playfieldOrientation,
+  FRAMING_STYLE_KEYS,
+  ownedId,
   pinballFxCommand,
   pinballFx3DirectFailureHint,
   pinballFx3FirstRunMessage,
@@ -369,6 +371,8 @@ import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystic
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
 import { createVpxPresetsMenu, prepareQuality, qualityAfterGame } from './qualite-vpx';
+import { createFramingMenu } from './cadrage-menu';
+import { createFramingPreviews } from './framing-preview';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
@@ -1251,6 +1255,18 @@ const teamThreads = createTeamThreads({
 // Volume de la ROM (rom-volume.ts) : lu sur la fiche, réglé dans « Réglages de cette table », posé avant
 // la partie. Déclaré avant la bibliothèque, qui le lit ; les ROM d'après le script déjà lu de la table.
 const romVolumes = createRomVolumes({ dataDir: loc.dataDir, romsOf: (table) => cachedScript(table.file, loc.dataDir)?.roms ?? [], sharedPinmame: () => (loc.root ? path.join(loc.root, 'pinmame') : undefined), log: (line) => console.log(line) });
+// Aperçus du cadrage rendus par VPX (framing-preview.ts) et style de la borne : déclarés avant la bibliothèque, qui les
+// lit (Point de vue d'une table), et l'écran « Cadrage des tables » (cadrage-menu.ts).
+const framingHost = {
+  previews: createFramingPreviews({ dataDir: loc.dataDir, vpxExe: () => vpxInstall(loc)?.exe, log: (line) => console.log(line) }),
+  orientation: () => currentPlayfieldOrientation(),
+  keepTop: () => Boolean(profile.keepTopFraming),
+  rom: (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms[0],
+  pinmame: () => (loc.root ? path.join(loc.root, 'pinmame') : undefined),
+  refresh: () => broadcast(),
+  log: (line: string) => console.log(line),
+  current: () => loadCabinet(loc.dataDir)?.framing,
+};
 const library = createLibrary({
   feedbackService,
   teamThreads,
@@ -1312,6 +1328,8 @@ const library = createLibrary({
   },
   pupFolder: () => IniDocument.parse(readTextIfExists(activeVpxIni(loc)) ?? '').get('Plugin.PUP', 'PUPFolder'),
   playfieldOrientation: () => currentPlayfieldOrientation(),
+  // Aperçus du cadrage (cadrage-menu.ts).
+  framing: () => framingHost,
   quit: () => void quit(),
   keys: () => KEYS,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
@@ -2464,6 +2482,22 @@ function jukeboxOutputPlace(name: string): string | undefined {
 }
 // Pré-réglages de qualité de VPX (qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.
 library.provideSystemItem('vpx-presets', createVpxPresetsMenu({ library, dataDir: () => loc.dataDir, iniPath: () => activeVpxIni(loc) }).item);
+// Cadrage des tables (cadrage-menu.ts) : le style de la borne, choisi sur une image de sa table rendue par VPX.
+library.provideSystemItem(
+  'vpx-framing',
+  createFramingMenu({
+    ...framingHost,
+    library,
+    sampleTable: () => [tables[state.index], ...tables].find((x) => x?.emulator === 'vpx' && fs.existsSync(x.file)),
+    choose: (style) => {
+      const cabinet = loadCabinet(loc.dataDir);
+      if (!cabinet) return;
+      saveCabinet(loc.dataDir, { ...cabinet, framing: style });
+      // Le joueur vient de choisir : ses clés de cadrage sont réécrites, même changées à la main avant.
+      syncConfiguration(observedDisplays(), profile, (id) => FRAMING_STYLE_KEYS.some((k) => id === ownedId('Player', k)));
+    },
+  }).item,
+);
 // VPX d'essai (vpx-essai.ts) : seulement avec la clé développeur de cette machine, sinon l'entrée n'existe pas.
 if (trialVpxAllowedHere()) {
   library.provideSystemItem('vpx-trial', createVpxTrialMenu({ library, root: () => loc.root, dataDir: () => loc.dataDir, relaunch: () => relaunchMenu() }).item);

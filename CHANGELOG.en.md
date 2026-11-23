@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Table framing (beta): System menu › My cabinet › VPX › Table framing. On a cabinet, a table cannot fill a 16:9 screen without a compromise: you choose between "Full screen, apron cropped" (default), "Whole table" and "Full screen, table widened", each shown on your own table, rendered by VPX without anything appearing on the cabinet.
+- Point of view of a table: each framing is shown there on a picture of the table, another style can be chosen for that table alone, and "Restore the previous framing" goes back. A table taken over before this version gets back the framing of its original installation if that installation is still on the disk.
+- A table's journey offers "Choose the framing" and, when the VPS database knows one, a community POV.
+- In game, the MagnaSave settings have a "Framing of this table" line, which opens the "Point of View" page of the VPX menu: framing is adjusted there live and saved for the table.
 - Profile, Community and Arena: in the tab bar, Exit no longer leaves the screen at once. It hands you back the content of the tab on screen, and a second Exit leaves the screen. From the content, the flippers reach the tab bar in its place, below the header.
 - In the tab bar, Tab and Shift+Tab on the keyboard switch tabs like the flippers: the lit tab is always the one you see, never a tab you passed over without its content.
 - Virtual reality enabled but headset unplugged or taken off: Cyber Pinball no longer looks for the headset during a game on the screens. Those attempts, every 15 seconds, made VPX drop frames on every table (about 115 fps instead of 120, with regular stutters).

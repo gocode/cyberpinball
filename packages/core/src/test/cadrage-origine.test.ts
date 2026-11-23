@@ -169,10 +169,15 @@ const FRAMING_WRITERS: Record<string, string> = {
   'packages/core/src/povview.ts': 'POV : appliqué seulement sans mode choisi (povView), sinon proposé ; écran « Point de vue »',
   'packages/core/src/tableview.ts': 'importedView : seulement sans mode choisi',
   'app/src/vpx-launch-compat.ts': 'copie à part pour VPX 10.8.0, le .ini de la table intact',
+  'app/src/table-pov.ts': 'Point de vue : seulement le choix du joueur, l’état d’avant gardé (framing-history.ts)',
+  'packages/core/src/framing-styles.ts': 'le style choisi pour une table, écrit par Point de vue',
+  'app/src/cadrage-menu.ts': 'aperçus seulement : le .ini d’une copie de travail, jamais celui de la table',
+  'app/src/frontend.ts': 'le style de la borne : VPinballX.ini, jamais le .ini d’une table',
 };
 
 test('garde : aucun autre code n’écrit de mode de cadrage ni de vue de borne dans un .ini', () => {
-  const writes = /\.set\(\s*'(?:Player|TableOverride)'\s*,\s*(?:'(?:CabinetAutofit\w*|BGSet|ViewCab\w*)'|\w+\.key\b)/;
+  // Une écriture directe ([Player] mode ou vue), ou l'appel d'une fonction qui en prépare une.
+  const writes = /\.set\(\s*'(?:Player|TableOverride)'\s*,\s*(?:'(?:CabinetAutofit\w*|BGSet|ViewCab\w*)'|\w+\.key\b)|\bwithTableFramingStyle\(|\bFRAMING_STYLE_KEYS\b/;
   const found: string[] = [];
   for (const dir of ['packages/core/src', 'app/src']) {
     for (const name of fs.readdirSync(path.join(REPO_ROOT, dir))) {

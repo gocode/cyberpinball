@@ -162,7 +162,7 @@ test('menu en partie : « Position du DMD » en tête, réglée aux flippers et 
   assert.equal(panel.sections[0]!.items[0]!.label, 'Écran', 'la place du DMD avant toute autre ligne');
   assert.deepEqual(
     panel.sections.flatMap((x) => x.items.map((i) => i.label)),
-    ['Écran', 'Position horizontale', 'Position verticale', 'Largeur', 'Hauteur', 'Format', 'DMD', 'Enregistrer pour cette table', 'Revenir à la position générale', 'Tous les réglages de VPX', 'Reprendre la partie'],
+    ['Écran', 'Position horizontale', 'Position verticale', 'Largeur', 'Hauteur', 'Format', 'DMD', 'Enregistrer pour cette table', 'Revenir à la position générale', 'Cadrage de cette table (menu de VPX › Point of View)', 'Tous les réglages de VPX', 'Reprendre la partie'],
   );
   // Sans place pour la table : la ligne est grisée avec sa raison, jamais cachée.
   assert.match(panel.sections[1]!.items[1]!.disabled!, /suit déjà la position générale/);
@@ -330,7 +330,7 @@ test('menu en partie : « Recentrer la vue 3D » seulement avec la Vision 3D, gr
   // Tête suivie : la ligne est là, dans « Partie », et demande le recentrage sans fermer le menu.
   const on = host({ vision3d: true, vision3dIntensity: '75 %' });
   const partie = dmdMenuPanel(on, s, (c) => c[0]!).sections.find((x) => x.title === 'Partie')!;
-  assert.deepEqual(partie.items.map((i) => i.label), ['Recentrer la vue 3D', 'Intensité de la vue 3D', 'Tous les réglages de VPX', 'Reprendre la partie']);
+  assert.deepEqual(partie.items.map((i) => i.label), ['Recentrer la vue 3D', 'Intensité de la vue 3D', 'Cadrage de cette table (menu de VPX › Point of View)', 'Tous les réglages de VPX', 'Reprendre la partie']);
   assert.equal(partie.items[1]!.value, '75 %');
   const i3 = startDmdMenu({ screen: 0, zone: band, hidden: false });
   i3.item = 10;
