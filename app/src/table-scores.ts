@@ -21,6 +21,7 @@ import {
   loadRomMemory,
   loadScoreJournal,
   newRecords,
+  readRomGameOver,
   readRomLastGame,
   readRomRecords,
   readTableRecords,
@@ -81,7 +82,7 @@ export interface TableBoard {
 export interface TableScores {
   /** Au Start : la mémoire des ROM, pour savoir au retour si une partie a été jouée. */
   snapshot(table: TableEntry): ScoresSnapshot;
-  /** Au retour : les scores de la partie, gardés ; ce qui a été gardé. */
+  /** Au retour : les scores de la partie, gardés ; ce qui a été gardé (`partial` : table quittée en cours de partie, à ne pas publier). */
   finish(table: TableEntry, snapshot: ScoresSnapshot, game: GameScores): Promise<PlayedScore[]>;
   /** Le tableau d'une période. */
   board(table: TableEntry, period: ScorePeriod): TableBoard;
@@ -218,7 +219,11 @@ export function createTableScores(opts: TableScoresOptions): TableScores {
             r.bytes ? { file: '', storage: r.rom, scores: readRomRecords(memory, r.bytes) ?? [] } : undefined,
             { file: '', storage: r.rom, scores: readRomRecords(memory, after) ?? [] },
           );
-          played = romPlayedScores(before, last, entered, at);
+          // Quittée en cours de partie : la ROM laisse « partie en cours » dans sa mémoire. Gardée, mais
+          // marquée (jamais publiée). Un score entré à son tableau d'honneur prouve la partie finie ; une
+          // carte qui ne dit pas game_over : finie, comme avant.
+          const quit = readRomGameOver(memory, after) === false && !entered.length;
+          played = romPlayedScores(before, last, entered, at, quit);
           break;
         }
         // Table originale : les scores entrés à son tableau d'honneur, avec leurs initiales.

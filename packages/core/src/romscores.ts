@@ -140,6 +140,25 @@ export function readRomLastGame(memory: RomMemory, nv: Buffer): number[] | undef
   return count !== undefined && count >= 1 && count <= scores.length ? scores.slice(0, count) : scores;
 }
 
+/**
+ * La partie est-elle finie dans cette mémoire ? « game_state.game_over » de la carte : un booléen,
+ * avec son masque et son inversion (« invert » : vrai quand l'octet masqué est nul). La ROM l'écrit
+ * dans sa mémoire à l'arrêt de PinMAME : quittée en cours de partie, la table laisse « partie en
+ * cours » (false) ; à l'écran d'attente, « partie finie » (true). undefined si la carte ne le décrit
+ * pas, s'il tombe hors de la NVRAM lisible (Stern SAM : parfois en RAM) ou s'il est illisible : on
+ * ne sait pas, l'appelant garde alors la partie comme finie.
+ */
+export function readRomGameOver(memory: RomMemory, nv: Buffer): boolean | undefined {
+  const d = (memory.map as { game_state?: { game_over?: Descriptor & { invert?: unknown } } }).game_state?.game_over;
+  if (!d || typeof d !== 'object' || d.encoding !== 'bool' || (d.nibble ?? 'both') !== 'both') return undefined;
+  const p = parts(memory);
+  const where = place(p, { start: d.start, length: 1 }, nv);
+  if (!where) return undefined;
+  const mask = num(d.mask) ?? 0xff;
+  const set = (nv[where.at]! & mask) !== 0;
+  return d.invert === true ? !set : set;
+}
+
 function encodeScore(p: ReturnType<typeof parts>, d: Descriptor, length: number, score: number): Buffer | undefined {
   const bytes: number[] = [];
   let n = score;

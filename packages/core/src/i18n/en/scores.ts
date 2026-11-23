@@ -8,6 +8,7 @@ export const messages: Record<string, string> = {
   'Record de la table': 'Table high score',
   'Aujourd’hui, {time}': 'Today, {time}',
   'Joueur {n}': 'Player {n}',
+  '{when} · partie quittée': '{when} · game left',
   'La mémoire de cette ROM n’est pas encore décrite : seuls les scores déjà connus s’affichent.': 'This ROM’s memory is not described yet: only the scores already known are shown.',
   'Cette table ne dit que les scores entrés à son tableau d’honneur : seuls ceux-là sont datés.': 'This table only tells the scores that made its high score list: only those are dated.',
   'Cette table ne garde aucun tableau d’honneur lisible : ses scores ne peuvent pas être relevés.': 'This table keeps no readable high score list: its scores cannot be recorded.',

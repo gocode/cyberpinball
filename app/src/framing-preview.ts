@@ -41,27 +41,30 @@ export interface FramingPreviews {
   render(req: FramingPreviewRequest): Promise<string>;
 }
 
-export function createFramingPreviews(deps: { dataDir: string; vpxExe(): string | undefined; log?(line: string): void }): FramingPreviews {
+export function createFramingPreviews(deps: {
+  dataDir: string;
+  vpxExe(): string | undefined;
+  log?(line: string): void;
+  /**
+   * Rend une image lisible par les fenêtres (cyber-media://, media-protocol.ts allowPreview) : le cache des aperçus
+   * n'est pas un dossier de médias. Appelé sur chaque image donnée (0.2.4-essai.12 : cartes vides sur la borne,
+   * « accès refusé hors des dossiers de médias »).
+   */
+  allow?(file: string): void;
+}): FramingPreviews {
   const cacheDir = path.join(deps.dataDir, 'cache', 'cadrage');
   let queue: Promise<unknown> = Promise.resolve();
   const running = new Map<string, Promise<string>>();
 
-  const keyOf = (req: FramingPreviewRequest, exe: string) => {
-    const stat = fs.statSync(req.table);
-    const exeStat = fs.statSync(exe);
-    const size = renderSize(req.window);
-    return crypto
-      .createHash('sha256')
-      .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, req.tableIni, framingKeys(req.globalIni), size]))
-      .digest('hex')
-      .slice(0, 32);
-  };
+  const keyOf = previewKey;
 
   function cached(req: FramingPreviewRequest): string | undefined {
     const exe = deps.vpxExe();
     if (!exe || !fs.existsSync(req.table)) return undefined;
     const file = path.join(cacheDir, `${keyOf(req, exe)}.png`);
-    return fs.existsSync(file) ? file : undefined;
+    if (!fs.existsSync(file)) return undefined;
+    deps.allow?.(file);
+    return file;
   }
 
   function render(req: FramingPreviewRequest): Promise<string> {
@@ -69,10 +72,16 @@ export function createFramingPreviews(deps: { dataDir: string; vpxExe(): string 
     if (!exe) return Promise.reject(new Error('VPX absent')); // i18n-ignore : erreur technique, dite par l'écran
     const key = keyOf(req, exe);
     const out = path.join(cacheDir, `${key}.png`);
-    if (fs.existsSync(out)) return Promise.resolve(out);
+    if (fs.existsSync(out)) {
+      deps.allow?.(out);
+      return Promise.resolve(out);
+    }
     const known = running.get(key);
     if (known) return known;
-    const job = queue.then(() => renderNow(req, exe, out, key));
+    const job = queue.then(() => renderNow(req, exe, out, key)).then((file) => {
+      deps.allow?.(file);
+      return file;
+    });
     queue = job.catch(() => undefined);
     running.set(key, job);
     void job.finally(() => running.delete(key)).catch(() => undefined);
@@ -85,8 +94,13 @@ export function createFramingPreviews(deps: { dataDir: string; vpxExe(): string 
     const image = first.image ?? (first.needsPup ? (await attempt(req, exe, key, true)).image : undefined);
     if (!image) throw new Error(first.error ?? 'aucune image'); // i18n-ignore : erreur technique, dite par l'écran
     fs.mkdirSync(cacheDir, { recursive: true });
-    // lecture entière : une image QOI de VPX, à RENDER_HEIGHT de haut (quelques Mo au plus).
-    writeFileAtomic(out, encodePng(decodeQoi(fs.readFileSync(image))));
+    try {
+      // lecture entière : une image QOI de VPX, à RENDER_HEIGHT de haut (quelques Mo au plus).
+      writeFileAtomic(out, encodePng(decodeQoi(fs.readFileSync(image))));
+    } finally {
+      // La capture gardée le temps de la conversion : jamais laissée dans le cache.
+      fs.rmSync(image, { force: true });
+    }
     return out;
   }
 
@@ -145,6 +159,17 @@ export function createFramingPreviews(deps: { dataDir: string; vpxExe(): string 
   }
 
   return { cached, render };
+}
+
+/** Nom de l'image en cache : la table et son état, le VPX, le .ini de la table, le cadrage de la borne, la taille. */
+export function previewKey(req: FramingPreviewRequest, exe: string): string {
+  const stat = fs.statSync(req.table);
+  const exeStat = fs.statSync(exe);
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, req.tableIni, framingKeys(req.globalIni), renderSize(req.window)]))
+    .digest('hex')
+    .slice(0, 32);
 }
 
 /** Taille de l'image rendue : la forme de la fenêtre du playfield, RENDER_HEIGHT de haut (pair, pour l'encodeur de VPX). */

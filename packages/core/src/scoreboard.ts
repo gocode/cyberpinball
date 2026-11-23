@@ -56,6 +56,11 @@ export interface PlayedScore {
   player?: number;
   /** Joueurs de la partie, quand ils étaient plusieurs. */
   of?: number;
+  /**
+   * Partie quittée en cours de jeu : la ROM n'avait pas fini (game_over faux à son arrêt). Gardé
+   * au journal et affiché, mais jamais publié (classements, défis, niveau) : ce n'est pas un score final.
+   */
+  partial?: true;
   how: PlayedSource;
 }
 
@@ -110,6 +115,8 @@ export interface BoardLine {
   at?: string;
   /** Le tableau d'honneur de la table le porte. */
   table?: true;
+  /** Partie quittée en cours de jeu (PlayedScore.partial). */
+  partial?: true;
 }
 
 /**
@@ -137,7 +144,7 @@ export function scoreBoard(played: readonly PlayedScore[], records: readonly Hig
   const kept = played.filter((p) => p.score > 0 && inPeriod(p.at, period, now)).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   for (const p of kept) {
     const same = lines.find((l) => l.table && l.at === undefined && l.score === p.score && (!l.initials || !p.initials || l.initials === p.initials));
-    const fields = { at: p.at, ...(p.player ? { player: p.player } : {}), ...(p.of ? { of: p.of } : {}) };
+    const fields = { at: p.at, ...(p.player ? { player: p.player } : {}), ...(p.of ? { of: p.of } : {}), ...(p.partial ? { partial: true as const } : {}) };
     if (same) Object.assign(same, fields, !same.initials && p.initials ? { initials: p.initials } : {});
     else lines.push({ score: p.score, ...(p.initials ? { initials: p.initials } : {}), ...fields });
   }
@@ -177,9 +184,10 @@ export function addPlayed(journal: ScoreJournal, table: string, scores: readonly
 /**
  * Scores d'une partie lus dans la mémoire de la ROM : ceux de la dernière partie, s'ils ont changé
  * pendant celle-ci. `entered` : les scores entrés au tableau de la machine pendant la partie, qui
- * donnent leurs initiales. Vide si la mémoire n'a pas bougé (aucune partie commencée).
+ * donnent leurs initiales. Vide si la mémoire n'a pas bougé (aucune partie commencée). `partial` :
+ * la table a été quittée en cours de partie (romscores.ts, readRomGameOver) : les scores sont gardés, marqués.
  */
-export function romPlayedScores(before: readonly number[] | undefined, after: readonly number[] | undefined, entered: readonly HighScore[], at: string): PlayedScore[] {
+export function romPlayedScores(before: readonly number[] | undefined, after: readonly number[] | undefined, entered: readonly HighScore[], at: string, partial = false): PlayedScore[] {
   if (!after?.some((s) => s > 0)) return [];
   if (before && before.length === after.length && before.every((s, i) => s === after[i])) return [];
   const playing = after.filter((s) => s > 0).length;
@@ -189,7 +197,7 @@ export function romPlayedScores(before: readonly number[] | undefined, after: re
     if (score <= 0) return;
     const found = left.findIndex((e) => e.score === score);
     const initials = found >= 0 ? left.splice(found, 1)[0]!.initials : undefined;
-    out.push({ at, score, ...(initials ? { initials } : {}), ...(playing > 1 ? { player: i + 1, of: playing } : {}), how: 'rom' });
+    out.push({ at, score, ...(initials ? { initials } : {}), ...(playing > 1 ? { player: i + 1, of: playing } : {}), ...(partial ? { partial: true as const } : {}), how: 'rom' });
   });
   return out;
 }
@@ -211,6 +219,7 @@ function parsePlayed(raw: unknown): PlayedScore | undefined {
     ...(typeof r.initials === 'string' && /^[\x20-\x7e]{1,8}$/.test(r.initials) ? { initials: r.initials } : {}),
     ...(small(r.player) ? { player: r.player as number } : {}),
     ...(small(r.of) ? { of: r.of as number } : {}),
+    ...(r.partial === true ? { partial: true as const } : {}),
     how: r.how as PlayedSource,
   };
 }

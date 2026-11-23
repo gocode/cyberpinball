@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Table framing and Point of view: the framing pictures now show. VPX rendered them, but the front-end refused to display them (empty cards).
+- Fixed: when playing alone at a table, leaving the table in the middle of a game no longer passes what the ROM had at the moment of the stop off as a final score. The score is only read when VPX closes (the ROM only writes its memory then): if it says the game was not over, the score is kept on your cabinet, marked "game left" in the table's score board, but it is not published to the rankings, not counted in a challenge and not kept as a level record.
+- A game played to the end, or whose score enters the table's high score list, counts as before. When the ROM's map does not say whether the game is over (some machines), the game also counts as before.
 - New: debug mode (System menu > My cabinet > Health and backups > Debug mode). It shows live, in a corner of the screen of your choice (the backglass by default, otherwise the DMD, otherwise the playfield), the measurements of all your screens: frame rate of each front-end window, VPX frame rate during a game over the last minute, stalls and their likely cause, media loading times and launch steps, processor, memory, graphics card. A compact line or a detailed panel, and on the DMD a bar readable from a distance.
 - Debug mode stays out of the way of the game: the window is transparent, never takes focus or clicks, does not show in recordings and never opens in the headset; on the playfield the panel is reduced so it does not hide the table. When it is off, nothing runs.
 - The last 10 minutes of measurements can go with the technical report (debogage.json file, with no path or account name): "Attach to reports" on the same screen.

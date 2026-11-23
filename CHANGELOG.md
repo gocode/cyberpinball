@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Cadrage des tables et Point de vue : les images des cadrages s'affichent. Elles étaient rendues par VPX, mais le front-end refusait de les montrer (cartes vides).
+- Corrigé : seul à une table, quitter la table en cours de partie ne fait plus passer pour un score final ce que la ROM avait au moment de l'arrêt. Le score n'est lu qu'à la fermeture de VPX (la ROM n'écrit sa mémoire qu'à ce moment) : si elle dit que la partie n'était pas finie, le score est gardé sur ta borne, marqué "partie quittée" dans le tableau des scores de la table, mais il n'est ni publié aux classements, ni compté dans un défi, ni retenu comme record du niveau.
+- Une partie qui va jusqu'au bout, ou dont le score entre au tableau d'honneur de la table, compte comme avant. Quand la carte de la ROM ne dit pas si la partie est finie (certaines machines), la partie compte aussi comme avant.
 - Nouveau : le mode débogage (Menu système > Ma borne > Santé et sauvegardes > Mode débogage). Il affiche en direct, dans un coin de l'écran de ton choix (le backglass par défaut, sinon le DMD, sinon le playfield), les mesures de tous tes écrans : cadence de chaque fenêtre du front-end, cadence de VPX en partie sur la dernière minute, à-coups et leur cause probable, temps de chargement des médias et étapes du lancement, processeur, mémoire, carte graphique. Une ligne compacte ou un panneau détaillé, sur le DMD une bande lisible de loin.
 - Le mode débogage ne gêne pas la partie : la fenêtre est transparente, ne prend jamais le focus ni les clics, n'apparaît pas dans les enregistrements et ne s'ouvre jamais dans le casque ; sur le playfield, le panneau est réduit pour ne pas cacher la table. Éteint, rien ne tourne.
 - Les mesures des 10 dernières minutes peuvent rejoindre le rapport technique (fichier debogage.json, sans chemin ni nom de compte) : "Joindre aux rapports" dans le même écran.

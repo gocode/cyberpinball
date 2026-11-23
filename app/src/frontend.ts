@@ -1262,7 +1262,7 @@ const romVolumes = createRomVolumes({ dataDir: loc.dataDir, romsOf: (table) => c
 // Aperçus du cadrage rendus par VPX (framing-preview.ts) et style de la borne : déclarés avant la bibliothèque, qui les
 // lit (Point de vue d'une table), et l'écran « Cadrage des tables » (cadrage-menu.ts).
 const framingHost = {
-  previews: createFramingPreviews({ dataDir: loc.dataDir, vpxExe: () => vpxInstall(loc)?.exe, log: (line) => console.log(line) }),
+  previews: createFramingPreviews({ dataDir: loc.dataDir, vpxExe: () => vpxInstall(loc)?.exe, log: (line) => console.log(line), allow: (file) => allowPreview(file) }),
   orientation: () => currentPlayfieldOrientation(),
   keepTop: () => Boolean(profile.keepTopFraming),
   rom: (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms[0],
@@ -3188,7 +3188,7 @@ function playFromNotice(table: TableEntry): void {
 /** Mon record sur une table : le meilleur relevé par le niveau, ou une partie de cette borne au tableau des scores. */
 function myTableBest(table: TableEntry): number | undefined {
   const best = levelTracker.state().bests[tableKey(presenceTable(table))] ?? 0;
-  const played = tableScores.board(table, 'all').lines.find((l) => l.at)?.score ?? 0;
+  const played = tableScores.board(table, 'all').lines.find((l) => l.at && !l.partial)?.score ?? 0;
   return Math.max(best, played) || undefined;
 }
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
@@ -6346,7 +6346,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           if (kept.length) broadcast();
           await publishScores(table, kept, Boolean(double && live?.multi));
           await noteChallengeScores(table, kept, Boolean(double && live?.multi));
-          levelAfterGame(kept.filter((p) => !p.of).map((p) => p.score));
+          // Une partie quittée en cours (partial) reste au tableau de la borne : ni classement, ni défi, ni record du niveau.
+          levelAfterGame(kept.filter((p) => !p.of && !p.partial).map((p) => p.score));
         })
         .catch((error: Error) => {
           console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`); // i18n-ignore : journal
@@ -6409,7 +6410,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
  * ni une partie à plusieurs (on ne sait pas qui joue après le joueur 1).
  */
 async function publishScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
-  const solo = kept.filter((p) => !p.of);
+  const solo = kept.filter((p) => !p.of && !p.partial);
   if (guest.active || multi || !solo.length) return;
   // VPX d'essai (vpx-essai.ts) : autre physique (secousses, lanceur), les scores restent sur la borne.
   if (vpxInstall(loc)?.trial) return void console.log(`Classements (${table.id}) : non publiés, partie jouée avec le VPX d'essai.`); // i18n-ignore : journal
@@ -6428,7 +6429,7 @@ async function publishScores(table: TableEntry, kept: readonly PlayedScore[], mu
  * Mêmes règles que les classements : ni invité, ni partie à plusieurs, ni VPX d'essai.
  */
 async function noteChallengeScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
-  const solo = kept.filter((p) => !p.of);
+  const solo = kept.filter((p) => !p.of && !p.partial);
   if (guest.active || multi || !solo.length || vpxInstall(loc)?.trial) return;
   try {
     const board = boardKey(await liveGames.versionOf(table));

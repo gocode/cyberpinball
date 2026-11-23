@@ -113,6 +113,31 @@ test('aperçus : VPinballX.ini fenêtré à la forme du playfield, sans son ni t
   assert.equal(IniDocument.parse(previewIni('', { width: 1080, height: 1920 }, 'X:\\p', true)).get('Plugin.PUP', 'Enable'), '1');
 });
 
+test('aperçus : chaque image donnée est autorisée à l’affichage (cache hors des dossiers de médias)', async () => {
+  // 0.2.4-essai.12 sur la borne : images rendues, mais cartes vides, « accès refusé hors des dossiers de médias ».
+  type Req = { table: string; tableIni: string; globalIni: string; window: { width: number; height: number } };
+  const mod = require(path.resolve(__dirname, '../../../../app/dist/framing-preview.js')) as {
+    createFramingPreviews(deps: { dataDir: string; vpxExe(): string; allow(file: string): void }): { cached(req: Req): string | undefined; render(req: Req): Promise<string> };
+    previewKey(req: Req, exe: string): string;
+  };
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cadrage-apercus-'));
+  const exe = path.join(dataDir, 'VPinballX_BGFX64.exe');
+  const table = path.join(dataDir, 'Table.vpx');
+  fs.writeFileSync(exe, 'x');
+  fs.writeFileSync(table, 'x');
+  const allowed: string[] = [];
+  const previews = mod.createFramingPreviews({ dataDir, vpxExe: () => exe, allow: (file) => allowed.push(file) });
+  const req: Req = { table, tableIni: '', globalIni: '[Player]\nBGSet = 1\n', window: { width: 1080, height: 1920 } };
+  assert.equal(previews.cached(req), undefined);
+  const png = path.join(dataDir, 'cache', 'cadrage', `${mod.previewKey(req, exe)}.png`);
+  fs.mkdirSync(path.dirname(png), { recursive: true });
+  fs.writeFileSync(png, 'png');
+  assert.equal(previews.cached(req), png);
+  assert.equal(await previews.render(req), png, 'déjà rendue : pas de VPX lancé');
+  assert.deepEqual(allowed, [png, png]);
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
 test('aperçus : une image QOI de VPX lue en RGBA opaque', () => {
   // 2 × 1 : un pixel rouge (QOI_OP_RGB), puis le même (QOI_OP_RUN), marqueur de fin.
   const header = Buffer.alloc(14);
