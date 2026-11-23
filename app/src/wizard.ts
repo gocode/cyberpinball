@@ -178,6 +178,7 @@ import { quitWithWindow } from './app-lifetime';
 import { otherFrontendsOnThisPc } from './frontend-gate';
 import { controlActions, controlCode, isControlRole, pressedIn, type ControlAction, type ControlSpec } from './wizard-controls';
 import { progressView } from './wizard-progress';
+import { nextAssignableRole } from './wizard-roles';
 import { openSoundPanel } from './sound-panel';
 import { quickCheckCabinet, quickCheckTexts, setupsView } from './sound-setups';
 import { probeAudioJacks } from '@cyberpinball/win-displays';
@@ -2301,8 +2302,11 @@ function edidDiagonal(display: ObservedDisplay | undefined): number | undefined 
 }
 
 function nextRole(): void {
-  wizard.roleIndex++;
-  if (wizard.roleIndex >= ROLES.length || roleOptions().length === 0) {
+  wizard.roleIndex = nextAssignableRole(wizard.roleIndex, ROLES.length, (index) => {
+    wizard.roleIndex = index;
+    return roleOptions().length > 0;
+  });
+  if (wizard.roleIndex >= ROLES.length) {
     // Écrans et rôles seuls : la disposition reste « Placer librement… » ou son entrée du menu.
     if (isOnly('ecrans')) {
       wizard.roleIndex = ROLES.length;

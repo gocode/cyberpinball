@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Analog gamepad triggers can be assigned to front-end and game buttons, with their SDL axis and direction passed through to VPX. Cabinet analog sensors are not treated as buttons.
+- On a single display, the wizard continues to the embedded playfield DMD option even when no display is available for the backglass.
 - VPX 10.8.0: launch without the editor window and exit with the cabinet’s Quit button even when this VPX uses different button mappings.
 - VPX 10.8.0: use the supplied POV when partial view settings hid it, in a separate settings file; an existing custom view keeps priority. Diagnostics read the log from this version’s folder.
 - Diagnostics: small, nearly empty volumes are no longer reported as almost full; EDID refresh rate margins no longer trigger advice to change cables.

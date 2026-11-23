@@ -224,7 +224,7 @@ function tick(): void {
   }
   const now = Date.now();
   for (const e of reader.poll()) {
-    const code = joystickCode(e.device, e.button);
+    const code = joystickCode(e.device, e.button, e.axis);
     for (const watcher of watchers) watcher(code, e.down);
     if (e.down) {
       held.set(code, now + REPEAT_DELAY_MS);

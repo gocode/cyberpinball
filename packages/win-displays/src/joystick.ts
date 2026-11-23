@@ -13,7 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as koffi from 'koffi';
-import { hatChanges, joystickDeviceIds } from '@cyberpinball/core';
+import { hatChanges, joystickDeviceIds, type JoystickAxisButton } from '@cyberpinball/core';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NativeFn = (...args: any[]) => any;
@@ -56,10 +56,13 @@ export interface JoystickButtonEvent {
   device: string;
   /**
    * Numéro du bouton tel que VPX l'écrit : le bouton SDL à partir de 0, ou une direction de croix
-   * (0x100 + 4 × croix + gauche, droite, haut, bas ; buttons.ts, hatButton).
+   * (0x100 + 4 × croix + gauche, droite, haut, bas ; buttons.ts, hatButton),
+   * ou un axe de gâchette (0x200 + axe, avec son seuil dans axis).
    */
   button: number;
   down: boolean;
+  /** Axe utilisé comme bouton, au seuil que VPX lit dans Mapping.*. */
+  axis?: JoystickAxisButton;
 }
 
 export interface JoystickReader {
@@ -72,7 +75,7 @@ export interface JoystickReader {
   /** Position des axes de chaque joystick, au dernier sondage (poll). */
   axes(): JoystickAxes[];
   /** Joystick virtuel de SDL (essais sans matériel) : son identifiant SDL. */
-  attachVirtual(name: string, buttons: number, axes?: number, hats?: number): number;
+  attachVirtual(name: string, buttons: number, axes?: number, hats?: number, gamepad?: boolean): number;
   /** Appuie ou relâche un bouton d'un joystick virtuel. */
   pressVirtual(sdlId: number, button: number, down: boolean): void;
   /** Place un axe d'un joystick virtuel, de -1 à 1. */
@@ -101,6 +104,10 @@ interface Api {
   SDL_GetJoystickAxis: NativeFn;
   SDL_GetNumJoystickHats: NativeFn;
   SDL_GetJoystickHat: NativeFn;
+  SDL_IsGamepad: NativeFn;
+  SDL_OpenGamepad: NativeFn;
+  SDL_CloseGamepad: NativeFn;
+  SDL_GetGamepadBindings: NativeFn;
   SDL_UpdateJoysticks: NativeFn;
   SDL_AttachVirtualJoystick: NativeFn;
   SDL_SetJoystickVirtualButton: NativeFn;
@@ -110,12 +117,17 @@ interface Api {
 
 /** Bibliothèques déjà chargées : SDL ne s'initialise qu'une fois par processus. */
 const loaded = new Map<string, Api>();
-let structs: { guid: koffi.TypeObject; virtualDesc: koffi.TypeObject } | undefined;
+let structs: { guid: koffi.TypeObject; virtualDesc: koffi.TypeObject; binding: koffi.TypeObject } | undefined;
 
 function loadApi(dll: string): Api {
   const known = loaded.get(dll);
   if (known) return known;
   structs ??= {
+    // SDL_GamepadBinding : les deux unions occupent chacune trois entiers (axis, min, max).
+    binding: koffi.struct('CP_SDL_GamepadBinding', {
+      input_type: 'int', input: koffi.array('int', 3),
+      output_type: 'int', output: koffi.array('int', 3),
+    }),
     guid: koffi.struct('CP_SDL_GUID', { data: koffi.array('uint8', 16) }),
     // SDL_VirtualJoystickDesc (SDL_joystick.h, SDL 3.2 et suivants).
     virtualDesc: koffi.struct('CP_SDL_VirtualJoystickDesc', {
@@ -167,6 +179,10 @@ function loadApi(dll: string): Api {
     SDL_GetJoystickAxis: lib.func('int16 SDL_GetJoystickAxis(void *joystick, int axis)'),
     SDL_GetNumJoystickHats: lib.func('int SDL_GetNumJoystickHats(void *joystick)'),
     SDL_GetJoystickHat: lib.func('uint8 SDL_GetJoystickHat(void *joystick, int hat)'),
+    SDL_IsGamepad: lib.func('bool SDL_IsGamepad(uint32 id)'),
+    SDL_OpenGamepad: lib.func('void *SDL_OpenGamepad(uint32 id)'),
+    SDL_CloseGamepad: lib.func('void SDL_CloseGamepad(void *gamepad)'),
+    SDL_GetGamepadBindings: lib.func('void *SDL_GetGamepadBindings(void *gamepad, _Out_ int *count)'),
     SDL_UpdateJoysticks: lib.func('void SDL_UpdateJoysticks()'),
     SDL_AttachVirtualJoystick: lib.func('uint32 SDL_AttachVirtualJoystick(const CP_SDL_VirtualJoystickDesc *desc)'),
     SDL_SetJoystickVirtualButton: lib.func('bool SDL_SetJoystickVirtualButton(void *joystick, int button, bool down)'),
@@ -187,6 +203,38 @@ interface Opened {
   axes: number;
   /** Valeur SDL de chaque croix au sondage précédent. */
   hats: number[];
+  triggers: { button: number; axis: JoystickAxisButton; down: boolean }[];
+}
+
+/** Gâchettes reconnues par SDL : leur axe brut et leur sens, sans supposer une marque ni un numéro d'axe. */
+function triggerBindings(sdl: Api, id: number): Opened['triggers'] {
+  if (!sdl.SDL_IsGamepad(id)) return [];
+  const gamepad = sdl.SDL_OpenGamepad(id);
+  if (!gamepad) return [];
+  try {
+    const count = [0];
+    const list = sdl.SDL_GetGamepadBindings(gamepad, count);
+    if (!list) return [];
+    try {
+      if (!count[0]) return [];
+      const pointers = koffi.decode(list, koffi.array('void *', count[0]!, 'Array')) as unknown[];
+      const result: Opened['triggers'] = [];
+      for (const pointer of pointers) {
+        const b = koffi.decode(pointer, structs!.binding) as { input_type: number; input: number[]; output_type: number; output: number[] };
+        // SDL_GAMEPAD_BINDTYPE_AXIS = 2 ; axes LEFT_TRIGGER = 4 et RIGHT_TRIGGER = 5.
+        if (b.input_type !== 2 || b.output_type !== 2 || (b.output[0] !== 4 && b.output[0] !== 5)) continue;
+        const [, min, max] = b.input as [number, number, number];
+        if (min === max) continue;
+        const axis = { threshold: Math.round((min + max) / 65536 * 10000) / 10000, reversed: max < min };
+        result.push({ button: 0x200 + b.input[0]!, axis, down: false });
+      }
+      return result;
+    } finally {
+      sdl.SDL_free(list);
+    }
+  } finally {
+    sdl.SDL_CloseGamepad(gamepad);
+  }
 }
 
 /**
@@ -242,7 +290,7 @@ export function openJoysticks(dll: string): JoystickReader {
       const buttons = Math.max(0, sdl.SDL_GetNumJoystickButtons(handle) as number);
       const axes = Math.max(0, sdl.SDL_GetNumJoystickAxes(handle) as number);
       const hats = Math.max(0, sdl.SDL_GetNumJoystickHats(handle) as number);
-      opened.set(j.sdlId, { ...j, handle, state: new Array<boolean>(buttons).fill(false), axes, hats: new Array<number>(hats).fill(0) });
+      opened.set(j.sdlId, { ...j, handle, state: new Array<boolean>(buttons).fill(false), axes, hats: new Array<number>(hats).fill(0), triggers: triggerBindings(sdl, j.sdlId) });
     }
   }
 
@@ -282,6 +330,13 @@ export function openJoysticks(dll: string): JoystickReader {
           for (const change of hatChanges(hat, j.hats[hat]!, value)) events.push({ device: j.id, ...change });
           j.hats[hat] = value;
         }
+        for (const trigger of j.triggers) {
+          const value = Number(sdl.SDL_GetJoystickAxis(j.handle, trigger.button - 0x200)) / 32768;
+          const down = trigger.axis.reversed ? value <= trigger.axis.threshold : value >= trigger.axis.threshold;
+          if (down === trigger.down) continue;
+          trigger.down = down;
+          events.push({ device: j.id, button: trigger.button, axis: trigger.axis, down });
+        }
       }
       return events;
     },
@@ -291,10 +346,10 @@ export function openJoysticks(dll: string): JoystickReader {
         .filter((j) => j.axes > 0)
         .map((j) => ({ device: j.id, name: j.name, values: Array.from({ length: j.axes }, (_, axis) => (sdl.SDL_GetJoystickAxis(j.handle, axis) as number) / 32768) }));
     },
-    attachVirtual(name, buttons, axes = 0, hats = 0) {
+    attachVirtual(name, buttons, axes = 0, hats = 0, gamepad = false) {
       const desc = {
         version: koffi.sizeof(structs!.virtualDesc),
-        type: axes > 0 ? SDL_JOYSTICK_TYPE_UNKNOWN : SDL_JOYSTICK_TYPE_GAMEPAD,
+        type: axes > 0 && !gamepad ? SDL_JOYSTICK_TYPE_UNKNOWN : SDL_JOYSTICK_TYPE_GAMEPAD,
         padding: 0,
         vendor_id: 0,
         product_id: 0,

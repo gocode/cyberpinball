@@ -122,7 +122,7 @@ function watch(dataDir: string, pidFile: string): void {
       open();
       if (!reader) return;
     }
-    for (const e of reader.poll()) if (joystickCode(e.device, e.button) === code) held = e.down;
+    for (const e of reader.poll()) if (joystickCode(e.device, e.button, e.axis) === code) held = e.down;
     if (!hold.update(held, now)) return;
     const decision = relaunchDecision({ appAlive: cyberPinballAlive(readPidFile(relaunchAppPidFile(dataDir))), vpxPlaying: vpxPlaying() });
     if (decision !== 'launch') {

@@ -452,8 +452,8 @@ test('joysticks : identifiants de VPX, rang par GUID identique', () => {
   assert.deepEqual(joystickDeviceIds([PINSCAPE_GUID, other, PINSCAPE_GUID]), [PINSCAPE, `SDLJoy_${other}_1`, `SDLJoy_${PINSCAPE_GUID}_2`]);
   assert.deepEqual(joystickButton(joy(4)), { device: PINSCAPE, button: 4 });
   assert.equal(joystickButton('ShiftLeft'), undefined);
-  // Un axe (seuil) ou un GUID tronqué n'est pas un bouton de la borne.
-  assert.equal(joystickButton(`${PINSCAPE};514;o;0.9`), undefined);
+  // Un axe avec un seuil explicite peut servir de bouton ; le GUID doit rester complet.
+  assert.deepEqual(joystickButton(`${PINSCAPE};514;o;0.9`), { device: PINSCAPE, button: 514, axis: { threshold: 0.9, reversed: false } });
   assert.equal(joystickButton('SDLJoy_0300_1;9'), undefined);
 });
 

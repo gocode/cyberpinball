@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Les gâchettes analogiques des manettes peuvent être relevées comme boutons de l’interface et du jeu, avec leur axe et leur sens reconnus par SDL et transmis à VPX. Les capteurs analogiques des pincabs ne deviennent pas des boutons.
+- Sur un seul écran, l’assistant continue jusqu’au choix du DMD incrusté dans le playfield même si aucun écran n’est disponible pour le backglass.
 - VPX 10.8.0 : lancement sans fenêtre de l’éditeur et sortie avec le bouton Quitter de la borne, même si ce VPX utilise d’autres boutons.
 - VPX 10.8.0 : reprise du POV fourni quand des valeurs de vue partielles le masquaient, dans un fichier distinct ; une vue déjà réglée reste prioritaire. Le diagnostic lit le journal dans le dossier de cette version.
 - Diagnostic : les petits volumes presque vides ne sont plus signalés comme presque pleins ; les marges de fréquence de l’EDID ne déclenchent plus un conseil de changement de câble.

@@ -516,6 +516,7 @@ export const messages: Record<string, string> = {
   'aucune touche': 'no key',
   'bouton de manette': 'gamepad button',
   'Bouton {n} du joystick': 'Joystick button {n}',
+  'Axe {n} du joystick ({direction})': 'Joystick axis {n} ({direction})',
   'Croix {arrow} du joystick': 'Joystick D-pad {arrow}',
   'Croix {n} {arrow} du joystick': 'Joystick D-pad {n} {arrow}',
   joystick: 'joystick',

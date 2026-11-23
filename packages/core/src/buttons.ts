@@ -443,6 +443,7 @@ export function keyLabel(code: string | undefined): string {
   const joy = joystickButton(code);
   // Numéroté à partir de 1, comme le panneau « Contrôleurs de jeu » de Windows et l'outil de configuration du Pinscape.
   if (joy) {
+    if (joy.axis) return t('Axe {n} du joystick ({direction})', { n: joy.button - 0x200 + 1, direction: joy.axis.reversed ? '−' : '+' });
     const hat = joystickHat(joy.button);
     if (!hat) return t('Bouton {n} du joystick', { n: joy.button + 1 });
     const arrow = HAT_ARROWS[hat.direction];
@@ -497,17 +498,23 @@ export function altGrPhantomControl(previous: { code: string; at: number } | und
 // Boutons de joystick
 
 /** Jeton de VPX d'un bouton de joystick : « SDLJoy_<GUID SDL en 32 chiffres hexadécimaux>_<rang>;<bouton> ». */
-const JOYSTICK_TOKEN = /^(SDLJoy_[0-9a-f]{32}_\d+);(\d+)$/i;
+const JOYSTICK_TOKEN = /^(SDLJoy_[0-9a-f]{32}_\d+);(\d+)(?:;([ox]);(-?(?:\d+(?:\.\d+)?|\.\d+)))?$/i;
+
+export interface JoystickAxisButton {
+  threshold: number;
+  reversed: boolean;
+}
 
 /** Joystick et numéro SDL (à partir de 0) d'un bouton de joystick ; undefined pour une touche du clavier. */
-export function joystickButton(code: string): { device: string; button: number } | undefined {
+export function joystickButton(code: string): { device: string; button: number; axis?: JoystickAxisButton } | undefined {
   const m = JOYSTICK_TOKEN.exec(code);
-  return m ? { device: m[1]!, button: Number(m[2]) } : undefined;
+  if (!m || (m[3] && (Number(m[2]) < 0x200 || Math.abs(Number(m[4])) > 1))) return undefined;
+  return { device: m[1]!, button: Number(m[2]), ...(m[3] && { axis: { threshold: Number(m[4]), reversed: m[3].toLowerCase() === 'x' } }) };
 }
 
 /** Code d'un bouton de joystick, tel que VPX l'écrit dans [Input]. */
-export function joystickCode(device: string, button: number): string {
-  return `${device};${button}`;
+export function joystickCode(device: string, button: number, axis?: JoystickAxisButton): string {
+  return `${device};${button}${axis ? `;${axis.reversed ? 'x' : 'o'};${axis.threshold}` : ''}`;
 }
 
 // Croix (chapeaux SDL) : VPX 10.8.1 en fait quatre boutons par croix, numérotés
@@ -1106,9 +1113,16 @@ export function withKeyboardKeys(current: string, keys: number[]): string {
  * changé ne laisse pas l'ancien ; ceux ajoutés dans VPX sont gardés.
  */
 export function withButtonMapping(current: string, keys: number[], joystick?: string, before?: string): string {
-  const stale = new Set(parseMapping(before ?? '').filter((alt) => alt.length === 1 && joystickButton(alt[0]!)).map((alt) => alt[0]!));
-  if (joystick) stale.add(joystick);
-  const kept = parseMapping(current).filter((alt) => !(alt.length === 1 && stale.has(alt[0]!)));
+  // VPX réécrit les seuils avec six décimales : comparer leur valeur, pas leur orthographe.
+  const identity = (token: string) => {
+    const joy = joystickButton(token);
+    // Un seuil nul, dans le sens normal, est entièrement omis par VPX.
+    const axis = joy && joy.button >= 0x200 ? (joy.axis ?? { threshold: 0, reversed: false }) : undefined;
+    return joy ? joystickCode(joy.device, joy.button, axis) : token;
+  };
+  const stale = new Set(parseMapping(before ?? '').filter((alt) => alt.length === 1 && joystickButton(alt[0]!)).map((alt) => identity(alt[0]!)));
+  if (joystick) stale.add(identity(joystick));
+  const kept = parseMapping(current).filter((alt) => !(alt.length === 1 && stale.has(identity(alt[0]!))));
   if (!joystick) return withKeyboardKeys(formatMapping(kept), keys);
   // Le joystick suffit : pas de « Key;0 » quand aucune touche du clavier ne reste.
   const rest = keys.length ? parseMapping(withKeyboardKeys(formatMapping(kept), keys)) : kept.filter((alt) => singleKey(alt) === undefined);
