@@ -177,7 +177,9 @@ test('connexion lente : le flux livré en plus de 20 s, sans long silence, est l
 
 test('connexion lente : la liste des publications et le flux aboutissent ; site muet : message habituel', async () => {
   const k = keys();
-  const patience = { idleMs: 300, attempts: 2, retryDelayMs: 10 };
+  // Silence toléré bien au-dessus du rythme des morceaux (120 ms) : à 300 ms, le test tombait quand la machine
+  // était chargée (compilation native en parallèle, 23/11/2026), sans rien dire du code.
+  const patience = { idleMs: 1500, attempts: 2, retryDelayMs: 10 };
   const files: Record<string, string> = {};
   const site = await slowSite(files, { pieces: 10, everyMs: 120 });
   try {

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Patched VPX, patch set 5: automatically importing a legacy POV view file no longer crashes when launching a table directly. Empty or invalid legacy numeric fields are ignored without aborting loading; valid view and quality settings are preserved.
 - Pre-merge check: a test is stopped when it has made no progress for 5 minutes, no longer when its test file runs longer than 5 minutes; long but healthy files are no longer wrongly interrupted.
 - A green check is still recognized after merging the shared branch in when only the line numbers of the work have shifted.
 - The tech sheet lists all graphics cards in its summary and names the card concerned by each driver warning, without assuming which one the game uses.

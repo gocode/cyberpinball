@@ -1,0 +1,69 @@
+diff --git a/src/parts/pintable.cpp b/src/parts/pintable.cpp
+index 3122358a..320276b8 100644
+--- a/src/parts/pintable.cpp
++++ b/src/parts/pintable.cpp
+@@ -3353,6 +3353,8 @@ void PinTable::ImportBackdropPOV(const std::filesystem::path &filename)
+ #endif
+    }
+ 
++   // Modified by Cyber Pinball, 2026-11-23: identify automatic imports before parsing legacy POV files.
++   PLOGI << "Importing POV settings: " << file.string();
+    const string ext = lowerCase(file.extension().string());
+ 
+    static const string vsPrefix[3] = { "ViewDT"s, "ViewCab"s, "ViewFSS"s };
+@@ -3471,11 +3473,10 @@ void PinTable::ImportBackdropPOV(const std::filesystem::path &filename)
+                //POV_FIELD("FPSLimiter", int, tableAdaptiveVSync, );
+                {
+                const auto node = section->FirstChildElement("FPSLimiter");
+-               if (node)
++               if (node && node->GetText())
+                {
+-                  int tableAdaptiveVSync;
+-                  sscanf_s(node->GetText(), "%i", &tableAdaptiveVSync);
+-                  if (tableAdaptiveVSync != -1)
++                  int tableAdaptiveVSync = -1;
++                  if (sscanf_s(node->GetText(), "%i", &tableAdaptiveVSync) == 1 && tableAdaptiveVSync != -1)
+                   {
+                      switch (tableAdaptiveVSync)
+                      {
+@@ -3505,22 +3506,20 @@ void PinTable::ImportBackdropPOV(const std::filesystem::path &filename)
+                //POV_FIELD("OverwriteDetailsLevel", "%i", overwriteGlobalDetailLevel);
+                {
+                const auto node = section->FirstChildElement("OverwriteDetailsLevel");
+-               if (node)
++               if (node && node->GetText())
+                {
+-                  int val;
+-                  sscanf_s(node->GetText(), "%i", &val);
+-                  if (val == 1)
++                  int val = -1;
++                  if (sscanf_s(node->GetText(), "%i", &val) == 1 && val == 1)
+                      POV_FIELD("DetailsLevel", int, m_settings.SetPlayer_AlphaRampAccuracy(value, true));
+                }
+                }
+                {
+                const auto node2 = section->FirstChildElement("OverwriteNightDay");
+-               if (node2)
++               if (node2 && node2->GetText())
+                {
+-                  int val;
+-                  sscanf_s(node2->GetText(), "%i", &val);
++                  int val = -1;
+                   //m_overwriteGlobalDayNight = (val == 1);
+-                  if (val == 1)
++                  if (sscanf_s(node2->GetText(), "%i", &val) == 1 && val == 1)
+                   {
+                      m_settings.SetPlayer_OverrideTableEmissionScale(true, true);
+                      POV_FIELD("NightDayLevel", float, m_settings.SetPlayer_EmissionScale(value / 100.f, true));
+@@ -3562,7 +3561,10 @@ void PinTable::ImportBackdropPOV(const std::filesystem::path &filename)
+    // update properties UI
+    if (!toUserSettings)
+       SetNonUndoableDirty(eSaveDirty);
+-   m_vpinball->SetPropSel(m_vmultisel);
++   // Modified by Cyber Pinball, 2026-11-23: -Play has no WinEditor. A valid automatic POV import
++   // must not dereference its null editor after applying the settings.
++   if (m_vpinball)
++      m_vpinball->SetPropSel(m_vmultisel);
+ }
+ 
+ // Select file and export the point of view definition

@@ -6,8 +6,8 @@ Cyber Pinball installs Visual Pinball X 10.8.1-5436 from its official archive, t
 Other plugins and libraries stay those of the official archive.
 Another VPX (trial version, VPX installed by the user) is never touched.
 
-Current patch set: "patched Cyber Pinball 4".
-The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-4`.
+Current patch set: "patched Cyber Pinball 5".
+The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-5`.
 
 ## Patches
 
@@ -18,6 +18,9 @@ The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on 
 
 ## Build
 
+Patch `05-pov-sans-editeur.patch` guards automatic imports of legacy POV views: direct launches have no Windows editor, yet VPX tried to refresh its properties, causing an access violation immediately after `InitTablePostLoad`. Empty or invalid legacy numeric fields are also ignored. The imported file is identified in the log.
+The automated `powershell -File scripts/banc-vpx-pov.ps1 -Vpx <VPX 5436 folder>` benchmark checks six cases on the hidden desktop, using a copy of VPX's bundled test table: no POV, named POV, `autopov.pov`, empty, invalid and valid legacy fields, including assertions on the exported settings.
+
 `node scripts/vpx-corrige.mjs` (CMake and Build Tools 2022 with the ATL component).
 VPX sources are those of commit `af26b2d93`, dependencies those of its `platforms/config.sh`.
 The PuP plugin links against the DLLs of the official archive (SDL_image, SDL_ttf, pupdmd), whose import libraries are generated from them; only their headers and FFmpeg's are downloaded.
@@ -25,4 +28,4 @@ The PuP plugin links against the DLLs of the official archive (SDL_image, SDL_tt
 ## License
 
 VPX is distributed under GPLv3+ (and a MAME-derived license for part of the files), see the attached `LICENSE` file.
-The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-4
+The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-5

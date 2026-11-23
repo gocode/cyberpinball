@@ -6,8 +6,8 @@ Cyber Pinball installe Visual Pinball X 10.8.1-5436 depuis son archive officiell
 Les autres plugins et les bibliothèques restent ceux de l'archive officielle.
 Un autre VPX (version d'essai, VPX installé par l'utilisateur) n'est jamais touché.
 
-Série de correctifs actuelle : « patched Cyber Pinball 4 ».
-Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-4`.
+Série de correctifs actuelle : « patched Cyber Pinball 5 ».
+Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-5`.
 
 ## Correctifs
 
@@ -18,6 +18,9 @@ Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les table
 
 ## Construire
 
+Le correctif `05-pov-sans-editeur.patch` protège l’import automatique des anciens cadrages POV : lors d’un lancement direct, aucun éditeur Windows n’existe et VPX tentait pourtant de rafraîchir ses propriétés, provoquant un accès mémoire interdit juste après `InitTablePostLoad`. Les champs numériques anciens vides ou illisibles sont également ignorés. Le fichier importé est nommé dans le journal.
+Le banc automatisé `powershell -File scripts/banc-vpx-pov.ps1 -Vpx <dossier de VPX 5436>` vérifie six cas sur le bureau caché, avec une copie de la table de test livrée par VPX : sans POV, POV nommé, `autopov.pov`, champs anciens vides, illisibles et valides, avec contrôle des réglages exportés.
+
 `node scripts/vpx-corrige.mjs` (CMake et Build Tools 2022 avec le composant ATL).
 Les sources de VPX sont celles du commit `af26b2d93`, les dépendances celles de son `platforms/config.sh`.
 Le plugin PuP est lié aux DLL de l'archive officielle (SDL_image, SDL_ttf, pupdmd), dont les bibliothèques d'import sont tirées ; seuls leurs en-têtes et ceux de FFmpeg sont téléchargés.
@@ -25,4 +28,4 @@ Le plugin PuP est lié aux DLL de l'archive officielle (SDL_image, SDL_ttf, pupd
 ## Licence
 
 VPX est distribué sous GPLv3+ (et une licence dérivée de MAME pour une partie des fichiers), voir le fichier `LICENSE` joint.
-Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-4
+Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-5

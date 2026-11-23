@@ -193,6 +193,17 @@ test('correctif 03, plugin PuP : le label décode son image sans garder son verr
   assert.deepEqual((corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES, ['VPinballX_BGFX64.exe', 'plugins/pup/plugin-pup64.dll']);
 });
 
+test('correctif 05 : import POV sans éditeur et champs anciens vides protégés, banc natif avec conservation des réglages', () => {
+  const diff = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '05-pov-sans-editeur.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'les correctifs natifs gardent les fins de ligne LF');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2}/);
+  assert.match(diff, /\+   if \(m_vpinball\)\n\+      m_vpinball->SetPropSel/, 'le lancement direct n’a aucun éditeur');
+  assert.match(diff, /\+.*Importing POV settings:/, 'le prochain rapport identifie le fichier importé');
+  const bench = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'banc-vpx-pov.mjs'), 'utf8');
+  for (const scenario of ['without-pov', 'named-pov', 'automatic-pov', 'empty-legacy-fields', 'invalid-legacy-fields', 'valid-legacy-fields']) assert.ok(bench.includes(scenario));
+  assert.match(bench, /assert\.equal\(number\(key\), expected/, 'le banc natif vérifie aussi les réglages numériques valides');
+});
+
 test('construction : un dossier de sources par série de correctifs, une construction à la fois', () => {
   // 21/11/2026 : une publication groupée (série 1) et une branche (série 2) construisaient dans le même dossier de
   // sources ; chacune effaçait les sources de l'autre au milieu de sa compilation.

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- VPX corrigé, série 5 : l’import automatique d’un ancien fichier de cadrage POV ne plante plus lors du lancement direct d’une table. Les champs numériques anciens vides ou illisibles sont ignorés sans interrompre le chargement ; le cadrage et les réglages valides sont conservés.
 - Vérification avant fusion : un test est arrêté quand il ne progresse plus depuis 5 minutes, et non plus quand son fichier de tests dure plus de 5 minutes ; les fichiers longs mais sains ne sont plus interrompus à tort.
 - Une vérification verte reste reconnue après l'intégration de la branche commune quand seuls les numéros de ligne du travail ont bougé.
 - La fiche technique cite toutes les cartes graphiques dans son résumé et nomme la carte concernée par chaque alerte de pilote, sans déduire laquelle est utilisée par la partie.

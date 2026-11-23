@@ -7,6 +7,8 @@
 //   en gardant le verrou du label, et la boucle de jeu l'attendait 200 à 300 ms à chaque image affichée (The Matrix) ;
 // - l'exécutable encore (série 4, 22/11/2026) : bilan du temps de rendu de la carte graphique au journal de VPX, lu par
 //   les pré-réglages de qualité (mode Auto).
+// - l'exécutable encore (série 5, 23/11/2026) : import automatique des cadrages POV sans éditeur,
+//   et lecture sûre des champs numériques anciens vides ou illisibles.
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -130,8 +132,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 4 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 4;
+/** Série de correctifs livrée (« patched Cyber Pinball 5 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 5;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {
