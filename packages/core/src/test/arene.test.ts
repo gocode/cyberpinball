@@ -201,10 +201,7 @@ function arena(overrides: Record<string, unknown> = {}) {
   const built = () => opened!.build();
   /** Start sur l'action de cette clé (un bloc au premier niveau, un élément dans un bloc). */
   const run = (key: string) => built().actions.find((a) => a.key === key)!.run();
-  /**
-   * Un onglet : jusqu'à la barre d'onglets (sortir du bloc où l'on est, puis Start sur la barre, ou Exit
-   * depuis un onglet en liste, où elle n'est pas un arrêt), puis Start sur lui.
-   */
+  /** Un onglet : jusqu'à la barre d'onglets (sortir du bloc où l'on est, puis Start sur la barre), puis Start sur lui. */
   const tab = (id: string) => {
     for (let i = 0; i < 3 && !built().actions.some((a) => a.key!.startsWith('tab:')); i++) {
       if (built().actions.some((a) => a.key === 'block:tabs')) run('block:tabs');
@@ -248,7 +245,12 @@ test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encor
     assert.equal(h.built().actions[h.at()!]!.key, key);
     assert.equal(h.built().hub.tabs.find((tab) => tab.current)?.label, label);
   }
-  // Exit depuis la barre d'onglets : la roue (règle du 22/11/2026, « exit à nouveau : on sort de l'écran »).
+  // Exit depuis la barre d'onglets : le contenu de l'onglet ouvert (règle du 23/11/2026) ; Exit à nouveau : la roue.
+  assert.match(h.built().hint!, /Start ou Exit : y entrer/);
+  h.built().back();
+  assert.deepEqual(h.events, []);
+  assert.ok(!h.built().actions.some((a) => a.key!.startsWith('tab:')), 'sorti de la barre');
+  assert.equal(h.built().hub.tabs.find((tab) => tab.current)?.label, 'Accueil');
   h.built().back();
   assert.deepEqual(h.events, ['roue']);
   h.events.length = 0;
@@ -264,10 +266,7 @@ test('écran de l’Arène : onglets à icônes, ceux qui n’existent pas encor
   assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression');
   h.built().keys!({ code: 'MagnaLeft' });
   assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Parties', 'le MagnaSave gauche revient en arrière');
-  // Exit : la barre d'onglets, le curseur sur l'onglet ouvert ; Exit à nouveau : la roue.
-  h.built().back();
-  assert.deepEqual(h.built().actions.map((a) => a.key), ['tab:home', 'tab:games', 'tab:progress']);
-  assert.equal(h.at(), 1, 'sur Parties, l’onglet ouvert');
+  // Exit depuis le contenu : la roue, d'un appui (règle du 23/11/2026 : plus de détour par la barre).
   assert.match(h.built().hint!, /Exit : retour à la roue/);
   assert.deepEqual(h.events, []);
   h.built().back();
@@ -293,16 +292,11 @@ test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exi
   const inside = h.built();
   assert.deepEqual(inside.actions.map((a) => a.label), ['Aller à la table', 'Classements']);
   assert.equal(h.at(), 0, 'le curseur sur la première action du bloc');
-  // Exit dans le bloc : on en ressort, le curseur sur lui ; Exit au premier niveau : la barre d'onglets
-  // (sur l'onglet ouvert) ; Exit à nouveau : la roue.
+  // Exit dans le bloc : on en ressort, le curseur sur lui ; Exit au premier niveau : la roue (23/11/2026).
   inside.back();
   assert.equal(h.at(), 1);
   assert.deepEqual(h.events, []);
-  assert.match(h.built().hint!, /Exit : retour aux onglets/);
-  h.built().back();
-  assert.equal(h.built().actions[0]!.key, 'tab:home');
-  assert.equal(h.at(), 0);
-  assert.deepEqual(h.events, []);
+  assert.match(h.built().hint!, /Exit : retour à la roue/);
   h.built().back();
   assert.deepEqual(h.events, ['roue']);
 });
@@ -312,9 +306,11 @@ test('navigation par blocs : Start sur un onglet montre son contenu, le curseur 
   h.menu.openHome(() => undefined);
   h.tab('progress');
   assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression');
-  // Progression est en liste : la barre d'onglets n'en est pas un arrêt, le curseur sur le premier élément.
-  assert.equal(h.at(), 0, 'le premier élément du contenu');
-  assert.ok(h.built().actions.every((a) => a.key!.startsWith('block:item:') || a.key!.startsWith('block:choice:')), 'chaque élément, directement');
+  // Progression est en liste : la barre d'onglets à sa place (le premier arrêt), puis chaque élément ; le curseur sur le premier élément.
+  assert.equal(h.at(), 1, 'le premier élément du contenu');
+  const [bar, ...items] = h.built().actions.map((a) => a.key!);
+  assert.equal(bar, 'block:tabs');
+  assert.ok(items.every((k) => k.startsWith('block:item:') || k.startsWith('block:choice:')), 'chaque élément, directement');
   // MagnaSave : l'onglet suivant qui s'ouvre, en boucle (Défis, Du jour et Ligue sautés).
   assert.equal(h.built().keys!({ code: 'MagnaRight' }), true);
   assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Accueil');
@@ -392,19 +388,22 @@ test('onglets hors Accueil : en liste, chaque élément est un arrêt direct des
   h.tab('progress');
   const b = h.built();
   const keys = b.actions.map((a) => a.key!);
-  assert.ok(!keys.includes('block:tabs'), 'la barre d’onglets n’est pas un élément de la liste : Exit y mène');
+  assert.equal(keys[0], 'block:tabs', 'la barre d’onglets, à sa place au-dessus de la liste (23/11/2026 : Exit n’y mène plus)');
   assert.ok(!keys.some((k) => k.startsWith('block:section:')), `aucun bloc de section : ${keys.join(', ')}`);
-  assert.equal(h.at(), 0, 'le curseur sur le premier élément du contenu');
-  assert.match(b.hint!, /Flippers : choisir · Start : valider · Exit : retour aux onglets/);
+  assert.equal(h.at(), 1, 'le curseur sur le premier élément du contenu');
+  assert.match(b.hint!, /Flippers : choisir · Start : valider · Exit : retour à la roue/);
   // Aucune section sous liseré ; chaque ligne porte son arrêt.
   assert.ok(b.hub.sections.every((s) => !(s as { block?: unknown }).block));
   const level = b.actions.find((a) => a.label === 'Mon niveau')!;
   level.run();
   assert.equal(h.events.at(-1), 'niveau', 'Start sur la ligne : son écran, tout de suite');
-  // Exit : la barre d'onglets, sur Progression ; Exit à nouveau : la roue.
+  // Start sur la barre : dedans, sur Progression ; Exit : retour au contenu de Progression ; Exit à nouveau : la roue.
+  h.run('block:tabs');
+  assert.ok(h.built().actions.every((a) => a.key!.startsWith('tab:')));
+  assert.equal(h.built().actions[h.at()!]!.key, 'tab:progress');
   h.built().back();
   assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Progression');
-  assert.ok(h.built().actions.every((a) => a.key!.startsWith('tab:')));
+  assert.equal(h.at(), 1, 'sur le premier élément de Progression');
   assert.equal(h.events.at(-1), 'niveau');
   h.built().back();
   assert.equal(h.events.at(-1), 'roue');
@@ -441,8 +440,8 @@ test('onglet Scores : les tables jouées récemment, Start ouvre leur tableau ; 
   assert.equal(s.title, 'Jouées récemment');
   assert.deepEqual(s.cards.map((c) => c.title), ['Thunder Reef', 'Neon Abyss']);
   assert.deepEqual(s.cards[0]!.ranks?.map((r) => r.place), ['#1', '#2']);
-  // Le premier élément ouvre les classements complets ; les tables suivent.
-  assert.equal(h.at(), 0);
+  // Le premier élément (après la barre d'onglets) ouvre les classements complets ; les tables suivent.
+  assert.equal(h.at(), 1);
   h.built().actions[h.at()!]!.run();
   assert.equal(h.events.at(-1), 'tables · Retour : Arène');
   h.built().actions.find((a) => a.label === 'Thunder Reef')!.run();

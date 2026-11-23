@@ -156,12 +156,11 @@ test('Communauté à onglets : le curseur dans la barre d’onglets, les flipper
   h.built().keys!({ code: 'FlipperLeft' });
   assert.equal(h.current(), 'profile', 'la barre boucle');
   // Start : dans le contenu, une liste sans blocs (hors Accueil, règle du 22/11/2026), le curseur sur son
-  // premier élément ; Exit remonte à la barre, puis à la roue.
+  // premier élément (la barre d'onglets la précède, à sa place) ; Exit quitte l'écran (23/11/2026).
   h.run('tab:profile');
   assert.ok(h.inList(), h.built().actions.map((a) => a.key).join(', '));
-  assert.equal(h.at(), 0);
-  h.built().back();
-  assert.ok(h.inTabs(), 'Exit remonte à la barre d’onglets');
+  assert.equal(h.built().actions[0]!.key, 'block:tabs');
+  assert.equal(h.at(), 1);
   assert.deepEqual(h.events, []);
   h.built().back();
   assert.deepEqual(h.events, ['roue']);
@@ -180,7 +179,7 @@ test('Accueil : un récapitulatif par onglet ; Start ouvre l’onglet sur la mê
   assert.equal(h.current(), 'players');
   assert.equal(h.built().hub.sections[1]!.title, 'Joueurs à découvrir');
   assert.ok(h.inList() && !h.inTabs(), 'dans la liste de l’onglet');
-  assert.equal(h.at(), 0, 'le curseur sur le premier élément de la bande');
+  assert.equal(h.at(), 1, 'le curseur sur le premier élément de la bande (après la barre d’onglets)');
   assert.ok(h.built().actions.some((a) => a.label === 'Ajouter'), 'on y ajoute un joueur d’un appui');
   // Exit : retour à l'accueil, le curseur sur ce récapitulatif (la barre d'onglets, puis Messages, puis En ligne).
   h.built().back();
@@ -271,8 +270,6 @@ test('Profil : mon profil et ce qui me concerne ; les réglages de la communaut�
   // dessinée comme les lignes d'actions des autres menus (retour du mainteneur, 21/11/2026).
   const sec = h.built().hub.sections.find((s) => s.title === 'Pseudo, confidentialité, compte')!;
   assert.deepEqual([sec.cards.length, sec.choices?.map((c) => c.title)], [0, ['Modifier mon profil', 'Confidentialité', 'Mon compte']]);
-  h.built().back();
-  h.run('tab:profile');
   h.built().actions.find((a) => a.key!.startsWith('block:choice:') && a.label === 'Mon compte')!.run();
   assert.deepEqual(h.events, ['groupe:compte'], 'Start sur l’entrée l’ouvre, sans bloc où entrer');
   const js = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'hub.js'), 'utf8');

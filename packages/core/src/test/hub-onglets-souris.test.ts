@@ -53,7 +53,8 @@ for (const menuFirst of [false, true]) test('clic sur les onglets depuis chaque 
   h.built().actions.find((a) => a.key === 'block:section:0')!.run();
   assert.equal(h.hub.current(), 'list');
   choose('empty');
-  h.built().back();
+  // Onglet vide : la barre d'onglets est le seul arrêt ; Start y entre (Exit quitterait l'écran, 23/11/2026).
+  h.built().actions.find((a) => a.key === 'block:tabs')!.run();
   assert.equal(h.hub.current(), 'empty');
   assert.ok(h.built().actions.every((a) => a.key.startsWith('tab:')));
   choose('list');

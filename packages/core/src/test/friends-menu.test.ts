@@ -20,6 +20,7 @@ const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
 interface Action {
   label: string;
+  key?: string;
   detail?: string;
   tone?: string;
   icon?: string;
@@ -255,9 +256,9 @@ async function pressButton(b: Built, label: string): Promise<void> {
   assert.ok(button?.action !== undefined, `« ${label} » : une action de l’en-tête`);
   await b.actions[button.action]!.run();
 }
-/** Un onglet du profil : Exit remonte à la barre d'onglets, puis Start sur l'onglet. */
+/** Un onglet du profil : Start sur la barre d'onglets (un arrêt des flippers, à sa place), puis sur l'onglet. */
 async function openTab(last: () => { build: Build }, label: string): Promise<Built> {
-  if (!last().build().actions.some((a) => a.label === 'Activité')) (last().build() as Built & { back(): void }).back();
+  if (!last().build().actions.some((a) => a.label === 'Activité')) await last().build().actions.find((a) => a.key === 'block:tabs')!.run();
   await last().build().actions.find((a) => a.label === label)!.run();
   return last().build();
 }

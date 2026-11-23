@@ -1,7 +1,14 @@
 // Catalogue anglais : l'Arène (médaillon, affiche, écran à onglets), sa rubrique du Menu système et
 // son réglage dans la roue. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
-  'Flippers : parcourir · Exit : retour aux onglets': 'Flippers: browse · Exit: back to tabs',
+  // app/src/hub-screen.ts : Exit de la barre d'onglets au contenu, puis hors de l'écran (23/11/2026)
+  'Flippers : parcourir · Exit : retour': 'Flippers: browse · Exit: back',
+  'Flippers : parcourir · Exit : retour à la roue': 'Flippers: browse · Exit: back to the wheel',
+  'Flippers : parcourir · Exit : retour à l’accueil': 'Flippers: browse · Exit: back to home',
+  'Flippers : changer d’onglet · Start ou Exit : y entrer': 'Flippers: switch tab · Start or Exit: enter it',
+  'Flippers : choisir un onglet · Start : l’ouvrir · Exit : revenir au contenu': 'Flippers: choose a tab · Start: open it · Exit: back to the content',
+  'Flippers : choisir · Start : valider · Exit : retour': 'Flippers: choose · Start: confirm · Exit: back',
+  'Flippers : choisir un bloc · Start : y entrer · Exit : retour': 'Flippers: choose a block · Start: enter it · Exit: back',
   'Flippers : changer d’onglet · Start : y entrer · Exit : retour': 'Flippers: change tab · Start: enter · Exit: back',
   'Classement des scores': 'Score rankings',
   // packages/core/src/arena.ts
@@ -124,7 +131,6 @@ export const messages: Record<string, string> = {
   // Le classement mondial sur l'Accueil, et l'XP de la partie rejointe (22/11/2026)
   'Retour : Arène': 'Back: Arena',
   // Onglets en liste, onglet Scores (22/11/2026)
-  'Flippers : choisir · Start : valider · Exit : retour aux onglets': 'Flippers: choose · Start: confirm · Exit: back to the tabs',
   'Flippers : choisir · Start : valider · Exit : retour à la roue': 'Flippers: choose · Start: confirm · Exit: back to the wheel',
   'Flippers : choisir un onglet · Start : l’ouvrir · Exit : retour à la roue': 'Flippers: choose a tab · Start: open it · Exit: back to the wheel',
   'Recherche, portée et période ; Start sur une table : son tableau des scores': 'Search, scope and period; Start on a table: its scoreboard',

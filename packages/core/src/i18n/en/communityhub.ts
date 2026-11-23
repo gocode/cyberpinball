@@ -46,7 +46,6 @@ export const messages: Record<string, string> = {
   'Flippers : changer d’onglet · Start : y entrer · Exit : retour à la roue': 'Flippers: switch tab · Start: enter it · Exit: back to the wheel',
   'Flippers : choisir · Start : valider · Exit : retour à l’accueil': 'Flippers: choose · Start: confirm · Exit: back to home',
   'Flippers : choisir un bloc · Start : y entrer · Exit : retour à l’accueil': 'Flippers: choose a block · Start: enter it · Exit: back to home',
-  'Flippers : choisir un bloc · Start : y entrer · Exit : retour aux onglets': 'Flippers: choose a block · Start: enter it · Exit: back to the tabs',
   // Tables en commun et connectés (22/11/2026)
   'en commun': 'in common',
   '+{n} table en commun': '+{n} table in common',

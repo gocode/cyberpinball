@@ -59,14 +59,14 @@ test('Records : ses scores publiés, d’abord là où il me devance (le plus pe
 
 interface Hub {
   person: { name: string; eyebrow?: string; status?: { text: string }; buttons: { label: string; off?: string; primary?: boolean; xp?: string; action?: number }[] };
-  tabs: { label: string; current: boolean; disabled?: string }[];
+  tabs: { label: string; current: boolean; disabled?: string; action?: number }[];
   sections: { title?: string; cards: { key?: string; title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
 }
 interface Built {
   heading: string;
   hub: Hub;
   hint?: string;
-  keys?(input: { code: string }): boolean;
+  keys?(input: { code: string; shift?: boolean }): boolean;
   actions: { label: string; key?: string; run(): void }[];
   back(): void;
 }
@@ -139,9 +139,9 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; lik
     assert.ok(b?.action !== undefined, `« ${label} » : un arrêt de l’en-tête`);
     built().actions[b.action]!.run();
   };
-  // Un onglet : Exit remonte à la barre d'onglets (règle du 22/11/2026), Start sur l'onglet.
+  // Un onglet : Start sur la barre d'onglets (un arrêt des flippers, à sa place, 23/11/2026), puis sur l'onglet.
   const tab = (label: string) => {
-    if (!built().actions.some((a) => a.key?.startsWith('tab:'))) built().back();
+    if (!built().actions.some((a) => a.key?.startsWith('tab:'))) built().actions.find((a) => a.key === 'block:tabs')!.run();
     built().actions.find((a) => a.label === label)!.run();
     return built();
   };
@@ -163,9 +163,13 @@ test('profil : un écran à onglets, l’en-tête du joueur, quatre onglets et j
   assert.deepEqual(b.hub.tabs.map((x) => x.label), ['Activité', 'Records', 'Badges', 'À propos']);
   assert.ok(b.hub.tabs.find((x) => x.label === 'Activité')!.current, 'ouvert sur Activité');
   assert.ok(!/retour à la roue/.test(b.hint ?? ''), 'Exit revient d’où l’on vient, pas à la roue');
-  // À l'arrivée, déjà dans la barre : Exit revient directement d'où l'on vient.
-  assert.match(b.hint ?? '', /changer d’onglet.*Exit : retour$/);
+  // À l'arrivée, déjà dans la barre : Exit rend la main au contenu de l'onglet ouvert (23/11/2026) ;
+  // un second Exit revient d'où l'on vient.
+  assert.match(b.hint ?? '', /changer d’onglet · Start ou Exit : y entrer$/);
   b.back();
+  assert.deepEqual(p.events, []);
+  assert.match(p.built().hint ?? '', /Exit : retour$/);
+  p.built().back();
   assert.deepEqual(p.events, ['back']);
 });
 
@@ -232,7 +236,7 @@ test('mon profil : Modifier mon profil, Confidentialité, Mon compte ; Start sur
   assert.equal(p.built().heading, 'Ont aimé');
 });
 
-for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un joueur'} : onglets immédiats aux flippers, Start entre, Exit remonte puis revient`, () => {
+for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un joueur'} : onglets immédiats aux flippers, Start entre, Exit du contenu revient`, () => {
   const p = profile({ mine });
   const current = () => p.built().hub.tabs.find((t) => t.current)!.label;
   const focused = () => p.built().actions[p.at()!]!.key;
@@ -248,9 +252,43 @@ for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un jo
   assert.ok(p.built().hub.sections.some((s) => s.choices?.length), 'la section est déjà affichée');
   p.built().actions[p.at()!]!.run();
   assert.ok(!p.built().actions.some((a) => a.key?.startsWith('tab:')), 'Start entre dans le contenu');
-  p.built().back();
-  assert.equal(focused(), 'tab:about');
+  assert.equal(current(), 'À propos');
   assert.deepEqual(p.events, []);
+  // Du contenu, Exit quitte la page (23/11/2026 : plus de détour par la barre).
+  p.built().back();
+  assert.deepEqual(p.events, ['back']);
+});
+
+for (const mine of [false, true]) test(`profil ${mine ? 'personnel' : 'd’un joueur'} : Exit dans la barre rend la main à l’onglet affiché, jamais un onglet survolé ; un second Exit quitte`, () => {
+  // Demande du mainteneur (23/11/2026) : « Exit sort d'abord de la barre d'onglets en rendant le focus à
+  // l'écran courant, puis un second Exit quitte la page ».
+  const p = profile({ mine });
+  const current = () => p.built().hub.tabs.find((t) => t.current)!.label;
+  const focused = () => p.built().actions[p.at()!]!.key;
+  // Tab (clavier) déplace comme un flipper : l'onglet sous le curseur est toujours celui qu'on voit.
+  assert.ok(p.built().keys?.({ code: 'Tab' }));
+  assert.equal(current(), 'Records');
+  assert.equal(focused(), 'tab:records');
+  assert.ok(p.built().keys?.({ code: 'Tab', shift: true }));
+  assert.equal(current(), 'Activité');
+  p.built().keys?.({ code: 'FlipLeft' });
+  assert.equal([current(), focused()].join(' '), 'À propos tab:about');
+  // Exit : le contenu de l'onglet affiché ; la barre n'a plus de curseur, seul À propos y reste allumé.
+  p.built().back();
+  assert.deepEqual(p.events, []);
+  assert.equal(current(), 'À propos');
+  assert.ok(!p.built().actions.some((a) => a.key?.startsWith('tab:')), 'sorti de la barre');
+  assert.ok(p.built().hub.tabs.every((t) => t.action === undefined), 'aucun onglet sous le curseur');
+  assert.ok(p.built().hub.sections.some((s) => s.choices?.length), 'le contenu d’À propos');
+  assert.notEqual(focused(), 'block:tabs', 'le curseur sur le contenu');
+  // La barre se rejoint aux flippers, à sa place (sous l'en-tête, au-dessus du contenu) : Start y entre, sur À propos.
+  const keys = p.built().actions.map((a) => a.key!);
+  assert.ok(keys.indexOf('block:tabs') < p.at()!);
+  assert.ok(keys.slice(0, keys.indexOf('block:tabs')).every((k) => k.startsWith('block:person:')));
+  p.built().actions.find((a) => a.key === 'block:tabs')!.run();
+  assert.equal(focused(), 'tab:about');
+  // Un second Exit depuis le contenu : d'où l'on vient.
+  p.built().back();
   p.built().back();
   assert.deepEqual(p.events, ['back']);
 });

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Profile, Community and Arena: in the tab bar, Exit no longer leaves the screen at once. It hands you back the content of the tab on screen, and a second Exit leaves the screen. From the content, the flippers reach the tab bar in its place, below the header.
+- In the tab bar, Tab and Shift+Tab on the keyboard switch tabs like the flippers: the lit tab is always the one you see, never a tab you passed over without its content.
 - Virtual reality enabled but headset unplugged or taken off: Cyber Pinball no longer looks for the headset during a game on the screens. Those attempts, every 15 seconds, made VPX drop frames on every table (about 115 fps instead of 120, with regular stutters).
 - Tables taken over from another installation (PinUP Popper, PinballY, a VPX folder) keep exactly the framing they had. Cyber Pinball reads the settings of the VPX that played them (its VPinballX.ini, or the registry for a VPX older than 10.8) and freezes for each one its mode (Manual, Fit Table, Fit Screen), the screen measurements and the view it read, without ever touching the original installation. A POV lying next to the table, which the old VPX ignored, is no longer applied on its own. Table page > Manage the table… > Point of view shows it ("Framing from the original installation") and lets you switch to the cabinet framing.
 - A temporary file that is still open no longer blocks cancelling or completing a table import. Cleanup retries in the background; if it still fails, temporary files are kept and navigation continues.
