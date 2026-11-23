@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- La mesure des couleurs ne cumule plus les vidéos des tables quittées : une seule mesure reste active et les sujets remplacés sont abandonnés. Un média momentanément illisible attend avant d’être réessayé.
+- Les lecteurs cachés utilisés pour mesurer une vidéo libèrent leur décodeur après une réussite, une erreur ou un délai dépassé. Une recherche d’image qui ne répond plus est interrompue et une page de conversion dont le rendu est tombé est recréée au prochain usage.
+- Après une déconnexion du service de décodage graphique, le front-end réessaie une fois la vidéo. Cet incident ne marque plus le fichier comme abîmé dans le diagnostic ; les anciennes erreurs de ce type sont ignorées.
+- La télécommande retire ses écouteurs quand elle quitte le navigateur intégré : les ouvertures successives n’accumulent plus les notifications de chargement.
 - VPX corrigé, série 5 : l’import automatique d’un ancien fichier de cadrage POV ne plante plus lors du lancement direct d’une table. Les champs numériques anciens vides ou illisibles sont ignorés sans interrompre le chargement ; le cadrage et les réglages valides sont conservés.
 - Vérification avant fusion : un test est arrêté quand il ne progresse plus depuis 5 minutes, et non plus quand son fichier de tests dure plus de 5 minutes ; les fichiers longs mais sains ne sont plus interrompus à tort.
 - Une vérification verte reste reconnue après l'intégration de la branche commune quand seuls les numéros de ligne du travail ont bougé.

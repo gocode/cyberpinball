@@ -56,6 +56,10 @@ export class TableTints {
   private pendingKey?: string;
   private timer?: NodeJS.Timeout;
   private run = 0;
+  private resolving = false;
+  private queued?: { subject: TintSubject; run: number };
+  /** Un décodeur momentanément indisponible ne doit pas être sollicité à chaque retour dans la roue. */
+  private readonly failed = new Map<string, number>();
   /** Dernier changement de table suivi (rafale : moins de SETTLE_MS entre deux). */
   private lastFollow = -Infinity;
   /** Cache sur disque, lu une fois : la teinte d'une table déjà mesurée se trouve sans relire le fichier à chaque appui. */
@@ -82,6 +86,7 @@ export class TableTints {
     clearTimeout(this.timer);
     this.timer = undefined;
     const run = ++this.run;
+    this.queued = undefined;
     const settleMs = this.opts.settleMs ?? SETTLE_MS;
     const now = (this.opts.now ?? Date.now)();
     const isolated = now - this.lastFollow >= settleMs;
@@ -99,21 +104,37 @@ export class TableTints {
     }
     this.timer = setTimeout(() => {
       this.timer = undefined;
-      void this.resolveSubject(subject).then((tint) => {
-        if (run === this.run) this.settle(tint);
-      });
+      this.queued = { subject, run };
+      void this.drain();
     }, this.opts.settleMs ?? SETTLE_MS);
   }
 
   dispose(): void {
     clearTimeout(this.timer);
     this.run++;
+    this.queued = undefined;
+  }
+
+  /** Une seule mesure active ; pendant son attente, seule la dernière table reste à traiter. */
+  private async drain(): Promise<void> {
+    if (this.resolving) return;
+    this.resolving = true;
+    try {
+      while (this.queued) {
+        const { subject, run } = this.queued;
+        this.queued = undefined;
+        const tint = await this.resolveSubject(subject, run);
+        if (run === this.run) this.settle(tint);
+      }
+    } finally {
+      this.resolving = false;
+    }
   }
 
   /** Ambiance d'après `files` ; points du DMD d'après `dmdFiles`, sinon ceux de l'ambiance. */
-  private async resolveSubject(subject: TintSubject): Promise<ShownTint | undefined> {
-    const ambient = await this.resolve(subject.files);
-    const dmd = (subject.dmdFiles?.length ? await this.resolve(subject.dmdFiles) : undefined)?.dmd ?? ambient?.dmd;
+  private async resolveSubject(subject: TintSubject, run: number): Promise<ShownTint | undefined> {
+    const ambient = await this.resolve(subject.files, run);
+    const dmd = (subject.dmdFiles?.length ? await this.resolve(subject.dmdFiles, run) : undefined)?.dmd ?? ambient?.dmd;
     if (!ambient && !dmd) return undefined;
     return { ...ambient, ...(dmd && { dmd }) };
   }
@@ -152,8 +173,9 @@ export class TableTints {
   }
 
   /** Teinte du premier fichier qui en a une. */
-  private async resolve(files: readonly string[]): Promise<TableTint | undefined> {
+  private async resolve(files: readonly string[], run: number): Promise<TableTint | undefined> {
     for (const file of files) {
+      if (run !== this.run) return undefined;
       const record = await this.measure(file);
       if (record && 'tint' in record) return record.tint;
     }
@@ -165,6 +187,7 @@ export class TableTints {
     // En mémoire par la même clé que le cache (chemin, taille, date) : un média remplacé est relu.
     const id = tintCacheKey(file);
     if (!id) return undefined;
+    if ((this.failed.get(id) ?? 0) > (this.opts.now ?? Date.now)()) return undefined;
     const known = this.memo.get(id) ?? cachedTint(this.cacheFile, file);
     if (known) {
       this.memo.set(id, known);
@@ -180,7 +203,10 @@ export class TableTints {
       storeTint(this.cacheFile, file, record);
       return record;
     } catch (error) {
-      // Média illisible : pas de teinte pour lui, sans rien garder (il sera relu s'il change).
+      // Une panne du décodeur ne condamne pas le fichier sur disque. Reprise après une minute,
+      // ou aussitôt si sa taille/date change ; pas de nouvelle tentative à chaque survol.
+      this.failed.set(id, (this.opts.now ?? Date.now)() + 60_000);
+      if (this.failed.size > 200) this.failed.delete(this.failed.keys().next().value!);
       console.log(`Couleur de la table : ${path.basename(file)} illisible (${(error as Error).message}).`);
       return undefined;
     }

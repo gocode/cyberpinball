@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Colour sampling no longer accumulates videos from tables that have been left: only one sample stays active and replaced subjects are discarded. Temporarily unreadable media wait before being retried.
+- Hidden video sampling players release their decoder after success, failure or timeout. An unresponsive frame seek is stopped, and a conversion page whose renderer crashed is recreated on its next use.
+- After the graphics decoding service disconnects, the front-end retries the video once. This incident no longer marks the file as damaged in diagnostics; previous errors of this type are ignored.
+- The phone remote removes its listeners when leaving the built-in browser: successive openings no longer accumulate loading notifications.
 - Patched VPX, patch set 5: automatically importing a legacy POV view file no longer crashes when launching a table directly. Empty or invalid legacy numeric fields are ignored without aborting loading; valid view and quality settings are preserved.
 - Pre-merge check: a test is stopped when it has made no progress for 5 minutes, no longer when its test file runs longer than 5 minutes; long but healthy files are no longer wrongly interrupted.
 - A green check is still recognized after merging the shared branch in when only the line numbers of the work have shifted.

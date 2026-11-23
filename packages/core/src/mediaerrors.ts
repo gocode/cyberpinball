@@ -83,7 +83,10 @@ export function mediaErrorsFile(logsDir: string): string {
 }
 
 /** Nature d'une erreur ; undefined pour une lecture interrompue (code 1), à ne pas enregistrer. */
-export function mediaErrorKind(report: Pick<MediaErrorReport, 'code' | 'image'>): MediaErrorKind | undefined {
+export function mediaErrorKind(report: Pick<MediaErrorReport, 'code' | 'image' | 'message'>): MediaErrorKind | undefined {
+  // Le service de décodage peut disparaître après un arrêt du processus GPU. Ce message
+  // accuse la connexion au décodeur, pas les octets du fichier : ne pas le condamner durablement.
+  if (report.message?.includes('PIPELINE_ERROR_DISCONNECTED')) return undefined;
   if (report.image) return 'image';
   switch (report.code) {
     case 1:
@@ -104,7 +107,7 @@ export function readMediaErrors(file: string): MediaErrorEntry[] {
   try {
     const log = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<MediaErrorLog>;
     if (log.version !== 1 || !Array.isArray(log.errors)) return [];
-    return log.errors.filter((e) => e && typeof e.file === 'string' && typeof e.size === 'number' && typeof e.mtimeMs === 'number');
+    return log.errors.filter((e) => e && typeof e.file === 'string' && typeof e.size === 'number' && typeof e.mtimeMs === 'number' && !e.message?.includes('PIPELINE_ERROR_DISCONNECTED'));
   } catch {
     return [];
   }

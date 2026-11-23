@@ -64,6 +64,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import type { BrowserWindow, WebContents, WebContentsView } from 'electron';
+import { remoteTargetEvents } from './remote-target-events';
 import {
   acceptWebSocket,
   cleanUploadName,
@@ -685,6 +686,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   const interfaces = opts.interfaces ?? os.networkInterfaces;
 
   let target: RemoteTarget | undefined;
+  let detachTargetEvents: (() => void) | undefined;
   /** Fenêtre d'un autre programme (Edge), pilotée par Windows ; passe après « Récupérer ». */
   let external: ExternalTarget | undefined;
   let menu: MenuTarget | undefined;
@@ -2435,11 +2437,13 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     makePointer(next.win);
     const contents = next.view.webContents;
     // Une page nouvelle : son titre, Retour et Avancer vont au téléphone.
-    for (const event of ['did-navigate', 'did-navigate-in-page', 'page-title-updated', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => pushPage());
-    contents.on('did-stop-loading', () => void probeField());
-    next.win.on('closed', () => {
-      if (target === next) detach();
-      closePointer();
+    detachTargetEvents = remoteTargetEvents(contents, next.win, {
+      page: () => pushPage(),
+      field: () => void probeField(),
+      closed: () => {
+        if (target === next) detach();
+        closePointer();
+      },
     });
     wake();
     pushState();
@@ -2462,6 +2466,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
    */
   function detach(): void {
     if (!target) return;
+    detachTargetEvents?.();
+    detachTargetEvents = undefined;
     target = undefined;
     surfaces.delete('browser');
     menuItems = new Map();

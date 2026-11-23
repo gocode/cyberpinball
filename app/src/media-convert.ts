@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { session, WebContentsView } from 'electron';
 import { mediaContentType, mediaKind, mp4VideoTrack, oggOpusFile, readWholeFile, t, wavFile, webmFile, writeFileAtomic, type AudioTrim, type EncodedFrame, type RgbaImage } from '@cyberpinball/core';
+import { MEDIA_FRAMES_SCRIPT } from './media-frames-script';
 
 const PARTITION = 'cyberpinball-conversion';
 const ORIGIN = 'https://conversion.cyberpinball.invalid';
@@ -261,39 +262,7 @@ window.shrinkVideo = async (id, out, width, height, fps, track) => {
   await fetch('/out/' + out + '?duration=' + Math.round(track.durationUs / 1000), { method: 'POST', body: all.buffer });
   return { frames: chunks.length };
 };
-window.framesOf = async (id, video, times, maxWidth, out) => {
-  const blob = await (await fetch('/in/' + id)).blob();
-  const grab = async (source, width, height, key) => {
-    const w = Math.min(maxWidth, width);
-    const h = Math.max(1, Math.round((height * w) / width));
-    const canvas = new OffscreenCanvas(w, h);
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(source, 0, 0, w, h);
-    const pixels = ctx.getImageData(0, 0, w, h).data;
-    await fetch('/out/' + key + '?w=' + w + '&h=' + h, { method: 'POST', body: pixels.buffer });
-  };
-  if (!video) {
-    const bitmap = await createImageBitmap(blob);
-    await grab(bitmap, bitmap.width, bitmap.height, out + '0');
-    return { width: bitmap.width, height: bitmap.height, count: 1 };
-  }
-  const url = URL.createObjectURL(blob);
-  try {
-    const v = document.createElement('video');
-    v.muted = true;
-    v.src = url;
-    await new Promise((resolve, reject) => { v.onloadeddata = resolve; v.onerror = () => reject(new Error('video')); });
-    for (let i = 0; i < times.length; i++) {
-      v.currentTime = v.duration * times[i];
-      await new Promise((resolve) => (v.onseeked = resolve));
-      await grab(v, v.videoWidth, v.videoHeight, out + i);
-    }
-    return { width: v.videoWidth, height: v.videoHeight, count: times.length };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-};
+${MEDIA_FRAMES_SCRIPT}
 </script>`;
 
 // Une seule page et un seul gestionnaire par processus : la session de conversion est partagée,
@@ -344,9 +313,18 @@ export function createConverter() {
       // Aucune fenêtre ne la porte : gardée ici, sinon le ramasse-miettes la détruirait (acquire-window.ts, hiddenViews).
       hiddenViews.add(v);
       v.webContents.once('destroyed', () => hiddenViews.delete(v));
+      v.webContents.once('render-process-gone', () => {
+        if (view === v) view = undefined;
+        if (!v.webContents.isDestroyed()) v.webContents.close();
+      });
       v.webContents.setAudioMuted(true);
       v.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-      await v.webContents.loadURL(`${ORIGIN}/`);
+      try {
+        await v.webContents.loadURL(`${ORIGIN}/`);
+      } catch (error) {
+        if (!v.webContents.isDestroyed()) v.webContents.close();
+        throw error;
+      }
       view = v;
       return v;
     })().finally(() => (loading = undefined));
@@ -359,7 +337,13 @@ export function createConverter() {
     try {
       return await Promise.race([
         v.webContents.executeJavaScript(script, true) as Promise<T>,
-        new Promise<never>((_r, reject) => (timer = setTimeout(() => reject(new Error(t('délai dépassé'))), TIMEOUT_MS))),
+        new Promise<never>((_r, reject) => (timer = setTimeout(() => {
+          reject(new Error(t('délai dépassé')));
+          // Le minuteur de la page ne peut pas tourner si son rendu est figé. Ne pas réutiliser
+          // cette page, ni laisser les conversions suivantes s'accumuler derrière elle.
+          if (view === v) view = undefined;
+          if (!v.webContents.isDestroyed()) v.webContents.close();
+        }, TIMEOUT_MS))),
       ]);
     } finally {
       clearTimeout(timer);
@@ -369,6 +353,7 @@ export function createConverter() {
   /** Message court d'une erreur de la page (« Unable to decode audio data » n'apprend rien à l'utilisateur). */
   function failure(error: unknown, what: 'audio' | 'image'): Error {
     const message = (error as Error)?.message ?? String(error);
+    if (/media frame timeout/.test(message)) return new Error(t('délai dépassé'));
     if (/decode|EncodingError|InvalidStateError|source image/i.test(message)) return new Error(what === 'audio' ? t('le navigateur intégré n’a pas su lire ce son') : t('le navigateur intégré n’a pas su lire cette image'));
     return new Error(message.split('\n')[0]!);
   }
@@ -458,6 +443,7 @@ export function createConverter() {
     try {
       size = await run(`framesOf(${JSON.stringify(id)}, ${video}, ${JSON.stringify(times)}, ${maxWidth}, ${JSON.stringify(key)})`);
     } catch (error) {
+      for (let i = 0; i < times.length; i++) outputs.delete(`${key}${i}`);
       throw failure(error, 'image');
     }
     const images: RgbaImage[] = [];

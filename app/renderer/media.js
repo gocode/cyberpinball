@@ -89,6 +89,7 @@
   const reported = new Set();
 
   function report(view, message, details = {}) {
+    if (message?.includes('PIPELINE_ERROR_DISCONNECTED')) return;
     if (!view?.url || reported.has(view.url)) return;
     reported.add(view.url);
     try {
@@ -323,6 +324,9 @@
 
     function retire(slot) {
       slots.delete(slot);
+      clearTimeout(slot.timer);
+      clearTimeout(slot.retryTimer);
+      slot.detach?.();
       slot.handle?.destroy?.();
       if (slot.media && slot.url && slot.media.tagName !== 'CANVAS') release(slot.url, slot.media);
       slot.node.remove();
@@ -449,9 +453,23 @@
       };
       const failed = () => {
         if (!slots.has(slot)) return;
+        // Après une panne du service GPU, le fichier n'est pas devenu illisible. Une seule
+        // reprise, avec un nouveau décodeur ; un second échec garde le repli sans boucle.
+        if (media.tagName === 'VIDEO' && media.error?.message?.includes('PIPELINE_ERROR_DISCONNECTED') && !slot.retried) {
+          slot.retried = true;
+          slot.retryTimer = setTimeout(() => {
+            if (!slots.has(slot) || slot !== current) return;
+            media.addEventListener('loadeddata', ready, { once: true });
+            media.addEventListener('error', failed, { once: true });
+            media.load();
+            play(slot);
+          }, 300);
+          return;
+        }
         if (media.tagName === 'VIDEO') report(view, videoError(media), { code: media.error?.code });
         else report(view, t('Image illisible (fichier abîmé ou format non pris en charge)'), { image: true });
         // Repli, sans garder l'élément illisible en réserve.
+        slot.detach?.();
         slot.media = undefined;
         unload(media);
         pool.delete(view.url);
@@ -459,6 +477,12 @@
         setRotation(frame, 0);
         fitTexts(frame);
         reveal(slot);
+      };
+
+      slot.detach = () => {
+        media.removeEventListener('error', failed);
+        media.removeEventListener('loadeddata', ready);
+        media.removeEventListener('load', ready);
       };
 
       frame.append(media);
