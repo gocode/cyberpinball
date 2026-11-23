@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- La fiche technique cite toutes les cartes graphiques dans son résumé et nomme la carte concernée par chaque alerte de pilote, sans déduire laquelle est utilisée par la partie.
+- Le diagnostic indique les scripts complémentaires que VPX n’a pas pu charger avant les erreurs de variables ou d’objets qui en découlent, uniquement pour la dernière partie de la table concernée.
 - Les gâchettes analogiques des manettes peuvent être relevées comme boutons de l’interface et du jeu, avec leur axe et leur sens reconnus par SDL et transmis à VPX. Les capteurs analogiques des pincabs ne deviennent pas des boutons.
 - Sur un seul écran, l’assistant continue jusqu’au choix du DMD incrusté dans le playfield même si aucun écran n’est disponible pour le backglass.
 - VPX 10.8.0 : lancement sans fenêtre de l’éditeur et sortie avec le bouton Quitter de la borne, même si ce VPX utilise d’autres boutons.

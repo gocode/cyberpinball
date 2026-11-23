@@ -34,7 +34,7 @@ test('tests lents : Electron installé avant, par vérifier comme par avant-fusi
   const shared = fs.readFileSync(path.join(scripts, 'tests-node.mjs'), 'utf8');
   assert.match(shared, /export function ensureElectron\(cwd, say = console\.log\)/);
   assert.match(fs.readFileSync(path.join(scripts, 'verifier.mjs'), 'utf8'), /if \(slow\) ensureElectron\(repo\);[\s\S]*spawnSync\(process\.execPath, args/, 'vérifier (et les tests touchés de fusionner) : avant de lancer');
-  assert.match(fs.readFileSync(path.join(scripts, 'avant-fusion.mjs'), 'utf8'), /ensureElectron\(cwd, say\);[\s\S]*const slow = collectTests/);
+  assert.match(fs.readFileSync(path.join(scripts, 'avant-fusion.mjs'), 'utf8'), /ensureElectron\(cwd, say\);[\s\S]*run\(process\.execPath, \[\.\.\.NODE_TEST_ARGS/);
   // Une seule installation, partagée : plus de copie locale.
   for (const f of fs.readdirSync(scripts).filter((n) => n.endsWith('.mjs') && n !== 'tests-node.mjs')) {
     assert.doesNotMatch(fs.readFileSync(path.join(scripts, f), 'utf8'), /function ensureElectron/, f);

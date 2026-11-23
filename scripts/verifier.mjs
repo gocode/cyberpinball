@@ -89,6 +89,19 @@ export function testsForChanges(changed, tests, sourceOf) {
   });
 }
 
+/** Fichiers changés par la branche depuis `base`, commités ou non (chemins relatifs). */
+export function changedFiles(root = repo, base = 'proto/ecrans') {
+  const diff = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { cwd: root, encoding: 'utf8' });
+  const status = execFileSync('git', ['status', '--porcelain', '-uall'], { cwd: root, encoding: 'utf8' });
+  return [...diff.split('\n'), ...status.split('\n').map((l) => l.slice(3))].map((l) => l.trim()).filter(Boolean);
+}
+
+/** Parmi `tests` (de collectTests), ceux qui importent ou citent un des fichiers `changed`. */
+export function touchedTests(changed, tests, all = tests) {
+  const names = new Set(testsForChanges(changed, tests.map((t) => t.name), (name) => all.find((t) => t.name === name)?.source()));
+  return tests.filter((t) => names.has(t.name));
+}
+
 function parseArgs(argv) {
   const opts = { patterns: [], electron: false, modifies: false, build: true, base: 'proto/ecrans', name: undefined };
   for (let i = 0; i < argv.length; i++) {
@@ -142,12 +155,8 @@ function main() {
   else if (opts.patterns.length) chosen = all.filter((t) => opts.patterns.some((p) => t.name.toLowerCase().includes(p)));
   else chosen = all.filter((t) => !t.slow);
   if (opts.modifies) {
-    const diff = execFileSync('git', ['diff', '--name-only', `${opts.base}...HEAD`], { cwd: repo, encoding: 'utf8' });
-    const status = execFileSync('git', ['status', '--porcelain', '-uall'], { cwd: repo, encoding: 'utf8' });
-    const changed = [...diff.split('\n'), ...status.split('\n').map((l) => l.slice(3))].map((l) => l.trim()).filter(Boolean);
-    const names = new Set(testsForChanges(changed, all.map((t) => t.name), (name) => all.find((t) => t.name === name)?.source()));
     const base = opts.patterns.length || opts.electron ? chosen : all;
-    chosen = base.filter((t) => names.has(t.name));
+    chosen = touchedTests(changedFiles(repo, opts.base), base, all);
   }
   if (!chosen.length) {
     console.log('Aucun fichier de test ne correspond.');

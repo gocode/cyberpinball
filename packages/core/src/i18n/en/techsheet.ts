@@ -2,6 +2,7 @@
 // (packages/core/src/techsheet.ts, app/src/tech-sheet.ts, page du téléphone). Clé : le texte français
 // tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  '{gpu} : pilote du {date}': '{gpu}: driver dated {date}',
   "Français": "French",
   "Anglais": "English",
   "le journal de VPX, dernière partie": "the VPX log, last game",
@@ -147,7 +148,6 @@ export const messages: Record<string, string> = {
   "Carte graphique": "Graphics card",
   "Pilote {version} du {date}": "Driver {version} from {date}",
   "Pilote {version}": "Driver {version}",
-  "Pilote graphique du {date}": "Graphics driver from {date}",
   "Plus de deux ans : un pilote récent du fabricant corrige souvent saccades et écrans noirs.": "More than two years old: a recent driver from the maker often fixes stutter and black screens.",
   "Carte mère": "Motherboard",
   "BIOS {version} du {date}": "BIOS {version} from {date}",

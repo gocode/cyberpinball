@@ -16,6 +16,17 @@ export function scriptRuntimeFinding(file: string, log: string): Finding | undef
     if (key(load.file) !== key(file)) continue;
     const session = lines.slice(load.index, loads[i + 1]?.index ?? lines.length);
     const errors = scriptErrorsDuringGame(session);
+    // GetTextFile échoue avant les variables non définies : le fichier non chargé est la cause observable.
+    const missing = [...new Set(session.flatMap((line) => {
+      const match = /\bScriptGlobalTable::GetTextFile[^\]]*\]\s+Unable to load file:\s*(.+?)\s*$/i.exec(line);
+      return match ? [match[1]!] : [];
+    }))];
+    if (missing.length) return {
+      code: 'scriptRuntimeError',
+      severity: 'warning',
+      title: t('Script complémentaire non chargé'),
+      detail: t('VPX n’a pas pu charger : {files}. Vérifiez les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.', { files: missing.slice(0, 8).map((file) => file.slice(0, 160)).join(', ') }),
+    };
     // Un chargement sans joueur est une extraction ou l'éditeur : il n'efface pas la dernière partie.
     if (!errors.length && !session.some((line) => /\bStarting script\b|\bStartup done\b/.test(line))) continue;
     if (!errors.length) return undefined;

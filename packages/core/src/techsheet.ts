@@ -379,7 +379,7 @@ function pcBlock(f: TechFacts, now: number): TechBlock {
       detail: g.driver ? (g.driverDate ? t('Pilote {version} du {date}', { version: g.driver, date: day(g.driverDate)! }) : t('Pilote {version}', { version: g.driver })) : undefined,
       ...(old && { state: 'check' as const }),
     });
-    if (old) notes.push({ state: 'check', title: t('Pilote graphique du {date}', { date: day(g.driverDate)! }), detail: t('Plus de deux ans : un pilote récent du fabricant corrige souvent saccades et écrans noirs.') });
+    if (old) notes.push({ state: 'check', title: t('{gpu} : pilote du {date}', { gpu: g.name, date: day(g.driverDate)! }), detail: t('Plus de deux ans : un pilote récent du fabricant corrige souvent saccades et écrans noirs.') });
   }
   if (!pc.gpus?.length) rows.push({ label: t('Carte graphique'), value: NOT_READ(), state: 'quiet' });
   if (pc.board) rows.push({ label: t('Carte mère'), value: joined([pc.board.maker, pc.board.model]), detail: pc.board.bios ? (pc.board.biosDate ? t('BIOS {version} du {date}', { version: pc.board.bios, date: day(pc.board.biosDate)! }) : t('BIOS {version}', { version: pc.board.bios })) : undefined });
@@ -396,7 +396,7 @@ function pcBlock(f: TechFacts, now: number): TechBlock {
     };
   });
   const sections: TechBlock['sections'] = disks.length ? [{ title: t('Disques'), rows: disks }, { title: t('Matériel'), rows }] : [{ rows }];
-  const essentials = [pc.cpu && shortCpu(pc.cpu.name), pc.memory && gb(pc.memory.total), pc.gpus?.[0]?.name.replace(/^NVIDIA\s+/i, '')].filter((s): s is string => Boolean(s));
+  const essentials = [pc.cpu && shortCpu(pc.cpu.name), pc.memory && gb(pc.memory.total), ...(pc.gpus ?? []).map((g) => g.name.replace(/^NVIDIA\s+/i, ''))].filter((s): s is string => Boolean(s));
   if (disks.some((d) => d.state === 'check')) notes.push({ state: 'check', title: t('Disque presque plein'), detail: t('Moins de 10 Go libres : une table, un PuP-Pack ou une mise à jour peut ne plus tenir.') });
   return block('pc', t('PC'), 'chip', sections, notes, essentials);
 }
@@ -673,7 +673,7 @@ export function pcLines(facts: PcHealthFacts, now = Date.now()): HealthLine[] {
     lines.push({
       check: 'pc',
       state: old ? 'check' : 'ok',
-      title: t('Pilote graphique du {date}', { date: day(g.driverDate)! }),
+      title: t('{gpu} : pilote du {date}', { gpu: g.name, date: day(g.driverDate)! }),
       ...(old && { detail: t('Plus de deux ans : installez le pilote récent du fabricant de la carte.') }),
       go: go('pc'),
       target: SHEET('pc'),

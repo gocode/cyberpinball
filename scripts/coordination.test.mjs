@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, expectedSuiteMs, imminent, liveEntries, readJson, tryLock, writeJson } from './coordination.mjs';
-import { ATTENTE_MAX_MS, publicationPlan, publicationRetry, worthWaiting } from './publication-groupee.mjs';
+import { ATTENTE_MAX_MS, dropMerge, enqueueMerge, pickSuspects, publicationPlan, publicationRetry, readMergeQueue, trainStatus, worthWaiting } from './publication-groupee.mjs';
 import { failedFiles, failureDetails, totals } from './sortie-tests.mjs';
 import { problemLines } from './controles.mjs';
 
@@ -105,6 +105,45 @@ test('places de vérification : trois par défaut ; quand toutes sont prises, la
     assert.ok(c, 'une place libérée est reprise');
     b();
     c();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('train : une entrée par branche dans la file, au dernier commit vérifié ; retirée une fois lue', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-file-fusion-'));
+  try {
+    enqueueMerge({ branche: 'a', head: 'aaa' }, dir);
+    enqueueMerge({ branche: 'b', head: 'bbb' }, dir);
+    enqueueMerge({ branche: 'a', head: 'aaa2' }, dir);
+    assert.deepEqual(readMergeQueue(dir).map((e) => [e.branche, e.head, e.etat]), [['b', 'bbb', 'en-file'], ['a', 'aaa2', 'en-file']]);
+    dropMerge('b', dir);
+    assert.deepEqual(readMergeQueue(dir).map((e) => e.branche), ['a']);
+    assert.equal(fs.existsSync(path.join(dir, 'a-fusionner.json.lock')), false, 'verrou de la file rendu');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('train rouge : la branche qui touche le test en échec est désignée ; sinon tout le lot', () => {
+  const merges = [
+    { branche: 'roue', tests: ['roue.test.js', 'ecrans-rapides.test.js'] },
+    { branche: 'son', tests: ['jukebox-app.test.js'] },
+    { branche: 'doc', tests: [] },
+  ];
+  assert.deepEqual(pickSuspects(['D:\\x\\packages\\core\\dist\\test\\roue.test.js'], merges), { suspects: ['roue'], certain: true });
+  assert.deepEqual(pickSuspects(['compilation'], merges), { suspects: ['roue', 'son', 'doc'], certain: false });
+  assert.deepEqual(pickSuspects(['x.test.js'], []), { suspects: [], certain: false });
+});
+
+test('train rouge : chaque session le lit (échecs, branches en cause) ; vert : rien à dire', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-train-etat-'));
+  try {
+    assert.equal(trainStatus(dir), undefined);
+    writeJson(path.join(dir, 'train-etat.json'), { etat: 'rouge', sha: '0123456789abcdef', date: at(0), echecs: ['roue.test.js'], suspects: ['roue'], suspectsCertains: true });
+    assert.match(trainStatus(dir), /rouge sur proto\/ecrans[\s\S]*01234567[\s\S]*roue\.test\.js[\s\S]*en cause : roue/);
+    writeJson(path.join(dir, 'train-etat.json'), { etat: 'vert', sha: 'x', date: at(0) });
+    assert.equal(trainStatus(dir), undefined);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

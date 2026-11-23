@@ -80,4 +80,22 @@ test('verifier : la suite rapide et test:electron se partagent tous les tests, l
   assert.match(read('controles.mjs'), /traductions\.mjs/, 'les traductions aussi');
   assert.match(read('avant-fusion.mjs'), /runControles\(/, 'avant-fusion commence par les contrôles express');
   assert.match(read('fusionner.mjs'), /runControles\(|runAvantFusion\(/, 'fusionner vérifie avant de fusionner');
+  // Train de fusion (23/11/2026) : la suite lente complète une fois par préversion, sur proto/ecrans,
+  // avant la publication ; jamais une préversion sans elle.
+  const train = read('publication-groupee.mjs');
+  assert.match(train, /runAvantFusion\(\{ cwd: main, say, complete: true, train: true \}\)[\s\S]*publish\(main, args/, 'la suite complète avant la publication');
+  assert.match(train, /if \(!result\.ok\) \{[\s\S]*return 1;/, 'suite rouge : pas de préversion');
+});
+
+test('vérification de branche : seulement les tests lents que la branche touche ; la suite complète, tous', async () => {
+  const { slowTestsFor } = await import('./avant-fusion.mjs');
+  const t = (name, slow, source = '') => ({ name, slow, source: () => source });
+  const all = [
+    t('roue.test.js', true, "import '../../../app/dist/library.js'"),
+    t('assistant.test.js', true, "import { wizard } from './wizard'"),
+    t('rapide.test.js', false, "import '../library'"),
+  ];
+  assert.deepEqual(slowTestsFor(all, { complete: true }).map((x) => x.name), ['roue.test.js', 'assistant.test.js']);
+  assert.deepEqual(slowTestsFor(all, { complete: false, changed: ['app/src/library.ts'] }).map((x) => x.name), ['roue.test.js']);
+  assert.deepEqual(slowTestsFor(all, { complete: false, changed: ['app/src/nouvelle-fonction.ts'] }), []);
 });

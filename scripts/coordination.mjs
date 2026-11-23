@@ -5,11 +5,16 @@
 //   file.json        : une entrée par branche en route vers une fusion (suite de tests, intégration,
 //                      attente du verrou…), avec sa fin prévue ; lue par la publication groupée pour
 //                      attendre les fusions imminentes (scripts/publication-groupee.mjs)
-//   durees.json      : durées mesurées des suites complètes, pour prévoir la fin des suivantes
-//   instables.json   : tests tombés dans la suite complète puis passés seuls (scripts/avant-fusion.mjs)
-//   certificats\     : dernière suite complète verte de chaque branche (scripts/fusionner.mjs)
-//   suite-<n>.lock   : places des vérifications complètes (deux à la fois par défaut, avant-fusion.mjs)
-//   chef-publication.lock : une seule publication groupée à la fois
+//   durees.json      : durées mesurées des suites complètes (train), pour prévoir la fin des suivantes
+//   durees-branche.json : durées des vérifications de branche (contrôles et tests lents touchés)
+//   instables.json   : tests tombés dans une suite puis passés seuls (scripts/avant-fusion.mjs)
+//   certificats\     : dernière vérification verte de chaque branche (scripts/fusionner.mjs)
+//   suite-<n>.lock   : places des vérifications (trois à la fois par défaut, avant-fusion.mjs)
+//   chef-publication.lock : le train de fusion (un seul à la fois, scripts/publication-groupee.mjs)
+//   a-fusionner.json : branches vérifiées que le train doit fusionner (commit exact vérifié)
+//   fusions.json     : fusions faites par le train, pour désigner les suspectes d'une suite rouge
+//   train-etat.json  : dernier résultat de la suite complète sur proto/ecrans (vert ou rouge)
+//   train.txt        : journal du train (il tourne détaché des sessions)
 //
 // Pourquoi (relevé du 21/11/2026, 30 sessions, 3 jours) : 69 suites complètes, 58 en échec, souvent
 // parce que trois sessions la lançaient en même temps (5 à 17 min la suite, délais dépassés) ; et
@@ -157,20 +162,36 @@ export function withdraw(branche, dir = coordinationDir()) {
 // ---------------------------------------------------------------- durées des suites complètes
 
 /** Médiane des dernières durées mesurées (ms), sinon la valeur par défaut. */
-export function expectedSuiteMs(durations) {
+export function expectedSuiteMs(durations, fallback = DUREE_SUITE_DEFAUT_MS) {
   const last = durations.slice(-10).map((d) => d.ms).filter((ms) => ms > 0).sort((a, b) => a - b);
-  if (!last.length) return DUREE_SUITE_DEFAUT_MS;
+  if (!last.length) return fallback;
   return last[Math.floor(last.length / 2)];
 }
 
-export function readDurations(dir = coordinationDir()) {
-  return readJson(path.join(dir, 'durees.json'), []);
+/** `name` : durees.json (suites complètes, celles du train) ou durees-branche.json (vérifications de branche). */
+export function readDurations(dir = coordinationDir(), name = 'durees.json') {
+  return readJson(path.join(dir, name), []);
 }
 
-export function recordDuration(ms, dir = coordinationDir()) {
-  const list = readDurations(dir);
+export function recordDuration(ms, dir = coordinationDir(), name = 'durees.json') {
+  const list = readDurations(dir, name);
   list.push({ ms, date: new Date().toISOString() });
-  writeJson(path.join(dir, 'durees.json'), list.slice(-30));
+  writeJson(path.join(dir, name), list.slice(-30));
+}
+
+// ---------------------------------------------------------------- dossier principal
+
+/**
+ * Ce qui empêche d'écrire dans le dossier principal maintenant (texte), ou undefined : fabrication
+ * en cours, fusion à moitié faite, autre branche, modifications non commitées.
+ */
+export function mainBusy(main) {
+  const fabrication = lockHolder(path.join(main, 'release', '.fabrication.lock'));
+  if (fabrication) return `publication en cours de fabrication (processus ${fabrication.pid})`;
+  if (fs.existsSync(path.join(main, '.git', 'MERGE_HEAD'))) return 'une fusion à moitié faite dans le dossier principal (MERGE_HEAD)';
+  if (currentBranch(main) !== BASE) return `le dossier principal n'est pas sur ${BASE}`;
+  if (git(['status', '--porcelain', '--untracked-files=no'], main)) return 'des modifications non commitées dans le dossier principal';
+  return undefined;
 }
 
 // ---------------------------------------------------------------- certificats de suite verte

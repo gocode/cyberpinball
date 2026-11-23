@@ -1,5 +1,7 @@
 // Catalogue anglais : tables. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Script complémentaire non chargé': 'Companion script not loaded',
+  'VPX n’a pas pu charger : {files}. Vérifiez les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.': 'VPX could not load: {files}. Check the scripts supplied with this version of the table and with VPX. Subsequent variable or object errors may follow from this failure.',
   'Erreur du script pendant la dernière partie': 'Script error during the last game',
   'Première erreur, ligne {line} : « {message} ». {count} Les erreurs suivantes peuvent en découler.':
     'First error, line {line}: “{message}”. {count} Subsequent errors may result from it.',

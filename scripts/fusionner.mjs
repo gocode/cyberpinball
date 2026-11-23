@@ -1,5 +1,5 @@
 // Fin de branche en une commande, depuis le worktree de la branche :
-//   npm run fusionner                 -> vérifie, fusionne dans proto/ecrans, publie (groupé)
+//   npm run fusionner                 -> vérifie la branche, la confie au train (fusion puis préversion)
 //   npm run fusionner -- --leger      -> idem, la préversion refait les installeurs (Electron ou exécutable changés)
 //   npm run fusionner -- --sans-publier
 //
@@ -7,42 +7,151 @@
 // 1. Arbre propre exigé (tout est commité).
 // 2. Intégration de proto/ecrans dans la branche ; npm ci si le lockfile a changé. Conflit : arrêt,
 //    la session le résout, commite et relance.
-// 3. Tests : si la dernière suite complète verte de la branche porte sur le même travail (certificat
-//    d'avant-fusion), seulement les contrôles express et les tests lents touchés par la branche ;
-//    sinon la vérification complète (scripts/avant-fusion.mjs).
-// 4. Attente de la voie libre dans le dossier principal : pas de fabrication ni de publication en
-//    cours, pas de fusion à moitié faite (MERGE_HEAD), arbre propre, sur proto/ecrans.
-// 5. git merge --ff-only. Si proto/ecrans a bougé entre-temps : retour à l'étape 2, d'office.
-// 6. Publication groupée (scripts/publication-groupee.mjs) : elle attend les fusions imminentes des
-//    autres sessions, ou laisse celle déjà en attente emporter cette fusion.
+// 3. Vérification de branche : contrôles express et tests lents touchés par la branche
+//    (scripts/avant-fusion.mjs). Si une vérification verte porte déjà sur le même travail (certificat),
+//    seulement les contrôles sans tests et les tests touchés.
+// 4. La branche, au commit vérifié, est confiée au train de fusion (scripts/publication-groupee.mjs),
+//    lancé détaché s'il ne tourne pas : il la fusionne dans proto/ecrans, passe la suite complète une
+//    fois pour tout le lot, puis publie la préversion.
+// 5. La session attend la fusion quelques secondes ; si le train est occupé (suite complète ou
+//    fabrication), elle s'arrête sur « en file » : le train fusionnera la branche juste après.
 //
-// Pourquoi : chaque session réécrivait ces étapes en longues commandes PowerShell (erreurs de syntaxe,
-// « Not possible to fast-forward », verrou oublié, suite complète relancée après chaque intégration).
+// Pourquoi (23/11/2026) : chaque session passait la suite lente complète (11 à 22 min à plusieurs),
+// attendait la fabrication pour fusionner, puis la publication : 25 à 40 min pour une petite
+// modification, et une session IA qui attend tout ce temps.
 
-import * as fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  BASE, DUREE_FUSION_MS, REPO, announce, coordinationDir, currentBranch, git, lockHolder, mainDir, readCertificate, sleep, withdraw, workFingerprint,
+  BASE, DUREE_FUSION_MS, REPO, announce, coordinationDir, currentBranch, git, mainDir, readCertificate, sleep, withdraw, workFingerprint,
 } from './coordination.mjs';
 import { printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport } from './sortie-tests.mjs';
 import { runAvantFusion } from './avant-fusion.mjs';
-import { publishGrouped, requestLeger } from './publication-groupee.mjs';
+import { dropMerge, enqueueMerge, launchTrain, readMergeQueue, requestLeger, trainHolder, trainStatus } from './publication-groupee.mjs';
 
 const iso = (ms) => new Date(ms).toISOString();
-const VOIE_LIBRE_MAX_MS = 30 * 60_000;
+const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+/** Attente de la fusion par le train quand il est libre ; au-delà, la session s'arrête sur « en file ». */
+const ATTENTE_FUSION_MS = 3 * 60_000;
 
-/** Ce qui empêche de fusionner dans le dossier principal maintenant (texte), ou undefined. */
-export function mainBlocker(main, dir) {
-  const fabrication = lockHolder(path.join(main, 'release', '.fabrication.lock'));
-  if (fabrication) return `publication en cours de fabrication (processus ${fabrication.pid})`;
-  const chef = lockHolder(path.join(dir, 'chef-publication.lock'));
-  if (chef?.etat === 'publication') return `publication groupée en cours (${chef.branche ?? '?'})`;
-  if (fs.existsSync(path.join(main, '.git', 'MERGE_HEAD'))) return 'une fusion à moitié faite dans le dossier principal (MERGE_HEAD)';
-  if (currentBranch(main) !== BASE) return `le dossier principal n'est pas sur ${BASE}`;
-  if (git(['status', '--porcelain', '--untracked-files=no'], main)) return 'des modifications non commitées dans le dossier principal';
-  return undefined;
+const isAncestor = (sha, ref, cwd) => spawnSync('git', ['merge-base', '--is-ancestor', sha, ref], { cwd, windowsHide: true }).status === 0;
+
+/** Vérifie la branche (intégration de proto/ecrans comprise). Rend true si elle est prête. */
+async function verifier({ cwd, dir, branche, say }) {
+  announce({ branche, etape: 'integration', finPrevue: iso(Date.now() + DUREE_FUSION_MS) }, dir);
+  const before = git(['rev-parse', 'HEAD'], cwd);
+  const merge = await run('git', ['merge', '--no-edit', BASE], { cwd });
+  if (merge.code !== 0) {
+    const conflicts = git(['diff', '--name-only', '--diff-filter=U'], cwd);
+    say(`Conflit en intégrant ${BASE} :\n${conflicts.split('\n').map((f) => `  - ${f}`).join('\n')}\nRésous, commite (git commit --no-edit), puis relance npm run fusionner.`);
+    return false;
+  }
+  const after = git(['rev-parse', 'HEAD'], cwd);
+  if (before !== after) {
+    say(`${BASE} intégré (${git(['log', '-1', '--format=%s', BASE], cwd)}).`);
+    const changed = git(['diff', '--name-only', before, after], cwd).split('\n');
+    if (changed.includes('package-lock.json')) {
+      say('Le lockfile a changé : npm ci…');
+      const npmArgs = ['ci', '--prefer-offline', '--no-audit', '--no-fund'];
+      // Sous npm run, npm_execpath désigne npm-cli.js : pas de shell. Sinon, npm par le shell (npm.cmd).
+      const ci = process.env.npm_execpath
+        ? await run(process.execPath, [process.env.npm_execpath, ...npmArgs], { cwd, log: path.join(cwd, 'tmp', 'fusionner-npm-ci.txt') })
+        : await run('npm', npmArgs, { cwd, log: path.join(cwd, 'tmp', 'fusionner-npm-ci.txt'), shell: true });
+      if (ci.code !== 0) {
+        say('npm ci a échoué : voir tmp/fusionner-npm-ci.txt.');
+        return false;
+      }
+    }
+  }
+  const cert = readCertificate(branche, dir);
+  const head = git(['rev-parse', 'HEAD'], cwd);
+  if (cert && cert.head === head) {
+    say('Vérification verte sur ce commit même : rien à revérifier.');
+    return true;
+  }
+  if (cert && cert.empreinte === workFingerprint(cwd)) {
+    // Le travail est celui de la vérification verte ; seul proto/ecrans a changé : contrôles sans
+    // tests, puis les tests touchés par la branche.
+    say('Vérification déjà verte pour ce travail : contrôles sans tests, puis les tests touchés par la branche.');
+    const controles = await runControles({ cwd, say, tests: false });
+    printControles(controles, say);
+    if (!controles.ok) return false;
+    const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-touches.txt'), timeoutMs: 15 * 60_000 });
+    if (touched.code === 0) return true;
+    // Relance à part des seuls fichiers en échec, jamais une suite complète.
+    const failing = [...new Set([...failedFiles(touched.out), ...touched.hung])];
+    if (!failing.length) {
+      say('Tests touchés en échec sans fichier identifiable (tmp/fusionner-touches.txt).');
+      return false;
+    }
+    const { failures } = await rerunAlone(failing, { cwd, say, prefix: 'fusionner-relance' });
+    if (failures.length) {
+      say(`Échecs confirmés :\n${failures.map((f) => `  ${f.file}\n${shortReport(f.details, 6)}`).join('\n')}`);
+      return false;
+    }
+    return true;
+  }
+  if (cert) say('Le travail a changé depuis la dernière vérification verte : nouvelle vérification.');
+  const result = await runAvantFusion({ cwd, say });
+  return result.ok;
+}
+
+/**
+ * La branche est en file : le train est lancé s'il ne tourne pas, puis la session attend la fusion,
+ * tant que le train est libre et au plus ATTENTE_FUSION_MS. Rend le code de sortie.
+ */
+export async function confier({ dir, main, branche, head, say, publier = true, wait = ATTENTE_FUSION_MS }) {
+  const started = Date.now();
+  let launches = 0;
+  let lastLaunch = 0;
+  let toldOld = false;
+  for (;;) {
+    const entry = readMergeQueue(dir).find((e) => e.branche === branche);
+    if (entry?.etat === 'conflit') {
+      dropMerge(branche, dir);
+      say(`Conflit avec ce qui vient d'arriver sur ${BASE} : ${(entry.fichiers ?? []).join(', ')}. Rien n'a été fusionné : relance npm run fusionner (il intègre ${BASE}, tu résous, tu commites, tu relances).`);
+      return 1;
+    }
+    if (entry?.etat === 'erreur') {
+      dropMerge(branche, dir);
+      say(`Le train n'a pas pu fusionner la branche :\n${entry.message ?? '?'}`);
+      return 1;
+    }
+    if (!entry && isAncestor(head, BASE, main)) {
+      say(`Fusionnée dans ${BASE} (${git(['log', '-1', '--format=%h %s', BASE], main)}).`);
+      say(`Le train passe maintenant la suite complète${publier ? ' puis publie la préversion' : ''} (journal : .git/coordination/train.txt). Un problème sera affiché par la prochaine npm run fusionner. Rien d'autre à faire ici.`);
+      return 0;
+    }
+    if (!entry) {
+      say(`La branche n'est plus dans la file du train mais ${head.slice(0, 8)} n'est pas dans ${BASE} : relance npm run fusionner.`);
+      return 1;
+    }
+    const holder = trainHolder(dir);
+    if (!holder) {
+      // Pas de train (ou il vient de finir sans voir cette branche) : on le lance, deux fois au plus.
+      if (Date.now() - lastLaunch > 20_000) {
+        if (launches >= 2) {
+          say('Le train ne démarre pas : la branche reste en file. Lance npm run publication-groupee depuis le dossier principal, puis regarde .git/coordination/train.txt.');
+          return 1;
+        }
+        const pid = launchTrain(main, { args: publier ? [] : ['--sans-publier'], dir });
+        say(`Train lancé (processus ${pid}, détaché : il continue sans cette session).`);
+        launches++;
+        lastLaunch = Date.now();
+      }
+    } else if (!holder.phase) {
+      // Publication groupée d'avant le train (sans file des fusions) : sa fin, puis le train.
+      if (!toldOld) say(`Une publication groupée d'avant le train tourne (processus ${holder.pid}) : j'attends sa fin pour lancer le train.`);
+      toldOld = true;
+    } else if (['verification', 'fabrication'].includes(holder.phase) || Date.now() - started > wait) {
+      const fin = holder.finPrevue ? `, fin prévue vers ${hhmm(holder.finPrevue)}` : '';
+      say(`En file : le train est occupé (${holder.phase === 'verification' ? 'suite complète' : holder.phase === 'fabrication' ? 'fabrication de la préversion' : holder.phase ?? '?'}${fin}). Il fusionnera ${branche} (${head.slice(0, 8)}) juste après${publier ? ', puis la publiera' : ''}. Rien d'autre à faire ici ; ne recommite pas sur cette branche d'ici là (un nouveau commit demande un nouveau npm run fusionner).`);
+      return 0;
+    }
+    await sleep(3000);
+  }
 }
 
 export async function fusionner({ cwd = REPO, say = console.log, leger = false, publier = true } = {}) {
@@ -50,125 +159,34 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
   const main = mainDir(cwd);
   const branche = currentBranch(cwd);
   if (!branche || branche === BASE || path.resolve(cwd) === path.resolve(main)) {
-    say(`Lancez npm run fusionner depuis le worktree de la branche à fusionner (ici : ${branche || 'HEAD détachée'}, ${cwd}).`);
+    say(`Lance npm run fusionner depuis le worktree de la branche à fusionner (ici : ${branche || 'HEAD détachée'}, ${cwd}).`);
     return 1;
   }
   if (git(['status', '--porcelain', '--untracked-files=no'], cwd)) {
-    say('Des modifications ne sont pas commitées : commitez-les (ou mettez-les de côté), puis relancez.');
+    say('Des modifications ne sont pas commitées : commite-les (ou mets-les de côté), puis relance.');
     return 1;
   }
+  const status = trainStatus(dir);
+  if (status) say(`${status}\n`);
+  const previous = readMergeQueue(dir).find((e) => e.branche === branche);
+  if (previous?.etat === 'en-file' && previous.head === git(['rev-parse', 'HEAD'], cwd)) {
+    say('Cette branche est déjà dans la file du train, à ce commit.');
+    return confier({ dir, main, branche, head: previous.head, say, publier });
+  }
+  if (previous) dropMerge(branche, dir);
   try {
-    for (let round = 1; round <= 5; round++) {
-      announce({ branche, etape: 'integration', finPrevue: iso(Date.now() + DUREE_FUSION_MS) }, dir);
-      // 2. Intégration de proto/ecrans.
-      const before = git(['rev-parse', 'HEAD'], cwd);
-      const merge = await run('git', ['merge', '--no-edit', BASE], { cwd });
-      if (merge.code !== 0) {
-        const conflicts = git(['diff', '--name-only', '--diff-filter=U'], cwd);
-        say(`Conflit en intégrant ${BASE} :\n${conflicts.split('\n').map((f) => `  - ${f}`).join('\n')}\nRésolvez, commitez (git commit --no-edit), puis relancez npm run fusionner.`);
-        withdraw(branche, dir);
-        return 1;
-      }
-      const after = git(['rev-parse', 'HEAD'], cwd);
-      if (before !== after) {
-        say(`${BASE} intégré (${git(['log', '-1', '--format=%s', BASE], cwd)}).`);
-        const changed = git(['diff', '--name-only', before, after], cwd).split('\n');
-        if (changed.includes('package-lock.json')) {
-          say('Le lockfile a changé : npm ci…');
-          const npmArgs = ['ci', '--prefer-offline', '--no-audit', '--no-fund'];
-          // Sous npm run, npm_execpath désigne npm-cli.js : pas de shell. Sinon, npm par le shell (npm.cmd).
-          const ci = process.env.npm_execpath
-            ? await run(process.execPath, [process.env.npm_execpath, ...npmArgs], { cwd, log: path.join(cwd, 'tmp', 'fusionner-npm-ci.txt') })
-            : await run('npm', npmArgs, { cwd, log: path.join(cwd, 'tmp', 'fusionner-npm-ci.txt'), shell: true });
-          if (ci.code !== 0) {
-            say('npm ci a échoué : voir tmp/fusionner-npm-ci.txt.');
-            withdraw(branche, dir);
-            return 1;
-          }
-        }
-      }
-      // 3. Tests.
-      const cert = readCertificate(branche, dir);
-      const head = git(['rev-parse', 'HEAD'], cwd);
-      if (cert && cert.head === head) {
-        say('Suite complète verte sur ce commit même : rien à revérifier.');
-      } else if (cert && cert.empreinte === workFingerprint(cwd)) {
-        // Le travail est celui de la suite verte ; seul proto/ecrans a changé. Pas de nouvelle passe
-        // complète (21/11/2026 : refaire les 360 fichiers rapides à chaque fusion, hors verrou,
-        // prenait 8 minutes sur une machine chargée) : contrôles sans tests, puis les tests touchés.
-        say('Suite complète déjà verte pour ce travail : contrôles sans tests, puis les tests touchés par la branche.');
-        const controles = await runControles({ cwd, say, tests: false });
-        printControles(controles, say);
-        if (!controles.ok) {
-          withdraw(branche, dir);
-          return 1;
-        }
-        const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-touches.txt'), timeoutMs: 15 * 60_000 });
-        if (touched.code !== 0) {
-          // Relance à part des seuls fichiers en échec, jamais une suite complète : le 21/11/2026,
-          // telecommande (instable connu) relançait 11 puis 8 minutes de suite à chaque réintégration.
-          const failing = [...new Set([...failedFiles(touched.out), ...touched.hung])];
-          if (!failing.length) {
-            say('Tests touchés en échec sans fichier identifiable (tmp/fusionner-touches.txt).');
-            withdraw(branche, dir);
-            return 1;
-          }
-          const { failures } = await rerunAlone(failing, { cwd, say, prefix: 'fusionner-relance' });
-          if (failures.length) {
-            say(`Échecs confirmés :\n${failures.map((f) => `  ${f.file}\n${shortReport(f.details, 6)}`).join('\n')}`);
-            withdraw(branche, dir);
-            return 1;
-          }
-        }
-      } else {
-        if (cert) say('Le travail a changé depuis la dernière suite verte : vérification complète.');
-        const full = await runAvantFusion({ cwd, say });
-        if (!full.ok) return 1;
-      }
-      announce({ branche, etape: 'attente-verrou', finPrevue: iso(Date.now() + 60_000) }, dir);
-      // 4. Voie libre dans le dossier principal.
-      const waitStart = Date.now();
-      let last;
-      for (;;) {
-        const blocker = mainBlocker(main, dir);
-        if (!blocker) break;
-        if (Date.now() - waitStart > VOIE_LIBRE_MAX_MS) {
-          say(`Fusion impossible depuis ${VOIE_LIBRE_MAX_MS / 60_000} min : ${blocker}. Rien n'a été fusionné.`);
-          withdraw(branche, dir);
-          return 1;
-        }
-        if (blocker !== last) say(`J'attends : ${blocker}.`);
-        last = blocker;
-        // Toujours annoncée comme imminente : la publication groupée qui suit l'attendra.
-        announce({ branche, etape: 'attente-verrou', finPrevue: iso(Date.now() + 60_000) }, dir);
-        await sleep(10_000);
-      }
-      // 5. Fusion.
-      const ff = await run('git', ['merge', '--ff-only', branche], { cwd: main });
-      if (ff.code === 0) {
-        announce({ branche, etape: 'fusionnee', finPrevue: iso(Date.now()) }, dir);
-        say(`Fusionnée dans ${BASE} : ${git(['log', '-1', '--format=%h %s', BASE], main)}.`);
-        break;
-      }
-      if (round === 5) {
-        say(`${BASE} bouge sans cesse : fusion abandonnée après 5 essais.\n${ff.out.trim()}`);
-        withdraw(branche, dir);
-        return 1;
-      }
-      say(`${BASE} a bougé pendant la vérification : nouvelle intégration (essai ${round + 1}).`);
-    }
+    const ok = await verifier({ cwd, dir, branche, say });
+    withdraw(branche, dir);
+    if (!ok) return 1;
   } catch (error) {
     withdraw(branche, dir);
     throw error;
   }
-  // 6. Publication groupée.
+  const head = git(['rev-parse', 'HEAD'], cwd);
   if (leger) requestLeger(branche, dir);
-  withdraw(branche, dir);
-  if (!publier) {
-    say('Publication non lancée (--sans-publier) : la prochaine publication groupée emportera cette fusion.');
-    return 0;
-  }
-  return publishGrouped({ cwd, say, branche });
+  enqueueMerge({ branche, head }, dir);
+  say(`Vérifiée : ${branche} (${head.slice(0, 8)}) confiée au train de fusion.`);
+  return confier({ dir, main, branche, head, say, publier });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- The tech sheet lists all graphics cards in its summary and names the card concerned by each driver warning, without assuming which one the game uses.
+- The diagnosis shows companion scripts that VPX could not load before subsequent variable or object errors, only for the last game of the relevant table.
 - Analog gamepad triggers can be assigned to front-end and game buttons, with their SDL axis and direction passed through to VPX. Cabinet analog sensors are not treated as buttons.
 - On a single display, the wizard continues to the embedded playfield DMD option even when no display is available for the backglass.
 - VPX 10.8.0: launch without the editor window and exit with the cabinet’s Quit button even when this VPX uses different button mappings.

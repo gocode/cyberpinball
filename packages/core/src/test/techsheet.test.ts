@@ -125,7 +125,7 @@ test('fiche : contrôles du PC pour la santé, chacun vers son bloc', () => {
       ['check', 'Playfield à 60 Hz, il annonce jusqu’à 144 Hz'],
       ['check', 'Redémarrage de Windows en attente'],
       ['ok', 'Alimentation : Utilisation normale'],
-      ['ok', 'Pilote graphique du 05/12/2024'],
+      ['ok', 'NVIDIA GeForce RTX 3060 Ti : pilote du 05/12/2024'],
     ],
   );
   // Économie d'énergie, pilote de plus de deux ans, moins de 8 Go : à vérifier.
@@ -134,6 +134,31 @@ test('fiche : contrôles du PC pour la santé, chacun vers son bloc', () => {
   // La santé place le groupe juste après l'espace disque.
   const health: HealthFacts = { at: '2026-11-11T13:30:00Z', disks: [], pc: pcHealthFacts(facts()), vpx: { installed: '10.8.1' } };
   assert.equal(healthLines(health)[0]!.check, 'pc');
+});
+
+test('fiche : toutes les cartes restent dans le résumé et chaque alerte désigne son pilote', () => {
+  const f = facts();
+  f.pc!.gpus = [
+    { name: 'Intel UHD Graphics 630', driver: '27.20.100.9000', driverDate: '2020-12-01' },
+    { name: 'NVIDIA GeForce RTX 3060 Ti', driver: '581.00', driverDate: '2026-10-01', memory: 8 * 1024 ** 3 },
+  ];
+  const now = Date.parse('2026-11-11');
+  const pc = techBlocks(f, now)[0]!;
+  assert.match(pc.summary, /Intel UHD Graphics 630/);
+  assert.match(pc.summary, /GeForce RTX 3060 Ti/);
+  assert.equal(pc.notes.filter((n) => /pilote/.test(n.title)).length, 1);
+  assert.match(pc.notes.find((n) => /pilote/.test(n.title))!.title, /Intel UHD Graphics 630/);
+  const drivers = pcLines(pcHealthFacts(f), now).filter((line) => /pilote/.test(line.title));
+  assert.deepEqual(drivers.map((line) => [line.state, line.title]), [
+    ['check', 'Intel UHD Graphics 630 : pilote du 01/12/2020'],
+    ['ok', 'NVIDIA GeForce RTX 3060 Ti : pilote du 01/10/2026'],
+  ]);
+  // L'ordre de l'inventaire ne désigne pas une carte utilisée par VPX ou par le front-end.
+  f.pc!.gpus.reverse();
+  const reversed = techBlocks(f, now)[0]!;
+  assert.match(reversed.summary, /Intel UHD Graphics 630/);
+  assert.match(reversed.summary, /GeForce RTX 3060 Ti/);
+  assert.doesNotMatch(reversed.summary, /utilisée|active|principale/);
 });
 
 test('fiche : six blocs, l’état de chacun écrit, les points à vérifier dans le résumé', () => {
