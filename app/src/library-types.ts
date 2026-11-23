@@ -144,6 +144,8 @@ export interface LibraryHost {
   recordableRoles?(): RecordedRole[];
   /** Journal de VPX (vpinball.log), lu par le médecin pour les PuP-Packs. */
   vpxLogFile?(): string | undefined;
+  /** Mode débogage : les mesures des dernières minutes (JSON), jointes au rapport technique ; undefined : aucune. */
+  debugReport?(): string | undefined;
   /** « Dossier PinUP Player » de VPX ([Plugin.PUP] PUPFolder, VPinballX.ini de la configuration active) : le plugin y cherche aussi les packs. */
   pupFolder?(): string | undefined;
   /** Playfield de la borne et VPinballX.ini actif : le médecin y juge le sens d'une table. */

@@ -65,6 +65,7 @@ export const SYSTEM_ITEM_IDS = [
   'local-play',
   'health',
   'tech-sheet',
+  'debug-mode',
   'cabinet',
   'vpx-presets',
   'vpx-framing',
@@ -233,8 +234,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'sante',
     icon: 'pulse',
     get label() { return t('Santé et sauvegardes'); },
-    get detail() { return t('Santé de la borne, fiche technique, sauvegardes'); },
-    entries: ['health', 'tech-sheet', 'backups'],
+    get detail() { return t('Santé de la borne, fiche technique, mode débogage, sauvegardes'); },
+    entries: ['health', 'tech-sheet', 'debug-mode', 'backups'],
   },
   // Communauté : sa porte du Menu système, toujours là même médaillon masqué (community-menu.ts y ajoute le
   // nombre de joueurs en ligne et ce que voient les autres) ; depuis le 21/11/2026, le médaillon ouvre l'écran
@@ -376,6 +377,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
   // Fiche technique (tech-sheet.ts) : PC, Windows, écrans, contrôleurs, logiciels, rapport à envoyer.
   'tech-sheet': { icon: 'report', get label() { return t('Fiche technique'); } },
+  // Mesures de tous les écrans en direct, par-dessus l'un d'eux (debogage-menu.ts) : pour voir d'où vient un ralentissement.
+  'debug-mode': { icon: 'gauge', get label() { return t('Mode débogage'); } },
   // Boutons, écrans, son, langue de la borne, configurations, assistant (frontend.ts, cabinetSetupItems).
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   // Qualité de l'image et fluidité en un choix (app/src/qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.

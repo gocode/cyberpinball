@@ -132,6 +132,7 @@ export * from './vpxfailure';
 export * from './vpxgamelog';
 export * from './fileerror';
 export * from './vpxcadence';
+export * from './debogage';
 export * from './vpxquality';
 export * from './dmdvideos';
 export * from './webmfile';

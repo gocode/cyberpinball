@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('cyber', {
   mediaError: (error: unknown) => ipcRenderer.send('media-error', error),
   // Fluidité de l'écran des tables pendant le défilement (renderer/cadence-ecran.js, journal).
   screenPace: (pace: unknown) => ipcRenderer.send('screen-pace', pace),
+  // Mode débogage (renderer/debogage-cadence.js) : la page compte ses images quand le processus principal le demande,
+  // et dit au bout de combien de temps un média de la roue est prêt.
+  onDebugPace: (callback: (on: boolean) => void) => {
+    ipcRenderer.on('debug-pace', (_event, on) => callback(Boolean(on)));
+  },
+  debugPace: (pace: unknown) => ipcRenderer.send('debug-pace', pace),
+  debugMedia: (media: unknown) => ipcRenderer.send('debug-media', media),
   // Assistant : sons de test joués par cette fenêtre sur la sortie audio demandée,
   // et compte rendu (sortie trouvée ou non, canaux disponibles).
   onSound: (callback: (command: unknown) => void) => {

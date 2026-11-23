@@ -25,6 +25,8 @@ import { fakeMenuTarget } from './doublures';
  * une partie), jamais pendant l'initialisation.
  */
 const REVIEWED = new Set([
+  // Mode débogage (23/11/2026) : lu par le rapport technique (debugReport), seulement quand le joueur en envoie un.
+  'debug',
   'activityMenu',
   'chatMenu',
   'chatService',

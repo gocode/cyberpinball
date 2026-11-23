@@ -294,8 +294,28 @@ void direBilan(const char* quand)
 ReleveArrets releve;
 bool releveDemarre = false;
 
+// Cadence en direct (cadence.h, CadenceDirecte) : une ligne par seconde, si Cyber Pinball le demande à VPX par
+// l'environnement (mode débogage). Lue une fois au début de chaque partie.
+CadenceDirecte direct;
+bool directActive = false;
+double directPrecedente = -1.0;
+
+void cadenceDirecte(double t)
+{
+   if (!directActive)
+      return;
+   if (directPrecedente >= 0.0 && direct.ecart(t, t - directPrecedente))
+   {
+      char ligne[160];
+      direct.ligne(ligne, sizeof(ligne), t, memoireMo());
+      LPI_LOGI("%s", ligne);
+   }
+   directPrecedente = t;
+}
+
 void compterImage(double t)
 {
+   cadenceDirecte(t);
    const bool aCoup = cadence.image(t);
    char ou[2048];
    if (releveDemarre)
@@ -505,6 +525,12 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    cadence.remiseAZero();
    cadenceDiteA = debut;
    aCoupsDits = 0;
+   // Mode débogage : la cadence dite chaque seconde (voir cadenceDirecte) ; une valeur « 1 » dans l'environnement de VPX.
+   directActive = false;
+   if (const char* demande = std::getenv("CYBERPINBALL_CADENCE_DIRECTE"))
+      directActive = demande[0] == '1';
+   direct.remiseAZero();
+   directPrecedente = -1.0;
    fenetre = Fenetre {};
    suivi.remiseAZero();
    diffusions = 0;

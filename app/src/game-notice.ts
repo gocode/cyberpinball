@@ -133,7 +133,7 @@ export interface Overlay {
 }
 
 /** La fenêtre transparente, sans focus, que les clics traversent, hors des captures, au-dessus de VPX (et du menu). */
-export function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void): Overlay {
+export function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void, page = 'game-notice.html'): Overlay {
   const created = createWindow({
     show: false,
     frame: false,
@@ -155,7 +155,7 @@ export function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void)
     o.loaded = true;
     onLoad(o);
   });
-  void created.loadFile(path.join(__dirname, '..', 'renderer', 'game-notice.html'));
+  void created.loadFile(path.join(__dirname, '..', 'renderer', page));
   return o;
 }
 

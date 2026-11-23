@@ -2,6 +2,12 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties instantanées, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  // Mode débogage (packages/core/src/news.ts)
+  'Le mode débogage': 'Debug mode',
+  'Les mesures de tous tes écrans en direct : cadence, chargements, processeur, mémoire.': 'Live measurements of all your screens: frame rate, loading times, processor, memory.',
+  'Allume-le dans Santé et sauvegardes : une ligne ou un panneau paraît sur l’écran de ton choix, le backglass par défaut, même pendant une partie, sans prendre la main à VPX.': 'Turn it on in Health and backups: a line or a panel appears on the screen of your choice, the backglass by default, even during a game, without taking control from VPX.',
+  'Tu vois la cadence de chaque écran et de VPX, les à-coups et leur cause probable, les temps de chargement, le processeur et la mémoire. Les mesures des 10 dernières minutes peuvent partir avec ton rapport.': 'You see the frame rate of each screen and of VPX, the stalls and their likely cause, loading times, processor and memory. The last 10 minutes of measurements can go with your report.',
+  'Menu système › Ma borne › Santé et sauvegardes › Mode débogage': 'System menu › My cabinet › Health and backups › Debug mode',
   'Indisponible : choisissez une table VPX sur la roue': 'Unavailable: choose a VPX table on the wheel',
   "Le point de vue de chaque table": "Each table’s point of view",
   "Gardez le cadrage de la borne, utilisez le POV fourni avec la table ou importez le vôtre, table par table.": "Keep the cabinet framing, use the POV supplied with the table or import your own, table by table.",
@@ -120,13 +126,6 @@ export const messages: Record<string, string> = {
     'Each country has its room, plus “World”: one line per message, with each player’s time, flag and nickname. You write with one-press phrases, the on-screen keyboard or your phone.',
   'Roue › Communauté': 'Wheel › Community',
 
-  'Les crédits de vos tables': 'Your tables’ credits',
-  'Qui a fait la table, son fronton, son PuP-Pack, ses médias : chaque auteur cité.': 'Who made the table, its backglass, its PuP-Pack, its media: every author credited.',
-  'La fiche de chaque table a ses crédits, d’après la base VPS : la table, le fronton, le PuP-Pack, les couleurs et les sons, les médias et les règles. Start sur une ligne montre tous ses auteurs et la page d’où vient la pièce, en QR code à viser au téléphone.':
-    'Every table’s page has its credits, from the VPS database: the table, the backglass, the PuP-Pack, colours and sounds, media and rules. Start on a line shows all its authors and the page the piece comes from, as a QR code to scan with your phone.',
-  'La roue cite l’auteur principal de chaque table, et « La communauté » rassemble les auteurs de toutes vos tables.':
-    'The wheel credits each table’s main author, and “The community” gathers the authors of all your tables.',
-  'Fiche d’une table › Crédits': 'Table page › Credits',
 
   'Le cadrage des tables, choisi sur ta table': 'Table framing, chosen on your own table',
   'Choisis comment les tables remplissent l’écran, en voyant ta propre table rendue par VPX.': 'Choose how tables fill the screen, while seeing your own table rendered by VPX.',

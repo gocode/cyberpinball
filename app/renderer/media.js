@@ -392,6 +392,8 @@
     function showNow(view, opts) {
       const key = keyOf(view, opts);
       if (current?.key === key) return;
+      // Mode débogage : au bout de combien de temps ce média est prêt (renderer/debogage-cadence.js).
+      const requestedAt = typeof performance === 'undefined' ? 0 : performance.now();
       // Une couche encore en attente de sa première image est abandonnée.
       for (const other of [...slots]) if (other !== current && !other.revealed) retire(other);
 
@@ -434,6 +436,7 @@
 
       const ready = () => {
         if (!slots.has(slot)) return;
+        if (view?.url) window.CyberDebug?.mediaReady(performance.now() - requestedAt, media.tagName === 'VIDEO' ? 'video' : 'image');
         const width = media.videoWidth || media.naturalWidth;
         const height = media.videoHeight || media.naturalHeight;
         setRotation(frame, measuredRotation(view, width, height));

@@ -122,4 +122,62 @@ private:
    int m_histo[MAX_MS + 1] {};
 };
 
+/**
+ * La cadence de la dernière seconde, dite en direct (mode débogage de Cyber Pinball, 23/11/2026) : l'affichage
+ * du mode débogage relit « Cadence live: ... » dans vpinball.log, une ligne par seconde, au lieu d'attendre le
+ * bilan de la minute. Allumée seulement quand Cyber Pinball le demande (variable d'environnement de VPX
+ * CYBERPINBALL_CADENCE_DIRECTE) : sans elle, aucune ligne de plus dans le journal. Compte tout depuis la première
+ * image (pas de démarrage ignoré : le chargement lent d'une table est justement ce qu'on veut voir).
+ */
+class CadenceDirecte
+{
+public:
+   static constexpr double PERIODE_S = 1.0;
+   static constexpr int MAX_ECARTS = 512;
+
+   /** Un écart entre deux images (secondes) arrivé à l'instant `t` ; true : une seconde est finie, `ligne` la dit. */
+   bool ecart(double t, double ecartS)
+   {
+      if (m_debut < 0.0)
+         m_debut = t - ecartS;
+      const int ms = static_cast<int>(ecartS * 1000.0 + 0.5);
+      if (m_n < MAX_ECARTS)
+         m_ecarts[m_n++] = ms;
+      m_images++;
+      if (ms >= A_COUP_MS)
+         m_aCoups++;
+      m_plusLong = std::max(m_plusLong, ms);
+      return t - m_debut >= PERIODE_S;
+   }
+
+   /** La ligne de la seconde finie, puis la seconde suivante commence à `t`. */
+   void ligne(char* ligne, size_t taille, double t, int memoireMo)
+   {
+      const double duree = std::max(0.001, t - m_debut);
+      int tries[MAX_ECARTS];
+      const int n = m_n;
+      std::copy(m_ecarts, m_ecarts + n, tries);
+      std::sort(tries, tries + n);
+      const int p50 = n ? tries[n / 2] : 0;
+      const int p99 = n ? tries[std::min(n - 1, static_cast<int>(n * 0.99))] : 0;
+      std::snprintf(ligne, taille, "Cadence live: fps=%.1f p50=%dms p99=%dms max=%dms stalls=%d mem=%dMB", m_images / duree, p50, p99, m_plusLong, m_aCoups, memoireMo);
+      remiseAZero(t);
+   }
+
+   void remiseAZero(double t = -1.0)
+   {
+      m_debut = t;
+      m_n = 0;
+      m_images = 0;
+      m_aCoups = 0;
+      m_plusLong = 0;
+   }
+
+private:
+   static constexpr int A_COUP_MS = Cadence::A_COUP_MS;
+   double m_debut = -1.0;
+   int m_n = 0, m_images = 0, m_aCoups = 0, m_plusLong = 0;
+   int m_ecarts[MAX_ECARTS] {};
+};
+
 } // namespace cyberpinball

@@ -86,6 +86,42 @@ int main()
       c.remiseAZero();
       VERIFIE(c.ecarts() == 0 && c.plusLong() == 0.0);
    }
+   {
+      // En direct (mode débogage) : une ligne par seconde, la forme que relit Cyber Pinball (debogage.ts).
+      CadenceDirecte d;
+      int lignes = 0;
+      char ligne[200] = "";
+      double precedente = -1.0;
+      // Trois secondes à 60 Hz, puis un arrêt de 300 ms : la ligne suivante le dit.
+      for (double t = 0.0; t < 3.0; t += 1.0 / 60.0)
+      {
+         if (precedente >= 0.0 && d.ecart(t, t - precedente))
+         {
+            d.ligne(ligne, sizeof(ligne), t, 2048);
+            lignes++;
+         }
+         precedente = t;
+      }
+      VERIFIE(lignes >= 2 && lignes <= 3);
+      VERIFIE(std::strncmp(ligne, "Cadence live: fps=", 18) == 0);
+      VERIFIE(std::strstr(ligne, " p50=17ms ") != nullptr);
+      VERIFIE(std::strstr(ligne, " stalls=0 ") != nullptr);
+      VERIFIE(std::strstr(ligne, " mem=2048MB") != nullptr);
+      double t = 3.0;
+      bool dite = false;
+      d.ecart(t + 0.3, 0.3);
+      t += 0.3;
+      for (; t < 5.0 && !dite; t += 1.0 / 60.0)
+         if (d.ecart(t, 1.0 / 60.0))
+         {
+            d.ligne(ligne, sizeof(ligne), t, 100);
+            dite = true;
+         }
+      VERIFIE(dite);
+      VERIFIE(std::strstr(ligne, " stalls=1 ") != nullptr);
+      VERIFIE(std::strstr(ligne, " max=300ms ") != nullptr);
+      std::printf("%s\n", ligne);
+   }
    std::printf(echecs ? "banc de la cadence : %d echec(s)\n" : "banc de la cadence : tout va bien\n", echecs);
    return echecs ? 1 : 0;
 }

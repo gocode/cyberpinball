@@ -370,7 +370,7 @@ import { onKeyInput } from './key-input';
 import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
-import { createVpxPresetsMenu, prepareQuality, qualityAfterGame } from './qualite-vpx';
+import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine } from './qualite-vpx';
 import { createFramingMenu } from './cadrage-menu';
 import { createFramingPreviews } from './framing-preview';
 import { loadPlugins } from './plugins';
@@ -456,6 +456,8 @@ import { prepareVpxClr } from './vpx-clr';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { createAnaglyphMenu } from './anaglyph-menu';
+import { createDebug } from './debogage';
+import { createDebugMenu } from './debogage-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
 import { shrinkDmdVideos } from './dmd-video-shrink';
 import { createVrFrontend } from './vr-frontend';
@@ -583,6 +585,7 @@ let launch: { step: LoadingStep; since: number; slow: boolean; timer: NodeJS.Tim
 function startLaunch(): void {
   endLaunch();
   const since = Date.now();
+  debug.launchBegin();
   launch = {
     step: 'prepare',
     since,
@@ -598,6 +601,7 @@ function startLaunch(): void {
 
 /** Étape vue pendant le lancement : le cartouche la dit, s'il est là. */
 function launchStep(step: LoadingStep): void {
+  debug.launchStep(step);
   if (!launch) return;
   const next = advanceLoadingStep(launch.step, step);
   if (next === launch.step) return;
@@ -1326,6 +1330,7 @@ const library = createLibrary({
     const install = vpxInstall(loc);
     return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
   },
+  debugReport: () => debug.report(),
   pupFolder: () => IniDocument.parse(readTextIfExists(activeVpxIni(loc)) ?? '').get('Plugin.PUP', 'PUPFolder'),
   playfieldOrientation: () => currentPlayfieldOrientation(),
   // Aperçus du cadrage (cadrage-menu.ts).
@@ -3223,6 +3228,35 @@ const gameNotices = createGameNotices({
   captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
 });
+// Mode débogage (debogage.ts) : les mesures de tous les écrans en direct, par-dessus un seul d'entre eux ; éteint, rien ne tourne.
+let debugGpu: { at: number; gpu: { name: string; vramMb?: number } | undefined } | undefined;
+const debug = createDebug({
+  dataDir: loc.dataDir,
+  version: app.getVersion(),
+  place: (role) => {
+    if (role === 'playfield') return playfieldPlace();
+    const rect = roleRects.find((r) => r.role === role)?.rect;
+    return rect ? { zone: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, rotation: 0 } : undefined;
+  },
+  displays: observedDisplays,
+  phase: () => (state.phase === 'playing' ? 'playing' : state.phase === 'loading' ? 'loading' : 'menu'),
+  // Une partie dans le casque : le mode débogage n'a rien à montrer sur les écrans.
+  vr: () => vrFront.vrGameStop !== undefined,
+  windows: () => windows,
+  table: () => (state.phase === 'playing' || state.phase === 'loading' ? playing?.title : tables[state.index]?.title),
+  // La carte graphique vient de la fiche technique (un fichier) : relue au plus toutes les cinq minutes.
+  gpu: () => {
+    if (!debugGpu || Date.now() - debugGpu.at > 300_000) {
+      const machine = qualityMachine(loc.dataDir);
+      debugGpu = { at: Date.now(), gpu: machine.gpu ? { name: machine.gpu, ...(machine.vramMb ? { vramMb: machine.vramMb } : {}) } : undefined };
+    }
+    return debugGpu.gpu;
+  },
+  coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
+  captureDir: process.env.CYBERPINBALL_CAPTURE,
+  log: (line) => console.log(line),
+});
+createDebugMenu({ debug, library });
 // Mon avatar (avatar-menu.ts) : une image à soi, recadrée aux boutons, que les amis voient partout.
 const avatarMenu = createAvatarMenu({
   library,
@@ -5505,6 +5539,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Future Pinball, non : il garde celle de la session (essai du 20/11/2026, table à l'envers à 0°).
   const windowsOrientation = simulated === undefined && playsOnWindowsOrientation(table.emulator);
   if (windowsOrientation) orientationForGame(zenName);
+  // Le mode débogage se retire lui-même (sa fenêtre est recréée à la mesure suivante, par-dessus la partie, sans bruit au journal).
+  debug.releaseWindow();
   closeTopmostWindows();
   playing = table;
   realign = undefined;
@@ -5847,6 +5883,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     });
   }
   if (romVolumeWatched) romVolumes.beforeGame(table);
+  // Le mode débogage se retire lui-même (sa fenêtre est recréée à la mesure suivante, par-dessus la partie, sans bruit au journal).
+  debug.releaseWindow();
   closeTopmostWindows();
   // Habillage FullDMD : le DMD de VPX posé dans le cadre du média FullDMD, que le fond de partie montre autour.
   dressing = loc.root && !otherVpx
@@ -5931,6 +5969,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     state = { ...state, phase: 'playing' };
     // La table à l'écran : le chargement est fini, son cartouche avec lui.
     endLaunch();
+    debug.playing();
     // VPX n'a pas trouvé le casque et joue sur les écrans (VR en « Autodetect ») : plus rien à mettre.
     if (!playedVr) vrFront.vrWearHint = undefined;
     // Journal des écrans : la pile des fenêtres, la fenêtre de jeu de VPX affichée (le gardien des barres n'y touche pas).
@@ -6082,6 +6121,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
       : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+  // Mode débogage : le journal de VPX est suivi pour la cadence en direct (debogage.ts).
+  debug.gameBegin({ pid: game.pid, vpxLog });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
   let gameStopAsked = false;
   const stopGame = game.stop;

@@ -60,6 +60,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Mode débogage (23/11/2026) : les mesures de tous les écrans en direct, par-dessus l'un d'eux. « Les crédits de vos tables » (0.1.11)
+    // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'mode-debogage',
+    date: '2026-11-23',
+    version: '0.2.4',
+    get title() { return t('Le mode débogage'); },
+    get detail() { return t('Les mesures de tous tes écrans en direct : cadence, chargements, processeur, mémoire.'); },
+    get more() {
+      return [
+        t('Allume-le dans Santé et sauvegardes : une ligne ou un panneau paraît sur l’écran de ton choix, le backglass par défaut, même pendant une partie, sans prendre la main à VPX.'),
+        t('Tu vois la cadence de chaque écran et de VPX, les à-coups et leur cause probable, les temps de chargement, le processeur et la mémoire. Les mesures des 10 dernières minutes peuvent partir avec ton rapport.'),
+      ];
+    },
+    get where() { return t('Menu système › Ma borne › Santé et sauvegardes › Mode débogage'); },
+    reach: { kind: 'system', id: 'debug-mode' },
+  },
+  {
     // Cadrage des tables choisi sur une image (23/11/2026) ; « Le Juke-box » (0.1.9) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
     id: 'cadrage-des-tables',
@@ -437,21 +454,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Roue › Communauté'); },
     reach: { kind: 'community', door: 'home' },
-  },
-  {
-    id: 'credits',
-    date: '2026-11-13',
-    version: '0.1.11',
-    get title() { return t('Les crédits de vos tables'); },
-    get detail() { return t('Qui a fait la table, son fronton, son PuP-Pack, ses médias : chaque auteur cité.'); },
-    get more() {
-      return [
-        t('La fiche de chaque table a ses crédits, d’après la base VPS : la table, le fronton, le PuP-Pack, les couleurs et les sons, les médias et les règles. Start sur une ligne montre tous ses auteurs et la page d’où vient la pièce, en QR code à viser au téléphone.'),
-        t('La roue cite l’auteur principal de chaque table, et « La communauté » rassemble les auteurs de toutes vos tables.'),
-      ];
-    },
-    get where() { return t('Fiche d’une table › Crédits'); },
-    reach: { kind: 'sheet', part: 'credits' },
   },
 ];
 

@@ -1633,6 +1633,9 @@ export function createLibrary(host: LibraryHost) {
     for (const a of launchAttachments(logText.slice(-1_500_000))) out.push({ name: a.name, text: a.text, about: abouts[a.kind] });
     const ini = readTextIfExists(activeVpxIni(locations()));
     if (ini) out.push({ name: 'VPinballX.ini', text: ini, about: t('les réglages de VPX') }); // i18n-ignore : nom de fichier
+    // Mode débogage : ce que les écrans et VPX ont mesuré pendant les dernières minutes (debogage.ts).
+    const measures = host.debugReport?.();
+    if (measures) out.push({ name: 'debogage.json', text: measures, about: t('les mesures du mode débogage, 10 minutes') }); // i18n-ignore : nom de fichier
     const set = loadCabinetSet(host.dataDir);
     if (set) out.push({ name: 'configurations.json', text: maskScreens(JSON.stringify(set, null, 1)), about: t('les écrans et les boutons de la borne') }); // i18n-ignore : nom de fichier
     return out;

@@ -1,0 +1,503 @@
+/* Mode débogage (app/src/debogage.ts) : les mesures de tous les écrans, dans un coin d'un seul d'entre eux.
+   Fenêtre transparente, sans focus, que les clics traversent et qu'aucune capture ne voit : VPX garde la main.
+   Les tailles sont celles d'un petit côté de 1 080 px (`zoom`
+   les met à l'échelle de l'écran) ; aucun texte sous 20 px. Verre fumé, filet sarcelle, halo de 20 px (la fenêtre
+   laisse la marge : rien n'est coupé) ; les valeurs restent claires tant que tout va bien, ambre = ralenti,
+   rouge = bloquant. */
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Cadre vu du joueur, tourné comme le plateau : le panneau se pose dans son coin haut droit. */
+.frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--w, 648px);
+  height: var(--h, 880px);
+  /* Les tailles de la page sont celles d'un petit côté de 1 080 px, en "px" (--u) ; la mise à l'échelle de l'écran est le scale ci-dessous. */
+  --u: 1px;
+  transform: translate(-50%, -50%) rotate(var(--turn, 0deg)) scale(var(--unit, 1));
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.panel {
+  position: absolute;
+  right: 24px;
+  top: 24px;
+  box-sizing: border-box;
+  width: 600px;
+  padding: 20px 24px 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: rgba(3, 8, 7, 0.94);
+  box-shadow: 0 0 0 1px rgba(28, 143, 128, 0.1), 0 0 20px rgba(28, 143, 128, 0.16);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panel.reduced {
+  width: 560px;
+}
+
+.head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 14px;
+}
+
+.name {
+  color: var(--signal);
+  font-size: calc(20 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.ctx {
+  font-size: calc(22 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  font-size: calc(22 * var(--u));
+  color: var(--ink-muted);
+}
+
+.sec {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.sec-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--signal);
+  font-size: calc(20 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.sec-title small {
+  color: var(--ink-muted);
+  font-size: calc(20 * var(--u));
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* Tableau des écrans : une grille commune, colonnes alignées sur toutes les lignes. */
+.grid {
+  display: grid;
+  column-gap: 14px;
+  row-gap: 8px;
+  align-items: baseline;
+}
+
+.grid.c3 {
+  grid-template-columns: minmax(0, 1fr) 56px 220px;
+}
+
+.grid.c4 {
+  grid-template-columns: minmax(0, 1fr) 56px 104px 104px;
+}
+
+.col {
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+}
+
+.col.num,
+.cell.num {
+  text-align: right;
+}
+
+.cell {
+  font-size: calc(22 * var(--u));
+  white-space: nowrap;
+}
+
+.cell.n {
+  font-weight: 500;
+}
+
+.cell.n small {
+  margin-left: 8px;
+  font-size: calc(20 * var(--u));
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.absent,
+.absent small {
+  color: var(--ink-faint);
+}
+
+/* Lignes clé / détail / valeur. */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 14px;
+  row-gap: 6px;
+  align-items: baseline;
+}
+
+.kv .k {
+  font-size: calc(22 * var(--u));
+}
+
+.kv .s {
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.kv .v {
+  font-size: calc(22 * var(--u));
+  text-align: right;
+  white-space: nowrap;
+}
+
+.kv .total {
+  font-weight: 600;
+}
+
+.av {
+  color: var(--warning) !important;
+}
+
+.ko {
+  color: var(--danger) !important;
+}
+
+/* Cadence de VPX. */
+.cad-top {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 16px;
+  align-items: end;
+}
+
+.cad-value {
+  font-size: calc(52 * var(--u));
+  font-weight: 600;
+  line-height: 1;
+}
+
+.cad-value small {
+  margin-left: 4px;
+  font-size: calc(24 * var(--u));
+  font-weight: 500;
+}
+
+.cad-state {
+  padding-bottom: 3px;
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+  line-height: 1.25;
+}
+
+.cad-state b {
+  display: block;
+  font-size: calc(22 * var(--u));
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cad-state b.av {
+  color: var(--warning);
+}
+
+.cad-state b.ko {
+  color: var(--danger);
+}
+
+.graph {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  height: 96px;
+  margin-top: 10px;
+}
+
+/* La fréquence visée : une ligne pointillée en haut des barres. */
+.graph::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  border-top: 1.5px dashed rgba(155, 173, 167, 0.7);
+}
+
+.graph .col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.graph .fill {
+  width: 100%;
+  border-radius: 1px;
+  background: var(--signal);
+  opacity: 0.55;
+}
+
+.graph .fill.av {
+  background: var(--warning);
+  opacity: 0.85;
+}
+
+.graph .fill.ko {
+  background: var(--danger);
+  opacity: 0.85;
+}
+
+.graph .col.last .fill {
+  opacity: 1;
+}
+
+/* Une seconde avec un à-coup : un repère rouge au-dessus de sa barre (la moyenne d'une seconde cacherait un gel bref). */
+.graph .mark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--danger);
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: calc(21 * var(--u));
+  color: var(--ink-muted);
+}
+
+.stats b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.stats b.av {
+  color: var(--warning);
+}
+
+.stats b.ko {
+  color: var(--danger);
+}
+
+.alert {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: calc(21 * var(--u));
+  line-height: 1.3;
+}
+
+.alert svg {
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+}
+
+.alert.av {
+  background: rgba(242, 179, 61, 0.1);
+  border: 1px solid rgba(242, 179, 61, 0.45);
+}
+
+.alert.av svg {
+  color: var(--warning);
+}
+
+.alert.ko {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.5);
+}
+
+.alert.ko svg {
+  color: var(--danger);
+}
+
+/* Étapes du lancement. */
+.chrono {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 8px;
+  align-items: start;
+}
+
+.chrono > div {
+  display: contents;
+}
+
+.chrono .wait-dot {
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin: 5px 2px 0;
+  border: 2px solid var(--ink-faint);
+  border-radius: 50%;
+}
+
+.chrono svg {
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
+  color: var(--ink-muted);
+}
+
+.chrono .k {
+  font-size: calc(22 * var(--u));
+}
+
+.chrono .k small {
+  display: block;
+  margin-top: 1px;
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+}
+
+.chrono .v {
+  font-size: calc(22 * var(--u));
+  text-align: right;
+}
+
+.chrono .current .k,
+.chrono .current .v {
+  font-weight: 600;
+}
+
+.chrono .current .k small {
+  font-weight: 400;
+}
+
+.chrono .current svg {
+  color: var(--ink);
+}
+
+.chrono .wait .k,
+.chrono .wait .v {
+  color: var(--ink-muted);
+}
+
+.chrono .wait svg {
+  color: var(--ink-faint);
+}
+
+.note {
+  margin-top: 8px;
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+  line-height: 1.3;
+}
+
+/* Ligne compacte. */
+.line {
+  position: absolute;
+  right: 24px;
+  top: 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  padding: 0 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 28px;
+  background: rgba(3, 8, 7, 0.94);
+  box-shadow: 0 0 0 1px rgba(28, 143, 128, 0.1), 0 0 20px rgba(28, 143, 128, 0.16);
+  font-size: calc(22 * var(--u));
+  white-space: nowrap;
+}
+
+.line[hidden] {
+  display: none;
+}
+
+.line .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--signal);
+}
+
+.line .dot.av {
+  background: var(--warning) !important;
+}
+
+.line .dot.ko {
+  background: var(--danger) !important;
+}
+
+.line .sep {
+  width: 1px;
+  height: 24px;
+  background: var(--line-strong);
+}
+
+.line .mu,
+.mu {
+  color: var(--ink-muted);
+}
+
+/* Bande du DMD : en bas de son écran, à son échelle (lisible de loin). */
+.line.bar {
+  left: 24px;
+  right: 24px;
+  top: auto;
+  bottom: 20px;
+  justify-content: center;
+  gap: 26px;
+  height: 84px;
+  padding: 0 24px;
+  border-radius: 14px;
+  font-size: calc(34 * var(--u));
+}
+
+.line.bar .dot {
+  width: 18px;
+  height: 18px;
+}
+
+.line.bar .sep {
+  height: 40px;
+}

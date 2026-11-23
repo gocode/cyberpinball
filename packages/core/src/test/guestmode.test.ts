@@ -92,6 +92,7 @@ test('mode invité : chaque message du menu dit la porte de son action', () => {
  */
 const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'frontend.ts': { count: 11, why: 'le menu : handleKey, handleKeyUp, le canal « action » et les raccourcis globaux (dont Échap pendant une partie dans le casque, et l’arrêt d’une partie de Pinball FX) passent par GuestMode (knock) ; le canal « jukebox » ne porte que des mesures de la fenêtre du clip (temps, fin, niveaux du son, place du clip), aucun geste ; le canal « screen-pace » ne porte que le relevé de fluidité de l’écran des tables (cadence-ecran.js), écrit au journal, aucun geste' },
+  'debogage.ts': { count: 2, why: 'canaux « debug-pace » et « debug-media » : cadence et temps de chargement comptés par les fenêtres du front-end (debogage-cadence.js), bornés et relus, aucun geste ; sans effet tant que le mode débogage est éteint' },
   'key-input.ts': { count: 2, why: 'touches des fenêtres inscrites par onKeyInput (menu, assistant), remises à leur traitement ; la page demande seulement si un appui a été traité' },
   'frontend-gate.ts': { count: 2, why: 'au démarrage, un autre menu de borne ouvert : attendre ou continuer, rien n’est modifié' },
   'language.ts': { count: 1, why: 'lecture du catalogue des traductions' },
