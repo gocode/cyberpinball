@@ -11,7 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { chooseDmdDisplay, diagnoseVpxFailure, GUEST_DOORS, inspectorDisplayReadable, liveFailedPlaying, livePlayerStateLabel, liveWaitView, vpxExitName, vpxScriptError, vpxShutdownCrash, type InspectorDisplay, type LiveGame } from '../index';
+import { chooseDmdDisplay, diagnoseVpxFailure, DOF_UNLOAD_FIXED_IN, GUEST_DOORS, inspectorDisplayReadable, liveFailedPlaying, livePlayerStateLabel, liveWaitView, vpxExitName, vpxScriptError, vpxShutdownCrash, type InspectorDisplay, type LiveGame } from '../index';
 import { historyStateLabel } from '../gamehistory';
 import { frontendSource } from './frontend-source';
 
@@ -83,10 +83,10 @@ test('plantage à la fermeture : la partie s’est jouée, dit tel ; la recherch
   assert.match(d.lines[0]!, /^La partie s’est jouée jusqu’au bout : VPX s’est arrêté \(0xC0000005, accès mémoire interdit\) après sa fin/);
   assert.match(d.lines[1]!, /DMDUtil de VPX a relancé la recherche du DMD réel/);
   assert.match(d.journal, /^VPX arrêté en se fermant, après la partie \(DAREDEVIL2\.0\.2\.vbs\) : 0xC0000005.* DMDUtil relançait/);
-  assert.deepEqual(vpxShutdownCrash(FERMETURE, 3221225477), { dmdProbe: true });
+  assert.deepEqual(vpxShutdownCrash(FERMETURE, 3221225477), { dmdProbe: true, dofUnload: false });
   // Fermeture normale (World Cup Soccer, même borne) : DMD détruit, aucune recherche après ; un plantage y serait autre chose.
   const propre = FERMETURE.filter((l) => !/Attempting to connect/.test(l));
-  assert.deepEqual(vpxShutdownCrash(propre, 3221225477), { dmdProbe: false });
+  assert.deepEqual(vpxShutdownCrash(propre, 3221225477), { dmdProbe: false, dofUnload: false });
   assert.match(diagnoseVpxFailure(propre, 3221225477, 'x.vpx')!.lines[1]!, /^Rien n’est à réparer dans la table/);
   // Sans « Closing player » : arrêté pendant la partie, comme avant ; code ordinaire : rien.
   assert.equal(vpxShutdownCrash(FERMETURE.slice(1), 3221225477), undefined);
@@ -95,6 +95,74 @@ test('plantage à la fermeture : la partie s’est jouée, dit tel ; la recherch
   // Une erreur du script plus haut que les 15 dernières lignes ne fait plus le diagnostic.
   const ancienne = ['Runtime error on line 3, col 1: Type incompatible', ...FERMETURE];
   assert.equal(diagnoseVpxFailure(ancienne, 3221225477, 'x.vpx')!.scriptError, undefined);
+});
+
+// Fins de journal inventées d'une borne à DudesCab, sur le modèle des rapports du 19/11 et du 23/11/2026 (Apollo 13,
+// Cobra) : la partie se ferme, le fil de DOF arrête la carte, les plugins se déchargent. Fermeture réussie : la libdof
+// de la 5436 arrête la carte une seconde fois sur le fil principal, puis « Plugin DOF unloaded ». Plantage : rien après.
+const dofLine = (thread: string, text: string) => `2026-11-20 21:14:02.130 INFO  [${thread}] [DOF:DOFPlugin::OnDOFLog@70] ${text}`;
+const unload = (plugin: string, id: number) => `2026-11-20 21:14:02.400 INFO  [Main] [MsgPI::MsgPlugin::Unload@550] Plugin ${plugin} unloaded [id=${id}]`;
+const DOF_FERMETURE = [
+  '2026-11-20 21:14:02.118 INFO  [Main] [Player::~Player@865] Closing player...',
+  dofLine('DOF.EventQueue', 'DudesCab DudesCab Controller 01 finished and updater thread stopped.'),
+  dofLine('DOF.EventQueue', 'Cabinet finished'),
+  unload('PUP', 13),
+  unload('CyberPinballDmd', 15),
+];
+const DOF_REUSSIE = [...DOF_FERMETURE, dofLine('Main', 'DudesCab DudesCab Controller 01 finished and updater thread stopped.'), unload('DOF', 9), unload('PinMAME', 4)];
+const DOF_PLANTEE = DOF_FERMETURE;
+
+test('plantage à la fermeture pendant le déchargement de DOF avec une DudesCab : reconnu, nommé, corrigé par la série 6', () => {
+  // Fermeture réussie : rien à dire (VPX sort avec le code 0, aucun diagnostic).
+  assert.equal(diagnoseVpxFailure(DOF_REUSSIE, 0, 'Apollo 13.vpx'), undefined);
+  // Le même journal avec un code de plantage : DOF a fini de se décharger, ce n'est pas ce défaut-là.
+  assert.deepEqual(vpxShutdownCrash(DOF_REUSSIE, 3221225477), { dmdProbe: false, dofUnload: false });
+
+  // Plantage : plugins déchargés, pas de « Plugin DOF unloaded », DudesCab au journal.
+  assert.deepEqual(vpxShutdownCrash(DOF_PLANTEE, 3221225477), { dmdProbe: false, dofUnload: true });
+  const d = diagnoseVpxFailure(DOF_PLANTEE, 3221225477, 'Cobra.vpx')!;
+  assert.equal(d.title, 'VPX a planté en se fermant');
+  assert.match(d.lines[0]!, /^La partie s’est jouée jusqu’au bout : VPX s’est arrêté \(0xC0000005, accès mémoire interdit\)/);
+  assert.match(d.lines[1]!, /bibliothèque DOF, qui pilote ta carte DudesCab\. Rien n’est à réparer dans la table : c’est un défaut connu de la bibliothèque DOF de VPX 10\.8\.1/);
+  assert.match(d.lines[2]!, /corrigé dans le VPX de Cyber Pinball à partir de la série 6 \(« patched Cyber Pinball 6 »\)/);
+  assert.equal(d.lines.length, 3);
+  assert.equal(d.journal, 'VPX arrêté en se fermant, après la partie (Cobra.vpx) : 0xC0000005, accès mémoire interdit ; plantage en déchargeant DOF avec une DudesCab (défaut de la libdof de VPX 10.8.1, corrigé par la série 6 du VPX corrigé ; en place : aucune série).');
+  assert.equal(DOF_UNLOAD_FIXED_IN, 6);
+
+  // VPX corrigé d'une série plus ancienne en place : la correction reste à venir, la série en place est au journal.
+  const ancienne = diagnoseVpxFailure(DOF_PLANTEE, 3221225477, 'Cobra.vpx', undefined, { vpxPatch: 5 })!;
+  assert.match(ancienne.lines[2]!, /à partir de la série 6/);
+  assert.match(ancienne.journal, /en place : série 5\)\.$/);
+  // La série corrigée était en place et VPX plante quand même : ne pas promettre ce qui est déjà là.
+  const corrigee = diagnoseVpxFailure(DOF_PLANTEE, 3221225477, 'Cobra.vpx', undefined, { vpxPatch: 6 })!;
+  assert.match(corrigee.lines[2]!, /depuis la série 6, et il était en place \(série 6\) : ce plantage a donc une autre cause/);
+  assert.match(corrigee.journal, /en place : série 6\)\.$/);
+
+  // DOF écrit beaucoup en fermant : « Closing player » est sorti des 120 dernières lignes, le cas reste reconnu.
+  const longue = [...Array.from({ length: 130 }, (_, i) => dofLine('DOF.EventQueue', `Toy ${i} finished`)), ...DOF_PLANTEE.slice(1)];
+  assert.equal(longue.some((l) => /Closing player/.test(l)), false);
+  assert.equal(vpxShutdownCrash(longue, 3221225477)?.dofUnload, true);
+  assert.equal(diagnoseVpxFailure(longue, 3221225477, 'x.vpx')!.title, 'VPX a planté en se fermant');
+
+  // Sans DudesCab (Pinscape), ou plantage pendant la partie (aucun plugin déchargé) : pas ce défaut.
+  const pinscape = DOF_PLANTEE.map((l) => l.replace(/DudesCab DudesCab Controller 01/, 'Pinscape Pinscape Controller 01'));
+  assert.deepEqual(vpxShutdownCrash(pinscape, 3221225477), { dmdProbe: false, dofUnload: false });
+  assert.match(diagnoseVpxFailure(pinscape, 3221225477, 'x.vpx')!.lines[1]!, /^Rien n’est à réparer dans la table/);
+  const enPartie = DOF_PLANTEE.filter((l) => !/unloaded|Closing player/.test(l));
+  assert.equal(vpxShutdownCrash(enPartie, 3221225477), undefined);
+  assert.equal(diagnoseVpxFailure(enPartie, 3221225477, 'x.vpx')!.title, 'VPX s’est arrêté pendant la partie');
+  // Code ordinaire : rien.
+  assert.equal(vpxShutdownCrash(DOF_PLANTEE, 1), undefined);
+
+  // Le plantage DMDUtil du 17/11/2026 garde son explication.
+  assert.match(diagnoseVpxFailure(FERMETURE, 3221225477, 'x.vpx')!.lines[1]!, /DMDUtil de VPX a relancé la recherche du DMD réel/);
+});
+
+test('application : la série du VPX corrigé en place accompagne le diagnostic d’une partie échouée', () => {
+  const front = frontendSource();
+  assert.match(front, /const vpxPatch = simulated === undefined && !otherVpx \? vpxCorrigeInPlace\(path\.dirname\(install\.exe\), install\.version/);
+  assert.match(front, /explain\(result, table, repaired, Boolean\(double\), changedFiles, vpxPatch\)/);
+  assert.match(front, /\.\.\.\(vpxPatch !== undefined && \{ vpxPatch \}\)/);
 });
 
 const tree = (controller: string, name = 'Display 0 128x32') => ({ name: controller, type: 'controller', children: [{ type: 'category', name: 'Displays', children: [{ type: 'display', name, mapping: 7 }] }] });
@@ -125,7 +193,7 @@ test('écran d’échec : arrêt reconnu = vraie raison, Start rejoue (ou ouvre 
   // Arrêté en démarrant, fichiers de VPX modifiés : Start les remet (vpx-fichiers-modifies.test.ts) ; sinon rejouer.
   assert.match(front, /const action: Message\['action'\] = known\.startup && changedFiles\.length \? 'install-vpx' : live \? 'live' : 'replay';/);
   assert.match(front, /return \{ title: known\.title, lines, action, table: table\.file, report: failureReport\(result, table, known\.title, known\.startup\) \};/);
-  assert.match(front, /explain\(result, table, repaired, Boolean\(double\), changedFiles\)/);
+  assert.match(front, /explain\(result, table, repaired, Boolean\(double\), changedFiles, vpxPatch\)/);
   assert.match(front, /state\.message\?\.action === 'replay' && is\(KEYS\.confirm\)/);
   assert.match(front, /state\.message\?\.action === 'live' && is\(KEYS\.confirm\)/);
   const renderer = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'frontend.js'), 'utf8');

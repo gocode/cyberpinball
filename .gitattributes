@@ -1,3 +1,4 @@
 # Correctifs de VPX (packages/vpx-corrige) : appliqués par git apply sur les sources de VPX, en LF. Jamais convertis
 # en CRLF à l'extraction, sinon ils ne s'appliquent plus (scripts/vpx-corrige.mjs).
 packages/vpx-corrige/correctifs/*.patch -text
+packages/vpx-corrige/correctifs-libdof/*.patch -text

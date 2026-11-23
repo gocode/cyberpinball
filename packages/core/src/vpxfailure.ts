@@ -146,16 +146,31 @@ const SCRIPT_ERROR_LINES = 15;
  * une source de DMD survit (FlexDMD, Serum…), DMDUtil recrée son DMD et relance la recherche du DMD
  * réel (« Attempting to connect », « Searching for ZeDMD »), puis il est déchargé avant qu'elle
  * finisse ; son fil se réveille dans du code déchargé. `dmdProbe` : ce cas-là, lu dans le journal.
+ *
+ * `dofUnload` : bornes à cartes DudesCab (rapports du 19/11 et du 23/11/2026, Apollo 13, Cobra, 4 cartes) : VPX
+ * décharge ses plugins (« Plugin CyberPinballDmd unloaded »), puis plante en déchargeant DOF, sans jamais écrire
+ * « Plugin DOF unloaded ». La libdof de la 5436 détruit la DudesCab sur le fil principal, et son destructeur relance
+ * Finish() et AllOff() sur une carte déjà arrêtée par le fil de DOF : libération sur un tas abîmé. Reconnu même quand
+ * « Closing player » est sorti de la fin du journal (DOF y écrit beaucoup en fermant) : les plugins ne se déchargent
+ * qu'à la fermeture.
  */
-export function vpxShutdownCrash(lines: readonly string[], exitCode: number | null | undefined): { dmdProbe: boolean } | undefined {
+export function vpxShutdownCrash(lines: readonly string[], exitCode: number | null | undefined): { dmdProbe: boolean; dofUnload: boolean } | undefined {
   if (exitCode === null || exitCode === undefined || vpxMissingLibrary(exitCode) || !EXIT_NAMES[exitCode >>> 0]) return undefined;
+  const pluginsUnloading = lines.some((l) => /\bPlugin \S+ unloaded\b/.test(l));
+  const dofUnload = pluginsUnloading && !lines.some((l) => /\bPlugin DOF unloaded\b/.test(l)) && lines.some((l) => /\bDudesCab\b/i.test(l));
   const closing = lines.findLastIndex((l) => /\bClosing player\b/.test(l));
-  if (closing < 0) return undefined;
-  const after = lines.slice(closing);
+  if (closing < 0 && !dofUnload) return undefined;
+  const after = closing < 0 ? [] : lines.slice(closing);
   const destroyed = after.findIndex((l) => /DMDUtil.*\bDMD destructor finished\b/.test(l));
   const dmdProbe = destroyed >= 0 && after.slice(destroyed + 1).some((l) => /DMDUtil.*\b(Attempting to connect|Searching for (ZeDMD|PIN2DMD|Pixelcade))\b/i.test(l));
-  return { dmdProbe };
+  return { dmdProbe, dofUnload };
 }
+
+/**
+ * Série du VPX corrigé de Cyber Pinball qui livre la libdof réparée (plugins/dof/dof64.dll, correctifs-libdof de
+ * packages/vpx-corrige) : le plantage `dofUnload` n'a plus lieu d'être à partir d'elle.
+ */
+export const DOF_UNLOAD_FIXED_IN = 6;
 
 /** Ce que le lanceur sait du lancement, en plus du journal et du code de sortie. */
 export interface VpxLaunchFacts {
@@ -163,6 +178,8 @@ export interface VpxLaunchFacts {
   logWritten?: boolean;
   /** Fichiers de VPX qui ne sont plus ceux de son archive (component-files.ts), décrits pour le joueur. */
   changedFiles?: readonly string[];
+  /** Série du VPX corrigé de Cyber Pinball en place pendant la partie (vpxCorrigeInPlace) ; absent : VPX officiel ou autre. */
+  vpxPatch?: number;
 }
 
 /**
@@ -219,15 +236,30 @@ export function diagnoseVpxFailure(
   // Planté en se fermant : la partie s'est jouée, rien n'est à réparer dans la table.
   const shutdown = !error ? vpxShutdownCrash(logTail, exitCode) : undefined;
   if (shutdown && exit) {
+    const patch = launch.vpxPatch;
+    const fixedInPlace = patch !== undefined && patch >= DOF_UNLOAD_FIXED_IN;
+    const lines = [t('La partie s’est jouée jusqu’au bout : VPX s’est arrêté ({exit}) après sa fin, en se fermant.', { exit })];
+    if (shutdown.dofUnload) {
+      lines.push(
+        t('Il déchargeait sa bibliothèque DOF, qui pilote ta carte DudesCab. Rien n’est à réparer dans la table : c’est un défaut connu de la bibliothèque DOF de VPX 10.8.1, qui arrêtait la carte une seconde fois après sa vraie fermeture.'),
+        fixedInPlace
+          ? t('Le VPX de Cyber Pinball le corrige depuis la série {fixed}, et il était en place (série {patch}) : ce plantage a donc une autre cause. Le rapport aidera à la trouver.', { fixed: DOF_UNLOAD_FIXED_IN, patch: patch! })
+          : t('C’est corrigé dans le VPX de Cyber Pinball à partir de la série {fixed} (« patched Cyber Pinball {fixed} »), posé avant chaque partie sur VPX 10.8.1-5436.', { fixed: DOF_UNLOAD_FIXED_IN }),
+      );
+    } else if (shutdown.dmdProbe) {
+      lines.push(t('Pendant la fermeture, le plugin DMDUtil de VPX a relancé la recherche du DMD réel (ZeDMD), puis a été déchargé avant qu’elle finisse. C’est un défaut de VPX 10.8.1, pas de la table ; Cyber Pinball fait désormais attendre la fin de cette recherche.'));
+    } else {
+      lines.push(t('Rien n’est à réparer dans la table : une autre partie peut se dérouler normalement.'));
+    }
+    const cause = shutdown.dofUnload
+      ? ` ; plantage en déchargeant DOF avec une DudesCab (défaut de la libdof de VPX 10.8.1, corrigé par la série ${DOF_UNLOAD_FIXED_IN} du VPX corrigé ; en place : ${patch === undefined ? 'aucune série' : `série ${patch}`})` // i18n-ignore : journal
+      : shutdown.dmdProbe
+        ? ' ; DMDUtil relançait la recherche du DMD réel pendant la fermeture' // i18n-ignore : journal
+        : '';
     return {
       title: t('VPX a planté en se fermant'),
-      lines: [
-        t('La partie s’est jouée jusqu’au bout : VPX s’est arrêté ({exit}) après sa fin, en se fermant.', { exit }),
-        shutdown.dmdProbe
-          ? t('Pendant la fermeture, le plugin DMDUtil de VPX a relancé la recherche du DMD réel (ZeDMD), puis a été déchargé avant qu’elle finisse. C’est un défaut de VPX 10.8.1, pas de la table ; Cyber Pinball fait désormais attendre la fin de cette recherche.')
-          : t('Rien n’est à réparer dans la table : une autre partie peut se dérouler normalement.'),
-      ],
-      journal: `VPX arrêté en se fermant, après la partie (${file}) : ${exit}${shutdown.dmdProbe ? ' ; DMDUtil relançait la recherche du DMD réel pendant la fermeture' : ''}.`, // i18n-ignore : journal
+      lines,
+      journal: `VPX arrêté en se fermant, après la partie (${file}) : ${exit}${cause}.`, // i18n-ignore : journal
     };
   }
   const lines: string[] = [];

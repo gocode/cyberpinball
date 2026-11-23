@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- VPX corrigé "patched Cyber Pinball 6" : sur une borne à cartes DudesCab, VPX ne plante plus en se fermant (0xC0000005) pendant le déchargement de DOF. La bibliothèque DOF de VPX 10.8.1 arrêtait la carte une seconde fois après sa vraie fermeture ; Cyber Pinball pose désormais avant chaque partie une bibliothèque DOF (`plugins/dof/dof64.dll`) reconstruite avec les correctifs publiés depuis par ses auteurs. Le plugin DOF de VPX et ta configuration ne changent pas.
+- Si VPX plante encore ainsi en se fermant, l'écran d'échec le dit clairement : la partie s'est jouée, rien n'est à réparer dans la table, c'est un défaut connu de la bibliothèque DOF de VPX 10.8.1, corrigé à partir de la série 6 du VPX de Cyber Pinball.
 - Cadrage des tables (bêta) : Menu système › Ma borne › VPX › Cadrage des tables. Sur une borne, une table ne remplit pas un écran 16:9 sans compromis : tu choisis entre « Plein écran, apron rogné » (par défaut), « Table entière » et « Plein écran, table élargie », chacun montré sur ta propre table, rendue par VPX sans rien afficher sur la borne.
 - Point de vue d'une table : chaque cadrage y est montré sur une image de la table, un autre style peut être choisi pour elle seule, et « Rétablir le cadrage précédent » revient en arrière. Une table reprise avant cette version retrouve le cadrage de son installation d'origine si celle-ci est encore sur le disque.
 - Le parcours d'une table propose « Choisir le cadrage » et, quand la base VPS en connaît, un POV de la communauté.

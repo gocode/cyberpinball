@@ -1,0 +1,30 @@
+Backport onto libdof eef645d9 (the libdof of VPX 10.8.1-5436) of upstream libdof commit 0383246
+("dudescab: align Finish and destructor with c#", 2026-08-31). The DudesCab destructor no longer runs Finish()
+and m_dev->AllOff() a second time, after the controller was already finished on the DOF event thread.
+
+diff --git a/src/cab/out/dudescab/DudesCab.cpp b/src/cab/out/dudescab/DudesCab.cpp
+--- a/src/cab/out/dudescab/DudesCab.cpp
++++ b/src/cab/out/dudescab/DudesCab.cpp
+@@ -42,7 +42,7 @@ DudesCab::DudesCab(int number)
+    SetNumber(number);
+ }
+
+-DudesCab::~DudesCab() { Finish(); }
++DudesCab::~DudesCab() { } // Modified by Cyber Pinball, 2026-11-23 (patched Cyber Pinball 6): backport of upstream 0383246.
+
+ void DudesCab::SetNumber(int value)
+ {
+@@ -84,12 +84,7 @@ void DudesCab::Init(Cabinet* cabinet)
+    OutputControllerFlexCompleteBase::Init(cabinet);
+ }
+
+-void DudesCab::Finish()
+-{
+-   if (m_dev)
+-      m_dev->AllOff();
+-   OutputControllerFlexCompleteBase::Finish();
+-}
++void DudesCab::Finish() { OutputControllerFlexCompleteBase::Finish(); } // Modified by Cyber Pinball (patched Cyber Pinball 6)
+
+ bool DudesCab::VerifySettings() { return true; }
+

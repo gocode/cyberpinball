@@ -1,7 +1,10 @@
 // Construit le VPX corrigé de Cyber Pinball : VPinballX_BGFX64.exe et le plugin PuP de VPX 10.8.1-5436, avec les
-// correctifs de packages/vpx-corrige/correctifs (voir son LISEZMOI). Cyber Pinball les pose à la place de ceux de
+// correctifs de packages/vpx-corrige/correctifs, et la bibliothèque DOF (plugins\dof\dof64.dll, libdof de la 5436) avec
+// ceux de packages/vpx-corrige/correctifs-libdof (voir son LISEZMOI). Cyber Pinball les pose à la place de ceux de
 // l'archive officielle (app/src/vpx-corrige.ts) ; les autres plugins et les bibliothèques restent ceux de la 5436.
-//   node scripts/vpx-corrige.mjs            -> build\vpx-corrige\VPinballX_BGFX64.exe (et .pdb), plugins\pup\plugin-pup64.dll
+//   node scripts/vpx-corrige.mjs            -> build\vpx-corrige\VPinballX_BGFX64.exe (et .pdb), plugins\pup\plugin-pup64.dll,
+//                                              plugins\dof\dof64.dll
+//   node scripts/vpx-corrige.mjs --libdof   -> dof64.dll seule (sans certificat : la construction complète la refait)
 //   node scripts/vpx-corrige.mjs --propre   -> repart de zéro (sources, dépendances et compilation)
 // Demande CMake, les outils C++ de Visual Studio (Build Tools 2022), curl et tar (fournis par Windows). Les sources
 // sont téléchargées une fois, au commit exact de la 5436 (et les dépendances à ceux de son platforms/config.sh) ;
@@ -26,13 +29,17 @@ const out = path.join(repo, 'build', 'vpx-corrige');
 export const VPX_CORRIGE_EXE = path.join(out, 'VPinballX_BGFX64.exe');
 /** Le plugin PuP corrigé, posé dans <VPX>\plugins\pup (build\vpx-corrige\plugins\pup, natif\vpx-corrige\plugins\pup). */
 export const VPX_CORRIGE_PUP = 'plugin-pup64.dll';
+/** La bibliothèque DOF corrigée (libdof), posée dans <VPX>\plugins\dof à côté du plugin-dof64.dll officiel. */
+export const VPX_CORRIGE_DOF = 'dof64.dll';
+/** Correctifs de libdof (série 6) : la recette les applique aux sources de la libdof de la 5436. */
+export const LIBDOF_PATCHES = path.join(VPX_CORRIGE_SOURCE, 'correctifs-libdof');
 
 /**
  * La version corrigée : commit de la 5436, révision gardée (le format des tables, les plugins et les réglages en
  * dépendent). `patch` : numéro de la série de correctifs, nommée en anglais partout où elle se voit (« patched Cyber
  * Pinball 1 ») : version produit de l'exécutable, journal de VPX, release des sources, fiche technique.
  */
-export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 5 };
+export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 6 };
 VPX_BASE.sha = `af26b2d93-patched-cyberpinball-${VPX_BASE.patch}`;
 
 const work = process.env.CYBERPINBALL_VPX_BUILD ?? path.join(process.env.LOCALAPPDATA ?? os.tmpdir(), 'cpvpx');
@@ -94,6 +101,7 @@ function readConfig(src) {
     ffmpeg: get('FFMPEG_SHA'),
     dmdutil: get('LIBDMDUTIL_SHA'),
     pinmame: get('PINMAME_SHA'),
+    libdof: get('LIBDOF_SHA'),
   };
 }
 
@@ -119,8 +127,8 @@ function msvcTool(name) {
   throw new Error(`${name} introuvable dans ${tools}`);
 }
 
-/** Bibliothèque d'import d'une DLL (ses exportations, relevées par dumpbin), pour lier sans reconstruire la DLL. */
-function importLibrary(dll, outLib) {
+/** Les noms exportés par une DLL (dumpbin /exports), dans l'ordre de sa table. */
+export function exportNames(dll) {
   const r = spawnSync(msvcTool('dumpbin.exe'), ['/exports', dll], { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) throw new Error(`dumpbin ${path.basename(dll)} : échec`);
   const names = [];
@@ -128,22 +136,47 @@ function importLibrary(dll, outLib) {
     const m = /^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]{8}\s+(\S+)/.exec(line);
     if (m) names.push(m[1]);
   }
+  return names;
+}
+
+/** Les DLL qu'une DLL charge (dumpbin /dependents), en minuscules. */
+export function dependentNames(dll) {
+  const r = spawnSync(msvcTool('dumpbin.exe'), ['/dependents', dll], { encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error(`dumpbin ${path.basename(dll)} : échec`);
+  return [...r.stdout.matchAll(/^\s+(\S+\.dll)\s*$/gim)].map((m) => m[1].toLowerCase());
+}
+
+/**
+ * Une DLL reconstruite doit pouvoir remplacer l'officielle sans rien changer pour qui la charge : mêmes exportations
+ * (plugin-dof64.dll, officiel, lie dof64.dll par ses noms décorés C++), et aucune bibliothèque que l'officielle ne
+ * charge pas déjà (sinon elle manquerait sur la borne). Renvoie les écarts, vide si elle convient.
+ */
+export function replacementGaps(official, rebuilt) {
+  const gaps = [];
+  const want = new Set(exportNames(official));
+  const got = new Set(exportNames(rebuilt));
+  if (!want.size) gaps.push(`${path.basename(official)} officielle : aucune exportation lue`);
+  for (const name of want) if (!got.has(name)) gaps.push(`exportation absente : ${name}`);
+  for (const name of got) if (!want.has(name)) gaps.push(`exportation en plus : ${name}`);
+  const loads = new Set(dependentNames(official));
+  for (const name of dependentNames(rebuilt)) if (!loads.has(name)) gaps.push(`bibliothèque chargée en plus : ${name}`);
+  return gaps;
+}
+
+/** Bibliothèque d'import d'une DLL (ses exportations, relevées par dumpbin), pour lier sans reconstruire la DLL. */
+function importLibrary(dll, outLib) {
+  const names = exportNames(dll);
   if (!names.length) throw new Error(`${path.basename(dll)} : aucune exportation`);
   const def = outLib.replace(/\.lib$/i, '.def');
   fs.writeFileSync(def, `LIBRARY ${path.basename(dll)}\r\nEXPORTS\r\n${names.map((n) => `  ${n}`).join('\r\n')}\r\n`);
   run(msvcTool('lib.exe'), ['/nologo', `/def:${def}`, '/machine:x64', `/out:${outLib}`], path.dirname(outLib), `bibliothèque d'import de ${path.basename(dll)}`);
 }
 
-/**
- * Ce que demande le plugin PuP (plugins\pup\plugin-pup64.dll, reconstruit pour 03-pup-label-sans-verrou.patch).
- * Ses bibliothèques restent celles de l'archive officielle : seuls leurs en-têtes sont téléchargés (SDL_image,
- * SDL_ttf, FFmpeg aux commits de platforms/config.sh, pupdmd.h au commit de libdmdutil), et les bibliothèques
- * d'import sont tirées des DLL de l'archive officielle.
- */
 /** Le projet Xcode de SDL_image et SDL_ttf : liens symboliques que Windows refuse d'extraire (exclus aussi par VPX). */
 const XCODE = ['*/Xcode/*'];
 
-function pupPluginDependencies(src, deps, lib, inc) {
+/** Le dossier d'un plugin dans l'archive officielle extraite (`plugins\pup`, `plugins\dof`), reconnu à l'une de ses DLL. */
+function officialPluginDir(name, dll) {
   const official = dependency('vpx-officiel', officialArchiveUrl(), (dir) => {
     const dl = path.join(work, 'dl');
     fs.mkdirSync(dl, { recursive: true });
@@ -155,17 +188,28 @@ function pupPluginDependencies(src, deps, lib, inc) {
     fs.mkdirSync(path.join(dir, 'x'), { recursive: true });
     run('tar.exe', ['-xf', zip, '-C', path.join(dir, 'x')], dir, 'extraction de VPX 10.8.1-5436 officiel');
   });
-  const pupDir = (function find(dir) {
+  const found = (function find(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!e.isDirectory()) continue;
       const p = path.join(dir, e.name);
-      if (e.name.toLowerCase() === 'pup' && fs.existsSync(path.join(p, 'plugin-pup64.dll'))) return p;
+      if (e.name.toLowerCase() === name && fs.existsSync(path.join(p, dll))) return p;
       const deeper = find(p);
       if (deeper) return deeper;
     }
     return undefined;
   })(path.join(official, 'x'));
-  if (!pupDir) throw new Error('archive officielle : plugins\\pup introuvable');
+  if (!found) throw new Error(`archive officielle : plugins\\${name} introuvable`);
+  return found;
+}
+
+/**
+ * Ce que demande le plugin PuP (plugins\pup\plugin-pup64.dll, reconstruit pour 03-pup-label-sans-verrou.patch).
+ * Ses bibliothèques restent celles de l'archive officielle : seuls leurs en-têtes sont téléchargés (SDL_image,
+ * SDL_ttf, FFmpeg aux commits de platforms/config.sh, pupdmd.h au commit de libdmdutil), et les bibliothèques
+ * d'import sont tirées des DLL de l'archive officielle.
+ */
+function pupPluginDependencies(src, deps, lib, inc) {
+  const pupDir = officialPluginDir('pup', 'plugin-pup64.dll');
   for (const name of ['SDL3_image64', 'SDL3_ttf64', 'pupdmd64']) importLibrary(path.join(pupDir, `${name}.dll`), path.join(lib, `${name}.lib`));
 
   const headers = dependency('pup-entetes', `${deps.sdlImage}-${deps.sdlTtf}-${deps.ffmpeg}-${deps.dmdutil}-${deps.pinmame}`, (dir) => {
@@ -188,6 +232,85 @@ function pupPluginDependencies(src, deps, lib, inc) {
     for (const sub of ['image', 'ttf', 'ffmpeg', 'dmdutil', 'pupdmd', 'pinmame']) fs.rmSync(path.join(dir, sub), { recursive: true, force: true });
   });
   for (const e of fs.readdirSync(path.join(headers, 'include'))) copy(path.join(headers, 'include', e), path.join(inc, e));
+}
+
+/** Les DLL de plugins\dof dont dof64.dll se sert, et le nom de leur bibliothèque d'import dans le CMakeLists de libdof. */
+const LIBDOF_LINKS = [
+  ['libusb64-1.0.dll', 'libusb64-1.0.lib'],
+  ['libserialport64-0.dll', 'libserialport64.lib'],
+  ['hidapi64.dll', 'hidapi64.lib'],
+  ['libftdi164.dll', 'libftdi164.lib'],
+];
+
+const libdofSrcDir = () => path.join(work, `libdof-${VPX_BASE.patch}`);
+const libdofBuildDir = () => path.join(work, `libdof-build-${VPX_BASE.patch}`);
+
+/**
+ * La bibliothèque DOF corrigée (série 6) : libdof au commit de la 5436 (LIBDOF_SHA de platforms/config.sh), avec les
+ * correctifs de correctifs-libdof, compilée par MSVC comme le fait VPX (platforms/windows-x64/external.sh). Ses
+ * dépendances (libusb, libserialport, hidapi, libftdi, construites par VPX avec MSYS2) restent les DLL de l'archive
+ * officielle : seuls leurs en-têtes sont téléchargés, aux commits du platforms/config.sh de libdof, et les
+ * bibliothèques d'import sont tirées des DLL officielles. include/DOF/DOF.h n'est pas touché : le plugin-dof64.dll
+ * officiel la charge telle quelle, ce que vérifie replacementGaps.
+ */
+function buildLibdof(cmake, deps) {
+  const patches = fs.readdirSync(LIBDOF_PATCHES).filter((f) => f.endsWith('.patch')).sort();
+  if (!patches.length) throw new Error('libdof : aucun correctif dans correctifs-libdof');
+  const patchKey = crypto.createHash('sha256');
+  for (const p of patches) patchKey.update(fs.readFileSync(path.join(LIBDOF_PATCHES, p)));
+  const key = `${deps.libdof}-${patchKey.digest('hex').slice(0, 16)}`;
+  const src = libdofSrcDir();
+  const stamp = `${src}.txt`;
+  if (!fs.existsSync(src) || !fs.existsSync(stamp) || fs.readFileSync(stamp, 'utf8').trim() !== key) {
+    const scratch = `${src}-x`;
+    const extracted = fetchTarball(`https://github.com/vpinball/libdof/archive/${deps.libdof}.tar.gz`, `libdof-${deps.libdof}.tar.gz`, scratch);
+    fs.rmSync(src, { recursive: true, force: true });
+    fs.renameSync(extracted, src);
+    fs.rmSync(scratch, { recursive: true, force: true });
+    for (const p of patches) run('git', ['apply', '--whitespace=nowarn', path.join(LIBDOF_PATCHES, p)], src, `libdof : correctif ${p}`);
+    fs.rmSync(libdofBuildDir(), { recursive: true, force: true });
+    fs.writeFileSync(stamp, key);
+  }
+
+  const config = fs.readFileSync(path.join(src, 'platforms', 'config.sh'), 'utf8');
+  const sha = (k) => {
+    const m = new RegExp(`^${k}=(\\S+)`, 'm').exec(config);
+    if (!m) throw new Error(`libdof platforms/config.sh : ${k} absent`);
+    return m[1];
+  };
+  const ext = { usb: sha('LIBUSB_SHA'), serial: sha('LIBSERIALPORT_SHA'), hid: sha('HIDAPI_SHA'), ftdi: sha('LIBFTDI_SHA') };
+  const headers = dependency('libdof-entetes', `${ext.usb}-${ext.serial}-${ext.hid}-${ext.ftdi}`, (dir) => {
+    // README.md de libusb : lien symbolique vers README, que Windows refuse d'extraire.
+    const usb = fetchTarball(`https://github.com/libusb/libusb/archive/${ext.usb}.tar.gz`, `libusb-${ext.usb}.tar.gz`, path.join(dir, 'usb'), ['*/README.md']);
+    copy(path.join(usb, 'libusb', 'libusb.h'), path.join(dir, 'include', 'libusb-1.0', 'libusb.h'));
+    const serial = fetchTarball(`https://github.com/sigrokproject/libserialport/archive/${ext.serial}.tar.gz`, `libserialport-${ext.serial}.tar.gz`, path.join(dir, 'serial'));
+    copy(path.join(serial, 'libserialport.h'), path.join(dir, 'include', 'libserialport.h'));
+    const hid = fetchTarball(`https://github.com/libusb/hidapi/archive/${ext.hid}.tar.gz`, `hidapi-${ext.hid}.tar.gz`, path.join(dir, 'hid'));
+    copy(path.join(hid, 'hidapi'), path.join(dir, 'include', 'hidapi'));
+    const ftdi = fetchTarball(`https://github.com/jsm174/libftdi/archive/${ext.ftdi}.tar.gz`, `libftdi-${ext.ftdi}.tar.gz`, path.join(dir, 'ftdi'));
+    copy(path.join(ftdi, 'src', 'ftdi.h'), path.join(dir, 'include', 'libftdi1', 'ftdi.h'));
+    for (const sub of ['usb', 'serial', 'hid', 'ftdi']) fs.rmSync(path.join(dir, sub), { recursive: true, force: true });
+  });
+  const inc = path.join(src, 'third-party', 'include');
+  for (const e of fs.readdirSync(path.join(headers, 'include'))) copy(path.join(headers, 'include', e), path.join(inc, e));
+
+  const dofDir = officialPluginDir('dof', VPX_CORRIGE_DOF);
+  const lib = path.join(src, 'third-party', 'build-libs', 'win', 'x64');
+  fs.mkdirSync(lib, { recursive: true });
+  for (const [dll, name] of LIBDOF_LINKS) importLibrary(path.join(dofDir, dll), path.join(lib, name));
+
+  const build = libdofBuildDir();
+  run(cmake, ['-S', src, '-B', build, ...GENERATOR, '-DPLATFORM=win', '-DARCH=x64', '-DBUILD_SHARED=ON', '-DBUILD_STATIC=OFF', '-DPOST_BUILD_COPY_EXT_LIBS=OFF'], src, 'libdof : configuration');
+  run(cmake, ['--build', build, '--config', 'Release', '--target', 'dof_shared', '--parallel'], src, 'libdof : compilation');
+  const built = path.join(build, 'Release', VPX_CORRIGE_DOF);
+  if (!fs.existsSync(built)) throw new Error(`libdof : ${VPX_CORRIGE_DOF} introuvable après la compilation (${built})`);
+  const gaps = replacementGaps(path.join(dofDir, VPX_CORRIGE_DOF), built);
+  if (gaps.length) throw new Error(`libdof : ${VPX_CORRIGE_DOF} ne peut pas remplacer l'officielle (${gaps.slice(0, 8).join(' ; ')}${gaps.length > 8 ? ` ; et ${gaps.length - 8} autres` : ''})`);
+  fs.mkdirSync(path.join(out, 'plugins', 'dof'), { recursive: true });
+  fs.copyFileSync(built, path.join(out, 'plugins', 'dof', VPX_CORRIGE_DOF));
+  // La licence de libdof voyage avec sa DLL.
+  fs.copyFileSync(path.join(src, 'LICENSE'), path.join(out, 'plugins', 'dof', 'LICENSE-libdof'));
+  return path.join(out, 'plugins', 'dof', VPX_CORRIGE_DOF);
 }
 
 /** Construit une dépendance si son repère (cache.txt) ne correspond pas. */
@@ -259,12 +382,21 @@ function withBuildLock(fn) {
   }
 }
 
-export function buildVpxCorrige({ clean = false, quiet = false } = {}) {
+export function buildVpxCorrige({ clean = false, quiet = false, dofOnly = false } = {}) {
   quietOutput = quiet;
   const cmake = cmakePath();
   if (!cmake) throw new Error('CMake absent (winget install Kitware.CMake).');
-  return withBuildLock(() => buildLocked(cmake, clean));
+  return withBuildLock(() => buildLocked(cmake, clean, dofOnly));
 }
+
+/** Les fichiers construits, que le certificat couvre (et que la fabrication livre). */
+const builtOutputs = () => [
+  VPX_CORRIGE_EXE,
+  path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP),
+  path.join(out, 'plugins', 'dof', VPX_CORRIGE_DOF),
+  path.join(out, 'plugins', 'dof', 'LICENSE-libdof'),
+  path.join(out, 'LICENSE'),
+];
 
 function buildInputs(cmake) {
   const located = spawnSync('where.exe', [cmake], { encoding: 'utf8', windowsHide: true });
@@ -273,21 +405,22 @@ function buildInputs(cmake) {
   return filesFingerprint([
     fileURLToPath(import.meta.url), path.join(repo, 'scripts', 'vpx-cache.mjs'),
     path.join(repo, 'scripts', 'casque-vr.mjs'),
-    path.join(VPX_CORRIGE_SOURCE, 'correctifs'),
+    path.join(VPX_CORRIGE_SOURCE, 'correctifs'), LIBDOF_PATCHES,
     path.join(repo, 'packages', 'installer', 'components.json'),
     vpxCorrigeSrcDir(), path.join(vpxBuildDir(), 'CMakeCache.txt'), cmakeExe,
+    libdofSrcDir(), path.join(libdofBuildDir(), 'CMakeCache.txt'),
     // cl.exe charge notamment c1xx.dll et c2.dll : le pilote seul ne décrit pas le compilateur.
     path.dirname(msvcTool('cl.exe')),
   ]);
 }
 
-function buildLocked(cmake, clean) {
+function buildLocked(cmake, clean, dofOnly) {
   const certificate = path.join(vpxBuildDir(), 'construit.json');
-  const outputs = [VPX_CORRIGE_EXE, path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP), path.join(out, 'LICENSE')];
-  if (!clean && fs.existsSync(certificate)) {
+  const outputs = builtOutputs();
+  if (!clean && !dofOnly && fs.existsSync(certificate)) {
     try {
       if (matchingBuild(certificate, buildInputs(cmake), outputs)) {
-        console.log('VPX corrigé : exécutable et plugin PuP vérifiés, compilation réutilisée.');
+        console.log('VPX corrigé : exécutable, plugin PuP et bibliothèque DOF vérifiés, compilation réutilisée.');
         return VPX_CORRIGE_EXE;
       }
     } catch {
@@ -295,8 +428,7 @@ function buildLocked(cmake, clean) {
     }
   }
   if (clean) {
-    fs.rmSync(vpxCorrigeSrcDir(), { recursive: true, force: true });
-    fs.rmSync(vpxBuildDir(), { recursive: true, force: true });
+    for (const dir of [vpxCorrigeSrcDir(), vpxBuildDir(), libdofSrcDir(), libdofBuildDir()]) fs.rmSync(dir, { recursive: true, force: true });
   }
   fs.rmSync(certificate, { force: true });
   if (clean) for (const shared of ['dl', 'ext']) fs.rmSync(path.join(work, shared), { recursive: true, force: true });
@@ -322,6 +454,7 @@ function buildLocked(cmake, clean) {
     fs.writeFileSync(srcStamp, srcKey);
   }
   const deps = readConfig(src);
+  if (dofOnly) return buildLibdof(cmake, deps);
   const lib = path.join(src, 'third-party', 'build-libs', 'windows-x64');
   const inc = path.join(src, 'third-party', 'include');
   fs.mkdirSync(lib, { recursive: true });
@@ -408,14 +541,16 @@ function buildLocked(cmake, clean) {
   fs.copyFileSync(pup, path.join(out, 'plugins', 'pup', VPX_CORRIGE_PUP));
   // La licence de VPX (GPLv3+ et licence héritée de MAME) voyage avec le binaire.
   fs.copyFileSync(path.join(src, 'LICENSE'), path.join(out, 'LICENSE'));
+  // La bibliothèque DOF (série 6) : libdof de la 5436 corrigée, chargée par le plugin-dof64.dll officiel.
+  buildLibdof(cmake, deps);
   saveBuild(certificate, buildInputs(cmake), outputs, writeFileAtomic);
   return VPX_CORRIGE_EXE;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const exe = buildVpxCorrige({ clean: process.argv.includes('--propre') });
-    console.log(`VPX corrigé : ${exe}`);
+    const built = buildVpxCorrige({ clean: process.argv.includes('--propre'), dofOnly: process.argv.includes('--libdof') });
+    console.log(`VPX corrigé : ${built}`);
   } catch (error) {
     console.error(`VPX corrigé : ${error.message}`);
     process.exit(1);

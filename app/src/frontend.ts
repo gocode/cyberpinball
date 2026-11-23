@@ -451,7 +451,7 @@ import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, probeVr, rememberVrSettings, restoreVrTableIni, writeIniSettings,  } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace } from './casque';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
-import { installVpxCorrige, installVpxCorrigeAtStartup } from './vpx-corrige';
+import { installVpxCorrige, installVpxCorrigeAtStartup, vpxCorrigeInPlace } from './vpx-corrige';
 import { prepareVpxClr } from './vpx-clr';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
@@ -6340,7 +6340,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     const changedFiles = result.failure === 'crash' && result.logWritten === false ? vpxChangedFiles(loc) : [];
     rememberLaunch(result, table.title, changedFiles);
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
-    const message = explain(result, table, repaired, Boolean(double), changedFiles);
+    // Série du VPX corrigé en place (vpx-corrige.ts) : un défaut qu'elle corrige ne se dit pas « à venir » (vpxfailure.ts).
+    const vpxPatch = simulated === undefined && !otherVpx ? vpxCorrigeInPlace(path.dirname(install.exe), install.version, path.join(__dirname, '..')) : undefined;
+    const message = explain(result, table, repaired, Boolean(double), changedFiles, vpxPatch);
     // Plantage de VPX : le rapport automatique (avec l'accord), ou la question au premier plantage, en quittant l'écran.
     if (result.failure === 'crash' && message.report && library.feedback) noteCrashOutcome(message, library.feedback.crashed(message.report.signature, table.title, message.report.about));
     state = { ...state, phase: 'message', message };
@@ -6811,12 +6813,13 @@ function tableScriptText(table: TableEntry): string | undefined {
  * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé. `repaired` : le script
  * vient d'être corrigé pour le core.vbs actuel (repairScriptStop), la partie suivante démarre.
  */
-function explain(result: LaunchResult, table: TableEntry, repaired?: string, live = false, changedFiles: readonly string[] = []): Message {
+function explain(result: LaunchResult, table: TableEntry, repaired?: string, live = false, changedFiles: readonly string[] = [], vpxPatch?: number): Message {
   // Arrêt reconnu dans le journal de VPX (vpxfailure.ts) : la vraie raison, et Start relance la
   // table, ou ouvre la partie entre amis ; jamais « ce qu'il manque pour jouer », rien ne manque.
   const known = repaired ? undefined : diagnoseVpxFailure(result.logTail, result.exitCode, path.basename(tableScriptFile(table) ?? table.file), tableScriptText(table), {
     ...(result.logWritten !== undefined && { logWritten: result.logWritten }),
     changedFiles,
+    ...(vpxPatch !== undefined && { vpxPatch }),
   });
   if (known) {
     console.log(known.journal);

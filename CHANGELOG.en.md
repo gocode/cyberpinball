@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Patched VPX "patched Cyber Pinball 6": on a cabinet with DudesCab boards, VPX no longer crashes while closing (0xC0000005) when DOF is unloaded. The VPX 10.8.1 DOF library shut the board down a second time after it was really closed; Cyber Pinball now installs before every game a DOF library (`plugins/dof/dof64.dll`) rebuilt with the fixes its authors have published since. The VPX DOF plugin and your configuration do not change.
+- If VPX still crashes this way while closing, the failure screen says so clearly: the game was played, nothing needs fixing in the table, it is a known flaw of the VPX 10.8.1 DOF library, fixed from patch set 6 of Cyber Pinball's VPX on.
 - Table framing (beta): System menu › My cabinet › VPX › Table framing. On a cabinet, a table cannot fill a 16:9 screen without a compromise: you choose between "Full screen, apron cropped" (default), "Whole table" and "Full screen, table widened", each shown on your own table, rendered by VPX without anything appearing on the cabinet.
 - Point of view of a table: each framing is shown there on a picture of the table, another style can be chosen for that table alone, and "Restore the previous framing" goes back. A table taken over before this version gets back the framing of its original installation if that installation is still on the disk.
 - A table's journey offers "Choose the framing" and, when the VPS database knows one, a community POV.

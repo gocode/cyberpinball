@@ -188,15 +188,21 @@ for (const name of fs.readdirSync(installerDir)) {
 // ou en cas d'échec, l'application part sans lui et les parties gardent les fichiers officiels. Les correctifs et leur
 // recette vont avec (licence GPL de VPX : les sources des changements accompagnent le binaire).
 {
-  const { buildVpxCorrige, VPX_CORRIGE_SOURCE, VPX_CORRIGE_PUP } = await import('./vpx-corrige.mjs');
+  const { buildVpxCorrige, VPX_CORRIGE_SOURCE, VPX_CORRIGE_PUP, VPX_CORRIGE_DOF } = await import('./vpx-corrige.mjs');
   try {
     const exe = buildVpxCorrige({ quiet: true });
     const dir = path.join(stage, 'natif', 'vpx-corrige');
-    fs.mkdirSync(path.join(dir, 'correctifs'), { recursive: true });
+    fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(exe, path.join(dir, path.basename(exe)));
     fs.mkdirSync(path.join(dir, 'plugins', 'pup'), { recursive: true });
     fs.copyFileSync(path.join(path.dirname(exe), 'plugins', 'pup', VPX_CORRIGE_PUP), path.join(dir, 'plugins', 'pup', VPX_CORRIGE_PUP));
-    for (const f of fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs'))) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, 'correctifs', f), path.join(dir, 'correctifs', f));
+    // La bibliothèque DOF corrigée (série 6) et sa licence (libdof).
+    fs.mkdirSync(path.join(dir, 'plugins', 'dof'), { recursive: true });
+    for (const f of [VPX_CORRIGE_DOF, 'LICENSE-libdof']) fs.copyFileSync(path.join(path.dirname(exe), 'plugins', 'dof', f), path.join(dir, 'plugins', 'dof', f));
+    for (const patches of ['correctifs', 'correctifs-libdof']) {
+      fs.mkdirSync(path.join(dir, patches), { recursive: true });
+      for (const f of fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, patches))) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, patches, f), path.join(dir, patches, f));
+    }
     for (const doc of ['LISEZMOI.md', 'README.md']) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, doc), path.join(dir, doc));
     fs.copyFileSync(path.join(path.dirname(exe), 'LICENSE'), path.join(dir, 'LICENSE'));
     console.log(`VPX corrigé : ${path.join('natif', 'vpx-corrige', path.basename(exe))}`);

@@ -152,6 +152,12 @@ export const messages: Record<string, string> = {
   'La partie s’est jouée jusqu’au bout : VPX s’est arrêté ({exit}) après sa fin, en se fermant.': 'The game was played to the end: VPX stopped ({exit}) after it, while closing.',
   'Pendant la fermeture, le plugin DMDUtil de VPX a relancé la recherche du DMD réel (ZeDMD), puis a été déchargé avant qu’elle finisse. C’est un défaut de VPX 10.8.1, pas de la table ; Cyber Pinball fait désormais attendre la fin de cette recherche.': 'While closing, VPX’s DMDUtil plugin started looking for the real DMD (ZeDMD) again, then was unloaded before it finished. This is a VPX 10.8.1 flaw, not the table’s; Cyber Pinball now waits for that search to end.',
   'Rien n’est à réparer dans la table : une autre partie peut se dérouler normalement.': 'Nothing needs fixing in the table: another game can run normally.',
+  'Il déchargeait sa bibliothèque DOF, qui pilote ta carte DudesCab. Rien n’est à réparer dans la table : c’est un défaut connu de la bibliothèque DOF de VPX 10.8.1, qui arrêtait la carte une seconde fois après sa vraie fermeture.':
+    'It was unloading its DOF library, which drives your DudesCab board. Nothing needs fixing in the table: this is a known flaw of the VPX 10.8.1 DOF library, which shut the board down a second time after it was really closed.',
+  'Le VPX de Cyber Pinball le corrige depuis la série {fixed}, et il était en place (série {patch}) : ce plantage a donc une autre cause. Le rapport aidera à la trouver.':
+    'Cyber Pinball’s VPX fixes it since patch set {fixed}, and it was in place (patch set {patch}): this crash has another cause. The report will help find it.',
+  'C’est corrigé dans le VPX de Cyber Pinball à partir de la série {fixed} (« patched Cyber Pinball {fixed} »), posé avant chaque partie sur VPX 10.8.1-5436.':
+    'It is fixed in Cyber Pinball’s VPX from patch set {fixed} on (“patched Cyber Pinball {fixed}”), installed before every game on VPX 10.8.1-5436.',
   'Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.': 'Game with friends: the others carry on; your score counts up to the stop.',
   'Start : rejouer la table': 'Start: play the table again',
   'Start : voir la partie entre amis': 'Start: see the game with friends',

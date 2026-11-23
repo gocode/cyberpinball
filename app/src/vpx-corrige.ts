@@ -9,6 +9,9 @@
 //   les pré-réglages de qualité (mode Auto).
 // - l'exécutable encore (série 5, 23/11/2026) : import automatique des cadrages POV sans éditeur,
 //   et lecture sûre des champs numériques anciens vides ou illisibles.
+// - la bibliothèque DOF plugins/dof/dof64.dll (série 6, 23/11/2026) : la libdof de la 5436 arrêtait une carte DudesCab
+//   une seconde fois en se déchargeant, après sa vraie fermeture, et VPX plantait en se fermant (0xC0000005) ; report
+//   des correctifs amont 0383246 et c79bcff. Le plugin-dof64.dll officiel la charge telle quelle (DOF.h inchangé).
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -24,7 +27,7 @@ import { renameWithRetry } from '@cyberpinball/core';
 export const VPX_CORRIGE_VERSION = '10.8.1-5436';
 export const VPX_CORRIGE_EXE = 'VPinballX_BGFX64.exe';
 /** Les fichiers remplacés, relatifs au dossier de VPX (séparateur « / », comme components.json). L'exécutable d'abord. */
-export const VPX_CORRIGE_FILES: readonly string[] = [VPX_CORRIGE_EXE, 'plugins/pup/plugin-pup64.dll'];
+export const VPX_CORRIGE_FILES: readonly string[] = [VPX_CORRIGE_EXE, 'plugins/pup/plugin-pup64.dll', 'plugins/dof/dof64.dll'];
 
 /** Les dossiers où chercher le corrigé : fabriqué avec l'application (natif\vpx-corrige), ou construit (build\vpx-corrige). */
 function corrigeDirs(appDir: string): string[] {
@@ -132,8 +135,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 5 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 5;
+/** Série de correctifs livrée (« patched Cyber Pinball 6 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 6;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

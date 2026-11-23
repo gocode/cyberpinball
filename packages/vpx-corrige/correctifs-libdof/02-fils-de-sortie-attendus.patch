@@ -1,0 +1,26 @@
+Backport onto libdof eef645d9 (the libdof of VPX 10.8.1-5436) of the FinishUpdaterThread part of upstream libdof
+commit c79bcff ("misc: join updater threads instead of detaching", 2026-10-24). An output controller's updater
+thread that did not stop within one second was detached, then kept running while the controller was destroyed;
+it is now always joined.
+
+diff --git a/src/cab/out/OutputControllerCompleteBase.cpp b/src/cab/out/OutputControllerCompleteBase.cpp
+--- a/src/cab/out/OutputControllerCompleteBase.cpp
++++ b/src/cab/out/OutputControllerCompleteBase.cpp
+@@ -242,13 +242,10 @@ void OutputControllerCompleteBase::FinishUpdaterThread()
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+       }
+
+-      if (m_updaterThreadFinished)
+-         m_updaterThread->join();
+-      else
+-      {
+-         Log::Warning("Updater thread did not quit within timeout. Thread termination may be forceful.");
+-         m_updaterThread->detach();
+-      }
++      // Modified by Cyber Pinball, 2026-11-23 (patched Cyber Pinball 6): backport of upstream c79bcff, join instead of detach.
++      if (!m_updaterThreadFinished)
++         Log::Warning("Updater thread did not quit within timeout. Waiting for it to finish.");
++      m_updaterThread->join();
+       m_updaterThread.reset();
+    }
+ }

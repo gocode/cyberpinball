@@ -6,6 +6,7 @@
 // fichiers de VPX ne le prend pas pour une modification, mais voit toujours un autre exécutable ; la fabrication le
 // livre avec son correctif et son LISEZMOI (GPL) ; le correctif reste celui qui bride les fenêtres annexes.
 // Série 3 (21/11/2026, The Matrix) : le plugin PuP corrigé est posé de même, et son correctif décode sans le verrou.
+// Série 6 (23/11/2026, bornes à DudesCab) : la bibliothèque DOF (dof64.dll, libdof corrigée) est posée de même.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -190,7 +191,77 @@ test('correctif 03, plugin PuP : le label décode son image sans garder son verr
   assert.match(recette, /'--target', 'vpinball', 'PUPPlugin'/);
   const sources = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige-sources.mjs'), 'utf8');
   for (const lib of ['SDL_image-', 'SDL_ttf-', 'FFmpeg-', 'libdmdutil-', 'libpupdmd-']) assert.ok(sources.includes(`'${lib}'`), `sources complètes : ${lib}`);
-  assert.deepEqual((corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES, ['VPinballX_BGFX64.exe', 'plugins/pup/plugin-pup64.dll']);
+  assert.deepEqual((corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES.slice(0, 2), ['VPinballX_BGFX64.exe', 'plugins/pup/plugin-pup64.dll']);
+});
+
+test('série 6, bibliothèque DOF : posée à côté du plugin-dof64.dll officiel, qui n’est jamais touché', () => {
+  // Rapports du 19/11 et du 23/11/2026 (bornes à DudesCab) : VPX plantait en se fermant, pendant le déchargement de DOF.
+  const DOF = path.join('plugins', 'dof', 'dof64.dll');
+  const PLUGIN = path.join('plugins', 'dof', 'plugin-dof64.dll');
+  const { root, app, vpx } = setup();
+  try {
+    fs.mkdirSync(path.join(app, 'natif', 'vpx-corrige', 'plugins', 'dof'), { recursive: true });
+    fs.writeFileSync(path.join(app, 'natif', 'vpx-corrige', DOF), Buffer.alloc(70, 6));
+    fs.mkdirSync(path.join(vpx, 'plugins', 'dof'), { recursive: true });
+    fs.writeFileSync(path.join(vpx, DOF), Buffer.alloc(60, 7));
+    fs.writeFileSync(path.join(vpx, PLUGIN), Buffer.alloc(10, 8));
+    assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'installed');
+    assert.deepEqual(fs.readFileSync(path.join(vpx, DOF)), Buffer.alloc(70, 6));
+    assert.deepEqual(fs.readdirSync(path.join(vpx, 'plugins', 'dof')).sort(), ['dof64.dll', 'dof64.dll.officiel', 'plugin-dof64.dll']);
+    assert.deepEqual(fs.readFileSync(path.join(vpx, PLUGIN)), Buffer.alloc(10, 8), 'le plugin officiel charge la libdof corrigée telle quelle');
+    const inPlace = (corrige as unknown as { vpxCorrigeInPlace(d: string, v: string | undefined, a: string): number | undefined }).vpxCorrigeInPlace;
+    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
+    // « Remettre les fichiers d'origine » a remis l'officielle : la série n'est plus en place, et la partie suivante la repose.
+    fs.writeFileSync(path.join(vpx, DOF), Buffer.alloc(60, 7));
+    assert.equal(inPlace(vpx, corrige.VPX_CORRIGE_VERSION, app), undefined);
+    assert.equal(corrige.installVpxCorrige(vpx, corrige.VPX_CORRIGE_VERSION, app), 'installed');
+    assert.deepEqual(fs.readFileSync(path.join(vpx, `${DOF}.officiel`)), Buffer.alloc(60, 7));
+    assert.equal(corrige.vpxCorrigeSizes(app, corrige.VPX_CORRIGE_VERSION)['plugins/dof/dof64.dll'], 70, 'la vérification des fichiers de VPX l’accepte');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('série 6 : correctifs de libdof (amont 0383246 et c79bcff), recette, fabrication, sources et diagnostic accordés', () => {
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs-libdof');
+  const patches = fs.readdirSync(dir).sort();
+  assert.deepEqual(patches, ['01-dudescab-sans-second-arret.patch', '02-fils-de-sortie-attendus.patch']);
+  const diffs = patches.map((p) => fs.readFileSync(path.join(dir, p), 'utf8'));
+  for (const diff of diffs) {
+    assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de libdof');
+    assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 6\)/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
+    // Le plugin-dof64.dll officiel charge dof64.dll par l'interface de DOF.h : elle ne change pas.
+    assert.doesNotMatch(diff, /^diff --git a\/include\//m, 'aucun en-tête public de libdof touché');
+    assert.doesNotMatch(diff, /@[a-z0-9-]+\.(com|org|net)/i, 'pas d’adresse électronique recopiée de l’amont');
+  }
+  const added = (diff: string, marker: string) => diff.split('\n').filter((l) => l.startsWith(marker) && !l.startsWith(marker.repeat(3))).join('\n');
+  assert.match(added(diffs[0]!, '-'), /DudesCab::~DudesCab\(\) \{ Finish\(\); \}/, 'le destructeur relançait Finish');
+  assert.match(added(diffs[0]!, '+'), /DudesCab::~DudesCab\(\) \{ \}/);
+  assert.match(added(diffs[0]!, '-'), /m_dev->AllOff\(\);/);
+  assert.doesNotMatch(added(diffs[0]!, '+'), /AllOff/, 'plus d’AllOff après la vraie fermeture');
+  assert.match(added(diffs[1]!, '-'), /m_updaterThread->detach\(\);/);
+  assert.match(added(diffs[1]!, '+'), /m_updaterThread->join\(\);/);
+  assert.doesNotMatch(added(diffs[1]!, '+'), /detach\(\)/);
+
+  const recette = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige.mjs'), 'utf8');
+  assert.match(recette, /'--target', 'dof_shared'/);
+  assert.match(recette, /replacementGaps\(path\.join\(dofDir, VPX_CORRIGE_DOF\), built\)/, 'exportations et dépendances comparées à l’officielle');
+  assert.match(recette, /LIBDOF_PATCHES,/, 'les correctifs de libdof font partie des entrées du certificat');
+  assert.match(recette, /path\.join\(out, 'plugins', 'dof', VPX_CORRIGE_DOF\)/, 'la DLL fait partie des sorties du certificat');
+  const fabriquer = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
+  assert.match(fabriquer, /\[VPX_CORRIGE_DOF, 'LICENSE-libdof'\]/, 'la DLL et sa licence partent avec l’application');
+  assert.match(fabriquer, /\['correctifs', 'correctifs-libdof'\]/);
+  const sources = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige-sources.mjs'), 'utf8');
+  for (const lib of ['libdof-', 'libusb-', 'libserialport-', 'hidapi-', 'libftdi-']) assert.ok(sources.includes(`'${lib}'`), `sources complètes : ${lib}`);
+  assert.ok(sources.includes('plugins/dof/dof64.dll'), 'la release des sources nomme la DLL');
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, '.gitattributes'), 'utf8'), /^packages\/vpx-corrige\/correctifs-libdof\/\*\.patch -text$/m);
+
+  const files = (corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES;
+  assert.ok(files.includes('plugins/dof/dof64.dll'));
+  assert.ok(!files.includes('plugins/dof/plugin-dof64.dll'), 'le plugin DOF reste l’officiel');
+  // L'écran d'échec annonce la correction à partir de la série qui la livre : jamais d'une série pas encore livrée.
+  const { DOF_UNLOAD_FIXED_IN } = require(path.join(REPO_ROOT, 'packages', 'core', 'dist', 'vpxfailure.js')) as { DOF_UNLOAD_FIXED_IN: number };
+  assert.ok(DOF_UNLOAD_FIXED_IN <= (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
 });
 
 test('correctif 05 : import POV sans éditeur et champs anciens vides protégés, banc natif avec conservation des réglages', () => {
