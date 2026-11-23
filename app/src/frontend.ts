@@ -464,7 +464,7 @@ import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { createActivityMenu, type MessageKind } from './activity-menu';
 import { createTeamThreads } from './team-threads';
-import { language as uiLanguage, loadFeedbackState as loadFeedbackStateFile, type FeedbackPerson as FeedbackSigner } from '@cyberpinball/core';
+import { headsetWanted, language as uiLanguage, loadFeedbackState as loadFeedbackStateFile, type FeedbackPerson as FeedbackSigner } from '@cyberpinball/core';
 import { createInboxMenu, type InboxLink, type InboxThread } from './inbox-menu';
 import { createLocalPlayItem } from './local-play';
 import { createNewsMenu } from './news-menu';
@@ -4504,7 +4504,16 @@ export function startFrontend(): void {
   setScreensBusy(() => Boolean(playing || launch));
   vrFront.headset = new HeadsetMenu({
     appDir: path.join(__dirname, '..'),
-    wanted: () => !vrFront.headsetPaused && !closing && (Boolean(HEADSET_TRIAL_DIR) || (vrFront.vrMode === 'auto' && probeVr().ready)),
+    wanted: () =>
+      headsetWanted({
+        paused: vrFront.headsetPaused,
+        closing,
+        trial: Boolean(HEADSET_TRIAL_DIR),
+        vrAuto: vrFront.vrMode === 'auto',
+        gameBusy: Boolean(playing || launch),
+        running: Boolean(vrFront.headset?.running),
+        ready: () => probeVr().ready,
+      }),
     loader: () => {
       const exe = vpxInstall(loc)?.exe;
       const loader = exe && path.join(path.dirname(exe), 'openxr_loader64.dll');

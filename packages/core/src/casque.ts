@@ -196,3 +196,34 @@ export function headsetProtocol(panels: readonly HeadsetPanel[]): string[] {
     'fin',
   ];
 }
+
+/** Ce que le front-end sait quand il se demande s'il faut le compagnon du casque (relu toutes les 2 s). */
+export interface HeadsetWantedState {
+  /** Partie dans le casque : le compagnon a rendu la main à VPX. */
+  paused: boolean;
+  /** Cyber Pinball se ferme. */
+  closing: boolean;
+  /** Essai sans casque (CYBERPINBALL_CASQUE_ESSAI). */
+  trial: boolean;
+  /** Réalité virtuelle réglée sur « auto ». */
+  vrAuto: boolean;
+  /** Un lancement ou une partie de VPX en cours. */
+  gameBusy: boolean;
+  /** Un compagnon tourne déjà (il garde le casque jusqu'à la relève par VPX). */
+  running: boolean;
+  /** Runtime OpenXR présent : lu seulement quand la réponse en dépend (registre et fichier). */
+  ready(): boolean;
+}
+
+/**
+ * Le compagnon doit-il tourner ? Jamais de compagnon neuf pendant un lancement ou une partie : casque
+ * absent, chaque essai (toutes les 15 s) ouvre une session OpenXR et rend les écrans hors écran pour lui,
+ * ce qui fait sauter des images à VPX (rapport 8OktjS0kVy, 23/11/2026 : 115 images/s au lieu de 119,9,
+ * 99e centile à 24 ms au lieu de 9, sur toutes les tables, option VR restée activée casque retiré) ;
+ * casque présent, VPX le prend lui-même. Celui qui tourne déjà au lancement garde le casque jusqu'à la relève.
+ */
+export function headsetWanted(s: HeadsetWantedState): boolean {
+  if (s.paused || s.closing) return false;
+  if (s.gameBusy && !s.running) return false;
+  return s.trial || (s.vrAuto && s.ready());
+}

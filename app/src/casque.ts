@@ -81,7 +81,10 @@ export function headsetExe(appDir: string): string | undefined {
 
 export interface HeadsetMenuOptions {
   appDir: string;
-  /** Doit-il tourner maintenant ? (réalité virtuelle activée, runtime présent, pas de partie en cours) */
+  /**
+   * Doit-il tourner maintenant ? (réalité virtuelle activée, runtime présent, pas de partie en cours :
+   * headsetWanted, packages/core/src/casque.ts, qui ne relance jamais de compagnon pendant une partie).
+   */
   wanted(): boolean;
   /** Chargeur OpenXR de la copie de VPX. */
   loader(): string | undefined;
