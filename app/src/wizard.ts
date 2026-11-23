@@ -669,11 +669,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     await delay(400);
     // L'étape où chaque geste a mené : les essais suivent le parcours, clic après clic.
     console.log(`Autopilote : ${code} → ${wizard.phase}${wizard.quit ? ' (question de sortie)' : ''}`); // i18n-ignore : console de l'autopilote
-    for (const [i, win] of windows.entries()) {
-      const name = `${String(step).padStart(2, '0')}-${code.replace(/[^\w-]+/g, '_').slice(0, 40)}-ecran${i + 1}`;
-      await layout.check(win.webContents, name);
-      if (captureDir) fs.writeFileSync(path.join(captureDir, `${name}.png`), (await win.webContents.capturePage()).toPNG());
-    }
+    // Les quatre écrans inspectés en même temps (LayoutReport.checkAll), puis capturés.
+    const pages = windows.map((win, i) => ({ win, contents: win.webContents, where: `${String(step).padStart(2, '0')}-${code.replace(/[^\w-]+/g, '_').slice(0, 40)}-ecran${i + 1}` }));
+    await layout.checkAll(pages);
+    if (captureDir) for (const { win, where } of pages) fs.writeFileSync(path.join(captureDir, `${where}.png`), (await win.webContents.capturePage()).toPNG());
   }
   layout.save();
   quit();

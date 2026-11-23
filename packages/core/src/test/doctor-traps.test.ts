@@ -535,6 +535,14 @@ const TRAPS: Trap[] = [
     code: 'manualView',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n'),
   },
+  // Cadrage de l'installation d'origine figé à l'ajout (origin-framing.ts, 23/11/2026) : dit pour information.
+  {
+    code: 'originFraming',
+    arm: (folder) => {
+      write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 1\r\nCabinetAutofitKeepTop = 0\r\n');
+      write(path.join(folder, `${TABLE}.info`), JSON.stringify({ CyberPinball: { framing: { from: 'VPX 10.8.1.5436', mode: 'auto', shape: 'landscape', keys: ['CabinetAutofitMode', 'CabinetAutofitKeepTop'] } } }));
+    },
+  },
   // Vue de borne réglée pour la table sous un VPX d'avant 10.8.1 (reprise d'une installation PinUP Popper, 17/11/2026).
   { code: 'importedView', arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[TableOverride]\r\nViewCabHOfs = 1.5\r\nViewCabVOfs = 8\r\nViewCabScaleY = 1.04\r\n') },
   // Fichier POV de la communauté posé avec la table (povview.ts) : rien de choisi pour elle, il est repris.

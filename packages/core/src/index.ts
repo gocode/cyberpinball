@@ -47,6 +47,7 @@ export * from './transfer';
 export * from './ratelimit';
 export * from './tablefiles';
 export * from './povview';
+export * from './origin-framing';
 export { hasOwnCabinetView } from './tableview';
 export * from './tablecontents';
 export * from './doctor';

@@ -192,7 +192,7 @@ test('fiche > Point de vue : le cadrage choisi pour la table, le retour à celui
   assert.match(String((importPovOps(s.entry().file, path.join(elsewhere, 'rien.ini')) as { error: string }).error), /ne contient pas de point de vue de borne/);
   assert.match(String((importPovOps(s.entry().file, path.join(elsewhere, 'a.txt')) as { error: string }).error), /n’est pas un fichier de point de vue/);
   // Sans le sens de la borne : jamais appliqué.
-  assert.match(tablePovState(s.entry().file).refused ?? '', /relancez l’assistant d’écrans/);
+  assert.match(tablePovState(s.entry().file).refused ?? '', /relance l’assistant d’écrans/);
   fs.rmSync(elsewhere, { recursive: true, force: true });
   s.done();
 });

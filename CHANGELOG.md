@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Tables reprises d'une autre installation (PinUP Popper, PinballY, dossier de VPX) : elles gardent exactement le cadrage qu'elles avaient. Cyber Pinball lit les réglages du VPX qui les jouait (son VPinballX.ini, ou le registre pour un VPX d'avant 10.8) et fige pour chacune son mode (Manuel, Ajuster, Remplir), les mesures de l'écran et la vue qu'il lisait, sans jamais toucher à l'installation d'origine. Un POV posé à côté de la table, que l'ancien VPX ignorait, n'est plus appliqué d'office. Fiche > Gérer la table… > Point de vue l'affiche (« Cadrage de l'installation d'origine ») et permet de passer au cadrage de la borne.
 - Un fichier temporaire encore ouvert ne bloque plus l’annulation ni la fin d’un ajout de table. Le nettoyage réessaie en arrière-plan ; s’il reste impossible, les fichiers temporaires sont conservés et la navigation continue.
 - La mesure des couleurs ne cumule plus les vidéos des tables quittées : une seule mesure reste active et les sujets remplacés sont abandonnés. Un média momentanément illisible attend avant d’être réessayé.
 - Les lecteurs cachés utilisés pour mesurer une vidéo libèrent leur décodeur après une réussite, une erreur ou un délai dépassé. Une recherche d’image qui ne répond plus est interrompue et une page de conversion dont le rendu est tombé est recréée au prochain usage.

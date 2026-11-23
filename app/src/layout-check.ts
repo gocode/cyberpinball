@@ -800,6 +800,29 @@ export class LayoutReport {
   }
 
   async check(contents: WebContents, where: string): Promise<void> {
+    this.record(where, await this.inspect(contents));
+  }
+
+  /**
+   * Plusieurs fenêtres d'un coup : chacune a son processus de rendu, elles sont inspectées en même
+   * temps, et leurs problèmes notés dans l'ordre donné. L'une après l'autre, l'assistant (quatre
+   * écrans, jusqu'à 2 s d'attente des animations chacun) passait environ 5 s par touche rejouée :
+   * l'essentiel des tests de l'assistant (23/11/2026).
+   */
+  async checkAll(pages: { contents: WebContents; where: string }[]): Promise<void> {
+    const found = await Promise.all(pages.map(({ contents }) => this.inspect(contents)));
+    pages.forEach(({ where }, i) => this.record(where, found[i]!));
+  }
+
+  private record(where: string, problems: string[]): void {
+    for (const problem of problems) {
+      const line = `${where} : ${problem}`;
+      console.log(`Mise en page : ${line}`);
+      this.lines.push(line);
+    }
+  }
+
+  private async inspect(contents: WebContents): Promise<string[]> {
     const errors = this.watch(contents);
     await contents.executeJavaScript(SETTLED).catch(() => undefined);
     let now: Stable | undefined;
@@ -816,11 +839,7 @@ export class LayoutReport {
     } catch {
       drifts = [];
     }
-    for (const problem of [...errors.splice(0), ...(await checkLayout(contents)), ...shifts, ...drifts]) {
-      const line = `${where} : ${problem}`;
-      console.log(`Mise en page : ${line}`);
-      this.lines.push(line);
-    }
+    return [...errors.splice(0), ...(await checkLayout(contents)), ...shifts, ...drifts];
   }
 
   /** Écrit le relevé (même vide : son absence voudrait dire que le contrôle n'a pas tourné). */

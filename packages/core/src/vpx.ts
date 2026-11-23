@@ -289,6 +289,16 @@ export function isVpxAutofit(raw: string | undefined): boolean {
   return vpxEnum(raw, AUTOFIT_LABELS, 0) !== 0;
 }
 
+/** CabinetAutofitMode as VPX reads it: 0 Manual, 1 Fit Table, 2 Fit Screen (a label or a number; else Manual). */
+export function vpxAutofitMode(raw: string | undefined): 0 | 1 | 2 {
+  return vpxEnum(raw, AUTOFIT_LABELS, 0) as 0 | 1 | 2;
+}
+
+/** BGSet as VPX reads it: cabinet view (1), or not (desktop, full single screen, missing). */
+export function isVpxCabinetView(raw: string | undefined): boolean {
+  return vpxEnum(raw, BGSET_LABELS, 0) === 1;
+}
+
 export interface VpxLayout {
   /** Owned settings, rewritten at each synchronisation. */
   settings: VpxSetting[];

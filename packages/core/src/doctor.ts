@@ -95,6 +95,7 @@ import { isVpxTable, parseTableName, readInfo, type TableEntry } from './tables'
 import { findTableIni } from './vpx-settings';
 import { hasOwnCabinetView, importedViewFinding, touchesCabinetView } from './tableview';
 import { povViewFinding } from './povview';
+import { originFramingHolds, originFramingOf, withOriginFraming, withoutOriginFraming } from './origin-framing';
 import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
@@ -170,6 +171,7 @@ export const FINDING_CODES = [
   'pupLog',
   'pupPackDisabled',
   'pupPackDisabledScript',
+  'originFraming',
   'manualView',
   'importedView',
   'povView',
@@ -855,8 +857,11 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   }
 
   // 7. Direction of the game changed by the table's .ini, otherwise the manual framing it imposes (often shipped with it).
-  const orientation = ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
-  const manual = orientation || manualViewFinding(entry.file) || importedViewFinding(entry.file, ctx.orientation);
+  // Cadrage de l'installation d'origine figé pour cette table (origin-framing.ts) : il passe avant tout le reste, tant
+  // que la fenêtre du playfield a la forme d'alors.
+  const origin = originFramingFinding(entry, ctx.orientation);
+  const orientation = !origin && ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
+  const manual = origin || orientation || manualViewFinding(entry.file) || importedViewFinding(entry.file, ctx.orientation);
   if (manual) findings.push(manual);
   // Point de vue fourni avec la table (fichier POV, povview.ts), sauf si son .ini la met déjà de travers.
   const pov = orientation ? undefined : povViewFinding(entry.file, ctx.orientation);
@@ -894,6 +899,33 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   // Only the ROM blocks "Jouer" (Play) (playable.ts): any other finding is at most a warning.
   const order: Record<FindingSeverity, number> = { error: 0, warning: 1, info: 2 };
   return findings.map(playSeverity).sort((a, b) => order[a.severity] - order[b.severity]);
+}
+
+/**
+ * Framing of the table's original installation, frozen in its .ini when it was added (origin-framing.ts): an
+ * information, never repaired on its own. Returning to the cabinet's framing removes the frozen keys. undefined: nothing
+ * frozen, or a manual framing for a playfield window that has since changed shape (the table could be sideways: the
+ * usual findings then apply).
+ */
+function originFramingFinding(entry: TableEntry, orientation: PlayfieldOrientation | undefined): Finding | undefined {
+  const note = originFramingOf(entry.info);
+  if (!note || !originFramingHolds(note, orientation)) return undefined;
+  const ini = findTableIni(entry.file);
+  const text = ini.exists ? fs.readFileSync(ini.path, 'utf8') : '';
+  const ops: FileOp[] = [
+    { op: 'write', path: ini.path, content: withoutOriginFraming(text, note, orientation?.globalIni ?? '') },
+    { op: 'write', path: entry.infoFile, content: JSON.stringify(withOriginFraming(entry.info, undefined), null, 2) + '\n' },
+  ];
+  return {
+    code: 'originFraming',
+    severity: 'info',
+    title: t('Cadrage de l’installation d’origine'),
+    detail:
+      note.mode === 'manual'
+        ? t('Cette table garde le cadrage qu’elle avait dans son installation d’origine ({from}) : cadrage manuel, avec sa propre vue. « Régler l’affichage en partie » dans la fiche permet de le retoucher.', { from: note.from })
+        : t('Cette table garde le cadrage qu’elle avait dans son installation d’origine ({from}) : cadrage automatique de VPX, avec les mesures d’écran d’alors. « Régler l’affichage en partie » dans la fiche permet de le retoucher.', { from: note.from }),
+    fix: { label: t('Passer cette table au cadrage de la borne'), ops },
+  };
 }
 
 /**

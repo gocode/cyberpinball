@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Tables taken over from another installation (PinUP Popper, PinballY, a VPX folder) keep exactly the framing they had. Cyber Pinball reads the settings of the VPX that played them (its VPinballX.ini, or the registry for a VPX older than 10.8) and freezes for each one its mode (Manual, Fit Table, Fit Screen), the screen measurements and the view it read, without ever touching the original installation. A POV lying next to the table, which the old VPX ignored, is no longer applied on its own. Table page > Manage the table… > Point of view shows it ("Framing from the original installation") and lets you switch to the cabinet framing.
 - A temporary file that is still open no longer blocks cancelling or completing a table import. Cleanup retries in the background; if it still fails, temporary files are kept and navigation continues.
 - Colour sampling no longer accumulates videos from tables that have been left: only one sample stays active and replaced subjects are discarded. Temporarily unreadable media wait before being retried.
 - Hidden video sampling players release their decoder after success, failure or timeout. An unresponsive frame seek is stopped, and a conversion page whose renderer crashed is recreated on its next use.

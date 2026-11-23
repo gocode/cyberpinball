@@ -314,6 +314,7 @@ import { joystickStatus, watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import { createTablePov } from './table-pov';
+import { freezeOriginFraming } from './origin-framing';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
 import { qrRows } from './remote-qr';
@@ -5359,6 +5360,14 @@ export function createLibrary(host: LibraryHost) {
       const cleanupRoots = [layout()!.import, prepared.staging];
       const checked: string[] = [];
       const others = otherVpxMenu.list();
+      // Tables reprises d'une autre installation : le .vpx d'origine et le VPX qui l'y jouait, pour figer son cadrage.
+      const origins = new Map<string, { vpx: string; exe: string }>();
+      for (const t of plan.tables) {
+        for (const step of t.steps.filter((st) => st.kind === 'table')) {
+          const exe = s.vpxHints?.get(step.from.toLowerCase());
+          if (exe) origins.set(path.resolve(step.to).toLowerCase(), { vpx: step.from, exe });
+        }
+      }
       for (const t of plan.tables) {
         // Le VPX de la table (autres-vpx.ts), écrit dans son .info avec le reste.
         if (others.length && t.steps.some((st) => st.kind === 'table')) t.info = withVpxChoice(t.info, planVpx.choiceFor(s, t, others, host.vpxVersion?.()));
@@ -5388,15 +5397,30 @@ export function createLibrary(host: LibraryHost) {
       // Les réparations des PuP-Packs que le menu fait avant chaque partie (PUP_PLAY_REPAIRS), faites
       // dès l'installation : pack renommé et lancé, option, images nommées comme des vidéos…
       const borne = pupCabinet(loadCabinet(host.dataDir));
+      let framedAny = false;
       for (const file of checked) {
         const table = find(file);
         if (!table) continue;
+        // Avant les réparations : le cadrage de l'installation d'origine, figé (mode écrit dans le .ini), passe avant un
+        // POV ou une vue reprise, que ces réparations ne posent que sur une table sans mode choisi.
+        const origin = origins.get(path.resolve(file).toLowerCase());
+        if (origin) {
+          try {
+            const framed = freezeOriginFraming(table.file, table.infoFile, origin.vpx, origin.exe, host.playfieldOrientation?.());
+            console.log(`Cadrage d'origine (${table.id}) : ${framed.summary}${framed.refused ? ` ; ${framed.refused}` : ''}.`); // i18n-ignore : journal
+            if (framed.note) framedAny = true;
+          } catch (error) {
+            console.log(`Cadrage d'origine (${table.id}) : non figé (${(error as Error).message}).`); // i18n-ignore : journal
+          }
+        }
         try {
           repairPupForPlay(table, { tablesDir: layout()!.tables, script: cachedScript(file, host.dataDir), cabinet: borne, orientation: host.playfieldOrientation?.() }, { trashDir });
         } catch (error) {
           console.log(`PuP-Pack (${table.id}) : réparation à l'installation impossible (${(error as Error).message}).`); // i18n-ignore : journal
         }
       }
+      // Les .info notés (CyberPinball.framing) : la fiche et le diagnostic les relisent.
+      if (framedAny) reloadTables(checked[0]);
       if (s.acquisition) noteSource(s.acquisition, checked);
       // Puis les médias de VPinMediaDB retenus dans le plan : ceux qui manquent aux nouvelles tables.
       const added: Row[] = [];
@@ -6537,9 +6561,8 @@ export function createLibrary(host: LibraryHost) {
       for (let waited = 0; busy && waited < 120_000; waited += 100) await delay(100);
       await delay(400);
       const name = `${String(i).padStart(2, '0')}-${step.replace(/[^\w-]+/g, '_').slice(0, 40)}`;
-      for (const [role, win] of host.windows()) {
-        if (win === playfield || isShown(win)) await layout.check(win.webContents, win === playfield ? name : `${name} (${role})`);
-      }
+      // Les écrans affichés inspectés en même temps (LayoutReport.checkAll).
+      await layout.checkAll([...host.windows()].filter(([, win]) => win === playfield || isShown(win)).map(([role, win]) => ({ contents: win.webContents, where: win === playfield ? name : `${name} (${role})` })));
       if (!captureDir) continue;
       // Avec les sons de l'interface déjà joués (ui-sounds.js) : son, volume, fenêtre muette pendant la partie.
       const sound = await playfield.webContents

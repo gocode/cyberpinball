@@ -3,7 +3,8 @@
 // - « POV … » : le point de vue préparé pour cette table et fourni avec elle (.pov, ou « <table> POV.ini »), appliqué à
 //   elle seule en cadrage manuel, si les flippers restent du côté du joueur sur cette borne (packages/core/src/povview.ts) ;
 // - « Importer un POV… » : un POV trouvé ailleurs (Téléchargements, clé USB…), rangé avec la table puis appliqué.
-// Une vue enregistrée pour la table dans le menu de VPX (« Régler l'affichage en partie ») est dite comme telle.
+// Une vue enregistrée pour la table dans le menu de VPX (« Régler l'affichage en partie ») est dite comme telle, et le
+// cadrage de l'installation d'origine d'une table reprise (packages/core/src/origin-framing.ts) aussi : un autre choix le remplace.
 
 import * as path from 'node:path';
 import { importPovOps, t, tablePovState, tLater, type FileOp, type PlayfieldOrientation, type TableEntry, type TablePovState } from '@cyberpinball/core';
@@ -26,6 +27,7 @@ export interface TablePovContext {
 export function framingText(state: TablePovState): string {
   if (state.framing === 'pov' && state.pov) return t('POV « {file} »', { file: path.basename(state.pov.file) });
   if (state.framing === 'own') return t('Vue réglée pour cette table');
+  if (state.framing === 'origin') return t('Cadrage de l’installation d’origine');
   return t('Cadrage de la borne');
 }
 
@@ -36,7 +38,7 @@ export function createTablePov(ctx: TablePovContext) {
   onGesture(() => (flash = undefined));
 
   function state(table: TableEntry): TablePovState {
-    return tablePovState(table.file, ctx.orientation());
+    return tablePovState(table.file, ctx.orientation(), table);
   }
 
   function choose(table: TableEntry, ops: FileOp[] | undefined, done: string, at: number): void {
@@ -82,7 +84,10 @@ export function createTablePov(ctx: TablePovContext) {
     const rows: Row[] = [];
     if (flash) rows.push({ text: flash.text, tone: flash.tone });
     if (s.framing === 'own') rows.push({ text: t('Cette table a sa propre vue, enregistrée pour elle (menu de VPX, ou reprise d’une autre installation).'), tone: 'info' });
+    if (s.framing === 'origin') rows.push({ text: t('Cette table garde le cadrage de son installation d’origine, comme avant son ajout.'), tone: 'info' });
     const povName = s.pov && path.basename(s.pov.file);
+    // L'entrée « Cadrage de l'installation d'origine », quand elle est là, décale les suivantes d'un cran.
+    const shift = s.framing === 'origin' ? 1 : 0;
     return {
       heading: t('Point de vue'),
       icon: 'crop',
@@ -97,6 +102,9 @@ export function createTablePov(ctx: TablePovContext) {
           tone: s.framing === 'cabinet' ? 'ok' : undefined,
           run: () => choose(table, s.cabinetOps, t('Cette table suit le cadrage de la borne.'), 0),
         },
+        ...(s.framing === 'origin'
+          ? [{ label: t('Cadrage de l’installation d’origine'), detail: current(true, t('Celui que la table avait avant son ajout')), icon: 'history' as const, tone: 'ok' as Tone, run: () => open(table, 1) }]
+          : []),
         ...(s.pov && povName
           ? [
               {
@@ -108,7 +116,7 @@ export function createTablePov(ctx: TablePovContext) {
                 run: () => {
                   if (s.refused) {
                     flash = { text: s.refused, tone: 'warning' };
-                    return open(table, 1);
+                    return open(table, 1 + shift);
                   }
                   choose(table, s.applyOps, t('Point de vue « {file} » appliqué à cette table.', { file: povName }), 1);
                 },
@@ -120,7 +128,7 @@ export function createTablePov(ctx: TablePovContext) {
           detail: t('Un fichier .pov, ou le .ini d’un POV pour VPX 10.8 : Téléchargements, clé USB, disques'),
           icon: 'download',
           badge: 'beta',
-          run: () => void importPov(table, s.pov ? 2 : 1),
+          run: () => void importPov(table, (s.pov ? 2 : 1) + shift),
         },
         { label: t('Retour'), icon: 'back', run: () => back(table) },
       ],
@@ -138,7 +146,7 @@ export function createTablePov(ctx: TablePovContext) {
 
   function open(table: TableEntry, at?: number): void {
     const s = state(table);
-    const cursor = at ?? (s.framing === 'pov' ? 1 : 0);
+    const cursor = at ?? (s.framing === 'pov' || s.framing === 'origin' ? 1 : 0);
     ctx.show(() => build(table, s), cursor);
   }
 

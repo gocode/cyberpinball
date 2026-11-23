@@ -18,6 +18,7 @@ import { IniDocument } from './ini';
 import type { PlayfieldOrientation } from './sync';
 import { isPovIniName } from './tablefiles';
 import { hasOwnCabinetView } from './tableview';
+import { originFramingHolds, originFramingOf, withOriginFraming, withoutOriginFraming } from './origin-framing';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { findTableIni } from './vpx-settings';
 
@@ -141,8 +142,11 @@ function wrongWay(next: IniDocument, orientation: PlayfieldOrientation, file: st
 
 const isManual = (mode: string) => mode === '0' || /^manual$/i.test(mode);
 
-/** Ce qui cadre une table : le cadrage de la borne, le POV fourni avec elle, ou sa propre vue (menu de VPX, autre installation). */
-export type TableFraming = 'cabinet' | 'pov' | 'own';
+/**
+ * Ce qui cadre une table : le cadrage de la borne, le POV fourni avec elle, sa propre vue (menu de VPX, autre installation),
+ * ou le cadrage de son installation d'origine, figé à l'ajout (origin-framing.ts).
+ */
+export type TableFraming = 'cabinet' | 'pov' | 'own' | 'origin';
 
 export interface TablePovState {
   framing: TableFraming;
@@ -160,14 +164,27 @@ export interface TablePovState {
  * Le cadrage de la table et ce que la fiche peut en faire (« Point de vue », bêta). Un POV pas encore appliqué alors que
  * rien n'est choisi pour la table l'est avant la partie (povView) : c'est donc lui qui la cadre.
  */
-export function tablePovState(tableFile: string, orientation?: PlayfieldOrientation): TablePovState {
+export function tablePovState(tableFile: string, orientation?: PlayfieldOrientation, table?: { infoFile: string; info: { [key: string]: unknown } }): TablePovState {
   const ini = findTableIni(tableFile);
   const doc = IniDocument.parse(ini.exists ? fs.readFileSync(ini.path, 'utf8') : '');
   const pov = findPovView(tableFile);
   const mode = doc.get('Player', 'CabinetAutofitMode')?.trim() ?? '';
   const next = pov && withPov(doc, pov);
-  const refused = pov && (orientation ? wrongWay(next!, orientation, path.basename(pov.file)) : t('Le sens de la borne n’est pas connu : relancez l’assistant d’écrans pour appliquer un point de vue.'));
+  const refused = pov && (orientation ? wrongWay(next!, orientation, path.basename(pov.file)) : t('Le sens de la borne n’est pas connu : relance l’assistant d’écrans pour appliquer un point de vue.'));
   const done = pov !== undefined && applied(doc, pov);
+  // Cadrage de l'installation d'origine (origin-framing.ts) : un autre choix le remplace, la note du .info est retirée.
+  const origin = table && originFramingOf(table.info);
+  const forget: FileOp[] = origin && table ? [{ op: 'write', path: table.infoFile, content: JSON.stringify(withOriginFraming(table.info, undefined), null, 2) + '\n' }] : [];
+  if (origin && originFramingHolds(origin, orientation)) {
+    const back = withoutOriginFraming(doc.toString(), origin, orientation?.globalIni ?? '');
+    return {
+      framing: 'origin',
+      ...(pov ? { pov } : {}),
+      ...(refused ? { refused } : {}),
+      ...(pov && !refused ? { applyOps: [{ op: 'write' as const, path: ini.path, content: withPov(IniDocument.parse(back), pov).toString() }, ...forget] } : {}),
+      cabinetOps: [{ op: 'write' as const, path: ini.path, content: back }, ...forget],
+    };
+  }
   const framing: TableFraming = isManual(mode)
     ? done
       ? 'pov'

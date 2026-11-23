@@ -160,13 +160,30 @@ export const messages: Record<string, string> = {
   'Créer « {name} »': 'Create “{name}”',
   'Cadrage manuel imposé par la table': 'Manual view forced by the table',
   'Cadrage manuel sans vue réglée': 'Manual view with no view set',
-  'Le sens de la borne n’est pas connu : relancez l’assistant d’écrans pour appliquer un point de vue.': 'The direction of the cabinet is not known: run the screen wizard again to apply a point of view.',
+  'Le sens de la borne n’est pas connu : relance l’assistant d’écrans pour appliquer un point de vue.': 'The direction of the cabinet is not known: run the screen wizard again to apply a point of view.',
+  // packages/core/src/origin-framing.ts et son constat (doctor.ts)
+  'Dans son installation d’origine ({from}), cette table se jouait en vue borne ; ici, la vue est celle d’un bureau : son cadrage d’alors ne s’applique pas.':
+    'In its original installation ({from}), this table was played in cabinet view; here the view is a desktop one: its framing from back then does not apply.',
+  'Dans son installation d’origine ({from}), cette table se jouait en vue bureau ; ici, la vue est celle d’une borne : son cadrage d’alors ne s’applique pas.':
+    'In its original installation ({from}), this table was played in desktop view; here the view is a cabinet one: its framing from back then does not apply.',
+  'Dans son installation d’origine ({from}), cette table se cadrait à la main, avec la rotation choisie par son auteur ; la fenêtre du playfield n’y avait pas la même forme qu’ici, ou elle n’est pas connue : son cadrage d’alors pourrait la montrer de travers.':
+    'In its original installation ({from}), this table was framed by hand, with the rotation chosen by its author; the playfield window did not have the same shape as here, or it is not known: its framing from back then could show it sideways.',
+  'Dans son installation d’origine ({from}), cette table se cadrait à la main ; sur cette borne, sa vue la dessinerait de travers : son cadrage d’alors ne s’applique pas.':
+    'In its original installation ({from}), this table was framed by hand; on this cabinet its view would draw it sideways: its framing from back then does not apply.',
+  'Cadrage de l’installation d’origine': 'Framing from the original installation',
+  'Cette table garde le cadrage qu’elle avait dans son installation d’origine ({from}) : cadrage manuel, avec sa propre vue. « Régler l’affichage en partie » dans la fiche permet de le retoucher.':
+    'This table keeps the framing it had in its original installation ({from}): manual framing, with its own view. “Adjust the display in game” in the table page lets you touch it up.',
+  'Cette table garde le cadrage qu’elle avait dans son installation d’origine ({from}) : cadrage automatique de VPX, avec les mesures d’écran d’alors. « Régler l’affichage en partie » dans la fiche permet de le retoucher.':
+    'This table keeps the framing it had in its original installation ({from}): VPX automatic framing, with the screen measurements from back then. “Adjust the display in game” in the table page lets you touch it up.',
+  'Passer cette table au cadrage de la borne': 'Switch this table to the cabinet framing',
   '« {name} » n’est pas un fichier de point de vue (.pov ou .ini).': '“{name}” is not a point of view file (.pov or .ini).',
   '« {name} » illisible : {error}': '“{name}” unreadable: {error}',
   '« {name} » ne contient pas de point de vue de borne (section fullscreen d’un .pov, ou [TableOverride] ViewCab… d’un .ini).':
     '“{name}” holds no cabinet point of view (fullscreen section of a .pov, or [TableOverride] ViewCab… of an .ini).',
   'POV « {file} »': 'POV “{file}”',
   'Vue réglée pour cette table': 'View set for this table',
+  'Cette table garde le cadrage de son installation d’origine, comme avant son ajout.': 'This table keeps the framing of its original installation, as before it was added.',
+  'Celui que la table avait avant son ajout': 'The one the table had before it was added',
   'Cadrage de la borne': 'Cabinet framing',
   'Écriture impossible : {error}': 'Cannot write: {error}',
   'Point de vue : choisir un fichier POV': 'Point of view: choose a POV file',
