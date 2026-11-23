@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- VPX 10.8.0: launch without the editor window and exit with the cabinet’s Quit button even when this VPX uses different button mappings.
+- VPX 10.8.0: use the supplied POV when partial view settings hid it, in a separate settings file; an existing custom view keeps priority. Diagnostics read the log from this version’s folder.
+- Diagnostics: small, nearly empty volumes are no longer reported as almost full; EDID refresh rate margins no longer trigger advice to change cables.
 - Legacy .NET ActiveX components used by table scripts now use the .NET runtime available on Windows, even without .NET 3.5. This prevents music initialization failures followed by cascading UltraDMD errors, without changing tables.
 - The diagnosis shows the first script error and the number of errors from the table’s last game. It keeps different tables separate and clears the finding after a new game without errors.
 

@@ -210,5 +210,7 @@ test('VPX : réglages dans la racine, passés par -Ini, jamais dans %APPDATA%\\V
   assert.ok(loc.dataDir.toLowerCase().startsWith('d:\\cyberpinball\\'), loc.dataDir);
   for (const p of [loc.vpxIni, loc.dataDir]) assert.ok(!p.toLowerCase().includes('vpinballx\\'), p);
   const launcher = fs.readFileSync(path.join(REPO, 'app', 'src', 'launcher.ts'), 'utf8');
-  assert.match(launcher, /\['-Ini', opts\.ini/);
+  assert.match(launcher, /const args = vpxLaunchArguments\(opts\);/);
+  const argumentsSource = fs.readFileSync(path.join(REPO, 'app', 'src', 'vpx-launch-compat.ts'), 'utf8');
+  assert.match(argumentsSource, /\['-Ini', opts\.ini/);
 });

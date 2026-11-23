@@ -10,6 +10,7 @@
 // En VR (packages/core/src/vr.ts), VPX n'ouvre pas « Visual Pinball Player » mais « Visual Pinball
 // VR Preview » (ce qu'un œil voit dans le casque) : elle tient lieu de fenêtre de jeu.
 
+import { classicVpx, vpxLaunchArguments } from './vpx-launch-compat';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -64,6 +65,8 @@ export interface LaunchResult {
    * ligne (rapports du 17/11/2026, dossier de VPX modifié). Absent : partie simulée, rien à dire.
    */
   logWritten?: boolean;
+  /** Journal du VPX réellement lancé, y compris une installation classique externe. */
+  logPath?: string;
   /** Le crash.txt que VPX a écrit à côté de la table en plantant (pile d'appels, modules), pour le rapport. */
   crashReport?: string;
 }
@@ -73,6 +76,8 @@ const CRASH_REPORT_MAX = 200_000;
 
 export interface LaunchOptions {
   exe: string;
+  /** Version du VPX lancé : les VPX classiques demandent aussi de masquer leur éditeur. */
+  version?: string;
   /** Le VPinballX.ini à passer par -Ini ; absent : celui de ce VPX (un autre VPX du PC et ses propres réglages). */
   ini?: string;
   table: string;
@@ -117,7 +122,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const t0 = Date.now();
   // VPX doit pouvoir prendre le premier plan même si Windows hésite.
   allowAnyForeground();
-  const args = [...(opts.ini ? ['-Ini', opts.ini] : []), ...(opts.tableIni ? ['-TableIni', opts.tableIni] : []), opts.display ? '-PovEdit' : '-Play', opts.table];
+  const args = vpxLaunchArguments(opts);
   const child = spawn(opts.exe, args, {
     cwd: path.dirname(opts.exe),
     windowsHide: false,
@@ -275,6 +280,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         notices,
         logTail: failure && logWritten ? readLogTail(opts.vpxPrefDir) : [],
         logWritten,
+        logPath: path.join(opts.vpxPrefDir, 'vpinball.log'),
         ...(crashReport && { crashReport }),
       });
     };
@@ -366,7 +372,9 @@ export function logWrittenSince(prefDir: string, since: number): boolean {
 /** Dossier des réglages et du journal d'une version de VPX : %APPDATA%\VPinballX\<majeure.mineure>. */
 export function vpxPrefDir(version: string): string {
   const minor = version.split('.').slice(0, 2).join('.');
-  return path.join(process.env.APPDATA ?? os.homedir(), 'VPinballX', minor);
+  // Jusqu’à la 10.8.0, GetMyPrefPath ne met pas la version dans le chemin.
+  const classic = classicVpx(version);
+  return path.join(process.env.APPDATA ?? os.homedir(), 'VPinballX', ...(classic ? [] : [minor]));
 }
 
 // 120 lignes : de quoi voir la fin de la partie (« Closing player… ») avant un plantage à la fermeture,

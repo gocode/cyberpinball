@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { prepareClassicPov } from './vpx-launch-compat';
 import { findWheelTable } from './wheel-table';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
@@ -342,7 +343,7 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { describeVcRuntime, ensureVcRuntime, vcRuntimeReady } from './vc-runtime';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
-import { rememberLaunch } from './launch-evidence';
+import { lastLaunchLogPath, rememberLaunch } from './launch-evidence';
 import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { detectPinballFx, detectPinballFx3 } from './pinballfx-install';
@@ -1304,6 +1305,8 @@ const library = createLibrary({
     return report?.result;
   },
   vpxLogFile: () => {
+    const previous = lastLaunchLogPath();
+    if (previous) return previous;
     const install = vpxInstall(loc);
     return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
   },
@@ -6031,10 +6034,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // jamais dans le casque, ni pour régler l'affichage, ni avec un autre VPX.
   const anaglyphGame = simulated === undefined && !displayMode && !otherVpx && !vrGame ? anaglyphMenu.prepareGame(played.file, double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)) : undefined;
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
+  const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
-      : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
   let gameStopAsked = false;
   const stopGame = game.stop;
@@ -6058,6 +6062,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // VPX attend le casque (consigne « Mettez le casque ») : il a le premier plan mais ne lit encore aucun bouton ;
   // Exit de la borne (touche ou bouton du joystick), lu ici quelle que soit la fenêtre au premier plan, arrête
   // la partie et ramène à la roue (essai.30 : le joueur restait bloqué sur cet écran).
+  // Un autre VPX peut avoir des boutons différents : Exit de la borne ferme toujours sa partie.
+  const stopOtherExit = otherVpx && simulated === undefined ? vrFront.watchExitWhileWaiting(() => true, () => game.stop()) : undefined;
   const stopWaitExit = vrGame !== undefined ? vrFront.watchExitWhileWaiting(() => Boolean(vrFront.vrWearHint) && !vrFront.headset?.worn, () => {
     console.log(`Réalité virtuelle (${played.id}) : Exit pendant l'attente du casque ; la partie s'arrête, retour à la roue.`); // i18n-ignore : journal
     game.stop();
@@ -6121,6 +6127,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   stopWaitExit?.();
+  stopOtherExit?.();
   vrFront.vrGameStop = undefined;
   // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
   if (result.ok) rememberLaunch(result, table.title);

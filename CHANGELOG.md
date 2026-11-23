@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- VPX 10.8.0 : lancement sans fenêtre de l’éditeur et sortie avec le bouton Quitter de la borne, même si ce VPX utilise d’autres boutons.
+- VPX 10.8.0 : reprise du POV fourni quand des valeurs de vue partielles le masquaient, dans un fichier distinct ; une vue déjà réglée reste prioritaire. Le diagnostic lit le journal dans le dossier de cette version.
+- Diagnostic : les petits volumes presque vides ne sont plus signalés comme presque pleins ; les marges de fréquence de l’EDID ne déclenchent plus un conseil de changement de câble.
 - Les composants ActiveX .NET historiques des scripts de table utilisent désormais le moteur .NET présent sur Windows, même sans .NET 3.5. Cela évite notamment l’arrêt de l’initialisation des musiques puis les erreurs UltraDMD en cascade, sans modifier les tables.
 - Le diagnostic affiche la première erreur de script et le nombre d’erreurs de la dernière partie de la table. Il ne confond pas les tables et retire ce constat après une nouvelle partie sans erreur.
 

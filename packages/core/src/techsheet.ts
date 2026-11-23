@@ -316,7 +316,8 @@ const LOW_DISK_BYTES = 10 * 1024 ** 3;
 export function refreshGap(d: TechDisplay): { kind: 'windows' | 'link'; max: number } | undefined {
   if (!d.hz) return undefined;
   if (d.offeredMaxHz && d.offeredMaxHz > d.hz + 1) return { kind: 'windows', max: d.offeredMaxHz };
-  if (d.edidMaxHz && d.edidMaxHz > d.hz + 1 && (!d.offeredMaxHz || d.offeredMaxHz <= d.hz + 1)) return { kind: 'link', max: d.edidMaxHz };
+  // Une limite de balayage EDID (62 Hz pour un écran 60 Hz) n’est pas un mode disponible.
+  if (d.edidMaxHz && d.edidMaxHz > d.hz + Math.max(5, d.hz * 0.05) && (!d.offeredMaxHz || d.offeredMaxHz <= d.hz + 1)) return { kind: 'link', max: d.edidMaxHz };
   return undefined;
 }
 
@@ -385,7 +386,8 @@ function pcBlock(f: TechFacts, now: number): TechBlock {
   for (const n of pc.network ?? []) rows.push({ label: t('Réseau'), value: joined([n.wifi ? t('Wi-Fi') : t('Ethernet'), n.bps ? speed(n.bps) : undefined]), detail: n.name });
   if (pc.bootAt) rows.push({ label: t('Démarré'), value: day(pc.bootAt)!, detail: uptime(now - Date.parse(pc.bootAt)) });
   const disks: TechRow[] = (pc.disks ?? []).map((d) => {
-    const low = d.free !== undefined && d.free < LOW_DISK_BYTES;
+    // Une petite partition système presque vide ne manque pas d’espace de stockage.
+    const low = d.free !== undefined && d.free < LOW_DISK_BYTES && (d.size === undefined || d.size <= 0 || d.free / d.size < 0.1);
     return {
       label: joined([d.root.replace(/\\$/, ''), d.label]),
       value: joined([d.model, d.size ? gb(d.size) : undefined]) || t('Disque'),

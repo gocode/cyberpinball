@@ -104,6 +104,9 @@ test('fiche : fréquence des écrans, sans affirmer ce qui n’est pas établi',
   assert.equal(refreshGap({ ...PLAYFIELD, hz: 144, offeredMaxHz: 144 }), undefined);
   assert.equal(refreshGap({ ...PLAYFIELD, hz: 60, offeredMaxHz: 60, edidMaxHz: 61 }), undefined);
   assert.equal(refreshGap({ ...PLAYFIELD, hz: undefined }), undefined);
+  for (const max of [62, 63, 65]) assert.equal(refreshGap({ ...PLAYFIELD, edidMaxHz: max }), undefined);
+  assert.equal(refreshGap({ ...PLAYFIELD, hz: 120, offeredMaxHz: 120, edidMaxHz: 125 }), undefined);
+  assert.deepEqual(refreshGap({ ...PLAYFIELD, offeredMaxHz: 75, edidMaxHz: 62 }), { kind: 'windows', max: 75 });
   const lines = pcLines(pcHealthFacts(facts()), Date.parse('2026-11-11'));
   const screen = lines.find((l) => l.target.kind === 'sheet' && l.target.block === 'displays')!;
   assert.equal(screen.state, 'check');

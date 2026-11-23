@@ -18,9 +18,18 @@ export interface LaunchEvidence {
 }
 
 let last: LaunchEvidence | undefined;
+let lastLogPath: string | undefined;
+let lastLogWritten: boolean | undefined;
+
+/** Journal de la dernière partie, réussie ou non : celui du VPX qui l’a jouée. */
+export function lastLaunchLogPath(): string | undefined {
+  return lastLogPath;
+}
 
 /** À la fin de chaque lancement : un échec garde ses pièces, une réussite les efface. */
-export function rememberLaunch(result: Pick<LaunchResult, 'ok' | 'logWritten' | 'crashReport'>, table: string, changedFiles: readonly string[] = [], at = Date.now()): void {
+export function rememberLaunch(result: Pick<LaunchResult, 'ok' | 'logWritten' | 'crashReport' | 'logPath'>, table: string, changedFiles: readonly string[] = [], at = Date.now()): void {
+  lastLogPath = result.logPath;
+  lastLogWritten = result.logWritten;
   last = result.ok
     ? undefined
     : {
@@ -42,7 +51,7 @@ export function launchAttachments(vpxLog: string): { name: string; text: string;
   if (last?.crashReport) out.push({ name: 'crash.txt', text: last.crashReport, kind: 'crash' }); // i18n-ignore : nom de fichier
   if (vpxLog) {
     // Journal antérieur au lancement : joint sous un autre nom, pour qu'on ne le lise pas comme celui du plantage.
-    if (last?.logWritten === false) out.push({ name: 'vpinball-partie-precedente.log', text: vpxLog, kind: 'previous-log' }); // i18n-ignore : nom de fichier
+    if (lastLogWritten === false) out.push({ name: 'vpinball-partie-precedente.log', text: vpxLog, kind: 'previous-log' }); // i18n-ignore : nom de fichier
     else out.push({ name: 'vpinball.log', text: vpxLog, kind: 'log' }); // i18n-ignore : nom de fichier
   }
   return out;
