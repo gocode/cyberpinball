@@ -109,7 +109,7 @@ test('niveaux : ma partie rejointe rapporte une fois par groupe de joueurs, pas 
   const first = play(emptyLevels(), [nova]);
   assert.deepEqual(first.gains.map((g) => [g.kind, g.xp]), [['live', XP.live], ['hosted', XP.hosted]]);
   assert.equal(first.gains[1]!.name, 'Nova');
-  assert.deepEqual(gainText(first.gains[1]!, (id) => id), { text: 'Votre partie a été rejointe', detail: 'Comet Chaser · avec Nova' });
+  assert.deepEqual(gainText(first.gains[1]!, (id) => id), { text: 'Ta partie a été rejointe', detail: 'Comet Chaser · avec Nova' });
   // Les mêmes, même un autre jour : plus rien pour l'hôte.
   const again = play(first.state, [nova], '2026-11-25T21:00:00');
   assert.deepEqual(again.gains.map((g) => g.kind), ['live']);

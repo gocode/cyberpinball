@@ -63,10 +63,10 @@ test('vue : carte entière quelques secondes, puis pastille ; temps restant ; ri
   const view = (ms: number) => gameNoticeView(invite, at, new Date(at.getTime() + ms));
   assert.deepEqual(view(0), {
     mode: 'full',
-    title: 'Bruno vous invite à jouer',
+    title: 'Bruno t’invite à jouer',
     short: 'Invitation de Bruno',
     table: 'Glass Lagoon (Inventé 1987)',
-    hint: 'Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule',
+    hint: 'Quitte la partie pour le rejoindre, ou continue : elle s’efface seule',
     left: '2:00',
     progress: 1,
     host: { key: 'k', name: 'Bruno' },

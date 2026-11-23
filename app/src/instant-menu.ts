@@ -1,6 +1,6 @@
-// Parties instantanées à l'écran (packages/core/src/instantgames.ts, 16/11/2026) : la porte de
+// Parties en direct à l'écran (packages/core/src/instantgames.ts, 16/11/2026) : la porte de
 // l'accueil Communauté, la liste des parties ouvertes par les autres joueurs (amis ou non), et
-// « Ouvrir une partie instantanée » : la table, puis le nombre de joueurs (2 à 4, vous compris).
+// « Ouvrir une partie en direct » : la table, puis le nombre de joueurs (2 à 4, vous compris).
 // La partie ouverte, son salon d'attente, le départ et les résultats sont ceux de la partie en
 // direct (live-game-menu.ts) : elle part d'elle-même dès qu'elle est complète.
 //
@@ -61,7 +61,7 @@ export interface InstantMenu {
   door(): { label: string; detail: string; quiet: boolean };
   /** Les parties ouvertes, « Retour » vers `back`. */
   open(back: () => void): void;
-  /** Entrée « Partie instantanée » de la fiche d'une table : le nombre de joueurs, puis la partie ouverte. */
+  /** Entrée « Partie en direct » de la fiche d'une table : le nombre de joueurs, puis la partie ouverte. */
   sheetAction(table: TableEntry, back: () => void): Action;
   /**
    * Fiche d'une table : une partie ouverte par un autre sur cette version exacte (boardKey), à
@@ -76,7 +76,7 @@ export interface InstantMenu {
    * pourquoi elle ne se rejoint pas ; `back` : où revenir après la partie ou son refus.
    */
   arena(back: () => void): { mine?: { title: string; seated: number; max: number; open(): void }; open: { game: InstantGame; joinable: boolean; reason?: string; join(): void }[] };
-  /** « Ouvrir une partie instantanée » : la table, puis le nombre de joueurs ; « Retour » vers `back`. */
+  /** « Ouvrir une partie en direct » : la table, puis le nombre de joueurs ; « Retour » vers `back`. */
   openNew(back: () => void): void;
   /** Pour « Joueurs » au téléphone : les parties ouvertes, en ouvrir une, la mienne (instant-menu.ts reste la source). */
   remote(): RemoteInstant;
@@ -120,7 +120,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     return {};
   }
 
-  /** Ma partie instantanée en cours, si j'en suis (hôte ou joueur). */
+  /** Ma partie en direct en cours, si j'en suis (hôte ou joueur). */
   const myInstant = () => {
     const g = games.current();
     return g?.instant && g.phase !== 'finished' && g.phase !== 'cancelled' ? g : undefined;
@@ -135,22 +135,22 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
 
   function door(): ReturnType<InstantMenu['door']> {
     const problem = unavailable();
-    const label = t('Parties instantanées');
+    const label = t('Parties en direct');
     if (problem) return { label, detail: problem, quiet: true };
     const mine = myInstant();
     if (mine) {
       const seats = mine.players.filter((p) => p.state === 'accepted').length;
-      return { label, detail: t('Votre partie : {title} · {n} sur {max}', { title: mine.title, n: seats, max: mine.instant!.max }), quiet: false };
+      return { label, detail: t('Ta partie : {title} · {n} sur {max}', { title: mine.title, n: seats, max: mine.instant!.max }), quiet: false };
     }
     const n = games.instantGames().length;
-    return { label, detail: n ? tn(n, '{n} partie ouverte : rejoignez-la', '{n} parties ouvertes : rejoignez-en une') : t('Aucune partie ouverte : lancez la vôtre'), quiet: false };
+    return { label, detail: n ? tn(n, '{n} partie ouverte : rejoins-la', '{n} parties ouvertes : rejoins-en une') : t('Aucune partie ouverte : lance la tienne'), quiet: false };
   }
 
   // ---------- Les parties ouvertes ----------
 
   /** Ce que j'ai de la table d'une partie ouverte (ni invitation ni récupération ici : elle se rejoint, ou pas). */
   const fitText = (match: LiveTableMatch, scriptDiffers?: boolean) =>
-    match === 'same' ? t('Même version chez vous') : match === 'missing' ? t('Vous n’avez pas cette table') : scriptDiffers ? t('Même table, autre script : la partie demande le même') : t('Autre version de cette table chez vous');
+    match === 'same' ? t('Même version chez toi') : match === 'missing' ? t('Tu n’as pas cette table') : scriptDiffers ? t('Même table, autre script : la partie demande le même') : t('Autre version de cette table chez toi');
 
   function seatsText(g: Pick<InstantGame, 'seats' | 'max'>): string {
     return t('{n} sur {max} joueurs', { n: g.seats.length, max: g.max });
@@ -161,7 +161,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     const same = found.match === 'same';
     const join = () => joinGame(g);
     const index = actions.push({ label: g.title, key: `instant:${g.id}`, icon: 'rocket', run: same ? join : () => undefined }) - 1;
-    const fit = !found.match ? t('Vérification de la table sur votre borne…') : fitText(found.match, found.scriptDiffers);
+    const fit = !found.match ? t('Vérification de la table sur ta borne…') : fitText(found.match, found.scriptDiffers);
     const free = instantFree(g);
     const others = g.seats.filter((s) => s.key !== g.key).map((s) => s.name);
     const detail = [
@@ -195,17 +195,17 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       // En tête : ma partie en cours (hôte ou joueur), sinon de quoi en ouvrir une.
       if (mine) {
         const seats = mine.players.filter((p) => p.state === 'accepted').length;
-        actions.push({ label: t('Votre partie : {title}', { title: mine.title }), detail: t('{n} sur {max} joueurs · départ dès qu’elle est complète', { n: seats, max: mine.instant!.max }), icon: 'gamepad', tone: 'ok', attention: true, run: () => host.live.open(here) });
+        actions.push({ label: t('Ta partie : {title}', { title: mine.title }), detail: t('{n} sur {max} joueurs · départ dès qu’elle est complète', { n: seats, max: mine.instant!.max }), icon: 'gamepad', tone: 'ok', attention: true, run: () => host.live.open(here) });
       } else {
-        actions.push({ label: t('Ouvrir une partie instantanée'), detail: t('Choisissez la table et le nombre de joueurs : elle s’affiche chez tous les joueurs en ligne'), icon: 'plus', tone: 'ok', run: () => openChooseTable(here) });
+        actions.push({ label: t('Ouvrir une partie en direct'), detail: t('Choisis la table et le nombre de joueurs : elle s’affiche chez tous les joueurs en ligne'), icon: 'plus', tone: 'ok', run: () => openChooseTable(here) });
       }
       const open = games.instantGames();
       if (open.length) sections.push({ title: t('Ouvertes en ce moment ({n})', { n: open.length }), kind: 'players', rows: open.map((g) => gameRow(g, actions)) });
-      else sections.push({ rows: [{ text: t('Aucune partie ouverte pour l’instant'), detail: t('Ouvrez la vôtre : elle s’affiche chez tous les joueurs en ligne, et part dès qu’elle est complète'), icon: 'info', tone: 'quiet' }] });
+      else sections.push({ rows: [{ text: t('Aucune partie ouverte pour l’instant'), detail: t('Ouvre la tienne : elle s’affiche chez tous les joueurs en ligne, et part dès qu’elle est complète'), icon: 'info', tone: 'quiet' }] });
     }
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return {
-      heading: t('Parties instantanées'),
+      heading: t('Parties en direct'),
       icon: 'rocket',
       lead: t('Une partie en direct ouverte à tous : chacun joue sur sa borne, la même version de la table, au même moment. Elle part d’elle-même dès qu’elle est complète.'),
       sections,
@@ -248,10 +248,10 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     });
     actions.push({ label: t('Retour'), icon: 'back', run: from });
     return {
-      heading: t('Ouvrir une partie instantanée'),
+      heading: t('Ouvrir une partie en direct'),
       icon: 'rocket',
-      lead: t('Choisissez la table. Ceux qui ont la même version pourront vous rejoindre.'),
-      sections: rows.length ? [{ title: t('Vos tables ({n})', { n: rows.length }), rows }] : [{ rows: [{ text: t('Aucune table VPX sur cette borne'), tone: 'info' }] }],
+      lead: t('Choisis la table. Ceux qui ont la même version pourront te rejoindre.'),
+      sections: rows.length ? [{ title: t('Tes tables ({n})', { n: rows.length }), rows }] : [{ rows: [{ text: t('Aucune table VPX sur cette borne'), tone: 'info' }] }],
       actions,
       back: from,
     };
@@ -268,7 +268,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     for (let n = INSTANT_MIN_PLAYERS; n <= INSTANT_MAX_PLAYERS; n++) {
       const count = n;
       const index = actions.push({ label: t('{n} joueurs', { n: count }), key: `count:${count}`, run: () => openGame(table, count) }) - 1;
-      rows.push({ text: t('{n} joueurs', { n: count }), detail: tn(count - 1, 'Vous et {n} autre joueur', 'Vous et {n} autres joueurs'), action: index, pick: true });
+      rows.push({ text: t('{n} joueurs', { n: count }), detail: tn(count - 1, 'Toi et {n} autre joueur', 'Toi et {n} autres joueurs'), action: index, pick: true });
     }
     actions.push({ label: t('Retour'), icon: 'back', run: from });
     return {
@@ -276,7 +276,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       icon: 'rocket',
       subheading: fullTitle(table),
       lead: t('La partie part d’elle-même dès que ce nombre est atteint, pour tout le monde.'),
-      sections: [{ title: t('Joueurs, vous compris'), rows }],
+      sections: [{ title: t('Joueurs, toi compris'), rows }],
       actions,
       back: from,
     };
@@ -318,7 +318,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
     const list = games.instantGames().map((g) => {
       const found = matchOf(g);
       const others = g.seats.map((s) => face(s.key, s.name));
-      const reason = busy ?? (!found.match ? t('Vérification de la table sur votre borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : mine?.id === g.id ? t('Vous êtes dans cette partie') : undefined);
+      const reason = busy ?? (!found.match ? t('Vérification de la table sur ta borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : mine?.id === g.id ? t('Tu es dans cette partie') : undefined);
       return {
         id: g.id,
         title: g.title,
@@ -338,14 +338,14 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       out.mine = {
         title: mine.title,
         detail: t('{n} sur {max} joueurs', { n: seated.length, max }),
-        seats: seated.map((p) => ({ name: p.key === myKey() ? t('Vous') : p.name, avatar: face(p.key, p.name), ...(p.key === myKey() ? { me: true as const } : {}) })),
+        seats: seated.map((p) => ({ name: p.key === myKey() ? t('Toi') : p.name, avatar: face(p.key, p.name), ...(p.key === myKey() ? { me: true as const } : {}) })),
         max,
         status: seated.length >= max ? t('Complète : départ pour tout le monde') : t('Départ à {n} joueurs', { n: max }),
         closes: t('Ouverte {ago} · fermée à {time} si elle n’est pas complète', { ago: socialAgo(mine.instant!.opened, now()), time: time(closes) }),
         host: hosting,
         invitable: invite.candidates.map((f) => ({ key: f.key, name: f.name, detail: t('En ligne') })),
         ...(invite.reason ? { inviteReason: invite.reason } : {}),
-        cancel: hosting ? t('Elle disparaît de la liste ; ceux qui l’ont rejointe en sont prévenus') : t('Votre place se libère pour un autre joueur'),
+        cancel: hosting ? t('Elle disparaît de la liste ; ceux qui l’ont rejointe en sont prévenus') : t('Ta place se libère pour un autre joueur'),
         note: t('Le départ, la partie et les résultats se passent à la borne ; le téléphone reste la télécommande et la messagerie.'),
       };
     } else {
@@ -358,7 +358,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
         ...(wanted ? { tables: [...playable()].sort((a, b) => a.title.localeCompare(b.title)).slice(0, PHONE_TABLES_MAX).map((e) => ({ ref: instantTableRef(e), title: fullTitle(e) })) } : {}),
         min: INSTANT_MIN_PLAYERS,
         max: INSTANT_MAX_PLAYERS,
-        text: t('Elle s’affiche chez tous les joueurs en ligne et part d’elle-même dès qu’elle est complète ; sinon, elle se ferme au bout de {n} minutes. Vous jouez à la borne.', { n: Math.round(INSTANT_OPEN_MS / 60_000) }),
+        text: t('Elle s’affiche chez tous les joueurs en ligne et part d’elle-même dès qu’elle est complète ; sinon, elle se ferme au bout de {n} minutes. Tu joues à la borne.', { n: Math.round(INSTANT_OPEN_MS / 60_000) }),
       };
     }
     return out;
@@ -408,7 +408,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
       lib.openCustom(build);
     },
     sheetAction(table, from) {
-      const base = { label: t('Partie instantanée'), icon: 'rocket' as const };
+      const base = { label: t('Partie en direct'), icon: 'rocket' as const };
       const problem = unavailable();
       if (problem) return { ...base, detail: problem, tone: 'quiet', run: () => undefined };
       if (table.emulator !== 'vpx') return { ...base, detail: t('Parties en direct : tables VPX seulement'), tone: 'quiet', run: () => undefined };
@@ -432,7 +432,7 @@ export function createInstantMenu(host: InstantMenuHost): InstantMenu {
         // Sur mes tables : celles que je n'ai pas du tout ne se proposent pas (la liste complète les montre).
         .filter(({ found }) => found.match !== 'missing')
         .map(({ g, found }) => {
-          const reason = busy ?? (!found.match ? t('Vérification de la table sur votre borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : undefined);
+          const reason = busy ?? (!found.match ? t('Vérification de la table sur ta borne…') : found.match !== 'same' ? fitText(found.match, found.scriptDiffers) : undefined);
           return { game: g, joinable: !reason, ...(reason ? { reason } : {}), join: () => ((back = to), joinGame(g)) };
         });
       return {

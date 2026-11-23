@@ -856,13 +856,13 @@ export function gainText(g: XpGain, badgeLabel: (id: string) => string): { text:
     case 'challenge-win':
       return { text: t('Défi gagné'), ...(table ? { detail: table } : {}) };
     case 'hosted':
-      return { text: t('Votre partie a été rejointe'), ...(g.name ? { detail: table ? t('{table} · avec {names}', { table, names: g.name }) : t('Avec {names}', { names: g.name }) } : table ? { detail: table } : {}) };
+      return { text: t('Ta partie a été rejointe'), ...(g.name ? { detail: table ? t('{table} · avec {names}', { table, names: g.name }) : t('Avec {names}', { names: g.name }) } : table ? { detail: table } : {}) };
     case 'ranking':
       return { text: t('Classement de la semaine'), ...(table ? { detail: `${table} · ${placeText(g.scope, g.rank)}` } : {}) };
     case 'badge':
       return { text: t('Badge {name}', { name: badgeLabel(g.badge ?? '') }) };
     case 'start':
-      return { text: t('Niveau de départ'), detail: t('Vos parties d’avant les niveaux') };
+      return { text: t('Niveau de départ'), detail: t('Tes parties d’avant les niveaux') };
     case 'room-day':
       return { text: t('Présent au salon'), detail: t('Premier message du jour') };
     case 'friend':
@@ -883,6 +883,6 @@ export function placeText(scope: RankingScopeXp | undefined, rank: number | unde
   const n = rank ?? 0;
   const place = n === 1 ? t('1er') : t('{n}e', { n });
   if (scope === 'world') return t('{place} au monde', { place });
-  if (scope === 'country') return t('{place} dans votre pays', { place });
+  if (scope === 'country') return t('{place} dans ton pays', { place });
   return t('{place} entre amis', { place });
 }

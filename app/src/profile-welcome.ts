@@ -69,7 +69,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
   function askName(): void {
     const s = me();
     // Le nom donné d'office ne se garde pas en tapant : le champ part vide.
-    host.library.openPrompt(t('Votre pseudo'), t('Pseudo'), hasDefaultName(s) ? '' : s.name, (value) => {
+    host.library.openPrompt(t('Ton pseudo'), t('Pseudo'), hasDefaultName(s) ? '' : s.name, (value) => {
       if (value === undefined) return show(NAME_AT);
       if (!host.net.rename(value)) {
         flash = { text: t('Pseudo refusé : {min} à {max} lettres, chiffres, espaces, tirets ou points', { min: NAME_MIN, max: NAME_MAX }), tone: 'error' };
@@ -77,7 +77,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
       }
       // Le nom d'office retapé tel quel (« Joueur A1B2 ») n'est pas un pseudo choisi.
       if (!named()) {
-        flash = { text: t('C’est le nom donné d’office : choisissez le vôtre'), tone: 'error' };
+        flash = { text: t('C’est le nom donné d’office : choisis le tien'), tone: 'error' };
         return show(NAME_AT);
       }
       flash = { text: t('Pseudo choisi : {name}', { name: me().name }), tone: 'ok' };
@@ -88,7 +88,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
   /** Continuer, ou Exit : la suite du démarrage, seulement une fois le pseudo choisi. */
   function leave(): void {
     if (named()) return done();
-    flash = { text: t('Choisissez d’abord votre pseudo : il est obligatoire pour jouer'), tone: 'warning' };
+    flash = { text: t('Choisis d’abord ton pseudo : il est obligatoire pour jouer'), tone: 'warning' };
     show(NAME_AT);
   }
 
@@ -97,11 +97,11 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
     const c = copy.summary;
     const view = avatarView(c.key, c.name, undefined);
     return {
-      heading: t('Votre profil de joueur'),
+      heading: t('Ton profil de joueur'),
       icon: 'account',
       avatar: view,
       subheading: t('Un compte a été trouvé sur ce PC'),
-      lead: t('Bienvenue ! Cyber Pinball a déjà été installé sur ce PC : votre compte est prêt à être repris, avec son niveau, ses badges et ses amis.'),
+      lead: t('Bienvenue ! Cyber Pinball a déjà été installé sur ce PC : ton compte est prêt à être repris, avec son niveau, ses badges et ses amis.'),
       sections: [
         {
           rows: [
@@ -136,12 +136,12 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
     const rows: Row[] = flash ? [flash] : [];
     rows.push(
       hasName
-        ? { text: t('Pseudo : {name}', { name: s.name }), detail: t('Vu tel quel par les autres joueurs, à côté de votre avatar'), tone: 'ok', badges: [t('Choisi')], icon: 'friend-list' }
+        ? { text: t('Pseudo : {name}', { name: s.name }), detail: t('Vu tel quel par les autres joueurs, à côté de ton avatar'), tone: 'ok', badges: [t('Choisi')], icon: 'friend-list' }
         : { text: t('Pseudo : à choisir'), detail: t('Obligatoire : c’est le nom que verront les autres joueurs'), tone: 'warning', badges: [t('Obligatoire')], icon: 'friend-list' },
       pictured
-        ? { text: t('Avatar : une image à vous'), detail: t('Recadrée en carré, vue à côté de votre pseudo'), tone: 'ok', badges: [t('Choisi')], icon: 'avatar' }
-        : { text: t('Avatar : vos initiales en attendant'), detail: t('Facultatif : une photo ou une image, recadrée aux boutons de la borne'), tone: 'info', icon: 'avatar' },
-      { text: t('Qui les voit'), detail: t('Vos amis et les classements : votre pseudo et votre avatar, à côté de vos scores publiés. L’annuaire des joueurs : votre pseudo seulement.'), icon: 'eye' },
+        ? { text: t('Avatar : une image à toi'), detail: t('Recadrée en carré, vue à côté de ton pseudo'), tone: 'ok', badges: [t('Choisi')], icon: 'avatar' }
+        : { text: t('Avatar : tes initiales en attendant'), detail: t('Facultatif : une photo ou une image, recadrée aux boutons de la borne'), tone: 'info', icon: 'avatar' },
+      { text: t('Qui les voit'), detail: t('Tes amis et les classements : ton pseudo et ton avatar, à côté de tes scores publiés. L’annuaire des joueurs : ton pseudo seulement.'), icon: 'eye' },
     );
     const actions: Action[] = [
       { label: hasName ? t('Changer de pseudo…') : t('Choisir mon pseudo…'), detail: t('Au clavier à l’écran, de {min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', ...(hasName ? {} : { tone: 'ok' as const }), run: askName },
@@ -159,8 +159,8 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
       ...(inviteShown() && host.invite
         ? [
             {
-              label: host.invite.chosen() ? t('Découvert grâce à {name}', { name: host.invite.chosen()! }) : t('Qui vous a fait découvrir Cyber Pinball ?'),
-              detail: t('Facultatif : il le verra sur son profil, le vôtre n’en dit rien'),
+              label: host.invite.chosen() ? t('Découvert grâce à {name}', { name: host.invite.chosen()! }) : t('Qui t’a fait découvrir Cyber Pinball ?'),
+              detail: t('Facultatif : il le verra sur son profil, le tien n’en dit rien'),
               icon: 'friend-add' as const,
               run: () => host.invite!.open(() => show(CONTINUE_AT_())),
             } satisfies Action,
@@ -168,14 +168,14 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
         : []),
       hasName
         ? { label: t('Continuer'), detail: t('Tout se change plus tard : Menu système > Communauté > Mon profil > Mon compte'), icon: 'check', ...(pictured ? { tone: 'ok' as const } : {}), run: leave }
-        : { label: t('Continuer'), detail: t('Choisissez d’abord votre pseudo'), icon: 'check', tone: 'quiet', run: leave },
+        : { label: t('Continuer'), detail: t('Choisis d’abord ton pseudo'), icon: 'check', tone: 'quiet', run: leave },
     ];
     return {
-      heading: t('Votre profil de joueur'),
+      heading: t('Ton profil de joueur'),
       icon: 'account',
       avatar: avatarView(s.key.publicKey, s.name, host.net.avatarFile(s.key.publicKey)),
       ...(hasName ? { subheading: s.name } : {}),
-      lead: t('Bienvenue ! Choisissez votre pseudo : c’est le nom que verront les autres joueurs, dans les classements, la Communauté et entre amis. L’avatar est facultatif. Tout se change plus tard.'),
+      lead: t('Bienvenue ! Choisis ton pseudo : c’est le nom que verront les autres joueurs, dans les classements, la Communauté et entre amis. L’avatar est facultatif. Tout se change plus tard.'),
       sections: [{ rows }],
       actions,
       back: leave,

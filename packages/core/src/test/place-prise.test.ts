@@ -95,10 +95,10 @@ test('place prise : une clé par table et par jour, relue pour lancer la table',
 
 const event = (over: Partial<NoticeEvent> = {}): NoticeEvent => ({ kind: 'place-taken', key: placeTakenKey({ board: AFM }, NOW), at: NOW.getTime(), who: 'Léa', player: LEA, subject: 'Attack from Mars', ...over });
 
-test('notification : « Léa vous a dépassé sur Attack from Mars », partout, et un clic lance sa table', () => {
-  assert.equal(noticeText('place-taken', [event()]).title, 'Léa vous a dépassé sur Attack from Mars');
+test('notification : « Léa t’a dépassé sur Attack from Mars », partout, et un clic lance sa table', () => {
+  assert.equal(noticeText('place-taken', [event()]).title, 'Léa t’a dépassé sur Attack from Mars');
   const long = noticeText('place-taken', [event({ subject: 'The Addams Family Special Collectors Edition' })]);
-  assert.equal(long.title, 'Léa vous a dépassé', 'trop long : la table passe en précision');
+  assert.equal(long.title, 'Léa t’a dépassé', 'trop long : la table passe en précision');
   assert.match(long.detail ?? '', /^The Addams Family/);
   const rule = NOTICE_RULES['place-taken'];
   assert.equal(rule.away, true, 'par-dessus VPX aussi, sauf si le réglage le masque');
@@ -188,8 +188,8 @@ test('Arène : la place prise est l’action du moment et la première page de l
   assert.equal(arenaMoment({ mine: { title: 'TZ', seated: 1, max: 2 }, taken, open: [], rivals: [], playedToday: true, now: NOW })?.kind, 'my-game', 'ma partie qui attend reste devant');
   const pages = arenaBoardPages({ open: [], rivals: [], records: [], taken, ago: () => 'il y a 20 min', now: NOW });
   assert.equal(pages[0]?.id, 'taken');
-  assert.equal(pages[0]?.lines[0]?.cells[0]?.text, 'Votre place est prise');
-  assert.equal(pages[0]?.foot, 'Léa vous a dépassé il y a 20 min');
+  assert.equal(pages[0]?.lines[0]?.cells[0]?.text, 'Ta place est prise');
+  assert.equal(pages[0]?.foot, 'Léa t’a dépassé il y a 20 min');
 });
 
 test('Arène : « Reprendre ma place » lance la table, « Défier » grisé, « Lui écrire » entre amis', () => {
@@ -218,7 +218,7 @@ test('Arène : « Reprendre ma place » lance la table, « Défier » grisé, «
   built!().actions.find((a) => a.key === 'tab:home')!.run();
   const b = built!();
   const hero = b.hub.sections[0]!.cards[0]!;
-  assert.equal(hero.title, 'vous a dépassé sur Attack from Mars');
+  assert.equal(hero.title, 't’a dépassé sur Attack from Mars');
   assert.deepEqual(hero.buttons!.map((x) => [x.label, x.off]), [['Reprendre ma place', undefined], ['Défier Léa', 'Bientôt'], ['Lui écrire', 'Entre amis seulement']]);
   assert.equal(hero.buttons![1]!.action, undefined, 'Défier : ni flipper ni clic');
   // Navigation par blocs : « Reprendre ma place » est le seul bouton possible du bloc, Start sur le bloc le fait tout de suite.
@@ -303,7 +303,7 @@ test('retour de partie : pas d’écran sans neuf ; avec du neuf, score, XP, jou
   const b = h.built()!;
   assert.deepEqual(b.hub.tabs, [], 'pas d’onglets');
   const titles = b.hub.sections.flatMap((s) => s.cards.map((c) => c.title));
-  assert.ok(titles.includes('Vous passez devant Léa'));
+  assert.ok(titles.includes('Tu passes devant Léa'));
   assert.ok(titles.includes('Prochain : Paul'));
   assert.ok(b.hub.band!.fresh! > 0, 'la part gagnée en clair sur la barre');
   assert.deepEqual(b.hub.band!.lines, ['Partie menée au bout +10', 'Partie de 12 min +12'], 'le détail du barème');

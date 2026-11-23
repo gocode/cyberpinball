@@ -45,7 +45,7 @@ const REVIEWED = new Set([
   'groupsMenu',
   'hours',
   'inGameMenu',
-  // Parties instantanées : l'entrée de la fiche d'une table, construite à l'ouverture d'une fiche.
+  // Parties en direct : l'entrée de la fiche d'une table, construite à l'ouverture d'une fiche.
   'instantMenu',
   'jukeboxPlayer',
   // Niveau du joueur : lu par les rappels du salon, des groupes et des parties en ligne (une ligne écrite,

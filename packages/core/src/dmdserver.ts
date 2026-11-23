@@ -136,7 +136,7 @@ export function dmdServerNotFoundProblem(devices: ObservedUsbDevice[], setup: Ha
   const known = detectHardwareDmds(devices).some((d) => hardwareDmdChoice(setup, d.model) !== 'off' && hardwareDmdDriverProblem(d));
   return known
     ? t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s)', { seconds })
-    : t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoyez un rapport (Menu système > Aide et infos > Retours et propositions)', { seconds });
+    : t('Le serveur du DMD ne trouve pas l’afficheur (aucune réponse en {seconds} s), sans cause trouvée : envoie un rapport (Menu système > Aide et infos > Retours et propositions)', { seconds });
 }
 
 /**

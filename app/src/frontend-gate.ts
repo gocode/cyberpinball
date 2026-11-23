@@ -134,8 +134,8 @@ function gateView(open: OtherFrontend[]) {
     prompt: one ? t('{names} est ouvert', { names }) : t('{names} sont ouverts', { names }),
     name: '',
     details: one
-      ? t('Les deux front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.', { names })
-      : t('Les front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.', { names }),
+      ? t('Les deux front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Ferme {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.', { names })
+      : t('Les front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Ferme {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.', { names }),
     step: t('Rien n’est fermé ni modifié chez {names}.', { names }),
     hint: t('Start : continuer quand même · Exit : quitter Cyber Pinball'),
     actions: [

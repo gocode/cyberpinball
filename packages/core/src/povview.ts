@@ -132,7 +132,7 @@ function wrongWay(next: IniDocument, orientation: PlayfieldOrientation, file: st
   const played = vpxPlayedFlipperEdge(read, orientation.window);
   if (played.edge === orientation.edge) return undefined;
   return played.edge
-    ? t('{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que vous êtes {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.', {
+    ? t('{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que tu es {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.', {
         file,
         played: EDGE_LABELS[played.edge],
         edge: EDGE_LABELS[orientation.edge],

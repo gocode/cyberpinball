@@ -36,7 +36,7 @@ export function elevationScreen(ask: ElevationAsk): Built {
         rows: [
           {
             text: t('Windows va demander une autorisation'),
-            detail: t('Répondez au clavier ou à la souris : Alt+O pour Oui, Échap pour Non. Les boutons de la borne n’y peuvent rien : Windows refuse toute réponse qui ne vient pas d’un vrai clavier ou d’une vraie souris. Sans réponse dans les {min} minutes, Cyber Pinball cesse d’attendre.', { min: ELEVATION_WAIT_MS / 60_000 }),
+            detail: t('Réponds au clavier ou à la souris : Alt+O pour Oui, Échap pour Non. Les boutons de la borne n’y peuvent rien : Windows refuse toute réponse qui ne vient pas d’un vrai clavier ou d’une vraie souris. Sans réponse dans les {min} minutes, Cyber Pinball cesse d’attendre.', { min: ELEVATION_WAIT_MS / 60_000 }),
             tone: 'warning',
             icon: 'alert',
           },

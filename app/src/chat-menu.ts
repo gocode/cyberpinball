@@ -142,7 +142,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
 
   function presenceText(key: string): string {
     const f = friendOf(key);
-    if (!f) return t('N’est plus dans vos amis');
+    if (!f) return t('N’est plus dans tes amis');
     const online = net.online(key);
     if (!online) return offlineText(net.listSync(), f.lastSeen, now());
     const p = net.presenceOf(key);
@@ -152,9 +152,9 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
 
   /** Pourquoi on ne peut pas écrire à cet ami en ce moment ; undefined : on peut. */
   function writeBlocked(key: string): string | undefined {
-    if (!net.state().enabled) return t('Partage désactivé : personne ne vous voit, vous ne voyez personne');
+    if (!net.state().enabled) return t('Partage désactivé : personne ne te voit, tu ne vois personne');
     if (!chat.state().enabled) return t('Messagerie désactivée sur cette borne : Réglages de la messagerie');
-    if (!friendOf(key)) return t('N’est plus dans vos amis : conversation en lecture seule');
+    if (!friendOf(key)) return t('N’est plus dans tes amis : conversation en lecture seule');
     return undefined;
   }
 
@@ -169,7 +169,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     if (!chat.state().enabled) return t('Désactivée sur cette borne · Réglages de la messagerie');
     const unread = Object.values(chat.state().conversations).reduce((n, c) => n + c.unread, 0);
     if (unread) return tn(unread, '{n} message non lu', '{n} messages non lus');
-    return t('Écrire à vos amis, même absents : le message part à leur retour');
+    return t('Écrire à tes amis, même absents : le message part à leur retour');
   }
 
   function openList(at?: number): void {
@@ -194,7 +194,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const refuses = c?.accepts === false;
     const gone = !friendOf(key);
     return {
-      sub: last ? `${last.out ? t('Vous : {text}', { text: oneLine(last.text!) }) : oneLine(last.text!)}` : t('Pas encore de message'),
+      sub: last ? `${last.out ? t('Toi : {text}', { text: oneLine(last.text!) }) : oneLine(last.text!)}` : t('Pas encore de message'),
       ...(last ? { aside: shortWhen(last.at) } : {}),
       unread: c?.unread ?? 0,
       ...(refuses
@@ -202,7 +202,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         : pending
           ? { note: { text: tn(pending, '{n} message en attente de sa connexion', '{n} messages en attente de sa connexion'), sign: '◷', tone: 'quiet' as const } }
           : gone
-            ? { note: { text: t('N’est plus dans vos amis'), sign: '✕', tone: 'quiet' as const } }
+            ? { note: { text: t('N’est plus dans tes amis'), sign: '✕', tone: 'quiet' as const } }
             : {}),
       ...(gone || refuses ? { tone: 'quiet' as const } : net.online(key) ? { tone: 'ok' as const } : {}),
     };
@@ -219,8 +219,8 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const s = net.state();
     const actions: Action[] = [];
     const sections: Section[] = [...takeFlash()];
-    if (!s.enabled) sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }] });
-    else if (!chat.state().enabled) sections.push({ rows: [{ text: t('Messagerie désactivée sur cette borne'), detail: t('Vos amis voient « N’accepte pas de messages ». Réglages de la messagerie : « Messagerie »'), tone: 'warning', badges: [t('Désactivée')] }] });
+    if (!s.enabled) sections.push({ rows: [{ text: t('Partage désactivé : personne ne te voit, tu ne vois personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }] });
+    else if (!chat.state().enabled) sections.push({ rows: [{ text: t('Messagerie désactivée sur cette borne'), detail: t('Tes amis voient « N’accepte pas de messages ». Réglages de la messagerie : « Messagerie »'), tone: 'warning', badges: [t('Désactivée')] }] });
     // Les conversations, la plus récente d'abord ; puis les amis sans message, en ligne d'abord ; puis les anciens amis.
     const row = (key: string, plain: string): Row => {
       const index = actions.push({ label: name(key, plain), key: `conv:${key}`, icon: 'message', run: () => openThread(key, () => openList(index)) }) - 1;
@@ -240,7 +240,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     };
     const rows = listKeys().map(({ key, plain }) => row(key, plain));
     if (rows.length) sections.push({ rows });
-    else sections.push({ rows: [{ text: t('Pas encore d’ami à qui écrire'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info', icon: 'friend-add' }] });
+    else sections.push({ rows: [{ text: t('Pas encore d’ami à qui écrire'), detail: t('« Trouver un joueur » : cherche un nom dans l’annuaire, ou une borne de ton réseau local'), tone: 'info', icon: 'friend-add' }] });
     if (!rows.length && host.openFind) actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => host.openFind!() });
     actions.push({ label: t('Réglages de la messagerie'), detail: settingsDetail(), icon: 'sliders', run: () => openSettings(() => openList(Number.MAX_SAFE_INTEGER)) });
     actions.push({ label: t('Retour'), icon: 'back', run: () => lib.openSystem() });
@@ -281,7 +281,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
   function phoneQuote(key: string, line: ChatLine): { quote?: { name: string; text: string; missing?: string } } {
     if (!line.reply) return {};
     const plain = friendOf(key)?.name ?? knownName(key);
-    const qv = chatQuoteView(convOf(key) ?? { lines: [], unread: 0 }, line.reply, (out) => (out ? t('Vous') : plain));
+    const qv = chatQuoteView(convOf(key) ?? { lines: [], unread: 0 }, line.reply, (out) => (out ? t('Toi') : plain));
     const missing = missingText(qv.missing);
     return { quote: { name: qv.name, text: qv.text, ...(missing ? { missing } : {}) } };
   }
@@ -311,9 +311,9 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const f = friendOf(key);
     if (blocked) return { text: blocked, tone: 'warning', icon: 'alert' };
     const c = convOf(key);
-    if (c?.accepts === false) return { text: t('{name} n’accepte pas de messages', { name: f!.name }), detail: t('Ce que vous écrivez attendra qu’il rouvre sa messagerie'), tone: 'warning', icon: 'close' };
-    if (!net.online(key)) return { text: t('{name} est hors ligne', { name: f!.name }), detail: t('Vos messages partiront dès que vos deux bornes seront allumées en même temps'), tone: 'info', icon: 'clock' };
-    return { text: t('{name} est en ligne', { name: f!.name }), detail: t('Vos messages partent tout de suite ; « Reçu » quand sa borne les a'), tone: 'ok', icon: 'check' };
+    if (c?.accepts === false) return { text: t('{name} n’accepte pas de messages', { name: f!.name }), detail: t('Ce que tu écris attendra qu’il rouvre sa messagerie'), tone: 'warning', icon: 'close' };
+    if (!net.online(key)) return { text: t('{name} est hors ligne', { name: f!.name }), detail: t('Tes messages partiront dès que tes deux bornes seront allumées en même temps'), tone: 'info', icon: 'clock' };
+    return { text: t('{name} est en ligne', { name: f!.name }), detail: t('Tes messages partent tout de suite ; « Reçu » quand sa borne les a'), tone: 'ok', icon: 'check' };
   }
 
   /** Un élément du fil : un jour, un évènement de l'ami (record, badge) ou un message ; la borne et le téléphone le dessinent chacun. */
@@ -347,7 +347,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       }
       const line = item.line!;
       const r = reactions.get(line.id);
-      const chips = [r?.theirs ? t('{reaction} · {name}', { reaction: reactionEmoji(r.theirs), name: plain }) : undefined, r?.mine ? t('{reaction} · vous', { reaction: reactionEmoji(r.mine) }) : undefined].filter((x): x is string => !!x);
+      const chips = [r?.theirs ? t('{reaction} · {name}', { reaction: reactionEmoji(r.theirs), name: plain }) : undefined, r?.mine ? t('{reaction} · toi', { reaction: reactionEmoji(r.mine) }) : undefined].filter((x): x is string => !!x);
       const meta = line.out
         ? line.delivery === 'received'
           ? t('{time} · Reçu', { time: time(line.at) })
@@ -387,7 +387,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       // La citation (un arrêt à elle, avant la bulle, si le message cité est encore affiché), puis la bulle.
       const quoted = line.reply?.id;
       const quote = line.reply
-        ? quoteRow(chatQuoteView(c, line.reply, (out) => (out ? t('Vous') : plain)), line.reply.id, actions, items.some((it) => it.kind === 'line' && it.line.id === quoted) ? () => goToLine(key, quoted!) : undefined)
+        ? quoteRow(chatQuoteView(c, line.reply, (out) => (out ? t('Toi') : plain)), line.reply.id, actions, items.some((it) => it.kind === 'line' && it.line.id === quoted) ? () => goToLine(key, quoted!) : undefined)
         : undefined;
       const index = actions.push({
         label: line.text!,
@@ -406,14 +406,14 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         pick: true,
       });
     }
-    if (!items.length && !chat.typingOf(key)) rows.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    if (!items.length && !chat.typingOf(key)) rows.push({ text: t('Pas encore de message : écris le premier'), bubble: 'day' });
     // Il écrit en ce moment : son badge et les trois points, sous le dernier message (typing.ts).
     if (chat.typingOf(key)) rows.push({ text: t('{name} écrit…', { name: plain }), typing: { players: [{ name: plain, avatar: avatar(key, plain) }] } });
     // Écrire : toujours là, grisé avec sa raison quand on ne peut pas.
     actions.push(
       blocked
         ? { label: t('Écrire un message…'), key: 'compose', icon: 'keyboard', tone: 'quiet', detail: t('Indisponible : {reason}', { reason: blocked }), run: () => undefined }
-        : { label: t('Écrire un message…'), key: 'compose', icon: 'keyboard', detail: t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(key) },
+        : { label: t('Écrire un message…'), key: 'compose', icon: 'keyboard', detail: t('Clavier à l’écran, ou ton téléphone appairé'), run: () => compose(key) },
       blocked
         ? { label: t('Réponse rapide…'), icon: 'star', tone: 'quiet', detail: t('Indisponible : {reason}', { reason: blocked }), run: () => undefined }
         : { label: t('Réponse rapide…'), icon: 'star', detail: t('Une phrase toute prête, d’un appui'), run: () => openReply(key) },
@@ -452,7 +452,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const quoted = reply ? convOf(key)?.lines.find((l) => l.id === reply && l.text) : undefined;
     lib.openPrompt(
       quoted ? t('Répondre à {name}', { name: plain }) : t('Message à {name}', { name: plain }),
-      t('Votre message'),
+      t('Ton message'),
       value,
       (text) => {
         if (text !== undefined && text.trim()) {
@@ -461,8 +461,8 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         openThread(key);
       },
       quoted
-        ? t('Votre réponse cite « {text} ». Le clavier à l’écran, ou votre téléphone appairé. 500 caractères au plus.', { text: oneLine(quoteExcerpt(quoted.text!)) })
-        : t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+        ? t('Ta réponse cite « {text} ». Le clavier à l’écran, ou ton téléphone appairé. 500 caractères au plus.', { text: oneLine(quoteExcerpt(quoted.text!)) })
+        : t('Le clavier à l’écran, ou ton téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
       // Tant qu'il reste du texte : « en train d'écrire » chez l'ami (typing.ts).
       { onInput: (active) => chat.typing(key, active) },
     );
@@ -486,7 +486,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       const rows: Row[] = CHAT_REACTIONS.map((r: Reaction) => {
         const on = mine === r;
         const index = actions.push({ label: reactionLabel(r), key: `react:${r}`, run: () => { chat.react(key, target!, on ? null : r); back(); } }) - 1;
-        return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Votre réaction · Start la retire') } : {}), action: index, pick: true };
+        return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Ta réaction · Start la retire') } : {}), action: index, pick: true };
       });
       sections.push({ title: t('Réagir à « {text} »', { text: oneLine(targetLine.text ?? '').slice(0, 60) }), kind: 'reactions', rows });
     }
@@ -497,7 +497,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       return { text: p, action: index, pick: true };
     });
     sections.push({ title: reply ? t('Répondre d’une phrase') : t('Phrases'), kind: 'phrases', rows: phrases });
-    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Votre réponse cite son message') : t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(key, '', reply) });
+    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Ta réponse cite son message') : t('Clavier à l’écran, ou ton téléphone appairé'), run: () => compose(key, '', reply) });
     // Le message cité par celui-ci : y aller (la citation est aussi un arrêt dans le fil).
     const cited = targetLine?.reply?.id;
     if (cited && threadLines(c).some((l) => l.id === cited)) actions.push({ label: t('Voir le message cité'), icon: 'history', detail: t('Le fil, sur le message auquel il répond'), run: () => goToLine(key, cited) });
@@ -509,7 +509,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
         key: 'delete',
         icon: 'trash',
         tone: 'warning',
-        detail: t('Pour vous et pour {name}', { name: plain }),
+        detail: t('Pour toi et pour {name}', { name: plain }),
         run: () =>
           confirm(
             t('Supprimer « {text} » ?', { text: quoted }),
@@ -577,12 +577,12 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
     const muted = Object.entries(s.conversations).filter(([, c]) => c.muted).map(([k]) => knownName(k));
     const conversations = Object.values(s.conversations).filter((c) => threadLines(c).length).length;
     const actions: Action[] = [
-      { label: t('Messagerie'), icon: 'message', detail: s.enabled ? t('Activée · vos amis peuvent vous écrire') : t('Désactivée · vos amis voient « N’accepte pas de messages »'), run: () => { chat.setEnabled(!s.enabled); here(0); } },
+      { label: t('Messagerie'), icon: 'message', detail: s.enabled ? t('Activée · tes amis peuvent t’écrire') : t('Désactivée · tes amis voient « N’accepte pas de messages »'), run: () => { chat.setEnabled(!s.enabled); here(0); } },
       { label: t('Son des messages'), icon: 'sound', detail: s.sound ? t('Activé · dans le front-end et en partie') : t('Désactivé'), run: () => { chat.setSound(!s.sound); here(1); } },
       { label: t('Répondre depuis le téléphone pendant une partie'), icon: 'phone', detail: s.phoneInGame ? t('Activé · le téléphone appairé lit et répond, les boutons restent à VPX') : t('Désactivé · les messages se lisent au retour au front-end'), run: () => { chat.setPhoneInGame(!s.phoneInGame); here(2); } },
       { label: t('Garder les messages'), icon: 'history', detail: t('{keep} · sur cette borne seulement, puis effacés', { keep: keepLabel(s.keep) }), run: () => { const i = CHAT_KEEP_CHOICES.indexOf(s.keep); chat.setKeep(CHAT_KEEP_CHOICES[(i + 1) % CHAT_KEEP_CHOICES.length]!); here(3); } },
       conversations
-        ? { label: t('Effacer toutes les conversations…'), icon: 'trash', tone: 'warning', detail: tn(conversations, 'Sur cette borne seulement · {n} conversation', 'Sur cette borne seulement · {n} conversations'), run: () => confirm(t('Effacer toutes les conversations ?'), t('Sur cette borne seulement : vos amis gardent les leurs.'), t('Tout effacer'), () => { chat.clearAll(); flash = { text: t('Conversations effacées'), tone: 'ok' }; here(4); }, () => here(4)) }
+        ? { label: t('Effacer toutes les conversations…'), icon: 'trash', tone: 'warning', detail: tn(conversations, 'Sur cette borne seulement · {n} conversation', 'Sur cette borne seulement · {n} conversations'), run: () => confirm(t('Effacer toutes les conversations ?'), t('Sur cette borne seulement : tes amis gardent les leurs.'), t('Tout effacer'), () => { chat.clearAll(); flash = { text: t('Conversations effacées'), tone: 'ok' }; here(4); }, () => here(4)) }
         : { label: t('Effacer toutes les conversations…'), icon: 'trash', tone: 'quiet', detail: t('Indisponible : aucune conversation'), run: () => undefined },
       { label: t('Retour'), icon: 'back', run: () => settingsBack() },
     ];
@@ -647,7 +647,7 @@ export function createChatMenu(host: ChatMenuHost): ChatMenu {
       return { key, name: friendOf(key)!.name, lines, ...(chat.typingOf(key) ? { typing: [friendOf(key)!.name] } : {}), reactions: CHAT_REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })), phrases: chatPhrases() };
     },
     remoteCommunity: (open) => {
-      const closed = !net.state().enabled ? t('Partage désactivé : personne ne vous voit, vous ne voyez personne') : !chat.state().enabled ? t('Messagerie désactivée sur cette borne : Réglages de la messagerie') : undefined;
+      const closed = !net.state().enabled ? t('Partage désactivé : personne ne te voit, tu ne vois personne') : !chat.state().enabled ? t('Messagerie désactivée sur cette borne : Réglages de la messagerie') : undefined;
       const rows = listKeys()
         .slice(0, COMMUNITY_SHOWN)
         .map(({ key, plain }) => {

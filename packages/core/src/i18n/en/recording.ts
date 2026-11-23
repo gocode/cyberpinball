@@ -43,11 +43,11 @@ export const messages: Record<string, string> = {
     'Playfield video filmed by “Play and record” for the wheel: {width} × {height} at most, never above the screen (Start: change)',
   '{delay} s après l’apparition de la table': '{delay} s after the table appears',
   'Dès l’apparition de la table': 'As soon as the table appears',
-  'Chaque écran filmé devient le média de cet écran sur la roue. Le plateau l’est toujours ; le fronton et l’afficheur, si vous le voulez.': 'Each filmed screen becomes that screen’s media on the wheel. The playfield always is; the backglass and the display, if you wish.',
+  'Chaque écran filmé devient le média de cet écran sur la roue. Le plateau l’est toujours ; le fronton et l’afficheur, si tu le veux.': 'Each filmed screen becomes that screen’s media on the wheel. The playfield always is; the backglass and the display, if you wish.',
   'Toujours filmé · média {label}': 'Always filmed · {label} media',
   'Filmé · média {label}': 'Filmed · {label} media',
   'Pas filmé': 'Not filmed',
-  'Temps laissé à la table pour s’installer (fondu de VPX, attract mode) avant de filmer. Lancez la bille pendant ce temps.': 'Time left for the table to settle (VPX fade-in, attract mode) before filming. Launch the ball meanwhile.',
+  'Temps laissé à la table pour s’installer (fondu de VPX, attract mode) avant de filmer. Lance la bille pendant ce temps.': 'Time left for the table to settle (VPX fade-in, attract mode) before filming. Launch the ball meanwhile.',
   'Enregistrement de la partie': 'Game recording',
   'Rejouer et enregistrer': 'Play and record again',
   'Utiliser pour la roue': 'Use for the wheel',
@@ -57,7 +57,7 @@ export const messages: Record<string, string> = {
   Confirmer: 'Confirm',
   'La roue montre la nouvelle vidéo dès le retour aux tables': 'The wheel shows the new video as soon as you are back to the tables',
   'Écriture interrompue : {error}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans la corbeille.': 'Writing interrupted: {error}. What was already done stays; the removed files are in the recycle bin.',
-  'Filmée pendant que vous jouez, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand vous quittez la table. Au retour, vous décidez quoi garder.':
+  'Filmée pendant que tu joues, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand tu quittes la table. Au retour, tu décides quoi garder.':
     'Filmed while you play, the game becomes the table’s video on the wheel. No button to press: recording stops by itself, or when you leave the table. When you come back, you decide what to keep.',
   '{duration} s de vidéo ; la partie continue': '{duration} s of video; the game goes on',
   'Longueur de la vidéo : la partie, elle, continue. Une vidéo de roue dure d’ordinaire 20 à 60 s ; elle finit par un fondu au noir, pour boucler sans à-coup.': 'Length of the video: the game itself goes on. A wheel video usually lasts 20 to 60 s; it ends with a fade to black, to loop without a jolt.',

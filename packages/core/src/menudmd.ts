@@ -201,7 +201,7 @@ export function markMenuDmdAuto(host: MenuDmdEditorHost, s: MenuDmdEditor): void
 /** Pourquoi une ligne n'est pas disponible (grisée, la raison dite quand on la choisit). */
 export function menuDmdBlocked(host: MenuDmdEditorHost, s: MenuDmdEditor, id: MenuDmdItemId): string | undefined {
   if (id === 'auto' && !host.ownPlace && !menuDmdDirty(s)) return t('Cette table suit déjà la place automatique.');
-  if (PLACE_LINES.includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD sur la roue »).');
+  if (PLACE_LINES.includes(id) && s.spot.hidden) return t('DMD masqué : affiche-le d’abord (ligne « DMD sur la roue »).');
   return undefined;
 }
 

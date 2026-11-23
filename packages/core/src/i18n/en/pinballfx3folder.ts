@@ -4,12 +4,12 @@
 export const messages: Record<string, string> = {
   // packages/core/src/pinballfx3-folder.ts
   '« {dir} » est introuvable (disque débranché, dossier déplacé ?).': '"{dir}" can’t be found (drive unplugged, folder moved?).',
-  '« {dir} » : ni « Pinball FX Classic.exe » ni « Pinball FX3.exe » ici. Choisissez le dossier qui contient l’exécutable de {game}.': '"{dir}": neither "Pinball FX Classic.exe" nor "Pinball FX3.exe" here. Choose the folder that holds the {game} executable.',
+  '« {dir} » : ni « Pinball FX Classic.exe » ni « Pinball FX3.exe » ici. Choisis le dossier qui contient l’exécutable de {game}.': '"{dir}": neither "Pinball FX Classic.exe" nor "Pinball FX3.exe" here. Choose the folder that holds the {game} executable.',
   '« {dir} » : l’exécutable est là, mais aucune table dans son dossier data\\steam.': '"{dir}": the executable is there, but there’s no table in its data\\steam folder.',
   'introuvable (disque débranché, dossier déplacé ?)': 'not found (drive unplugged, folder moved?)',
   'ni « Pinball FX Classic.exe » ni « Pinball FX3.exe » ici': 'neither "Pinball FX Classic.exe" nor "Pinball FX3.exe" here',
   'aucune table dans son dossier data\\steam': 'no table in its data\\steam folder',
-  '{game} a été lancé depuis le dossier choisi ({dir}), sans passer par Steam. S’il exige Steam, il refuse de s’ouvrir ainsi : « Oublier ce dossier » (Ajouter une table > Tables de {game}) revient au jeu de Steam. Sinon, vérifiez que le mode borne est activé dans le jeu et que la table est achetée sur votre compte.':
+  '{game} a été lancé depuis le dossier choisi ({dir}), sans passer par Steam. S’il exige Steam, il refuse de s’ouvrir ainsi : « Oublier ce dossier » (Ajouter une table > Tables de {game}) revient au jeu de Steam. Sinon, vérifie que le mode borne est activé dans le jeu et que la table est achetée sur ton compte.':
     '{game} was started from the chosen folder ({dir}), without going through Steam. If it requires Steam, it refuses to open this way: "Forget this folder" (Add a table > {game} tables) goes back to the Steam game. Otherwise, check that cabinet mode is enabled in the game and that the table is bought on your account.',
   // app/src/frontend.ts
   '{game} est introuvable sur ce PC. Menu système > Tables > Ajouter une table > « Tables de {game} » : l’installer avec Steam, ou choisir le dossier du jeu.':
@@ -19,7 +19,7 @@ export const messages: Record<string, string> = {
   'Steam absent de ce PC : choisir le dossier du jeu, ou installer Steam puis {game}': 'No Steam on this PC: choose the game folder, or install Steam then {game}',
   'Dossier de Pinball FX3': 'Pinball FX3 folder',
   'Aucune table à lister': 'No table to list',
-  'Installez {game} avec Steam, ou choisissez le dossier du jeu : ses tables apparaissent ici.': 'Install {game} with Steam, or choose the game folder: its tables show up here.',
+  'Installe {game} avec Steam, ou choisis le dossier du jeu : ses tables apparaissent ici.': 'Install {game} with Steam, or choose the game folder: its tables show up here.',
   'Le dossier des tables du dossier choisi est vide ou illisible : {dir}.': 'The chosen folder’s table folder is empty or unreadable: {dir}.',
   'Image du dossier du jeu : « {file} »': 'Image from the game folder: "{file}"',
   // app/src/pinballfx3-folder-ui.ts
@@ -39,7 +39,7 @@ export const messages: Record<string, string> = {
   'Dossier oublié.': 'Folder forgotten.',
   'C’est le dossier du jeu de Steam : rien à changer, les parties passent par Steam.': 'That’s the Steam game folder: nothing to change, games go through Steam.',
   'Dossier gardé : {dir}.': 'Folder kept: {dir}.',
-  'Dossier de {game} reconnu dans votre sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.': '{game} folder recognized in your selection: its tables aren’t installed like VPX tables, you choose them here.',
+  'Dossier de {game} reconnu dans ta sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.': '{game} folder recognized in your selection: its tables aren’t installed like VPX tables, you choose them here.',
   '{n} table trouvée.': '{n} table found.',
   '{n} tables trouvées.': '{n} tables found.',
   'Les parties se lancent par « {exe} », sans passer par Steam ; si le jeu exige Steam, c’est lui qui refusera de s’ouvrir.': 'Games start from "{exe}", without going through Steam; if the game requires Steam, it’s the game that will refuse to open.',

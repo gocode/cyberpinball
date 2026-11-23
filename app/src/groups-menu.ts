@@ -136,14 +136,14 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
 
   /** Pourquoi on ne peut rien faire dans les groupes en ce moment ; undefined : on peut. */
   function blocked(): string | undefined {
-    if (!net.state().enabled) return t('Partage désactivé : personne ne vous voit, vous ne voyez personne');
+    if (!net.state().enabled) return t('Partage désactivé : personne ne te voit, tu ne vois personne');
     return undefined;
   }
 
   // ---------- Présence d'un membre ----------
 
   function presence(key: string): { text: string; on: boolean } {
-    if (key === myKey()) return { text: t('Vous'), on: true };
+    if (key === myKey()) return { text: t('Toi'), on: true };
     if (isFriend(key)) {
       if (!net.online(key)) return { text: t('Hors ligne'), on: false };
       return net.presenceOf(key)?.status === 'playing' ? { text: t('En partie'), on: true } : { text: t('En ligne'), on: true };
@@ -184,10 +184,10 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const last = v.messages.at(-1);
     const top = ranking(v)[0];
     if (last && last.body.k === 'msg' && (!v.week || !top || Date.parse(last.at) >= Date.parse(top.at))) {
-      const who = last.by === myKey() ? t('Vous') : last.name;
+      const who = last.by === myKey() ? t('Toi') : last.name;
       return t('{name} : « {text} » · {ago}', { name: who, text: oneLine(shownText(last.body.text)).slice(0, 60), ago: socialAgo(last.at, now()) });
     }
-    if (v.week && top) return t('Table de la semaine : {table} · {name} mène avec {score}', { table: v.week.table.title, name: top.key === myKey() ? t('vous') : top.name, score: formatNumber(top.score) });
+    if (v.week && top) return t('Table de la semaine : {table} · {name} mène avec {score}', { table: v.week.table.title, name: top.key === myKey() ? t('toi') : top.name, score: formatNumber(top.score) });
     if (v.week) return t('Table de la semaine : {table}', { table: v.week.table.title });
     return t('Pas encore de message');
   }
@@ -210,7 +210,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const open = groups.publicGroups().length;
       if (open) parts.push(tn(open, '{n} groupe public à rejoindre', '{n} groupes publics à rejoindre'));
     }
-    return { detail: parts.length ? parts.join(' · ') : t('Vos cercles, publics ou privés : discussion, table de la semaine, classement'), attention: unread.length > 0 || invites.length > 0, quiet: false };
+    return { detail: parts.length ? parts.join(' · ') : t('Tes cercles, publics ou privés : discussion, table de la semaine, classement'), attention: unread.length > 0 || invites.length > 0, quiet: false };
   }
 
   const inviterName = (from: string, v: GroupView) => net.state().friends.find((f) => f.key === from)?.name ?? v.members.find((m) => m.key === from)?.name ?? from.slice(0, 8);
@@ -276,7 +276,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       heading: t('Groupes'),
       icon: 'group',
       subheading: sub.join(' · '),
-      lead: t('Vos groupes, et les groupes publics à rejoindre. Un groupe privé ne paraît nulle part : on y entre sur invitation. Discussion, table de la semaine et classement restent entre membres.'),
+      lead: t('Tes groupes, et les groupes publics à rejoindre. Un groupe privé ne paraît nulle part : on y entre sur invitation. Discussion, table de la semaine et classement restent entre membres.'),
       sections,
       actions,
       back: () => listBack(),
@@ -301,7 +301,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const problem = blocked();
     const full = view.members.length + view.invited.length >= GROUP_MEMBERS_MAX;
     const removed = view.former.get(myKey())?.how === 'removed';
-    return problem ?? (full ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : removed ? t('le créateur vous a retiré : il faut une invitation') : undefined);
+    return problem ?? (full ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : removed ? t('le créateur t’a retiré : il faut une invitation') : undefined);
   }
 
   /** Les amis à inviter dans ce groupe (ni membres ni déjà invités), et pourquoi personne (complet, tous là, partage coupé). */
@@ -309,14 +309,14 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const problem = blocked();
     const room = GROUP_MEMBERS_MAX - v.members.length - v.invited.length;
     const candidates = friendsSorted().filter((f) => !isMember(v, f.key) && !v.invited.some((i) => i.key === f.key));
-    const reason = problem ?? (room <= 0 ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : candidates.length ? undefined : t('tous vos amis sont membres ou invités'));
+    const reason = problem ?? (room <= 0 ? t('{n} membres au plus', { n: GROUP_MEMBERS_MAX }) : candidates.length ? undefined : t('tous tes amis sont membres ou invités'));
     return { candidates: reason ? [] : candidates, ...(reason ? { reason } : {}) };
   }
 
   function openPublic(g: string, back: () => void): void {
     lib.openCustom(() => {
       const found = groups.publicGroups().find((x) => x.view.id === g);
-      if (!found) return { heading: t('Groupe public'), icon: 'group', sections: [{ rows: [{ text: t('Ce groupe n’est plus dans l’annuaire'), detail: t('Il est peut-être devenu privé, ou vous en êtes déjà membre'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
+      if (!found) return { heading: t('Groupe public'), icon: 'group', sections: [{ rows: [{ text: t('Ce groupe n’est plus dans l’annuaire'), detail: t('Il est peut-être devenu privé, ou tu en es déjà membre'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
       const { view } = found;
       const members: Row[] = view.members.map((m) => {
         const p = presence(m.key);
@@ -327,7 +327,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         const local = localTable(view.week.table);
         const thumb = local ? host.wheel?.(local) : undefined;
         const made = view.week.table.manufacturer && view.week.table.year ? `${view.week.table.manufacturer} ${view.week.table.year} · ` : '';
-        sections.push({ title: t('Table de la semaine'), rows: [{ text: view.week.table.title, detail: made + (local ? t('déjà dans votre borne') : t('pas dans votre borne')), ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Prête') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }) }] });
+        sections.push({ title: t('Table de la semaine'), rows: [{ text: view.week.table.title, detail: made + (local ? t('déjà dans ta borne') : t('pas dans ta borne')), ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Prête') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }) }] });
       }
       const reason = joinReason(view);
       const actions: Action[] = [
@@ -337,7 +337,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
               label: t('Rejoindre'),
               icon: 'check',
               tone: 'ok',
-              detail: t('Vous voyez aussitôt la discussion, la table de la semaine et le classement'),
+              detail: t('Tu vois aussitôt la discussion, la table de la semaine et le classement'),
               run: () => {
                 if (!groups.joinPublic(g)) {
                   flash = { text: t('Ce groupe n’a pas pu être rejoint'), tone: 'warning' };
@@ -356,7 +356,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         heading: shownName(view.name),
         icon: 'group',
         subheading: [tn(view.members.length, '{n} membre', '{n} membres'), t('groupe public')].join(' · '),
-        lead: t('Rejoindre : vous voyez la discussion, la table de la semaine et le classement du groupe ; ses membres voient votre pseudo, votre pays et votre avatar.'),
+        lead: t('Rejoindre : tu vois la discussion, la table de la semaine et le classement du groupe ; ses membres voient ton pseudo, ton pays et ton avatar.'),
         sections,
         actions,
         back,
@@ -408,18 +408,18 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const ready = Boolean(d.name);
     actions.push(
       ready
-        ? { label: t('Créer le groupe'), icon: 'check', tone: 'ok', detail: d.picked.size ? tn(d.picked.size, '{n} invitation partira tout de suite', '{n} invitations partiront tout de suite') : t('Vous seul pour l’instant : invitez plus tard'), run: () => finishCreate() }
-        : { label: t('Créer le groupe'), icon: 'check', tone: 'quiet', detail: t('Indisponible : choisissez d’abord un nom'), run: () => undefined },
+        ? { label: t('Créer le groupe'), icon: 'check', tone: 'ok', detail: d.picked.size ? tn(d.picked.size, '{n} invitation partira tout de suite', '{n} invitations partiront tout de suite') : t('Toi seul pour l’instant : invite plus tard'), run: () => finishCreate() }
+        : { label: t('Créer le groupe'), icon: 'check', tone: 'quiet', detail: t('Indisponible : choisis d’abord un nom'), run: () => undefined },
       { label: t('Annuler'), icon: 'back', run: d.back },
     );
     return {
       heading: t('Créer un groupe'),
       icon: 'plus',
       subheading: d.picked.size ? tn(d.picked.size, '{n} ami invité', '{n} amis invités') : t('Aucun ami invité pour l’instant'),
-      lead: t('Le groupe vit sur les bornes de ses membres, comme vos messages : aucun serveur, aucun compte.'),
+      lead: t('Le groupe vit sur les bornes de ses membres, comme tes messages : aucun serveur, aucun compte.'),
       sections: [
         { title: t('Nom du groupe'), rows: [nameRow] },
-        friends.length ? { title: t('Inviter des amis'), rows: invite } : { title: t('Inviter des amis'), rows: [{ text: t('Pas encore d’ami à inviter'), detail: t('Seuls vos amis peuvent être invités : « Trouver un joueur » dans Mes amis'), icon: 'friend-add', tone: 'info' }] },
+        friends.length ? { title: t('Inviter des amis'), rows: invite } : { title: t('Inviter des amis'), rows: [{ text: t('Pas encore d’ami à inviter'), detail: t('Seuls tes amis peuvent être invités : « Trouver un joueur » dans Mes amis'), icon: 'friend-add', tone: 'info' }] },
         { title: t('Accès'), rows: [accessRow] },
       ],
       actions,
@@ -434,7 +434,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       if (text !== undefined && [...name].length > GROUP_NAME_MAX) flash = { text: t('Nom trop long : {n} caractères au plus', { n: GROUP_NAME_MAX }), tone: 'warning' };
       // Validé vide : le nom d'avant reste (un groupe a toujours un nom).
       done(text === undefined || !name ? value : [...name].slice(0, GROUP_NAME_MAX).join(''));
-    }, t('{n} caractères au plus. Le clavier à l’écran, ou votre téléphone appairé.', { n: GROUP_NAME_MAX }));
+    }, t('{n} caractères au plus. Le clavier à l’écran, ou ton téléphone appairé.', { n: GROUP_NAME_MAX }));
   }
 
   function finishCreate(): void {
@@ -446,7 +446,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       lib.openCustom(buildCreate);
       return;
     }
-    flash = friends.length ? { text: tn(friends.length, 'Groupe créé · {n} invitation envoyée', 'Groupe créé · {n} invitations envoyées'), detail: t('Elles arrivent à vos amis dès que leur borne est allumée'), tone: 'ok' } : { text: t('Groupe créé'), tone: 'ok' };
+    flash = friends.length ? { text: tn(friends.length, 'Groupe créé · {n} invitation envoyée', 'Groupe créé · {n} invitations envoyées'), detail: t('Elles arrivent à tes amis dès que leur borne est allumée'), tone: 'ok' } : { text: t('Groupe créé'), tone: 'ok' };
     draft = undefined;
     // La liste d'abord : le retour du groupe la nomme (« Retour : Groupes »), pas l'écran quitté.
     lib.openCustom(buildList, 0);
@@ -497,7 +497,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const v = groups.view(g);
     const up = current?.g === g ? current.back : () => lib.openCustom(buildList, 0);
     if (!v || !isMember(v, myKey())) {
-      return { heading: t('Groupe'), icon: 'group', sections: [{ rows: [{ text: t('Vous n’êtes plus membre de ce groupe'), tone: 'warning', icon: 'lock' }] }], actions: [{ label: t('Retour'), icon: 'back', run: up }], back: up };
+      return { heading: t('Groupe'), icon: 'group', sections: [{ rows: [{ text: t('Tu n’es plus membre de ce groupe'), tone: 'warning', icon: 'lock' }] }], actions: [{ label: t('Retour'), icon: 'back', run: up }], back: up };
     }
     // Sous les yeux : ce qui arrive est lu.
     if (groups.entry(g)?.unread) groups.markRead(g);
@@ -513,7 +513,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const index = actions.push({ label: t('Jouer : {table}', { table: week.table.title }), key: 'week', icon: 'play', ...(local ? {} : { tone: 'quiet' as const }), run: () => (local ? host.play(local) : undefined) }) - 1;
       const meta = weekMeta(week);
       const thumb = local ? host.wheel?.(local) : undefined;
-      sections.push({ title: t('Table de la semaine'), rows: [{ text: week.table.title, detail: local ? meta : `${meta} · ${t('pas dans votre borne')}`, ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Jouer') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }), action: index, pick: true }] });
+      sections.push({ title: t('Table de la semaine'), rows: [{ text: week.table.title, detail: local ? meta : `${meta} · ${t('pas dans ta borne')}`, ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Jouer') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }), action: index, pick: true }] });
     } else {
       sections.push({ title: t('Table de la semaine'), rows: [{ text: t('Pas de table de la semaine'), detail: t('« Choisir la table de la semaine » : un membre la choisit pour tous, jusqu’à dimanche'), icon: 'play', tone: 'info' }] });
     }
@@ -539,11 +539,11 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const c = chips(v, line);
       const named = groupLineMentions(v, line).map((key) => ({ name: v.members.find((m) => m.key === key)!.name, me: key === myKey() }));
       const pieces = bubblePieces(text, named);
-      chat.push({ text, detail: `${mine ? t('Vous') : line.name} · ${time(line.at)}`, bubble: mine ? 'out' : 'in', ...(quote ? { quote } : {}), ...(pieces ? { pieces } : {}), ...(c.length ? { badges: c } : {}), action: index, pick: true });
+      chat.push({ text, detail: `${mine ? t('Toi') : line.name} · ${time(line.at)}`, bubble: mine ? 'out' : 'in', ...(quote ? { quote } : {}), ...(pieces ? { pieces } : {}), ...(c.length ? { badges: c } : {}), action: index, pick: true });
     }
     // Les membres qui écrivent en ce moment : leurs badges et les trois points, sous le dernier message (typing.ts).
     const typers = groups.typers(g);
-    if (!chat.length && !typers.length) chat.push({ text: t('Pas encore de message : écrivez le premier'), bubble: 'day' });
+    if (!chat.length && !typers.length) chat.push({ text: t('Pas encore de message : écris le premier'), bubble: 'day' });
     if (typers.length) {
       const shown = typers.slice(0, TYPING_SHOWN_MAX);
       const names = shown.map((x) => x.name).join(', ');
@@ -559,7 +559,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const ranks = ranking(v);
       const rows: Row[] = ranks.map((r, i) => {
         const index = actions.push({ label: r.name, key: `rank:${r.key}`, icon: 'trophy', run: () => openPlayer(r.key, here) }) - 1;
-        return { text: `${i + 1}. ${r.key === myKey() ? t('Vous') : r.name}`, detail: `${formatNumber(r.score)} · ${socialAgo(r.at, now())}`, avatar: avatar(r.key, r.name), flag: flag(r.country), ...(i === 0 ? { badges: [t('Record du groupe')] } : {}), ...(r.key === myKey() ? { tone: 'info' as const } : {}), action: index, pick: true };
+        return { text: `${i + 1}. ${r.key === myKey() ? t('Toi') : r.name}`, detail: `${formatNumber(r.score)} · ${socialAgo(r.at, now())}`, avatar: avatar(r.key, r.name), flag: flag(r.country), ...(i === 0 ? { badges: [t('Record du groupe')] } : {}), ...(r.key === myKey() ? { tone: 'info' as const } : {}), action: index, pick: true };
       });
       sections.push({ title: t('Classement du groupe'), kind: 'players', rows: rows.length ? rows : [{ text: t('Pas encore de score depuis le choix de la table'), detail: t('Les scores publiés aux classements par les membres comptent d’eux-mêmes'), icon: 'trophy', tone: 'quiet' }] });
     }
@@ -573,7 +573,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       invite.reason
         ? unavailable(t('Inviter des amis'), 'friend-add', invite.reason)
         : { label: t('Inviter des amis'), icon: 'friend-add', detail: listNames(invite.candidates.map((f) => f.name), (names) => t('{names} ne sont pas encore membres', { names }), (name) => t('{name} n’est pas encore membre', { name })), run: () => openInvite(g) },
-      { label: t('Membres'), icon: 'friends', detail: others.length ? t('{names} et vous', { names: others.map((m) => m.name).join(', ') }) : v.invited.length ? tn(v.invited.length, '{n} invitation en attente', '{n} invitations en attente') : t('Vous seul pour l’instant'), run: () => openMembers(g) },
+      { label: t('Membres'), icon: 'friends', detail: others.length ? t('{names} et toi', { names: others.map((m) => m.name).join(', ') }) : v.invited.length ? tn(v.invited.length, '{n} invitation en attente', '{n} invitations en attente') : t('Toi seul pour l’instant'), run: () => openMembers(g) },
       { label: t('Quitter le groupe'), icon: 'exit', detail: leaveDetail(v), run: () => confirmLeave(g) },
       { label: t('Retour'), icon: 'back', run: up },
     );
@@ -590,12 +590,12 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
 
   /** Ce que dit la table de la semaine : son fabricant et son année, jusqu'à quand, qui l'a choisie. */
   function weekMeta(week: NonNullable<GroupView['week']>): string {
-    return [week.table.manufacturer && week.table.year ? `${week.table.manufacturer} ${week.table.year}` : undefined, untilText(week.until), t('choisie par {name}', { name: week.by === myKey() ? t('vous') : week.byName })].filter(Boolean).join(' · ');
+    return [week.table.manufacturer && week.table.year ? `${week.table.manufacturer} ${week.table.year}` : undefined, untilText(week.until), t('choisie par {name}', { name: week.by === myKey() ? t('toi') : week.byName })].filter(Boolean).join(' · ');
   }
 
   /** Ce que coûte de quitter ce groupe. */
   function leaveDetail(v: GroupView): string {
-    return v.creator === myKey() && v.members.some((m) => m.key !== myKey()) ? t('Vous l’avez créé : personne ne pourra plus retirer de membre') : t('Vous ne verrez plus ses messages');
+    return v.creator === myKey() && v.members.some((m) => m.key !== myKey()) ? t('Tu l’as créé : personne ne pourra plus retirer de membre') : t('Tu ne verras plus ses messages');
   }
 
   /** « Lucas et Camille », « Lucas, Camille et 2 autres » : la phrase qui convient au nombre. */
@@ -622,10 +622,10 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       r.reason === 'gap'
         ? { text: t('Un instant : une ligne toutes les 3 secondes'), tone: 'warning' }
         : r.reason === 'burst'
-          ? { text: t('Beaucoup de messages d’affilée : attendez quelques minutes'), tone: 'warning' }
+          ? { text: t('Beaucoup de messages d’affilée : attends quelques minutes'), tone: 'warning' }
           : r.reason === 'text'
             ? { text: t('Message trop long : 500 caractères au plus'), tone: 'warning' }
-            : { text: t('Message pas envoyé : vous n’êtes plus membre, ou le partage est coupé'), tone: 'warning' };
+            : { text: t('Message pas envoyé : tu n’es plus membre, ou le partage est coupé'), tone: 'warning' };
   }
 
   /** Le clavier : `value`, le texte déjà écrit (« @pseudo » d'une mention) ; `reply`, le message cité. */
@@ -634,15 +634,15 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     const quoted = reply ? v?.messages.find((l) => l.id === reply) : undefined;
     lib.openPrompt(
       quoted ? t('Répondre à {name}', { name: quoted.name }) : t('Message à {group}', { group: v?.name ?? '' }),
-      t('Votre message'),
+      t('Ton message'),
       value,
       (text) => {
         if (text !== undefined && text.trim()) sendResult(groups.send(g, text, quoted?.id));
         openGroup(g);
       },
       quoted && quoted.body.k === 'msg'
-        ? t('Votre réponse cite « {text} ». Le clavier à l’écran, ou votre téléphone appairé. 500 caractères au plus.', { text: oneLine(shownText(quoteExcerpt(quoted.body.text))) })
-        : t('Le clavier à l’écran, ou votre téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
+        ? t('Ta réponse cite « {text} ». Le clavier à l’écran, ou ton téléphone appairé. 500 caractères au plus.', { text: oneLine(shownText(quoteExcerpt(quoted.body.text))) })
+        : t('Le clavier à l’écran, ou ton téléphone appairé : son texte s’écrit ici en direct. 500 caractères au plus.'),
       // Tant qu'il reste du texte : « en train d'écrire » chez les membres (typing.ts).
       { onInput: (active) => groups.typing(g, active) },
     );
@@ -678,7 +678,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       const rows: Row[] = REACTIONS.map((r: Reaction) => {
         const on = mine === r;
         const index = actions.push({ label: reactionLabel(r), key: `react:${r}`, run: () => (groups.react(g, line.id, on ? null : r), back()) }) - 1;
-        return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Votre réaction · Start la retire') } : {}), action: index, pick: true };
+        return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Ta réaction · Start la retire') } : {}), action: index, pick: true };
       });
       sections.push({ title: t('Réagir à « {text} »', { text: oneLine(shownText(line.body.text)).slice(0, 60) }), kind: 'reactions', rows });
     }
@@ -687,7 +687,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       return { text: p, action: index, pick: true };
     });
     sections.push({ title: reply ? t('Répondre d’une phrase') : t('Phrases'), kind: 'phrases', rows: phrases });
-    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Votre réponse cite son message') : t('Clavier à l’écran, ou votre téléphone appairé'), run: () => compose(g, '', reply) });
+    actions.push({ label: t('Écrire un message…'), icon: 'keyboard', detail: reply ? t('Ta réponse cite son message') : t('Clavier à l’écran, ou ton téléphone appairé'), run: () => compose(g, '', reply) });
     const others = v ? v.members.filter((m) => m.key !== myKey()) : [];
     actions.push(
       others.length
@@ -703,7 +703,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         label: t('Supprimer ce message…'),
         icon: 'trash',
         tone: 'warning',
-        detail: t('Pour vous et pour tous les membres'),
+        detail: t('Pour toi et pour tous les membres'),
         run: () =>
           confirm(t('Supprimer « {text} » ?', { text: quoted }), t('Le message disparaît chez chaque membre dès que sa borne reçoit le retrait. Rien ne le rétablit.'), t('Supprimer'), () => {
             if (groups.remove(g, line.id)) flash = { text: t('Message supprimé'), tone: 'ok' };
@@ -755,8 +755,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
 
   function confirmLeave(g: string): void {
     const v = groups.view(g);
-    confirm(t('Quitter « {group} » ?', { group: v?.name ?? '' }), t('Ses messages disparaissent de cette borne. Pour y revenir, un membre devra vous inviter de nouveau.'), t('Quitter le groupe'), () => {
-      if (groups.leave(g)) flash = { text: t('Vous avez quitté « {group} »', { group: v?.name ?? '' }), tone: 'ok' };
+    confirm(t('Quitter « {group} » ?', { group: v?.name ?? '' }), t('Ses messages disparaissent de cette borne. Pour y revenir, un membre devra t’inviter de nouveau.'), t('Quitter le groupe'), () => {
+      if (groups.leave(g)) flash = { text: t('Tu as quitté « {group} »', { group: v?.name ?? '' }), tone: 'ok' };
       lib.openCustom(buildList, 0);
     }, () => openGroup(g));
   }
@@ -783,7 +783,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         icon: 'play',
         subheading: groups.view(g)?.name,
         lead: t('Pour tous les membres, jusqu’à dimanche 23:59. Ceux qui ne l’ont pas la voient grisée.'),
-        sections: rows.length ? [{ title: t('Vos tables ({n})', { n: rows.length }), rows }] : [{ rows: [{ text: t('Aucune table sur cette borne'), tone: 'info' }] }],
+        sections: rows.length ? [{ title: t('Tes tables ({n})', { n: rows.length }), rows }] : [{ rows: [{ text: t('Aucune table sur cette borne'), tone: 'info' }] }],
         actions,
         back,
       };
@@ -810,13 +810,13 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         picked.size
           ? { label: tn(picked.size, 'Inviter {n} ami', 'Inviter {n} amis'), icon: 'check', tone: 'ok', detail: t('Les invitations partent tout de suite'), run: () => {
               const n = groups.invite(g, candidates.filter((f) => picked.has(f.key)));
-              flash = { text: tn(n, '{n} invitation envoyée', '{n} invitations envoyées'), detail: t('Elles arrivent à vos amis dès que leur borne est allumée'), tone: 'ok' };
+              flash = { text: tn(n, '{n} invitation envoyée', '{n} invitations envoyées'), detail: t('Elles arrivent à tes amis dès que leur borne est allumée'), tone: 'ok' };
               back();
             } }
-          : { label: t('Inviter'), icon: 'check', tone: 'quiet', detail: t('Indisponible : cochez au moins un ami'), run: () => undefined },
+          : { label: t('Inviter'), icon: 'check', tone: 'quiet', detail: t('Indisponible : coche au moins un ami'), run: () => undefined },
         { label: t('Annuler'), icon: 'back', run: back },
       );
-      return { heading: t('Inviter des amis'), icon: 'friend-add', subheading: v?.name, lead: t('Seuls vos amis peuvent être invités. Ils voient le groupe dès qu’ils acceptent.'), sections: [{ title: t('Vos amis'), rows: rows.length ? rows : [{ text: t('Tous vos amis sont membres ou invités'), tone: 'info' }] }], actions, back, listStart: t('cocher ou décocher') };
+      return { heading: t('Inviter des amis'), icon: 'friend-add', subheading: v?.name, lead: t('Seuls tes amis peuvent être invités. Ils voient le groupe dès qu’ils acceptent.'), sections: [{ title: t('Tes amis'), rows: rows.length ? rows : [{ text: t('Tous tes amis sont membres ou invités'), tone: 'info' }] }], actions, back, listStart: t('cocher ou décocher') };
     };
     lib.openCustom(build, 0);
   }
@@ -835,12 +835,12 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         const p = presence(m.key);
         const facts = [m.key === v.creator ? t('Créateur') : undefined, p.text].filter(Boolean).join(' · ');
         const index = actions.push({ label: m.name, key: `member:${m.key}`, icon: 'account', run: () => (creator && m.key !== myKey() ? openMember(g, m.key, here) : openPlayer(m.key, here)) }) - 1;
-        return { text: m.key === myKey() ? t('{name} (vous)', { name: m.name }) : m.name, avatar: avatar(m.key, m.name), flag: flag(m.country), detail: facts, ...(p.on ? { tone: 'ok' as const } : {}), action: index, pick: true };
+        return { text: m.key === myKey() ? t('{name} (toi)', { name: m.name }) : m.name, avatar: avatar(m.key, m.name), flag: flag(m.country), detail: facts, ...(p.on ? { tone: 'ok' as const } : {}), action: index, pick: true };
       });
       const pending: Row[] = v.invited.map((i) => {
         const by = v.members.find((m) => m.key === i.by)?.name ?? '?';
         const index = actions.push({ label: i.name, key: `invited:${i.key}`, icon: 'account', run: () => (creator ? openMember(g, i.key, here) : openPlayer(i.key, here)) }) - 1;
-        return { text: i.name, avatar: avatar(i.key, i.name), detail: t('Invité par {name} · en attente de sa réponse', { name: i.by === myKey() ? t('vous') : by }), tone: 'quiet', action: index, pick: true };
+        return { text: i.name, avatar: avatar(i.key, i.name), detail: t('Invité par {name} · en attente de sa réponse', { name: i.by === myKey() ? t('toi') : by }), tone: 'quiet', action: index, pick: true };
       });
       const e = groups.entry(g);
       // L'accès : le créateur l'ouvre ou le ferme (le curseur reste dessus) ; les autres le lisent.
@@ -859,7 +859,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         heading: t('Membres'),
         icon: 'friends',
         subheading: v.name,
-        lead: creator ? t('Vous avez créé ce groupe : Start sur un membre pour le retirer.') : t('Chaque membre peut inviter ses amis ; le créateur peut retirer un membre.'),
+        lead: creator ? t('Tu as créé ce groupe : Start sur un membre pour le retirer.') : t('Chaque membre peut inviter ses amis ; le créateur peut retirer un membre.'),
         sections: [{ title: tn(v.members.length, '{n} membre', '{n} membres'), kind: 'players', rows }, ...(pending.length ? [{ title: tn(pending.length, '{n} invitation en attente', '{n} invitations en attente'), kind: 'players', rows: pending }] : [])],
         actions,
         back,
@@ -924,7 +924,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         const local = localTable(view.week.table);
         const thumb = local ? host.wheel?.(local) : undefined;
         const made = view.week.table.manufacturer && view.week.table.year ? `${view.week.table.manufacturer} ${view.week.table.year} · ` : '';
-        sections.push({ title: t('Table de la semaine'), rows: [{ text: view.week.table.title, detail: made + (local ? t('déjà dans votre borne') : t('pas dans votre borne')), ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Prête') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }) }] });
+        sections.push({ title: t('Table de la semaine'), rows: [{ text: view.week.table.title, detail: made + (local ? t('déjà dans ta borne') : t('pas dans ta borne')), ...(thumb ? { thumb } : { icon: 'play' as const }), aside: local ? t('Prête') : t('Absente'), ...(local ? {} : { tone: 'quiet' as const }) }] });
       }
       const problem = blocked();
       const actions: Action[] = [
@@ -944,8 +944,8 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       return {
         heading: view.name,
         avatar: avatar(invitation.from, from),
-        subheading: view.access === 'public' ? (invitation.from === view.creator ? t('{name} vous invite dans son groupe public', { name: from }) : t('{name} vous invite dans un groupe public', { name: from })) : invitation.from === view.creator ? t('{name} vous invite dans son groupe privé', { name: from }) : t('{name} vous invite dans un groupe privé', { name: from }),
-        lead: t('Accepter : vous voyez la discussion, la table de la semaine et le classement du groupe ; ses membres voient votre pseudo, votre pays et votre avatar.'),
+        subheading: view.access === 'public' ? (invitation.from === view.creator ? t('{name} t’invite dans son groupe public', { name: from }) : t('{name} t’invite dans un groupe public', { name: from })) : invitation.from === view.creator ? t('{name} t’invite dans son groupe privé', { name: from }) : t('{name} t’invite dans un groupe privé', { name: from }),
+        lead: t('Accepter : tu vois la discussion, la table de la semaine et le classement du groupe ; ses membres voient ton pseudo, ton pays et ton avatar.'),
         sections,
         actions,
         back,
@@ -972,16 +972,16 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
     return {
       g: v.id,
       ...(v.week
-        ? { week: { title: v.week.table.title, detail: weekMeta(v.week), ...(local ? (host.busy?.() ? { reason: host.busy()! } : {}) : { reason: t('pas dans votre borne') }) } }
+        ? { week: { title: v.week.table.title, detail: weekMeta(v.week), ...(local ? (host.busy?.() ? { reason: host.busy()! } : {}) : { reason: t('pas dans ta borne') }) } }
         : { noWeek: t('« Choisir la table de la semaine » : un membre la choisit pour tous, jusqu’à dimanche') }),
       ranking: ranks.map((r, i) => {
         const src = flagSrc(r.country);
-        return { rank: i + 1, name: r.key === myKey() ? t('Vous') : r.name, ...(src ? { flag: src } : {}), score: formatNumber(r.score), ...(r.key === myKey() ? { me: true as const } : {}) };
+        return { rank: i + 1, name: r.key === myKey() ? t('Toi') : r.name, ...(src ? { flag: src } : {}), score: formatNumber(r.score), ...(r.key === myKey() ? { me: true as const } : {}) };
       }),
       ...(v.week && !ranks.length ? { rankingEmpty: t('Pas encore de score depuis le choix de la table') } : {}),
       members: [
         ...v.members.map((m) => member(m.key, m.name, m.country, [m.key === v.creator ? t('Créateur') : undefined, presence(m.key).text].filter(Boolean).join(' · '))),
-        ...v.invited.map((i) => member(i.key, i.name, undefined, t('Invité par {name} · en attente de sa réponse', { name: i.by === myKey() ? t('vous') : (v.members.find((m) => m.key === i.by)?.name ?? '?') }))),
+        ...v.invited.map((i) => member(i.key, i.name, undefined, t('Invité par {name} · en attente de sa réponse', { name: i.by === myKey() ? t('toi') : (v.members.find((m) => m.key === i.by)?.name ?? '?') }))),
       ],
       invitable: invite.candidates.map((f) => member(f.key, f.name, undefined, presence(f.key).text)),
       ...(invite.reason ? { inviteReason: invite.reason } : {}),
@@ -999,7 +999,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
       return [tn(view.members.length, '{n} membre', '{n} membres'), ...(creator ? [t('créé par {name}', { name: creator })] : []), ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title })] : [])].join(' · ');
     };
     const preview = (view: GroupView) => [
-      ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title }) + ` · ${localTable(view.week.table) ? t('déjà dans votre borne') : t('pas dans votre borne')}`] : []),
+      ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title }) + ` · ${localTable(view.week.table) ? t('déjà dans ta borne') : t('pas dans ta borne')}`] : []),
       ...view.members.slice(0, 12).map((m) => [m.name, m.key === view.creator ? t('Créateur') : undefined, presence(m.key).text].filter(Boolean).join(' · ')),
     ];
     const invitations = problem
@@ -1010,7 +1010,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
             g: view.id,
             name: view.name,
             avatar: face(invitation.from, from),
-            detail: [t('{name} vous invite', { name: from }), tn(view.members.length, '{n} membre', '{n} membres'), ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title })] : [])].join(' · '),
+            detail: [t('{name} t’invite', { name: from }), tn(view.members.length, '{n} membre', '{n} membres'), ...(view.week ? [t('Table de la semaine : {table}', { table: view.week.table.title })] : [])].join(' · '),
           };
         });
     const directory = problem ? [] : groups.publicGroups();
@@ -1076,7 +1076,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
         groups.setMuted(g, act === 'mute');
         return;
       case 'leave':
-        if (groups.leave(g)) say(t('Vous avez quitté « {group} »', { group: v.name }));
+        if (groups.leave(g)) say(t('Tu as quitté « {group} »', { group: v.name }));
         return;
     }
   }
@@ -1154,7 +1154,7 @@ export function createGroupsMenu(host: GroupsMenuHost): GroupsMenu {
           avatar: face(v.id, v.name),
           presence: [tn(v.members.length, '{n} membre', '{n} membres'), accessText(v)].join(' · '),
           state: on ? 'online' : 'offline',
-          status: on ? { text: tn(on, '{n} membre en ligne', '{n} membres en ligne'), detail: t('Vos messages leur arrivent tout de suite'), tone: 'ok' } : { text: t('Aucun autre membre en ligne'), detail: t('Vos messages partiront dès qu’un membre sera en ligne'), tone: 'info' },
+          status: on ? { text: tn(on, '{n} membre en ligne', '{n} membres en ligne'), detail: t('Tes messages leur arrivent tout de suite'), tone: 'ok' } : { text: t('Aucun autre membre en ligne'), detail: t('Tes messages partiront dès qu’un membre sera en ligne'), tone: 'info' },
           ...(groups.typers(v.id).length ? { typing: groups.typers(v.id).map((x) => x.name) } : {}),
           items,
           reactions: REACTIONS.map((r) => ({ id: r, label: reactionLabel(r) })),

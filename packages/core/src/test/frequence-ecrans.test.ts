@@ -88,7 +88,7 @@ test('écran annexe plus lent que le playfield, VPX officiel : à vérifier, la 
     assert.doesNotMatch(l.detail!, /bille/);
   }
   // Le remède : la fréquence la plus haute de cet écran, proposée par Windows ou à obtenir par le câble.
-  assert.match(lines[2]!.detail!, /Windows propose 75 Hz : choisissez-la .*Affichage avancé/);
+  assert.match(lines[2]!.detail!, /Windows propose 75 Hz : choisis-la .*Affichage avancé/);
   assert.match(lines[0]!.detail!, /Il annonce jusqu’à 75 Hz\. Windows ne propose pas plus à cette définition/);
   const block = displaysBlock(f);
   assert.equal(block.state, 'check');

@@ -43,7 +43,7 @@ export function shortFollowUrl(url: string): string {
 export function followLinks(lang: Language = currentLanguage()): FollowLink[] {
   const link = (network: FollowNetwork, name: string, url: string, purpose: string): FollowLink => ({ network, icon: FOLLOW_ICONS[network], name, url, short: shortFollowUrl(url), purpose });
   return [
-    link('facebook', 'Facebook', lang === 'fr' ? FOLLOW_URLS.facebook.fr : FOLLOW_URLS.facebook.other, t('Les nouveautés et vos questions')),
+    link('facebook', 'Facebook', lang === 'fr' ? FOLLOW_URLS.facebook.fr : FOLLOW_URLS.facebook.other, t('Les nouveautés et tes questions')),
     link('youtube', 'YouTube', FOLLOW_URLS.youtube, t('Les tutoriels vidéo, pas à pas')),
     link('github', 'GitHub', FOLLOW_URLS.github, t('Les versions et le code source')),
   ];

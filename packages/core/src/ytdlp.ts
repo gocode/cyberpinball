@@ -209,11 +209,11 @@ export function parseYtDlpLine(raw: string): YtDlpLine | undefined {
 /** Raison lisible d'un échec de yt-dlp, d'après son message (anglais). */
 export function ytdlpErrorText(message: string | undefined): string {
   const m = message ?? '';
-  if (/not a bot|confirm you.re not|sign in to confirm/i.test(m)) return t('YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard, ou prenez un fichier proposé par un site');
+  if (/not a bot|confirm you.re not|sign in to confirm/i.test(m)) return t('YouTube demande de prouver qu’on n’est pas un robot : réessaie plus tard, ou prends un fichier proposé par un site');
   if (/private video/i.test(m)) return t('vidéo privée');
   if (/members|join this channel|premium/i.test(m)) return t('vidéo réservée aux abonnés de la chaîne');
   if (/age.restricted|confirm your age|inappropriate for some users/i.test(m)) return t('vidéo soumise à une limite d’âge');
-  if (/not available in your country|geo.?restrict/i.test(m)) return t('vidéo indisponible dans votre pays');
+  if (/not available in your country|geo.?restrict/i.test(m)) return t('vidéo indisponible dans ton pays');
   if (/video unavailable|has been removed|does not exist/i.test(m)) return t('vidéo indisponible');
   if (/unsupported url/i.test(m)) return t('page que yt-dlp ne sait pas lire');
   if (/requested format is not available|no video formats/i.test(m)) return t('aucun format d’un seul tenant pour cette vidéo (il faudrait ffmpeg)');

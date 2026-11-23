@@ -60,7 +60,7 @@ const MAX_ROWS = 40;
 export function createMediaImport(host: MediaImportHost) {
   function open(): void {
     if (!host.tablesDir()) {
-      host.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des tables.')]);
+      host.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lance « Installer » depuis le lanceur : il crée le dossier des tables.')]);
       return;
     }
     const found = knownInstallations();
@@ -73,11 +73,11 @@ export function createMediaImport(host: MediaImportHost) {
       );
       return {
         heading: title(),
-        lead: t('Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que vous ayez validé le plan.'),
+        lead: t('Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que tu aies validé le plan.'),
         sections: [
           {
             title: t('Installations trouvées sur ce PC'),
-            rows: rows.length ? rows : [{ text: t('Aucune aux emplacements habituels'), detail: t('Choisissez le dossier de l’installation.'), tone: 'quiet' }],
+            rows: rows.length ? rows : [{ text: t('Aucune aux emplacements habituels'), detail: t('Choisis le dossier de l’installation.'), tone: 'quiet' }],
           },
         ],
         actions,

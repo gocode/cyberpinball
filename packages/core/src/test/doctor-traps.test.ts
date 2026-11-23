@@ -1014,7 +1014,7 @@ test('table qui change le sens de la partie : constat, réparation, rien quand V
   const side = { window: d, edge: 'right' as const, globalIni: '[Player]\nBGSet = 1\nCabinetAutofitMode = 1\n' };
   const desktop = findings(side);
   assert.equal(desktop[0]?.code, 'tableOrientation');
-  assert.match(desktop[0]!.detail, /flippers en bas, alors que vous êtes à droite/);
+  assert.match(desktop[0]!.detail, /flippers en bas, alors que tu es à droite/);
   applyOps(desktop[0]!.fix!.ops, { trashDir });
   assert.ok(!fs.existsSync(ini), 'seule la clé dans le fichier : il part entier à la corbeille');
   // VPinballX.ini lui-même en cadrage manuel : la synchronisation le dit, pas le médecin de chaque table.
@@ -1205,7 +1205,7 @@ test('médecin des médias : proportions, orientation du plateau et DMD selon la
 
 test('afficheurs DMD et FullDMD : le médecin parle de celui que l’écran montre, et ne demande jamais d’en garder un', () => {
   // Table reprise de PinUP Popper (17/11/2026) : « (DMD) » en 21:9 et « (FullDMD) » en 16:9, sur un DMD 4:1.
-  // Le constat disait « gardez l’un des deux » et les proportions parlaient du 16:9, « faute de média DMD ».
+  // Le constat disait « garde l’un des deux » et les proportions parlaient du 16:9, « faute de média DMD ».
   const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
   const folder = healthyTable(tablesDir);
   const run = (cabinet: PupCabinet = CABINET) => diagnose(scanTables(tablesDir)[0]!, { tablesDir, script: scriptFacts(SCRIPT), cabinet });
@@ -1226,12 +1226,12 @@ test('afficheurs DMD et FullDMD : le médecin parle de celui que l’écran mont
   found = run();
   assert.equal(found.find((f) => f.code === 'mediaDmdSwapped'), undefined);
   assert.equal(found.find((f) => f.code === 'mediaRatio'), undefined);
-  // Un seul afficheur mal libellé : renommé en un geste, sans « gardez l’un des deux ».
+  // Un seul afficheur mal libellé : renommé en un geste, sans « garde l’un des deux ».
   fs.rmSync(media(folder, `(FullDMD) ${TABLE}.mp4`));
   const swapped = run().find((f) => f.code === 'mediaDmdSwapped')!;
   assert.equal(swapped.severity, 'info', 'le front-end le montre déjà où il va le mieux');
   assert.ok(swapped.fix);
-  for (const f of run()) assert.doesNotMatch(`${f.detail} ${f.fix?.label ?? ''}`, /gardez l’un des deux|Configuration de la borne > Écran du DMD/, f.code);
+  for (const f of run()) assert.doesNotMatch(`${f.detail} ${f.fix?.label ?? ''}`, /garde l’un des deux|Configuration de la borne > Écran du DMD/, f.code);
   fs.rmSync(tablesDir, { recursive: true });
 });
 

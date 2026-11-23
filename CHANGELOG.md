@@ -11,6 +11,17 @@ son interface).
 
 ## 0.2.4
 
+- Défis : l'onglet de l'Arène a enfin son bouton "Lancer un défi" : il ouvre le choix de la table, puis du joueur, au lieu d'expliquer un chemin dans les fiches ; sans partie jouée, il est grisé avec sa raison.
+- Partage coupé : "Régler le partage" s'ouvre sur place depuis l'onglet Défis, la Communauté et mon profil, plus de long chemin à suivre dans les réglages.
+- Joueurs à découvrir : chaque suggestion propose "Voir le profil" avant "Ajouter en ami" ; le bouton du profil s'appelle aussi "Ajouter en ami".
+- Mon profil dit la vérité sur son état : "Partage désactivé", "Profil public désactivé" ou "Profil public en cours de préparation", trois situations qui ne se confondent plus.
+- Profil d'un joueur dont l'activité est masquée : l'en-tête le dit, l'onglet Badges n'affiche plus un faux "Aucun encore", et Start sur la carte la réaffiche d'un geste.
+- Un niveau trop élevé pour l'ancienneté connue s'affiche "Niveau en cours de vérification" au lieu de "Niveau ?".
+- Start sur la publication d'un autre joueur annonce "Tu aimes cette publication" ou "Tu n'aimes plus cette publication", et la note du titre dit ce que fait Start.
+- Les tables du jour ouvertes depuis l'Arène proposent "Retour : Arène" (et non "Retour : Classements").
+- "À proximité" devient "Sur mon réseau local" (filtre des joueurs et rubrique de "Trouver un joueur").
+- "Instantanée" devient "Parties en direct" partout (menus, fiches, notes) ; les libellés génériques d'une partie entre amis s'appellent "Partie entre amis", pour ne plus les confondre avec une partie en direct.
+- Toute l'interface tutoie le joueur : plus aucun "vous", "votre", "vos", "veuillez" ni impératif au pluriel dans les textes des écrans, du téléphone et des messages ; un test garde cette règle.
 - Cadrage des tables et Point de vue : les images des cadrages s'affichent. Elles étaient rendues par VPX, mais le front-end refusait de les montrer (cartes vides).
 - Corrigé : seul à une table, quitter la table en cours de partie ne fait plus passer pour un score final ce que la ROM avait au moment de l'arrêt. Le score n'est lu qu'à la fermeture de VPX (la ROM n'écrit sa mémoire qu'à ce moment) : si elle dit que la partie n'était pas finie, le score est gardé sur ta borne, marqué "partie quittée" dans le tableau des scores de la table, mais il n'est ni publié aux classements, ni compté dans un défi, ni retenu comme record du niveau.
 - Une partie qui va jusqu'au bout, ou dont le score entre au tableau d'honneur de la table, compte comme avant. Quand la carte de la ROM ne dit pas si la partie est finie (certaines machines), la partie compte aussi comme avant.

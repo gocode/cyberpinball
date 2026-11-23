@@ -4286,7 +4286,7 @@ body:not([data-mode='browser'])[data-view='profile'] .profile {
   margin-bottom: 4px;
 }
 
-/* ---------- Groupes et parties instantanées (telephone-groupes.js, lot 4) ---------- */
+/* ---------- Groupes et parties en direct (telephone-groupes.js, lot 4) ---------- */
 
 /* Une page plein écran de la Communauté (Groupes publics, Votre partie) : comme un profil. */
 .full-page {
@@ -4481,7 +4481,7 @@ body:not([data-mode='browser'])[data-view='page'] .full-page {
   color: var(--meta);
 }
 
-/* Ouvrir une partie instantanée (feuille du bas) : la table, le nombre de joueurs. */
+/* Ouvrir une partie en direct (feuille du bas) : la table, le nombre de joueurs. */
 .instant-field {
   display: flex;
   align-items: center;
@@ -4654,7 +4654,7 @@ body:not([data-mode='browser'])[data-view='page'] .full-page {
   white-space: normal;
 }
 
-/* « Ouvrir une partie instantanée » seul sur sa ligne : toute la largeur, comme les rangées de boutons. */
+/* « Ouvrir une partie en direct » seul sur sa ligne : toute la largeur, comme les rangées de boutons. */
 .groups-actions > .people-btn {
   width: 100%;
 }

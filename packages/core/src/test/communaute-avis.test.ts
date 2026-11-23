@@ -2,7 +2,7 @@
 // Communauté du Menu système (un seul écran) ; « Retours et propositions » n'y est plus, il est dans Aide et
 // infos. Ces tests fixent :
 // - le médaillon ouvre la rubrique elle-même, son « Retour » vers la roue, avec le compte des joueurs en tête ;
-// - les entrées propres à l'accueil (classements, salon du pays, niveau, parties instantanées, groupes) sont fournies ;
+// - les entrées propres à l'accueil (classements, salon du pays, niveau, parties en direct, groupes) sont fournies ;
 // - le nombre de joueurs en ligne ne se dit qu'au-delà de cinq.
 
 import assert from 'node:assert/strict';
@@ -71,7 +71,7 @@ test('Communauté : le médaillon ouvre la rubrique du Menu système elle-même,
 test('Communauté : l’accueil a ses entrées à lui, qui reviennent à l’accueil', () => {
   setLanguage('fr');
   const h = harness();
-  assert.deepEqual(Object.keys(h.menu.homeItems).sort(), ['rankings', 'rooms'], 'sans niveau, parties instantanées ni groupes : leurs entrées n’existent pas');
+  assert.deepEqual(Object.keys(h.menu.homeItems).sort(), ['rankings', 'rooms'], 'sans niveau, parties en direct ni groupes : leurs entrées n’existent pas');
   assert.equal(h.menu.homeItems.rankings!.detail, '3 tables classées');
   h.menu.homeItems.rankings!.run();
   assert.deepEqual(h.did.slice(-2), ['classements', 'menu système'], 'le « Retour » des classements ramène à la rubrique');
@@ -79,7 +79,7 @@ test('Communauté : l’accueil a ses entrées à lui, qui reviennent à l’acc
   assert.equal(h.menu.homeItems.rooms!.tone, 'quiet');
   const full = harness({
     level: { detail: () => 'Niveau 4', avatar: () => ({}), open: () => {} },
-    instant: { door: () => ({ label: 'Partie instantanée', detail: 'Aucune ouverte', quiet: true }), open: () => {} },
+    instant: { door: () => ({ label: 'Partie en direct', detail: 'Aucune ouverte', quiet: true }), open: () => {} },
     groups: { door: () => ({ detail: '2 groupes', attention: true, quiet: false }), open: () => {} },
   });
   assert.deepEqual(Object.keys(full.menu.homeItems).sort(), ['groups', 'instant', 'my-level', 'rankings', 'rooms']);

@@ -200,7 +200,7 @@ export function vrReadiness(probe: OpenXrProbe): VrReadiness {
     return { ready: false, reason: t('Aucun logiciel de casque installé (runtime OpenXR) : Meta Quest Link, SteamVR ou Virtual Desktop') };
   }
   if (probe.text === undefined) {
-    return { ready: false, reason: t('Le runtime OpenXR déclaré est introuvable ({file}) : réinstallez le logiciel du casque', { file: path.win32.basename(probe.manifest) }) };
+    return { ready: false, reason: t('Le runtime OpenXR déclaré est introuvable ({file}) : réinstalle le logiciel du casque', { file: path.win32.basename(probe.manifest) }) };
   }
   return { ready: true, runtime: openXrRuntimeName(probe.manifest, probe.text) };
 }

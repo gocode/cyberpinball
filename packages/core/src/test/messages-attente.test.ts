@@ -147,7 +147,7 @@ test('messages en attente : la ligne ouvre sa conversation, dit ce qui y attend,
     assert.equal(row('Bruno · Les Flippeurs du Nord').note?.text, 'Start : ouvrir la discussion du groupe');
     assert.equal(row('Bruno · Les Flippeurs du Nord').avatar, undefined, 'un groupe : son icône, pas la pastille du dernier auteur');
     // Le groupe quitté : la ligne reste, grisée avec sa raison.
-    assert.equal(row('Orion · Tilt du samedi').note?.text, 'Vous n’êtes plus dans ce groupe');
+    assert.equal(row('Orion · Tilt du samedi').note?.text, 'Tu n’es plus dans ce groupe');
     build!().actions.find((a) => a.label === '2 messages de Nova')!.run();
     assert.deepEqual(did, [`friend-message ${NOVA.slice(0, 4)}`]);
     // La conversation de Nova lue là où elle se tient : sa ligne aussi, et elle seule.
@@ -186,7 +186,7 @@ test('messages en attente : la pastille compte hors sourdine, rien quand rien n�
   menu.open(() => opened.push('retour'));
   const built = build!();
   assert.equal(built.heading, 'Messages en attente');
-  assert.equal(built.subheading, '9 messages attendent votre lecture');
+  assert.equal(built.subheading, '9 messages attendent ta lecture');
   const [waiting, community] = built.sections;
   assert.deepEqual(waiting!.rows.map((r) => r.text), ['Nova', 'Les Flippeurs du Nord', 'Salon France', 'Léa']);
   assert.equal(waiting!.rows[1]!.detail, 'Groupe · Bruno : Neon Harbor');

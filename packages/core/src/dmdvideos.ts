@@ -86,7 +86,7 @@ export function heavyDmdVideosFinding(tableFolder: string, dmdFolder: string): F
       t('Le plugin FlexDMD de VPX 10.8.1 décode chaque vidéo en entier, d’un coup, à chaque scène qui la montre : la partie se fige une à plusieurs secondes, flippers compris, et VPX prend de la mémoire à chaque fois.'),
       heavy.every((v) => isShrinkableDmdVideo(v.file))
         ? t('Le DMD n’a que 128 × 32 points : Cyber Pinball les ramène à cette taille avant la prochaine partie, où elles s’afficheront pareil, sans arrêt ; les originaux vont à sa corbeille.')
-        : t('Le DMD n’a que 128 × 32 points : Cyber Pinball ramène à cette taille, avant la prochaine partie, celles qu’il sait lire (mp4, mov, webm) ; les autres (wmv, avi) restent telles quelles : remplacez-les par des mp4 à la taille du DMD.'),
+        : t('Le DMD n’a que 128 × 32 points : Cyber Pinball ramène à cette taille, avant la prochaine partie, celles qu’il sait lire (mp4, mov, webm) ; les autres (wmv, avi) restent telles quelles : remplace-les par des mp4 à la taille du DMD.'),
     ].join(' '),
   };
 }

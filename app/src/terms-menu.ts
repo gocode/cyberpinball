@@ -65,7 +65,7 @@ export function createTermsMenu(host: TermsMenuHost): TermsMenu {
     return {
       heading: t('Refuser les conditions ?'),
       icon: 'rules',
-      lead: t('Cyber Pinball ne s’utilise qu’avec l’accord de ces conditions. Sans lui, il se ferme ; elles vous seront présentées au prochain lancement.'),
+      lead: t('Cyber Pinball ne s’utilise qu’avec l’accord de ces conditions. Sans lui, il se ferme ; elles te seront présentées au prochain lancement.'),
       sections: [],
       actions: [
         { label: t('Revoir les conditions'), detail: t('Revenir au texte pour l’accepter'), icon: 'back', run: () => ((refusing = false), show(0)) },

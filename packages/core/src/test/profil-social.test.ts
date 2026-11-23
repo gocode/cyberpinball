@@ -60,7 +60,7 @@ test('Records : ses scores publiés, d’abord là où il me devance (le plus pe
 interface Hub {
   person: { name: string; eyebrow?: string; status?: { text: string }; buttons: { label: string; off?: string; primary?: boolean; xp?: string; action?: number }[] };
   tabs: { label: string; current: boolean; disabled?: string; action?: number }[];
-  sections: { title?: string; cards: { key?: string; title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
+  sections: { title?: string; note?: string; cards: { key?: string; title: string; readOnly?: boolean; detail?: string; aside?: string; asideIcon?: string; asideTone?: string; action?: number }[]; choices?: { title: string; action?: number }[] }[];
 }
 interface Built {
   heading: string;
@@ -71,21 +71,21 @@ interface Built {
   back(): void;
 }
 
-function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; likes?: number; plays?: boolean; tableAvailable?: boolean } = {}) {
+function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; likes?: number; plays?: boolean; tableAvailable?: boolean; sharingOff?: boolean; noPublic?: boolean; noCard?: boolean; hidden?: boolean; fresh?: boolean } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createProfileMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'profile-menu.js')) as {
     createProfileMenu(host: object): { openProfile(key: string, back: () => void): void; openMine(back: () => void): void };
   };
   let opened: { build: () => Built; at?: number } | undefined;
   const events: string[] = [];
-  const state = { ...newSocialState(new Date(0)), enabled: true, key: { publicKey: ME }, name: 'Kiko', friends: opts.friend ? [{ key: THEO, name: 'Théo', since: ago(90_000), events: [] }] : [] };
+  const state = { ...newSocialState(new Date(0)), enabled: !opts.sharingOff, ...(opts.noPublic ? { publicProfile: false } : {}), key: { publicKey: ME }, name: 'Kiko', friends: opts.friend ? [{ key: THEO, name: 'Théo', since: ago(90_000), events: [] }] : [] };
   const card = (k: string) => ({
     key: k,
     name: k === ME ? 'Kiko' : 'Théo',
     country: 'FR',
     badges: ['first-game'],
     records: 1,
-    xp: 20_000,
+    xp: opts.fresh ? 50_000_000 : 20_000,
     friends: 12,
     events: [{ id: `ev-${k[0]}`, kind: 'record', at: ago(30), table: { title: 'Thunder Reef' }, score: 1_000, rank: 1 }],
     likes: { [`ev-${k[0]}`]: opts.likes ?? 3 },
@@ -95,8 +95,10 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; lik
   });
   const net = fakeSocialNet({
     state: () => state,
-    publicCard: (k: string) => card(k),
-    cardFirstSeen: () => ago(60 * 24 * 365),
+    publicCard: (k: string) => (opts.noCard ? undefined : card(k)),
+    cardFirstSeen: () => (opts.fresh ? ago(60) : ago(60 * 24 * 365)),
+    activityHidden: () => Boolean(opts.hidden),
+    hideActivity: (k: string, on: boolean) => events.push(`hide:${k === THEO ? 'theo' : k}:${on}`),
     rankings: () => ({ ...emptyRankings(), scores: [score(THEO, BOARD('1'), 1_000), score(ME, BOARD('1'), 400)] }),
     livePlayers: () => (opts.online ? [{ key: THEO, name: 'Théo', status: 'online', at: ago(1), sig: '' }] : []),
     likedByMe: () => false,
@@ -122,6 +124,7 @@ function profile(opts: { friend?: boolean; mine?: boolean; online?: boolean; lik
     block: (key: string) => events.push(`block:${key}`),
     openThread: (key: string) => events.push(`thread:${key}`),
     system: { open: (group: string) => events.push(`system:${group}`) },
+    openSharing: () => events.push('sharing'),
     now: () => NOW,
   });
   if (opts.mine) menu.openMine(() => events.push('back'));
@@ -173,17 +176,17 @@ test('profil : un écran à onglets, l’en-tête du joueur, quatre onglets et j
   assert.deepEqual(p.events, ['back']);
 });
 
-test('profil d’un autre joueur : « Ajouter +25 XP » en tête des actions, curseur dans les onglets ; « Écrire » grisé, sa raison, jamais un arrêt', () => {
+test('profil d’un autre joueur : « Ajouter en ami +25 XP » en tête des actions, curseur dans les onglets ; « Écrire » grisé, sa raison, jamais un arrêt', () => {
   const p = profile();
   const buttons = p.built().hub.person.buttons;
-  assert.equal(buttons[0]!.label, 'Ajouter');
+  assert.equal(buttons[0]!.label, 'Ajouter en ami');
   assert.equal(buttons[0]!.primary, true);
   assert.equal(buttons[0]!.xp, '+25 XP');
   assert.equal(p.built().actions[p.at()!]!.key, 'tab:activity', 'le curseur dans la barre d’onglets');
   const write = buttons.find((x) => x.label === 'Écrire')!;
   assert.equal(write.off, 'Entre amis seulement');
   assert.equal(write.action, undefined);
-  p.press('Ajouter');
+  p.press('Ajouter en ami');
   assert.ok(p.events.includes('request:Théo'));
   // Ce qui reste entre amis est dit, sans rien inventer.
   assert.ok(p.built().hub.sections.some((s) => s.title === 'Entre amis'));
@@ -206,6 +209,53 @@ test('Activité : chaque publication porte le pouce et son nombre ; Start l’ai
   // Onglet en liste : la publication est un arrêt direct, Start l'aime.
   p.pick('event:ev-b');
   assert.ok(p.events.includes('like:ev-b:true'));
+});
+
+test('Start sur la publication d’un autre joueur : le J’aime est dit à l’écran, jamais en silence', () => {
+  const p = profile();
+  p.pick('event:ev-b');
+  assert.equal(p.built().hub.person.eyebrow, 'Tu aimes cette publication');
+  const note = p.built().hub.sections.find((s) => s.title === 'Activité')!.note ?? '';
+  assert.match(note, /Start : aimer ou ne plus aimer/, 'la note du titre dit ce que fait Start');
+});
+
+test('activité masquée : dite sur l’en-tête, Badges jamais grisé « Aucun encore », et de quoi l’afficher d’un geste', () => {
+  const p = profile({ hidden: true });
+  assert.equal(p.built().hub.person.status?.text, 'Activité masquée sur cette borne');
+  const badges = p.built().hub.tabs.find((x) => x.label === 'Badges')!;
+  assert.equal(badges.disabled, undefined, 'un onglet qui dit « Aucun encore » alors qu’il cache tout serait faux');
+  for (const label of ['Activité', 'Badges']) {
+    const cards = p.tab(label).hub.sections.flatMap((s) => s.cards);
+    assert.deepEqual(cards.map((c) => c.title), ['Activité masquée sur cette borne'], `${label} : la raison, pas un fil vide`);
+    assert.ok(cards[0]!.action !== undefined, `${label} : un arrêt des flippers pour l’afficher de nouveau`);
+  }
+  p.pick('hidden');
+  assert.ok(p.events.includes('hide:theo:false'));
+});
+
+test('niveau trop haut pour l’ancienneté connue : « en cours de vérification », jamais « Niveau ? »', () => {
+  const p = profile({ fresh: true });
+  const texts = JSON.stringify(p.built().hub) + JSON.stringify(p.tab('À propos').hub);
+  assert.ok(!/Niveau \?/.test(texts), 'aucun « Niveau ? »');
+  assert.match(texts, /Niveau en cours de vérification/);
+});
+
+test('mon profil, trois états distincts : partage coupé, profil public coupé, profil en préparation', () => {
+  const status = (o: Parameters<typeof profile>[0]) => profile({ mine: true, ...o }).built().hub.person.status?.text ?? '';
+  assert.match(status({ sharingOff: true }), /^Partage désactivé/);
+  assert.match(status({ noPublic: true }), /^Profil public désactivé/);
+  assert.match(status({ noCard: true }), /en cours de préparation/);
+  assert.doesNotMatch(status({ noCard: true }), /désactivé/, 'une carte pas encore faite n’est pas un profil coupé');
+  assert.match(status({}), /^Profil public activé/);
+});
+
+test('mon profil, partage coupé : « Régler le partage » sur place, jamais un chemin à retrouver', () => {
+  const p = profile({ mine: true, sharingOff: true });
+  const sections = p.built().hub.sections;
+  assert.ok(sections.some((s) => s.choices?.some((c) => c.title === 'Régler le partage')));
+  assert.ok(!JSON.stringify(sections).includes('Partage et réseau : « Activer'), 'plus de chemin à suivre à la main');
+  p.pick('sharing');
+  assert.deepEqual(p.events, ['sharing']);
 });
 
 test('Records : l’écart à rattraper en ambre, sur deux lignes', () => {

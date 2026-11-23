@@ -355,7 +355,7 @@ export function dmdServerProgram(): DmdServerProgram | { problem: string } {
   const vpx = vpxInstall(locations());
   if (!vpx) return { problem: t('VPX n’est pas installé : le serveur du DMD s’appuie sur ses fichiers') };
   const dmdutilDir = path.join(path.dirname(vpx.exe), 'plugins', 'dmdutil');
-  if (!fs.existsSync(path.join(dmdutilDir, 'dmdutil64.dll'))) return { problem: t('VPX sans son module DMD (plugins\\dmdutil) : réinstallez VPX depuis Cyber Pinball') };
+  if (!fs.existsSync(path.join(dmdutilDir, 'dmdutil64.dll'))) return { problem: t('VPX sans son module DMD (plugins\\dmdutil) : réinstalle VPX depuis Cyber Pinball') };
   return { exe, dmdutilDir };
 }
 

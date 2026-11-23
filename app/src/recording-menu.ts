@@ -103,7 +103,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
       icon: 'record',
       subheading: table.title,
       // Une aide courte, les valeurs restent dans les réglages.
-      lead: t('Filmée pendant que vous jouez, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand vous quittez la table. Au retour, vous décidez quoi garder.'),
+      lead: t('Filmée pendant que tu joues, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand tu quittes la table. Au retour, tu décides quoi garder.'),
       sections: [],
       actions: [
         { label: t('Lancer et enregistrer'), detail: summary(s), tone: 'ok', icon: 'record', run: () => ctx.play(table, s) },
@@ -178,7 +178,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
       heading: t('Écrans filmés'),
       icon: 'screens',
       subheading: table.title,
-      lead: t('Chaque écran filmé devient le média de cet écran sur la roue. Le plateau l’est toujours ; le fronton et l’afficheur, si vous le voulez.'),
+      lead: t('Chaque écran filmé devient le média de cet écran sur la roue. Le plateau l’est toujours ; le fronton et l’afficheur, si tu le veux.'),
       sections: [],
       actions: [
         ...roles.map((role): Action => {
@@ -213,7 +213,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
       subheading: table.title,
       lead:
         field === 'delay'
-          ? t('Temps laissé à la table pour s’installer (fondu de VPX, attract mode) avant de filmer. Lancez la bille pendant ce temps.')
+          ? t('Temps laissé à la table pour s’installer (fondu de VPX, attract mode) avant de filmer. Lance la bille pendant ce temps.')
           : t('Longueur de la vidéo : la partie, elle, continue. Une vidéo de roue dure d’ordinaire 20 à 60 s ; elle finit par un fondu au noir, pour boucler sans à-coup.'),
       sections: [],
       actions: [

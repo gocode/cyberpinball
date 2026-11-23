@@ -193,7 +193,7 @@ test('chargement : le garde-fou de mise en page contrôle les deux compositions 
 // chargement sans rien sur la borne, VPX attendait le casque). La borne le dit en grand, du Start à la fin.
 const WEAR = {
   status: 'Partie dans le casque',
-  text: 'Mettez le casque : la table démarre quand il est sur la tête',
+  text: 'Mets le casque : la table démarre quand il est sur la tête',
   keys: ['Exit : arrêter (au clavier : Ctrl+Maj+K ou Échap)', 'Pour jouer sur les écrans : Menu système > Ma borne > Réalité virtuelle et vision 3D'],
 };
 /** Ce qu'affiche l'écran : les espaces avant « : » sont insécables (typo, frontend.js). */

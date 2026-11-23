@@ -16,7 +16,7 @@ export const messages: Record<string, string> = {
   'Santé et sauvegardes': 'Health and backups',
   'Santé de la borne, fiche technique, mode débogage, sauvegardes': 'Cabinet health, tech sheet, debug mode, backups',
   'Mode débogage': 'Debug mode',
-  'Parties instantanées, classements, progression : niveau, badges, historique': 'Instant games, leaderboards, progress: level, badges, history',
+  'Parties en direct, classements, progression : niveau, badges, historique': 'Live games, leaderboards, progress: level, badges, history',
   'Niveau, badges, historique des parties': 'Level, badges, game history',
   'Mon profil': 'My profile',
   'Pseudo, avatar, pays, confidentialité, compte': 'Nickname, avatar, country, privacy, account',

@@ -453,12 +453,12 @@ function windowsBlock(f: TechFacts): TechBlock {
   rows.push(w.name ? { label: t('Édition'), value: joined([w.name, w.release]), detail: w.build ? t('Build {build}', { build: w.build }) : undefined } : { label: t('Édition'), value: NOT_READ(), state: 'quiet' });
   if (w.rebootPending !== undefined) {
     rows.push(w.rebootPending ? { label: t('Mises à jour'), value: t('Redémarrage en attente'), detail: t('Windows peut redémarrer seul, même pendant une partie'), state: 'check' } : { label: t('Mises à jour'), value: t('Aucun redémarrage en attente') });
-    if (w.rebootPending) notes.push({ state: 'check', title: t('Redémarrage de Windows en attente'), detail: t('Redémarrez la borne quand elle est libre : Windows termine la mise à jour.') });
+    if (w.rebootPending) notes.push({ state: 'check', title: t('Redémarrage de Windows en attente'), detail: t('Redémarre la borne quand elle est libre : Windows termine la mise à jour.') });
   }
   if (w.power) {
     const saver = w.power.scheme === 'saver';
     rows.push({ label: t('Alimentation'), value: powerLabel(w.power), detail: joined([w.power.screenMinutes !== undefined ? t('Écran éteint après : {d}', { d: minutes(w.power.screenMinutes)! }) : undefined, w.power.sleepMinutes !== undefined ? t('Veille après : {d}', { d: minutes(w.power.sleepMinutes)! }) : undefined]) || undefined, ...(saver && { state: 'check' as const }) });
-    if (saver) notes.push({ state: 'check', title: t('Mode d’alimentation économique'), detail: t('Le processeur et la carte graphique sont bridés : choisissez « Performances élevées » dans les options d’alimentation de Windows.') });
+    if (saver) notes.push({ state: 'check', title: t('Mode d’alimentation économique'), detail: t('Le processeur et la carte graphique sont bridés : choisis « Performances élevées » dans les options d’alimentation de Windows.') });
   }
   if (w.gameMode !== undefined) rows.push({ label: t('Mode Jeu'), value: w.gameMode ? t('Activé') : t('Désactivé') });
   if (w.gpuScheduling !== undefined) rows.push({ label: t('Accélération GPU'), value: w.gpuScheduling ? t('Planification matérielle activée') : t('Planification matérielle désactivée') });
@@ -517,8 +517,8 @@ function displaysBlock(f: TechFacts): TechBlock {
 export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max: number }, impact: Exclude<RefreshImpact, 'none'>): TechBlock['notes'][number] {
   const link = () =>
     d.connection === 'hdmi'
-      ? t('Windows ne propose pas plus à cette définition : vérifiez le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.')
-      : t('Windows ne propose pas plus à cette définition : vérifiez le port, le câble et le réglage de l’écran.');
+      ? t('Windows ne propose pas plus à cette définition : vérifie le port et le câble. En HDMI, certains câbles et cartes plafonnent la 4K à 60 Hz ; un câble DisplayPort l’évite souvent.')
+      : t('Windows ne propose pas plus à cette définition : vérifie le port, le câble et le réglage de l’écran.');
   if (impact === 'cap') {
     return {
       state: 'check',
@@ -526,7 +526,7 @@ export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max
       detail: [
         t('Tant que VPX dessine aussi sur cet écran, toute la partie suit sa fréquence, playfield compris.'),
         ...(gap.kind === 'windows'
-          ? [t('Windows propose {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) })]
+          ? [t('Windows propose {max} : choisis-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) })]
           : [t('Il annonce jusqu’à {max}.', { max: hz(gap.max) }), link()]),
       ].join(' '),
     };
@@ -535,7 +535,7 @@ export function refreshNote(d: TechDisplay, gap: { kind: 'windows' | 'link'; max
     return {
       state: 'check',
       title: t('{screen} à {hz}, Windows propose {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }),
-      detail: t('La bille est plus fluide à {max} : choisissez-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }),
+      detail: t('La bille est plus fluide à {max} : choisis-la dans les paramètres d’affichage de Windows (Affichage avancé).', { max: hz(gap.max) }),
     };
   }
   return { state: 'check', title: t('{screen} à {hz}, il annonce jusqu’à {max}', { screen: displayName(d), hz: hz(d.hz!), max: hz(gap.max) }), detail: link() };
@@ -606,7 +606,7 @@ function appBlock(f: TechFacts): TechBlock {
     rows.push({ label: t('Journal'), value: a.errors ? tn(a.errors, '{n} erreur depuis hier', '{n} erreurs depuis hier') : t('Aucune erreur depuis hier'), detail: a.errors ? t('Elles sont dans le rapport') : undefined });
     rows.push({ label: t('Langue'), value: a.language });
     // En dernier et en retrait : le joueur ne s'en sert que si l'équipe le lui demande.
-    if (a.borne) rows.push({ label: t('Numéro de la borne'), value: a.borne, detail: t('À donner à l’équipe de Cyber Pinball pour qu’elle retrouve vos rapports'), state: 'quiet' });
+    if (a.borne) rows.push({ label: t('Numéro de la borne'), value: a.borne, detail: t('À donner à l’équipe de Cyber Pinball pour qu’elle retrouve tes rapports'), state: 'quiet' });
   } else rows.push({ label: t('Cyber Pinball'), value: NOT_READ(), state: 'quiet' });
   const notes: TechBlock['notes'] = a?.firewall === false && a.friends !== 'off' ? [{ state: 'check', title: t('Règle du pare-feu absente'), detail: t('Sans elle, ni le réseau des amis ni la télécommande ne reçoivent rien.') }] : [];
   const essentials = a ? [t('Version {version}', { version: a.version }), tn(a.tables, '{n} table', '{n} tables'), a.friends === 'connected' ? t('réseau des amis connecté') : ''].filter(Boolean) : [];
@@ -658,12 +658,12 @@ export function pcLines(facts: PcHealthFacts, now = Date.now()): HealthLine[] {
   // « Écrans au plus haut » seulement s'ils le sont tous ; sinon le playfield, le seul qui compte pour la bille.
   const fine = !gaps.length ? t('Écrans à la fréquence la plus haute proposée') : facts.displays.some((d) => d.role === 'playfield' && d.hz) ? t('Playfield à la fréquence la plus haute proposée') : undefined;
   if (!flagged && fine && facts.displays.some((d) => d.hz)) lines.push({ check: 'pc', state: 'ok', title: fine, go: go('displays'), target: SHEET('displays') });
-  if (facts.rebootPending) lines.push({ check: 'pc', state: 'check', title: t('Redémarrage de Windows en attente'), detail: t('Windows peut redémarrer seul pendant une partie : redémarrez la borne quand elle est libre.'), go: go('windows'), target: SHEET('windows') });
+  if (facts.rebootPending) lines.push({ check: 'pc', state: 'check', title: t('Redémarrage de Windows en attente'), detail: t('Windows peut redémarrer seul pendant une partie : redémarre la borne quand elle est libre.'), go: go('windows'), target: SHEET('windows') });
   if (facts.power) {
     const saver = facts.power.scheme === 'saver';
     lines.push(
       saver
-        ? { check: 'pc', state: 'check', title: t('Mode d’alimentation économique'), detail: t('Processeur et carte graphique bridés : choisissez « Performances élevées ».'), go: go('windows'), target: SHEET('windows') }
+        ? { check: 'pc', state: 'check', title: t('Mode d’alimentation économique'), detail: t('Processeur et carte graphique bridés : choisis « Performances élevées ».'), go: go('windows'), target: SHEET('windows') }
         : { check: 'pc', state: 'ok', title: t('Alimentation : {mode}', { mode: powerLabel(facts.power) }), go: go('windows'), target: SHEET('windows') },
     );
   }
@@ -674,7 +674,7 @@ export function pcLines(facts: PcHealthFacts, now = Date.now()): HealthLine[] {
       check: 'pc',
       state: old ? 'check' : 'ok',
       title: t('{gpu} : pilote du {date}', { gpu: g.name, date: day(g.driverDate)! }),
-      ...(old && { detail: t('Plus de deux ans : installez le pilote récent du fabricant de la carte.') }),
+      ...(old && { detail: t('Plus de deux ans : installe le pilote récent du fabricant de la carte.') }),
       go: go('pc'),
       target: SHEET('pc'),
     });

@@ -123,7 +123,7 @@ export async function installComponent(root: string, component: Component, onPro
 
   if (!status.installed && component.distribution === 'manual' && !opts.archive) {
     throw new Error(
-      t('{name} ne peut pas être redistribué : téléchargez-le depuis {homepage} et décompressez-le dans {folder}.', { name: component.name, homepage: component.homepage, folder: paths.version }),
+      t('{name} ne peut pas être redistribué : télécharge-le depuis {homepage} et décompresse-le dans {folder}.', { name: component.name, homepage: component.homepage, folder: paths.version }),
     );
   }
 

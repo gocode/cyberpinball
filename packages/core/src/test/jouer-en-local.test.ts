@@ -26,7 +26,7 @@ test('jouer en local : toute la rubrique Communauté part, sauf l’interrupteur
 });
 
 test('jouer en local : toute l’Arène part, rubrique et médaillon (21/11/2026)', () => {
-  // Ce qui se joue contre les autres, niveaux compris : parties instantanées, classements, progression.
+  // Ce qui se joue contre les autres, niveaux compris : parties en direct, classements, progression.
   // Toute entrée de la rubrique, présente ou ajoutée plus tard, disparaît d'office.
   const arena = systemItemsUnder('arene');
   assert.ok(arena.length >= 5, arena.join(', '));

@@ -14,7 +14,7 @@ export const messages: Record<string, string> = {
   '{button} : pas de bouton': '{button}: no button',
   '{button} : {key}': '{button}: {key}',
   'Impossible de valider : {problems}.': 'Can’t confirm: {problems}.',
-  'Essayez d’abord sur la borne : {buttons}.': 'Try these on the cabinet first: {buttons}.',
+  'Essaie d’abord sur la borne : {buttons}.': 'Try these on the cabinet first: {buttons}.',
   'Boutons : aucun bouton pressé, touches actuelles gardées.': 'Buttons: no button pressed, current keys kept.',
   'Boutons : aucun bouton pressé, touches par défaut des encodeurs gardées.': 'Buttons: no button pressed, encoder default keys kept.',
   'Boutons relevés : flippers, Start, Exit sur {main} ; {n} bouton facultatif': 'Buttons mapped: flippers, Start, Exit on {main}; {n} optional button',
@@ -28,15 +28,15 @@ export const messages: Record<string, string> = {
   facultatif: 'optional',
   'reprise par {button}': 'now on {button}',
   Enregistrer: 'Save',
-  'Essayez les boutons': 'Try the buttons',
+  'Essaie les boutons': 'Try the buttons',
   'Perdent leur touche dans VPX : {actions}': 'Lose their key in VPX: {actions}',
   'Les autres touches de VPX ne changent pas.': 'Other VPX keys don’t change.',
   'Sans réponse dans {n} s : touches actuelles gardées.': 'No answer in {n} s: current keys kept.',
   'Touches par défaut des encodeurs': 'Encoder default keys',
   'Relevé : {last}': 'Mapped: {last}',
   'Touches actuelles': 'Current keys',
-  '{last} · choisissez un bouton pour lui donner une autre touche.': '{last} · pick a button to give it another key.',
-  'Appuyez sur le bouton': 'Press the button',
+  '{last} · choisis un bouton pour lui donner une autre touche.': '{last} · pick a button to give it another key.',
+  'Appuie sur le bouton': 'Press the button',
   'Bouton {n} sur {total}': 'Button {n} of {total}',
   'Bouton facultatif {n} sur {total}': 'Optional button {n} of {total}',
   'Touche actuelle : {key}': 'Current key: {key}',
@@ -57,14 +57,14 @@ export const messages: Record<string, string> = {
   Suivant: 'Next',
   'Retour et menu': 'Back and menu',
   'Aide-mémoire': 'Cheat sheet',
-  '{key} reste la touche de secours « {action} » : choisissez un autre bouton.': '{key} stays the “{action}” fallback key: choose another button.',
+  '{key} reste la touche de secours « {action} » : choisis un autre bouton.': '{key} stays the “{action}” fallback key: choose another button.',
   'Interface : {list}': 'Interface: {list}',
   annuler: 'cancel',
   'bouton précédent': 'previous button',
   // Relevé des boutons : actions à la souris et consignes, une par geste (19/11/2026)
   'Passer ce bouton': 'Skip this button',
   'Terminer le relevé': 'Finish mapping',
-  '{button} est obligatoire : appuyez dessus sur la borne.': '{button} is required: press it on the cabinet.',
+  '{button} est obligatoire : appuie dessus sur la borne.': '{button} is required: press it on the cabinet.',
   'Encore à relever sur la borne : {buttons}.': 'Still to map on the cabinet: {buttons}.',
   'boutons restants avec leur touche actuelle': 'remaining buttons with their current key',
   'Après les boutons obligatoires': 'After the required buttons',
@@ -73,7 +73,7 @@ export const messages: Record<string, string> = {
   Revenir: 'Back',
   Finir: 'Finish',
   Corriger: 'Fix',
-  'impossible, bouton obligatoire : appuyez dessus sur la borne': 'not possible, required button: press it on the cabinet',
+  'impossible, bouton obligatoire : appuie dessus sur la borne': 'not possible, required button: press it on the cabinet',
   'pas ce bouton sur la borne : Exit ({exit}) ou « Passer ce bouton »': 'the cabinet has no such button: Exit ({exit}) or “Skip this button”',
   'pas de bouton pour ce rôle : Retour ({exit}) ou « Passer ce bouton »': 'no button for this role: Back ({exit}) or “Skip this button”',
   'Retour arrière ou « ◀ Précédent » : {back}': 'Backspace or “◀ Previous”: {back}',
@@ -86,7 +86,7 @@ export const messages: Record<string, string> = {
     'Previous / Next ({left} / {right}) or arrows, then Confirm ({start}) or Enter; or a click',
   'Retour arrière ou « ◀ Précédent » : étape précédente': 'Backspace or “◀ Previous”: previous step',
   'rien avant cette étape': 'nothing before this step',
-  'pressez sur la borne les boutons marqués ○, puis « {save} »': 'press the buttons marked ○ on the cabinet, then “{save}”',
+  'presse sur la borne les boutons marqués ○, puis « {save} »': 'press the buttons marked ○ on the cabinet, then “{save}”',
   '« {save} »': '“{save}”',
   'un bouton de la liste pour le refaire, ou « Tout modifier »': 'a button in the list to redo it, or “Change all”',
   // Commandes cliquables des étapes (wizard-controls.ts)
@@ -105,7 +105,7 @@ export const messages: Record<string, string> = {
   'Ouvrir l’éditeur': 'Open the editor',
   'Dans le fronton': 'In the backbox',
   'Sur le plateau': 'On the playfield',
-  'Plateau, près de vous': 'Playfield, near you',
+  'Plateau, près de toi': 'Playfield, near you',
   'Plateau, côté fronton': 'Playfield, backbox side',
   'Rien entendu': 'Nothing heard',
   'Recommencer l’étape': 'Restart the step',
@@ -113,15 +113,15 @@ export const messages: Record<string, string> = {
   'Rotation de l’écran du playfield…': 'Rotating the playfield screen…',
   'Windows n’a pas tourné l’écran. Start : continuer quand même.': 'Windows didn’t rotate the screen. Start: continue anyway.',
   'Retour à l’orientation d’origine…': 'Back to the original orientation…',
-  'Pas de réponse : orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.':
+  'Pas de réponse : orientation d’origine rétablie. Start : continuer, tables à l’envers pour toi.':
     'No answer: original orientation restored. Start: continue, with tables upside down for you.',
-  'Orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.': 'Original orientation restored. Start: continue, with tables upside down for you.',
+  'Orientation d’origine rétablie. Start : continuer, tables à l’envers pour toi.': 'Original orientation restored. Start: continue, with tables upside down for you.',
   '{error} Start : continuer quand même.': '{error} Start: continue anyway.',
   'haut-parleur de l’écran du fronton': 'backbox screen speaker',
   'carte 7.1': '7.1 card',
   'haut-parleur de l’écran du playfield': 'playfield screen speaker',
   '{n} sorties portent ce nom : le son peut venir de l’autre, et VPX prendra la dernière.': '{n} outputs have this name: the sound may come from the other one, and VPX will use the last.',
-  'Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Répondez quand même si vous savez où elle est branchée.':
+  'Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Réponds quand même si tu sais où elle est branchée.':
     'Electron can’t find this output by that name: no sound played. Answer anyway if you know where it’s connected.',
   'Electron ne donne pas le nom des sorties audio : aucun son joué.': 'Electron doesn’t give the audio output names: no sound played.',
   'Electron n’a ouvert que {n} canaux sur cette sortie : ces haut-parleurs ne peuvent pas être testés. Exit : rien entendu.':
@@ -129,17 +129,17 @@ export const messages: Record<string, string> = {
   'Le son n’a pas pu être joué ({detail}).': 'The sound couldn’t be played ({detail}).',
   // Configurations du son proposées (audio-setups.ts, sound-setups.ts).
   'Près du fronton': 'Near the backbox',
-  'Près de vous': 'Near you',
-  VOUS: 'YOU',
+  'Près de toi': 'Near you',
+  TOI: 'YOU',
   'rien de branché': 'nothing plugged in',
   '{source} non branchée': '{source} not plugged in',
   'Aucune ne correspond : régler pas à pas': 'None fits: set up step by step',
-  'Chaque sortie sonne, vous dites où vous l’entendez': 'Each output plays, you say where you hear it',
-  'Un son à gauche, puis à droite : l’entendez-vous dans le fronton, des deux côtés ?': 'A sound on the left, then on the right: do you hear it in the backbox, on both sides?',
+  'Chaque sortie sonne, tu dis où tu l’entends': 'Each output plays, you say where you hear it',
+  'Un son à gauche, puis à droite : l’entends-tu dans le fronton, des deux côtés ?': 'A sound on the left, then on the right: do you hear it in the backbox, on both sides?',
   'Oui, dans le fronton': 'Yes, in the backbox',
   'Un son à gauche, puis à droite : vibrent-ils sous le plateau, près du fronton ?': 'A sound on the left, then on the right: do they vibrate under the playfield, near the backbox?',
   'Oui, près du fronton': 'Yes, near the backbox',
-  'Un son à gauche, puis à droite : vibrent-ils sous le plateau, près de vous ?': 'A sound on the left, then on the right: do they vibrate under the playfield, near you?',
+  'Un son à gauche, puis à droite : vibrent-ils sous le plateau, près de toi ?': 'A sound on the left, then on the right: do they vibrate under the playfield, near you?',
   'Oui, près de moi': 'Yes, near me',
   'Branchement du son': 'Sound wiring',
   'Flippers : choisir · Start : essayer cette configuration · Exit : régler pas à pas': 'Flippers: choose · Start: try this setup · Exit: set up step by step',
@@ -170,8 +170,8 @@ export const messages: Record<string, string> = {
   'La carte annonce {channels} canaux : à vérifier par le son': 'The card reports {channels} channels: to be checked by ear',
   'Réglage Windows nécessaire avant le test : stéréo → 7.1, l’essai ouvre le panneau': 'Windows setting needed before the test: stereo → 7.1, trying it opens the panel',
   'Réglage Windows nécessaire avant le test : stéréo → 5.1, l’essai ouvre le panneau': 'Windows setting needed before the test: stereo → 5.1, trying it opens the panel',
-  'Deux exciters : réglez la carte en 5.1, ils recevront tout le son du plateau': 'Two exciters: set the card to 5.1, they will get the whole playfield sound',
-  'Branchez plutôt ces exciters sur la sortie arrière': 'Plug these exciters into the rear output instead',
+  'Deux exciters : règle la carte en 5.1, ils recevront tout le son du plateau': 'Two exciters: set the card to 5.1, they will get the whole playfield sound',
+  'Branche plutôt ces exciters sur la sortie arrière': 'Plug these exciters into the rear output instead',
   'le fronton sur les haut-parleurs de {screen}': 'the backbox on the speakers of {screen}',
   'le fronton sur la {jack}': 'the backbox on the {jack}',
   'SSF : {screen} + {card}': 'SSF: {screen} + {card}',
@@ -204,13 +204,13 @@ export const messages: Record<string, string> = {
     'Exciters or speakers on the playfield (SSF, surround)? This card is set to {channels} in Windows: to drive them, it must switch to 7.1.',
   'Dans le panneau Son de Windows : « {name} », Configurer, 7.1 Surround, puis Suivant jusqu’au bout. Le test des haut-parleurs démarre dès que Windows annonce le 5.1 ou le 7.1. Le 5.1 suffit pour deux exciters, quatre demandent le 7.1. Ni l’un ni l’autre : cette sortie reste en stéréo, il faut une carte son 7.1.':
     'In the Windows Sound panel: “{name}”, Configure, 7.1 Surround, then Next to the end. The speaker test starts as soon as Windows reports 5.1 or 7.1. 5.1 is enough for two exciters, four need 7.1. Neither: this output stays stereo, you need a 7.1 sound card.',
-  'Deux exciters seulement, sur la prise arrière : réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.':
+  'Deux exciters seulement, sur la prise arrière : règle la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.':
     'Only two exciters, on the rear jack: set the card to 5.1 in Windows. In 7.1, VPX keeps part of each sound for the side jack, silent here.',
-  'Deux exciters seulement, sur la prise des côtés : branchez-les sur la prise arrière et réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.':
+  'Deux exciters seulement, sur la prise des côtés : branche-les sur la prise arrière et règle la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.':
     'Only two exciters, on the side jack: plug them into the rear jack and set the card to 5.1 in Windows. In 7.1, VPX keeps part of each sound for the rear jack, silent here.',
-  'Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, réglez la carte en 7.1 (Panneau de configuration > Son > Configurer).':
+  'Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, règle la carte en 7.1 (Panneau de configuration > Son > Configurer).':
     'Playfield sound: SSF in 5.1 on “{name}”. VPX plays the playfield in stereo on the rear pair: perfect for two exciters; for four, set the card to 7.1 (Control Panel > Sound > Configure).',
-  'Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffectez la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branchez sur la prise casque en façade ; vérifiez aussi les câbles des prises noire et grise.':
+  'Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffecte la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branche sur la prise casque en façade ; vérifie aussi les câbles des prises noire et grise.':
     'Nothing heard on the rear or sides: on a motherboard with three jacks, reassign the blue or pink jack in the maker’s audio console (Realtek Audio Console), or plug into the front headphone jack; also check the cables of the black and grey jacks.',
   'Start : oui, passer cette carte en 7.1 · Exit : non, rester en stéréo · Retour arrière : revenir': 'Start: yes, switch this card to 7.1 · Exit: no, stay in stereo · Back: go back',
   'Start : rouvrir le panneau Son · Exit : rester en stéréo · Retour arrière : revenir': 'Start: reopen the Sound panel · Exit: stay in stereo · Back: go back',
@@ -240,7 +240,7 @@ export const messages: Record<string, string> = {
   'Quel écran affiche le DMD ou le FullDMD ?': 'Which screen shows the DMD or the FullDMD?',
   'Écran du DMD : {kind}': 'DMD screen: {kind}',
   // packages/core/src/dmdscreen.ts
-  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.':
+  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dis-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.':
     'DMD: {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. If it’s a FullDMD, say so in Cabinet setup > DMD screen: the menu, VPX and PuP-Packs will treat it as one.',
   'FullDMD dans une zone {ratio} : les médias 16:9 y seront réduits. Écran du DMD (Configuration de la borne) lui rend tout son écran.':
     'FullDMD in a {ratio} area: 16:9 media will be shrunk into it. DMD screen (Cabinet setup) gives it back its whole screen.',
@@ -249,7 +249,7 @@ export const messages: Record<string, string> = {
   'incrusté dans le playfield': 'embedded in the playfield',
   'incrusté dans le playfield, comme enregistré': 'embedded in the playfield, as saved',
   'sur cet écran avec le Backglass, comme enregistré': 'on this screen with the Backglass, as saved',
-  'Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Ma borne > Configuration de la borne > Configurations de la borne.':
+  'Nouvelle configuration « {name} », avec son propre VPinballX.ini : renomme-la dans Menu système > Ma borne > Configuration de la borne > Configurations de la borne.':
     'New configuration “{name}”, with its own VPinballX.ini: rename it in Menu and setup > Cabinet configurations.',
   'Configuration « {name} » mise à jour.': 'Configuration “{name}” updated.',
   'Aucune modification : VPinballX.ini est déjà à jour.': 'No changes: VPinballX.ini is already up to date.',
@@ -264,23 +264,23 @@ export const messages: Record<string, string> = {
   'Réglage du playfield en cours': 'Playfield setup in progress',
   'Où sont les flippers ?': 'Where are the flippers?',
   "Flippers {edge} de l'image Windows": 'Flippers {edge} of the Windows image',
-  'VPX afficherait les tables flippers {edge} : Start retourne l’écran dans Windows pour les mettre de votre côté.':
+  'VPX afficherait les tables flippers {edge} : Start retourne l’écran dans Windows pour les mettre de ton côté.':
     'VPX would show tables with the flippers {edge}: Start flips the screen in Windows to put them on your side.',
-  'VPX afficherait les tables flippers {edge} : Start tourne l’écran dans Windows pour les mettre de votre côté.':
+  'VPX afficherait les tables flippers {edge} : Start tourne l’écran dans Windows pour les mettre de ton côté.':
     'VPX would show tables with the flippers {edge}: Start rotates the screen in Windows to put them on your side.',
-  'VPX affichera les tables flippers {edge}, à l’envers pour vous.': 'VPX will show tables with the flippers {edge}, upside down for you.',
-  'Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de votre côté · Start : {confirm} · Exit : revenir':
+  'VPX affichera les tables flippers {edge}, à l’envers pour toi.': 'VPX will show tables with the flippers {edge}, upside down for you.',
+  'Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de ton côté · Start : {confirm} · Exit : revenir':
     'Flippers: rotate until this text reads upright, the strip on your side · Start: {confirm} · Exit: back',
   'retourner l’écran pour VPX': 'flip the screen for VPX',
   valider: 'confirm',
   'Écran retourné': 'Screen flipped',
   'Écran tourné': 'Screen rotated',
-  'Les tables auront leurs flippers de votre côté. Ce texte est-il toujours à l’endroit ?': 'Tables will have their flippers on your side. Is this text still upright?',
+  'Les tables auront leurs flippers de ton côté. Ce texte est-il toujours à l’endroit ?': 'Tables will have their flippers on your side. Is this text still upright?',
   'Sans réponse, retour à l’orientation d’origine dans {n} s.': 'No answer: back to the original orientation in {n} s.',
   'Start : garder cette orientation · Exit : revenir à l’orientation d’origine': 'Start: keep this orientation · Exit: back to the original orientation',
   'Diagonale de l’écran': 'Screen size',
-  'L’écran ne donne pas sa taille : indiquez la diagonale de l’image, en pouces.': 'The screen doesn’t report its size: enter the picture diagonal, in inches.',
-  '{cm} cm, taille annoncée par l’écran. Vérifiez-la : certains téléviseurs se trompent.': '{cm} cm, as reported by the screen. Check it: some TVs get it wrong.',
+  'L’écran ne donne pas sa taille : indique la diagonale de l’image, en pouces.': 'The screen doesn’t report its size: enter the picture diagonal, in inches.',
+  '{cm} cm, taille annoncée par l’écran. Vérifie-la : certains téléviseurs se trompent.': '{cm} cm, as reported by the screen. Check it: some TVs get it wrong.',
   '{cm} cm. L’écran annonce {inches}″.': '{cm} cm. The screen reports {inches}″.',
   'Flippers : moins / plus · Start : valider · Exit : revenir': 'Flippers: less / more · Start: confirm · Exit: back',
   'Aucun rôle': 'No role',
@@ -288,7 +288,7 @@ export const messages: Record<string, string> = {
   '{role} : placer librement…': '{role}: place freely…',
   '{role} {option} ?': '{role} {option}?',
   '{role} ?': '{role}?',
-  'L’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.': 'The layout editor, to place the {role} wherever you like, then back here.',
+  'L’éditeur de disposition, pour placer le {role} où tu veux, puis retour ici.': 'The layout editor, to place the {role} wherever you like, then back here.',
   'Quel écran affiche le {role} ?': 'Which screen shows the {role}?',
   'Rôle {n} sur {total}': 'Role {n} of {total}',
   // app/src/wizard-progress.ts
@@ -326,15 +326,15 @@ export const messages: Record<string, string> = {
   'canaux inconnus': 'unknown channels',
   ' · sortie par défaut de Windows': ' · Windows default output',
   'Sortie {n} sur {total}': 'Output {n} of {total}',
-  '{n} bip : où l’entendez-vous ? Actuellement : {role}{reason}.': '{n} beep: where do you hear it? Currently: {role}{reason}.',
-  '{n} bips : où l’entendez-vous ? Actuellement : {role}{reason}.': '{n} beeps: where do you hear them? Currently: {role}{reason}.',
+  '{n} bip : où l’entends-tu ? Actuellement : {role}{reason}.': '{n} beep: where do you hear it? Currently: {role}{reason}.',
+  '{n} bips : où l’entends-tu ? Actuellement : {role}{reason}.': '{n} beeps: where do you hear them? Currently: {role}{reason}.',
   ' (proposé : {reason})': ' (suggested: {reason})',
   'Flipper gauche : fronton · Flipper droit : plateau · Start : les deux · Exit : aucun, sortie suivante':
     'Left flipper: backbox · Right flipper: playfield · Start: both · Exit: neither, next output',
   '{pair} : {place}': '{pair}: {place}',
   'Haut-parleurs {n} sur {total}': 'Speakers {n} of {total}',
   'Un bip à gauche, puis un plus aigu à droite : où sont ces haut-parleurs ?{answered}': 'A beep on the left, then a higher one on the right: where are these speakers?{answered}',
-  'Flipper gauche : plateau, près de vous · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu':
+  'Flipper gauche : plateau, près de toi · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu':
     'Left flipper: playfield, near you · Right flipper: playfield, backbox side · Start: in the backbox · Exit: nothing heard',
 
   // app/src/arrange.ts
@@ -372,7 +372,7 @@ export const messages: Record<string, string> = {
   'aucun écran': 'no screen',
   oui: 'yes',
   "Le playfield change d'écran à l'étape des rôles.": 'The playfield’s screen is chosen in the roles step.',
-  "Le {role} n'a pas d'écran : choisissez-en un à la ligne « Écran ».": 'The {role} has no screen: pick one on the “Screen” line.',
+  "Le {role} n'a pas d'écran : choisis-en un à la ligne « Écran ».": 'The {role} has no screen: pick one on the “Screen” line.',
   "Aucun autre rôle sur l'écran du {role}.": 'No other role on the {role} screen.',
   "Plus grande zone au format {format} ; format « Libre » pour tout l'écran.": 'Largest {format} area; “Free” format for the whole screen.',
   'Aimantation : les bords tirés à la souris se collent à ceux de l’écran et des autres zones.': 'Snapping: edges dragged with the mouse stick to the screen and to other areas.',
@@ -381,7 +381,7 @@ export const messages: Record<string, string> = {
   "{x}, {y} sortirait de l'écran : {placedX}, {placedY}.": '{x}, {y} would be off the screen: {placedX}, {placedY}.',
   '{n} px de large': '{n} px wide',
   "{asked} ne tient pas sur l'écran : {width} × {height}.": '{asked} doesn’t fit on the screen: {width} × {height}.',
-  "{role} sur l'écran {n} : relâchez pour l'y laisser.": '{role} on screen {n}: release to leave it there.',
+  "{role} sur l'écran {n} : relâche pour l'y laisser.": '{role} on screen {n}: release to leave it there.',
   incrusté: 'embedded',
   fenêtre: 'window',
   'plein écran': 'full screen',
@@ -400,9 +400,9 @@ export const messages: Record<string, string> = {
   "{previous} / {next} : choisir une ligne · {confirm} : l'ouvrir · {exit} : étape précédente": '{previous} / {next}: pick a line · {confirm}: open it · {exit}: previous step',
   'Disposition · {role}': 'Layout · {role}',
   '{width} × {height} px en {x}, {y} · {where} · format {format}': '{width} × {height} px at {x}, {y} · {where} · {format} format',
-  'Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner ; Alt maintenu : sans aimantation. Flèches du clavier : la déplacer au pixel.':
+  'Souris : tire une zone pour la déplacer, jusque sur un autre écran ; tire un coin pour la redimensionner ; Alt maintenu : sans aimantation. Flèches du clavier : la déplacer au pixel.':
     'Mouse: drag an area to move it, even onto another screen; drag a corner to resize it; hold Alt: no snapping. Arrow keys: move it pixel by pixel.',
-  'Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner. Flèches du clavier : la déplacer au pixel.':
+  'Souris : tire une zone pour la déplacer, jusque sur un autre écran ; tire un coin pour la redimensionner. Flèches du clavier : la déplacer au pixel.':
     'Mouse: drag an area to move it, even onto another screen; drag a corner to resize it. Arrow keys: move it pixel by pixel.',
   "Les zones peuvent se chevaucher. Superposition : {order} pour les incrustations ; Windows décide pour deux fenêtres. Pas de rotation par zone : VPX n'en a pas de réglage.":
     'Areas may overlap. Stacking: {order} for embedded displays; Windows decides for two windows. No rotation per area: VPX has no setting for it.',
@@ -416,10 +416,10 @@ export const messages: Record<string, string> = {
   'VPinballX.ini avait déjà ces touches.': 'VPinballX.ini already had these keys.',
 
   // app/renderer/screen.html
-  '▼ FLIPPERS · VOUS ÊTES ICI ▼': '▼ FLIPPERS · YOU ARE HERE ▼',
+  '▼ FLIPPERS · TU ES ICI ▼': '▼ FLIPPERS · YOU ARE HERE ▼',
 
   // app/renderer/screen.js
-  'Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner': 'Drag an area to move it, even onto another screen · drag a corner to resize it',
+  'Tire une zone pour la déplacer, jusque sur un autre écran · tire un coin pour la redimensionner': 'Drag an area to move it, even onto another screen · drag a corner to resize it',
   Annuler: 'Cancel',
   'Points à vérifier': 'Things to check',
   'Sortie sans enregistrer': 'Leaving without saving',
@@ -488,10 +488,10 @@ export const messages: Record<string, string> = {
   'Volume + (multimédia)': 'Volume + (media)',
   'Volume − (multimédia)': 'Volume − (media)',
   '{n} du pavé': 'Numpad {n}',
-  'La touche Windows ouvre le menu Démarrer : réglez ce bouton de l’encodeur sur une autre touche.': 'The Windows key opens the Start menu: set this encoder button to another key.',
-  'Tab est réservée à l’accès à la configuration : réglez ce bouton de l’encodeur sur une autre touche.': 'Tab is reserved for opening the setup: set this encoder button to another key.',
-  'Retour arrière est réservée pour corriger un relevé : réglez ce bouton de l’encodeur sur une autre touche.': 'Backspace is reserved for correcting the mapping: set this encoder button to another key.',
-  'Touche « {code} » inconnue de VPX : réglez ce bouton de l’encodeur sur une autre touche.': 'Key “{code}” is unknown to VPX: set this encoder button to another key.',
+  'La touche Windows ouvre le menu Démarrer : règle ce bouton de l’encodeur sur une autre touche.': 'The Windows key opens the Start menu: set this encoder button to another key.',
+  'Tab est réservée à l’accès à la configuration : règle ce bouton de l’encodeur sur une autre touche.': 'Tab is reserved for opening the setup: set this encoder button to another key.',
+  'Retour arrière est réservée pour corriger un relevé : règle ce bouton de l’encodeur sur une autre touche.': 'Backspace is reserved for correcting the mapping: set this encoder button to another key.',
+  'Touche « {code} » inconnue de VPX : règle ce bouton de l’encodeur sur une autre touche.': 'Key “{code}” is unknown to VPX: set this encoder button to another key.',
   'Quitter la partie': 'Quit the game',
   Tremblements: 'Nudge',
   'Flipper gauche en deux temps': 'Left staged flipper',
@@ -520,7 +520,7 @@ export const messages: Record<string, string> = {
   'Croix {arrow} du joystick': 'Joystick D-pad {arrow}',
   'Croix {n} {arrow} du joystick': 'Joystick D-pad {n} {arrow}',
   joystick: 'joystick',
-  '{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donnez-leur un identifiant USB différent si leur outil le permet, sinon relevez tous les boutons sur une seule.': '{n} identical boards ({name}): VPX tells them apart by the order they were plugged in, which can swap. Give each one a different USB ID if its tool allows it; otherwise set up all the buttons on just one.',
+  '{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donne-leur un identifiant USB différent si leur outil le permet, sinon relève tous les boutons sur une seule.': '{n} identical boards ({name}): VPX tells them apart by the order they were plugged in, which can swap. Give each one a different USB ID if its tool allows it; otherwise set up all the buttons on just one.',
   // app/src/wizard.ts : joysticks pendant le relevé des boutons
   'Joystick lu : {names}': 'Joystick read: {names}',
   'Aucun joystick branché': 'No joystick connected',
@@ -531,7 +531,7 @@ export const messages: Record<string, string> = {
   'Joystick lu : {names} · l’un de ses boutons : modifier mes boutons': 'Joystick read: {names} · any of its buttons: change my buttons',
   'Visual Pinball X est installé · Joystick lu : {names} · l’un de ses boutons : retour au relevé des boutons': 'Visual Pinball X is installed · Joystick read: {names} · any of its buttons: back to button mapping',
   // app/src/wizard.ts : premier écran des boutons d'une borne neuve, et « Valider » indisponible
-  'Vos boutons sont-ils déjà les bons ?': 'Are your buttons already right?',
+  'Tes boutons sont-ils déjà les bons ?': 'Are your buttons already right?',
   'Garder ces touches': 'Keep these keys',
   'Modifier mes boutons': 'Change my buttons',
   'Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.': 'No answer within {n} s: these keys are kept and the wizard moves on to the screens.',
@@ -592,7 +592,7 @@ export const messages: Record<string, string> = {
   'plateau, côté joueur': 'playfield, player side',
   'plateau, côté fronton': 'playfield, backbox side',
   'rien entendu': 'nothing heard',
-  'Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échangez les prises « arrière » et « côté » de la carte son.':
+  'Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échange les prises « arrière » et « côté » de la carte son.':
     'Rear speakers near the backbox and side speakers on the player side: in SSF, VPX expects them the other way round. Swap the “rear” and “side” jacks on the sound card.',
   'Rien entendu sur l’avant : en SSF, VPX y envoie seulement le son du fronton si la même carte le joue.':
     'Nothing heard on the front: in SSF, VPX only sends the backbox sound there if the same card plays it.',
@@ -601,22 +601,22 @@ export const messages: Record<string, string> = {
   '{role} : la sortie « {name} » est introuvable. Est-elle branchée ? VPX jouera ce son sur la sortie par défaut de Windows.':
     '{role}: output “{name}” not found. Is it connected? VPX will play this sound on the Windows default output.',
   '{role} : sortie « {name} » retrouvée par son écran (le pilote l’a recréée).': '{role}: output “{name}” found again through its screen (the driver recreated it).',
-  '{role} : {n} sorties s’appellent « {name} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renommez l’une d’elles dans le panneau Son de Windows (Propriétés), puis relancez l’assistant.':
+  '{role} : {n} sorties s’appellent « {name} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renomme l’une d’elles dans le panneau Son de Windows (Propriétés), puis relance l’assistant.':
     '{role}: {n} outputs are named “{name}”. VPX will use the last one in its list, maybe not the right one: rename one of them in the Windows Sound panel (Properties), then run the wizard again.',
-  'Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : réglez-la en {needed} (Panneau de configuration > Son > Configurer).':
+  'Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : règle-la en {needed} (Panneau de configuration > Son > Configurer).':
     'Playfield sound: {mode} mixing, but “{name}” is set to {channels} in Windows. VPX will fall back to stereo: set it to {needed} (Control Panel > Sound > Configure).',
   '5.1 ou 7.1': '5.1 or 7.1',
 
   // packages/core/src/zones.ts
   Libre: 'Free',
-  "{role} : zone d'écran invalide dans cabinet.json ({zone}). L'écran entier est utilisé ; refaites la disposition des écrans.":
+  "{role} : zone d'écran invalide dans cabinet.json ({zone}). L'écran entier est utilisé ; refais la disposition des écrans.":
     '{role}: invalid screen area in cabinet.json ({zone}). The whole screen is used; redo the screen layout.',
   'VPX dessine le {role} par-dessus': 'VPX draws the {role} on top',
   "Windows décide lequel passe devant (VPX n'a pas de réglage)": 'Windows decides which one is in front (VPX has no setting for it)',
-  "{first} et {second} se recouvrent sur l'écran « {screen} » : {front}. Refaites la disposition des écrans pour leur donner chacun sa zone.":
+  "{first} et {second} se recouvrent sur l'écran « {screen} » : {front}. Refais la disposition des écrans pour leur donner chacun sa zone.":
     '{first} and {second} overlap on screen “{screen}”: {front}. Redo the screen layout to give each one its own area.',
   "{first} et {second} se chevauchent sur l'écran « {screen} » : {front}.": '{first} and {second} overlap on screen “{screen}”: {front}.',
-  '{role} incrusté sur tout le playfield : la table sera cachée derrière. Refaites la disposition des écrans pour lui donner une zone.':
+  '{role} incrusté sur tout le playfield : la table sera cachée derrière. Refais la disposition des écrans pour lui donner une zone.':
     '{role} embedded over the whole playfield: the table will be hidden behind it. Redo the screen layout to give it an area.',
   "{roles} incrusté dans le playfield, joueur {edge} de l'image : VPX ne tourne pas les incrustations, le joueur les verra {how}.":
     '{roles} embedded in the playfield, player {edge} of the image: VPX doesn’t rotate embedded displays, the player will see them {how}.',
@@ -653,7 +653,7 @@ export const messages: Record<string, string> = {
     'Start: flip the screen anyway · Exit: keep the Windows orientation (tables upside down in Cyber Pinball)',
   'Start : tourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)':
     'Start: rotate the screen anyway · Exit: keep the Windows orientation (tables upside down in Cyber Pinball)',
-  'Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour vous. Start : continuer.':
+  'Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour toi. Start : continuer.':
     'Windows orientation kept: {names} is left untouched. In Cyber Pinball, the tables will be upside down for you. Start: continue.',
   // packages/core/src/buttons.ts : boutons du menu de VPX
   'Changer de ligne': 'Change line',
@@ -684,19 +684,19 @@ export const messages: Record<string, string> = {
   'VPX ne lira aucun lanceur analogique : le bouton Lanceur seul.': 'VPX will read no analog plunger: the Launch button only.',
   'Garder le réglage actuel': 'Keep the current setting',
   'Pas de lanceur analogique': 'No analog plunger',
-  'Tirez le lanceur à fond, puis lâchez-le': 'Pull the plunger all the way, then let go',
+  'Tire le lanceur à fond, puis lâche-le': 'Pull the plunger all the way, then let go',
   'Axes lus : {names}': 'Axes read: {names}',
   'Aucun joystick à axes branché': 'No joystick with axes connected',
   'Réglage actuel : {what}': 'Current setting: {what}',
   'Plunger à capteur (potentiomètre…) lu par un Pinscape ou un contrôleur en mode joystick.': 'Sensor plunger (potentiometer…) read by a Pinscape or a controller in joystick mode.',
-  'Branchez le Pinscape, ou choisissez « Pas de lanceur analogique » si le lanceur est un simple bouton.': 'Connect the Pinscape, or choose “No analog plunger” if the plunger is a plain button.',
+  'Branche le Pinscape, ou choisis « Pas de lanceur analogique » si le lanceur est un simple bouton.': 'Connect the Pinscape, or choose “No analog plunger” if the plunger is a plain button.',
   'L’axe qui bouge le plus devient le lanceur.': 'The axis that moves the most becomes the plunger.',
   'Flippers ({left} / {right}) : choisir · Start ({start}) : valider · Exit ({exit}) : quitter sans enregistrer ?': 'Flippers ({left} / {right}): choose · Start ({start}): confirm · Exit ({exit}): quit without saving?',
   'Lanceur analogique': 'Analog plunger',
   'Réglage trouvé dans VPX': 'Setting found in VPX',
-  'Essayez le lanceur : la jauge suit ce que VPX lira': 'Try the plunger: the gauge follows what VPX will read',
+  'Essaie le lanceur : la jauge suit ce que VPX lira': 'Try the plunger: the gauge follows what VPX will read',
   'Joystick du lanceur introuvable : est-il branché ?': 'Plunger joystick not found: is it connected?',
-  'Tirez et lâchez le lanceur pour l’essayer': 'Pull and release the plunger to try it',
+  'Tire et lâche le lanceur pour l’essayer': 'Pull and release the plunger to try it',
   'Dernier tir : force {n} %': 'Last shot: strength {n} %',
   'Flippers ({left} / {right}) : moins / plus · Start ({start}) : terminer': 'Flippers ({left} / {right}): less / more · Start ({start}): done',
   'Flippers ({left} / {right}) : choisir · Start ({start}) : changer ou valider · Clic sur une ligne : la changer': 'Flippers ({left} / {right}): choose · Start ({start}): change or confirm · Click a line: change it',
@@ -706,7 +706,7 @@ export const messages: Record<string, string> = {
   'Repos': 'Rest',
   'Tiré à fond': 'Fully pulled',
   'axe {n}': 'axis {n}',
-  'Au repos, l’axe vaut {value} % au lieu de 0 : VPX croira le lanceur tiré. Calibrez le lanceur sur la carte (bouton de calibration du Pinscape, ou son outil de configuration).': 'At rest, the axis reads {value} % instead of 0: VPX will think the plunger is pulled. Calibrate the plunger on the board (Pinscape calibration button, or its config tool).',
+  'Au repos, l’axe vaut {value} % au lieu de 0 : VPX croira le lanceur tiré. Calibre le lanceur sur la carte (bouton de calibration du Pinscape, ou son outil de configuration).': 'At rest, the axis reads {value} % instead of 0: VPX will think the plunger is pulled. Calibrate the plunger on the board (Pinscape calibration button, or its config tool).',
   'inversé': 'reversed',
   'normal': 'normal',
   'Lanceur : axe {axis} de {device}, sens {direction}, zone morte {dz} %': 'Plunger: axis {axis} of {device}, {direction} direction, dead zone {dz} %',
@@ -718,7 +718,7 @@ export const messages: Record<string, string> = {
   'Lanceur enregistré': 'Plunger saved',
   // Tilt (tilt.ts, tilt-step.ts) et balancier de l'étape « Boutons »
   'Balancier de tilt': 'Tilt bob',
-  'Faites toucher l’anneau au balancier': 'Make the tilt bob touch its ring',
+  'Fais toucher l’anneau au balancier': 'Make the tilt bob touch its ring',
   'Le pendule contre son anneau, câblé sur une entrée du Pinscape (bouton de joystick) ou de l’encodeur (touche T)': 'The pendulum against its ring, wired to a Pinscape input (joystick button) or to the encoder (T key)',
   'L’interrupteur à lame lestée de la porte du monnayeur : la ROM arrête la partie de tous les joueurs': 'The weighted leaf switch of the coin door: the ROM ends the game for every player',
   'secousse trop forte': 'nudging too hard',
@@ -731,9 +731,9 @@ export const messages: Record<string, string> = {
   'Tilt : aucun balancier, ni réel ni simulé': 'Tilt: no tilt bob, neither real nor simulated',
   'Slam tilt : {key}': 'Slam tilt: {key}',
   'menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Tilt »': 'system menu > “My cabinet” > “Cabinet setup” > “Buttons” > “Tilt”',
-  'Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relevez-le à l’étape « Boutons du jeu », ou choisissez le balancier simulé ({where}).':
+  'Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relève-le à l’étape « Boutons du jeu », ou choisis le balancier simulé ({where}).':
     'Tilt: cabinet tilt bob chosen, but no “Tilt bob” button recorded. Record it at the “Game buttons” step, or choose the simulated tilt bob ({where}).',
-  'Tilt : le balancier de la borne ({key}) et celui que VPX simule à partir des secousses sont actifs ensemble : un même coup peut compter deux fois. Choisissez l’un des deux ({where}).':
+  'Tilt : le balancier de la borne ({key}) et celui que VPX simule à partir des secousses sont actifs ensemble : un même coup peut compter deux fois. Choisis l’un des deux ({where}).':
     'Tilt: the cabinet tilt bob ({key}) and the one VPX simulates from nudges are both active: a single bump can count twice. Choose one of them ({where}).',
   'Tilt : balancier simulé, mais ni accéléromètre ni bouton de tremblement pour le faire bouger : il ne tiltera jamais.':
     'Tilt: simulated tilt bob, but neither an accelerometer nor a nudge button to move it: it will never tilt.',
@@ -753,12 +753,12 @@ export const messages: Record<string, string> = {
   '{mode}, contact à {angle}': '{mode}, contact at {angle}',
   'balancier simulé éteint': 'simulated tilt bob off',
   'Contacts avec l’anneau : {n} · depuis le dernier, {pct} % du contact, secousse de {g} g': 'Contacts with the ring: {n} · since the last one, {pct}% of the contact, {g} g nudge',
-  'Secouez la borne : {pct} % du contact au plus, secousse de {g} g': 'Nudge the cabinet: {pct}% of the contact at most, {g} g nudge',
+  'Secoue la borne : {pct} % du contact au plus, secousse de {g} g': 'Nudge the cabinet: {pct}% of the contact at most, {g} g nudge',
   'Contacts du balancier : {n}': 'Tilt bob contacts: {n}',
-  'Faites toucher l’anneau au balancier pour l’essayer': 'Make the tilt bob touch its ring to try it',
+  'Fais toucher l’anneau au balancier pour l’essayer': 'Make the tilt bob touch its ring to try it',
   'La borne ne tiltera pas.': 'The cabinet will not tilt.',
   'Réglage actuel de VPX : {what}': 'Current VPX setting: {what}',
-  'Essayez : le balancier suit ce que VPX calculera': 'Try it: the tilt bob follows what VPX will compute',
+  'Essaie : le balancier suit ce que VPX calculera': 'Try it: the tilt bob follows what VPX will compute',
   'Pas d’accéléromètre : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.':
     'No accelerometer: only the nudge buttons will move the simulated tilt bob, and this test does not show it.',
   // Accéléromètre choisi à l'étape « Tilt », sans lien avec le lanceur
@@ -773,7 +773,7 @@ export const messages: Record<string, string> = {
     'Larger: the ball and the tilt bob react to gentler nudges. At {pinscape}, 1 g measured by a Pinscape (set to “1G”) is 1 g in VPX.',
   'Axes {x} et {y} de {device} : secousse lue {pct} %, VPX l’ignore sous {floor} %': 'Axes {x} and {y} of {device}: {pct}% nudge read, VPX ignores it under {floor}%',
   'Accéléromètre : axes {x} et {y} de {device}, force des secousses {gain}': 'Accelerometer: axes {x} and {y} of {device}, nudge strength {gain}',
-  'Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Réglez la force des secousses à l’essai ({where}).':
+  'Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Règle la force des secousses à l’essai ({where}).':
     'Nudging: accelerometer read at strength {gain}; a Pinscape set to “1G” gives almost no nudge there (VPX ignores anything under {floor}% of the scale). Set the nudge strength by testing ({where}).',
   'Balancier de la borne ou simulé par VPX, force des secousses de l’accéléromètre : réglage à l’essai': 'Cabinet tilt bob or simulated by VPX, accelerometer nudge strength: set by testing',
   'Toute touche maintenue {n} s': 'Any key held {n} s',

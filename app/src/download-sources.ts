@@ -45,7 +45,7 @@ export function friendDetail(reason: FetchFailure, file: string): string | undef
     case 'check':
       return t('contenu refusé à l’arrivée : {file}', { file });
     case 'not-found':
-      return t('introuvable chez votre ami : {file}', { file });
+      return t('introuvable chez ton ami : {file}', { file });
     case 'size':
     case 'sha':
       return t('fichier abîmé ou changé : {file}', { file });

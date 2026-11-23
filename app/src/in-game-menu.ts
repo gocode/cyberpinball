@@ -431,11 +431,11 @@ export function createInGameMenu(opts: {
       return close(true);
     } else if (typeof out === 'object' && 'recenter3d' in out) {
       game.vision3d?.recenter();
-      menu.state.notice = t('Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.');
+      menu.state.notice = t('Vue 3D recentrée : ta position de jeu est remesurée pendant une seconde, reste en place.');
       opts.log(`Réglages en partie (${game.table.id}) : vue 3D recentrée.`); // i18n-ignore : journal
     } else if (typeof out === 'object' && 'intensity3d' in out && game.vision3d) {
       menu.host.vision3dIntensity = game.vision3d.nextIntensity();
-      menu.state.notice = t('Intensité de la vue 3D : {v}. Bougez la tête pour juger ; Start pour la suivante.', { v: menu.host.vision3dIntensity });
+      menu.state.notice = t('Intensité de la vue 3D : {v}. Bouge la tête pour juger ; Start pour la suivante.', { v: menu.host.vision3dIntensity });
     }
     applyLive(menu.state.spot);
     render();
@@ -638,7 +638,7 @@ export function createInGameMenu(opts: {
 /** « Recentrer la vue 3D » : possible quand la tête est suivie, sinon pourquoi (HeadTracker.state). */
 function vision3dLine(state: string): true | string {
   if (state === 'tracking') return true;
-  if (state === 'failed') return t('Le capteur de la Vision 3D ne répond pas : voyez le journal de Cyber Pinball.');
+  if (state === 'failed') return t('Le capteur de la Vision 3D ne répond pas : vois le journal de Cyber Pinball.');
   if (state === 'searching') return t('Vision 3D : aucune tête devant le capteur pour l’instant.');
-  return t('Vision 3D : le capteur démarre, réessayez dans un instant.');
+  return t('Vision 3D : le capteur démarre, réessaie dans un instant.');
 }

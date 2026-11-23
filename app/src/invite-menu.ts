@@ -66,7 +66,7 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
   const players = (list: readonly DirectoryEntry[]): Player[] => list.map((d) => ({ key: d.profile.key, name: d.profile.name }));
 
   function askSearch(value = ''): void {
-    host.library.openPrompt(t('Qui vous a fait découvrir Cyber Pinball ?'), t('Nom du joueur'), value, (query) => (query && query.trim() ? host.library.openCustom(() => buildResults(query.trim())) : show()));
+    host.library.openPrompt(t('Qui t’a fait découvrir Cyber Pinball ?'), t('Nom du joueur'), value, (query) => (query && query.trim() ? host.library.openCustom(() => buildResults(query.trim())) : show()));
   }
 
   function buildResults(query: string): Built {
@@ -80,7 +80,7 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
       heading: t('Résultats'),
       icon: 'friend-add',
       subheading: t('« {query} » · {count}', { query, count: tn(found.length, '{n} joueur', '{n} joueurs') }),
-      sections: [{ rows: rows.length ? rows : [{ text: t('Personne de ce nom dans l’annuaire'), detail: t('L’annuaire ne connaît que les bornes vues depuis le démarrage du partage : réessayez quand sa borne est allumée'), tone: 'info' }] }],
+      sections: [{ rows: rows.length ? rows : [{ text: t('Personne de ce nom dans l’annuaire'), detail: t('L’annuaire ne connaît que les bornes vues depuis le démarrage du partage : réessaie quand sa borne est allumée'), tone: 'info' }] }],
       actions,
       back: show,
     };
@@ -95,15 +95,15 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
     const sections: Section[] = [];
     if (inv.mine) {
       // Confirmé : plus rien à changer.
-      rows.push({ text: t('{name} vous a fait découvrir Cyber Pinball', { name: inv.declared?.name ?? inv.mine.name }), detail: inv.sent ? t('C’est compté : il le voit sur son profil') : t('C’est compté : il le verra sur son profil dès que sa borne sera en ligne'), tone: 'ok', icon: 'check' });
+      rows.push({ text: t('{name} t’a fait découvrir Cyber Pinball', { name: inv.declared?.name ?? inv.mine.name }), detail: inv.sent ? t('C’est compté : il le voit sur son profil') : t('C’est compté : il le verra sur son profil dès que sa borne sera en ligne'), tone: 'ok', icon: 'check' });
       sections.push({ rows });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
-      return { heading: t('Qui vous a fait découvrir Cyber Pinball ?'), icon: 'friend-add', sections, actions, back };
+      return { heading: t('Qui t’a fait découvrir Cyber Pinball ?'), icon: 'friend-add', sections, actions, back };
     }
     if (inv.declared) {
       rows.push({
-        text: t('Vous avez choisi {name}', { name: inv.declared.name }),
-        detail: t('Ça comptera à votre première partie menée au bout : il le verra alors sur son profil'),
+        text: t('Tu as choisi {name}', { name: inv.declared.name }),
+        detail: t('Ça comptera à ta première partie menée au bout : il le verra alors sur son profil'),
         tone: 'ok',
         icon: 'check',
       });
@@ -111,9 +111,9 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
     if (rows.length) sections.push({ rows });
     const near = nearbyPlayers(s, now()).filter((d) => d.profile.key !== me);
     const nearKeys = new Set(near.map((d) => d.profile.key));
-    if (near.length) sections.push({ title: t('Sur votre réseau local'), rows: playerRows(players(near), actions, t('Sa borne est sur votre réseau local')) });
+    if (near.length) sections.push({ title: t('Sur ton réseau local'), rows: playerRows(players(near), actions, t('Sa borne est sur ton réseau local')) });
     const friends: Player[] = s.friends.filter((f) => !nearKeys.has(f.key)).map((f) => ({ key: f.key, name: f.name }));
-    if (friends.length) sections.push({ title: t('Vos amis'), rows: playerRows(friends, actions, t('Ami')) });
+    if (friends.length) sections.push({ title: t('Tes amis'), rows: playerRows(friends, actions, t('Ami')) });
     actions.push({ label: t('Chercher un joueur…'), detail: t('Son pseudo, ou l’identifiant vu sur sa fiche'), icon: 'search', run: () => askSearch() });
     actions.push({
       label: t('Personne : je l’ai trouvé seul'),
@@ -125,11 +125,11 @@ export function createInviteMenu(host: InviteMenuHost): InviteMenu {
       },
     });
     actions.push(inv.declared ? { label: t('Valider'), icon: 'check', tone: 'ok', run: back } : { label: t('Plus tard'), detail: t('Menu système > Communauté > Mon profil > Confidentialité > Mon profil public, pendant un mois'), icon: 'back', run: back });
-    if (!sections.length) sections.push({ rows: [{ text: t('Personne sur votre réseau local pour l’instant'), detail: t('Cherchez son pseudo dans l’annuaire'), tone: 'info', icon: 'info' }] });
+    if (!sections.length) sections.push({ rows: [{ text: t('Personne sur ton réseau local pour l’instant'), detail: t('Cherche son pseudo dans l’annuaire'), tone: 'info', icon: 'info' }] });
     return {
-      heading: t('Qui vous a fait découvrir Cyber Pinball ?'),
+      heading: t('Qui t’a fait découvrir Cyber Pinball ?'),
       icon: 'friend-add',
-      lead: t('Un joueur vous a fait découvrir Cyber Pinball ? Dites-le : il le verra sur son profil, parmi les personnes qu’il a invitées. Votre profil, lui, n’en dit rien.'),
+      lead: t('Un joueur t’a fait découvrir Cyber Pinball ? Dis-le : il le verra sur son profil, parmi les personnes qu’il a invitées. Ton profil, lui, n’en dit rien.'),
       sections,
       actions,
       back,

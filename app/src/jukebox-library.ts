@@ -286,7 +286,7 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
     const parsed = parsePlaylistLink(link);
     if ('refused' in parsed) return { ok: false, reason: parsed.refused };
     // J'aime, À regarder plus tard : lisibles avec les cookies du compte seulement (relus dans la session à chaque appel).
-    const personal: YtDlpRun = { ok: false, reason: t('Playlist personnelle de votre compte YouTube : connectez le compte (Gestion du Juke-box, Compte YouTube)') };
+    const personal: YtDlpRun = { ok: false, reason: t('Playlist personnelle de ton compte YouTube : connecte le compte (Gestion du Juke-box, Compte YouTube)') };
     const read = (cookies: string | undefined) => (parsed.personal && !cookies ? Promise.resolve(personal) : opts.ytdlp.run(playlistArgs(parsed, opts.node, cookies), signal));
     const r = opts.account ? await opts.account.withCookies(read) : await read(undefined);
     if (!r.ok) return r;
@@ -642,8 +642,8 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
 /** Raison d'un échec de lecture d'une playlist (yt-dlp, en anglais). */
 function playlistError(line: string): string {
   if (/does not exist|not found|404/i.test(line)) return t('Playlist introuvable sur YouTube');
-  if (/private/i.test(line)) return t('Playlist privée : connectez le compte YouTube qui la possède, ou rendez-la publique ou non répertoriée');
-  if (/not a bot|sign in to confirm/i.test(line)) return t('YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard');
+  if (/private/i.test(line)) return t('Playlist privée : connecte le compte YouTube qui la possède, ou rends-la publique ou non répertoriée');
+  if (/not a bot|sign in to confirm/i.test(line)) return t('YouTube demande de prouver qu’on n’est pas un robot : réessaie plus tard');
   if (/getaddrinfo|timed out|connection|network|unable to download/i.test(line)) return t('réseau injoignable');
   return line.replace(/^ERROR:\s*/, '').slice(0, 200);
 }

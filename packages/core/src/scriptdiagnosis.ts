@@ -25,7 +25,7 @@ export function scriptRuntimeFinding(file: string, log: string): Finding | undef
       code: 'scriptRuntimeError',
       severity: 'warning',
       title: t('Script complémentaire non chargé'),
-      detail: t('VPX n’a pas pu charger : {files}. Vérifiez les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.', { files: missing.slice(0, 8).map((file) => file.slice(0, 160)).join(', ') }),
+      detail: t('VPX n’a pas pu charger : {files}. Vérifie les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.', { files: missing.slice(0, 8).map((file) => file.slice(0, 160)).join(', ') }),
     };
     // Un chargement sans joueur est une extraction ou l'éditeur : il n'efface pas la dernière partie.
     if (!errors.length && !session.some((line) => /\bStarting script\b|\bStartup done\b/.test(line))) continue;

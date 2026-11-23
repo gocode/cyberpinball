@@ -252,7 +252,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     if (!act) return {};
     switch (act.type) {
       case 'friend': {
-        if (!host.friends.isFriend(act.key)) return { gone: t('N’est plus dans vos amis') };
+        if (!host.friends.isFriend(act.key)) return { gone: t('N’est plus dans tes amis') };
         const status = host.friends.playing(act.key) ? t('En partie') : host.friends.online(act.key) ? t('En ligne') : t('Hors ligne');
         return { run: () => host.friends.openFriend(act.key, back), label: t('voir son profil'), status };
       }
@@ -266,7 +266,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         const gone: Record<string, string> = {
           answered: t('Invitation déjà répondue'),
           cancelled: t('Invitation annulée'),
-          started: t('Partie lancée sans vous'),
+          started: t('Partie lancée sans toi'),
           replaced: t('Remplacée par une nouvelle invitation'),
           expired: t('Invitation expirée'),
           offline: t('Invitation retirée'),
@@ -290,7 +290,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
         const threads = host.threads;
         if (!threads) return {};
         const waiting = threads.pending(kind, thread);
-        if (waiting === undefined) return { gone: act.type === 'chat' ? t('N’est plus dans vos amis') : act.type === 'group' ? t('Vous n’êtes plus dans ce groupe') : t('Salon fermé') };
+        if (waiting === undefined) return { gone: act.type === 'chat' ? t('N’est plus dans tes amis') : act.type === 'group' ? t('Tu n’es plus dans ce groupe') : t('Salon fermé') };
         const label = act.type === 'chat' ? t('lire la conversation') : act.type === 'group' ? t('ouvrir la discussion du groupe') : t('ouvrir le salon');
         return { run: () => threads.open(kind, thread, back), label, ...(waiting ? { status: tn(waiting, '{n} en attente', '{n} en attente') } : {}) };
       }
@@ -360,14 +360,14 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
       else sections.push({ title, rows: [row] });
     });
     const back = screen?.back ?? (() => host.library.openSystem());
-    if (entries.length) actions.push({ label: t('Effacer l’activité récente'), detail: t('Vos amis, téléchargements et parties restent'), icon: 'broom', run: () => confirmClear(entries.length) });
+    if (entries.length) actions.push({ label: t('Effacer l’activité récente'), detail: t('Tes amis, téléchargements et parties restent'), icon: 'broom', run: () => confirmClear(entries.length) });
     actions.push({ label: t('Retour'), icon: 'back', run: () => leave(back) });
     return {
       heading: t('Activité récente'),
       icon: 'bell',
       ...(was.size ? { subheading: tn(was.size, '{n} notification non lue', '{n} notifications non lues', {}) } : {}),
       lead: tn(ACTIVITY_MAX, 'Jusqu’à {n} notification, gardée d’un démarrage à l’autre.', 'Jusqu’à {n} notifications, gardées d’un démarrage à l’autre.'),
-      sections: sections.length ? sections : [{ rows: [{ text: t('Aucune activité récente'), detail: t('Vos prochaines notifications apparaîtront ici.'), tone: 'info', icon: 'info' }] }],
+      sections: sections.length ? sections : [{ rows: [{ text: t('Aucune activité récente'), detail: t('Tes prochaines notifications apparaîtront ici.'), tone: 'info', icon: 'info' }] }],
       actions,
       back: () => leave(back),
       listStart: t('ouvrir l’action indiquée'),
@@ -386,7 +386,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
       () => ({
         heading: t('Effacer toute l’activité récente ?'),
         icon: 'alert',
-        lead: t('Vos amis, téléchargements et parties restent.'),
+        lead: t('Tes amis, téléchargements et parties restent.'),
         sections: [],
         actions: [
           {

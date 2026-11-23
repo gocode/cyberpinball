@@ -1,4 +1,4 @@
-// Parties instantanées (demandées le 16/11/2026) : un joueur ouvre une partie
+// Parties en direct (demandées le 16/11/2026) : un joueur ouvre une partie
 // en direct à tous, choisit le nombre de joueurs (2 à 4), et elle s'affiche dans la Communauté de
 // chaque borne. N'importe qui la rejoint, sans être ami ; dès qu'elle est complète, elle part pour
 // tout le monde. La partie elle-même est celle des amis (livegame.ts) : même version de la table
@@ -17,7 +17,7 @@ import { LIVE_MAX_PLAYERS, parseLiveTable, type LiveInvite, type LiveTable } fro
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
 import { normalizeName } from './social';
 
-/** Joueurs au moins dans une partie instantanée, l'hôte compris. */
+/** Joueurs au moins dans une partie en direct, l'hôte compris. */
 export const INSTANT_MIN_PLAYERS = 2;
 /** Joueurs au plus : ceux d'une partie en direct (réseau maillé, § 13.2). */
 export const INSTANT_MAX_PLAYERS = LIVE_MAX_PLAYERS;

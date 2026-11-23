@@ -105,7 +105,7 @@ test('ROM absente : le parcours mène à sa page dans la base VPS, puis reçue, 
     assert.equal(journeySummary(j), '2 étapes réglées · 1 indispensable à faire');
     assert.equal(step(j, 'rom').state, 'todo');
     assert.equal(step(j, 'rom').title, 'ROM t2_l8');
-    assert.match(step(j, 'rom').detail, /Ouvrez sa page sur vpforums\.org/);
+    assert.match(step(j, 'rom').detail, /Ouvre sa page sur vpforums\.org/);
     assert.match(step(j, 'rom').note!, /droit d’auteur/);
     const fetch = primary(j);
     assert.equal(fetch.action.kind, 'fetch');

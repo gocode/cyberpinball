@@ -112,7 +112,7 @@ export function createInboxMenu(host: InboxMenuHost): InboxMenu {
     sections.push(
       rows.length
         ? { title: t('En attente'), rows }
-        : { rows: [{ text: t('Aucun message en attente'), detail: t('Les messages de vos amis, de vos groupes et les mentions dans les salons s’afficheront ici.'), icon: 'info', tone: 'info' }] },
+        : { rows: [{ text: t('Aucun message en attente'), detail: t('Les messages de tes amis, de tes groupes et les mentions dans les salons s’afficheront ici.'), icon: 'info', tone: 'info' }] },
     );
     const links = host.links();
     if (links.length) {
@@ -128,7 +128,7 @@ export function createInboxMenu(host: InboxMenuHost): InboxMenu {
     return {
       heading: t('Messages en attente'),
       icon: 'inbox',
-      ...(count ? { subheading: tn(count, '{n} message attend votre lecture', '{n} messages attendent votre lecture') } : {}),
+      ...(count ? { subheading: tn(count, '{n} message attend ta lecture', '{n} messages attendent ta lecture') } : {}),
       sections,
       actions,
       back: () => back(),

@@ -186,10 +186,10 @@ export function calibrationGap(left: Point3, right: Point3, middle: Point3): num
 export function calibrationProblem(left: Point3, right: Point3): string | undefined {
   const width = length(sub(right, left)) * 100;
   const tilt = Math.abs(left.y - right.y) * 100;
-  if (width < 40 || width > 120) return t('Les deux coins sont à {n} cm l’un de l’autre : une barre avant fait de 40 à 120 cm. Recommencez par le coin gauche.', { n: Math.round(width) });
+  if (width < 40 || width > 120) return t('Les deux coins sont à {n} cm l’un de l’autre : une barre avant fait de 40 à 120 cm. Recommence par le coin gauche.', { n: Math.round(width) });
   // Pas de hauteur refusée : les points touchés sont dans la pièce que VPX reçoit aussi, quel que soit
   // le sol du Quest (essai du 10 novembre 2026 : sol faux de 70 cm, chaque calage refusé « à 184 cm du sol »).
-  if (tilt > 5) return t('Un coin est {n} cm plus haut que l’autre : un coin a été mal touché. Recommencez par le coin gauche.', { n: Math.round(tilt) });
+  if (tilt > 5) return t('Un coin est {n} cm plus haut que l’autre : un coin a été mal touché. Recommence par le coin gauche.', { n: Math.round(tilt) });
   return undefined;
 }
 
@@ -214,7 +214,7 @@ export function anchorHeight(place: CabinetPlace): number {
  */
 export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace; setting?: CalibrationSetting; combo?: string }): { detail: string; unavailable: boolean } {
   if (!opts.vrReady) return { detail: t('Réalité virtuelle indisponible : rien à caler'), unavailable: true };
-  if (opts.headset !== 'shown') return { detail: t('Mettez le casque, le front-end de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
+  if (opts.headset !== 'shown') return { detail: t('Mets le casque, le front-end de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
   const p = opts.place;
   const status =
     p?.lockbarWidth !== undefined && p.lockbarHeight !== undefined
@@ -226,8 +226,8 @@ export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMen
     detail: [
       status,
       opts.setting === 'bureau'
-        ? t('Au bureau : la borne se pose devant vous (A), ou sur deux points du bord du bureau touchés du bout de la manette. Dans le casque : ≡ de la manette gauche')
-        : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Dans le casque : ≡ de la manette gauche'),
+        ? t('Au bureau : la borne se pose devant toi (A), ou sur deux points du bord du bureau touchés du bout de la manette. Dans le casque : ≡ de la manette gauche')
+        : t('Touche la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Dans le casque : ≡ de la manette gauche'),
       ...(opts.combo ? [t('À tout moment, dans le front-end comme en partie : {combo}', { combo: opts.combo })] : []),
       t('Le Quest garde ce calage avec une limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis, et le calage revient d’office'),
     ].join(' · '),
@@ -320,7 +320,7 @@ export const VPX_TABLE_OFFSET_MAX_CM = 100;
 export function vpxPlaceProblem(settings: readonly VpxSetting[]): string | undefined {
   const far = settings.some((s) => s.section === 'PlayerVR' && (s.key === 'TableX' || s.key === 'TableY') && Math.abs(Number(s.value)) > VPX_TABLE_OFFSET_MAX_CM);
   return far
-    ? t('La borne est à plus d’un mètre du centre de la limite du Quest : VPX ne peut pas y poser ses tables (décalage limité à 1 m). Refaites la limite du Quest autour de la borne, puis recalez.')
+    ? t('La borne est à plus d’un mètre du centre de la limite du Quest : VPX ne peut pas y poser ses tables (décalage limité à 1 m). Refais la limite du Quest autour de la borne, puis recale.')
     : undefined;
 }
 
@@ -447,7 +447,7 @@ export const EYES_MAX_M = 2.1;
 /** Yeux mesurés trop bas ou trop haut : le sol du Quest est à refaire, et le chemin du réglage. Sinon rien. */
 export function eyeHeightProblem(eyes: number | undefined): string | undefined {
   if (eyes === undefined || (eyes >= EYES_MIN_M && eyes <= EYES_MAX_M)) return undefined;
-  return t('Vos yeux sont mesurés à {h} m du sol : le sol du Quest est mal réglé, et la borne serait à vos pieds. Avant de caler, dans le Quest : Paramètres rapides > Paramètres > Configuration de l’environnement > Limite > « Définir le niveau du sol », puis touchez le sol avec la manette.', {
+  return t('Tes yeux sont mesurés à {h} m du sol : le sol du Quest est mal réglé, et la borne serait à tes pieds. Avant de caler, dans le Quest : Paramètres rapides > Paramètres > Configuration de l’environnement > Limite > « Définir le niveau du sol », puis touche le sol avec la manette.', {
     h: (Math.round(eyes * 100) / 100).toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR'),
   });
 }
@@ -514,7 +514,7 @@ export function gameHeadSummary(heads: readonly { x: number; z: number; yaw: num
  */
 export function roomMismatchProblem(summary: GameHeadSummary | undefined): string | undefined {
   if (!summary || summary.samples < 3 || summary.turned < summary.samples * 0.6) return undefined;
-  return t('À la dernière partie, vous jouiez dos à la borne calée : la table de VPX n’était pas sur elle (pièce différente pour VPX, par exemple après « Réinitialiser la vue » de Link). Recalez, puis relancez la partie.');
+  return t('À la dernière partie, tu jouais dos à la borne calée : la table de VPX n’était pas sur elle (pièce différente pour VPX, par exemple après « Réinitialiser la vue » de Link). Recale, puis relance la partie.');
 }
 
 // --- Calage en partie (12 novembre 2026) --------------------------------------------------------
@@ -773,8 +773,8 @@ export function shouldOfferCalibration(reason: CalibrationOfferReason, keeping: 
 export function roomKeepingAdvice(keeping: RoomKeeping | undefined, combo: string | undefined): string | undefined {
   if (keeping !== 'recentred') return undefined;
   return combo
-    ? t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recalez d’un geste ({combo}), ou créez une limite de pièce dans le Quest.', { combo })
-    : t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recalez, ou créez une limite de pièce dans le Quest.');
+    ? t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recale d’un geste ({combo}), ou crée une limite de pièce dans le Quest.', { combo })
+    : t('Le Quest est en limite fixe : il déplace la pièce chaque fois que le casque est remis. Recale, ou crée une limite de pièce dans le Quest.');
 }
 
 /** Changements de pièce reçus par VPX pendant la partie (vpinball.log) : « Réinitialiser la vue » fait en jeu. */

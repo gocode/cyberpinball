@@ -170,9 +170,9 @@ test('écran des parties : ouvert dans la liste, cochée ou non en toutes lettre
     assert.match(parts.sections.find((x) => x.title)!.title!, /2 cochées sur 4/);
     // Start sur la ROM : l'attestation ; cochée, le curseur passe sur « Prendre la ROM ».
     s.act(partLabel('rom'));
-    assert.equal(s.view().heading, 'La ROM : vos droits');
+    assert.equal(s.view().heading, 'La ROM : tes droits');
     s.act('Prendre la ROM');
-    assert.equal(s.view().heading, 'La ROM : vos droits', 'sans attestation cochée, rien ne se prend');
+    assert.equal(s.view().heading, 'La ROM : tes droits', 'sans attestation cochée, rien ne se prend');
     s.act('J’atteste');
     assert.equal(s.at(), 1, 'curseur sur « Prendre la ROM »');
     s.act('Prendre la ROM');
@@ -214,8 +214,8 @@ test('toute partie décochée d’office, une seule règle : elle dit qu’elle 
     }
     assert.equal(row('b2s').note?.text, 'Disponible : Start pour la cocher');
     // Chaque partie sous droits, la même attestation, puis retour sur sa ligne, cochée.
-    for (const [part, heading, take] of [['rom', 'La ROM : vos droits', 'Prendre la ROM'], ['pup', 'Le PuP-Pack : vos droits', 'Prendre le PuP-Pack']] as const) {
-      assert.equal(row(part).note?.text, 'Disponible, à cocher vous-même : Start, puis l’attestation de vos droits');
+    for (const [part, heading, take] of [['rom', 'La ROM : tes droits', 'Prendre la ROM'], ['pup', 'Le PuP-Pack : tes droits', 'Prendre le PuP-Pack']] as const) {
+      assert.equal(row(part).note?.text, 'Disponible, à cocher toi-même : Start, puis l’attestation de tes droits');
       s.act(partLabel(part));
       assert.equal(s.view().heading, heading);
       s.act('J’atteste');

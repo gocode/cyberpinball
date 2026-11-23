@@ -615,7 +615,7 @@ export interface JukeboxPosterView {
 
 /** Affiche du médaillon : la dernière écoute, ou l'invitation à importer une première playlist. */
 export function jukeboxPoster(input: { stats: string; empty: boolean; last?: { title: string; artist?: string; album?: string } }): JukeboxPosterView {
-  if (input.empty) return { stats: t('Votre première playlist vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Importez une playlist YouTube'), detail: t('Depuis votre téléphone ou la fenêtre Récupérer.') };
+  if (input.empty) return { stats: t('Ta première playlist t’attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Importe une playlist YouTube'), detail: t('Depuis ton téléphone ou la fenêtre Récupérer.') };
   const detail = [input.last?.artist, input.last?.album ? t('album {album}', { album: input.last.album }) : undefined].filter(Boolean).join(' · ');
   return input.last
     ? { stats: input.stats, empty: false, eyebrow: t('Dernière écoute'), heading: input.last.title, detail }

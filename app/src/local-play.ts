@@ -20,9 +20,9 @@ export interface LocalPlayHost {
 /** Ce que retire le jeu local, dans l'ordre où le joueur le croise. */
 function removedRows(): Row[] {
   return [
-    { text: t('Niveaux, XP et badges'), detail: t('La carte du joueur, les moments de badge et de niveau disparaissent ; vos XP continuent de se compter en silence'), icon: 'medal' },
-    { text: t('Amis, joueurs en ligne, demandes d’amis'), detail: t('Personne ne vous voit, vous ne voyez personne'), icon: 'friends' },
-    { text: t('Messages, salons, groupes, parties instantanées'), detail: t('Avec la pastille des messages et la Communauté au téléphone'), icon: 'message' },
+    { text: t('Niveaux, XP et badges'), detail: t('La carte du joueur, les moments de badge et de niveau disparaissent ; tes XP continuent de se compter en silence'), icon: 'medal' },
+    { text: t('Amis, joueurs en ligne, demandes d’amis'), detail: t('Personne ne te voit, tu ne vois personne'), icon: 'friends' },
+    { text: t('Messages, salons, groupes, parties en direct'), detail: t('Avec la pastille des messages et la Communauté au téléphone'), icon: 'message' },
     { text: t('Classements en ligne'), detail: t('Le tableau des scores garde ceux de cette borne'), icon: 'trophy' },
     { text: t('Le médaillon Communauté de la roue'), detail: t('Et « Jouer avec un ami » sur la fiche des tables'), icon: 'globe' },
   ];
@@ -31,9 +31,9 @@ function removedRows(): Row[] {
 /** Ce qui reste, pour qu'on ne craigne pas de tout perdre. */
 function keptRows(): Row[] {
   return [
-    { text: t('Toutes vos tables, leurs scores sur cette borne, le Juke-box'), icon: 'tables' },
+    { text: t('Toutes tes tables, leurs scores sur cette borne, le Juke-box'), icon: 'tables' },
     { text: t('La mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions'), icon: 'upgrade' },
-    { text: t('Vos amis, vos XP et vos badges, gardés tels quels : tout revient si vous remettez la communauté'), icon: 'check' },
+    { text: t('Tes amis, tes XP et tes badges, gardés tels quels : tout revient si tu remets la communauté'), icon: 'check' },
   ];
 }
 

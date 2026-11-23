@@ -82,7 +82,7 @@ test('« Votre profil de joueur » : pas de sortie sans pseudo, avatar facultati
   assert.ok(profileWelcomeDue(loadSocial(dir)));
 
   let built = last().build();
-  assert.equal(built.heading, 'Votre profil de joueur');
+  assert.equal(built.heading, 'Ton profil de joueur');
   assert.equal(last().at, 0, 'sélection sur le pseudo');
   assert.deepEqual(built.actions.map((a) => a.label), ['Choisir mon pseudo…', 'Mettre un avatar…', 'Continuer']);
   assert.equal(new Set(built.actions.map((a) => a.icon)).size, built.actions.length, 'une icône par action');

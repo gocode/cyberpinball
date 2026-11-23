@@ -195,35 +195,35 @@ export function vision3dReadiness(hw: Vision3dHardware, choice: Vision3dSourceCh
     : blocked
       ? { ready: false, reason: kinectBlockedReason(), memoryIntegrity: true }
       : camera === 'absent'
-        ? { ready: false, reason: t('Kinect sans courant : branchez son adaptateur secteur (seuls son moteur et ses micros sont vus)') }
+        ? { ready: false, reason: t('Kinect sans courant : branche son adaptateur secteur (seuls son moteur et ses micros sont vus)') }
         : !hw.kinect1Driver || camera?.problem === 28
           ? { ready: false, reason: t('Kinect détectée, pilote de Microsoft manquant'), installKinectDriver: true }
           : hw.kinectXbox360 && !hw.kinectSdk
             ? { ready: false, reason: t('Kinect pour Xbox 360 : le pilote seul la refuse, il faut aussi le kit de Microsoft (SDK 1.8)'), installKinectDriver: true }
           : camera && !camera.started
-            ? { ready: false, reason: t('Windows n’a pas chargé le pilote de la Kinect (code {code}) : redémarrez le PC, puis débranchez et rebranchez la Kinect', { code: camera.problem }), restart: true }
+            ? { ready: false, reason: t('Windows n’a pas chargé le pilote de la Kinect (code {code}) : redémarre le PC, puis débranche et rebranche la Kinect', { code: camera.problem }), restart: true }
             : undefined;
   if (choice !== 'webcam') {
     if (hw.kinect1 && !unusable) return { ready: true, source: 'kinect1', label: t('Kinect pour Xbox 360') };
     // Le pilote à installer passe avant la webcam : le joueur a branché sa Kinect pour s'en servir.
     if (unusable && (unusable as { installKinectDriver?: true }).installKinectDriver) return unusable;
     if (unusable && !webcam) return unusable;
-    if (choice === 'kinect1' && !hw.kinect1) return { ready: false, reason: t('Kinect pour Xbox 360 introuvable : branchez-la avec son adaptateur secteur') };
+    if (choice === 'kinect1' && !hw.kinect1) return { ready: false, reason: t('Kinect pour Xbox 360 introuvable : branche-la avec son adaptateur secteur') };
   }
   if (webcam) return { ready: true, source: 'webcam', label: webcam, ...(unusable && !unusable.ready && choice !== 'webcam' && { note: blocked ? t('Kinect refusée par l’intégrité de la mémoire de Windows : webcam utilisée') : t('Kinect pas prête ({reason}) : webcam utilisée', { reason: unusable.reason }) }) };
-  if (hw.kinect2) return { ready: false, reason: t('La Kinect pour Xbox One n’est pas encore prise en charge : branchez une webcam ou une Kinect pour Xbox 360') };
-  return { ready: false, reason: t('Aucune caméra : branchez une webcam ou une Kinect pour Xbox 360') };
+  if (hw.kinect2) return { ready: false, reason: t('La Kinect pour Xbox One n’est pas encore prise en charge : branche une webcam ou une Kinect pour Xbox 360') };
+  return { ready: false, reason: t('Aucune caméra : branche une webcam ou une Kinect pour Xbox 360') };
 }
 
 /** Codes d'erreur du pilote de la Kinect v1 (NuiApi.h du SDK 1.8, FACILITY_NUI = 0x301). */
 const NUI_ERRORS: Record<number, () => string> = {
   0x83010006: () => t('le pilote ne reconnaît pas cette Kinect comme authentique'),
-  0x83010007: () => t('pas assez de débit USB : branchez la Kinect seule sur un port, sans concentrateur'),
-  0x83010008: () => t('le pilote refuse cette Kinect pour Xbox 360 sans le kit de Microsoft (SDK 1.8) : réinstallez le pilote depuis l’écran Vision 3D'),
+  0x83010007: () => t('pas assez de débit USB : branche la Kinect seule sur un port, sans concentrateur'),
+  0x83010008: () => t('le pilote refuse cette Kinect pour Xbox 360 sans le kit de Microsoft (SDK 1.8) : réinstalle le pilote depuis l’écran Vision 3D'),
   0x83010009: () => t('la Kinect est déjà utilisée par un autre logiciel'),
   0x83010014: () => t('aucune Kinect branchée'),
-  0x83010015: () => t('la Kinect n’est pas prête : débranchez-la, attendez cinq secondes, rebranchez-la'),
-  0x8301027f: () => t('la Kinect n’a pas de courant : branchez son adaptateur secteur'),
+  0x83010015: () => t('la Kinect n’est pas prête : débranche-la, attends cinq secondes, rebranche-la'),
+  0x8301027f: () => t('la Kinect n’a pas de courant : branche son adaptateur secteur'),
   0x83010585: () => t('aucune Kinect trouvée'),
 };
 
@@ -236,7 +236,7 @@ export function nuiErrorReason(hr: number): string {
 
 /** La Kinect v1 et l'intégrité de la mémoire de Windows : pourquoi, et les deux issues. */
 export function kinectBlockedReason(): string {
-  return t('Windows refuse le pilote de la Kinect pour Xbox 360 (intégrité de la mémoire activée) : désactivez-la puis redémarrez, ou branchez une webcam');
+  return t('Windows refuse le pilote de la Kinect pour Xbox 360 (intégrité de la mémoire activée) : désactive-la puis redémarre, ou branche une webcam');
 }
 
 /** Ce que dit le journal de VPX (vpinball.log, depuis le lancement) du plugin Vision3D. */
@@ -304,12 +304,12 @@ export function vision3dMenuText(
   return setting.mode === 'on'
     ? {
         label: t('Vision 3D : activée'),
-        detail: [t('{sensor} · la perspective des tables suit votre tête ; recentrer : réglages en partie · choisir pour désactiver', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
+        detail: [t('{sensor} · la perspective des tables suit ta tête ; recentrer : réglages en partie · choisir pour désactiver', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
         unavailable: false,
       }
     : {
         label: t('Vision 3D : désactivée'),
-        detail: [t('{sensor} prête · choisir pour que la perspective des tables suive votre tête', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
+        detail: [t('{sensor} prête · choisir pour que la perspective des tables suive ta tête', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
         unavailable: false,
       };
 }

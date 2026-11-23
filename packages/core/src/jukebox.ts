@@ -67,7 +67,7 @@ export function unavailableText(reason: UnavailableReason): string {
     case 'private':
       return t('Vidéo privée');
     case 'blocked':
-      return t('Bloquée dans votre pays');
+      return t('Bloquée dans ton pays');
     case 'members':
       return t('Réservée aux abonnés de la chaîne');
     case 'age':
@@ -699,7 +699,7 @@ export function findPlaylist(store: Pick<JukeboxStore, 'playlists'>, id: string)
 /** Nom accepté : 1 à 60 signes, pas déjà pris (sans tenir compte de la casse). */
 export function playlistNameProblem(store: Pick<JukeboxStore, 'playlists'>, name: string, except?: string): string | undefined {
   const n = name.trim();
-  if (!n) return t('Donnez un nom à la playlist');
+  if (!n) return t('Donne un nom à la playlist');
   if (n.length > PLAYLIST_NAME_MAX) return t('Nom trop long : {max} signes au plus', { max: PLAYLIST_NAME_MAX });
   if (store.playlists.some((p) => p.id !== except && p.name.trim().toLowerCase() === n.toLowerCase())) return t('Une playlist porte déjà ce nom');
   return undefined;

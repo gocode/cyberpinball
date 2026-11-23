@@ -46,7 +46,7 @@ function fakeCollections() {
   const list = [
     { id: 'all', group: 'main', label: 'Toutes', icon: 'list', tables: [1, 2, 3, 4] },
     { id: 'favorites', group: 'main', label: 'Favoris', icon: 'star', tables: [2] },
-    { id: 'never', group: 'main', label: 'Jamais jouées', icon: 'list', tables: [], reason: 'Toutes vos tables ont déjà été jouées' },
+    { id: 'never', group: 'main', label: 'Jamais jouées', icon: 'list', tables: [], reason: 'Toutes tes tables ont déjà été jouées' },
     { id: 'maker:bally', group: 'maker', label: 'Bally', icon: 'list', tables: [1, 3] },
   ];
   let active = 'all';

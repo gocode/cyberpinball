@@ -236,7 +236,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     const name = ctx.who?.()?.name;
     return {
       label: t('Envoyé'),
-      detail: state.anonymous ? t('Anonymement · l’équipe peut quand même vous répondre') : name ? t('Avec votre pseudo, {name} · l’équipe pourra vous répondre', { name }) : t('Avec votre pseudo · l’équipe pourra vous répondre'),
+      detail: state.anonymous ? t('Anonymement · l’équipe peut quand même te répondre') : name ? t('Avec ton pseudo, {name} · l’équipe pourra te répondre', { name }) : t('Avec ton pseudo · l’équipe pourra te répondre'),
       icon: state.anonymous ? 'lock' : 'account',
       key: 'feedback:anonymous',
       run: () => {
@@ -247,7 +247,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
   }
 
   /** La ligne de l'écran « Merci » : la réponse de l'équipe arrivera dans les messages. */
-  const answerRow = (): Row => ({ icon: 'message', text: t('L’équipe peut vous répondre'), detail: t('Sa réponse arrivera avec une notification, dans vos messages en attente et dans « Mes échanges avec l’équipe »'), tone: 'info' });
+  const answerRow = (): Row => ({ icon: 'message', text: t('L’équipe peut te répondre'), detail: t('Sa réponse arrivera avec une notification, dans tes messages en attente et dans « Mes échanges avec l’équipe »'), tone: 'info' });
 
   // ---------- L'accueil : le tableau des propositions ----------
 
@@ -296,13 +296,13 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
               ? t('Lecture des propositions…')
               : tn(all.length, '{n} proposition · les plus demandées d’abord', '{n} propositions · les plus demandées d’abord'),
         lead: queued
-          ? tn(queued, 'Votez pour ce qui compte pour vous : l’équipe commence par le plus demandé. {n} rapport attend la connexion pour partir.', 'Votez pour ce qui compte pour vous : l’équipe commence par le plus demandé. {n} rapports attendent la connexion pour partir.')
-          : t('Votez pour ce qui compte pour vous : l’équipe commence par le plus demandé.'),
+          ? tn(queued, 'Vote pour ce qui compte pour toi : l’équipe commence par le plus demandé. {n} rapport attend la connexion pour partir.', 'Vote pour ce qui compte pour toi : l’équipe commence par le plus demandé. {n} rapports attendent la connexion pour partir.')
+          : t('Vote pour ce qui compte pour toi : l’équipe commence par le plus demandé.'),
         hint: t('Flippers : choisir · Start : ouvrir, voter · Exit : revenir'),
         tabs,
         sections: rows.length
           ? [{ title: tab === 'mine' ? t('Proposées ou votées depuis cette borne') : t('Les plus demandées'), rows }]
-          : [{ rows: [{ icon: 'info', text: net === 'offline' ? t('Pas de liste sans connexion') : tab === 'mine' ? t('Rien proposé ni voté d’ici pour l’instant') : t('Aucune proposition ici pour l’instant'), detail: t('« Proposer une idée » : la vôtre sera la première.'), tone: 'quiet' }] }],
+          : [{ rows: [{ icon: 'info', text: net === 'offline' ? t('Pas de liste sans connexion') : tab === 'mine' ? t('Rien proposé ni voté d’ici pour l’instant') : t('Aucune proposition ici pour l’instant'), detail: t('« Proposer une idée » : la tienne sera la première.'), tone: 'quiet' }] }],
         actions,
         back,
       };
@@ -354,7 +354,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       };
     const total = value.people.length + value.others;
     const title = total ? t('Ils la soutiennent ({n})', { n: total }) : t('Ils la soutiennent');
-    if (!total) return { title, rows: [{ icon: 'info', text: t('Personne d’autre pour l’instant'), detail: p.voted ? '' : t('Votez : votre pseudo s’affichera ici'), tone: 'quiet' }] };
+    if (!total) return { title, rows: [{ icon: 'info', text: t('Personne d’autre pour l’instant'), detail: p.voted ? '' : t('Vote : ton pseudo s’affichera ici'), tone: 'quiet' }] };
     const shown = value.people.slice(0, SUPPORTERS_SHOWN);
     const rest = total - shown.length;
     const rows: Row[] = shown.map((who) => personRow(who));
@@ -372,9 +372,9 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       const canVote = ctx.service.canWrite();
       actions.push(
         p.voted
-          ? { label: t('Retirer mon vote'), detail: tn(p.votes, '{n} vote, le vôtre compris', '{n} votes, le vôtre compris'), icon: 'close', key: 'feedback:unvote', run: () => void ctx.service.vote(p.id, false).then(self) }
+          ? { label: t('Retirer mon vote'), detail: tn(p.votes, '{n} vote, le tien compris', '{n} votes, le tien compris'), icon: 'close', key: 'feedback:unvote', run: () => void ctx.service.vote(p.id, false).then(self) }
           : canVote
-            ? { label: t('Voter pour cette proposition'), detail: t('Une voix par borne · votre pseudo s’affiche parmi ses soutiens'), icon: 'check', tone: 'ok', key: 'feedback:vote', run: () => void ctx.service.vote(p.id, true).then(self) }
+            ? { label: t('Voter pour cette proposition'), detail: t('Une voix par borne · ton pseudo s’affiche parmi ses soutiens'), icon: 'check', tone: 'ok', key: 'feedback:vote', run: () => void ctx.service.vote(p.id, true).then(self) }
             : { label: t('Voter pour cette proposition'), detail: t('Indisponible : la borne n’a pas encore sa clé de joueur'), icon: 'check', tone: 'quiet', key: 'feedback:vote', run: self },
       );
       // Traduite par le service : l'original à un appui (et retour à la traduction).
@@ -436,7 +436,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       actions.push({
         label: t('Joindre des fichiers…'),
         detail: full
-          ? t('Indisponible : {n} fichiers au plus ; retirez-en un d’abord', { n: ATTACHMENTS_COUNT_MAX })
+          ? t('Indisponible : {n} fichiers au plus ; retires-en un d’abord', { n: ATTACHMENTS_COUNT_MAX })
           : box.files.length
             ? t('{size} sur {max} · privé, lu par l’équipe seule', { size: formatSize(size), max: formatSize(ATTACHMENTS_BYTES_MAX) })
             : t('Captures d’écran, journaux, réglages · privé, lu par l’équipe seule'),
@@ -510,7 +510,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           ctx.prompt(t('Titre'), t('En une phrase'), draft.title, (value) => {
             if (value !== undefined) draft.title = value.replace(/\s+/g, ' ').trim().slice(0, PROPOSAL_TITLE_MAX);
             self();
-          }, draft.kind === 'bug' ? t('Ce qui ne marche pas, en une phrase : « Le DMD reste noir sur Glass Lagoon ».') : t('Ce que vous aimeriez, en une phrase : « Trier les tables par fabricant ».')),
+          }, draft.kind === 'bug' ? t('Ce qui ne marche pas, en une phrase : « Le DMD reste noir sur Glass Lagoon ».') : t('Ce que tu aimerais, en une phrase : « Trier les tables par fabricant ».')),
       });
       actions.push({
         label: t('Description'),
@@ -521,7 +521,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
           ctx.prompt(t('Description'), t('Les détails'), draft.text, (value) => {
             if (value !== undefined) draft.text = cleanProposalText(value.slice(0, 2000)) ?? '';
             self();
-          }, t('Visible de tous avec le titre si vous publiez en public. Ni nom, ni adresse, ni numéro de téléphone.')),
+          }, t('Visible de tous avec le titre si tu publies en public. Ni nom, ni adresse, ni numéro de téléphone.')),
       });
       actions.push({
         label: t('Joindre le rapport technique'),
@@ -534,7 +534,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       if (ctx.threads) actions.push(signatureAction(self));
       const filesSection = attachmentsUi(draft, self, actions);
       const ready = Boolean(title) && !draft.sending;
-      const why = draft.sending ? t('Envoi en cours…') : !title ? t('Indisponible : écrivez d’abord un titre ({min} caractères au moins)', { min: PROPOSAL_TITLE_MIN }) : !ctx.service.canWrite() ? t('Indisponible : la borne n’a pas encore sa clé de joueur') : undefined;
+      const why = draft.sending ? t('Envoi en cours…') : !title ? t('Indisponible : écris d’abord un titre ({min} caractères au moins)', { min: PROPOSAL_TITLE_MIN }) : !ctx.service.canWrite() ? t('Indisponible : la borne n’a pas encore sa clé de joueur') : undefined;
       // Le privé d'abord : un problème signalé reste entre le joueur et l'équipe ; publier est un choix
       // de plus, nommé comme tel (« en public »). Le bouton mis en avant : privé pour un problème,
       // publié pour une idée (les autres joueurs votent).
@@ -542,7 +542,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       const publicReady = ready && ctx.service.canWrite();
       actions.push({
         label: t('Envoyer à l’équipe seulement'),
-        detail: draft.sending ? t('Envoi en cours…') : privateReady ? t('Privé : rien n’est publié') : t('Indisponible : écrivez d’abord un titre ou une description'),
+        detail: draft.sending ? t('Envoi en cours…') : privateReady ? t('Privé : rien n’est publié') : t('Indisponible : écris d’abord un titre ou une description'),
         icon: 'lock',
         ...(privateReady ? (draft.kind === 'bug' ? { tone: 'ok' as const } : {}) : { tone: 'quiet' as const }),
         key: 'feedback:private',
@@ -551,7 +551,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       });
       actions.push({
         label: t('Publier en public'),
-        detail: why ?? (near.length ? t('Visible de tous tout de suite · si l’une des propositions proches est la même, votez plutôt pour elle') : t('Visible de tous tout de suite · les autres joueurs pourront voter')),
+        detail: why ?? (near.length ? t('Visible de tous tout de suite · si l’une des propositions proches est la même, vote plutôt pour elle') : t('Visible de tous tout de suite · les autres joueurs pourront voter')),
         icon: 'upload',
         ...(publicReady ? (draft.kind === 'bug' ? {} : { tone: 'ok' as const }) : { tone: 'quiet' as const }),
         key: 'feedback:publish',
@@ -562,7 +562,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
       const sections: Built['sections'] = [];
       if (draft.context.about) sections.push({ rows: [{ icon: 'alert', text: draft.context.about, detail: t('Rappelé dans le rapport'), tone: 'warning' }] });
       sections.push({ title: t('Nature'), options: true, rows: kindRows });
-      if (nearRows.length) sections.push({ title: t('Déjà proposé ? Votez plutôt'), rows: nearRows });
+      if (nearRows.length) sections.push({ title: t('Déjà proposé ? Vote plutôt'), rows: nearRows });
       if (filesSection) sections.push(filesSection);
       return {
         heading: draft.kind === 'bug' ? t('Signaler un problème') : t('Proposer une idée'),
@@ -618,8 +618,8 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
 
   function openSent(draft: Draft, published: string | undefined, report: string | undefined, id: string | undefined, back: () => void): void {
     const rows: Row[] = [];
-    if (published === 'ok') rows.push({ icon: 'check', text: t('Proposition publiée'), detail: t('« {title} » · votre vote compte déjà', { title: draft.title }), tone: 'ok', badges: [t('✓ Publiée')] });
-    else if (published === 'quota') rows.push({ icon: 'alert', text: t('Pas publiée : cinq propositions par jour au plus'), detail: t('Elle est partie à l’équipe en privé ; republiez-la demain si vous voulez que les autres votent.'), tone: 'warning' });
+    if (published === 'ok') rows.push({ icon: 'check', text: t('Proposition publiée'), detail: t('« {title} » · ton vote compte déjà', { title: draft.title }), tone: 'ok', badges: [t('✓ Publiée')] });
+    else if (published === 'quota') rows.push({ icon: 'alert', text: t('Pas publiée : cinq propositions par jour au plus'), detail: t('Elle est partie à l’équipe en privé ; republie-la demain si tu veux que les autres votent.'), tone: 'warning' });
     else if (published) rows.push({ icon: 'alert', text: t('Pas publiée : le service ne répond pas'), detail: t('Elle part à l’équipe en privé dès que la borne est en ligne.'), tone: 'warning' });
     if (report === 'sent') rows.push({ icon: 'lock', text: draft.attach ? t('Rapport technique envoyé à l’équipe') : t('Message envoyé à l’équipe'), detail: draft.files.length ? tn(draft.files.length, 'Chiffré, avec {n} fichier joint : seule l’équipe peut le lire', 'Chiffré, avec {n} fichiers joints : seule l’équipe peut le lire') : t('Chiffré : seule l’équipe peut le lire'), tone: 'ok', badges: [t('✓ Envoyé')] });
     else if (report === 'queued') rows.push({ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] });
@@ -700,14 +700,14 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     };
     const build = (): Built => {
       const head: Row[] = [{ icon: 'alert', text: report.about, tone: 'warning' }];
-      if (report.notified) head.push({ icon: 'check', text: t('Les développeurs ont été prévenus de ce plantage'), detail: t('Le rapport automatique est parti : ils vont l’examiner. Ce que vous faisiez à ce moment les aidera.'), tone: 'ok', badges: [t('✓ Prévenus')] });
+      if (report.notified) head.push({ icon: 'check', text: t('Les développeurs ont été prévenus de ce plantage'), detail: t('Le rapport automatique est parti : ils vont l’examiner. Ce que tu faisais à ce moment les aidera.'), tone: 'ok', badges: [t('✓ Prévenus')] });
       const what: Row[] = report.notified
-        ? [{ icon: 'edit', text: t('Votre description, ce plantage rappelé'), detail: t('Le rapport technique est déjà parti : il ne repart pas') }]
+        ? [{ icon: 'edit', text: t('Ta description, ce plantage rappelé'), detail: t('Le rapport technique est déjà parti : il ne repart pas') }]
         : [
             ...(findings.length ? [{ icon: 'list' as const, text: t('Le diagnostic de la table'), detail: findings.slice(0, 3).join(' · ') + (findings.length > 3 ? ' …' : '') }] : []),
             { icon: 'report', text: t('La fiche technique, la santé de la borne et les journaux'), detail: t('Ce qu’envoie « Envoyer un rapport » de la fiche technique') },
           ];
-      what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: ctx.threads && !state.anonymous ? t('Votre pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis') : t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
+      what.push({ icon: 'lock', text: t('Chiffré pour les développeurs, anonymisé'), detail: ctx.threads && !state.anonymous ? t('Ton pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis') : t('Ni ton nom, ni le nom du PC, ni adresse IP, ni noms d’amis'), tone: 'info' });
       const sections: Built['sections'] = [{ rows: head }];
       if (result === 'sent') sections.push({ rows: [{ icon: 'check', text: t('Rapport envoyé aux développeurs'), detail: box.files.length ? tn(box.files.length, 'Chiffré, avec {n} fichier joint : seuls les développeurs peuvent le lire. Ils vont l’examiner.', 'Chiffré, avec {n} fichiers joints : seuls les développeurs peuvent le lire. Ils vont l’examiner.') : t('Chiffré : seuls les développeurs peuvent le lire. Ils vont l’examiner.'), tone: 'ok', badges: [t('✓ Envoyé')] }] });
       else if (result === 'queued') sections.push({ rows: [{ icon: 'clock', text: t('Envoi en attente'), detail: t('La borne n’est pas en ligne : il partira tout seul dès qu’elle le sera'), tone: 'info', badges: [t('En attente')] }] });
@@ -725,7 +725,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         const ready = !sending && (!wanted || Boolean(text) || box.files.length > 0);
         actions.push({
           label: !report.notified ? t('Envoyer le rapport') : text || !box.files.length ? t('Envoyer ma description') : t('Envoyer mes fichiers'),
-          detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décrivez d’abord ce qui s’est passé, ou joignez un fichier'),
+          detail: sending ? t('Envoi en cours…') : ready ? t('Aux développeurs · chiffré, anonymisé') : t('Indisponible : décris d’abord ce qui s’est passé, ou joins un fichier'),
           icon: 'upload',
           tone: ready ? 'ok' : 'quiet',
           key: 'devreport:send',
@@ -734,7 +734,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
         });
         actions.push({
           label: t('Décrire ce qui s’est passé'),
-          detail: text ? `« ${text.length > 60 ? `${text.slice(0, 60)}…` : text} »` : report.needsText ? t('À écrire : le diagnostic ne voit rien, dites ce qui ne va pas') : t('Facultatif : ce que vous faisiez, depuis quand, ce que vous avez essayé'),
+          detail: text ? `« ${text.length > 60 ? `${text.slice(0, 60)}…` : text} »` : report.needsText ? t('À écrire : le diagnostic ne voit rien, dis ce qui ne va pas') : t('Facultatif : ce que tu faisais, depuis quand, ce que tu as essayé'),
           icon: 'edit',
           key: 'devreport:text',
           ...(wanted && !text ? { attention: true } : {}),
@@ -784,7 +784,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
             {
               icon: 'lock',
               text: t('Chiffré pour l’équipe, anonymisé'),
-              detail: ctx.threads && !state.anonymous ? t('Votre pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus') : t('Ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus'),
+              detail: ctx.threads && !state.anonymous ? t('Ton pseudo seulement : ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus') : t('Ni ton nom, ni le nom du PC, ni adresse IP, ni noms d’amis ; un même plantage une fois par jour au plus'),
               tone: 'info',
             },
           ],
@@ -817,7 +817,7 @@ export function createFeedbackMenu(ctx: FeedbackMenuContext) {
     borne: () => state.borne,
     detail: () => {
       const n = ctx.service.list().length;
-      return n ? tn(n, 'Votez et proposez · {n} proposition', 'Votez et proposez · {n} propositions') : t('Votez pour les idées des joueurs, proposez les vôtres, signalez un problème');
+      return n ? tn(n, 'Vote et propose · {n} proposition', 'Vote et propose · {n} propositions') : t('Vote pour les idées des joueurs, propose les tiennes, signale un problème');
     },
     changed,
   };

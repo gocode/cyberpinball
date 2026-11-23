@@ -19,12 +19,12 @@ export const messages: Record<string, string> = {
   'Cette table suit de nouveau la position générale de la configuration « {name} ».': 'This table follows the general position of the “{name}” configuration again.',
   'Cette table n’a pas de position à elle : elle suit déjà la position générale.': 'This table has no position of its own: it already follows the general position.',
   'Un seul écran branché.': 'Only one screen connected.',
-  'DMD masqué : affichez-le d’abord (ligne « DMD »).': 'DMD hidden: show it first (“DMD” line).',
+  'DMD masqué : affiche-le d’abord (ligne « DMD »).': 'DMD hidden: show it first (“DMD” line).',
   masqué: 'hidden',
   affiché: 'shown',
   'Abandonner les changements': 'Discard the changes',
   'Continuer le réglage': 'Keep adjusting',
-  'DMD sur l’écran {n} : relâchez pour l’y laisser.': 'DMD on screen {n}: release to leave it there.',
+  'DMD sur l’écran {n} : relâche pour l’y laisser.': 'DMD on screen {n}: release to leave it there.',
   '{previous} / {next} : choisir · {confirm} : valider · {exit} : continuer le réglage': '{previous} / {next}: choose · {confirm}: confirm · {exit}: keep adjusting',
   '{previous} / {next} : réduire ou agrandir (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler': '{previous} / {next}: shrink or enlarge (hold to go faster) · {confirm}: confirm · {exit}: cancel',
   '{previous} / {next} : gauche, droite · {up} / {down} : haut, bas (maintenir pour aller vite) · {confirm} : valider · {exit} : annuler':
@@ -36,7 +36,7 @@ export const messages: Record<string, string> = {
   'Position du DMD · réglée pour cette table': 'DMD position · set for this table',
   'Position du DMD · position générale': 'DMD position · general position',
   'La position du DMD a changé sans être enregistrée.': 'The DMD position changed and hasn’t been saved.',
-  'Souris : tirez le DMD pour le déplacer, jusque sur un autre écran ; tirez un coin pour le redimensionner ; Alt maintenu : sans aimantation.':
+  'Souris : tire le DMD pour le déplacer, jusque sur un autre écran ; tire un coin pour le redimensionner ; Alt maintenu : sans aimantation.':
     'Mouse: drag the DMD to move it, even onto another screen; drag a corner to resize it; hold Alt: no snapping.',
   'DMD masqué · {width} × {height}': 'DMD hidden · {width} × {height}',
   'DMD · {width} × {height} en {x}, {y}': 'DMD · {width} × {height} at {x}, {y}',
@@ -55,7 +55,7 @@ export const messages: Record<string, string> = {
   'Revenir à la place automatique': 'Back to the automatic position',
   'Cette table reprend la place automatique du DMD sur la roue.': 'This table is back to the automatic DMD position on the wheel.',
   'Cette table suit déjà la place automatique.': 'This table already follows the automatic position.',
-  'DMD masqué : affichez-le d’abord (ligne « DMD sur la roue »).': 'DMD hidden: show it first (“DMD on the wheel” line).',
+  'DMD masqué : affiche-le d’abord (ligne « DMD sur la roue »).': 'DMD hidden: show it first (“DMD on the wheel” line).',
   'DMD masqué sur la roue': 'DMD hidden on the wheel',
   'Enregistré pour cette table : la roue le montre dès maintenant.': 'Saved for this table: the wheel shows it right away.',
   'Rien à garder : c’est la place automatique, la table la suit.': 'Nothing to keep: this is the automatic position, the table follows it.',
@@ -78,9 +78,9 @@ export const messages: Record<string, string> = {
   // packages/core/src/dmdplace.ts, app/src/in-game-menu.ts : Vision 3D en partie
   'Recentrer la vue 3D': 'Recenter the 3D view',
   'Intensité de la vue 3D': '3D view intensity',
-  'Intensité de la vue 3D : {v}. Bougez la tête pour juger ; Start pour la suivante.': '3D view intensity: {v}. Move your head to judge; Start for the next one.',
-  'Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.': '3D view recentered: your playing position is measured again for one second, stay in place.',
-  'Le capteur de la Vision 3D ne répond pas : voyez le journal de Cyber Pinball.': 'The 3D vision sensor is not responding: see the Cyber Pinball log.',
+  'Intensité de la vue 3D : {v}. Bouge la tête pour juger ; Start pour la suivante.': '3D view intensity: {v}. Move your head to judge; Start for the next one.',
+  'Vue 3D recentrée : ta position de jeu est remesurée pendant une seconde, reste en place.': '3D view recentered: your playing position is measured again for one second, stay in place.',
+  'Le capteur de la Vision 3D ne répond pas : vois le journal de Cyber Pinball.': 'The 3D vision sensor is not responding: see the Cyber Pinball log.',
   'Vision 3D : aucune tête devant le capteur pour l’instant.': '3D vision: no head in front of the sensor yet.',
-  'Vision 3D : le capteur démarre, réessayez dans un instant.': '3D vision: the sensor is starting, try again in a moment.',
+  'Vision 3D : le capteur démarre, réessaie dans un instant.': '3D vision: the sensor is starting, try again in a moment.',
 };

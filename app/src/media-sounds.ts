@@ -130,7 +130,7 @@ export function createTableSounds(ctx: TableSoundsContext) {
     return {
       heading: t('{label} : sons de la table', { label: info.label }),
       subheading: s.table.title,
-      lead: t('Les sons que la table a déjà, et les vidéos qui ont du son, rangés par dossier. Choisissez un dossier, puis écoutez : le son de la carte choisie se joue.'),
+      lead: t('Les sons que la table a déjà, et les vidéos qui ont du son, rangés par dossier. Choisis un dossier, puis écoute : le son de la carte choisie se joue.'),
       sections: rows.length ? [{ rows }] : [],
       actions,
       back,

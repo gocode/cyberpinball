@@ -106,7 +106,7 @@ export function createPlaceTaken(host: PlaceTakenHost): PlaceTakenService {
         who: p.rival.name,
         player: p.rival.key,
         subject: p.title,
-        extra: p.period === 'today' ? tLater('{their} contre vos {mine} · vous êtes {rank}ᵉ du jour', params) : tLater('{their} contre vos {mine} · vous êtes {rank}ᵉ', params),
+        extra: p.period === 'today' ? tLater('{their} contre tes {mine} · tu es {rank}ᵉ du jour', params) : tLater('{their} contre tes {mine} · tu es {rank}ᵉ', params),
         place: { rank: p.mine.rank, of: p.players },
       });
       host.log(`Place prise : ${p.rival.name} passe devant sur ${p.title} (${p.period === 'today' ? 'jour' : 'tout temps'}, ${p.rival.score} contre ${p.mine.score}).`); // i18n-ignore : journal
@@ -147,7 +147,7 @@ export function createPlaceTaken(host: PlaceTakenHost): PlaceTakenService {
     if (!table || !ref) return {};
     const local = host.daily.localFor({ ...table, title: ref.title });
     if (local.state === 'missing') return { gone: t('Table absente de cette borne') };
-    if (local.state === 'other') return { gone: t('Vous n’avez plus cette version de la table') };
+    if (local.state === 'other') return { gone: t('Tu n’as plus cette version de la table') };
     if (local.state === 'pending') return { status: t('Version de la table en calcul') };
     const entry = local.table;
     const still = off() ? undefined : stillTaken(host.daily.input(), ref, now());

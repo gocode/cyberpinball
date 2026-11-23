@@ -407,7 +407,7 @@ export function resolveReturn(j: Pick<DownloadJob, 'back' | 'source'>, world: Re
     case 'table-sheet':
       return world.hasTable(back.table) ? { to: back } : friendBack(t('La table n’est plus sur la borne.'));
     case 'friend-library':
-      return world.hasFriend(back.friend) ? { to: back } : { to: { screen: 'downloads' }, lost: t('{name} n’est plus dans vos amis.', { name: world.friendName?.(back.friend) ?? t('Cet ami') }) };
+      return world.hasFriend(back.friend) ? { to: back } : { to: { screen: 'downloads' }, lost: t('{name} n’est plus dans tes amis.', { name: world.friendName?.(back.friend) ?? t('Cet ami') }) };
     default:
       return { to: back };
   }
@@ -424,7 +424,7 @@ export function returnLabel(back: DownloadReturn, world: Pick<ReturnWorld, 'tabl
     case 'table-sheet':
       return t('Fiche · {table}', { table: table(back.table) });
     case 'friend-library':
-      return t('Bibliothèque de {name}', { name: world.friendName?.(back.friend) ?? t('votre ami') });
+      return t('Bibliothèque de {name}', { name: world.friendName?.(back.friend) ?? t('ton ami') });
     case 'wait-list':
       return t('Liste d’attente');
     case 'updates':

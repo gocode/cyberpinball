@@ -32,7 +32,7 @@ export function createFollowMenu(host: FollowMenuHost) {
       detail: link.purpose,
       icon: link.icon,
       key: `follow:${link.network}`,
-      qr: { url: link.url, title: t('{name} sur votre téléphone', { name: link.name }) },
+      qr: { url: link.url, title: t('{name} sur ton téléphone', { name: link.name }) },
       link: link.url,
       run: () => {
         if (!host.browse(link)) openCode(link, () => open(back, i));
@@ -42,7 +42,7 @@ export function createFollowMenu(host: FollowMenuHost) {
     return {
       heading: t('Nous suivre'),
       icon: 'globe',
-      lead: t('Tutoriels vidéo, nouveautés, réponses à vos questions : retrouvez Cyber Pinball ici. Start ouvre la page ; son QR code l’ouvre sur votre téléphone.'),
+      lead: t('Tutoriels vidéo, nouveautés, réponses à tes questions : retrouve Cyber Pinball ici. Start ouvre la page ; son QR code l’ouvre sur ton téléphone.'),
       sections: [],
       actions,
       back,
@@ -57,8 +57,8 @@ export function createFollowMenu(host: FollowMenuHost) {
       subheading: link.purpose,
       remote: { phase: 'offer' as const, qr: qrRows(link.url), url: link.url, title: '', line: '' },
       remoteWording: {
-        offer: t('{name} sur votre téléphone', { name: link.name }),
-        offerLines: [t('Visez ce code avec votre téléphone pour ouvrir la page.'), link.short],
+        offer: t('{name} sur ton téléphone', { name: link.name }),
+        offerLines: [t('Vise ce code avec ton téléphone pour ouvrir la page.'), link.short],
       },
       sections: [],
       actions: [{ label: t('Retour'), icon: 'back', run: back }],

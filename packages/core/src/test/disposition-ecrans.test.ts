@@ -40,7 +40,7 @@ const electron = process.platform === 'win32' ? electronPath() : undefined;
 
 test('disposition des écrans : le geste à la souris est dans la ligne d’aide, l’étiquette d’une zone est un texte de la page', () => {
   const wizard = fs.readFileSync(path.join(APP, 'src', 'wizard.ts'), 'utf8');
-  assert.match(wizard, /hint: panelHere \? '' : t\('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner'\)/);
+  assert.match(wizard, /hint: panelHere \? '' : t\('Tire une zone pour la déplacer, jusque sur un autre écran · tire un coin pour la redimensionner'\)/);
   const html = fs.readFileSync(path.join(APP, 'renderer', 'screen.html'), 'utf8');
   assert.doesNotMatch(html, /arrange-coach/, 'plus de bandeau posé par-dessus les écrans');
   const css = fs.readFileSync(path.join(APP, 'renderer', 'screen.css'), 'utf8');

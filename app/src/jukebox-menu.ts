@@ -317,7 +317,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   /** L'entrée du menu système : son détail résume la bibliothèque. */
   function detail(): string {
     const s = store();
-    if (!s.playlists.length) return t('Aucune playlist : importez-en une de YouTube, ou ajoutez vos fichiers');
+    if (!s.playlists.length) return t('Aucune playlist : importes-en une de YouTube, ou ajoute tes fichiers');
     const usage = jb.usage();
     return [tn(s.playlists.length, '{n} playlist', '{n} playlists'), tn(usage.entries, '{n} morceau', '{n} morceaux'), ...(usage.duration ? [formatTotalTime(usage.duration)] : []), ...(usage.bytes ? [t('{size} sur la borne', { size: formatSize(usage.bytes) })] : [])].join(' · ');
   }
@@ -389,7 +389,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       row.current = true;
       row.badges = [t('Choisie')];
     }
-    sections.push({ title: t('Playlists'), kind: 'jb-playlists', rows: rows.length ? rows : [{ text: t('Aucune playlist'), detail: t('Importez une playlist de YouTube, ou créez-en une pour y ajouter vos fichiers.'), tone: 'quiet', icon: 'jukebox' }] });
+    sections.push({ title: t('Playlists'), kind: 'jb-playlists', rows: rows.length ? rows : [{ text: t('Aucune playlist'), detail: t('Importe une playlist de YouTube, ou crées-en une pour y ajouter tes fichiers.'), tone: 'quiet', icon: 'jukebox' }] });
 
     // Les actions de la playlist choisie : les actions de l'écran, sous son nom.
     let actionsTitle: string | undefined;
@@ -429,7 +429,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     // Exit : le lecteur (ouverte de lui), ou le menu système (son raccourci).
     add({ label: from === 'player' && s.playlists.length ? t('Retour au lecteur') : t('Retour'), icon: 'back', key: 'back', run: back });
     return {
-      heading: t('Vos playlists'),
+      heading: t('Tes playlists'),
       subheading: s.playlists.length ? detail() : t('Gestion des playlists'),
       app: app(),
       variant: 'jukebox jukebox-manage',
@@ -448,9 +448,9 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       if (name === undefined) return open();
       const change = jb.apply(createPlaylist(store(), name, new Date()));
       if (!change.ok) return askName(name, change.reason);
-      flash = { text: t('Playlist « {name} » créée : importez-y de YouTube ou ajoutez vos fichiers.', { name: change.playlist.name }), tone: 'ok' };
+      flash = { text: t('Playlist « {name} » créée : importes-y de YouTube ou ajoute tes fichiers.', { name: change.playlist.name }), tone: 'ok' };
       open(change.playlist.id);
-    }, problem ?? t('Une playlist vide, à remplir de vos fichiers ou de morceaux YouTube.'));
+    }, problem ?? t('Une playlist vide, à remplir de tes fichiers ou de morceaux YouTube.'));
   }
 
   function askRename(id: string, value?: string, problem?: string): void {
@@ -534,7 +534,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       return {
         heading: t('Supprimer « {name} » ?', { name: p.name }),
         icon: 'trash',
-        lead: t('La playlist est retirée du Juke-box. Vos fichiers locaux et la playlist sur YouTube ne sont pas touchés.'),
+        lead: t('La playlist est retirée du Juke-box. Tes fichiers locaux et la playlist sur YouTube ne sont pas touchés.'),
         variant: 'jukebox jukebox-confirm', app: app(),
         sections: [{ rows: [{ text: p.name, detail: playlistFacts(p, jb.usage().playlists.get(p.id)), sub: playlistSecondLine(p), thumb: playlistImage(p.id) ?? 'music' }] }],
         actions,
@@ -623,7 +623,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
           { label: t('Tout télécharger'), icon: 'download', key: 'go', ...(blocker ? { tone: 'quiet' as const, detail: blocker } : {}), run: () => {
             if (blocker) return;
             const change = jb.downloadAll(id);
-            if (change.ok) flash = { text: tn(change.enqueue.length, '{n} morceau en téléchargement : suivez-les dans Téléchargements.', '{n} morceaux en téléchargement : suivez-les dans Téléchargements.'), tone: 'ok' };
+            if (change.ok) flash = { text: tn(change.enqueue.length, '{n} morceau en téléchargement : suis-les dans Téléchargements.', '{n} morceaux en téléchargement : suis-les dans Téléchargements.'), tone: 'ok' };
             open(id);
           } },
           { label: t('Annuler'), icon: 'close', key: 'cancel', run: toManage(id) },
@@ -731,7 +731,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         sections: [
           // Ce qui vient d'arriver (un morceau déplacé vers une autre playlist), en tête.
           ...(note ? [{ kind: 'jb-flash', rows: [{ text: note.text, tone: note.tone, icon: note.tone === 'ok' ? ('check' as const) : ('alert' as const) }] }] : []),
-          { title: t('Morceaux'), kind: 'jb-tracks', rows: rows.length ? rows : [{ text: t('Playlist vide'), detail: t('Importez de YouTube ou ajoutez vos fichiers.'), tone: 'quiet' }] },
+          { title: t('Morceaux'), kind: 'jb-tracks', rows: rows.length ? rows : [{ text: t('Playlist vide'), detail: t('Importe de YouTube ou ajoute tes fichiers.'), tone: 'quiet' }] },
         ],
         actions,
         back: toManage(id),
@@ -779,7 +779,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         heading: info.title,
         icon: 'edit',
         subheading: [info.artist, p.name].filter(Boolean).join(' · '),
-        lead: t('Votre correction l’emporte sur ce que dit YouTube ou le fichier, dans toutes les playlists où le morceau se trouve. Laissez un champ vide pour reprendre l’information d’origine.'),
+        lead: t('Ta correction l’emporte sur ce que dit YouTube ou le fichier, dans toutes les playlists où le morceau se trouve. Laisse un champ vide pour reprendre l’information d’origine.'),
         variant: 'jukebox jukebox-track', app: app(),
         sections: [
           ...(note ? [{ kind: 'jb-flash', rows: [{ text: note.text, tone: note.tone, icon: note.tone === 'ok' ? ('check' as const) : ('alert' as const) }] }] : []),
@@ -856,7 +856,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     ask(t('Corriger : {field}', { field: label }), label, v.info[name] ?? '', (value) => {
       if (value !== undefined) jb.commit(setCorrection(store(), songKey(v.track), { [name]: value }));
       openTrack(id, key, ['title', 'artist', 'album'].indexOf(name));
-    }, t('Laissez vide pour reprendre l’information de YouTube ou du fichier.'));
+    }, t('Laisse vide pour reprendre l’information de YouTube ou du fichier.'));
   }
 
   // ---------- Fichiers locaux ----------
@@ -892,7 +892,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         heading: t('Ajouter des fichiers'),
         icon: 'folder',
         subheading: p.name,
-        lead: desk ? t('L’explorateur de Windows s’ouvre : choisissez des fichiers, ou un dossier entier. Les fichiers sont lus à leur emplacement, rien n’est copié.') : t('Le sélecteur de fichiers s’ouvre : choisissez des fichiers, ou un dossier entier. Les fichiers sont lus à leur emplacement, rien n’est copié.'),
+        lead: desk ? t('L’explorateur de Windows s’ouvre : choisis des fichiers, ou un dossier entier. Les fichiers sont lus à leur emplacement, rien n’est copié.') : t('Le sélecteur de fichiers s’ouvre : choisis des fichiers, ou un dossier entier. Les fichiers sont lus à leur emplacement, rien n’est copié.'),
         variant: 'jukebox jukebox-files', app: app(),
         // Fichiers ou dossiers glissés sur la fenêtre (bureau) : relevés comme ceux qu'on choisit.
         drop: (paths) => void scanPaths(paths, paths.length === 1 ? 'folder' : 'files'),
@@ -992,7 +992,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const add = (a: Action) => actions.push(a) - 1;
       const rows: Row[] = [];
       const linkAt = add({ label: t('Taper ou coller un lien'), key: 'link', icon: 'link', run: () => askLink('', undefined, prefer) });
-      rows.push({ text: t('Taper ou coller un lien'), detail: t('Au clavier, on ne tape que l’identifiant de la playlist ; au téléphone, collez le lien entier'), icon: 'link', action: linkAt, pick: true });
+      rows.push({ text: t('Taper ou coller un lien'), detail: t('Au clavier, on ne tape que l’identifiant de la playlist ; au téléphone, colle le lien entier'), icon: 'link', action: linkAt, pick: true });
       if (account) {
         const mineReason = connected ? undefined : t('Compte YouTube pas connecté : « Compte YouTube », puis « Se connecter à YouTube »');
         const mineAt = add({ label: t('Mes playlists YouTube'), key: 'mine', icon: 'list', run: () => (mineReason ? undefined : openMine(prefer)), ...(mineReason ? quiet(mineReason) : {}) });
@@ -1009,7 +1009,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       return {
         heading: t('Importer de YouTube'),
         icon: 'jukebox',
-        subheading: t('YouTube → votre Juke-box'),
+        subheading: t('YouTube → ton Juke-box'),
         variant: 'jukebox jukebox-start',
         app: app(),
         sections,
@@ -1037,7 +1037,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         if (!link?.trim()) return host.account ? openImportStart(prefer) : open();
         startImport(link, 'prompt', prefer);
       },
-      problem ?? (phone ? t('Collez le lien sur le téléphone, puis Envoyer. Dans YouTube : Partager, puis Copier le lien.') : t('Tapez l’identifiant de la playlist (PL…, OLAK5uy_…), ou collez le lien entier avec Ctrl+V. Dans YouTube : Partager, puis Copier le lien.')),
+      problem ?? (phone ? t('Colle le lien sur le téléphone, puis Envoyer. Dans YouTube : Partager, puis Copier le lien.') : t('Tape l’identifiant de la playlist (PL…, OLAK5uy_…), ou colle le lien entier avec Ctrl+V. Dans YouTube : Partager, puis Copier le lien.')),
       {
         prefixes: [
           { label: t('Playlist'), text: JUKEBOX_LINK_PREFIXES.playlist },
@@ -1067,10 +1067,10 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     const state = account?.state();
     if (state?.signingIn) return t('Connexion en cours dans Microsoft Edge');
     if (state?.checking) return t('Vérification de la connexion…');
-    if (state?.connected) return t('Connecté : vos playlists privées, « J’aime » et « À regarder plus tard » sont accessibles');
+    if (state?.connected) return t('Connecté : tes playlists privées, « J’aime » et « À regarder plus tard » sont accessibles');
     const missing = account?.edgeMissing();
     if (missing) return missing;
-    return t('Pas connecté : vos playlists privées, « J’aime » et « À regarder plus tard » restent inaccessibles');
+    return t('Pas connecté : tes playlists privées, « J’aime » et « À regarder plus tard » restent inaccessibles');
   }
 
   /** Le compte YouTube : son état, la connexion dans Edge, ses playlists, la déconnexion. */
@@ -1096,15 +1096,15 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         signIn(t('Se reconnecter'), t('Rouvre Microsoft Edge, si YouTube ne reconnaît plus la connexion ou pour changer de compte'));
         add({ label: t('Se déconnecter'), icon: 'unlock', key: 'signout', detail: t('Efface la connexion gardée par Cyber Pinball (le profil d’Edge du Juke-box)'), run: () => void signOut() });
       } else {
-        signIn(t('Se connecter à YouTube'), t('Microsoft Edge s’ouvre sur l’écran des navigateurs : connectez-vous, puis fermez-le'), 'ok');
+        signIn(t('Se connecter à YouTube'), t('Microsoft Edge s’ouvre sur l’écran des navigateurs : connecte-toi, puis ferme-le'), 'ok');
         add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
       }
       add({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       return {
         heading: t('Compte YouTube'),
         icon: 'account',
-        subheading: t('Vos playlists, privées comprises'),
-        lead: t('La connexion se fait dans Microsoft Edge, comme sur n’importe quel PC : Cyber Pinball ne voit jamais votre mot de passe et ne garde que la connexion.'),
+        subheading: t('Tes playlists, privées comprises'),
+        lead: t('La connexion se fait dans Microsoft Edge, comme sur n’importe quel PC : Cyber Pinball ne voit jamais ton mot de passe et ne garde que la connexion.'),
         variant: 'jukebox jukebox-account',
         app: app(t('Compte YouTube')),
         sections,
@@ -1152,7 +1152,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         sections.push({
           kind: 'jb-summary',
           rows: [
-            { text: where, detail: t('Connectez-vous à YouTube avec votre compte Google, puis fermez Edge.'), icon: 'account', tone: 'ok' },
+            { text: where, detail: t('Connecte-toi à YouTube avec ton compte Google, puis ferme Edge.'), icon: 'account', tone: 'ok' },
             ...(phone ? [] : [{ text: t('Au téléphone'), detail: t('Le pavé tactile est la souris d’Edge, le clavier y tape.'), icon: 'phone' as const }]),
             { text: t('Avec les boutons de la borne'), detail: t('Flippers : champ précédent ou suivant · Start : Entrée · Exit : fermer Edge'), icon: 'gamepad' },
           ],
@@ -1170,7 +1170,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         sections,
         actions,
         back: finish,
-        ...(!closing && host.remoteBar?.() ? { remote: host.remoteBar()!, remoteWording: { offer: t('Scannez pour piloter Edge avec votre téléphone'), paired: [t('Pavé tactile : la souris d’Edge · Clavier : il tape dans Edge')] } } : {}),
+        ...(!closing && host.remoteBar?.() ? { remote: host.remoteBar()!, remoteWording: { offer: t('Scanne pour piloter Edge avec ton téléphone'), paired: [t('Pavé tactile : la souris d’Edge · Clavier : il tape dans Edge')] } } : {}),
       };
     };
     display(build, 0);
@@ -1193,7 +1193,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     const build = (): Built => {
       const actions: Action[] = [];
       const sections: Section[] = [];
-      if (state.phase === 'loading') sections.push({ kind: 'jb-wait', rows: [{ text: t('Lecture de vos playlists…'), detail: t('Avec la connexion gardée, en lecture seule. Rien n’est téléchargé.'), icon: 'refresh', progress: { busy: true } }] });
+      if (state.phase === 'loading') sections.push({ kind: 'jb-wait', rows: [{ text: t('Lecture de tes playlists…'), detail: t('Avec la connexion gardée, en lecture seule. Rien n’est téléchargé.'), icon: 'refresh', progress: { busy: true } }] });
       else if (state.phase === 'failed') {
         sections.push({ kind: 'jb-flash', rows: [{ text: t('Lecture impossible'), detail: state.reason, tone: 'warning', icon: 'alert' }] });
         actions.push({ label: t('Réessayer'), icon: 'refresh', key: 'retry', run: () => openMine(prefer, backTo) });
@@ -1308,8 +1308,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       current = undefined;
       open(state?.result?.playlist ?? chosen);
     };
-    const linkRow: Row = { text: state?.link ?? '', detail: state?.from === 'recuperer' ? t('Lien reçu de « Récupérer »') : state?.from === 'compte' ? t('Playlist de votre compte YouTube') : host.phone?.() ? t('Lien reçu du téléphone, ou tapé au clavier') : t('Lien tapé ou collé au clavier'), icon: 'link' };
-    const base = { heading: t('Importer de YouTube'), icon: 'jukebox' as const, subheading: t('YouTube → votre Juke-box'), back: backTo };
+    const linkRow: Row = { text: state?.link ?? '', detail: state?.from === 'recuperer' ? t('Lien reçu de « Récupérer »') : state?.from === 'compte' ? t('Playlist de ton compte YouTube') : host.phone?.() ? t('Lien reçu du téléphone, ou tapé au clavier') : t('Lien tapé ou collé au clavier'), icon: 'link' };
+    const base = { heading: t('Importer de YouTube'), icon: 'jukebox' as const, subheading: t('YouTube → ton Juke-box'), back: backTo };
     if (!state) return { ...base, sections: [], actions: [{ label: t('Retour aux playlists'), icon: 'back', key: 'back', run: backTo }] };
 
     if (state.phase === 'analyzing') {
@@ -1567,7 +1567,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       heading: t('Import lancé'),
       icon: 'jukebox',
       subheading: p?.name,
-      lead: ready === views.length ? t('Tout est prêt.') : t('Les morceaux prêts se jouent déjà ; les autres arrivent par la file des téléchargements, même si vous quittez cet écran.'),
+      lead: ready === views.length ? t('Tout est prêt.') : t('Les morceaux prêts se jouent déjà ; les autres arrivent par la file des téléchargements, même si tu quittes cet écran.'),
       variant: 'jukebox jukebox-import jukebox-done', app: app(),
       sections,
       actions,

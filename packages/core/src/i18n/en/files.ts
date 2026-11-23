@@ -3,10 +3,10 @@
 export const messages: Record<string, string> = {
   // packages/core/src/fileerror.ts, app/src/library.ts (runAction)
   'Opération impossible': 'Could not do that',
-  '« {name} » est ouvert dans {programs} : fermez-le, puis réessayez.': '“{name}” is open in {programs}: close it, then try again.',
-  '« {name} » est ouvert par un autre programme (VPX, un lecteur vidéo, l’Explorateur de fichiers…) : fermez-le, puis réessayez.':
+  '« {name} » est ouvert dans {programs} : ferme-le, puis réessaie.': '“{name}” is open in {programs}: close it, then try again.',
+  '« {name} » est ouvert par un autre programme (VPX, un lecteur vidéo, l’Explorateur de fichiers…) : ferme-le, puis réessaie.':
     '“{name}” is open in another program (VPX, a video player, File Explorer…): close it, then try again.',
-  'Le disque est plein : libérez de la place, puis réessayez.': 'The disk is full: free some space, then try again.',
+  'Le disque est plein : libère de la place, puis réessaie.': 'The disk is full: free some space, then try again.',
   '« {name} » n’existe plus : la liste va se mettre à jour.': '“{name}” no longer exists: the list will update.',
   'L’opération n’a pas pu se faire : {message}': 'That could not be done: {message}',
   // packages/core/src/downloads.ts
@@ -56,14 +56,14 @@ export const messages: Record<string, string> = {
   'Dossier illisible ({error}).': 'Unreadable folder ({error}).',
 
   // app/src/file-picker.ts
-  'Introuvable désormais : {files}. Choisissez de nouveau.': 'No longer found: {files}. Choose again.',
+  'Introuvable désormais : {files}. Choisis de nouveau.': 'No longer found: {files}. Choose again.',
   Emplacements: 'Places',
   'Dossier · {date}': 'Folder · {date}',
-  'Choisissez un autre emplacement, ou « Réessayer » une fois la clé rebranchée.': 'Choose another place, or “Try again” once the drive is plugged back in.',
+  'Choisis un autre emplacement, ou « Réessayer » une fois la clé rebranchée.': 'Choose another place, or “Try again” once the drive is plugged back in.',
   '{n} fichier caché : il ne convient pas ici. « Afficher tous les fichiers » le montre.': '{n} file hidden: it does not fit here. “Show all files” shows it.',
   '{n} fichiers cachés : ils ne conviennent pas ici. « Afficher tous les fichiers » les montre.': '{n} files hidden: they do not fit here. “Show all files” shows them.',
   'Aucun téléchargement pour le moment': 'No downloads yet',
-  'Ce que Cyber Pinball télécharge est gardé ici. Essayez Téléchargements de Windows, une clé USB…': 'What Cyber Pinball downloads is kept here. Try Windows Downloads, a USB drive…',
+  'Ce que Cyber Pinball télécharge est gardé ici. Essaie Téléchargements de Windows, une clé USB…': 'What Cyber Pinball downloads is kept here. Try Windows Downloads, a USB drive…',
   'Aucun sous-dossier': 'No subfolders',
   'Ce dossier est vide': 'This folder is empty',
   '{n} autre fichier caché : il ne convient pas ici': '{n} other file hidden: it does not fit here',
@@ -71,7 +71,7 @@ export const messages: Record<string, string> = {
   'Prendre le fichier choisi': 'Take the chosen file',
   'Prendre les {n} fichiers choisis': 'Take the {n} chosen files',
   'Prendre les fichiers choisis': 'Take the chosen files',
-  'Choisissez au moins un fichier : Start le coche': 'Choose at least one file: Start ticks it',
+  'Choisis au moins un fichier : Start le coche': 'Choose at least one file: Start ticks it',
   'Prendre ce dossier entier': 'Take this whole folder',
   '« {name} » et ses sous-dossiers': '“{name}” and its subfolders',
   'Dossier parent': 'Parent folder',
@@ -112,7 +112,7 @@ export const messages: Record<string, string> = {
   '{n} fichiers récents': '{n} recent files',
   'Tout vider': 'Empty all',
   '{summary} : corbeille de Cyber Pinball': '{summary}: Cyber Pinball trash',
-  'Tout ce que Cyber Pinball a téléchargé, gardé pour le reprendre sans le télécharger de nouveau. Ce que vous retirez part dans la corbeille de Cyber Pinball.':
+  'Tout ce que Cyber Pinball a téléchargé, gardé pour le reprendre sans le télécharger de nouveau. Ce que tu retires part dans la corbeille de Cyber Pinball.':
     'Everything Cyber Pinball has downloaded, kept so you can reuse it without downloading it again. What you remove goes to the Cyber Pinball trash.',
   'Fichier introuvable': 'File not found',
   'Déplacé ou effacé depuis.': 'Moved or deleted since.',
@@ -146,7 +146,7 @@ export const messages: Record<string, string> = {
   '{n} ROM absentes : téléchargements, clé USB ou ce PC': '{n} missing ROMs: downloads, USB drive or this PC',
   'Reprendre un fichier téléchargé': 'Reuse a downloaded file',
   'Choisir des fichiers…': 'Choose files…',
-  'Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici': 'USB drive, Downloads, Desktop, disks; or drag them here',
+  'Clé USB, Téléchargements, Bureau, disques ; ou glisse-les ici': 'USB drive, Downloads, Desktop, disks; or drag them here',
   'Choisir un dossier…': 'Choose a folder…',
   'Tout le dossier d’une table, depuis une clé USB ou un disque': 'A table’s whole folder, from a USB drive or a disk',
   'Téléchargements de Cyber Pinball : rien pour le moment': 'Cyber Pinball downloads: nothing yet',
@@ -160,7 +160,7 @@ export const messages: Record<string, string> = {
   'Ajout de ce qu’il manque à {table}': 'Adding what {table} is missing',
   'Choisir des fichiers': 'Choose files',
   'Ajouter une page : choisir un fichier…': 'Add a page: choose a file…',
-  'Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici': 'Cyber Pinball downloads, USB drive, this PC; or drag it here',
+  'Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glisse-le ici': 'Cyber Pinball downloads, USB drive, this PC; or drag it here',
   'Choisir un fichier…': 'Choose a file…',
   'Remplacer : choisir un fichier…': 'Replace: choose a file…',
   '{label} de {table}': '{label} of {table}',

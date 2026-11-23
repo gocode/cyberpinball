@@ -150,14 +150,14 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
         const missing = game.instant.max - game.players.filter((x) => x.state === 'accepted').length;
         return { text: t('{name} a rejoint la partie', { name }), detail: missing > 0 ? tn(missing, 'Encore {n} joueur et elle part', 'Encore {n} joueurs et elle part') : t('Complète : départ pour tout le monde'), tone: 'ok', icon: 'check' };
       }
-      if (p.state === 'accepted') return { text: t('{name} a accepté votre invitation', { name }), detail: t('Lancez la partie quand vous voulez'), tone: 'ok', icon: 'check' };
-      const freed = t('Sa place est libérée : invitez un autre ami, ou changez de table');
+      if (p.state === 'accepted') return { text: t('{name} a accepté ton invitation', { name }), detail: t('Lance la partie quand tu veux'), tone: 'ok', icon: 'check' };
+      const freed = t('Sa place est libérée : invite un autre ami, ou change de table');
       const text =
         p.state === 'busy' ? t('{name} est occupé pour l’instant', { name })
         : p.state === 'expired' ? (p.offline ? t('{name} est passé hors ligne : invitation retirée', { name }) : t('Pas de réponse de {name} en deux minutes', { name }))
         : p.match === 'missing' ? t('{name} n’a pas cette table', { name })
         : p.match === 'other-version' ? t('{name} n’a pas la même version', { name })
-        : t('{name} a refusé votre invitation', { name });
+        : t('{name} a refusé ton invitation', { name });
       return { text, detail: freed, tone: 'warning', icon: 'alert' };
     });
   }
@@ -165,11 +165,11 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   function playerRows(game: LiveGame): Row[] {
     return game.players.map((p) => {
       // Une borne en retard (pas de départ automatique ni de score en direct chez elle) : dit tout de suite, pas pris pour un bug.
-      // Partie instantanée : une borne d'avant ne la voit même pas ; sans version connue, c'est qu'on ne la sait pas encore (la salle de l'hôte arrive).
+      // Partie en direct : une borne d'avant ne la voit même pas ; sans version connue, c'est qu'on ne la sait pas encore (la salle de l'hôte arrive).
       const behind = p.key !== myKey() && p.state !== 'invited' && p.state !== 'declined' && liveBehind(p) && !(game.instant && p.proto === undefined);
-      const state = p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre') : livePlayerStateLabel(p, game.table.balls);
+      const state = p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour te rejoindre') : livePlayerStateLabel(p, game.table.balls);
       return {
-        text: p.key === myKey() ? t('{name} (vous)', { name: p.name }) : p.name,
+        text: p.key === myKey() ? t('{name} (toi)', { name: p.name }) : p.name,
         ...face(p.key, p.name),
         detail: behind ? `${state} · ${liveBehindLabel(p)}` : state,
         icon: p.host ? 'gamepad' : 'friend-list',
@@ -231,14 +231,14 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   /** Mon nombre de billes par partie, quand il diffère de celui de celui qui invite : rien sinon. */
   const ballsRow = (mine: number | undefined, theirs: number | undefined): Row[] =>
     liveOtherBalls({ balls: mine }, theirs)
-      ? [{ text: liveBallsAgainst(mine!, theirs!), detail: t('Votre score reste hors classement : réglez votre table sur {n} billes pour être classé.', { n: theirs! }), tone: 'warning', icon: 'rules' }]
+      ? [{ text: liveBallsAgainst(mine!, theirs!), detail: t('Ton score reste hors classement : règle ta table sur {n} billes pour être classé.', { n: theirs! }), tone: 'warning', icon: 'rules' }]
       : [];
 
   /** Pas la même version que celui qui invite : la partie ne se joue pas (décision du 30/10/2026), il récupère la sienne. */
   const otherVersionRow = (name: string, scriptDiffers: boolean | undefined): Row =>
     scriptDiffers
-      ? { text: t('Même table, autre script'), detail: t('Un .vbs posé à côté de votre table remplace son script : la partie demande le même script que {name}.', { name }), tone: 'warning', icon: 'alert' }
-      : { text: t('Autre version de cette table'), detail: t('La partie se joue sur la même version pour tous : récupérez celle de {name}.', { name }), tone: 'warning', icon: 'alert' };
+      ? { text: t('Même table, autre script'), detail: t('Un .vbs posé à côté de ta table remplace son script : la partie demande le même script que {name}.', { name }), tone: 'warning', icon: 'alert' }
+      : { text: t('Autre version de cette table'), detail: t('La partie se joue sur la même version pour tous : récupère celle de {name}.', { name }), tone: 'warning', icon: 'alert' };
 
   // ---------- La table, chez mes invités ----------
 
@@ -301,7 +301,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
 
   function friendAction(key: string, back: () => void): Action {
     const base = { label: t('Inviter à une partie en direct'), icon: 'gamepad' as const };
-    if (!host.net.online(key)) return { ...base, detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne : invitez-le quand il sera connecté'), tone: 'quiet', run: () => undefined };
+    if (!host.net.online(key)) return { ...base, detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne : invite-le quand il sera connecté'), tone: 'quiet', run: () => undefined };
     const detail = playingNow(key) ? t('En partie : il recevra une notification discrète sur sa table') : t('Chacun sur sa borne, au même moment');
     return { ...base, detail, tone: 'ok', run: () => inviteFriend(key, back) };
   }
@@ -348,7 +348,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       heading: t('Jouer avec un ami'),
       icon: 'gamepad',
       subheading: table.title,
-      lead: t('Choisissez qui inviter : en tête, ceux qui ont cette table dans la même version. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.'),
+      lead: t('Choisis qui inviter : en tête, ceux qui ont cette table dans la même version. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.'),
       sections,
       actions,
       back,
@@ -409,7 +409,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const sections: Section[] = [];
     if (!choices.length) sections.push({ rows: [{ text: t('Aucune table sur cette borne'), tone: 'info' }] });
     if (same.length) sections.push({ title: t('Même version chez tous ({n})', { n: same.length }), rows: same.map(row) });
-    else if (choices.length && !unsure.length) sections.push({ rows: [{ text: t('Aucune table en commun dans la même version'), detail: t('Récupérez la version d’un ami (Start sur une table grisée), ou laissez-le prendre la vôtre dans votre bibliothèque partagée.'), tone: 'info' }] });
+    else if (choices.length && !unsure.length) sections.push({ rows: [{ text: t('Aucune table en commun dans la même version'), detail: t('Récupère la version d’un ami (Start sur une table grisée), ou laisse-le prendre la tienne dans ta bibliothèque partagée.'), tone: 'info' }] });
     if (unsure.length) sections.push({ title: t('À vérifier ({n})', { n: unsure.length }), rows: unsure.map(row) });
     if (blocked.length) sections.push({ title: t('Indisponibles ({n})', { n: blocked.length }), rows: blocked.map(row) });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
@@ -418,8 +418,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       icon: 'gamepad',
       lead:
         keys.length > 1
-          ? t('Choisissez la table : en tête, celles que {names} ont tous dans la même version que vous. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { names: plain })
-          : t('Choisissez la table : en tête, celles que {name} a dans la même version que vous. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { name: plain }),
+          ? t('Choisis la table : en tête, celles que {names} ont tous dans la même version que toi. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { names: plain })
+          : t('Choisis la table : en tête, celles que {name} a dans la même version que toi. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { name: plain }),
       sections,
       actions,
       back,
@@ -463,7 +463,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   function openGame(at?: number): void {
     // Compte à rebours, et salon d'un invité : le curseur sur « Retour », un Start par mégarde ne quitte pas la partie.
     const game = games.current();
-    // Partie instantanée, même pour l'hôte : « Annuler » est la première action, jamais sous le curseur à l'ouverture.
+    // Partie en direct, même pour l'hôte : « Annuler » est la première action, jamais sous le curseur à l'ouverture.
     const safe = game?.phase === 'countdown' || (game?.phase === 'gathering' && (game.host !== myKey() || !!game.instant));
     host.library.openCustom(buildGame, at ?? (safe ? Number.MAX_SAFE_INTEGER : undefined));
   }
@@ -483,7 +483,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     if (hosting) {
       actions.push({
         label: t('Lancer la partie'),
-        detail: canStartGame(game) ? tn(accepted, 'Départ dans 5 s pour vous et {n} ami', 'Départ dans 5 s pour vous et {n} amis') : t('Dès qu’un ami a accepté'),
+        detail: canStartGame(game) ? tn(accepted, 'Départ dans 5 s pour toi et {n} ami', 'Départ dans 5 s pour toi et {n} amis') : t('Dès qu’un ami a accepté'),
         icon: 'start',
         tone: canStartGame(game) ? 'ok' : undefined,
         attention: canStartGame(game),
@@ -501,14 +501,14 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     } else {
       actions.push({ label: t('Quitter la partie'), icon: 'close', run: () => { games.leave(); back(); } });
     }
-    actions.push({ label: t('Retour'), detail: hosting ? t('Le salon reste ouvert : « Mes amis » y ramène') : t('Vous restez dans la partie'), icon: 'back', run: back });
+    actions.push({ label: t('Retour'), detail: hosting ? t('Le salon reste ouvert : « Mes amis » y ramène') : t('Tu restes dans la partie'), icon: 'back', run: back });
     const hostPlayer = game.players.find((p) => p.host);
     const myself = game.players.find((p) => p.key === myKey());
     return {
-      heading: t('Partie en direct'),
+      heading: t('Partie entre amis'),
       icon: 'gamepad',
       subheading: game.title,
-      lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
+      lead: hosting ? t('Lance quand tes amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
         ...flashSections(),
         ...(hosting && answerRows(game).length ? [{ rows: answerRows(game) }] : []),
@@ -521,7 +521,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   }
 
   /**
-   * Le salon d'une partie instantanée (instantgames.ts) : ouverte à tous, elle part d'elle-même dès
+   * Le salon d'une partie en direct (instantgames.ts) : ouverte à tous, elle part d'elle-même dès
    * qu'elle est complète ; les places libres se voient, l'hôte peut l'annuler, un joueur la quitter.
    */
   function buildInstantRoom(game: LiveGame, back: () => void): Built {
@@ -532,7 +532,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const hostPlayer = game.players.find((p) => p.host);
     const pending = games.joinPending();
     const waitRow: Row = pending
-      ? { text: t('Connexion à la borne de {name}…', { name: hostPlayer?.name ?? '?' }), detail: t('Vous entrez dans la partie dès qu’elle répond'), tone: 'info', icon: 'network', progress: { tone: 'info', busy: true } }
+      ? { text: t('Connexion à la borne de {name}…', { name: hostPlayer?.name ?? '?' }), detail: t('Tu entres dans la partie dès qu’elle répond'), tone: 'info', icon: 'network', progress: { tone: 'info', busy: true } }
       : free > 0
         ? { text: tn(free, 'En attente de {n} joueur', 'En attente de {n} joueurs'), detail: hosting ? t('Annoncée à tous les joueurs en ligne : elle part d’elle-même dès qu’elle est complète') : t('Elle part d’elle-même dès qu’elle est complète'), tone: 'info', icon: 'clock', progress: { tone: 'info', busy: true } }
         : { text: t('Complète : départ pour tout le monde'), tone: 'ok', icon: 'check' };
@@ -540,11 +540,11 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const actions: Action[] = [
       hosting
         ? { label: t('Annuler la partie'), detail: t('Elle disparaît de la liste ; ceux qui l’ont rejointe en sont prévenus'), icon: 'close', run: () => { games.leave(); back(); } }
-        : { label: t('Quitter la partie'), detail: t('Votre place se libère pour un autre joueur'), icon: 'close', run: () => { games.leave(); back(); } },
-      { label: t('Retour'), detail: t('Vous restez dans la partie : le départ vous ramène ici'), icon: 'back', run: back },
+        : { label: t('Quitter la partie'), detail: t('Ta place se libère pour un autre joueur'), icon: 'close', run: () => { games.leave(); back(); } },
+      { label: t('Retour'), detail: t('Tu restes dans la partie : le départ te ramène ici'), icon: 'back', run: back },
     ];
     return {
-      heading: t('Partie instantanée'),
+      heading: t('Partie en direct'),
       icon: 'rocket',
       subheading: game.title,
       lead: hosting ? t('Ouverte à tous les joueurs en ligne qui ont cette version de la table. Chacun joue sur sa borne, au même moment.') : t('Ouverte par {name}. Chacun joue sur sa borne, au même moment.', { name: hostPlayer?.name ?? '?' }),
@@ -625,7 +625,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
    */
   function resultRow(p: LivePlayer, place: number | undefined, compared: boolean, hostBalls: number | undefined): Row {
     const score = liveScore(p);
-    const who = p.key === myKey() ? t('{name} (vous)', { name: p.name }) : p.name;
+    const who = p.key === myKey() ? t('{name} (toi)', { name: p.name }) : p.name;
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
     const reason = p.manual && score === undefined
       ? liveManualScoreLabel()
@@ -656,7 +656,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const hosting = game.host === myKey();
     const actions: Action[] = [];
     if (finished && hosting && games.table()) {
-      // Après une partie instantanée, seuls les amis se réinvitent (les autres ne reçoivent pas d'invitation).
+      // Après une partie en direct, seuls les amis se réinvitent (les autres ne reçoivent pas d'invitation).
       const friends = new Set(host.net.state().friends.map((f) => f.key));
       const again = game.players.filter((p) => !p.host && ['done', 'failed', 'playing', 'loading', 'accepted'].includes(p.state) && host.net.online(p.key) && (!game.instant || friends.has(p.key)));
       if (again.length) actions.push({ label: t('Rejouer avec les mêmes joueurs'), detail: again.map((p) => p.name).join(', '), icon: 'restart', tone: 'ok', run: () => replay(again) });
@@ -700,18 +700,18 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const hostPlayer = game.players.find((p) => p.host);
     const name = hostPlayer?.name ?? '?';
     const hosting = game.host === myKey();
-    // Partie instantanée : pourquoi elle n'a pas eu lieu (complète, partie sans moi, pas complète en trente minutes, hôte injoignable).
+    // Partie en direct : pourquoi elle n'a pas eu lieu (complète, partie sans moi, pas complète en trente minutes, hôte injoignable).
     const said: Row = game.instant && game.endWhy === 'full'
-      ? { text: t('La partie de {name} est complète', { name }), detail: t('Une autre place s’ouvrira peut-être : revoyez les parties ouvertes'), tone: 'info' }
+      ? { text: t('La partie de {name} est complète', { name }), detail: t('Une autre place s’ouvrira peut-être : revois les parties ouvertes'), tone: 'info' }
       : game.instant && game.endWhy === 'started'
         ? { text: t('La partie de {name} est déjà partie', { name }), tone: 'info' }
         : game.instant && game.endWhy === 'expired'
           ? hosting
-            ? { text: t('Pas complète en trente minutes : partie fermée'), detail: t('Ouvrez-en une autre, ou rejoignez une partie ouverte'), tone: 'info' }
+            ? { text: t('Pas complète en trente minutes : partie fermée'), detail: t('Ouvres-en une autre, ou rejoins une partie ouverte'), tone: 'info' }
             : { text: t('Pas de réponse de la borne de {name}', { name }), detail: t('Elle s’est peut-être éteinte, ou son réseau est coupé'), tone: 'info' }
-          : { text: hosting ? t('Vous avez annulé la partie') : t('{name} a annulé la partie', { name }), tone: 'info' };
+          : { text: hosting ? t('Tu as annulé la partie') : t('{name} a annulé la partie', { name }), tone: 'info' };
     return {
-      heading: game.instant && game.endWhy && game.endWhy !== 'cancelled' ? t('Partie instantanée') : t('Partie annulée'),
+      heading: game.instant && game.endWhy && game.endWhy !== 'cancelled' ? t('Partie en direct') : t('Partie annulée'),
       icon: game.instant ? 'rocket' : 'gamepad',
       subheading: game.title,
       sections: [{ rows: [said] }],
@@ -749,10 +749,10 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const name = end?.name ?? '?';
     const said: Record<string, { text: string; detail?: string }> = {
       cancelled: { text: t('Invitation annulée par {name}', { name }) },
-      started: { text: t('{name} a lancé la partie sans vous', { name }), detail: t('Votre réponse n’est pas arrivée avant le départ') },
-      replaced: { text: t('{name} a changé de table', { name }), detail: t('Une nouvelle invitation vous attend') },
+      started: { text: t('{name} a lancé la partie sans toi', { name }), detail: t('Ta réponse n’est pas arrivée avant le départ') },
+      replaced: { text: t('{name} a changé de table', { name }), detail: t('Une nouvelle invitation t’attend') },
       expired: { text: t('Invitation expirée'), detail: t('Pas de réponse en deux minutes') },
-      offline: { text: t('Invitation retirée par {name}', { name }), detail: t('Votre borne semblait hors ligne de son côté') },
+      offline: { text: t('Invitation retirée par {name}', { name }), detail: t('Ta borne semblait hors ligne de son côté') },
       'host-offline': { text: t('{name} est passé hors ligne', { name }), detail: t('Son invitation est retirée') },
       full: { text: t('La partie de {name} est complète', { name }) },
     };
@@ -781,7 +781,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       tableRow(invite),
       ...(liveBehind(invite.host) ? [{ text: t('Ancienne version chez {name}', { name: invite.host.name }), detail: liveBehindLabel(invite.host), tone: 'warning', icon: 'alert' } as Row] : []),
       ...(!match
-        ? [{ text: t('Vérification de la table sur votre borne…'), tone: 'quiet' } as Row]
+        ? [{ text: t('Vérification de la table sur ta borne…'), tone: 'quiet' } as Row]
         : match === 'other-version'
           ? [otherVersionRow(invite.host.name, found?.scriptDiffers)]
           : [{ text: liveMatchLabel(match), tone: match === 'same' ? 'ok' : 'error' } as Row]),
@@ -795,7 +795,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     if (match === 'same') {
       actions.push({
         label: t('Accepter'),
-        detail: t('Vous jouerez votre partie sur votre borne, au départ donné par {name}', { name: invite.host.name }),
+        detail: t('Tu joueras ta partie sur ta borne, au départ donné par {name}', { name: invite.host.name }),
         icon: 'check',
         tone: 'ok',
         run: async () => {
@@ -832,7 +832,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       ...face(invite.host.key, invite.host.name),
       subheading: invite.host.name,
 
-      lead: t('Jouez chacun sur votre borne, avec un départ commun.'),
+      lead: t('Chacun joue sur sa borne, avec un départ commun.'),
       sections: [...flashSections(), { rows }],
       actions,
       back,
@@ -888,7 +888,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     pendingAction(back) {
       const game = games.current();
       if (game) {
-        const lead = game.phase === 'finished' ? t('Résultats de la partie en direct') : game.phase === 'cancelled' ? t('Partie annulée') : game.instant ? t('Partie instantanée') : t('Partie en direct');
+        const lead = game.phase === 'finished' ? t('Résultats de la partie en direct') : game.phase === 'cancelled' ? t('Partie annulée') : game.instant ? t('Partie en direct') : t('Partie entre amis');
         return { label: `${lead} : ${game.title}`, icon: 'gamepad', attention: game.phase === 'finished' || game.phase === 'countdown', run: () => { gameBack = back; openGame(); } };
       }
       const invite = games.invites()[0];

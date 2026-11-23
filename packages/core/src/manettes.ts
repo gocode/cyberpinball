@@ -309,7 +309,7 @@ export const TRIGGERS_HINT_COMBO: readonly ControllerButton[] = ['gachette-gauch
 
 /** La combinaison telle que le joueur la lit (« les deux joysticks enfoncés ensemble, 3 s »), ou undefined. */
 export function calibrationComboLabel(profile: HeadsetProfile | undefined): string | undefined {
-  return calibrationCombo(profile) ? t('enfoncez les deux sticks (sous les pouces) jusqu’au clic, 3 s') : undefined;
+  return calibrationCombo(profile) ? t('enfonce les deux sticks (sous les pouces) jusqu’au clic, 3 s') : undefined;
 }
 
 /** Le réglage par défaut d'un profil : celui des Touch est la règle d'origine (A valide, B revient…). */
@@ -353,7 +353,7 @@ export function controllerOddity(setting: ControllerSetting): string | undefined
   const { valider, retour } = setting.functions;
   if (!usual.valider || !usual.retour || (valider !== usual.retour && retour !== usual.valider)) return undefined;
   const label = (el: ControllerElement | undefined) => (el ? CONTROLLER_ELEMENTS[el].label : '—');
-  return t('Vos manettes sont réglées à l’envers de l’habitude : {valider} valide et {retour} revient (et met en pause en partie). D’habitude, {usualValider} valide et {usualRetour} revient.', {
+  return t('Tes manettes sont réglées à l’envers de l’habitude : {valider} valide et {retour} revient (et met en pause en partie). D’habitude, {usualValider} valide et {usualRetour} revient.', {
     valider: label(valider),
     retour: label(retour),
     usualValider: label(usual.valider),

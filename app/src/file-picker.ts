@@ -184,7 +184,7 @@ export function createFilePicker(ctx: FilePickerContext) {
     const missing = paths.filter((p) => !fs.existsSync(p));
     if (missing.length) {
       s.selected = s.selected.filter((p) => !missing.includes(p));
-      s.flash = { text: t('Introuvable désormais : {files}. Choisissez de nouveau.', { files: missing.map((p) => path.basename(p)).join(', ') }), tone: 'error' };
+      s.flash = { text: t('Introuvable désormais : {files}. Choisis de nouveau.', { files: missing.map((p) => path.basename(p)).join(', ') }), tone: 'error' };
       return ctx.broadcast();
     }
     const l = ctx.layout();
@@ -241,13 +241,13 @@ export function createFilePicker(ctx: FilePickerContext) {
         } else rows.push(fileRow(s, e.path, { name: e.name, kind: DOWNLOAD_KIND_LABELS[e.kind], detail: `${formatSize(e.size)} · ${day(e.mtimeMs)}`, matches: e.matches }, actions, multiple));
       }
     }
-    if (error) rows.push({ text: error, detail: t('Choisissez un autre emplacement, ou « Réessayer » une fois la clé rebranchée.'), tone: 'warning' });
+    if (error) rows.push({ text: error, detail: t('Choisis un autre emplacement, ou « Réessayer » une fois la clé rebranchée.'), tone: 'warning' });
     else if (!rows.length) {
       rows.push(
         hidden
           ? { text: t('Aucun fichier qui convienne'), detail: tn(hidden, '{n} fichier caché : il ne convient pas ici. « Afficher tous les fichiers » le montre.', '{n} fichiers cachés : ils ne conviennent pas ici. « Afficher tous les fichiers » les montre.'), tone: 'quiet' }
           : s.place.kind === 'cp-downloads'
-            ? { text: t('Aucun téléchargement pour le moment'), detail: t('Ce que Cyber Pinball télécharge est gardé ici. Essayez Téléchargements de Windows, une clé USB…'), tone: 'quiet' }
+            ? { text: t('Aucun téléchargement pour le moment'), detail: t('Ce que Cyber Pinball télécharge est gardé ici. Essaie Téléchargements de Windows, une clé USB…'), tone: 'quiet' }
             : { text: r.mode === 'folder' ? t('Aucun sous-dossier') : t('Ce dossier est vide'), tone: 'quiet' },
       );
     } else if (hidden) rows.push({ text: tn(hidden, '{n} autre fichier caché : il ne convient pas ici', '{n} autres fichiers cachés : ils ne conviennent pas ici'), tone: 'quiet' });
@@ -260,7 +260,7 @@ export function createFilePicker(ctx: FilePickerContext) {
       gestures.push(
         n
           ? { label: tn(n, 'Prendre le fichier choisi', 'Prendre les {n} fichiers choisis'), detail: s.selected.map((f) => path.basename(f)).slice(0, 3).join(', ') + (n > 3 ? '…' : ''), icon: 'check', tone: 'ok', run: () => finish(s, [...s.selected]) }
-          : { label: t('Prendre les fichiers choisis'), detail: t('Choisissez au moins un fichier : Start le coche'), icon: 'check', tone: 'quiet', run: () => undefined },
+          : { label: t('Prendre les fichiers choisis'), detail: t('Choisis au moins un fichier : Start le coche'), icon: 'check', tone: 'quiet', run: () => undefined },
       );
     }
     if ((r.mode === 'folder' || r.mode === 'files-or-folder') && s.dir && s.place.kind !== 'cp-downloads' && !error)

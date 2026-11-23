@@ -263,15 +263,15 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
   function sendReason(reason: string): string {
     switch (reason) {
       case 'rules':
-        return t('Acceptez d’abord les règles des salons');
+        return t('Accepte d’abord les règles des salons');
       case 'gap':
-        return t('Trois secondes entre deux lignes : réessayez');
+        return t('Trois secondes entre deux lignes : réessaie');
       case 'burst':
-        return t('Vingt lignes en dix minutes au plus : patientez un peu');
+        return t('Vingt lignes en dix minutes au plus : patiente un peu');
       case 'disabled':
         return t('Salons désactivés : Réglages de la communauté');
       case 'muted':
-        return mySanction() ?? t('Décision de la modération : vous ne pouvez pas écrire pour l’instant');
+        return mySanction() ?? t('Décision de la modération : tu ne peux pas écrire pour l’instant');
       default:
         return t('Ligne vide ou trop longue : 300 caractères au plus');
     }
@@ -370,7 +370,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       return { ...logRow(l, acts, reacts), action: index, pick: true } satisfies Row;
     });
     const typing = typingRow(room);
-    if (!rows.length && !typing) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Soyez le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
+    if (!rows.length && !typing) rows.push({ text: t('Rien de neuf pour l’instant'), detail: t('Sois le premier : « Écrire dans le salon »'), icon: 'message', tone: 'quiet' });
     if (typing) rows.push(typing);
     sections.push({ kind: 'room', rows });
     // Les présents, dans la colonne latérale (à droite au bureau, dessous en borne).
@@ -385,7 +385,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
             text: h.name,
             avatar: avatarView(h.key, h.name, net.avatarFile(h.key)),
             flag: playerFlag(h.country, locale()),
-            badges: h.key === self ? [t('Vous')] : relationOf(me(), h.key) === 'friend' ? [t('Ami')] : [],
+            badges: h.key === self ? [t('Toi')] : relationOf(me(), h.key) === 'friend' ? [t('Ami')] : [],
           }))
         : [{ text: t('Personne pour l’instant'), tone: 'quiet' }],
     });
@@ -460,7 +460,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       if (!chips.length) chips.push({ text: t('Aucune phrase préparée'), tone: 'quiet' });
       // Juste après les phrases : les gérer (Réglages de la communauté > Phrases préparées), retour sur ce bouton.
       actions.push({ label: t('Gérer les phrases…'), detail: t('Ajouter, modifier, ranger, supprimer'), icon: 'edit', key: 'phrases', run: () => openPhrases(() => openWrite(room, readyPhrases().length)) });
-      if (mention) actions.push({ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il vous a cité à {time}', { time: time(mention.at) }), icon: 'message', run: () => askText(room, `@${mention.name} `, send) });
+      if (mention) actions.push({ label: t('Répondre à @{name}', { name: mention.name }), detail: t('Il t’a cité à {time}', { time: time(mention.at) }), icon: 'message', run: () => askText(room, `@${mention.name} `, send) });
       // « Écrire » dit ce qu'on fait ; le clavier à l'écran n'est que le moyen (16/11/2026). /me : une
       // action à la troisième personne, comme sur IRC (« /me arrive » s'affiche « <Pseudo> arrive », en italique).
       actions.push({ label: t('Écrire…'), detail: t('Au clavier à l’écran · « /me arrive » s’affiche « {name} arrive »', { name: me().name }), icon: 'keyboard', run: () => askText(room, '', send) });
@@ -478,7 +478,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         // bande sous les phrases, à la taille de celle du clavier à l'écran.
         phone: true,
         phoneBand: true,
-        remoteWording: { offer: t('Écrivez avec votre téléphone'), paired: [t('Communauté › Salon : le champ est prêt sur le téléphone')] },
+        remoteWording: { offer: t('Écris avec ton téléphone'), paired: [t('Communauté › Salon : le champ est prêt sur le téléphone')] },
         sections: [
           { title: t('Derniers messages'), kind: 'room', rows: recent.length ? recent : [{ text: t('Rien de neuf pour l’instant'), icon: 'message', tone: 'quiet' }] },
           { title: t('Phrases préparées'), kind: 'chips', rows: chips },
@@ -541,17 +541,17 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
             backToRoom();
           };
           const index = actions.push({ label: reactionText(r), key: `react:${r}`, run }) - 1;
-          return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Votre réaction · Start la retire') } : {}), ...(problem ? { tone: 'quiet' as const } : {}), action: index, pick: true };
+          return { text: reactionName(r), emoji: REACTION_EMOJI[r], ...(on ? { current: true, detail: t('Ta réaction · Start la retire') } : {}), ...(problem ? { tone: 'quiet' as const } : {}), action: index, pick: true };
         });
         sections.push({ title: t('Réagir'), kind: 'reactions', rows });
       }
       if (!self) {
-        actions.push({ label: t('Répondre à {name}', { name: l.name }), detail: t('Votre ligne commencera par @{name}', { name: l.name }), icon: 'message', run: () => (net.rooms().rulesAt ? askText(room, `@${l.name} `, (text) => { const why = write(room, text); if (why) notice = { text: why, tone: 'warning' }; backToRoom(); }) : openRules(here)) });
+        actions.push({ label: t('Répondre à {name}', { name: l.name }), detail: t('Ta ligne commencera par @{name}', { name: l.name }), icon: 'message', run: () => (net.rooms().rulesAt ? askText(room, `@${l.name} `, (text) => { const why = write(room, text); if (why) notice = { text: why, tone: 'warning' }; backToRoom(); }) : openRules(here)) });
         actions.push({ label: t('Voir son profil'), detail: rel === 'friend' ? t('Sa présence, sa bibliothèque, son activité récente') : t('Pays, badges, records et activité récente'), icon: 'account', run: () => host.openProfile(l.key, here) });
         if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), sends: true, detail: t('Il la verra dans « Demandes d’amis »'), icon: 'friend-add', run: () => { net.request({ key: l.key, name: l.name }); notice = { text: t('Demande envoyée à {name}', { name: l.name }), tone: 'ok' }; backToRoom(); } });
         actions.push(isIgnored
           ? { label: t('Ne plus ignorer {name}', { name: l.name }), icon: 'eye', run: () => { setIgnored(l.key, false); backToRoom(); } }
-          : { label: t('Ignorer {name} dans les salons', { name: l.name }), detail: t('Ses lignes disparaissent de vos salons · il n’est pas prévenu'), icon: 'eye', run: () => { setIgnored(l.key, true); notice = { text: t('{name} est ignoré dans les salons', { name: l.name }), tone: 'ok' }; backToRoom(); } });
+          : { label: t('Ignorer {name} dans les salons', { name: l.name }), detail: t('Ses lignes disparaissent de tes salons · il n’est pas prévenu'), icon: 'eye', run: () => { setIgnored(l.key, true); notice = { text: t('{name} est ignoré dans les salons', { name: l.name }), tone: 'ok' }; backToRoom(); } });
         actions.push({ label: t('Signaler ce message'), detail: t('Envoyé chiffré aux modérateurs, avec la raison ; {name} ne saura pas qui', { name: l.name }), icon: 'alert', run: () => askReason(t('Signaler ce message'), (reason) => { net.report(l, reason); notice = { text: t('Signalement envoyé aux modérateurs'), tone: 'ok' }; backToRoom(); }, here) });
         if (net.amModerator()) for (const a of decisions(l, backToRoom)) actions.push(a);
         actions.push({ label: t('Bloquer {name}', { name: l.name }), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', tone: 'warning', run: () => confirmBlock(l, here, backToRoom) });
@@ -563,7 +563,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       return {
         heading: l.name,
         avatar: avatarView(l.key, l.name, net.avatarFile(l.key)),
-        subheading: self ? t('Votre ligne') : rel === 'friend' ? t('Votre ami') : t('Pas votre ami'),
+        subheading: self ? t('Ta ligne') : rel === 'friend' ? t('Ton ami') : t('Pas ton ami'),
         sections,
         actions,
         back: backToRoom,
@@ -576,7 +576,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
   function confirmRetract(l: RoomLine, cancel: () => void, after: () => void): void {
     lib.openCustom(
       () => ({
-        heading: t('Supprimer votre ligne ?'),
+        heading: t('Supprimer ta ligne ?'),
         icon: 'alert',
         lead: t('« {text} » disparaît du salon, ici et chez les autres joueurs à mesure que leurs bornes le reçoivent. Rien ne la rétablit.', { text: shownText(l.text).slice(0, 80) }),
         sections: [],
@@ -595,7 +595,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       () => ({
         heading: t('Bloquer {name} ?', { name: l.name }),
         icon: 'alert',
-        lead: t('Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de vos salons. Débloquer : Partage et réseau.'),
+        lead: t('Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de tes salons. Débloquer : Partage et réseau.'),
         sections: [],
         actions: [
           { label: t('Bloquer'), icon: 'lock', tone: 'warning', run: () => { net.block(l.key); notice = { text: t('{name} est bloqué', { name: l.name }), tone: 'ok' }; after(); } },
@@ -685,7 +685,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         heading: t('Signalements'),
         icon: 'alert',
         subheading: tn(queue.length, '{n} message à traiter', '{n} messages à traiter'),
-        lead: t('Vos décisions sont signées de votre clé de modérateur et appliquées par toutes les bornes. Le joueur signalé ne sait pas qui l’a signalé.'),
+        lead: t('Tes décisions sont signées de ta clé de modérateur et appliquées par toutes les bornes. Le joueur signalé ne sait pas qui l’a signalé.'),
         sections: [{ rows: rows.length ? rows : [{ text: t('Rien à traiter'), icon: 'check', tone: 'ok' }] }],
         actions,
         back,
@@ -729,12 +729,12 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
     lib.openCustom(() => ({
       heading: t('Règles des salons'),
       icon: 'rules',
-      lead: accepted ? t('Acceptées le {date}.', { date: new Date(accepted).toLocaleDateString(locale()) }) : t('Avant votre premier message, une seule fois. Lire reste possible sans les accepter.'),
+      lead: accepted ? t('Acceptées le {date}.', { date: new Date(accepted).toLocaleDateString(locale()) }) : t('Avant ton premier message, une seule fois. Lire reste possible sans les accepter.'),
       sections: [
         {
           rows: [
             { text: t('Respect'), detail: t('Pas d’insulte, pas de harcèlement, pas de propos haineux.'), icon: 'friends' },
-            { text: t('Rien de personnel'), detail: t('Ni adresse, ni téléphone, ni nom complet : les vôtres comme ceux des autres.'), icon: 'lock' },
+            { text: t('Rien de personnel'), detail: t('Ni adresse, ni téléphone, ni nom complet : les tiens comme ceux des autres.'), icon: 'lock' },
             { text: t('Pas de publicité'), detail: t('Ni vente, ni lien, ni spam : une ligne toutes les 3 secondes au plus.'), icon: 'close' },
             { text: t('On parle flipper'), detail: t('Tables, scores, parties, réglages de borne : le reste dans la messagerie.'), icon: 'flipper' },
             { text: t('La modération veille'), detail: t('Elle pourra masquer un message, mettre en sourdine ou exclure, sur toutes les bornes.'), icon: 'alert' },
@@ -763,7 +763,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         return { label: roomName(room), detail: [shownCrowd(n) ? tn(n, '{n} présent', '{n} présents') : undefined, detail].filter(Boolean).join(' · '), ...(c ? { flag: flagView(c, locale()) } : { icon: 'globe' as const }), key: `room:${room}`, run: () => openRoom(room, () => openList(back)) };
       };
       const actions: Action[] = [
-        ...(mine ? [entry(mine, t('le salon de votre pays'))] : []),
+        ...(mine ? [entry(mine, t('le salon de ton pays'))] : []),
         entry(WORLD_ROOM, t('tous les pays, en anglais de préférence')),
         ...active.map((r) => entry(r.room, t('dernière ligne à {time}', { time: time(r.last.at) }))),
         { label: t('Autres pays…'), detail: t('Tous les pays, par leur nom'), icon: 'search', run: () => openCountries(() => openList(back)) },
@@ -849,7 +849,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const full = list.length >= PHRASES_MAX;
       actions.push({
         label: t('Ajouter une phrase…'),
-        detail: full ? t('{n} phrases au plus : supprimez-en une d’abord', { n: PHRASES_MAX }) : t('Clavier à l’écran ou téléphone · 300 caractères'),
+        detail: full ? t('{n} phrases au plus : supprime-en une d’abord', { n: PHRASES_MAX }) : t('Clavier à l’écran ou téléphone · 300 caractères'),
         icon: 'plus',
         ...(full ? { tone: 'quiet' as const } : {}),
         run: () =>
@@ -863,7 +863,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const original = phrasesSetting(list) === undefined;
       actions.push({
         label: t('Rétablir celles d’origine…'),
-        detail: original ? t('Ce sont déjà celles d’origine') : t('Les six phrases du départ, à la place des vôtres'),
+        detail: original ? t('Ce sont déjà celles d’origine') : t('Les six phrases du départ, à la place des tiennes'),
         icon: 'restore',
         ...(original ? { tone: 'quiet' as const } : {}),
         run: () => (original ? here(addAt + 1) : confirmRestore((done) => here(done ? DEFAULT_PHRASES.length + 1 : addAt + 1, done))),
@@ -889,7 +889,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       () => ({
         heading: t('Rétablir les phrases d’origine ?'),
         icon: 'restore',
-        lead: t('Vos phrases sont remplacées par les six du départ, dans la langue de la borne.'),
+        lead: t('Tes phrases sont remplacées par les six du départ, dans la langue de la borne.'),
         sections: [],
         actions: [
           { label: t('Rétablir'), icon: 'restore', tone: 'warning', run: () => { net.setRooms({ phrases: undefined }); after({ text: t('Phrases d’origine rétablies'), tone: 'ok' }); } },
@@ -996,14 +996,14 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
       const s = net.rooms();
       const social = me();
       const actions: Action[] = [
-        { label: social.publicPresence !== false ? t('Apparaître en ligne pour tous : oui') : t('Apparaître en ligne pour tous : non'), detail: t('« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence'), icon: 'pulse', run: () => { net.setPublicPresence(social.publicPresence === false); here(0); } },
+        { label: social.publicPresence !== false ? t('Apparaître en ligne pour tous : oui') : t('Apparaître en ligne pour tous : non'), detail: t('« En ligne » ou « En partie », jamais la table ; tes amis voient toujours ta présence'), icon: 'pulse', run: () => { net.setPublicPresence(social.publicPresence === false); here(0); } },
         { label: s.enabled ? t('Salons : activés') : t('Salons : désactivés'), detail: s.enabled ? t('Lire et écrire dans les salons publics') : t('Les salons restent visibles, grisés ; pour la famille'), icon: 'globe', run: () => { net.setRooms({ enabled: !s.enabled }); here(1); } },
         { label: t('Salon par défaut : {room}', { room: roomName(defaultRoom()) }), detail: t('Celui où l’on entre depuis la Communauté'), icon: 'pin', run: () => { net.setRooms({ defaultRoom: defaultRoom() === WORLD_ROOM && myCountry() ? roomOfCountry(myCountry()!) : WORLD_ROOM }); here(2); } },
         { label: s.filter ? t('Filtre de mots : activé') : t('Filtre de mots : désactivé'), detail: t('Masque les mots grossiers par des étoiles'), icon: 'filter', run: () => { net.setRooms({ filter: !s.filter }); here(3); } },
-        { label: s.mentionsInGame ? t('Mentions pendant les parties : carte et son') : t('Mentions pendant les parties : rien'), detail: t('Quand on vous cite dans un salon, en haut du plateau'), icon: 'bell', run: () => { net.setRooms({ mentionsInGame: !s.mentionsInGame }); here(4); } },
-        { label: s.lineNotices !== false ? t('Nouveaux messages de mes salons : notification') : t('Nouveaux messages de mes salons : rien'), detail: t('Votre salon et ceux où vous avez écrit depuis hier · dans le front-end, deux minutes au plus'), icon: 'inbox', run: () => { net.setRooms({ lineNotices: s.lineNotices === false ? undefined : false }); here(5); } },
+        { label: s.mentionsInGame ? t('Mentions pendant les parties : carte et son') : t('Mentions pendant les parties : rien'), detail: t('Quand on te cite dans un salon, en haut du plateau'), icon: 'bell', run: () => { net.setRooms({ mentionsInGame: !s.mentionsInGame }); here(4); } },
+        { label: s.lineNotices !== false ? t('Nouveaux messages de mes salons : notification') : t('Nouveaux messages de mes salons : rien'), detail: t('Ton salon et ceux où tu as écrit depuis hier · dans le front-end, deux minutes au plus'), icon: 'inbox', run: () => { net.setRooms({ lineNotices: s.lineNotices === false ? undefined : false }); here(5); } },
         { label: t('Phrases préparées'), detail: tn(roomPhrases(s).length, '{n} phrase, en badges dans « Écrire dans le salon » et au téléphone', '{n} phrases, en badges dans « Écrire dans le salon » et au téléphone'), icon: 'message', run: () => openPhrases(() => here(6)) },
-        { label: tn(s.ignored.length, '{n} joueur ignoré', '{n} joueurs ignorés'), detail: s.ignored.length ? t('Start : ne plus les ignorer') : t('Leurs lignes disparaissent de vos salons'), icon: 'eye', ...(s.ignored.length ? {} : { tone: 'quiet' as const }), run: () => (s.ignored.length ? openIgnored(() => here(7)) : here(7)) },
+        { label: tn(s.ignored.length, '{n} joueur ignoré', '{n} joueurs ignorés'), detail: s.ignored.length ? t('Start : ne plus les ignorer') : t('Leurs lignes disparaissent de tes salons'), icon: 'eye', ...(s.ignored.length ? {} : { tone: 'quiet' as const }), run: () => (s.ignored.length ? openIgnored(() => here(7)) : here(7)) },
         { label: t('Règles des salons'), detail: s.rulesAt ? t('Acceptées le {date}', { date: new Date(s.rulesAt).toLocaleDateString(locale()) }) : t('Pas encore acceptées'), icon: 'rules', run: () => openRules(() => here(8)) },
         { label: t('Retour'), icon: 'back', run: back },
       ];
@@ -1111,7 +1111,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
             ...(relationOf(me(), l.key) === 'friend' ? { friend: true } : {}),
           };
         });
-      const problem = writeProblem(room) ?? (net.rooms().rulesAt ? undefined : t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'));
+      const problem = writeProblem(room) ?? (net.rooms().rulesAt ? undefined : t('Accepte d’abord les règles des salons, à la borne : Écrire dans le salon'));
       const typing = net.roomTypers(room).filter((x) => !ignored(x.key)).map((x) => x.name);
       // Les salons en tête, comme « Salons » à la borne : le mien, Monde, ceux où l'on parle, et celui montré.
       const mineRoom = myCountry() ? roomOfCountry(myCountry()!) : undefined;
@@ -1153,7 +1153,7 @@ export function createRoomsMenu(host: RoomsMenuHost): RoomsMenu {
         if (kind !== null && !(REACTIONS as readonly string[]).includes(kind)) return;
         const problem = writeProblem(room);
         if (problem) return say(problem, 'warning');
-        if (!net.rooms().rulesAt) return say(t('Acceptez d’abord les règles des salons, à la borne : Écrire dans le salon'), 'warning');
+        if (!net.rooms().rulesAt) return say(t('Accepte d’abord les règles des salons, à la borne : Écrire dans le salon'), 'warning');
         if (!net.roomReact(l.id, kind as (typeof REACTIONS)[number] | null)) say(t('Réaction impossible pour l’instant'), 'warning');
         return;
       }

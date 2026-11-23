@@ -164,7 +164,7 @@ export function createTechSheet(ctx: TechSheetContext) {
       lead: facts
         ? checks
           ? tn(checks, 'Tout ce qui compose la borne. {n} bloc a un point à vérifier.', 'Tout ce qui compose la borne. {n} blocs ont un point à vérifier.')
-          : t('Tout ce qui compose la borne, pour repérer un problème ou le décrire à qui vous aide.')
+          : t('Tout ce qui compose la borne, pour repérer un problème ou le décrire à qui t’aide.')
         : t('Premier relevé en cours : PC, Windows, écrans, contrôleurs et logiciels.'),
       sections: blocks.length ? [{ options: true, rows }] : [],
       actions,
@@ -252,12 +252,12 @@ export function createTechSheet(ctx: TechSheetContext) {
       if (!drives.length) pick({ icon: 'usb', text: t('Sur une clé USB'), detail: t('Aucune clé branchée : elle apparaît ici dès qu’elle l’est'), tone: 'quiet' }, { label: t('Sur une clé USB'), key: 'report:usb', run: self });
       if (friends?.length) pick({ icon: 'message', text: t('À un ami'), detail: t('Le résumé, dans la messagerie · {online}', { online: tn(friends.filter((f) => f.online).length, '{n} ami en ligne', '{n} amis en ligne') }) }, { label: t('À un ami'), key: 'report:friend', run: () => openFriends() });
       else pick({ icon: 'message', text: t('À un ami'), detail: friends ? t('Aucun ami pour l’instant : Menu système > Communauté > Joueurs > Trouver un joueur') : t('Réseau des amis coupé'), tone: 'quiet' }, { label: t('À un ami'), key: 'report:friend', run: self });
-      pick({ icon: 'folder', text: t('Dans un dossier de la borne'), detail: t('{dir} · à copier vous-même', { dir: reportDir() }) }, { label: t('Dans un dossier de la borne'), key: 'report:folder', run: () => sendFolder(reportDir()) });
+      pick({ icon: 'folder', text: t('Dans un dossier de la borne'), detail: t('{dir} · à copier toi-même', { dir: reportDir() }) }, { label: t('Dans un dossier de la borne'), key: 'report:folder', run: () => sendFolder(reportDir()) });
       const contents: Row[] = [
         { icon: 'report', text: t('La fiche technique et la santé de la borne'), detail: t('Une page lisible dans tout navigateur, sur ordinateur ou téléphone') },
         { icon: 'list', text: t('Les journaux'), detail: t('Cyber Pinball sur 7 jours, VPX de la dernière partie') },
         { icon: 'sliders', text: t('Les réglages de la borne et de VPX'), detail: t('VPinballX.ini, configurations des écrans et des boutons') },
-        { icon: 'lock', text: t('Jamais : votre nom d’utilisateur, le nom du PC, les adresses IP'), detail: t('Ni les noms de vos amis, vos messages ou les clés du réseau : remplacés ou retirés avant l’envoi'), tone: 'info' },
+        { icon: 'lock', text: t('Jamais : ton nom d’utilisateur, le nom du PC, les adresses IP'), detail: t('Ni les noms de tes amis, tes messages ou les clés du réseau : remplacés ou retirés avant l’envoi'), tone: 'info' },
       ];
       actions.push({
         label: t('Décrire le problème'),
@@ -279,7 +279,7 @@ export function createTechSheet(ctx: TechSheetContext) {
         heading: t('Envoyer un rapport'),
         icon: 'upload',
         subheading: t('Fiche technique, santé, réglages et journaux · {files} · {size}', { files: tn(r.files.length, '{n} fichier', '{n} fichiers'), size: formatSize(r.zip.length) }),
-        lead: t('Anonymisé : ni votre nom, ni le nom du PC, ni adresse IP, ni noms d’amis. Pour qu’un ami, un forum ou un dépanneur comprenne votre borne sans venir la voir.'),
+        lead: t('Anonymisé : ni ton nom, ni le nom du PC, ni adresse IP, ni noms d’amis. Pour qu’un ami, un forum ou un dépanneur comprenne ta borne sans venir la voir.'),
         hint: t('Flippers : choisir · Start : envoyer ici · Exit : revenir'),
         sections: [
           { title: t('Où l’envoyer'), options: true, rows },
@@ -310,7 +310,7 @@ export function createTechSheet(ctx: TechSheetContext) {
             title: t('Remplacé avant l’envoi'),
             kind: 'spec',
             rows: [
-              { label: t('Chemins'), text: `${user}\\…`, detail: t('Votre nom d’utilisateur, partout où il apparaît'), tone: 'info' },
+              { label: t('Chemins'), text: `${user}\\…`, detail: t('Ton nom d’utilisateur, partout où il apparaît'), tone: 'info' },
               { label: t('Noms'), text: t('‹PC›, ‹ami 1›, ‹ami 2›…'), detail: t('Nom du PC, de la borne et des joueurs, noms des amis'), tone: 'info' },
               { label: t('Adresses'), text: t('‹adresse IP›, ‹adresse e-mail›'), detail: t('Retirées des journaux et des réglages'), tone: 'info' },
             ],
@@ -342,8 +342,8 @@ export function createTechSheet(ctx: TechSheetContext) {
     if (!sent || !phone) return void openReport();
     console.log(`Fiche technique : rapport donné au téléphone (${formatSize(r.zip.length)}).`); // i18n-ignore : journal
     done(t('Rapport disponible sur le téléphone'), 'phone', t('{phone} · {when}', { phone, when: formatDateTime(Date.now(), { timeStyle: 'short' }) }), [
-      { icon: 'check', text: t('{name} · {size}', { name: r.name, size: formatSize(r.zip.length) }), detail: t('Sur le téléphone : touchez « Télécharger le rapport »'), tone: 'ok', badges: [t('Prêt à télécharger')] },
-      { icon: 'message', text: t('Ensuite, depuis le téléphone'), detail: t('« Préparer un e-mail » ouvre sa messagerie avec le résumé ; joignez-y le fichier téléchargé. « Copier le résumé » pour un forum ou WhatsApp.'), tone: 'info' },
+      { icon: 'check', text: t('{name} · {size}', { name: r.name, size: formatSize(r.zip.length) }), detail: t('Sur le téléphone : touche « Télécharger le rapport »'), tone: 'ok', badges: [t('Prêt à télécharger')] },
+      { icon: 'message', text: t('Ensuite, depuis le téléphone'), detail: t('« Préparer un e-mail » ouvre sa messagerie avec le résumé ; joins-y le fichier téléchargé. « Copier le résumé » pour un forum ou WhatsApp.'), tone: 'info' },
     ]);
   }
 
@@ -358,22 +358,22 @@ export function createTechSheet(ctx: TechSheetContext) {
       if (!back.equals(r.zip)) throw new Error(t('le fichier relu ne correspond pas'));
     } catch (error) {
       console.error(`Fiche technique : rapport non écrit dans ${dir} (${(error as Error).message}).`); // i18n-ignore : journal
-      return done(t('Rapport non enregistré'), 'alert', dir, [{ icon: 'alert', text: t('Écriture impossible : {reason}', { reason: (error as Error).message }), detail: t('Essayez une autre destination.'), tone: 'error' }], [
+      return done(t('Rapport non enregistré'), 'alert', dir, [{ icon: 'alert', text: t('Écriture impossible : {reason}', { reason: (error as Error).message }), detail: t('Essaie une autre destination.'), tone: 'error' }], [
         { label: t('Choisir une autre destination'), icon: 'upload', run: () => void openReport() },
       ]);
     }
     console.log(`Fiche technique : rapport écrit (${formatSize(r.zip.length)}).`); // i18n-ignore : journal
-    const eject = drive && ctx.eject ? [{ label: t('Éjecter la clé'), detail: t('Attendez le message avant de la débrancher'), icon: 'usb' as const, tone: 'ok' as const, run: () => void ejectDrive(drive) }] : [];
+    const eject = drive && ctx.eject ? [{ label: t('Éjecter la clé'), detail: t('Attends le message avant de la débrancher'), icon: 'usb' as const, tone: 'ok' as const, run: () => void ejectDrive(drive) }] : [];
     done(t('Rapport enregistré'), drive ? 'usb' : 'folder', drive ? (drive.name ? t('Clé « {name} » ({letter})', { name: drive.name, letter: drive.letter }) : drive.letter) : dir, [
       { icon: 'check', text: r.name, detail: t('Dans {dir} · {size} · relu après l’écriture', { dir, size: formatSize(r.zip.length) }), tone: 'ok', badges: [t('✓ Vérifié')] },
-      { icon: 'desktop', text: t('Sur un autre ordinateur'), detail: t('Ouvrez le fichier .zip, puis rapport.html pour le lire ; joignez le .zip à un e-mail pour l’envoyer.'), tone: 'info' },
+      { icon: 'desktop', text: t('Sur un autre ordinateur'), detail: t('Ouvre le fichier .zip, puis rapport.html pour le lire ; joins le .zip à un e-mail pour l’envoyer.'), tone: 'info' },
     ], eject);
   }
 
   async function ejectDrive(drive: DriveInfo): Promise<void> {
     const ok = await ctx.eject!(drive);
     done(ok ? t('Clé éjectée') : t('Clé encore utilisée'), 'usb', drive.letter, [
-      ok ? { icon: 'check', text: t('Vous pouvez débrancher la clé'), tone: 'ok' } : { icon: 'alert', text: t('Windows n’a pas libéré la clé'), detail: t('Fermez ce qui l’utilise, puis réessayez.'), tone: 'warning' },
+      ok ? { icon: 'check', text: t('Tu peux débrancher la clé'), tone: 'ok' } : { icon: 'alert', text: t('Windows n’a pas libéré la clé'), detail: t('Ferme ce qui l’utilise, puis réessaie.'), tone: 'warning' },
     ]);
   }
 
@@ -387,7 +387,7 @@ export function createTechSheet(ctx: TechSheetContext) {
       return {
         heading: t('Envoyer le résumé à un ami'),
         icon: 'message',
-        subheading: t('Le résumé du rapport arrive dans votre fil avec lui, comme un message'),
+        subheading: t('Le résumé du rapport arrive dans ton fil avec lui, comme un message'),
         lead: t('Le fichier complet passe par le téléphone ou une clé USB : la messagerie ne transporte que du texte.'),
         hint: t('Flippers : choisir · Start : envoyer à cet ami · Exit : revenir'),
         sections: [{ options: true, rows }],
@@ -404,7 +404,7 @@ export function createTechSheet(ctx: TechSheetContext) {
     if (description) ctx.sendFriend(friend.key, `${t('Le problème :')} ${description}`.slice(0, 500));
     console.log('Fiche technique : résumé du rapport envoyé à un ami.'); // i18n-ignore : journal
     done(t('Résumé envoyé à {name}', { name: friend.name }), 'message', friend.online ? t('Il est en ligne : il le reçoit tout de suite') : t('Il le recevra à sa reconnexion'), [
-      { icon: 'check', text: t('Le résumé est dans votre fil avec {name}', { name: friend.name }), detail: r.short.split('\n').slice(0, 3).join(' · '), tone: 'ok', badges: [friend.online ? t('Envoyé') : t('En attente')] },
+      { icon: 'check', text: t('Le résumé est dans ton fil avec {name}', { name: friend.name }), detail: r.short.split('\n').slice(0, 3).join(' · '), tone: 'ok', badges: [friend.online ? t('Envoyé') : t('En attente')] },
       { icon: 'info', text: t('Le fichier complet'), detail: t('S’il le demande : « Sur le téléphone connecté » ou « Sur une clé USB »'), tone: 'info' },
     ]);
   }

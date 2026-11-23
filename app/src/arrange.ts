@@ -296,7 +296,7 @@ function valueOf(host: ArrangeHost, s: ArrangeState, item: ItemId): string {
 function itemDisabled(host: ArrangeHost, s: ArrangeState, item: ItemId): string | undefined {
   if (item === 'snap') return undefined;
   if (item === 'screen' && s.role === 'playfield') return t("Le playfield change d'écran à l'étape des rôles.");
-  if (!displayOf(host, s.role) && !['role', 'screen', 'reset', 'done'].includes(item)) return t("Le {role} n'a pas d'écran : choisissez-en un à la ligne « Écran ».", { role: labelOf(host, s.role) });
+  if (!displayOf(host, s.role) && !['role', 'screen', 'reset', 'done'].includes(item)) return t("Le {role} n'a pas d'écran : choisis-en un à la ligne « Écran ».", { role: labelOf(host, s.role) });
   if (item === 'place' && neighbours(host, s.role).length === 0) return t("Aucun autre rôle sur l'écran du {role}.", { role: labelOf(host, s.role) });
   return undefined;
 }
@@ -542,7 +542,7 @@ function drag(host: ArrangeHost, s: ArrangeState, action: Extract<ArrangeAction,
   });
   host.assignments[action.role] = plan.display;
   setZone(host, action.role, plan.zone);
-  s.notice = plan.display !== origin ? t("{role} sur l'écran {n} : relâchez pour l'y laisser.", { role: labelOf(host, action.role), n: plan.display + 1 }) : undefined;
+  s.notice = plan.display !== origin ? t("{role} sur l'écran {n} : relâche pour l'y laisser.", { role: labelOf(host, action.role), n: plan.display + 1 }) : undefined;
   return 'handled';
 }
 
@@ -626,8 +626,8 @@ export function arrangePanel(host: ArrangeHost, s: ArrangeState, keyLabel: (code
     hint,
     notice: s.notice,
     mouse: s.snap
-      ? t('Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner ; Alt maintenu : sans aimantation. Flèches du clavier : la déplacer au pixel.')
-      : t('Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner. Flèches du clavier : la déplacer au pixel.'),
+      ? t('Souris : tire une zone pour la déplacer, jusque sur un autre écran ; tire un coin pour la redimensionner ; Alt maintenu : sans aimantation. Flèches du clavier : la déplacer au pixel.')
+      : t('Souris : tire une zone pour la déplacer, jusque sur un autre écran ; tire un coin pour la redimensionner. Flèches du clavier : la déplacer au pixel.'),
     order: t("Les zones peuvent se chevaucher. Superposition : {order} pour les incrustations ; Windows décide pour deux fenêtres. Pas de rotation par zone : VPX n'en a pas de réglage.", {
       order: EMBEDDED_ORDER.map((r) => labelOf(host, r)).join(t(' sous ')),
     }),

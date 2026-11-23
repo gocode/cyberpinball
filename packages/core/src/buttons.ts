@@ -56,7 +56,7 @@ export const BUTTONS: readonly ButtonInfo[] = [
   {
     id: 'tilt',
     get label() { return t('Balancier de tilt'); },
-    get prompt() { return t('Faites toucher l’anneau au balancier'); },
+    get prompt() { return t('Fais toucher l’anneau au balancier'); },
     get how() { return t('Le pendule contre son anneau, câblé sur une entrée du Pinscape (bouton de joystick) ou de l’encodeur (touche T)'); },
     required: false,
     default: 'KeyT',
@@ -473,10 +473,10 @@ export const PREVIOUS_KEY = 'Backspace';
  */
 export function refusedKey(code: string): string | undefined {
   if (joystickButton(code)) return undefined;
-  if (code === 'MetaLeft' || code === 'MetaRight') return t('La touche Windows ouvre le menu Démarrer : réglez ce bouton de l’encodeur sur une autre touche.');
-  if (code === CONFIG_KEY) return t('Tab est réservée à l’accès à la configuration : réglez ce bouton de l’encodeur sur une autre touche.');
-  if (code === PREVIOUS_KEY) return t('Retour arrière est réservée pour corriger un relevé : réglez ce bouton de l’encodeur sur une autre touche.');
-  if (sdlScancode(code) === undefined) return t('Touche « {code} » inconnue de VPX : réglez ce bouton de l’encodeur sur une autre touche.', { code });
+  if (code === 'MetaLeft' || code === 'MetaRight') return t('La touche Windows ouvre le menu Démarrer : règle ce bouton de l’encodeur sur une autre touche.');
+  if (code === CONFIG_KEY) return t('Tab est réservée à l’accès à la configuration : règle ce bouton de l’encodeur sur une autre touche.');
+  if (code === PREVIOUS_KEY) return t('Retour arrière est réservée pour corriger un relevé : règle ce bouton de l’encodeur sur une autre touche.');
+  if (sdlScancode(code) === undefined) return t('Touche « {code} » inconnue de VPX : règle ce bouton de l’encodeur sur une autre touche.', { code });
   return undefined;
 }
 
@@ -606,7 +606,7 @@ export function twinJoysticksInUse(twins: readonly TwinJoysticks[], cabinet: Pic
 
 /** Ce qu'il faut dire de cartes identiques, en une phrase, avec le remède. */
 export function twinJoysticksAdvice(twin: TwinJoysticks): string {
-  return t('{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donnez-leur un identifiant USB différent si leur outil le permet, sinon relevez tous les boutons sur une seule.', { n: twin.devices.length, name: twin.name || t('joystick') });
+  return t('{n} cartes identiques ({name}) : VPX les distingue par leur ordre de branchement, qui peut s’inverser. Donne-leur un identifiant USB différent si leur outil le permet, sinon relève tous les boutons sur une seule.', { n: twin.devices.length, name: twin.name || t('joystick') });
 }
 
 /**
@@ -685,7 +685,7 @@ export function refusedNavigationKey(id: string, code: string): string | undefin
   const refused = refusedKey(code);
   if (refused) return refused;
   const owner = NAVIGATION.find((n) => n.id !== id && n.fallback.includes(code));
-  return owner ? t('{key} reste la touche de secours « {action} » : choisissez un autre bouton.', { key: keyLabel(code), action: owner.label }) : undefined;
+  return owner ? t('{key} reste la touche de secours « {action} » : choisis un autre bouton.', { key: keyLabel(code), action: owner.label }) : undefined;
 }
 
 export const INTERFACE_KEYS: KeySet = {

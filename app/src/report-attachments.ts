@@ -138,7 +138,7 @@ export function refusalText(refused: readonly AttachRefusal[]): { text: string; 
       : first.why === 'size'
         ? t('« {file} » trop lourd ({size})', { file: first.file, size: formatSize(first.size ?? 0) })
         : first.why === 'folder'
-          ? t('« {file} » est un dossier : choisissez des fichiers', { file: first.file })
+          ? t('« {file} » est un dossier : choisis des fichiers', { file: first.file })
           : t('« {file} » illisible', { file: first.file });
   const others = refused.length - 1;
   const limits = t('{n} fichiers et {max} en tout au plus ; les captures d’écran sont réduites', { n: ATTACHMENTS_COUNT_MAX, max: formatSize(ATTACHMENTS_BYTES_MAX) });

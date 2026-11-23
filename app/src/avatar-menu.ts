@@ -174,8 +174,8 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     if (flash) rows.push(flash);
     rows.push(
       has
-        ? { text: t('Votre avatar : une image à vous'), detail: t('Vos amis la voient à côté de votre nom'), tone: 'ok', badges: [t('Choisi')] }
-        : { text: t('Pas encore d’avatar : vos initiales'), detail: t('Choisissez une photo ou une image : tous les joueurs la verront à côté de votre nom'), tone: 'info' },
+        ? { text: t('Ton avatar : une image à toi'), detail: t('Tes amis la voient à côté de ton nom'), tone: 'ok', badges: [t('Choisi')] }
+        : { text: t('Pas encore d’avatar : tes initiales'), detail: t('Choisis une photo ou une image : tous les joueurs la verront à côté de ton nom'), tone: 'info' },
       { text: t('Qui le voit'), detail: t('Tous les joueurs, amis ou non : Joueurs en ligne, salons, classements, profil public, demandes d’ami.'), icon: 'eye' },
     );
     const actions: Action[] = [
@@ -183,9 +183,9 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
       { label: t('Chercher une image sur le web…'), detail: t('Navigateur intégré : clic droit sur une image, « Télécharger cette image »'), icon: 'image-download', run: () => browseWeb() },
       saved
         ? { label: t('Recadrer mon avatar'), detail: t('Reprend la dernière image choisie et son cadrage'), icon: 'crop', run: () => openCrop(0) }
-        : { label: t('Recadrer mon avatar'), detail: t('Indisponible : choisissez d’abord une image'), icon: 'crop', tone: 'quiet', run: () => undefined },
+        : { label: t('Recadrer mon avatar'), detail: t('Indisponible : choisis d’abord une image'), icon: 'crop', tone: 'quiet', run: () => undefined },
     ];
-    if (has) actions.push({ label: t('Retirer mon avatar'), detail: t('Les autres joueurs voient de nouveau vos initiales'), icon: 'trash', run: () => confirmRemove() });
+    if (has) actions.push({ label: t('Retirer mon avatar'), detail: t('Les autres joueurs voient de nouveau tes initiales'), icon: 'trash', run: () => confirmRemove() });
     actions.push({ label: t('Retour'), icon: 'back', run: () => back() });
     return {
       heading: t('Mon avatar'),
@@ -224,10 +224,10 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     const cancel = () => openMain();
     host.library.openCustom(
       () => ({
-        heading: t('Retirer votre avatar ?'),
+        heading: t('Retirer ton avatar ?'),
         icon: 'alert',
         avatar: myView(),
-        sections: [{ rows: [{ text: t('Les autres joueurs verront de nouveau vos initiales'), tone: 'info' }] }],
+        sections: [{ rows: [{ text: t('Les autres joueurs verront de nouveau tes initiales'), tone: 'info' }] }],
         actions: [
           {
             label: t('Retirer'),
@@ -235,7 +235,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
             tone: 'warning',
             run: () => {
               host.net.setAvatar(undefined);
-              flash = { text: t('Avatar retiré : les autres joueurs voient vos initiales'), tone: 'ok' };
+              flash = { text: t('Avatar retiré : les autres joueurs voient tes initiales'), tone: 'ok' };
               openMain();
             },
           },
@@ -265,7 +265,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
   function buildCrop(): Built {
     const w = savedWork();
     if (!w) {
-      return { heading: t('Recadrer mon avatar'), icon: 'crop', sections: [{ rows: [{ text: t('L’image choisie n’est plus là : choisissez-en une autre'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: () => openMain() }], back: () => openMain() };
+      return { heading: t('Recadrer mon avatar'), icon: 'crop', sections: [{ rows: [{ text: t('L’image choisie n’est plus là : choisis-en une autre'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: () => openMain() }], back: () => openMain() };
     }
     const limits = cropLimits(w.crop, w.width, w.height);
     const actions: Action[] = [];
@@ -273,7 +273,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
       const at = actions.length;
       actions.push({ label, icon, ...opts, run: () => run(at) });
     };
-    add(t('Valider ce cadrage'), 'check', () => void save(), { tone: 'ok', detail: t('Enregistré, et envoyé à vos amis reliés') });
+    add(t('Valider ce cadrage'), 'check', () => void save(), { tone: 'ok', detail: t('Enregistré, et envoyé à tes amis reliés') });
     add(t('Zoom avant'), 'zoom-in', (at) => (limits.closest ? undefined : gesture(at, (x) => zoomCrop(x.crop, 1, x.width, x.height))), limits.closest ? { tone: 'quiet', detail: t('Au plus près') } : {});
     add(t('Zoom arrière'), 'zoom-out', (at) => (limits.widest ? undefined : gesture(at, (x) => zoomCrop(x.crop, -1, x.width, x.height))), limits.widest ? { tone: 'quiet', detail: t('Toute l’image est dans le cadre') } : {});
     add(t('Déplacer vers la gauche'), 'move-left', (at) => gesture(at, (x) => moveCrop(x.crop, -1, 0, x.width, x.height)));
@@ -286,14 +286,14 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     return {
       heading: t('Recadrer mon avatar'),
       icon: 'crop',
-      lead: t('Flippers : choisir un geste · Start : l’appliquer, autant de fois qu’il faut. À la souris : glissez le cadre, la molette zoome.'),
+      lead: t('Flippers : choisir un geste · Start : l’appliquer, autant de fois qu’il faut. À la souris : glisse le cadre, la molette zoome.'),
       sections: [],
       crop: {
         src: mediaUrl(w.file),
         width: w.width,
         height: w.height,
         box: cropBox(w.crop, w.width, w.height),
-        caption: t('Ce que verront vos amis'),
+        caption: t('Ce que verront tes amis'),
         input: (g) => {
           const x = savedWork();
           if (!x) return;
@@ -338,7 +338,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
       openMain();
     },
     detail() {
-      return me().avatar ? t('Votre image, vue par vos amis') : t('Pas encore d’avatar : une photo ou une image à vous');
+      return me().avatar ? t('Ton image, vue par tes amis') : t('Pas encore d’avatar : une photo ou une image à toi');
     },
   };
 }

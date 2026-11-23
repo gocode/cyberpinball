@@ -105,7 +105,7 @@ function markEngine() {
 }
 
 /**
- * « Vos comptes » (recherche libre d'une table) : une pastille par site, avec son état. Connecté :
+ * « Tes comptes » (recherche libre d'une table) : une pastille par site, avec son état. Connecté :
  * elle cherche le texte du champ sur ce site ; pas encore : elle ouvre sa page de connexion.
  */
 function showAccounts(accounts) {
@@ -129,7 +129,7 @@ function showAccounts(accounts) {
       state.className = 'site-state';
       state.textContent = a.connected ? t('connecté') : t('se connecter');
       b.append(dot, name, state);
-      b.title = a.connected ? t('Chercher le texte sur {site}, avec votre compte', { site: a.label }) : t('Ouvrir la page de connexion de {site}', { site: a.label });
+      b.title = a.connected ? t('Chercher le texte sur {site}, avec ton compte', { site: a.label }) : t('Ouvrir la page de connexion de {site}', { site: a.label });
       b.addEventListener('click', () => window.cyberAcquire.site(a.id, $('query').value));
       return b;
     }),

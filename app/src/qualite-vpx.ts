@@ -384,7 +384,7 @@ export function createVpxPresetsMenu(host: VpxPresetsMenuHost): { item: Provided
       })),
       {
         label: qualityLabel('custom'),
-        detail: t('Vos propres réglages (Réglages de VPX) : Cyber Pinball n’y touche pas. Choisissez un mode pour reprendre.'),
+        detail: t('Tes propres réglages (Réglages de VPX) : Cyber Pinball n’y touche pas. Choisis un mode pour reprendre.'),
         icon: 'sliders',
         activeChoice: choice === 'custom' ? t('Choix actuel') : undefined,
         tone: choice === 'custom' ? 'ok' : undefined,
@@ -395,7 +395,7 @@ export function createVpxPresetsMenu(host: VpxPresetsMenuHost): { item: Provided
     return {
       heading: t('Pré-réglages'),
       icon: 'gauge',
-      lead: t('Qualité de l’image et fluidité de VPX en un choix. Les réglages un par un restent dans Réglages de VPX ; en changer un vous fait passer en Personnalisé.'),
+      lead: t('Qualité de l’image et fluidité de VPX en un choix. Les réglages un par un restent dans Réglages de VPX ; en changer un te fait passer en Personnalisé.'),
       sections: [],
       actions,
       back: () => host.library.openSystem(),

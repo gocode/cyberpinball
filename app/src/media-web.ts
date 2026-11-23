@@ -143,14 +143,14 @@ export function createWebSearch(ctx: WebSearchContext) {
     const query = queryFor(table, type, title, refine);
     wanted = { table: table.file, type };
     ctx.sites.openWeb({ url: webEngineUrl(query, 'web'), table: table.file, title: table.title, type, label: typeLabel(type), query, engine: 'web' });
-    return t('Navigateur intégré ouvert : cherchez, téléchargez, le fichier est vérifié puis proposé ici. Fermer (Échap) garde la page.');
+    return t('Navigateur intégré ouvert : cherche, télécharge, le fichier est vérifié puis proposé ici. Fermer (Échap) garde la page.');
   }
 
   /** Détail de l'action qui ouvre la recherche : téléchargement en cours, reprise, ou le texte cherché. */
   function detail(table: TableEntry, type: MediaType, title?: string, refine?: SiteSearchOptions): string {
     const loading = ctx.sites.webProgress();
     if (loading) return t('Téléchargement en cours : {got}', { got: formatTransfer(loading, true) });
-    if (ctx.sites.resumable(startUrl(table, type, title, refine))) return t('Reprend la page où vous en étiez ; ce que vous téléchargez revient ici');
+    if (ctx.sites.resumable(startUrl(table, type, title, refine))) return t('Reprend la page où tu en étais ; ce que tu télécharges revient ici');
     return t('Navigateur intégré, recherche libre : « {query} »', { query: queryFor(table, type, title, refine) });
   }
 
@@ -233,18 +233,18 @@ export function createWebSearch(ctx: WebSearchContext) {
         lead: t('Le fichier a bien été reçu, mais rien dedans ne peut servir de {label} ({formats}). Rien n’a été gardé.', { label: lowerFirst(label), formats: mediaTypeInfo(r.type).formats.join(', ') }),
         sections: asideSections(r),
         actions: [
-          { label: t('Retour à la recherche'), detail: t('Reprend la page où vous en étiez'), tone: 'ok', run: research },
+          { label: t('Retour à la recherche'), detail: t('Reprend la page où tu en étais'), tone: 'ok', run: research },
           { label: t('Retour : {label}', { label }), run: back },
         ],
         back,
       };
     }
     const actions: Action[] = list.map((u) => ({ label: path.basename(u.file), detail: statusOf(r.type, u).label, run: () => ctx.show(() => buildFile(key, u)) }));
-    actions.push({ label: t('Retour à la recherche'), detail: t('Reprend la page où vous en étiez'), run: research }, { label: t('Garder pour plus tard'), detail: t('Restent proposés dans « Voir les propositions »'), run: back });
+    actions.push({ label: t('Retour à la recherche'), detail: t('Reprend la page où tu en étais'), run: research }, { label: t('Garder pour plus tard'), detail: t('Restent proposés dans « Voir les propositions »'), run: back });
     return {
       heading: t('Reçu pour « {label} » : {n} fichiers', { label, n: list.length }),
       subheading: `${table.title} · ${fromOf(r)} · ${r.filename}`,
-      lead: t('Choisissez celui à affecter : son aperçu, ce qui sera écrit et ce qui part à la corbeille sont montrés avant toute écriture.'),
+      lead: t('Choisis celui à affecter : son aperçu, ce qui sera écrit et ce qui part à la corbeille sont montrés avant toute écriture.'),
       sections: asideSections(r),
       actions,
       back,
@@ -333,10 +333,10 @@ export function createWebSearch(ctx: WebSearchContext) {
       lead = t('« {file} » est une image .{ext} que « {label} » ne lit pas : elle sera redessinée en PNG, à l’identique, puis rangée.', { file: name, ext, label });
       if (type === 'Wheel' && /^(jpe?g|jfif|bmp)$/.test(ext)) lead += ` ${t('Ce format n’a pas de transparence : le logo gardera son fond.')}`;
     } else if (u.convert.from === 'video') {
-      lead = t('« {file} » est une vidéo : son son sera extrait en WAV, découpé à votre guise, puis rangé.', { file: name });
+      lead = t('« {file} » est une vidéo : son son sera extrait en WAV, découpé à ta guise, puis rangé.', { file: name });
       if (isMp4(u)) lead += ` ${t('Sa piste son peut aussi être prise telle quelle, en .m4a, sans réencodage.')}`;
     }
-    else lead = t('« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.', { file: name, ext });
+    else lead = t('« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à ta guise, puis rangé.', { file: name, ext });
     const sections: Section[] = asideSections(r);
     const actions: Action[] = [];
     const entry = (file: string): MediaPageEntry => ({ from: file, mode: 'copy', origin: originOf(r) });
@@ -365,7 +365,7 @@ export function createWebSearch(ctx: WebSearchContext) {
       });
     }
     actions.push(
-      { label: t('Retour à la recherche'), detail: t('Reprend la page où vous en étiez'), run: research },
+      { label: t('Retour à la recherche'), detail: t('Reprend la page où tu en étais'), run: research },
       { label: t('Garder pour plus tard'), detail: t('Reste proposé dans « Voir les propositions »'), run: back },
     );
     // Un son s'écoute tant que sa carte est choisie : la carte est la première action, « Écouter ».
@@ -593,7 +593,7 @@ export function createWebSearch(ctx: WebSearchContext) {
       lead:
         type === 'AudioLaunch'
           ? t('Le son de lancement accompagne le départ de la partie : quelques secondes suffisent. Rien n’est écrit avant « Affecter cet extrait ».')
-          : t('La musique du jeu joue en boucle tant que la table est choisie : gardez le passage qui la fait reconnaître. Rien n’est écrit avant « Affecter cet extrait ».'),
+          : t('La musique du jeu joue en boucle tant que la table est choisie : garde le passage qui la fait reconnaître. Rien n’est écrit avant « Affecter cet extrait ».'),
       sections: [],
       actions,
       back,

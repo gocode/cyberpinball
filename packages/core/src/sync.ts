@@ -142,7 +142,7 @@ export function planVpxSync(
       if (match.approximate.includes(fp)) {
         findings.push({
           severity: 'warning',
-          message: t("{role} : écran « {screen} » retrouvé par son modèle seulement (pas de numéro de série). Vérifiez qu'il s'agit bien du bon écran.", {
+          message: t("{role} : écran « {screen} » retrouvé par son modèle seulement (pas de numéro de série). Vérifie qu'il s'agit bien du bon écran.", {
             role: role.label,
             screen: screen?.label ?? fp,
           }),
@@ -160,7 +160,7 @@ export function planVpxSync(
     if (d.scale !== undefined && d.scale !== 1) {
       findings.push({
         severity: 'warning',
-        message: t("{name} est mis à l'échelle à {scale} %. VPX repère les écrans en coordonnées logiques : gardez 100 % sur une borne.", {
+        message: t("{name} est mis à l'échelle à {scale} %. VPX repère les écrans en coordonnées logiques : garde 100 % sur une borne.", {
           name: d.friendlyName || d.gdiName,
           scale: Math.round(d.scale * 100),
         }),
@@ -270,7 +270,7 @@ export function planVpxSync(
     if (!size) {
       findings.push({
         severity: 'warning',
-        message: t("Playfield : taille de l'écran inconnue. Relancez l'assistant d'écrans et indiquez sa diagonale pour que VPX cadre les tables à la bonne échelle."),
+        message: t("Playfield : taille de l'écran inconnue. Relance l'assistant d'écrans et indique sa diagonale pour que VPX cadre les tables à la bonne échelle."),
       });
     }
     // Sens des tables d'après ce que VPX lira, valeurs changées ou gardées à la main comprises
@@ -280,7 +280,7 @@ export function planVpxSync(
   } else {
     findings.push({
       severity: 'info',
-      message: t("Playfield : orientation non renseignée. Relancez l'assistant d'écrans pour que les tables soient cadrées automatiquement."),
+      message: t("Playfield : orientation non renseignée. Relance l'assistant d'écrans pour que les tables soient cadrées automatiquement."),
     });
   }
 
@@ -340,7 +340,7 @@ export function planVpxSync(
     findings.push({
       severity: 'warning',
       message: t(
-        "Boutons de la borne incohérents dans cabinet.json ({issues}) : l'interface suit les touches par défaut des encodeurs et [Input] n'est pas touché. Refaites l'étape « Boutons » ou remettez les touches par défaut.",
+        "Boutons de la borne incohérents dans cabinet.json ({issues}) : l'interface suit les touches par défaut des encodeurs et [Input] n'est pas touché. Refais l'étape « Boutons » ou remets les touches par défaut.",
         { issues: buttonIssues.join(t(' ; ')) },
       ),
     });
@@ -382,7 +382,7 @@ export function planVpxSync(
         findings.push({
           severity: 'warning',
           message: t(
-            "{plugin} et {other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent {object}, et le dernier chargé l'emporte. Remettez [Plugin.{other}] Enable = 0.",
+            "{plugin} et {other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent {object}, et le dernier chargé l'emporte. Remets [Plugin.{other}] Enable = 0.",
             { plugin, other, object: plugin === 'B2S' ? 'B2S.Server' : t('le même objet') },
           ),
         });
@@ -396,7 +396,7 @@ export function planVpxSync(
   if (manualEdits.length) {
     findings.push({
       severity: 'warning',
-      message: t("VPinballX.ini modifié à la main : {edits}. Cyber Pinball n'y a pas touché : gardez ces valeurs ou remettez les siennes.", { edits: manualEdits.map(formatManualEdit).join(t(' ; ')) }),
+      message: t("VPinballX.ini modifié à la main : {edits}. Cyber Pinball n'y a pas touché : garde ces valeurs ou remets les siennes.", { edits: manualEdits.map(formatManualEdit).join(t(' ; ')) }),
     });
   }
 
@@ -494,7 +494,7 @@ export function orientationFinding(window: ObservedDisplay, edge: FlipperEdge, r
     return {
       severity: 'warning',
       message: t(
-        "Playfield : flippers {edge} de l'image, mais VPX les place toujours {expected}. Les tables s'afficheront à l'envers : relancez l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.",
+        "Playfield : flippers {edge} de l'image, mais VPX les place toujours {expected}. Les tables s'afficheront à l'envers : relance l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.",
         { edge: EDGE_LABELS[edge], expected: EDGE_LABELS[expected] },
       ),
     };
@@ -503,12 +503,12 @@ export function orientationFinding(window: ObservedDisplay, edge: FlipperEdge, r
   return {
     severity: 'warning',
     message: played.edge
-      ? t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX les dessinera {played}. Les tables s'afficheront de travers : remettez les valeurs de Cyber Pinball.", {
+      ? t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX les dessinera {played}. Les tables s'afficheront de travers : remets les valeurs de Cyber Pinball.", {
           edge: EDGE_LABELS[edge],
           keys,
           played: EDGE_LABELS[played.edge],
         })
-      : t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s'afficher de travers. Remettez le cadrage automatique (CabinetAutofitMode = 1).", {
+      : t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s'afficher de travers. Remets le cadrage automatique (CabinetAutofitMode = 1).", {
           edge: EDGE_LABELS[edge],
           keys,
         }),

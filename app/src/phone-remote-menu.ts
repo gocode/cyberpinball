@@ -44,14 +44,14 @@ export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard', wordin
         qr: bar.qr,
         title: wording?.offer ?? (big ? t('Connecter un téléphone') : t('Taper au téléphone')),
         lines: wording?.offerLines ?? (big
-          ? [t('Scannez avec votre téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Accepté une fois, le téléphone revient ensuite sans QR code.')]
-          : [t('Scannez ce QR sur le même réseau Wi-Fi que la borne.')]),
+          ? [t('Scanne avec ton téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Accepté une fois, le téléphone revient ensuite sans QR code.')]
+          : [t('Scanne ce QR sur le même réseau Wi-Fi que la borne.')]),
       };
     case 'pending':
       return {
         phase: 'pending',
         code: bar.code,
-        title: t('Comparez les codes'),
+        title: t('Compare les codes'),
         lines: big ? [t('Le même code doit apparaître sur le téléphone ({device}).', { device: bar.line }), t('Start : accepter · Exit : refuser')] : [t('Start : accepter · Exit : refuser')],
       };
     case 'paired':

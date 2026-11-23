@@ -117,7 +117,7 @@ test('Affiche Communauté : le message qui attend, mes amis en ligne, le salon, 
   ]);
   // Au fronton, une phrase : le message qui attend.
   assert.equal(p.heading, 'On fait une partie ce soir ?');
-  assert.match(p.eyebrow, /^Nina vous a écrit · il y a 4 min/);
+  assert.match(p.eyebrow, /^Nina t’a écrit · il y a 4 min/);
 });
 
 test('Affiche Communauté : personne en ligne, des joueurs suggérés à la place (jamais vide)', () => {
@@ -146,6 +146,6 @@ test('Affiche Communauté : partage coupé, ce qu’il faut faire et rien d’au
   setLanguage('fr');
   const p = poster({ enabled: false });
   assert.equal(p.empty, true);
-  assert.equal(p.heading, 'Activez le partage');
+  assert.equal(p.heading, 'Active le partage');
   assert.deepEqual([p.people, p.chips, p.said, p.room], [[], [], undefined, undefined]);
 });

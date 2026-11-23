@@ -262,7 +262,7 @@ test('vingt phrases au plus : « Ajouter » grisé avec sa raison', () => {
   assert.equal(h.phrases().length, PHRASES_MAX);
   const add = h.built().actions.find((a) => a.label === 'Ajouter une phrase…')!;
   assert.equal(add.tone, 'quiet');
-  assert.equal(add.detail, '20 phrases au plus : supprimez-en une d’abord');
+  assert.equal(add.detail, '20 phrases au plus : supprime-en une d’abord');
   add.run();
   assert.equal(h.prompt(), undefined, 'pas de clavier');
   assert.equal(h.cursor(), 'Ajouter une phrase…');

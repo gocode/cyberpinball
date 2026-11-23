@@ -5,7 +5,7 @@
 //
 // « Joueurs » réunit les anciennes entrées « Mes amis » et « Joueurs en ligne » (21/11/2026) : le
 // premier onglet, Amis, montre les demandes reçues en tête puis mes amis, en ligne d'abord ; les
-// suivants (Tous, Mon pays, À proximité, Mêmes tables) les joueurs dont le signal public a moins de
+// suivants (Tous, Mon pays, Sur mon réseau local, Mêmes tables) les joueurs dont le signal public a moins de
 // cinq minutes, puis tous ceux que la borne a croisés. Pour un joueur qui n'est pas mon ami, jamais la
 // table en cours : « En ligne » ou « En partie », puis ce qui nous rapproche (tables en commun, réseau
 // local). MagnaSave passe d'un onglet à l'autre ; Start ouvre son profil, le seul écran d'un joueur.
@@ -82,7 +82,7 @@ export interface CommunityMenuHost {
   rooms?: { door(): { label: string; detail: string; attention: boolean; quiet: boolean }; glance?(): RoomGlance; peek?(): CommunityRoomPeek; problem?(): string | undefined; open(back: () => void): void };
   /** Mon niveau : le rapprochement avec les joueurs suggérés. */
   myLevel?(): number;
-  /** Les parties instantanées, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
+  /** Les parties en direct, ouvertes à tous (instant-menu.ts) : ce que dit la porte, et les ouvrir. */
   instant?: { door(): { label: string; detail: string; quiet: boolean }; open(back: () => void): void };
   /** Les classements de toutes mes tables (rankings-menu.ts) : ce que dit la porte, et les ouvrir. */
   rankings: { detail(): string; open(back: () => void): void; standing?(): PlayerStanding | undefined };
@@ -100,7 +100,7 @@ export interface CommunityMenu {
   openPlayers(back?: () => void, tab?: PlayersTab): void;
   /** Menu système > Communauté > Joueurs. */
   item: ProvidedSystemItem;
-  /** Les autres entrées de l'accueil fournies ici : Mon niveau, Partie instantanée, Groupes, salon du pays, Classements. */
+  /** Les autres entrées de l'accueil fournies ici : Mon niveau, Partie en direct, Groupes, salon du pays, Classements. */
   homeItems: Partial<Record<'my-level' | 'instant' | 'groups' | 'rooms' | 'rankings', ProvidedSystemItem>>;
   /** Ce que dit le médaillon : joueurs en ligne, ceux de mon pays, mes amis ; quelque chose attend. */
   summary(): { online: number; country: number; friends: number; attention: boolean };
@@ -294,7 +294,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       case 'country':
         return t('Mon pays');
       case 'nearby':
-        return t('À proximité');
+        return t('Sur mon réseau local');
       case 'tables':
         return t('Mêmes tables');
     }
@@ -317,7 +317,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       case 'elsewhere':
         return t('En ligne ailleurs ({n})', { n });
       case 'nearby':
-        return t('Sur votre réseau local ({n})', { n });
+        return t('Sur ton réseau local ({n})', { n });
       case 'tables':
         return t('Le plus de tables en commun ({n})', { n });
       case 'offline':
@@ -329,7 +329,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   function closeness(p: OnlinePlayer, tables: ReadonlyMap<string, readonly string[]>, shown: PlayersTab = filter): string | undefined {
     const common = tables.get(p.key) ?? [];
     if (shown === 'tables' && common.length) return tn(common.length, '{n} table : {list}', '{n} tables : {list}', { list: common.slice(0, 3).join(', ') + (common.length > 3 ? '…' : '') });
-    if (p.nearby) return t('Sur votre réseau local');
+    if (p.nearby) return t('Sur ton réseau local');
     if (common.length) return tn(common.length, '{n} table en commun', '{n} tables en commun');
     return undefined;
   }
@@ -377,7 +377,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
         return [f, shown];
       }),
     );
-    const note = !s.enabled ? t('Partage désactivé : personne ne vous voit, vous ne voyez personne') : !status.running ? (status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…')) : undefined;
+    const note = !s.enabled ? t('Partage désactivé : personne ne te voit, tu ne vois personne') : !status.running ? (status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…')) : undefined;
     return {
       requests: s.enabled
         ? s.incoming.map((r) => ({ key: r.key, name: r.name, avatar: avatar(r.key, r.name), flag: flagOf(card(r.key)), detail: t('Demande reçue {ago}', { ago: socialAgo(r.at, now()) }) }))
@@ -420,7 +420,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     if (on.length) sections.push({ title: t('En ligne ({n})', { n: on.length }), kind: 'players', rows: on.map((p) => row(p, 'friends')) });
     if (off.length) sections.push({ title: t('Hors ligne ({n})', { n: off.length }), kind: 'players', rows: off.map((p) => row(p, 'offline')) });
     if (!friends.length && !s.incoming.length)
-      sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), icon: 'info', tone: 'quiet' }] });
+      sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherche un nom dans l’annuaire, ou une borne de ton réseau local'), icon: 'info', tone: 'quiet' }] });
     return sections;
   }
 
@@ -436,7 +436,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const here = () => lib.openCustom(buildPlayers);
     const counts = onlineCounts(list, myCountry());
     if (!s.enabled) {
-      sections.push({ rows: [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Le réactiver : Partage et réseau'), icon: 'network', tone: 'quiet' }] });
+      sections.push({ rows: [{ text: t('Partage désactivé : personne ne te voit, tu ne vois personne'), detail: t('Le réactiver : Partage et réseau'), icon: 'network', tone: 'quiet' }] });
     } else if (!status.running) {
       sections.push({ rows: [{ text: status.error ? t('Réseau des bornes indisponible : nouvel essai tout seul') : t('Connexion au réseau des bornes…'), icon: 'network', tone: 'quiet' }] });
     }
@@ -507,7 +507,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       const shown = s.publicPresence !== false;
       actions.push({
         label: shown ? t('Apparaître en ligne pour tous : oui') : t('Apparaître en ligne pour tous : non'),
-        detail: shown ? t('« En ligne » ou « En partie », jamais la table ; vos amis voient toujours votre présence') : t('Les autres vous voient hors ligne ; vos amis voient toujours votre présence'),
+        detail: shown ? t('« En ligne » ou « En partie », jamais la table ; tes amis voient toujours ta présence') : t('Les autres te voient hors ligne ; tes amis voient toujours ta présence'),
         icon: 'pulse',
         run: () => (net.setPublicPresence(!shown), here()),
       });
@@ -517,7 +517,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
       heading: t('Joueurs'),
       icon: 'friends',
       subheading: countsLine(online),
-      lead: filter === 'friends' ? t('Vos amis, ceux en ligne d’abord, et les demandes reçues en tête. Start ouvre le profil d’un joueur.') : t('Tous les joueurs croisés par votre borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.'),
+      lead: filter === 'friends' ? t('Tes amis, ceux en ligne d’abord, et les demandes reçues en tête. Start ouvre le profil d’un joueur.') : t('Tous les joueurs croisés par ta borne, ceux en ligne d’abord. La table en cours n’est montrée qu’entre amis.'),
       tabs,
       sections,
       actions,
@@ -555,7 +555,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     const s = net.state();
     return {
       subheading: s.enabled ? countsLine(players()) : t('Partage désactivé'),
-      lead: t('Ce que voient les autres joueurs : votre pseudo, votre avatar, votre pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.'),
+      lead: t('Ce que voient les autres joueurs : ton pseudo, ton avatar, ton pays, « En ligne » ou « En partie ». Table en cours, bibliothèque et messages : entre amis seulement.'),
     };
   }
   lib.decorateSystemGroup('amis', homeDecor);
@@ -655,9 +655,9 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
   }
 
   function poster(): CommunityPosterView {
-    const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Votre borne. Vos joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Votre borne. Vos joueurs.'), start: t('Start'), open: t('Ouvrir la Communauté') };
+    const frame = { edition: t('Le flipper se joue à plusieurs'), label: t('Ta borne. Tes joueurs.'), title: t('COMMUNAUTÉ'), tagline: t('Ta borne. Tes joueurs.'), start: t('Start'), open: t('Ouvrir la Communauté') };
     if (!net.state().enabled)
-      return { ...frame, stats: t('Le réseau des bornes vous attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Activez le partage'), detail: t('Menu système › Communauté › Réglages de la communauté › Partage et réseau'), people: [], chips: [] };
+      return { ...frame, stats: t('Le réseau des bornes t’attend.'), empty: true, eyebrow: t('Pour commencer'), heading: t('Active le partage'), detail: t('Menu système › Communauté › Réglages de la communauté › Partage et réseau'), people: [], chips: [] };
     const s = net.state();
     const list = players();
     // Le message qui m'attend : la conversation la plus récente où quelque chose attend.
@@ -696,7 +696,7 @@ export function createCommunityMenu(host: CommunityMenuHost): CommunityMenu {
     if (s.incoming.length) chips.push({ icon: 'friend-add', text: tn(s.incoming.length, '{n} demande d’ami', '{n} demandes d’ami'), hot: true });
     // Au fronton, une phrase : le message qui attend, sinon la dernière ligne du salon.
     const last = peek?.lines.at(-1);
-    const eyebrow = said ? t('{name} vous a écrit · {when}', { name: said.name, when: said.when.toLocaleLowerCase() }) : room ? (room.present ? `${room.name} · ${room.present}` : room.name) : t('Joueurs en ligne');
+    const eyebrow = said ? t('{name} t’a écrit · {when}', { name: said.name, when: said.when.toLocaleLowerCase() }) : room ? (room.present ? `${room.name} · ${room.present}` : room.name) : t('Joueurs en ligne');
     const heading = said ? (said.who ? `<${said.who}> ${said.text}` : said.text) : (room?.problem ?? (last ? `<${last.nick}> ${last.text}` : t('Rien de neuf pour l’instant')));
     const friends = list.filter((p) => p.friend);
     const detail = friends.length ? t('Amis en ligne : {names}', { names: friends.slice(0, 3).map((p) => p.name).join(', ') + (friends.length > 3 ? ` +${friends.length - 3}` : '') }) : t('Messages, joueurs, groupes et salons');

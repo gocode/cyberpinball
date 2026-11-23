@@ -28,7 +28,8 @@ export interface DailyTablesMenuHost {
 }
 
 export interface DailyTablesMenu {
-  open(back: () => void): void;
+  /** `from` : le libellé du retour quand l'écran s'ouvre d'ailleurs que des Classements (« Retour : Arène »). */
+  open(back: () => void, from?: string): void;
   /** Ce que dit la porte des Classements (ou un onglet de l'Arène). */
   detail(): string;
 }
@@ -45,6 +46,8 @@ export const levelLabel = (h: { level?: number; levelUnsure?: true }): string | 
 export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMenu {
   const svc = host.service;
   let back: () => void = () => undefined;
+  /** Le libellé du retour : l'écran d'où l'on vient, jamais un autre. */
+  let backLabel: string | undefined;
   let scope: DailyScope = 'country';
 
   const scopeLabel = (sc: DailyScope) => (sc === 'world' ? t('Monde') : sc === 'friends' ? t('Amis') : svc.country() ? countryName(svc.country()!, locale()) : t('Pays'));
@@ -68,8 +71,8 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
 
   /** « Record du jour : Paul · Niv. 24 · 10 340 000 ». */
   function recordText(line: DailyLine, board: DailyBoard): string {
-    if (!line.record) return t('Aucun score publié : votre score sera le premier');
-    const who = [line.record.mine ? t('vous') : line.record.name, levelLabel(line.record), formatNumber(line.record.score)].filter(Boolean).join(' · ');
+    if (!line.record) return t('Aucun score publié : ton score sera le premier');
+    const who = [line.record.mine ? t('toi') : line.record.name, levelLabel(line.record), formatNumber(line.record.score)].filter(Boolean).join(' · ');
     return board.period === 'today' ? t('Record du jour : {who}', { who }) : t('Record de la semaine : {who}', { who });
   }
 
@@ -77,12 +80,12 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
   function mineText(line: DailyLine, board: DailyBoard, local: LocalMatch, holder: { name: string } | undefined): string {
     if (local.state === 'pending') return t('Empreinte de la table en calcul…');
     if (local.state === 'other')
-      return holder ? t('Autre version que la vôtre · Start : récupérer cette version chez {name}', { name: holder.name }) : t('Autre version que la vôtre · récupérer cette version : aucun ami ne l’a pour l’instant');
-    if (local.state === 'missing') return holder ? t('Vous n’avez pas cette table · Start : la récupérer chez {name}', { name: holder.name }) : t('Vous n’avez pas cette table');
+      return holder ? t('Autre version que la tienne · Start : récupérer cette version chez {name}', { name: holder.name }) : t('Autre version que la tienne · récupérer cette version : aucun ami ne l’a pour l’instant');
+    if (local.state === 'missing') return holder ? t('Tu n’as pas cette table · Start : la récupérer chez {name}', { name: holder.name }) : t('Tu n’as pas cette table');
     const me = line.me;
     if (!me) return board.period === 'today' ? t('Pas encore jouée aujourd’hui') : t('Pas encore jouée cette semaine');
-    if (!me.above) return t('Vous : {score} · {place}, le record est à vous', { score: formatNumber(me.score), place: placeLabel(me.rank) });
-    return t('Vous : {score} · {place} · à {gap} de {name} ({above})', { score: formatNumber(me.score), place: placeLabel(me.rank), gap: formatNumber(me.gap ?? 0), name: me.above.name, above: placeLabel(me.above.rank) });
+    if (!me.above) return t('Toi : {score} · {place}, le record est à toi', { score: formatNumber(me.score), place: placeLabel(me.rank) });
+    return t('Toi : {score} · {place} · à {gap} de {name} ({above})', { score: formatNumber(me.score), place: placeLabel(me.rank), gap: formatNumber(me.gap ?? 0), name: me.above.name, above: placeLabel(me.above.rank) });
   }
 
   function lineRow(line: DailyLine, board: DailyBoard, actions: Action[], here: () => void): Row {
@@ -118,13 +121,13 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
       .slice(0, RECENT_OFFERED);
     const head: Row = {
       text: board.period === 'today' ? t('Personne n’a encore joué aujourd’hui') : t('Personne n’a encore joué cette semaine'),
-      detail: t('Votre prochain score sera le premier du classement'),
+      detail: t('Ton prochain score sera le premier du classement'),
       icon: 'info',
       tone: 'info',
     };
     const rows = recent.map((table): Row => {
       const action = actions.push({ label: t('Jouer · {title}', { title: table.title }), key: `recent:${table.file}`, icon: 'play', run: () => host.play(table) }) - 1;
-      return { text: table.title, detail: t('Jouée récemment : ouvrez le classement'), icon: 'play', action, pick: true };
+      return { text: table.title, detail: t('Jouée récemment : ouvre le classement'), icon: 'play', action, pick: true };
     });
     return [head, ...rows];
   }
@@ -155,7 +158,7 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
     } else {
       sections.push({ rows: board.lines.map((l) => lineRow(l, board, actions, here)) });
     }
-    actions.push({ label: t('Retour : Classements'), icon: 'back', key: 'back', run: () => back() });
+    actions.push({ label: backLabel ?? t('Retour : Classements'), icon: 'back', key: 'back', run: () => back() });
     const calm = board?.period === 'week';
     return {
       heading: t('Tables du jour'),
@@ -180,8 +183,9 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
   }
 
   return {
-    open(to) {
+    open(to, from) {
       back = to;
+      backLabel = from;
       scope = firstScope();
       // Le curseur sur la première table, juste après les onglets.
       host.library.openCustom(build, DAILY_SCOPES.length);
@@ -190,7 +194,7 @@ export function createDailyTablesMenu(host: DailyTablesMenuHost): DailyTablesMen
       if (svc.unavailable()) return t('Indisponible : {why}', { why: svc.unavailable()! });
       const board = svc.board(firstScope());
       const top = board.lines[0];
-      if (!top) return t('Les plus jouées aujourd’hui, le record du jour, votre écart');
+      if (!top) return t('Les plus jouées aujourd’hui, le record du jour, ton écart');
       return board.period === 'today' ? t('{title} en tête aujourd’hui · {plays}', { title: top.title, plays: playsText(top) }) : t('{title} en tête cette semaine · {plays}', { title: top.title, plays: playsText(top) });
     },
   };

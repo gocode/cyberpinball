@@ -6,7 +6,7 @@
 // n'est pas battu. Le défié peut refuser ; personne n'a joué de son côté : le défi expire, sans vainqueur.
 //
 // Pas de serveur : chaque étape est une petite note signée par son auteur (Ed25519, comme les scores des
-// classements et les parties instantanées), relayée de borne en borne et gardée par chacune jusqu'à
+// classements et les parties en direct), relayée de borne en borne et gardée par chacune jusqu'à
 // l'échéance (CHALLENGE_GRACE_MS en plus). Ainsi le défi arrive même si les deux bornes ne sont jamais
 // allumées en même temps : une troisième le garde et le remet. Notes :
 // - offer : le défi (qui, à qui, la table, le score à battre, l'échéance) ;
@@ -424,10 +424,10 @@ export const challengeToPlay = (c: Pick<Challenge, 'state' | 'leader' | 'role'>)
 
 /** Peut-on défier ce joueur sur cette version ? Undefined : oui ; sinon la raison, dite à l'écran. */
 export function challengeBlocked(list: readonly Challenge[], opponent: string, table: Pick<ChallengeTable, 'board' | 'balls'>, me: string): string | undefined {
-  if (opponent === me) return t('Vous ne pouvez pas vous défier vous-même');
+  if (opponent === me) return t('Tu ne peux pas te défier toi-même');
   const same = list.find((c) => challengeOpen(c) && c.opponent.key === opponent && c.table.board === table.board && (c.table.balls ?? 0) === (table.balls ?? 0));
   if (same) return t('Défi déjà en cours sur cette table');
-  if (list.filter((c) => c.role === 'sent' && challengeOpen(c)).length >= CHALLENGE_SENT_MAX) return tn(CHALLENGE_SENT_MAX, 'Déjà {n} défi en cours : attendez la fin d’un défi', 'Déjà {n} défis en cours : attendez la fin d’un défi');
+  if (list.filter((c) => c.role === 'sent' && challengeOpen(c)).length >= CHALLENGE_SENT_MAX) return tn(CHALLENGE_SENT_MAX, 'Déjà {n} défi en cours : attends la fin d’un défi', 'Déjà {n} défis en cours : attends la fin d’un défi');
   return undefined;
 }
 

@@ -74,9 +74,9 @@ test('la carte part toujours : « Partez ! » lu, ou restée trop longtemps, san
   let game = gameStatus(gameStatus(launched(), 'borne', { state: 'loading', ready: true, manual: true }, at(0)), 'poste', { state: 'loading', ready: true, manual: true }, at(0));
   game = giveGo(game, 'all-ready', at(0));
   const go = liveWaitView(game, 'poste', at(1000), { manual: true, readyAt: at(0).getTime() });
-  assert.equal(go?.title, 'Partez !');
-  assert.match(go!.lead, /Appuyez sur Start/);
-  assert.match(go!.note!, /Table sans relevé : quittez-la à la fin de votre partie/);
+  assert.equal(go?.title, 'Pars !');
+  assert.match(go!.lead, /Appuie sur Start/);
+  assert.match(go!.note!, /Table sans relevé : quitte-la à la fin de ta partie/);
   assert.equal(liveWaitView(game, 'poste', at(LIVE_GO_SHOW_MS + 1), { manual: true, readyAt: at(0).getTime() }), undefined);
 });
 
@@ -164,7 +164,7 @@ test('table sans relevé : dite avant la partie (choix, salon, invitation), avec
   const label = liveManualLabel('script');
   assert.equal(label.text, 'Départ manuel, pas de score en direct');
   assert.match(label.detail, /son script ne donne pas l’état de jeu/);
-  assert.match(label.detail, /chacun appuie sur Start à « Partez ! »/);
+  assert.match(label.detail, /chacun appuie sur Start à « Pars ! »/);
   for (const r of ['rom', 'inspector', 'other'] as const) assert.ok(liveManualLabel(r).detail.length > 40, r);
   // L'invitation porte la marque de l'hôte ; une valeur inconnue est ignorée.
   const invite = parseLiveMessage({ t: 'game-invite', game: { id: '0123456789abcdef', title: '2001', table: { table: { title: '2001' }, manual: 'script' }, players: [] } }) as Extract<LiveMessage, { t: 'game-invite' }>;
@@ -336,7 +336,7 @@ test('service : table sans relevé, réseau coupé après « partez » : la vue 
     await until('acceptée', () => host.current()!.players[1]!.state === 'accepted');
     assert.ok(host.start());
     await until('« partez » reçu des deux côtés', () => !!host.current()!.goAt && !!guest.current()?.goAt, 20_000);
-    assert.equal((last.poste as { title: string } | undefined)?.title ?? 'Partez !', 'Partez !');
+    assert.equal((last.poste as { title: string } | undefined)?.title ?? 'Pars !', 'Pars !');
     // Plus aucun message : ni salle, ni score (table sans relevé). La carte doit finir quand même.
     net.state.cut = true;
     await until('la fin de l’attente portée chez l’invité', () => last.poste === undefined, LIVE_GO_SHOW_MS + 4000);

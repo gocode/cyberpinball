@@ -33,5 +33,5 @@ export const ELEVATION_WAIT_MS = 3 * 60_000;
 
 /** Ce que l'écran dit quand la demande de Windows est restée sans réponse. */
 export function elevationNoAnswer(): string {
-  return t('Pas de réponse à la demande de Windows en {min} minutes : Cyber Pinball n’attend plus. Si elle est encore affichée, répondez Non (Échap).', { min: ELEVATION_WAIT_MS / 60_000 });
+  return t('Pas de réponse à la demande de Windows en {min} minutes : Cyber Pinball n’attend plus. Si elle est encore affichée, réponds Non (Échap).', { min: ELEVATION_WAIT_MS / 60_000 });
 }

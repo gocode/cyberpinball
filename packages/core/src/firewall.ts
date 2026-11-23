@@ -260,7 +260,7 @@ export interface FirewallProblem {
 export function firewallProblems(app: FirewallState | undefined, vpx: VpxFirewallState | undefined): FirewallProblem[] {
   const out: FirewallProblem[] = [];
   const appReason: Partial<Record<FirewallState, string>> = {
-    missing: t('Aucune règle n’autorise Cyber Pinball : Windows bloque les bornes qui vous appellent'),
+    missing: t('Aucune règle n’autorise Cyber Pinball : Windows bloque les bornes qui t’appellent'),
     blocked: t('Une règle de Windows bloque Cyber Pinball : son invite « Autoriser l’accès » est restée sans réponse'),
     partial: t('Cyber Pinball n’est autorisé que sur certains réseaux (privé ou public)'),
     'other-program': t('La règle vise un autre emplacement de Cyber Pinball'),

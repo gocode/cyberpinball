@@ -249,7 +249,7 @@ test('écran : de la plus récente à la plus ancienne, par jour ; la table en t
   assert.equal(got!.text, 'Game of Thrones LE (Stern 2015)');
   assert.equal(
     got!.detail!.replace(/\u202f|\u00a0/g, ' '),
-    '1. Bruno (vous) 2 841 350 120 · 2. Alexis 1 000 000 · Chloé 9 999, hors classement · Dora 8 888, hors classement · Émile, score inconnu',
+    '1. Bruno (toi) 2 841 350 120 · 2. Alexis 1 000 000 · Chloé 9 999, hors classement · Dora 8 888, hors classement · Émile, score inconnu',
   );
   assert.equal(got!.badges!.length, 1, 'l’heure');
   assert.deepEqual(list.actions.map((a) => a.label), ['Game of Thrones LE (Stern 2015)', 'The Goonies (Original 2024)', 'Retour']);
@@ -263,7 +263,7 @@ test('écran : de la plus récente à la plus ancienne, par jour ; la table en t
   assert.deepEqual(texts, [
     'Version : VPW 1.0 | 3 billes par partie',
     'Hôte : Alexis | 5 joueurs',
-    '1. Bruno (vous) — 2 841 350 120 | Record enregistré, place 1 du tableau · 12 min',
+    '1. Bruno (toi) — 2 841 350 120 | Record enregistré, place 1 du tableau · 12 min',
     '2. Alexis — 1 000 000 | 10 min',
     'Chloé — 9 999 | Hors classement : réglages de l’hôte non reçus',
     'Dora — 8 888 | Hors classement : 5 billes au lieu de 3',

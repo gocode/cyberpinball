@@ -1,5 +1,5 @@
 // Arène (décidée le 21/11/2026, planche « Engagement », version 6) : le médaillon de la roue qui
-// rassemble ce qui se joue contre les autres (parties instantanées, classements, progression), à
+// rassemble ce qui se joue contre les autres (parties en direct, classements, progression), à
 // côté de la Communauté (les autres joueurs). Ce module calcule, sans réseau ni fichier, ce que
 // montrent son affiche et son écran :
 // - la bande « Votre niveau » : palier, barre, et en hachures ce qu'une partie peut encore rapporter
@@ -125,7 +125,7 @@ export function arenaXpRules(): ArenaXpRule[] {
     { icon: 'friends', text: t('Partie en ligne menée au bout'), xp: XP.live },
     { icon: 'trophy', text: t('Victoire en ligne'), xp: XP.liveWin },
     { icon: 'trophy', text: t('Défi gagné'), xp: XP.challengeWin },
-    { icon: 'rocket', text: t('Votre partie rejointe'), xp: XP.hosted, detail: t('Une fois par groupe de joueurs') },
+    { icon: 'rocket', text: t('Ta partie rejointe'), xp: XP.hosted, detail: t('Une fois par groupe de joueurs') },
   ];
 }
 
@@ -262,7 +262,7 @@ export function playerRecords(store: RankingStore, key: string, me: string, max 
 // ---------------------------------------------------------------------------
 // L'action du moment
 
-/** Une partie instantanée ouverte sur une de mes tables (instant-menu.ts), telle que l'Arène la montre. */
+/** Une partie en direct ouverte sur une de mes tables (instant-menu.ts), telle que l'Arène la montre. */
 export interface ArenaOpenGame {
   id: string;
   title: string;
@@ -273,7 +273,7 @@ export interface ArenaOpenGame {
   joinable: boolean;
 }
 
-/** Ma partie instantanée en cours (hôte ou joueur), en attente de joueurs. */
+/** Ma partie en direct en cours (hôte ou joueur), en attente de joueurs. */
 export interface ArenaMyGame {
   title: string;
   seated: number;
@@ -375,13 +375,13 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
     rival && {
       id: 'rival',
       lines: [
-        heading(rival.passed ? t('Votre place est prise') : t('À battre')),
+        heading(rival.passed ? t('Ta place est prise') : t('À battre')),
         centered(rival.table.title),
         pair(`${rival.mine.rank - 1} ${rival.rival.name}`, dmdNumber(rival.rival.score)),
-        pair(`${rival.mine.rank} ${t('Vous')}`, dmdNumber(rival.mine.score), true),
+        pair(`${rival.mine.rank} ${t('Toi')}`, dmdNumber(rival.mine.score), true),
         centered(t('À reprendre : {n}', { n: dmdNumber(rival.gap) })),
       ],
-      foot: rival.passed ? t('{name} vous a dépassé {ago}', { name: rival.rival.name, ago: d.ago(rival.rival.at) }) : t('{name} est juste devant vous', { name: rival.rival.name }),
+      foot: rival.passed ? t('{name} t’a dépassé {ago}', { name: rival.rival.name, ago: d.ago(rival.rival.at) }) : t('{name} est juste devant toi', { name: rival.rival.name }),
     };
   const tk = d.taken;
   // La place annoncée a sa page ; le rival de la même table ne la redit pas.
@@ -389,20 +389,20 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
   if (d.mine)
     pages.push({
       id: 'my-game',
-      lines: [heading(t('Votre partie attend')), centered(d.mine.title), centered(t('{n} sur {max} joueurs', { n: d.mine.seated, max: d.mine.max })), centered(t('Départ dès qu’elle est complète'), true)],
-      foot: t('Votre partie instantanée part dès qu’elle est complète'),
+      lines: [heading(t('Ta partie attend')), centered(d.mine.title), centered(t('{n} sur {max} joueurs', { n: d.mine.seated, max: d.mine.max })), centered(t('Départ dès qu’elle est complète'), true)],
+      foot: t('Ta partie en direct part dès qu’elle est complète'),
     });
   if (tk)
     pages.push({
       id: 'taken',
       lines: [
-        centered(t('Votre place est prise'), true),
+        centered(t('Ta place est prise'), true),
         centered(tk.title),
         pair(`${tk.rival.rank} ${tk.rival.name}`, dmdNumber(tk.rival.score)),
-        pair(`${tk.mine.rank} ${t('Vous')}`, dmdNumber(tk.mine.score), true),
+        pair(`${tk.mine.rank} ${t('Toi')}`, dmdNumber(tk.mine.score), true),
         centered(t('À reprendre : {n}', { n: dmdNumber(tk.rival.score - tk.mine.score) })),
       ],
-      foot: t('{name} vous a dépassé {ago}', { name: tk.rival.name, ago: d.ago(tk.rival.at) }),
+      foot: t('{name} t’a dépassé {ago}', { name: tk.rival.name, ago: d.ago(tk.rival.at) }),
     });
   if (freshPassed) pages.push(rivalPage()!);
   const open = d.open.find((g) => g.joinable) ?? d.open[0];
@@ -410,22 +410,22 @@ export function arenaBoardPages(d: ArenaBoardInput): ArenaBoardPage[] {
     pages.push({
       id: 'open-game',
       lines: [heading(t('Partie ouverte')), centered(open.title), centered(t('Avec {name}', { name: open.host.name })), centered(tn(open.max - open.seats.length, '{n} place libre', '{n} places libres'))],
-      foot: d.open.length > 1 ? tn(d.open.length, '{n} partie ouverte sur vos tables', '{n} parties ouvertes sur vos tables') : t('{name} attend des joueurs', { name: open.host.name }),
+      foot: d.open.length > 1 ? tn(d.open.length, '{n} partie ouverte sur tes tables', '{n} parties ouvertes sur tes tables') : t('{name} attend des joueurs', { name: open.host.name }),
     });
   if (rival && !freshPassed && !(tk && rival.board === tk.board)) pages.push(rivalPage()!);
   const st = d.standing;
   if (st?.world || st?.country) {
     // Court : l'intitulé tient sur une ligne du vrai DMD (128 points).
-    const lines: ArenaBoardLine[] = [heading(t('Votre classement'))];
+    const lines: ArenaBoardLine[] = [heading(t('Ton classement'))];
     if (st.world) lines.push(pair(t('Monde'), `${dmdPlace(st.world.rank)} / ${dmdNumber(st.world.players)}`));
     if (st.country) lines.push(pair(st.country.name, `${dmdPlace(st.country.rank)} / ${dmdNumber(st.country.players)}`));
-    pages.push({ id: 'standing', lines, foot: t('Votre place selon vos XP, de tout temps') });
+    pages.push({ id: 'standing', lines, foot: t('Ta place selon tes XP, de tout temps') });
   }
   if (d.records.length)
     pages.push({
       id: 'records',
-      lines: [heading(t('Vos records')), ...d.records.slice(0, 3).map((r) => pair(r.table.title, dmdNumber(r.score)))],
-      foot: tn(d.records.length, 'Votre dernier record publié', 'Vos derniers records publiés'),
+      lines: [heading(t('Tes records')), ...d.records.slice(0, 3).map((r) => pair(r.table.title, dmdNumber(r.score)))],
+      foot: tn(d.records.length, 'Ton dernier record publié', 'Tes derniers records publiés'),
     });
   return pages;
 }

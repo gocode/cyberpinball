@@ -854,7 +854,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
     push(
       'legacyIni',
       'warning',
-      t('Configuration DOF de votre ancien front-end trouvée dans {dir} ({files}, {date}), mais le plugin DOF de VPX ne la lit pas : « Reprendre la configuration de l’ancien DOF » la met en place.', {
+      t('Configuration DOF de ton ancien front-end trouvée dans {dir} ({files}, {date}), mais le plugin DOF de VPX ne la lit pas : « Reprendre la configuration de l’ancien DOF » la met en place.', {
         dir: legacy.dir,
         files: legacyDofFiles(legacy),
         date: formatDate(legacy.modified),
@@ -866,7 +866,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
     return out;
   }
   if (!setup.ini.length && !legacy) {
-    push('noIni', 'warning', t('Aucun fichier directoutputconfig.ini : DOF ne sait pas quoi allumer. Importez la configuration de votre borne faite sur configtool.vpuniverse.com.'));
+    push('noIni', 'warning', t('Aucun fichier directoutputconfig.ini : DOF ne sait pas quoi allumer. Importe la configuration de ta borne faite sur configtool.vpuniverse.com.'));
   }
   for (const d of detected) {
     if (d.type === 'TeensyStripController' || !setup.ini.length) continue;
@@ -874,7 +874,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
       push(
         'missingIni',
         'warning',
-        t('{controller} ({usb}) : aucun directoutputconfig{n}.ini. Dans le configtool, déclarez ce contrôleur sous le numéro {n}, puis réimportez la configuration.', {
+        t('{controller} ({usb}) : aucun directoutputconfig{n}.ini. Dans le configtool, déclare ce contrôleur sous le numéro {n}, puis réimporte la configuration.', {
           controller: DOF_CONTROLLERS[d.type].label,
           usb: d.usb,
           n: d.numbers.join(t(' ou ')),
@@ -895,7 +895,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
     push(
       'addressableUndeclared',
       'warning',
-      t('Teensy branché ({port}) mais aucun Cabinet.xml ne le déclare : libdof ne le trouve pas seul. Décrivez vos bandes de LED dans « LED et retours (DOF) ».', {
+      t('Teensy branché ({port}) mais aucun Cabinet.xml ne le déclare : libdof ne le trouve pas seul. Décris tes bandes de LED dans « LED et retours (DOF) ».', {
         port: teensy.map((d) => d.device.port ?? d.usb).join(', '),
       }),
     );
@@ -912,7 +912,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
     push(
       'addressableIniUndeclared',
       'warning',
-      t('Votre configuration du configtool a des LED adressables (contrôleur {n}) mais rien ne dit à DOF où elles sont branchées : décrivez vos bandes dans « Bandes de LED adressables… »{port}.', {
+      t('Ta configuration du configtool a des LED adressables (contrôleur {n}) mais rien ne dit à DOF où elles sont branchées : décris tes bandes dans « Bandes de LED adressables… »{port}.', {
         n: orphanAddressable.join(', '),
         port: port ? t(' (port série {port} branché : sans doute leur contrôleur)', { port }) : '',
       }),
@@ -955,7 +955,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
         }
       }
       if (setup.ini.length && !numbers.has(e.number)) {
-        push('equivalentWithoutIni', 'warning', t('{equivalent} : aucun directoutputconfig{n}.ini. Dans le configtool, le contrôleur de vos LED adressables doit porter le numéro {n}.', { equivalent: e.name, n: e.number }));
+        push('equivalentWithoutIni', 'warning', t('{equivalent} : aucun directoutputconfig{n}.ini. Dans le configtool, le contrôleur de tes LED adressables doit porter le numéro {n}.', { equivalent: e.name, n: e.number }));
       }
     }
   }
@@ -1196,7 +1196,7 @@ export function ledProblems(leds: CabinetLeds): string[] {
   if (leds.controller === 'ArtNet') {
     ledsPerOutput(leds).forEach((n, i) => {
       if (n > ARTNET_LEDS_PER_UNIVERSE) {
-        problems.push(t('Univers Art-Net {u} : {n} LED, {max} au plus (512 canaux DMX). Répartissez les bandes sur plusieurs univers.', { u: artnetUniverse(leds, i + 1), n, max: ARTNET_LEDS_PER_UNIVERSE }));
+        problems.push(t('Univers Art-Net {u} : {n} LED, {max} au plus (512 canaux DMX). Répartis les bandes sur plusieurs univers.', { u: artnetUniverse(leds, i + 1), n, max: ARTNET_LEDS_PER_UNIVERSE }));
       }
     });
   }
@@ -1330,13 +1330,13 @@ export function planLedWrite(dir: string, leds: CabinetLeds, now = new Date()): 
       /* illisible : traité comme écrit à la main */
     }
     if (!global?.cabinetPattern) {
-      plan.refused.push({ file: globalFile, reason: t('GlobalConfig écrit à la main, sans CabinetConfigFilePattern : ajoutez <CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern>.') });
+      plan.refused.push({ file: globalFile, reason: t('GlobalConfig écrit à la main, sans CabinetConfigFilePattern : ajoute <CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern>.') });
     } else target = resolvePattern(global.cabinetPattern, dir);
   } else {
     plan.files.push({ file: globalFile, content: globalConfigXml(now) });
   }
   if (ownedOrAbsent(target)) plan.files.push({ file: target, content: cabinetXml(leds, now) });
-  else plan.refused.push({ file: target, reason: t('Cabinet.xml écrit à la main : Cyber Pinball ne le remplace pas. Retirez-le (ou mettez-le de côté) pour que Cyber Pinball écrive le sien.') });
+  else plan.refused.push({ file: target, reason: t('Cabinet.xml écrit à la main : Cyber Pinball ne le remplace pas. Retire-le (ou mets-le de côté) pour que Cyber Pinball écrive le sien.') });
   return plan;
 }
 
@@ -1595,7 +1595,7 @@ export function planLegacyCabinet(file: string, dir: string, options: { devices?
       /* illisible : traité comme écrit à la main */
     }
     if (!global?.cabinetPattern) {
-      plan.problems.push(t('GlobalConfig écrit à la main, sans CabinetConfigFilePattern : ajoutez <CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern>.'));
+      plan.problems.push(t('GlobalConfig écrit à la main, sans CabinetConfigFilePattern : ajoute <CabinetConfigFilePattern>{GlobalConfigDir}\\Cabinet.xml</CabinetConfigFilePattern>.'));
     } else {
       target = resolvePattern(global.cabinetPattern, dir);
       writeGlobal = false;

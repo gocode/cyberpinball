@@ -240,7 +240,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   // Communauté : sa porte du Menu système, toujours là même médaillon masqué (community-menu.ts y ajoute le
   // nombre de joueurs en ligne et ce que voient les autres) ; depuis le 21/11/2026, le médaillon ouvre l'écran
   // à onglets (community-hub.ts), et ses réglages restent ici. Nommée « Amis » jusqu'au 18/11/2026.
-  // Le 21/11/2026, ce qui se joue contre les autres (parties instantanées, classements, niveau) part dans l'Arène.
+  // Le 21/11/2026, ce qui se joue contre les autres (parties en direct, classements, niveau) part dans l'Arène.
   amis: {
     id: 'amis',
     icon: 'friends',
@@ -254,7 +254,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'arene',
     icon: 'trophy',
     get label() { return t('Arène'); },
-    get detail() { return t('Parties instantanées, classements, progression : niveau, badges, historique'); },
+    get detail() { return t('Parties en direct, classements, progression : niveau, badges, historique'); },
     entries: ['instant', 'rankings', 'progression'],
   },
   // Tout ce qui se mesure : niveau, badges, parties jouées (« Mon niveau » de la Communauté jusqu'au 21/11/2026).
@@ -348,8 +348,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Joueurs (community-menu.ts) : mes amis et les demandes reçues d'abord, puis tous les joueurs ; « Mes amis »
   // et « Joueurs en ligne » réunis le 21/11/2026. L'identifiant reste celui d'avant (menu-systeme.json, téléphone).
   'online-players': { icon: 'friend-list', get label() { return t('Joueurs'); } },
-  // Parties instantanées (instant-menu.ts) : le libellé dit s'il y en a une ouverte.
-  instant: { icon: 'rocket', get label() { return t('Partie instantanée'); } },
+  // Parties en direct (instant-menu.ts) : le libellé dit s'il y en a une ouverte.
+  instant: { icon: 'rocket', get label() { return t('Partie en direct'); } },
   // Groupes publics ou privés (groups-menu.ts).
   groups: { icon: 'friends', get label() { return t('Groupes'); } },
   // Le salon du pays (rooms-menu.ts) : le libellé le nomme.

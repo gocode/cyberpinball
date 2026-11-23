@@ -75,9 +75,9 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
         { icon: 'glasses', text: on ? t('Lunettes 3D activées : les tables se jouent en relief') : t('Lunettes 3D désactivées'), tone: on ? ('ok' as const) : ('quiet' as const) },
         setting.calibration
           ? { icon: 'check', text: t('Lunettes {glasses}, calibrées pour cet écran', { glasses: glassesLabel(setting.glasses) }), tone: 'ok' as const }
-          : { icon: 'info', text: t('Lunettes {glasses}, réglages d’usine', { glasses: glassesLabel(setting.glasses) }), detail: t('Calibrez-les : moins d’images fantômes, des couleurs plus justes'), tone: 'quiet' as const },
+          : { icon: 'info', text: t('Lunettes {glasses}, réglages d’usine', { glasses: glassesLabel(setting.glasses) }), detail: t('Calibre-les : moins d’images fantômes, des couleurs plus justes'), tone: 'quiet' as const },
       ];
-      if (on && ctx.vision3dOn()) rows.push({ icon: 'eye', text: t('Avec la Vision 3D : le relief suit aussi votre tête'), tone: 'ok' as const });
+      if (on && ctx.vision3dOn()) rows.push({ icon: 'eye', text: t('Avec la Vision 3D : le relief suit aussi ta tête'), tone: 'ok' as const });
       if (on && ctx.vrOn()) rows.push({ icon: 'vr', text: t('Une partie dans le casque se joue sans les lunettes'), tone: 'quiet' as const });
       const actions = [
         {
@@ -100,13 +100,13 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
         },
         {
           label: t('Calibrer les lunettes'),
-          detail: t('Avec vos lunettes, devant cet écran : six réglages, un œil fermé à chaque fois'),
+          detail: t('Avec tes lunettes, devant cet écran : six réglages, un œil fermé à chaque fois'),
           icon: 'sliders' as const,
           run: () => openCalibration(),
         },
         {
           label: t('Profondeur : {v}', { v: depthLabel(setting.depth) }),
-          detail: t('Choisir pour la changer, de 50 % (douce) à 150 % (marquée) ; 100 % : l’écart réel entre vos yeux'),
+          detail: t('Choisir pour la changer, de 50 % (douce) à 150 % (marquée) ; 100 % : l’écart réel entre tes yeux'),
           icon: 'gauge' as const,
           run: () => {
             save({ depth: nextDepth(setting.depth) }, `profondeur ${depthLabel(nextDepth(setting.depth))}`);
@@ -149,7 +149,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
       return {
         heading: SYSTEM_ITEMS.anaglyph.label,
         icon: SYSTEM_ITEMS.anaglyph.icon,
-        lead: t('La table en relief avec des lunettes à filtres colorés. Avec la Vision 3D, le relief suit aussi votre tête. Seul le plateau est en relief : le fronton et le DMD restent à plat.'),
+        lead: t('La table en relief avec des lunettes à filtres colorés. Avec la Vision 3D, le relief suit aussi ta tête. Seul le plateau est en relief : le fronton et le DMD restent à plat.'),
         sections: [{ rows }],
         actions,
         back,
@@ -185,8 +185,8 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
           anaglyph: {
             ...view,
             lines: [
-              eye === 'left' ? t('Gardez vos lunettes et fermez l’œil droit.') : t('Gardez vos lunettes et fermez l’œil gauche.'),
-              t('Réglez le gris jusqu’à ce qu’aucun des deux visages ne ressorte plus que l’autre.'),
+              eye === 'left' ? t('Garde tes lunettes et ferme l’œil droit.') : t('Garde tes lunettes et ferme l’œil gauche.'),
+              t('Règle le gris jusqu’à ce qu’aucun des deux visages ne ressorte plus que l’autre.'),
               t('Gris : {p} %', { p: view.percent }),
             ],
           },

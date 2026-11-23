@@ -1,4 +1,4 @@
-// Groupes et parties instantanées de la page du téléphone (lot 4 de la Communauté au téléphone,
+// Groupes et parties en direct de la page du téléphone (lot 4 de la Communauté au téléphone,
 // 18/11/2026). La borne choisit, vérifie et traduit tout (groups-menu.ts, instant-menu.ts : remote,
 // remoteAct) ; la page dessine et ne renvoie que des identités que la borne vérifie (« group-act »,
 // « instant-act ») :
@@ -7,8 +7,8 @@
 // - Groupes publics, plein écran : chercher, Rejoindre, Aperçu, « Déjà membre » grisé ;
 // - un groupe : sa table de la semaine et son classement en tête du fil, l'auteur au-dessus de chaque
 //   message, son menu ⋮ (Membres, Inviter des amis, Notifications, Quitter le groupe) ;
-// - Joueurs : les parties instantanées ouvertes en tête (Rejoindre, ou grisée avec sa raison), « Ouvrir
-//   une partie instantanée » (la table choisie à la borne, « Changer », 2 à 4 joueurs), puis « Votre
+// - Joueurs : les parties en direct ouvertes en tête (Rejoindre, ou grisée avec sa raison), « Ouvrir
+//   une partie en direct » (la table choisie à la borne, « Changer », 2 à 4 joueurs), puis « Votre
 //   partie » plein écran (places, heure de fermeture, Inviter des amis, Annuler).
 // Une fonction indisponible reste visible, grisée, avec sa raison.
 //
@@ -244,13 +244,13 @@ function groupWeekItem(gh) {
 function openGroupMenu(th) {
   const gh = th.group;
   openSheet(th.name, [
-    { label: t('Membres'), run: () => openSheet(t('Membres'), gh.members.map((m) => ({ label: m.me ? t('{name} (vous)', { name: m.name }) : `${m.name} · ${m.detail}`, run: () => (m.me ? undefined : communityOpenProfile(m.key)) }))) },
+    { label: t('Membres'), run: () => openSheet(t('Membres'), gh.members.map((m) => ({ label: m.me ? t('{name} (toi)', { name: m.name }) : `${m.name} · ${m.detail}`, run: () => (m.me ? undefined : communityOpenProfile(m.key)) }))) },
     {
       label: t('Inviter des amis'),
       run: () =>
         gh.inviteReason
           ? openSheet(t('Inviter des amis'), [], { text: t('Indisponible : {reason}', { reason: gh.inviteReason }) })
-          : openSheet(t('Inviter des amis'), gh.invitable.map((f) => ({ label: `${f.name} · ${f.detail}`, run: () => send({ t: 'group-act', a: 'invite', g: gh.g, key: f.key }) })), { text: t('Seuls vos amis peuvent être invités. Ils voient le groupe dès qu’ils acceptent.') }),
+          : openSheet(t('Inviter des amis'), gh.invitable.map((f) => ({ label: `${f.name} · ${f.detail}`, run: () => send({ t: 'group-act', a: 'invite', g: gh.g, key: f.key }) })), { text: t('Seuls tes amis peuvent être invités. Ils voient le groupe dès qu’ils acceptent.') }),
     },
     { label: gh.muted ? t('Notifications du groupe : coupées') : t('Notifications du groupe : activées'), run: () => send({ t: 'group-act', a: gh.muted ? 'unmute' : 'mute', g: gh.g }) },
     {
@@ -261,13 +261,13 @@ function openGroupMenu(th) {
   ]);
 }
 
-// ---------- Joueurs : les parties instantanées ----------
+// ---------- Joueurs : les parties en direct ----------
 
 /** Ce qui va en tête de « Joueurs » : les parties ouvertes, ma partie, ou de quoi en ouvrir une. */
 function instantHead(c) {
   const ins = c.instant;
   if (!ins) return [];
-  const rows = [sectionTitle(ins.games.length ? `${t('Parties instantanées')} · ${tn(ins.games.length, '{n} ouverte', '{n} ouvertes')}` : t('Parties instantanées'))];
+  const rows = [sectionTitle(ins.games.length ? `${t('Parties en direct')} · ${tn(ins.games.length, '{n} ouverte', '{n} ouvertes')}` : t('Parties en direct'))];
   if (ins.blocked) {
     rows.push(Object.assign(document.createElement('li'), { className: 'instant-blocked' }));
     rows.at(-1).append(profileLine({ text: ins.blocked, tone: 'quiet', icon: 'network' }));
@@ -300,10 +300,10 @@ function instantHead(c) {
     const acts = document.createElement('div');
     acts.className = 'people-actions';
     acts.append(peopleButton(t('Voir'), 'rocket', 'primary', () => communityOpenPage('instant')));
-    card.append(cardHead(tableInitial(ins.mine.title), t('Votre partie : {title}', { title: ins.mine.title }), `${ins.mine.detail} · ${ins.mine.status}`), acts);
+    card.append(cardHead(tableInitial(ins.mine.title), t('Ta partie : {title}', { title: ins.mine.title }), `${ins.mine.detail} · ${ins.mine.status}`), acts);
     li.append(card);
   } else if (ins.open) {
-    const b = peopleButton(t('Ouvrir une partie instantanée'), 'plus', ins.open.reason ? 'off' : '', () => (ins.open.reason ? openSheet(t('Ouvrir une partie instantanée'), [], { text: ins.open.reason }) : openInstantSheet()));
+    const b = peopleButton(t('Ouvrir une partie en direct'), 'plus', ins.open.reason ? 'off' : '', () => (ins.open.reason ? openSheet(t('Ouvrir une partie en direct'), [], { text: ins.open.reason }) : openInstantSheet()));
     if (ins.open.reason) b.setAttribute('aria-disabled', 'true');
     li.append(b);
   }
@@ -311,7 +311,7 @@ function instantHead(c) {
   return rows;
 }
 
-/** « Ouvrir une partie instantanée » : la table (celle de la borne par défaut, « Changer »), 2 à 4 joueurs. */
+/** « Ouvrir une partie en direct » : la table (celle de la borne par défaut, « Changer »), 2 à 4 joueurs. */
 function openInstantSheet() {
   const open = community.data?.instant?.open;
   if (!open) return;
@@ -325,7 +325,7 @@ function openInstantSheet() {
   label.textContent = pages.table ? t('Table') : t('Table · choisie à la borne');
   const value = document.createElement('span');
   value.className = 'instant-field-value';
-  value.textContent = table?.title ?? t('Choisissez une table');
+  value.textContent = table?.title ?? t('Choisis une table');
   text.append(label, value);
   const change = document.createElement('button');
   change.type = 'button';
@@ -339,7 +339,7 @@ function openInstantSheet() {
   field.append(tableInitial(table?.title ?? '?'), text, change);
   const countLabel = document.createElement('div');
   countLabel.className = 'instant-field-label';
-  countLabel.textContent = t('Joueurs, vous compris');
+  countLabel.textContent = t('Joueurs, toi compris');
   const toggle = document.createElement('div');
   toggle.className = 'phone-toggle';
   toggle.setAttribute('role', 'radiogroup');
@@ -363,7 +363,7 @@ function openInstantSheet() {
   note.className = 'instant-note';
   note.textContent = open.text;
   openSheet(
-    t('Ouvrir une partie instantanée'),
+    t('Ouvrir une partie en direct'),
     table
       ? [
           {
@@ -496,7 +496,7 @@ function pageTop() {
   }
   if (pages.kind === 'instant') {
     const mine = community.data?.instant?.mine;
-    return { title: t('Votre partie'), detail: mine ? `${mine.title} · ${mine.detail}` : '' };
+    return { title: t('Ta partie'), detail: mine ? `${mine.title} · ${mine.detail}` : '' };
   }
   if (LEVEL_PAGES.includes(pages.kind)) {
     const page = community.data?.page;

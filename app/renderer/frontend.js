@@ -1100,7 +1100,7 @@ function attractScreen(s) {
     box.append(line);
   }
   // Pendant le préavis d'arrêt de l'horaire, sa propre invite seule : pas deux consignes à la fois.
-  if (!s.stop) box.append(el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au front-end')));
+  if (!s.stop) box.append(el('div', 'attract-hint', t('Appuie sur un bouton pour revenir au front-end')));
   return box;
 }
 
@@ -1139,7 +1139,7 @@ function gearButton(s) {
   // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
   if (s.attention) {
     gear.classList.add('has-attention');
-    gear.title = t('Menu système (Tab) : un élément attend votre intervention');
+    gear.title = t('Menu système (Tab) : un élément attend ton intervention');
     gear.append(el('span', 'gear-dot'));
   }
   return gear;
@@ -1789,7 +1789,7 @@ function showFriendCard(zone, c) {
   hideFriendCard();
   const card = el('div', 'friend-card');
   const text = el('div', 'friend-card-text');
-  text.append(el('div', 'friend-card-kicker', t('Votre ami')), el('div', 'friend-card-name', c.name), el('div', 'friend-card-presence', c.presence));
+  text.append(el('div', 'friend-card-kicker', t('Ton ami')), el('div', 'friend-card-name', c.name), el('div', 'friend-card-presence', c.presence));
   for (const f of c.facts) text.append(el('div', 'friend-card-fact', f));
   card.append(avatarNode(c.avatar, 'friend-card-avatar'), text);
   zone.append(card);
@@ -2068,7 +2068,7 @@ function syncStop(s) {
   const bar = el('div', 'stop-notice-bar');
   bar.style.setProperty('--stop-ms', `${stop.ms}ms`);
   bar.style.setProperty('--stop-delay', `${-Math.max(0, stop.ms - (stop.endsAt - Date.now()))}ms`);
-  box.append(count, bar, el('div', 'stop-notice-hint', t('Appuyez sur un bouton pour garder la borne allumée')));
+  box.append(count, bar, el('div', 'stop-notice-hint', t('Appuie sur un bouton pour garder la borne allumée')));
   const tick = () => {
     const seconds = Math.max(0, Math.ceil((stop.endsAt - Date.now()) / 1000));
     count.replaceChildren(String(seconds), el('small', '', t('s')));

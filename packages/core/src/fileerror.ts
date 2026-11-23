@@ -28,10 +28,10 @@ export function fileErrorText(error: unknown, holders: readonly string[] = []): 
   const e = (error ?? {}) as FsError;
   const name = e.path ? path.basename(e.path) : undefined;
   if (isFileLocked(error)) {
-    if (holders.length) return t('« {name} » est ouvert dans {programs} : fermez-le, puis réessayez.', { name: name ?? '?', programs: formatList(holders) });
-    return t('« {name} » est ouvert par un autre programme (VPX, un lecteur vidéo, l’Explorateur de fichiers…) : fermez-le, puis réessayez.', { name: name ?? '?' });
+    if (holders.length) return t('« {name} » est ouvert dans {programs} : ferme-le, puis réessaie.', { name: name ?? '?', programs: formatList(holders) });
+    return t('« {name} » est ouvert par un autre programme (VPX, un lecteur vidéo, l’Explorateur de fichiers…) : ferme-le, puis réessaie.', { name: name ?? '?' });
   }
-  if (e.code === 'ENOSPC') return t('Le disque est plein : libérez de la place, puis réessayez.');
+  if (e.code === 'ENOSPC') return t('Le disque est plein : libère de la place, puis réessaie.');
   if (e.code === 'ENOENT') return t('« {name} » n’existe plus : la liste va se mettre à jour.', { name: name ?? '?' });
   return t('L’opération n’a pas pu se faire : {message}', { message: e.message ?? String(error) });
 }

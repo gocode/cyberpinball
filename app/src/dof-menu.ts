@@ -193,7 +193,7 @@ export function createDofMenu(host: DofMenuHost) {
         tone: 'quiet',
       });
     }
-    if (!controllerRows.length) controllerRows.push({ icon: 'info', text: t('Aucun contrôleur de retours reconnu'), detail: t('Pinscape, LedWiz, Teensy, DudesCab, PacLed… : branchez-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });
+    if (!controllerRows.length) controllerRows.push({ icon: 'info', text: t('Aucun contrôleur de retours reconnu'), detail: t('Pinscape, LedWiz, Teensy, DudesCab, PacLed… : branche-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });
     // La KL25Z ne pilote pas de LED adressables : cas réel du 04/11/2026.
     const kl25z = detected.some((d) => d.type === 'Pinscape' || d.alternatives?.includes('Pinscape'));
     const addressable = detected.some((d) => DOF_CONTROLLERS[d.type].addressable) || (s?.cabinet?.strips.length ?? 0) > 0;
@@ -253,24 +253,24 @@ export function createDofMenu(host: DofMenuHost) {
           }
         : {
             label: t('Ouvrir configtool.vpuniverse.com'),
-            detail: s ? t('Navigateur intégré indisponible : téléchargez le ZIP ailleurs, puis importez-le') : t('Indisponible sans VPX installé'),
+            detail: s ? t('Navigateur intégré indisponible : télécharge le ZIP ailleurs, puis importe-le') : t('Indisponible sans VPX installé'),
             icon: 'link',
             tone: 'quiet',
-            run: () => library.openNotice(t('Configtool indisponible'), [s ? t('Le navigateur intégré n’est pas disponible ici.') : t('Installez d’abord VPX : DOF fait partie de VPX.')], () => open()),
+            run: () => library.openNotice(t('Configtool indisponible'), [s ? t('Le navigateur intégré n’est pas disponible ici.') : t('Installe d’abord VPX : DOF fait partie de VPX.')], () => open()),
           },
       s
         ? { label: t('Importer la configuration du configtool…'), detail: t('Le ZIP téléchargé depuis configtool.vpuniverse.com ; l’ancienne configuration est sauvegardée'), icon: 'import', run: () => void pickZip() }
-        : { label: t('Importer la configuration du configtool…'), detail: t('Indisponible sans VPX installé'), icon: 'import', tone: 'quiet', run: () => library.openNotice(t('Import indisponible'), [t('Installez d’abord VPX : DOF fait partie de VPX.')], () => open()) },
+        : { label: t('Importer la configuration du configtool…'), detail: t('Indisponible sans VPX installé'), icon: 'import', tone: 'quiet', run: () => library.openNotice(t('Import indisponible'), [t('Installe d’abord VPX : DOF fait partie de VPX.')], () => open()) },
       {
         label: t('Bandes de LED adressables…'),
         detail: findings.some((f) => f.code === 'addressableIniUndeclared')
-          ? t('Vos fichiers du configtool attendent des LED adressables : dites ici où elles sont branchées')
+          ? t('Tes fichiers du configtool attendent des LED adressables : dis ici où elles sont branchées')
           : s?.cabinet?.strips.length
             ? tn(s.cabinet.strips.length, '{n} bande décrite', '{n} bandes décrites')
-            : t('Décrire vos bandes WS2812 : Cabinet.xml écrit pour vous'),
+            : t('Décrire tes bandes WS2812 : Cabinet.xml écrit pour toi'),
         icon: 'bulb',
         ...(s ? (findings.some((f) => f.code === 'addressableIniUndeclared') ? { tone: 'warning' as const } : {}) : { tone: 'quiet' as const }),
-        run: () => (s ? openEditor() : library.openNotice(t('LED adressables indisponibles'), [t('Installez d’abord VPX : DOF fait partie de VPX.')], () => open())),
+        run: () => (s ? openEditor() : library.openNotice(t('LED adressables indisponibles'), [t('Installe d’abord VPX : DOF fait partie de VPX.')], () => open())),
       },
       { label: t('Vérifier de nouveau'), detail: t('Relit les périphériques USB et le dossier de DOF'), icon: 'refresh', run: () => refresh() },
       { label: t('Retour'), icon: 'back', run: back },
@@ -391,7 +391,7 @@ export function createDofMenu(host: DofMenuHost) {
     if (plan.problems.length) sections.push({ title: t('Pourquoi il n’est pas repris'), rows: plan.problems.map((p) => ({ icon: 'alert' as const, text: p, tone: 'warning' as const })) });
     const actions: Action[] = plan.problems.length
       ? [
-          { label: t('Décrire les bandes dans Cyber Pinball…'), detail: t('Cabinet.xml écrit pour vous, d’après vos bandes'), icon: 'bulb', run: () => openEditor() },
+          { label: t('Décrire les bandes dans Cyber Pinball…'), detail: t('Cabinet.xml écrit pour toi, d’après tes bandes'), icon: 'bulb', run: () => openEditor() },
           { label: t('Ne pas le reprendre'), icon: 'back', run: () => open() },
         ]
       : [
@@ -535,7 +535,7 @@ export function createDofMenu(host: DofMenuHost) {
         {
           icon: 'info',
           text: t('{max} LED par univers : chaque bande au début du sien', { max: ARTNET_LEDS_PER_UNIVERSE }),
-          detail: t('WLED range 170 LED par univers à la suite. Une bande sur le 2e univers commence donc à la LED 170 dans WLED, pas juste après la précédente : saisissez dans LED Preferences le « Start » indiqué plus bas pour chaque bande, sinon ses couleurs arrivent décalées.'),
+          detail: t('WLED range 170 LED par univers à la suite. Une bande sur le 2e univers commence donc à la LED 170 dans WLED, pas juste après la précédente : saisis dans LED Preferences le « Start » indiqué plus bas pour chaque bande, sinon ses couleurs arrivent décalées.'),
         },
         {
           icon: 'info',
@@ -639,7 +639,7 @@ export function createDofMenu(host: DofMenuHost) {
       icon: 'bulb',
       lead: onBoard
         ? t('{controller} : les bandes se décrivent dans l’outil de la carte.', { controller: controllerLabel(d.controller) })
-        : t('Chaque bande devient un toy de DOF ; dans le configtool, votre contrôleur de LED adressables porte le numéro {n} et chaque toy la sortie DOF indiquée ici.', { n: DOF_ADDRESSABLE_NUMBER }),
+        : t('Chaque bande devient un toy de DOF ; dans le configtool, ton contrôleur de LED adressables porte le numéro {n} et chaque toy la sortie DOF indiquée ici.', { n: DOF_ADDRESSABLE_NUMBER }),
       sections,
       actions,
       back: () => leaveEditor(),
@@ -887,7 +887,7 @@ export function createDofMenu(host: DofMenuHost) {
           },
           {
             label: t('Ordre des couleurs : {order}', { order: s.colorOrder }),
-            detail: t('GRB pour la plupart des WS2812 : rouge et vert inversés, essayez RGB'),
+            detail: t('GRB pour la plupart des WS2812 : rouge et vert inversés, essaie RGB'),
             icon: 'palette',
             run: () => choose(5, t('Ordre des couleurs'), LED_COLOR_ORDERS, String, s.colorOrder, (v: LedColorOrder) => (s.colorOrder = v)),
           },
@@ -951,7 +951,7 @@ export function createDofMenu(host: DofMenuHost) {
       );
     }
     lines.push(
-      t('Dans le configtool : contrôleur de LED adressables numéro {n}, avec {list}. Puis « Generate Config » et importez le ZIP.', {
+      t('Dans le configtool : contrôleur de LED adressables numéro {n}, avec {list}. Puis « Generate Config » et importe le ZIP.', {
         n: leds.number ?? DOF_ADDRESSABLE_NUMBER,
         list: leds.strips.map((s) => t('« {name} » sur la sortie {n}', { name: s.name, n: s.dofOutput })).join(', '),
       }),

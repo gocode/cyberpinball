@@ -267,7 +267,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
           return t('Images préparées à l’avance');
         },
         get help() {
-          return t('Plus de marge pour la fluidité, mais plus de latence. Gardez la plus petite valeur qui reste fluide.');
+          return t('Plus de marge pour la fluidité, mais plus de latence. Garde la plus petite valeur qui reste fluide.');
         },
       },
       {
@@ -717,7 +717,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
           return t('Démarrage rapide des ROM');
         },
         get help() {
-          return t('Saute le test de la mémoire (« TESTING… ») que les ROM Williams et Bally WPC refont à chaque partie. Ne change ni les règles ni les scores. Cyber Pinball l’active tant que vous n’avez rien choisi.');
+          return t('Saute le test de la mémoire (« TESTING… ») que les ROM Williams et Bally WPC refont à chaque partie. Ne change ni les règles ni les scores. Cyber Pinball l’active tant que tu n’as rien choisi.');
         },
         get values() {
           return [t('Non'), t('Oui')];

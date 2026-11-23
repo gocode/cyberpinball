@@ -10,7 +10,7 @@
 // message qui l'a causé (game-answer, game-room, game-status, game-cancel, l'expiration d'une
 // invitation, la fin par l'attente des derniers). Ce qui change :
 // - hôte : un invité accepte ; décline, est occupé, ne répond pas (avec la raison) ; un joueur
-//   rejoint sa partie instantanée ;
+//   rejoint sa partie en direct ;
 // - tous : un joueur quitte la partie ou ne la démarre pas ; celui qui invite l'annule ;
 // - tous : la partie est finie pour tout le monde, quand j'étais déjà revenu de la mienne (sinon
 //   les résultats s'ouvrent d'eux-mêmes à mon retour : rien à annoncer).
@@ -54,7 +54,7 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
   for (const p of game.players) {
     if (p.key === me) continue;
     const before = prev.players.get(p.key);
-    // Partie instantanée : un joueur entré dans ma partie (il n'était pas là, ou il revient).
+    // Partie en direct : un joueur entré dans ma partie (il n'était pas là, ou il revient).
     if (next.hosting && game.instant && p.state === 'accepted' && (!before || ['left', 'declined', 'busy', 'expired'].includes(before.state))) {
       out.push({ kind: 'live-joined', key: `${game.id}|${p.key}|${p.answeredAt ?? ''}`, at: now, who: p.name, player: p.key, ...subject });
       continue;

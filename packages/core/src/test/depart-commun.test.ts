@@ -97,8 +97,8 @@ test('machine d’états : chargement, prêt, partez quand tous les attendus son
     ],
   );
   // Vue de Bruno : sa table charge ; sans relevé, il sait quand appuyer sur Start.
-  assert.equal(liveWaitView(game, 'bruno', at(20_000))!.lead, 'Votre table se charge…');
-  assert.match(liveWaitView(game, 'bruno', at(20_000), { manual: true })!.note!, /^Attendez « Partez ! » pour appuyer sur Start · Table sans relevé : quittez-la à la fin de votre partie/);
+  assert.equal(liveWaitView(game, 'bruno', at(20_000))!.lead, 'Ta table se charge…');
+  assert.match(liveWaitView(game, 'bruno', at(20_000), { manual: true })!.note!, /^Attends « Pars ! » pour appuyer sur Start · Table sans relevé : quitte-la à la fin de ta partie/);
   // Bruno prêt : tous les attendus le sont, « partez ».
   game = gameStatus(game, 'bruno', { state: 'loading', ready: true }, at(30_000));
   assert.equal(liveGoDue(game, at(30_000)), 'all-ready');
@@ -107,7 +107,7 @@ test('machine d’états : chargement, prêt, partez quand tous les attendus son
   assert.equal(liveGoDue(game, at(31_000)), undefined, 'une seule fois');
   assert.equal(giveGo(game, 'timeout', at(40_000)), game);
   const go = liveWaitView(game, 'bruno', at(31_000), { manual: true })!;
-  assert.deepEqual([go.title, go.go, go.lead], ['Partez !', true, 'Tout le monde est prêt · Appuyez sur Start']);
+  assert.deepEqual([go.title, go.go, go.lead], ['Pars !', true, 'Tout le monde est prêt · Appuie sur Start']);
   // « Partez ! » quelques secondes, puis la bande de la partie prend la suite.
   assert.ok(liveWaitView(game, 'alexis', at(30_000 + LIVE_GO_SHOW_MS)));
   assert.equal(liveWaitView(game, 'alexis', at(30_000 + LIVE_GO_SHOW_MS + 1)), undefined);
@@ -127,13 +127,13 @@ test('un joueur jamais prêt : départ sans lui après le délai ; il part dès 
   game = giveGo(game, 'timeout', at(10_000 + LIVE_READY_WAIT_MS));
   assert.deepEqual(game.goLate, ['bruno']);
   const alexis = liveWaitView(game, 'alexis', at(10_000 + LIVE_READY_WAIT_MS + 500))!;
-  assert.deepEqual([alexis.title, alexis.lead], ['Partez !', 'Départ sans Bruno : table pas prête à temps, départ dès qu’elle le sera']);
+  assert.deepEqual([alexis.title, alexis.lead], ['Pars !', 'Départ sans Bruno : table pas prête à temps, départ dès qu’elle le sera']);
   assert.equal(alexis.rows.find((r) => r.name === 'Bruno')!.status, 'Chargement de la table… il part dès qu’elle est prête');
   // Chez Bruno : tant que sa table charge, il sait que les autres sont partis ; prête, c'est à lui.
   const later = at(10_000 + LIVE_READY_WAIT_MS + 30_000);
   assert.deepEqual([liveWaitView(game, 'bruno', later)!.title, liveWaitView(game, 'bruno', later)!.go], ['Les autres sont partis', false]);
   const mine = liveWaitView(game, 'bruno', later, { readyAt: later.getTime() - 1000 })!;
-  assert.deepEqual([mine.title, mine.lead], ['Partez !', 'Les autres sont déjà partis : à vous !']);
+  assert.deepEqual([mine.title, mine.lead], ['Pars !', 'Les autres sont déjà partis : à toi !']);
   assert.equal(liveWaitView(game, 'bruno', later, { readyAt: later.getTime() - LIVE_GO_SHOW_MS - 1 }), undefined);
 });
 
@@ -164,7 +164,7 @@ test('borne ancienne : signalée, jamais attendue ; un invité dont l’hôte es
   const old = { ...launched(), players: launched().players.map((p) => (p.host ? { ...p, proto: 3 } : p)), phase: 'playing' as const };
   assert.equal(liveGuestGo(old, undefined, T0), 'host-behind');
   const behind = liveWaitView(giveGo(old, 'host-behind', at(1000)), 'bruno', at(1500), { readyAt: at(1000).getTime() })!;
-  assert.deepEqual([behind.title, behind.lead], ['Partez !', 'Alexis a une ancienne version de Cyber Pinball : votre table part sans attendre les autres']);
+  assert.deepEqual([behind.title, behind.lead], ['Pars !', 'Alexis a une ancienne version de Cyber Pinball : ta table part sans attendre les autres']);
   // Hôte à jour mais muet (sa borne éteinte) : après le délai et la marge, l'invité prêt part seul.
   const current = { ...launched(), phase: 'playing' as const };
   assert.equal(liveGuestGo(current, at(0).getTime(), at(LIVE_GO_FALLBACK_MS - 1)), undefined);
@@ -172,7 +172,7 @@ test('borne ancienne : signalée, jamais attendue ; un invité dont l’hôte es
   assert.equal(liveGuestGo(current, undefined, at(10 * LIVE_GO_FALLBACK_MS)), undefined, 'pas prêt : rien à faire partir');
   assert.ok(LIVE_GO_FALLBACK_MS > LIVE_READY_WAIT_MS, 'l’hôte, s’il répond, donne « partez » avant');
   const silent = liveWaitView(giveGo(current, 'no-signal', at(LIVE_GO_FALLBACK_MS)), 'bruno', at(LIVE_GO_FALLBACK_MS), { readyAt: 0 })!;
-  assert.equal(silent.lead, 'Plus de nouvelles de Alexis : votre table part seule');
+  assert.equal(silent.lead, 'Plus de nouvelles de Alexis : ta table part seule');
 });
 
 test('protocole : « prêt » dans game-status, l’attente puis « partez » dans la salle, vérifiés ; l’invité les lit à son horloge', () => {

@@ -411,7 +411,7 @@ test('aide des gâchettes (13 novembre 2026 : le geste du calage confondu avec l
   assert.equal(hold.due(3_000), false);
   const front = frontendSource();
   assert.match(front, /if \(event !== 'debut' \|\| calibration \|\| controllerWizard \|\| playing \|\| launch \|\| !calibrationCombo\(headset\?\.profile \?\? 'touch'\)\) return;/);
-  assert.match(front, /showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
+  assert.match(front, /showBanner\(t\('Pour recaler la borne : enfonce les deux sticks, pas les gâchettes'\)\);/);
   // Toute autre touche annule l'aide.
   assert.match(front, /if \(!TRIGGERS_HINT_COMBO\.includes\(name as ControllerButton\)\) \{\s*if \(down\) \{\s*triggersHold\.reset\(\);/);
 });
@@ -436,12 +436,12 @@ test('schéma des manettes (maquette validée le 13 novembre 2026) : un composan
   // Le calage : gâchettes pour placer, A une fois placée ; en bas, le geste des sticks ; le conseil ne le répète pas.
   const front = frontendSource();
   assert.match(front, /const schema = drawn && !desk && !c\.placing \? \(c\.place \? \['a'\] : \['gachette-gauche', 'gachette-droite'\]\) : undefined;/);
-  assert.match(front, /band: \{ \.\.\.\(drawn && \{ schema: \[\.\.\.combo\] \}\), text: t\('À tout moment, enfoncez les deux sticks 3 s'\)/);
+  assert.match(front, /band: \{ \.\.\.\(drawn && \{ schema: \[\.\.\.combo\] \}\), text: t\('À tout moment, enfonce les deux sticks 3 s'\)/);
   assert.match(front, /calibrationCombo\(headset\?\.profile \?\? 'touch'\) \? undefined : calibrationComboLabel\(headset\?\.profile\)/);
   // La carte du geste : rappel au premier port et aide des gâchettes ; sans dessin, le bandeau en texte.
   assert.equal(GESTURE_CARD_MS, 6000);
   assert.match(front, /if \(!showGestureCard\(\)\) showBanner\(t\('Recaler la borne à tout moment/);
-  assert.match(front, /if \(!showGestureCard\(\)\) showBanner\(t\('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'\)\);/);
+  assert.match(front, /if \(!showGestureCard\(\)\) showBanner\(t\('Pour recaler la borne : enfonce les deux sticks, pas les gâchettes'\)\);/);
   assert.match(front, /headsetCard: headsetCardView/);
   // Le texte du geste dit où et avec quel doigt.
   assert.match(calibrationComboLabel('touch')!, /sous les pouces/);
@@ -685,7 +685,7 @@ test('borne calée sans contour (avant l’ancrage, 13 novembre 2026) : dit et c
   assert.match(front, /if \(!r\) \{\s*noContourCheck\(place\);/);
   assert.match(front, /if \(!offerCalibration\('sans-contour'\)\) return;\s*noContourSaid = signature;/);
   assert.match(front, /'calage-sans-contour\.json'/);
-  assert.match(front, /t\('Calez la borne une fois : elle se replacera ensuite seule\.'\)/);
+  assert.match(front, /t\('Cale la borne une fois : elle se replacera ensuite seule\.'\)/);
   // Seuls les calages sur la vraie barre (menu, partie) donnent le contour courant à une place qui n'en avait pas.
   assert.match(front, /headset\?\.showPlace\(place, true, true\);/);
   assert.match(front, /headset\?\.showPlace\(next, true, true\);/);

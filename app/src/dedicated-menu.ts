@@ -159,7 +159,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         rows: [
           ...blockers,
           ...(others
-            ? [{ text: t('Autre front-end installé : {names}', { names: others }), detail: t('S’il se lance lui aussi à l’ouverture de session, les deux se disputeront les écrans : retirez son lancement automatique'), tone: 'warning' as const, badges: [t('À vérifier')] }]
+            ? [{ text: t('Autre front-end installé : {names}', { names: others }), detail: t('S’il se lance lui aussi à l’ouverture de session, les deux se disputeront les écrans : retire son lancement automatique'), tone: 'warning' as const, badges: [t('À vérifier')] }]
             : []),
         ],
       },
@@ -193,8 +193,8 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const replace: Action = replaceBlocker
       ? { label: t('Remplacer le bureau pour ce compte'), detail: t('Indisponible : {reason}', { reason: replaceBlocker.text }), icon: 'lock', tone: 'quiet', run: () => undefined }
       : launcher
-        ? { label: t('Activer pour ce compte'), detail: t('Shell Launcher ; Windows demande votre autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => confirmThen(t('Activer la borne dédiée pour ce compte (Shell Launcher).'), () => activate()) }
-        : { label: t('Remplacer le bureau pour ce compte'), detail: t('Windows demande votre autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => install('shell') };
+        ? { label: t('Activer pour ce compte'), detail: t('Shell Launcher ; Windows demande ton autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => confirmThen(t('Activer la borne dédiée pour ce compte (Shell Launcher).'), () => activate()) }
+        : { label: t('Remplacer le bureau pour ce compte'), detail: t('Windows demande ton autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => install('shell') };
     const startup: Action = startupBlocker
       ? { label: t('Lancer au démarrage de Windows'), detail: t('Indisponible : {reason}', { reason: startupBlocker.text }), icon: 'power', tone: 'quiet', run: () => undefined }
       : {
@@ -231,9 +231,9 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     else rows.push({ text: t('{edition} : sans Shell Launcher', { edition }), detail: t('Cyber Pinball passe par le réglage « Interface utilisateur personnalisée » du compte, et se relance lui-même'), tone: 'ok', badges: [t('Prêt')] });
     if (!host.command()) rows.push({ text: t('Cyber Pinball tourne depuis ses sources'), detail: t('Seule une installation (CyberPinball.exe) peut s’ouvrir avec Windows'), tone: 'error', badges: [t('Bloquant')] });
     if (probe.otherAdmins === undefined) {
-      rows.push({ text: t('Comptes administrateurs illisibles'), detail: t('Vérifiez qu’un autre compte administrateur existe : c’est par lui qu’on reprend la main en secours'), tone: 'warning', badges: [t('À vérifier')] });
+      rows.push({ text: t('Comptes administrateurs illisibles'), detail: t('Vérifie qu’un autre compte administrateur existe : c’est par lui qu’on reprend la main en secours'), tone: 'warning', badges: [t('À vérifier')] });
     } else if (!probe.otherAdmins.length) {
-      adminRow = { text: t('Aucun autre compte administrateur que « {user} »', { user: probe.user }), detail: t('Créez-en un avant de remplacer le bureau : c’est par lui qu’on reprend la main en secours'), tone: 'error', badges: [t('Bloquant')] };
+      adminRow = { text: t('Aucun autre compte administrateur que « {user} »', { user: probe.user }), detail: t('Crées-en un avant de remplacer le bureau : c’est par lui qu’on reprend la main en secours'), tone: 'error', badges: [t('Bloquant')] };
       rows.push(adminRow);
     } else {
       rows.push({ text: t('Compte administrateur de secours : {names}', { names: formatList(probe.otherAdmins) }), tone: 'ok' });
@@ -259,7 +259,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       : [{ text: t('Cyber Pinball se lance au démarrage de Windows, pour le compte « {user} »', { user: record.user }), detail: t('Le bureau reste derrière : fond noir, icônes masquées'), tone: 'ok' }];
     const ignored = settingsIgnored(record);
     if (ignored) state.push(ignored);
-    else if (shell && !host.shellSession) state.push({ text: t('Cette session a démarré avec le bureau Windows'), detail: t('Ouvrez une nouvelle session (ou redémarrez le PC) pour l’appliquer'), tone: 'info' });
+    else if (shell && !host.shellSession) state.push({ text: t('Cette session a démarré avec le bureau Windows'), detail: t('Ouvre une nouvelle session (ou redémarre le PC) pour l’appliquer'), tone: 'info' });
     return {
       subheading: shell
         ? host.shellSession
@@ -279,7 +279,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       actions: [
         {
           label: shell ? t('Désactiver et rétablir le bureau') : t('Ne plus lancer au démarrage'),
-          detail: needsElevation(record.reference) ? t('Windows demande votre autorisation ; réglages d’avant remis et vérifiés') : t('Réglages d’avant remis et vérifiés'),
+          detail: needsElevation(record.reference) ? t('Windows demande ton autorisation ; réglages d’avant remis et vérifiés') : t('Réglages d’avant remis et vérifiés'),
           icon: 'restore',
           run: () => uninstall(record),
         },
@@ -295,7 +295,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const state: Row[] = [
       { text: t('Activée pour le compte « {user} » : Cyber Pinball à la place du bureau et de la barre des tâches', { user: record.user }), detail: t('Relancé s’il se ferme ou plante ; les autres comptes gardent le bureau Windows'), tone: 'ok' },
     ];
-    if (!host.shellSession) state.push({ text: t('Cette session a démarré avec le bureau Windows'), detail: t('Ouvrez une nouvelle session (ou redémarrez le PC) pour l’appliquer'), tone: 'info' });
+    if (!host.shellSession) state.push({ text: t('Cette session a démarré avec le bureau Windows'), detail: t('Ouvre une nouvelle session (ou redémarre le PC) pour l’appliquer'), tone: 'info' });
     return {
       subheading: host.shellSession ? t('Activée le {date} · cette session démarre directement dans Cyber Pinball', { date }) : t('Activée le {date} · effet à la prochaine ouverture de session', { date }),
       sections: [
@@ -309,7 +309,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         },
       ],
       actions: [
-        { label: t('Désactiver et rétablir le bureau'), detail: t('Windows demande votre autorisation ; le bureau revient à la prochaine ouverture de session'), icon: 'restore', run: () => confirmThen(t('Désactiver la borne dédiée et rétablir le bureau.'), () => deactivate(record)) },
+        { label: t('Désactiver et rétablir le bureau'), detail: t('Windows demande ton autorisation ; le bureau revient à la prochaine ouverture de session'), icon: 'restore', run: () => confirmThen(t('Désactiver la borne dédiée et rétablir le bureau.'), () => deactivate(record)) },
         ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le front-end', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
         rescueAction(),
         backAction(),
@@ -322,11 +322,11 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       subheading: t('Activation commencée le {date} · Windows doit redémarrer', { date: formatDate(record.activatedAt) }),
       sections: [
         ...(flash ? [{ rows: flash.rows }] : []),
-        { rows: [{ text: t('Fonctions de Windows « Shell Launcher » activées : redémarrez le PC, puis revenez ici terminer l’activation'), tone: 'warning', badges: [t('À vérifier')] }] },
+        { rows: [{ text: t('Fonctions de Windows « Shell Launcher » activées : redémarre le PC, puis reviens ici terminer l’activation'), tone: 'warning', badges: [t('À vérifier')] }] },
       ],
       actions: [
-        { label: t('Terminer l’activation'), detail: t('Après le redémarrage ; Windows demande votre autorisation'), icon: 'lock', run: () => confirmThen(t('Terminer l’activation de la borne dédiée.'), () => activate()) },
-        { label: t('Annuler et rétablir'), detail: t('Remet l’état d’avant ; Windows demande votre autorisation'), icon: 'restore', run: () => confirmThen(t('Annuler et rétablir le bureau.'), () => deactivate(record)) },
+        { label: t('Terminer l’activation'), detail: t('Après le redémarrage ; Windows demande ton autorisation'), icon: 'lock', run: () => confirmThen(t('Terminer l’activation de la borne dédiée.'), () => activate()) },
+        { label: t('Annuler et rétablir'), detail: t('Remet l’état d’avant ; Windows demande ton autorisation'), icon: 'restore', run: () => confirmThen(t('Annuler et rétablir le bureau.'), () => deactivate(record)) },
         rescueAction(),
         backAction(),
       ],
@@ -339,13 +339,13 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       () => ({
         heading: t('Secours : accéder à Windows'),
         icon: 'info',
-        lead: t('Cyber Pinball ne répond plus, ou vous voulez travailler dans Windows ; en dernier recours, rétablir le bureau sans Cyber Pinball.'),
+        lead: t('Cyber Pinball ne répond plus, ou tu veux travailler dans Windows ; en dernier recours, rétablir le bureau sans Cyber Pinball.'),
         sections: [
           {
             title: t('Sur la borne'),
             rows: [
-              { text: t('Appuyez sur Ctrl+Alt+Suppr, puis « Gestionnaire des tâches »'), detail: t('Fichier > Exécuter une nouvelle tâche : explorer.exe (une fenêtre de fichiers), ou tout autre programme') },
-              { text: t('Appuyez sur Ctrl+Alt+Suppr, puis « Se déconnecter »'), detail: t('Ouvrez ensuite la session d’un compte administrateur : il garde le bureau Windows') },
+              { text: t('Appuie sur Ctrl+Alt+Suppr, puis « Gestionnaire des tâches »'), detail: t('Fichier > Exécuter une nouvelle tâche : explorer.exe (une fenêtre de fichiers), ou tout autre programme') },
+              { text: t('Appuie sur Ctrl+Alt+Suppr, puis « Se déconnecter »'), detail: t('Ouvre ensuite la session d’un compte administrateur : il garde le bureau Windows') },
             ],
           },
           ...(loadSettingsRecord(host.dataDir)
@@ -355,7 +355,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
                   rows: [
                     {
                       text: t('Gestionnaire des tâches > Fichier > Exécuter une nouvelle tâche'),
-                      detail: t('powershell -ExecutionPolicy RemoteSigned -File "{file}" (cochez « Créer cette tâche avec des privilèges d’administration » si le bureau est remplacé)', { file: settingsRescueFile(host.dataDir) }),
+                      detail: t('powershell -ExecutionPolicy RemoteSigned -File "{file}" (coche « Créer cette tâche avec des privilèges d’administration » si le bureau est remplacé)', { file: settingsRescueFile(host.dataDir) }),
                     },
                   ],
                 },
@@ -387,7 +387,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const setting = shellSettingFor(command);
     const previous = loadDedicatedRecord(host.dataDir);
     let result = { error: '?' } as ElevatedResult;
-    await host.library.task(t('Autorisation demandée à Windows : répondez dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
+    await host.library.task(t('Autorisation demandée à Windows : réponds dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
       result = await host.system.runElevated({ kind: 'activate', sid, setting });
     });
     flash = undefined;
@@ -404,12 +404,12 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         const problems = outcome.status === 'done' ? activationProblems(outcome.after, setting) : [];
         flash =
           outcome.status === 'restart'
-            ? { rows: [{ text: t('Fonctions de Windows activées : redémarrez le PC, puis revenez ici terminer l’activation'), tone: 'warning', badges: [t('À vérifier')] }] }
+            ? { rows: [{ text: t('Fonctions de Windows activées : redémarre le PC, puis reviens ici terminer l’activation'), tone: 'warning', badges: [t('À vérifier')] }] }
             : problems.length
               ? { rows: [{ text: t('Activation incomplète : Windows ne dit pas ce qui était demandé'), detail: t('« Désactiver et rétablir le bureau » remet l’état d’avant'), tone: 'error', badges: [t('Bloquant')] }, ...differenceRows(problems, user)] }
               : {
                   rows: [
-                    { text: t('Activation enregistrée et vérifiée'), detail: t('Ouvrez une nouvelle session pour l’appliquer (redémarrez le PC)'), tone: 'ok' },
+                    { text: t('Activation enregistrée et vérifiée'), detail: t('Ouvre une nouvelle session pour l’appliquer (redémarre le PC)'), tone: 'ok' },
                     { text: t('Pour revenir en arrière : « Désactiver et rétablir le bureau », ici'), detail: t('En secours, depuis un compte administrateur : {file}', { file: rescueScriptFile(host.dataDir) }) },
                   ],
                 };
@@ -422,7 +422,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
   /** Désactiver : remettre l'état d'avant (référence enregistrée), puis le vérifier point par point. */
   async function deactivate(record: DedicatedRecord): Promise<void> {
     let result = { error: '?' } as ElevatedResult;
-    await host.library.task(t('Autorisation demandée à Windows : répondez dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
+    await host.library.task(t('Autorisation demandée à Windows : réponds dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
       result = await host.system.runElevated({ kind: 'deactivate', sid: record.sid, reference: record.reference });
     });
     flash = undefined;
@@ -433,7 +433,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       const differences = outcome.status === 'done' ? restoreDifferences(record.reference, outcome.settled, outcome.after) : [];
       if (outcome.status === 'failed') flash = { rows: failureRows(outcome) };
       else if (differences.length) {
-        flash = { rows: [{ text: t('L’état d’avant n’est pas tout à fait revenu'), detail: t('Choisissez de nouveau « Désactiver et rétablir le bureau », ou voyez « Secours »'), tone: 'error', badges: [t('Bloquant')] }, ...differenceRows(differences, record.user)] };
+        flash = { rows: [{ text: t('L’état d’avant n’est pas tout à fait revenu'), detail: t('Choisis de nouveau « Désactiver et rétablir le bureau », ou vois « Secours »'), tone: 'error', badges: [t('Bloquant')] }, ...differenceRows(differences, record.user)] };
       } else {
         removeDedicatedRecord(host.dataDir);
         fs.rmSync(rescueScriptFile(host.dataDir), { force: true });
@@ -480,7 +480,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const verb = outcome.kind === 'activate' ? t('L’activation a échoué : {reason}', { reason }) : t('La désactivation a échoué : {reason}', { reason });
     const rows: Row[] = [{ text: verb, tone: 'error', badges: [t('Bloquant')] }];
     if (outcome.rolledBack) rows.push({ text: t('L’état d’avant est remis'), tone: 'ok' });
-    else if (outcome.rollbackError) rows.push({ text: t('Retour en arrière incomplet : {error}', { error: outcome.rollbackError }), detail: t('Voyez « Secours »'), tone: 'error' });
+    else if (outcome.rollbackError) rows.push({ text: t('Retour en arrière incomplet : {error}', { error: outcome.rollbackError }), detail: t('Vois « Secours »'), tone: 'error' });
     return rows;
   }
 
@@ -507,7 +507,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
 
   /** Message d'attente : l'UAC à répondre, ou l'écriture dans la session. */
   function settingsTask(elevate: boolean): string {
-    return elevate ? t('Autorisation demandée à Windows : répondez dans la fenêtre « Contrôle de compte d’utilisateur »…') : t('Réglages de Windows en cours…');
+    return elevate ? t('Autorisation demandée à Windows : réponds dans la fenêtre « Contrôle de compte d’utilisateur »…') : t('Réglages de Windows en cours…');
   }
 
   /** Installer une façon : relever (la sauvegarde), écrire, vérifier. */
@@ -539,7 +539,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
           ? { rows: [{ text: t('Activation incomplète : Windows ne dit pas ce qui était demandé'), detail: t('« Désactiver » remet l’état d’avant'), tone: 'error', badges: [t('Bloquant')] }, ...settingsDifferenceRows(problems, user)] }
           : {
               rows: [
-                { text: t('Sauvegarde prise, réglages écrits et vérifiés'), detail: t('Effet à la prochaine ouverture de session (redémarrez le PC)'), tone: 'ok' },
+                { text: t('Sauvegarde prise, réglages écrits et vérifiés'), detail: t('Effet à la prochaine ouverture de session (redémarre le PC)'), tone: 'ok' },
                 { text: t('Pour revenir en arrière : « Désactiver », ici'), detail: t('En secours, hors de Cyber Pinball : {file}', { file: settingsRescueFile(host.dataDir) }) },
               ],
             };
@@ -565,7 +565,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
       const differences = settingsDifferences(record.reference, outcome.after);
       if (outcome.status === 'failed') flash = { rows: settingsFailureRows(outcome, t('La désactivation a échoué : {reason}', { reason: outcome.error ?? '?' })) };
       else if (differences.length) {
-        flash = { rows: [{ text: t('L’état d’avant n’est pas tout à fait revenu'), detail: t('Choisissez de nouveau « Désactiver », ou voyez « Secours »'), tone: 'error', badges: [t('Bloquant')] }, ...settingsDifferenceRows(differences, record.user)] };
+        flash = { rows: [{ text: t('L’état d’avant n’est pas tout à fait revenu'), detail: t('Choisis de nouveau « Désactiver », ou vois « Secours »'), tone: 'error', badges: [t('Bloquant')] }, ...settingsDifferenceRows(differences, record.user)] };
       } else forgetSettings(record, t('Configuration précédente restaurée et vérifiée'));
       console.log(`Réglages de Windows de la borne : désactivation ${outcome.status}${differences.length ? `, ${differences.length} différence(s)` : ''} ; ${(outcome.log ?? []).join(' ; ')}`);
     }
@@ -625,7 +625,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
   function settingsFailureRows(outcome: SettingsOutcome, text: string): Row[] {
     const rows: Row[] = [{ text, tone: 'error', badges: [t('Bloquant')] }];
     if (outcome.rolledBack) rows.push({ text: t('L’état d’avant est remis'), tone: 'ok' });
-    else if (outcome.rollbackError) rows.push({ text: t('Retour en arrière incomplet : {error}', { error: outcome.rollbackError }), detail: t('Voyez « Secours »'), tone: 'error' });
+    else if (outcome.rollbackError) rows.push({ text: t('Retour en arrière incomplet : {error}', { error: outcome.rollbackError }), detail: t('Vois « Secours »'), tone: 'error' });
     return rows;
   }
 
@@ -663,7 +663,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     get detail() {
       const record = loadDedicatedRecord(host.dataDir);
       const settings = loadSettingsRecord(host.dataDir);
-      if (record?.state === 'restart') return t('Activation commencée : redémarrez le PC, puis terminez-la ici');
+      if (record?.state === 'restart') return t('Activation commencée : redémarre le PC, puis termine-la ici');
       const user = record?.user ?? (settings?.mode === 'shell' ? settings.user : undefined);
       return user ? t('Cyber Pinball à la place du bureau Windows, pour le compte « {user} »', { user }) : t('Cyber Pinball à la place du bureau Windows, ou lancé au démarrage ; désactivée');
     },

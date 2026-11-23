@@ -4,11 +4,11 @@ export const messages: Record<string, string> = {
   // packages/core/src/downloadqueue.ts
   'La table n’est plus sur la borne.': 'The table is no longer on the cabinet.',
   'Cet ami': 'This friend',
-  '{name} n’est plus dans vos amis.': '{name} is no longer one of your friends.',
+  '{name} n’est plus dans tes amis.': '{name} is no longer one of your friends.',
   'Médias du jeu · {table}': 'Game media · {table}',
   'Parties du jeu · {table}': 'Game parts · {table}',
   'Fiche · {table}': 'Sheet · {table}',
-  'votre ami': 'your friend',
+  'ton ami': 'your friend',
   'À suivre': 'Up next',
   'En cours': 'Downloading',
   'En pause': 'Paused',
@@ -61,7 +61,7 @@ export const messages: Record<string, string> = {
   'En cours et en attente': 'Downloading and waiting',
   'Terminés et bloqués': 'Finished and blocked',
   'Aucun téléchargement en cours': 'No downloads in progress',
-  'Ce que vous demandez à un site ou à un ami arrive ici : vous le suivez, il reprend seul après une coupure, et il vous ramène là où vous l’avez demandé.':
+  'Ce que tu demandes à un site ou à un ami arrive ici : tu le suis, il reprend seul après une coupure, et il te ramène là où tu l’as demandé.':
     'What you ask a site or a friend for arrives here: you follow it, it resumes by itself after a cut, and it takes you back to where you asked for it.',
   'Tout mettre en pause': 'Pause all',
   'Tout reprendre': 'Resume all',
@@ -70,7 +70,7 @@ export const messages: Record<string, string> = {
   'Fichiers téléchargés': 'Downloaded files',
   '{size} à recevoir': '{size} to receive',
   'au moins {size} à recevoir': 'at least {size} to receive',
-  'Vos téléchargements, leurs reprises et les écrans où continuer.': 'Your downloads, their resumes and the screens to carry on from.',
+  'Tes téléchargements, leurs reprises et les écrans où continuer.': 'Your downloads, their resumes and the screens to carry on from.',
   'Téléchargement retiré': 'Download removed',
   Reprise: 'Resume',
   'Automatique au retour de {name}, à partir des données déjà reçues. Le fichier repris est vérifié en entier.':
@@ -80,7 +80,7 @@ export const messages: Record<string, string> = {
   'Retour vers : {screen}': 'Back to: {screen}',
   'Rangé dans': 'Stored in',
   'Revenir à {screen}': 'Go back to {screen}',
-  'Vérifiez, puis enregistrez': 'Check, then save',
+  'Vérifie, puis enregistre': 'Check, then save',
   'Le plan d’ajout, avant toute installation': 'The add plan, before anything is installed',
   'Le téléchargement continue': 'The download carries on',
   'Mettre en pause': 'Pause',
@@ -113,7 +113,7 @@ export const messages: Record<string, string> = {
   'Annuler la réception': 'Cancel the transfer',
   'Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer. Si {name} se déconnecte, la réception reprend seule à son retour.':
     'Each file is checked on arrival (size, fingerprint), then the add plan shows everything before installing. If {name} goes offline, the transfer resumes by itself when they are back.',
-  'Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table. Si {name} se déconnecte, la réception reprend seule à son retour.':
+  'Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de ta table. Si {name} se déconnecte, la réception reprend seule à son retour.':
     'Each file is checked on arrival (size, fingerprint, content) before it enters your table’s media draft. If {name} goes offline, the transfer resumes by itself when they are back.',
 
   // app/src/acquire-window.ts, app/src/catalog.ts, app/src/media-sites.ts

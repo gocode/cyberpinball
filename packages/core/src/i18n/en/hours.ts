@@ -23,7 +23,7 @@ export const messages: Record<string, string> = {
   'Liste des périphériques indisponible': 'Device list unavailable',
   'Périphériques autorisés par Windows : {devices}': 'Devices allowed by Windows: {devices}',
   'Aucun périphérique autorisé détecté': 'No allowed device detected',
-  'Après extinction, rallumez la borne avec le bouton d’alimentation du PC. Les autorisations ci-dessous concernent uniquement la veille.':
+  'Après extinction, rallume la borne avec le bouton d’alimentation du PC. Les autorisations ci-dessous concernent uniquement la veille.':
     'After a shutdown, turn the cabinet back on with the PC power button. The permissions below only apply to sleep.',
   'Bouton d’alimentation du PC': 'PC power button',
   'Informations lues dans Windows ; aucun réglage modifié ici.': 'Read from Windows; no setting is changed here.',
@@ -55,8 +55,8 @@ export const messages: Record<string, string> = {
   'Arrêt automatique': 'Automatic stop',
   'Heure à laquelle la borne s’arrête, si personne ne joue. Une partie en cours la retient : elle s’arrête dès que la borne est libre, jusqu’à la fin de la nuit.':
     'Time at which the cabinet stops, if nobody is playing. A game in progress holds it back: it stops as soon as the cabinet is free, until the end of the night.',
-  'Heure de la fin de la nuit : choisissez deux heures différentes': 'Time the night ends: choose two different times',
-  'Heure du début de la nuit : choisissez deux heures différentes': 'Time the night starts: choose two different times',
+  'Heure de la fin de la nuit : choisis deux heures différentes': 'Time the night ends: choose two different times',
+  'Heure du début de la nuit : choisis deux heures différentes': 'Time the night starts: choose two different times',
   'hors de la nuit': 'outside the night',
   'Écrans pendant l’attente nocturne': 'Screens during night attract mode',
   'Voile noir posé sur chaque écran la nuit, quand la borne est en attente. Il descend lentement et se lève au premier bouton. Écrans noirs : les vidéos s’arrêtent dessous.':
@@ -64,6 +64,6 @@ export const messages: Record<string, string> = {
   // app/renderer/frontend.js
   'Mise en veille dans': 'Going to sleep in',
   'Extinction dans': 'Shutting down in',
-  'Appuyez sur un bouton pour garder la borne allumée': 'Press a button to keep the cabinet on',
+  'Appuie sur un bouton pour garder la borne allumée': 'Press a button to keep the cabinet on',
   s: 's',
 };

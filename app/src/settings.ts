@@ -279,7 +279,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
   session = s;
   reload();
   s.cursor = firstSelectable(rows(), 0, 1);
-  if (!schema) s.notice = { text: t('Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».'), tone: 'error' };
+  if (!schema) s.notice = { text: t('Aucun schéma de réglages pour cette version de VPX : lance « npm run vpx-schema ».'), tone: 'error' };
 
   win.on('closed', () => {
     if (session === s) session = undefined;
@@ -485,7 +485,7 @@ function openRow(row: Row): void {
     return;
   }
   if (lock === 'tableOnly') {
-    s.panel = info(label(row), [t('Ce réglage se règle table par table : ouvrez la fiche d’une table, puis ses réglages.')], [], id);
+    s.panel = info(label(row), [t('Ce réglage se règle table par table : ouvre la fiche d’une table, puis ses réglages.')], [], id);
     return;
   }
   if (lock === 'editor') {
@@ -975,7 +975,7 @@ function wizardLabel(kind: WizardKind): string {
 }
 
 function keepYours(): string {
-  return t('Pour imposer une autre valeur, modifiez VPinballX.ini : au démarrage suivant, Cyber Pinball vous proposera de garder la vôtre.');
+  return t('Pour imposer une autre valeur, modifie VPinballX.ini : au démarrage suivant, Cyber Pinball te proposera de garder la tienne.');
 }
 
 /**
@@ -993,7 +993,7 @@ function inputMapping(row: { section: string; key: string; value: string }) {
     keys: describeMapping(row.value, action),
     owned,
     why: owned
-      ? t('Touche gérée par Cyber Pinball : elle découle des boutons de la borne. Pour la changer, refaites l’étape « Boutons » de l’assistant ; une touche ajoutée dans VPX pour une manette est gardée.')
+      ? t('Touche gérée par Cyber Pinball : elle découle des boutons de la borne. Pour la changer, refais l’étape « Boutons » de l’assistant ; une touche ajoutée dans VPX pour une manette est gardée.')
       : t('Touche de VPX, que Cyber Pinball ne gère pas. Elle se change dans le menu de VPX (F12, puis « Input Settings »).'),
   };
 }
@@ -1040,9 +1040,9 @@ function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: W
     return { why: t('Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).'), how: t('Pour la changer : menu système > Ma borne > Configuration de la borne > Boutons > Tilt.') };
   }
   if (def.section === 'Player' && VPX_AUDIO_OWNED_KEYS.includes(def.key)) {
-    return { why: t('Elle découle de l’affectation des sorties audio de la borne.'), how: t('Pour la changer, relancez l’assistant (étape Son).'), wizard: 'full' };
+    return { why: t('Elle découle de l’affectation des sorties audio de la borne.'), how: t('Pour la changer, relance l’assistant (étape Son).'), wizard: 'full' };
   }
-  return { why: t('Elle découle de l’affectation des écrans de la borne.'), how: t('Pour la changer, relancez l’assistant d’écrans.'), wizard: 'screens' };
+  return { why: t('Elle découle de l’affectation des écrans de la borne.'), how: t('Pour la changer, relance l’assistant d’écrans.'), wizard: 'screens' };
 }
 
 function rowView(row: Row) {

@@ -24,7 +24,7 @@ test('sonde du PIN2DMD : chaque étape manquée devient une phrase qui dit quoi 
   assert.equal(pin2dmdProbeProblem({ stage: 'ok', code: 0 }), undefined);
   assert.match(pin2dmdProbeProblem({ stage: 'list', code: 0 })!, /la libusb de VPX ne le trouve pas/);
   // Occupé (ACCESS -3 à l'ouverture, BUSY -6 à la réservation) : avec, puis sans programme reconnu.
-  assert.match(pin2dmdProbeProblem({ stage: 'open', code: -3, holders: ['dmdext', 'PinUP Popper'] })!, /déjà ouvert par un autre programme \(dmdext et PinUP Popper\).*Fermez-le/);
+  assert.match(pin2dmdProbeProblem({ stage: 'open', code: -3, holders: ['dmdext', 'PinUP Popper'] })!, /déjà ouvert par un autre programme \(dmdext et PinUP Popper\).*Ferme-le/);
   assert.match(pin2dmdProbeProblem({ stage: 'claim', code: -6 })!, /déjà ouvert par un autre programme \(dmdext, un autre front-end/);
   // Pilote que la libusb de VPX ne sait pas utiliser (NOT_SUPPORTED -12) : WinUSB par Zadig.
   assert.match(pin2dmdProbeProblem({ stage: 'open', code: -12 }, 'libusb0')!, /pilote actuel \(libusb0\).*WinUSB avec Zadig/);

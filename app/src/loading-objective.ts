@@ -34,10 +34,10 @@ export function loadingObjective(goal: TableGoal, opts: { face(h: DailyHolder): 
   const lines: string[] = [];
   const where = goal.recordScope === 'country' && opts.country ? countryName(opts.country, locale()) : t('Monde');
   if (goal.record && !goal.record.mine) lines.push(t('Record du jour · {where} : {name} · {score}', { where, name: goal.record.name, score: formatNumber(goal.record.score) }));
-  if (!o) return { label, name: t('Ouvrir le classement'), lines: [t('Personne n’a encore joué cette version en ligne : votre score sera le premier')] };
-  if (o.leader) return { label, name: t('Défendre votre place'), lines: [t('Personne au-dessus de vous sur cette version'), ...lines] };
+  if (!o) return { label, name: t('Ouvrir le classement'), lines: [t('Personne n’a encore joué cette version en ligne : ton score sera le premier')] };
+  if (o.leader) return { label, name: t('Défendre ta place'), lines: [t('Personne au-dessus de toi sur cette version'), ...lines] };
   const target = o.target!;
   const mine = o.mine ?? opts.best;
-  const gapLine = mine ? t('Votre record : {score} · il manque {gap}', { score: formatNumber(mine), gap: formatNumber(Math.max(0, target.score - mine)) }) : t('Pas encore de score pour vous sur cette version');
+  const gapLine = mine ? t('Ton record : {score} · il manque {gap}', { score: formatNumber(mine), gap: formatNumber(Math.max(0, target.score - mine)) }) : t('Pas encore de score pour toi sur cette version');
   return { label, name: t('Battre {name}', { name: target.name }), score: formatNumber(target.score), avatar: opts.face(target), lines: [gapLine, ...lines] };
 }

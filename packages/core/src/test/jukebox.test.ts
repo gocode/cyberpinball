@@ -177,7 +177,7 @@ test('playlists : créer, renommer, refuser un nom vide ou pris, réordonner, su
   assert.equal(a.playlist.quality, '1080p', '1080p par défaut');
   s = a.store;
   assert.equal(playlistNameProblem(s, 'néon NOCTURNE'), 'Une playlist porte déjà ce nom');
-  assert.equal(playlistNameProblem(s, '   '), 'Donnez un nom à la playlist');
+  assert.equal(playlistNameProblem(s, '   '), 'Donne un nom à la playlist');
   assert.match(playlistNameProblem(s, 'x'.repeat(61))!, /trop long/);
   const b = createPlaylist(s, 'Arcade 84', NOW);
   assert.ok(b.ok);
@@ -286,7 +286,7 @@ test('liste à plat : titres, durées, miniatures ; privées, supprimées, rése
   ];
   const det = parseDetailLines(lines);
   assert.deepEqual(det.get(A), { tags: { artist: 'Néons Fictifs', album: 'Nuits à venir', track: 'Ville basse' }, title: 'Néons Fictifs - Ville basse (Official Video)', duration: 215 });
-  assert.deepEqual(det.get(D), { unavailable: 'blocked', detail: 'Bloquée dans votre pays' });
+  assert.deepEqual(det.get(D), { unavailable: 'blocked', detail: 'Bloquée dans ton pays' });
   assert.equal(det.has(E), false, 'la demande de preuve « pas un robot » n’est pas une raison propre à la vidéo');
   const merged = mergeDetails(a, det);
   assert.equal(merged.entries[0]!.album, 'Nuits à venir');
@@ -658,7 +658,7 @@ test('état : jouable, en téléchargement avec son pourcentage, hors ligne, fic
   assert.equal(trackStatus(dl, ctx()).kind, 'pending');
   assert.equal(trackStatus(dl, ctx({ library: new Map([[A, song(A)]]) })).kind, 'playable');
   assert.equal(trackStatus(dl, ctx({ library: new Map([[A, song(A, { video: undefined })]]) }), 0).kind, 'playable', 'son seul : la vidéo n’est pas attendue');
-  assert.deepEqual(trackStatus(tr({ unavailable: { reason: 'blocked', since: '' } }), ctx()), { kind: 'unavailable', playable: false, label: 'Bloquée dans votre pays', reason: 'Bloquée dans votre pays' });
+  assert.deepEqual(trackStatus(tr({ unavailable: { reason: 'blocked', since: '' } }), ctx()), { kind: 'unavailable', playable: false, label: 'Bloquée dans ton pays', reason: 'Bloquée dans ton pays' });
   assert.equal(trackStatus(tr({ source: 'download', unavailable: { reason: 'deleted', since: '' } }), ctx({ library: new Map([[A, song(A)]]) })).kind, 'removed');
   const file = tr({ source: 'file', youtube: undefined, path: 'F:\\Clips\\x.mp4' });
   assert.equal(trackStatus(file, ctx()).play, 'file');

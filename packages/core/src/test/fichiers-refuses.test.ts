@@ -29,10 +29,10 @@ test('toute action d’un écran du front-end passe par runAction, jamais appel�
 test('message : fichier tenu par un programme (nommé ou non), disque plein, autre erreur', () => {
   const eperm = Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM', path: 'C:\\Cyber Pinball\\tables\\Champions League - Season 2023 (Original 2023)' });
   assert.ok(isFileLocked(eperm));
-  assert.equal(fileErrorText(eperm, ['VPinballX64']), '« Champions League - Season 2023 (Original 2023) » est ouvert dans VPinballX64 : fermez-le, puis réessayez.');
+  assert.equal(fileErrorText(eperm, ['VPinballX64']), '« Champions League - Season 2023 (Original 2023) » est ouvert dans VPinballX64 : ferme-le, puis réessaie.');
   assert.match(fileErrorText(eperm), /est ouvert par un autre programme \(VPX, un lecteur vidéo, l’Explorateur de fichiers…\)/);
   assert.match(fileErrorText(Object.assign(new Error('x'), { code: 'EBUSY', path: 'a\\b.mp4' })), /« b\.mp4 »/);
-  assert.equal(fileErrorText(Object.assign(new Error('x'), { code: 'ENOSPC' })), 'Le disque est plein : libérez de la place, puis réessayez.');
+  assert.equal(fileErrorText(Object.assign(new Error('x'), { code: 'ENOSPC' })), 'Le disque est plein : libère de la place, puis réessaie.');
   assert.match(fileErrorText(new Error('autre chose')), /autre chose$/);
   assert.ok(!isFileLocked(new Error('x')));
 });

@@ -187,8 +187,8 @@ test('nouvelles : reçu, battu par l’autre, plus que 6 h, résultat ; chacune 
   assert.equal(log.entries.length, 1, 'une ligne pour tout le défi, même sur trois jours');
   assert.equal(log.entries[0]!.stage, 'lost');
   assert.equal(log.entries[0]!.read, false);
-  assert.equal(noticeText('challenge', [event('beaten', at(20 * H))]).title, 'Léo a battu votre score : à vous');
-  assert.equal(noticeText('challenge', [event('received', at(H))]).title, 'Léo vous défie');
+  assert.equal(noticeText('challenge', [event('beaten', at(20 * H))]).title, 'Léo a battu ton score : à toi');
+  assert.equal(noticeText('challenge', [event('received', at(H))]).title, 'Léo te défie');
 });
 
 test('XP : +40 au vainqueur, dans le plafond du jeu, au plus trois défis payés par jour', () => {
@@ -355,7 +355,7 @@ test('écrans : « Défi de Nina » à jouer ; autre version grisée ou à récu
       now: () => now,
     });
   try {
-    // Nina défie Léo d'un geste (« Votre place est prise », retour de partie).
+    // Nina défie Léo d'un geste (« Ta place est prise », retour de partie).
     const ninaMenu = menuOf(nina.svc);
     const b = ninaMenu.button(pub(LEO), TABLE, 4_000_000, 'best', 'challenge', () => undefined);
     assert.equal(b.label, 'Défier Léo');
@@ -377,7 +377,7 @@ test('écrans : « Défi de Nina » à jouer ; autre version grisée ou à récu
     assert.equal(leoMenu.sections(() => undefined).sections[0]!.title, 'À jouer');
     // Une autre version que la sienne : grisée, ou « Récupérer cette version » chez un ami qui l'a.
     local = 'other';
-    assert.equal(leoMenu.playCards(() => undefined)[0]!.buttons![0]!.off, 'Autre version que la vôtre');
+    assert.equal(leoMenu.playCards(() => undefined)[0]!.buttons![0]!.off, 'Autre version que la tienne');
     holders = [{ key: NINA.key.publicKey, name: 'Nina', fetch: () => undefined }];
     assert.equal(leoMenu.playCards(() => undefined)[0]!.buttons![0]!.label, 'Récupérer cette version');
     local = 'missing';

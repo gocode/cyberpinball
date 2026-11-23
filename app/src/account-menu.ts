@@ -108,8 +108,8 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     const rows: Row[] = [
       { text: t('Copie de secours sur ce PC'), detail: t('Hors du dossier de Cyber Pinball : reprise d’office s’il est réinstallé ici, même ailleurs'), tone: 'ok', badges: [t('Active')], icon: 'drive' },
       p.codeNotedAt
-        ? { text: t('Code de récupération : noté'), detail: t('Le {date} · 24 mots qui redonnent votre compte sur n’importe quel PC', { date: day(p.codeNotedAt) }), tone: 'ok', badges: [t('Noté')], icon: 'lock' }
-        : { text: t('Code de récupération : pas encore noté'), detail: t('24 mots à noter, ou leur QR à photographier : ils redonnent votre compte sur n’importe quel PC'), tone: 'warning', badges: [t('À noter')], icon: 'lock' },
+        ? { text: t('Code de récupération : noté'), detail: t('Le {date} · 24 mots qui redonnent ton compte sur n’importe quel PC', { date: day(p.codeNotedAt) }), tone: 'ok', badges: [t('Noté')], icon: 'lock' }
+        : { text: t('Code de récupération : pas encore noté'), detail: t('24 mots à noter, ou leur QR à photographier : ils redonnent ton compte sur n’importe quel PC'), tone: 'warning', badges: [t('À noter')], icon: 'lock' },
       p.password
         ? { text: t('Mot de passe : identifiant {name}', { name: p.password.name }), detail: t('Créé le {date} · retrouver son compte avec son pseudo et ce mot de passe', { date: day(p.password.at) }), tone: 'ok', badges: [t('Actif')], icon: 'unlock' }
         : { text: t('Mot de passe : aucun'), detail: svc.online() ? t('Facultatif : retrouver son compte avec son pseudo et un mot de passe') : t('Indisponible : service du compte injoignable'), tone: 'quiet', icon: 'unlock' },
@@ -120,7 +120,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
           ? { text: t('Copie chiffrée sur le serveur : coupée'), detail: t('Le code ne redonnera que la clé : ni amis, ni niveau, ni badges'), tone: 'warning', badges: [t('Coupée')], icon: 'upload' }
           : vault === 'offline'
             ? { text: t('Copie chiffrée sur le serveur : pas à jour'), detail: t('Service injoignable : nouvel essai tout seul'), tone: 'warning', badges: [t('En attente')], icon: 'upload' }
-            : { text: t('Copie chiffrée sur le serveur'), detail: p.vaultSent ? t('À jour le {date} · le serveur ne peut pas l’ouvrir : seuls votre code ou votre mot de passe l’ouvrent', { date: day(p.vaultSent.at) }) : t('Envoi en cours'), tone: 'ok', badges: [p.vaultSent ? t('À jour') : t('Envoi')], icon: 'upload' },
+            : { text: t('Copie chiffrée sur le serveur'), detail: p.vaultSent ? t('À jour le {date} · le serveur ne peut pas l’ouvrir : seuls ton code ou ton mot de passe l’ouvrent', { date: day(p.vaultSent.at) }) : t('Envoi en cours'), tone: 'ok', badges: [p.vaultSent ? t('À jour') : t('Envoi')], icon: 'upload' },
       );
     }
     return rows;
@@ -134,7 +134,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         : { label: t('Noter mon code de récupération…'), detail: t('24 mots et leur QR, à l’abri des regards'), icon: 'lock', tone: 'ok', key: 'code', run: () => openCode() },
       p.password
         ? { label: t('Changer de mot de passe…'), detail: t('Identifiant {name}', { name: p.password.name }), icon: 'unlock', key: 'password', run: () => askPassword() }
-        : { label: t('Créer un mot de passe…'), detail: svc.online() ? t('Votre pseudo devient votre identifiant') : t('Indisponible : service du compte injoignable'), icon: 'unlock', key: 'password', ...(svc.online() ? {} : { tone: 'quiet' as const }), run: () => (svc.online() ? askPassword() : undefined) },
+        : { label: t('Créer un mot de passe…'), detail: svc.online() ? t('Ton pseudo devient ton identifiant') : t('Indisponible : service du compte injoignable'), icon: 'unlock', key: 'password', ...(svc.online() ? {} : { tone: 'quiet' as const }), run: () => (svc.online() ? askPassword() : undefined) },
     ];
     if (p.password) actions.push({ label: t('Retirer le mot de passe'), detail: t('Le code de récupération reste'), icon: 'close', key: 'password-off', run: () => void removePassword() });
     if (p.codeNotedAt || p.password) {
@@ -146,7 +146,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     }
     actions.push(
       { label: t('Reprendre un compte sur cette borne…'), detail: t('Code, mot de passe, copie de ce PC ou sauvegarde'), icon: 'restore', key: 'restore', run: () => openRestore(reopenProtect) },
-      { label: t('Sauvegardes'), detail: t('« Réglages et scores » contient aussi votre compte'), icon: 'drive', key: 'backups', run: () => host.library.runSystemItem('backups', reopenProtect) },
+      { label: t('Sauvegardes'), detail: t('« Réglages et scores » contient aussi ton compte'), icon: 'drive', key: 'backups', run: () => host.library.runSystemItem('backups', reopenProtect) },
       backAction(protectBack),
     );
     return {
@@ -154,7 +154,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       icon: 'lock',
       avatar: myAvatar(),
       subheading: t('{name} · niveau {level}', { name: me().name, level: host.level().level }),
-      lead: t('Votre compte n’existe que sur cette borne : notez votre code de récupération pour le retrouver sur un autre PC ou après une réinstallation.'),
+      lead: t('Ton compte n’existe que sur cette borne : note ton code de récupération pour le retrouver sur un autre PC ou après une réinstallation.'),
       sections: [...flashSections(), { rows: protectRows() }],
       actions,
       back: protectBack,
@@ -189,19 +189,19 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     const words = svc.words();
     const rows: Row[] = [];
     for (let i = 0; i < words.length; i += WORDS_PER_ROW) rows.push({ text: words.slice(i, i + WORDS_PER_ROW).map((w, k) => `${i + k + 1} ${w}`).join('  ·  '), icon: 'lock' });
-    const qr = { url: recoveryQrText(words), title: t('Le même code en QR'), caption: t('24 mots, en texte : aucune adresse'), hint: t('Photographiez-le avec votre téléphone. Pour reprendre le compte, l’appareil photo du téléphone le lit et colle les mots.') };
+    const qr = { url: recoveryQrText(words), title: t('Le même code en QR'), caption: t('24 mots, en texte : aucune adresse'), hint: t('Photographie-le avec ton téléphone. Pour reprendre le compte, l’appareil photo du téléphone le lit et colle les mots.') };
     host.library.openCustom(
       () => ({
-        heading: t('Votre code de récupération'),
+        heading: t('Ton code de récupération'),
         icon: 'lock',
         subheading: t('{name} · 24 mots, dans l’ordre', { name: me().name }),
-        lead: t('Notez ces mots sur papier, ou photographiez le QR avec votre téléphone. Quiconque les a peut prendre votre compte : ne les partagez jamais.'),
+        lead: t('Note ces mots sur papier, ou photographie le QR avec ton téléphone. Quiconque les a peut prendre ton compte : ne les partage jamais.'),
         sections: [
           { title: t('Les 24 mots'), rows },
-          { rows: [{ text: t('Le code ne quitte jamais cette borne'), detail: t('Cyber Pinball ne peut pas le retrouver pour vous : gardez-le à l’abri'), icon: 'info' }] },
+          { rows: [{ text: t('Le code ne quitte jamais cette borne'), detail: t('Cyber Pinball ne peut pas le retrouver pour toi : garde-le à l’abri'), icon: 'info' }] },
         ],
         actions: [
-          { label: t('Je l’ai noté'), detail: t('Vous choisirez ses trois premiers mots, dans l’ordre'), icon: 'check', tone: 'ok', qr, run: () => verifyCode() },
+          { label: t('Je l’ai noté'), detail: t('Tu choisiras ses trois premiers mots, dans l’ordre'), icon: 'check', tone: 'ok', qr, run: () => verifyCode() },
           { label: t('Plus tard'), detail: t('Mon compte le rappellera'), icon: 'clock', qr, run: () => reopenProtect() },
         ],
         back: toProtect,
@@ -232,10 +232,10 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       if (picked.length < RECOVERY_CHECK_COUNT) return host.library.openCustom(build);
       if (picked.every((c, n) => choices[c] === words[n])) {
         svc.noteCode();
-        flash = { text: t('Code de récupération noté : votre compte est protégé'), tone: 'ok' };
+        flash = { text: t('Code de récupération noté : ton compte est protégé'), tone: 'ok' };
         return reopenProtect();
       }
-      restart({ text: t('Ce ne sont pas les trois premiers mots dans l’ordre : revoyez le code et recommencez'), tone: 'error' });
+      restart({ text: t('Ce ne sont pas les trois premiers mots dans l’ordre : revois le code et recommence'), tone: 'error' });
     };
     // Exit et « Quitter » sont la même fonction : le bouton de retour en tête le dit aussi.
     const quit = () => openCode();
@@ -254,7 +254,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         heading: t('Vérifier le code'),
         icon: 'lock',
         subheading: t('Mot n° {n} sur {count}', { n: Math.min(next, RECOVERY_CHECK_COUNT), count: RECOVERY_CHECK_COUNT }),
-        lead: t('Choisissez les trois premiers mots de votre code, dans l’ordre : le mot n° 1, puis le 2, puis le 3. Son numéro s’inscrit dans la case.'),
+        lead: t('Choisis les trois premiers mots de ton code, dans l’ordre : le mot n° 1, puis le 2, puis le 3. Son numéro s’inscrit dans la case.'),
         sections: [...flashSections(), { title: t('Mots proposés'), options: true, rows }],
         actions,
         back: quit,
@@ -270,7 +270,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     const login = me().name;
     host.library.openPrompt(
       t('Créer un mot de passe'),
-      t('Votre mot de passe'),
+      t('Ton mot de passe'),
       '',
       (first) => {
         if (first === undefined) return reopenProtect();
@@ -286,9 +286,9 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
             return reopenProtect(1);
           }
           reviewPassword(login, first);
-        }, t('Retapez-le pour être sûr qu’il est bien celui que vous voulez.'), { secret: true });
+        }, t('Retape-le pour être sûr qu’il est bien celui que tu veux.'), { secret: true });
       },
-      t('Identifiant : {name}. Au moins 8 caractères. Le serveur ne le connaît pas et ne peut pas le retrouver : sans lui, seul votre code de récupération vous rendra votre compte.', { name: login }),
+      t('Identifiant : {name}. Au moins 8 caractères. Le serveur ne le connaît pas et ne peut pas le retrouver : sans lui, seul ton code de récupération te rendra ton compte.', { name: login }),
       { secret: true },
     );
   }
@@ -300,12 +300,12 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     const save = async () => {
       if (busy) return;
       busy = true;
-      host.library.openCustom(() => ({ heading: t('Créer un mot de passe'), icon: 'unlock', sections: [{ rows: [{ text: t('Envoi au serveur…'), detail: t('Votre compte part chiffré : le serveur ne peut pas l’ouvrir'), icon: 'clock' }] }], actions: [{ label: t('Patientez…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
+      host.library.openCustom(() => ({ heading: t('Créer un mot de passe'), icon: 'unlock', sections: [{ rows: [{ text: t('Envoi au serveur…'), detail: t('Ton compte part chiffré : le serveur ne peut pas l’ouvrir'), icon: 'clock' }] }], actions: [{ label: t('Patiente…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
       const r = await svc.setPassword(password, login);
       flash = r.ok
         ? { text: t('Mot de passe créé : identifiant {name}', { name: login }), tone: 'ok' }
         : r.why === 'taken'
-          ? { text: t('L’identifiant {name} est déjà pris : changez de pseudo, puis recommencez', { name: login }), tone: 'error' }
+          ? { text: t('L’identifiant {name} est déjà pris : change de pseudo, puis recommence', { name: login }), tone: 'error' }
           : r.why === 'offline'
             ? { text: t('Mot de passe pas créé : service du compte injoignable'), tone: 'error' }
             : { text: t('Mot de passe refusé par le service'), tone: 'error' };
@@ -317,13 +317,13 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         icon: 'unlock',
         avatar: myAvatar(),
         subheading: t('Identifiant : {name}', { name: login }),
-        lead: t('Votre compte est chiffré sur cette borne avec votre mot de passe, puis gardé sur le serveur de Cyber Pinball. Le serveur ne peut pas l’ouvrir, et ne connaît pas votre mot de passe.'),
+        lead: t('Ton compte est chiffré sur cette borne avec ton mot de passe, puis gardé sur le serveur de Cyber Pinball. Le serveur ne peut pas l’ouvrir, et ne connaît pas ton mot de passe.'),
         sections: [
           {
             rows: [
-              { text: t('Identifiant : {name}', { name: login }), detail: t('Votre pseudo, sans tenir compte des majuscules ; réservé pour vous'), icon: 'friend-list' },
+              { text: t('Identifiant : {name}', { name: login }), detail: t('Ton pseudo, sans tenir compte des majuscules ; réservé pour toi'), icon: 'friend-list' },
               { text: t('Mot de passe : {dots}', { dots: '●'.repeat(Math.min(16, [...password].length)) }), detail: tn([...password].length, '{n} caractère', '{n} caractères'), tone: strength === 'weak' ? 'warning' : 'ok', badges: [strengthText], icon: 'lock' },
-              { text: t('Mot de passe oublié : pas de réinitialisation'), detail: t('Aucune adresse e-mail n’est demandée : seul votre code de récupération vous sauvera'), tone: 'warning', icon: 'alert' },
+              { text: t('Mot de passe oublié : pas de réinitialisation'), detail: t('Aucune adresse e-mail n’est demandée : seul ton code de récupération te sauvera'), tone: 'warning', icon: 'alert' },
             ],
           },
         ],
@@ -367,7 +367,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     return {
       heading: t('Reprendre un compte'),
       icon: 'restore',
-      lead: t('Le compte repris remplacera celui de cette borne. Rien ne change avant votre confirmation.'),
+      lead: t('Le compte repris remplacera celui de cette borne. Rien ne change avant ta confirmation.'),
       sections: flashSections(),
       actions,
       back: toRestoreBack,
@@ -377,9 +377,9 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
   const copyDetail = (s: AccountSummary) => t('Niveau {level} · {badges} · {friends} · copie du {date}', { level: s.level, badges: tn(s.badges, '{n} badge', '{n} badges'), friends: tn(s.friends, '{n} ami', '{n} amis'), date: day(s.at) });
 
   function problemText(p: RecoveryProblem): string {
-    if (p.kind === 'count') return t('{n} mots sur 24 : continuez', { n: p.count });
-    if (p.kind === 'unknown') return t('Le mot n° {n} « {word} » n’est pas dans la liste : vérifiez-le', { n: p.position, word: p.word });
-    return t('Un mot est faux ou deux sont inversés : vérifiez le code');
+    if (p.kind === 'count') return t('{n} mots sur 24 : continue', { n: p.count });
+    if (p.kind === 'unknown') return t('Le mot n° {n} « {word} » n’est pas dans la liste : vérifie-le', { n: p.position, word: p.word });
+    return t('Un mot est faux ou deux sont inversés : vérifie le code');
   }
 
   /** Les 24 mots : tapés au clavier à l'écran, ou collés d'un coup par le téléphone (le QR lu). */
@@ -397,7 +397,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         }
         void open(() => svc.openWithWords(words), () => askWords(words.join(' ')));
       },
-      t('Séparez les mots par des espaces. Avec le téléphone : visez le QR du code avec son appareil photo, copiez le texte, collez-le ici.'),
+      t('Sépare les mots par des espaces. Avec le téléphone : vise le QR du code avec son appareil photo, copie le texte, colle-le ici.'),
     );
   }
 
@@ -410,7 +410,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         subheading: t('{n} mots sur 24', { n: words.length }),
         sections: [...flashSections(), ...(words.length ? [{ title: t('Déjà tapés'), rows: chunk(words).map((ws, i) => ({ text: ws.map((w, k) => `${i * WORDS_PER_ROW + k + 1} ${w}`).join('  ·  '), icon: 'check' as const, tone: 'ok' as const })) }] : [])],
         actions: [
-          { label: t('Continuer à taper…'), detail: t('Au clavier à l’écran ou avec votre téléphone'), icon: 'keyboard', tone: 'ok', run: () => askWords(words.join(' ') + (words.length ? ' ' : '')) },
+          { label: t('Continuer à taper…'), detail: t('Au clavier à l’écran ou avec ton téléphone'), icon: 'keyboard', tone: 'ok', run: () => askWords(words.join(' ') + (words.length ? ' ' : '')) },
           backAction(toRestore),
         ],
         back: toRestore,
@@ -422,11 +422,11 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
   const chunk = (words: string[]) => Array.from({ length: Math.ceil(words.length / WORDS_PER_ROW) }, (_, i) => words.slice(i * WORDS_PER_ROW, (i + 1) * WORDS_PER_ROW));
 
   function askLogin(): void {
-    host.library.openPrompt(t('Reprendre un compte'), t('Identifiant (votre pseudo)'), '', (login) => {
+    host.library.openPrompt(t('Reprendre un compte'), t('Identifiant (ton pseudo)'), '', (login) => {
       if (!login?.trim()) return reopenRestore(1);
       host.library.openPrompt(
         t('Reprendre un compte'),
-        t('Votre mot de passe'),
+        t('Ton mot de passe'),
         '',
         (password) => {
           if (!password) return reopenRestore(1);
@@ -440,7 +440,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
 
   /** Cherche le compte (coffre), en attendant ; puis la confirmation, ou ce qui ne va pas. */
   async function open(find: () => Promise<OpenResult>, retry: () => void): Promise<void> {
-    host.library.openCustom(() => ({ heading: t('Reprendre un compte'), icon: 'restore', sections: [{ rows: [{ text: t('Recherche de votre compte…'), detail: t('Votre copie chiffrée, sur le serveur de Cyber Pinball'), icon: 'clock' }] }], actions: [{ label: t('Patientez…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
+    host.library.openCustom(() => ({ heading: t('Reprendre un compte'), icon: 'restore', sections: [{ rows: [{ text: t('Recherche de ton compte…'), detail: t('Ta copie chiffrée, sur le serveur de Cyber Pinball'), icon: 'clock' }] }], actions: [{ label: t('Patiente…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
     const r = await find();
     if (r.ok) return confirm(r.bundle, r.from, () => reopenRestore());
     const text =
@@ -451,10 +451,10 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
           : r.why === 'unknown'
             ? t('Aucun compte avec cet identifiant et un mot de passe')
             : r.why === 'tries'
-              ? t('Trop d’essais : réessayez dans une heure, ou prenez votre code de récupération')
+              ? t('Trop d’essais : réessaie dans une heure, ou prends ton code de récupération')
               : r.why === 'damaged'
-                ? t('Copie chiffrée illisible : prenez une sauvegarde ou la copie de ce PC')
-                : t('Service du compte injoignable : vérifiez Internet, ou prenez votre code de récupération');
+                ? t('Copie chiffrée illisible : prends une sauvegarde ou la copie de ce PC')
+                : t('Service du compte injoignable : vérifie Internet, ou prends ton code de récupération');
     host.library.openCustom(
       () => ({
         heading: t('Reprendre un compte'),
@@ -485,7 +485,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       : [
           {
             text: t('Le compte « {name} » de cette borne', { name: current.name }),
-            detail: current.friends.length || host.level().xp > 0 ? t('Niveau {level} · {friends} : notez d’abord son code s’il compte pour vous', { level: host.level().level, friends: tn(current.friends.length, '{n} ami', '{n} amis') }) : t('Sans partie ni ami'),
+            detail: current.friends.length || host.level().xp > 0 ? t('Niveau {level} · {friends} : note d’abord son code s’il compte pour toi', { level: host.level().level, friends: tn(current.friends.length, '{n} ami', '{n} amis') }) : t('Sans partie ni ami'),
             tone: current.friends.length || host.level().xp > 0 ? 'warning' : 'quiet',
             icon: 'trash',
           },
@@ -502,13 +502,13 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
             rows:
               from === 'key'
                 ? [
-                    back_({ text: t('Votre clé de joueur : vos amis vous reconnaissent'), detail: t('Pas de copie chiffrée sur le serveur : ni pseudo, ni amis, ni niveau, ni badges ; choisissez votre pseudo ensuite'), tone: 'warning', icon: 'account' }),
+                    back_({ text: t('Ta clé de joueur : tes amis te reconnaissent'), detail: t('Pas de copie chiffrée sur le serveur : ni pseudo, ni amis, ni niveau, ni badges ; choisis ton pseudo ensuite'), tone: 'warning', icon: 'account' }),
                   ]
                 : [
                     { text: t('Pseudo {name} et son avatar', { name: s.name }), icon: 'account' },
                     { text: t('Niveau {level}, {xp} XP et {badges}', { level: s.level, xp: s.xp, badges: tn(s.badges, '{n} badge', '{n} badges') }), icon: 'medal' },
-                    { text: tn(s.friends, '{n} ami', '{n} amis'), detail: t('Ils vous reconnaissent : rien à redemander'), icon: 'friends' },
-                    { text: t('Les scores de vos tables restent sur l’autre borne'), detail: t('Une sauvegarde « Réglages et scores » les ramène'), tone: 'quiet', icon: 'trophy' },
+                    { text: tn(s.friends, '{n} ami', '{n} amis'), detail: t('Ils te reconnaissent : rien à redemander'), icon: 'friends' },
+                    { text: t('Les scores de tes tables restent sur l’autre borne'), detail: t('Une sauvegarde « Réglages et scores » les ramène'), tone: 'quiet', icon: 'trophy' },
                   ],
           },
           { title: t('Remplacé'), rows: replaced },
@@ -530,7 +530,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
   function askName(back: () => void): void {
     host.library.openPrompt(t('Mon pseudo'), t('Pseudo'), me().name, (value) => {
       if (value !== undefined && !host.net.rename(value)) flash = { text: t('Pseudo refusé : {min} à {max} lettres, chiffres, espaces, tirets ou points', { min: NAME_MIN, max: NAME_MAX }), tone: 'error' };
-      else if (value !== undefined) flash = { text: t('Pseudo changé : vos amis et l’annuaire le reçoivent'), tone: 'ok' };
+      else if (value !== undefined) flash = { text: t('Pseudo changé : tes amis et l’annuaire le reçoivent'), tone: 'ok' };
       back();
     }, t('De {min} à {max} caractères : lettres, chiffres, espaces, tirets ou points.', { min: NAME_MIN, max: NAME_MAX }));
   }
@@ -547,7 +547,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
       () => ({
         heading: t('Mon pays'),
         icon: 'globe',
-        lead: t('Il accompagne vos scores : il vous place au classement national, et se voit à côté de votre nom.'),
+        lead: t('Il accompagne tes scores : il te place au classement national, et se voit à côté de ton nom.'),
         sections: [],
         actions: [
           { label: t('D’après la région de Windows'), detail: t('Le pays réglé dans Windows, s’il se lit'), icon: 'refresh', key: 'windows', run: () => choose(undefined) },
@@ -571,19 +571,19 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
     return {
       heading: t('Ce que voient les autres'),
       icon: 'pulse',
-      lead: t('Vos amis voient toujours votre présence, votre table et vos parties. Pour les autres joueurs, choisissez.'),
+      lead: t('Tes amis voient toujours ta présence, ta table et tes parties. Pour les autres joueurs, choisis.'),
       sections: [
         ...flashSections(),
         {
           rows: [
-            s.publicProfile === false ? { text: t('Profil public : désactivé'), detail: t('Les autres ne voient que votre pseudo dans l’annuaire'), tone: 'quiet', icon: 'eye' } : { text: t('Profil public : visible de tous'), detail: t('Pays, badges, records et activité récente'), tone: 'ok', icon: 'eye' },
-            s.shareScores === false ? { text: t('Scores : pas publiés'), detail: t('Vous voyez les classements ; vos parties n’y entrent pas'), tone: 'quiet', icon: 'trophy' } : { text: t('Scores : publiés aux classements'), detail: t('Amis, national et mondial ; jamais en mode invité'), tone: 'ok', icon: 'trophy' },
-            s.publicPresence === false ? { text: t('Présence : vos amis seulement'), detail: t('Les autres ne vous voient pas dans « Joueurs en ligne »'), tone: 'quiet', icon: 'pulse' } : { text: t('Présence : en ligne pour tous'), detail: t('« En ligne » ou « En partie », jamais la table'), tone: 'ok', icon: 'pulse' },
+            s.publicProfile === false ? { text: t('Profil public : désactivé'), detail: t('Les autres ne voient que ton pseudo dans l’annuaire'), tone: 'quiet', icon: 'eye' } : { text: t('Profil public : visible de tous'), detail: t('Pays, badges, records et activité récente'), tone: 'ok', icon: 'eye' },
+            s.shareScores === false ? { text: t('Scores : pas publiés'), detail: t('Tu vois les classements ; tes parties n’y entrent pas'), tone: 'quiet', icon: 'trophy' } : { text: t('Scores : publiés aux classements'), detail: t('Amis, national et mondial ; jamais en mode invité'), tone: 'ok', icon: 'trophy' },
+            s.publicPresence === false ? { text: t('Présence : tes amis seulement'), detail: t('Les autres ne te voient pas dans « Joueurs en ligne »'), tone: 'quiet', icon: 'pulse' } : { text: t('Présence : en ligne pour tous'), detail: t('« En ligne » ou « En partie », jamais la table'), tone: 'ok', icon: 'pulse' },
             s.friendsVisibility === 'private'
-              ? { text: t('Amis : privés'), detail: t('Personne ne voit vos amis en commun'), tone: 'quiet', icon: 'friend-list' }
+              ? { text: t('Amis : privés'), detail: t('Personne ne voit tes amis en commun'), tone: 'quiet', icon: 'friend-list' }
               : s.friendsVisibility === 'friends'
-                ? { text: t('Amis : vos amis seulement'), detail: t('Vos amis voient vos amis en commun ; les autres, non'), tone: 'ok', icon: 'friend-list' }
-                : { text: t('Amis : publics'), detail: t('Les joueurs voient les amis que vous avez en commun avec eux'), tone: 'ok', icon: 'friend-list' },
+                ? { text: t('Amis : tes amis seulement'), detail: t('Tes amis voient tes amis en commun ; les autres, non'), tone: 'ok', icon: 'friend-list' }
+                : { text: t('Amis : publics'), detail: t('Les joueurs voient les amis que tu as en commun avec eux'), tone: 'ok', icon: 'friend-list' },
           ],
         },
       ],
@@ -592,17 +592,17 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
           ? { label: t('Activer mon profil public'), icon: 'eye', run: toggle(() => host.net.setPublicProfile(true), t('Profil public activé')) }
           : { label: t('Désactiver mon profil public'), icon: 'eye', run: toggle(() => host.net.setPublicProfile(false), t('Profil public désactivé')) },
         s.shareScores === false
-          ? { label: t('Publier mes scores'), icon: 'trophy', sends: true as const, run: toggle(() => host.net.setShareScores(true), t('Vos scores sont publiés aux classements')) }
-          : { label: t('Ne plus publier mes scores'), icon: 'trophy', run: toggle(() => host.net.setShareScores(false), t('Vos scores ne sont plus publiés')) },
+          ? { label: t('Publier mes scores'), icon: 'trophy', sends: true as const, run: toggle(() => host.net.setShareScores(true), t('Tes scores sont publiés aux classements')) }
+          : { label: t('Ne plus publier mes scores'), icon: 'trophy', run: toggle(() => host.net.setShareScores(false), t('Tes scores ne sont plus publiés')) },
         s.publicPresence === false
-          ? { label: t('Apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(true), t('Vous apparaissez en ligne pour tous')) }
-          : { label: t('Ne plus apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(false), t('Vous n’apparaissez plus en ligne pour les autres joueurs')) },
+          ? { label: t('Apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(true), t('Tu apparais en ligne pour tous')) }
+          : { label: t('Ne plus apparaître en ligne pour tous'), icon: 'pulse', run: toggle(() => host.net.setPublicPresence(false), t('Tu n’apparais plus en ligne pour les autres joueurs')) },
         // Qui voit mes amis : Start passe au choix suivant (publics, amis seulement, privés), le curseur reste dessus.
         s.friendsVisibility === 'private'
-          ? { label: t('Mes amis : privés'), detail: t('Start : publics'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('public'), t('Vos amis sont publics')) }
+          ? { label: t('Mes amis : privés'), detail: t('Start : publics'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('public'), t('Tes amis sont publics')) }
           : s.friendsVisibility === 'friends'
-            ? { label: t('Mes amis : vos amis seulement'), detail: t('Start : privés'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('private'), t('Vos amis sont privés')) }
-            : { label: t('Mes amis : publics'), detail: t('Start : vos amis seulement'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('friends'), t('Vos amis ne sont visibles que de vos amis')) },
+            ? { label: t('Mes amis : tes amis seulement'), detail: t('Start : privés'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('private'), t('Tes amis sont privés')) }
+            : { label: t('Mes amis : publics'), detail: t('Start : tes amis seulement'), icon: 'friend-list', run: toggle(() => host.net.setFriendsVisibility('friends'), t('Tes amis ne sont visibles que de tes amis')) },
         backAction(itemBack),
       ],
       back: itemBack,
@@ -645,7 +645,7 @@ export function createAccountMenu(host: AccountMenuHost): AccountMenu {
         run: () => host.library.openCustom(buildPrivacy, 0),
       },
       'account-delete': {
-        detail: t('Votre nom, vos amis, vos messages, vos scores publiés : effacés ici et chez les autres'),
+        detail: t('Ton nom, tes amis, tes messages, tes scores publiés : effacés ici et chez les autres'),
         run: () => host.openDelete(() => itemBack()),
       },
     },

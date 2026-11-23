@@ -45,7 +45,7 @@ export function joystickButtonCount(cabinet: ButtonsOf | undefined): number {
 export function defaultButtonsRefusal(cabinet: ButtonsOf | undefined): string | undefined {
   const n = joystickButtonCount(cabinet);
   if (n === 0) return undefined;
-  return t('Les boutons de cette borne sont des boutons de joystick ({n}, Pinscape ou encodeur en mode manette) : des touches de clavier ne peuvent pas les remplacer, et plus aucun bouton ne répondrait. Pour changer un bouton, refaites l’étape « Boutons ».', { n });
+  return t('Les boutons de cette borne sont des boutons de joystick ({n}, Pinscape ou encodeur en mode manette) : des touches de clavier ne peuvent pas les remplacer, et plus aucun bouton ne répondrait. Pour changer un bouton, refais l’étape « Boutons ».', { n });
 }
 
 /** Garde le relevé que la remise va remplacer. */

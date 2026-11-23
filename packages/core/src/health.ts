@@ -725,7 +725,7 @@ function vrLinkLines(facts: VrNetworkFacts): HealthLine[] {
         check: 'vr',
         state: 'check',
         title: t('Air Link sur un PC en Wi-Fi'),
-        detail: t('Le casque perd des images : reliez le PC au routeur par un câble Ethernet, ou passez au câble USB Link ({adapter})', { adapter: facts.network!.adapter }),
+        detail: t('Le casque perd des images : relie le PC au routeur par un câble Ethernet, ou passe au câble USB Link ({adapter})', { adapter: facts.network!.adapter }),
         go,
         target,
       },

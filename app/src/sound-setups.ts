@@ -29,8 +29,8 @@ export interface SetupsView {
 const labels = (): CabinetView['labels'] => ({
   fronton: t('Fronton'),
   haut: t('Près du fronton'),
-  bas: t('Près de vous'),
-  you: t('VOUS'),
+  bas: t('Près de toi'),
+  you: t('TOI'),
   empty: t('rien de branché'),
   absent: t('{source} non branchée'),
 });
@@ -43,7 +43,7 @@ export function setupsView(list: readonly AudioSetup[], index: number): SetupsVi
   const items: SetupsView['items'] = list.map((s, i) => ({ title: s.title, detail: s.detail, badges: s.badges, selected: i === index }));
   items.push({
     title: t('Aucune ne correspond : régler pas à pas'),
-    detail: t('Chaque sortie sonne, vous dites où vous l’entendez'),
+    detail: t('Chaque sortie sonne, tu dis où tu l’entends'),
     badges: [],
     selected: index >= list.length,
     quiet: true,
@@ -72,10 +72,10 @@ export function quickCheckCabinet(setup: AudioSetup, pairs: readonly SpeakerPair
 export function quickCheckTexts(place: SpeakerPlace): { step: string; yes: string } {
   switch (place) {
     case 'backglass':
-      return { step: t('Un son à gauche, puis à droite : l’entendez-vous dans le fronton, des deux côtés ?'), yes: t('Oui, dans le fronton') };
+      return { step: t('Un son à gauche, puis à droite : l’entends-tu dans le fronton, des deux côtés ?'), yes: t('Oui, dans le fronton') };
     case 'top':
       return { step: t('Un son à gauche, puis à droite : vibrent-ils sous le plateau, près du fronton ?'), yes: t('Oui, près du fronton') };
     default:
-      return { step: t('Un son à gauche, puis à droite : vibrent-ils sous le plateau, près de vous ?'), yes: t('Oui, près de moi') };
+      return { step: t('Un son à gauche, puis à droite : vibrent-ils sous le plateau, près de toi ?'), yes: t('Oui, près de moi') };
   }
 }

@@ -19,7 +19,7 @@ export const messages: Record<string, string> = {
   '{items} à corriger à part': '{items} to fix separately',
   '{when} · apporte aussi : {parts}': '{when} · also brings: {parts}',
   '{parts} · voir le plan': '{parts} · see the plan',
-  'Ce que vous récupérez, jeu par jeu. Chaque fichier va dans la partie que dit son contenu, quel que soit l’élément qu’on attendait ; s’il y a un doute, on vous le demande. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Rien n’est installé avant le plan.':
+  'Ce que tu récupères, jeu par jeu. Chaque fichier va dans la partie que dit son contenu, quel que soit l’élément qu’on attendait ; s’il y a un doute, on te le demande. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Rien n’est installé avant le plan.':
     'What you are getting, game by game. Each file goes to the part its content says, whatever item was expected; when in doubt, you are asked. Start on an item: reopen it, reassign it, empty it or replace it. Nothing is installed before the plan.',
   // app/src/library.ts
   'Parties du jeu': 'Game parts',
@@ -47,7 +47,7 @@ export const messages: Record<string, string> = {
   'Le jeu d’abord ; la partie est celle que dit le contenu. Une table installée reçoit le fichier par le plan d’ajout, à valider ; un jeu attendu le reçoit dans sa liste d’attente.':
     'The game first; the part is the one the content says. An installed table receives the file through the add plan, to confirm; an expected game receives it in its waiting list.',
   'Quelle partie ?': 'Which part?',
-  'Le contenu de ce fichier n’a pas pu être lu : dites ce qu’il est. Le plan vérifiera avant d’installer.': 'The content of this file could not be read: say what it is. The plan will check before installing.',
+  'Le contenu de ce fichier n’a pas pu être lu : dis ce qu’il est. Le plan vérifiera avant d’installer.': 'The content of this file could not be read: say what it is. The plan will check before installing.',
   // app/src/game-parts.ts
   'Parties du jeu…': 'Game parts…',
   'Installer ce qui est reçu': 'Install what was received',
@@ -99,10 +99,10 @@ export const messages: Record<string, string> = {
   'Logo, fronton, vidéos, règles : ce que montre le front-end. Ils se choisissent dans « Médias du jeu ».': 'Logo, backglass, videos, rules: what the menu shows. They are chosen in “Game media”.',
   // Recherche libre, propositions des parties de toutes les sources, jeu VPS d’une table
   'Recherche libre': 'Free search',
-  'Ce que vous choisirez : table, fronton, PuP-Pack, ROM, médias…': 'What you choose: table, backglass, PuP-Pack, ROM, media…',
-  '{kind} : le fichier que vous choisirez': '{kind}: the file you choose',
-  'Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.': 'Search, open a page, download: the file is recognised, then filed in the part of {game} its content says.',
-  'Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis proposé à l’ajout.': 'Search, open a page, download: the file is recognised, then offered for adding.',
+  'Ce que tu choisiras : table, fronton, PuP-Pack, ROM, médias…': 'What you choose: table, backglass, PuP-Pack, ROM, media…',
+  '{kind} : le fichier que tu choisiras': '{kind}: the file you choose',
+  'Cherche, ouvre une page, télécharge : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.': 'Search, open a page, download: the file is recognised, then filed in the part of {game} its content says.',
+  'Cherche, ouvre une page, télécharge : le fichier est reconnu, puis proposé à l’ajout.': 'Search, open a page, download: the file is recognised, then offered for adding.',
   '« {file} » : {kind} de {game}, à installer.': '“{file}”: {kind} of {game}, to install.',
   'C’est {content}, pas {expected} : rangé dans sa propre partie.': 'It is {content}, not {expected}: filed in its own part.',
   'Reçu « {file} » ({content}) : gardé de côté, dans « Récupérés et attendus » et Téléchargements.': 'Received “{file}” ({content}): kept aside, in “Received and expected” and Downloads.',
@@ -118,7 +118,7 @@ export const messages: Record<string, string> = {
   '{n} jeux possibles ; sans lui, la recherche se fait par le titre': '{n} possible games; without one, searching by title',
   'Le jeu reconnu donne les fichiers connus de chaque partie et le titre cherché sur les sites. Il est retenu avec la table.': 'The recognised game gives the known files of each part and the title searched on the sites. It is kept with the table.',
   'Aucun jeu connu ne correspond': 'No known game matches',
-  '« Chercher un titre… », ou cherchez les parties par le titre de la table.': '“Search a title…”, or search the parts by the table’s title.',
+  '« Chercher un titre… », ou cherche les parties par le titre de la table.': '“Search a title…”, or search the parts by the table’s title.',
   'Jeu retenu : {game}.': 'Game kept: {game}.',
   '≈ {n} s d’attente imposée par le site': '≈ {n} s wait imposed by the site',
   'Téléchargé': 'Downloaded',
@@ -126,7 +126,7 @@ export const messages: Record<string, string> = {
   'Tous les fichiers téléchargés…': 'All downloaded files…',
   'Dans la table': 'In the table',
   'attente imposée par le site': 'wait imposed by the site',
-  'le site impose d’attendre entre deux recherches : réessayez dans {n} s': 'the site imposes a wait between two searches: try again in {n} s',
+  'le site impose d’attendre entre deux recherches : réessaie dans {n} s': 'the site imposes a wait between two searches: try again in {n} s',
   // app/src/game-parts.ts, library.ts : PuP-Pack désactivé, table par table (pupdisabled.ts)
   'la table se joue sans lui': 'the table plays without it',
   'Désactiver le PuP-Pack': 'Disable the PuP-Pack',
@@ -135,7 +135,7 @@ export const messages: Record<string, string> = {
   'Réactiver le PuP-Pack': 'Re-enable the PuP-Pack',
   'Aucun pack désactivé à ce nom': 'No disabled pack under this name',
   'Ses vidéos reviennent dès la prochaine partie, telles qu’avant': 'Its videos come back from the next game, as they were',
-  'PuP-Pack désactivé : réactivez-le d’abord': 'PuP-Pack disabled: re-enable it first',
+  'PuP-Pack désactivé : réactive-le d’abord': 'PuP-Pack disabled: re-enable it first',
   'La table se joue sans ses vidéos, comme si le pack n’était pas installé. Rien n’est effacé : « Réactiver le PuP-Pack » le remet tel quel, avec son option.': 'The table plays without its videos, as if the pack were not installed. Nothing is deleted: “Re-enable the PuP-Pack” puts it back as it was, with its option.',
   'même dossier : se joue aussi sans ce pack': 'same folder: also plays without this pack',
   'Le pack est rangé à part, dans « {folder} » : VPX ne le trouve plus, et rien ne le réclame ni ne le retélécharge.': 'The pack is set aside in “{folder}”: VPX no longer finds it, and nothing asks for it or downloads it again.',

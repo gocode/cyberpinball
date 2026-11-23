@@ -48,7 +48,7 @@ const day = (iso: string) => {
 const time = (iso: string) => new Date(iso).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 
 export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMenu {
-  const who = (game: HistoryGame, p: HistoryPlayer) => (p.key === game.me ? t('{name} (vous)', { name: p.name }) : p.name);
+  const who = (game: HistoryGame, p: HistoryPlayer) => (p.key === game.me ? t('{name} (toi)', { name: p.name }) : p.name);
 
   /** Un joueur sur la ligne d'une partie : « 1. Bruno 2 841 350 120 », « Chloé 9 999, hors classement ». */
   function short(game: HistoryGame, p: HistoryPlayer): string {

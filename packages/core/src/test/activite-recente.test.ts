@@ -58,7 +58,7 @@ test('activité : chaque notification entre en entier, sans rien de raccourci', 
   const e = ev('live-invite', '0123456789abcdef|0', T0, { who: long, subject: table });
   add(log, e);
   const text = activityText(log.entries[0]!);
-  assert.equal(text.title, `${long} vous invite à rejoindre une partie`);
+  assert.equal(text.title, `${long} t’invite à rejoindre une partie`);
   assert.equal(text.detail, table);
   // La notification, elle, raccourcit pour tenir sur sa ligne : c'est ce qui se perd.
   assert.notEqual(noticeText('live-invite', [e]).title, text.title);
@@ -141,7 +141,7 @@ test('activité : le journal est gardé d’un démarrage à l’autre ; illisib
   const again = loadActivity(file).log;
   assert.deepEqual(again.entries, log.entries);
   assert.equal(activityUnread(again), 2);
-  assert.equal(activityText(again.entries[1]!).detail, 'Vous : place 2 sur 3', 'le chemin du menu système, Start y mène : la ligne ne le redit pas');
+  assert.equal(activityText(again.entries[1]!).detail, 'Toi : place 2 sur 3', 'le chemin du menu système, Start y mène : la ligne ne le redit pas');
   // Une ligne abîmée (genre inconnu, heure absente) est laissée de côté ; les autres restent.
   const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as { entries: unknown[] };
   raw.entries.push({ id: 'x', kind: 'inconnu', key: 'x', at: T0, count: 1 }, { id: 'y', kind: 'friend-online', key: 'y', count: 1 });
@@ -341,7 +341,7 @@ test('activité : l’écran, par jour, chaque action dite ou grisée avec sa ra
   assert.equal(screen.subheading, '5 notifications non lues');
   assert.deepEqual(screen.sections.map((s) => s.title), ['Aujourd’hui', 'Hier']);
   const rows = screen.sections.flatMap((s) => s.rows);
-  assert.deepEqual(rows.map((r) => r.text), ['Téléchargement fini', 'Téléchargement bloqué', 'Bruno vous invite à rejoindre une partie', 'Bruno vous invite à rejoindre une partie', 'Bruno vient de se connecter']);
+  assert.deepEqual(rows.map((r) => r.text), ['Téléchargement fini', 'Téléchargement bloqué', 'Bruno t’invite à rejoindre une partie', 'Bruno t’invite à rejoindre une partie', 'Bruno vient de se connecter']);
   assert.ok(rows.every((r) => r.unread && r.badges!.includes('Non lu')), 'le repère de chaque ligne pas lue');
   // Ce qui ne vaut plus : grisé, la raison dite, Start ne fait rien.
   assert.deepEqual(rows.map((r) => [r.tone === 'quiet', r.note?.sign, r.note?.text]), [

@@ -116,7 +116,7 @@ function momentView() {
     to: lv(11, 0.1),
     avatar: { initials: 'AB', hue: 140, level: 11 },
     sounds: {},
-    texts: { unlocked: 'Badge débloqué', secret: 'Secret dévoilé', level: 'Niveau', start: 'Votre niveau de départ', startDetail: 'Calculé sur vos parties d’avant les niveaux', badgesSoFar: '3 badges déjà mérités', continue: 'Un bouton pour continuer' },
+    texts: { unlocked: 'Badge débloqué', secret: 'Secret dévoilé', level: 'Niveau', start: 'Ton niveau de départ', startDetail: 'Calculé sur tes parties d’avant les niveaux', badgesSoFar: '3 badges déjà mérités', continue: 'Un bouton pour continuer' },
   };
 }
 

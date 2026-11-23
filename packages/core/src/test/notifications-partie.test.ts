@@ -157,11 +157,11 @@ test('relevé : le gagnant parmi les scores classés, ou moi ; aucun score, aucu
 const ev = (kind: NoticeKind, who: string, extra: Partial<NoticeEvent> = {}): NoticeEvent => ({ kind, key: `0123456789abcdef|${who}`, at: 0, who, subject: 'Glass Lagoon (Inventé 1987)', ...extra });
 
 test('textes : regroupés par genre, avec les noms ; la raison ; le gagnant, ma place et le chemin des résultats', () => {
-  assert.deepEqual(noticeText('live-accepted', [ev('live-accepted', 'Bruno')]), { title: 'Bruno a accepté votre invitation', detail: 'Pour lancer : Menu système > Communauté > Joueurs' });
+  assert.deepEqual(noticeText('live-accepted', [ev('live-accepted', 'Bruno')]), { title: 'Bruno a accepté ton invitation', detail: 'Pour lancer : Menu système > Communauté > Joueurs' });
   assert.equal(noticeText('live-accepted', [ev('live-accepted', 'Bruno'), ev('live-accepted', 'Léa')]).title, 'Bruno et Léa ont accepté');
   assert.equal(noticeText('live-accepted', ['Bruno', 'Léa', 'David'].map((n) => ev('live-accepted', n))).title, 'Bruno, Léa et David ont accepté');
   assert.equal(noticeText('live-accepted', ['Maximilien-Alexandre', 'Léa', 'Anne-Charlotte'].map((n) => ev('live-accepted', n))).title, '3 invités ont accepté', 'un nom ne se coupe pas : le nombre');
-  assert.deepEqual(noticeText('live-declined', [ev('live-declined', 'David', { reason: 'missing' })]), { title: 'David a décliné votre invitation', detail: 'N’a pas cette table' });
+  assert.deepEqual(noticeText('live-declined', [ev('live-declined', 'David', { reason: 'missing' })]), { title: 'David a décliné ton invitation', detail: 'N’a pas cette table' });
   assert.deepEqual(noticeText('live-declined', [ev('live-declined', 'David', { reason: 'expired' })]), { title: 'Pas de réponse de David' });
   assert.deepEqual(noticeText('live-declined', [ev('live-declined', 'David', { reason: 'missing' }), ev('live-declined', 'Zoé', { reason: 'busy' })]), {
     title: 'David et Zoé ont décliné',
@@ -172,9 +172,9 @@ test('textes : regroupés par genre, avec les noms ; la raison ; le gagnant, ma 
   assert.equal(noticeText('live-cancelled', [ev('live-cancelled', 'Bruno')]).title, 'Bruno a annulé la partie');
   assert.deepEqual(noticeText('live-finished', [ev('live-finished', 'Bruno', { place: { rank: 2, of: 3 } })]), {
     title: 'Partie entre amis : Bruno gagne',
-    detail: 'Menu système > Communauté · vous : place 2 sur 3',
+    detail: 'Menu système > Communauté · toi : place 2 sur 3',
   });
-  assert.equal(noticeText('live-finished', [{ ...ev('live-finished', ''), who: undefined, won: true }]).title, 'Partie entre amis : vous gagnez !');
+  assert.equal(noticeText('live-finished', [{ ...ev('live-finished', ''), who: undefined, won: true }]).title, 'Partie entre amis : tu gagnes !');
   assert.equal(noticeText('live-finished', [{ ...ev('live-finished', ''), who: undefined }]).title, 'Partie entre amis terminée');
   setLanguage('en');
   try {
@@ -236,7 +236,7 @@ test('file : la partie entre amis passe avant tout, seule, plus longtemps ; regr
   assert.equal(c.tick(2000 + NOTICE_LIVE_SHOW_MS, on).view?.leaving, true);
   // Puis le refus, seul : jamais fondu dans un résumé.
   const second = c.tick(2000 + NOTICE_LIVE_SHOW_MS + 5000, on).view;
-  assert.equal(second?.title, 'David a décliné votre invitation');
+  assert.equal(second?.title, 'David a décliné ton invitation');
   assert.equal(second?.detail, 'Occupé pour l’instant');
   // Enfin le résumé des autres.
   const third = c.tick(2000 + 2 * NOTICE_LIVE_SHOW_MS + 10_000, on).view;
@@ -252,7 +252,7 @@ test('file : hors du menu des tables, seul ce qui se montre partout ; les autres
   assert.equal(c.tick(NOTICE_GATHER_MS + 500, { canShow: true, away: true }).view, undefined);
   c.push([ev('live-accepted', 'Bruno', { at: 10_000 })]);
   const shown = c.tick(10_000 + NOTICE_GATHER_MS, { canShow: true, away: true }).view;
-  assert.equal(shown?.title, 'Bruno a accepté votre invitation');
+  assert.equal(shown?.title, 'Bruno a accepté ton invitation');
   c.push([{ kind: 'friend-request', key: 'z', at: 11_000, who: 'Zoé' }]);
   assert.equal(c.tick(30_000, { canShow: true, away: true }).view, undefined, 'la demande d’ami attend le menu des tables');
   assert.equal(c.tick(31_000, on).view?.title, 'Demande d’ami : Zoé');
@@ -514,7 +514,7 @@ test('partout : l’invitation en une ligne avec son carillon (sans gros délai)
     invites = [invite];
     m.menu.observe();
     const v = m.menu.view().notice;
-    assert.equal(v?.title, 'Bruno vous invite à rejoindre une partie', 'tout de suite, avec le carillon');
+    assert.equal(v?.title, 'Bruno t’invite à rejoindre une partie', 'tout de suite, avec le carillon');
     assert.equal(v?.detail, 'Glass Lagoon (Inventé 1987)');
     assert.equal(v?.away, true);
     assert.deepEqual(m.sounds, [], 'le carillon sonne à l’arrivée (frontend.ts, onInvite), pas un second son');
@@ -530,7 +530,7 @@ test('partout : l’invitation en une ligne avec son carillon (sans gros délai)
     m.menu.stop();
   }
   // Textes : seule, puis plusieurs.
-  assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno')]).title, 'Bruno vous invite à rejoindre une partie');
+  assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno')]).title, 'Bruno t’invite à rejoindre une partie');
   assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno'), ev('live-invite', 'Léa')]).title, '2 invitations à une partie');
   setLanguage('en');
   try {

@@ -155,7 +155,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
             ...noticeRows(),
             {
               text: t('Ce que fait Cyber Pinball'),
-              detail: t('Il ne livre aucun de ces médias : il les télécharge à votre demande, après un plan à valider. Un média que vous avez déjà n’est remplacé que si vous le demandez, et l’ancien part à la corbeille.'),
+              detail: t('Il ne livre aucun de ces médias : il les télécharge à ta demande, après un plan à valider. Un média que tu as déjà n’est remplacé que si tu le demandes, et l’ancien part à la corbeille.'),
               tone: 'quiet',
             },
           ],
@@ -251,7 +251,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
 
   /** Cherche les médias de ce jeu ; `back` revient au gestionnaire, avec un message éventuel. */
   function openTable(table: TableEntry, back: (message?: { text: string; tone: 'ok' | 'info' | 'warning' | 'error' }) => void): void {
-    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des téléchargements.')]);
+    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lance « Installer » depuis le lanceur : il crée le dossier des téléchargements.')]);
     withNotice(() => search(table, back), () => back());
   }
 
@@ -305,7 +305,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
           rows: [
             {
               text: t('Sans réseau'),
-              detail: t('{problem}. Réessayez quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.', { problem: problem ?? t('GitHub injoignable') }),
+              detail: t('{problem}. Réessaie quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.', { problem: problem ?? t('GitHub injoignable') }),
               tone: 'warning',
             },
           ],
@@ -336,7 +336,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
           rows: [
             {
               text: t('Autres sources'),
-              detail: t('Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; déposez ensuite le fichier dans le dossier d’import, ou glissez-le sur l’écran des médias.'),
+              detail: t('Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; dépose ensuite le fichier dans le dossier d’import, ou glisse-le sur l’écran des médias.'),
               tone: 'quiet',
             },
           ],
@@ -657,7 +657,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   }
 
   function openMissing(): void {
-    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des tables.')]);
+    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lance « Installer » depuis le lanceur : il crée le dossier des tables.')]);
     withNotice(
       () =>
         void ctx.task(t('Recherche des médias manquants…'), async () => {
@@ -830,7 +830,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       return {
         heading: t('Voir une table'),
         subheading: MEDIADB_CITATION,
-        lead: t('Choisissez une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.'),
+        lead: t('Choisis une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.'),
         sections: [{ rows: offers.map((o, i) => surveyRow(o, i)) }],
         actions: [
           ...offers.map((o, i) => ({
@@ -1000,7 +1000,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
 export function otherGameRows(table: TableEntry | undefined, game: VpsGame | undefined): Row[] {
   const own = table?.info.Info?.VPSId;
   if (!game || !own || game.id === own) return [];
-  return [{ text: t('Autre jeu que votre table : {game}', { game: vpsLabel(game) }), detail: t('Même titre, autre table de la base VPS (autres auteurs, autre année) : ses médias peuvent ne pas ressembler à votre table.'), tone: 'warning' }];
+  return [{ text: t('Autre jeu que ta table : {game}', { game: vpsLabel(game) }), detail: t('Même titre, autre table de la base VPS (autres auteurs, autre année) : ses médias peuvent ne pas ressembler à ta table.'), tone: 'warning' }];
 }
 
 /** Ce que VPinMediaDB a pour un jeu, pour le plan d'ajout : un fichier par média, et le poids total. */

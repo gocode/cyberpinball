@@ -493,7 +493,7 @@ export type PhoneMessage =
    */
   | { t: 'group-act'; s: number; a: RemoteGroupAct; g?: string; key?: string }
   /**
-   * Parties instantanées (instant-menu.ts, remoteAct) : rejoindre une partie annoncée (`id`), en
+   * Parties en direct (instant-menu.ts, remoteAct) : rejoindre une partie annoncée (`id`), en
    * ouvrir une (`table` : la référence d'une table reçue, sinon celle choisie à la borne ; `count` :
    * 2 à 4 joueurs), inviter un ami dans la mienne (`key`), l'annuler ou la quitter, demander la liste
    * des tables (« Changer »). La borne vérifie tout.
@@ -530,7 +530,7 @@ export type RemoteGroupAct = (typeof REMOTE_GROUP_ACTS)[number];
 export const REMOTE_PAGES = ['level', 'badges', 'rules', 'activity'] as const;
 export type RemotePage = (typeof REMOTE_PAGES)[number];
 
-/** Gestes sur les parties instantanées, au téléphone. */
+/** Gestes sur les parties en direct, au téléphone. */
 export const REMOTE_INSTANT_ACTS = ['join', 'open', 'invite', 'cancel', 'tables'] as const;
 export type RemoteInstantAct = (typeof REMOTE_INSTANT_ACTS)[number];
 
@@ -543,7 +543,7 @@ const finite = (v: unknown, max: number): v is number => typeof v === 'number' &
 const isChatKey = (v: unknown): v is string => typeof v === 'string' && /^(?:[0-9a-f]{64}|g:[0-9a-f]{16})$/.test(v);
 /** La clé publique d'un joueur (64 caractères hexadécimaux), jamais autre chose. */
 const isPlayerKey = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
-/** Un identifiant de groupe, de partie instantanée, ou la référence d'une table : 16 chiffres hexadécimaux. */
+/** Un identifiant de groupe, de partie en direct, ou la référence d'une table : 16 chiffres hexadécimaux. */
 const isHexId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v);
 /** L'identité d'une action d'un écran (sa clé, sinon son libellé) : courte, sans caractère de contrôle. */
 const isActionId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200 && !/[\x00-\x1f\x7f]/.test(v);

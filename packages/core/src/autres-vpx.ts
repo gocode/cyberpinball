@@ -233,7 +233,7 @@ export function tooNewReason(c: TooNewTable): string {
 export function tooNewAdvice(c: TooNewTable): string {
   const first = c.able[0];
   if (first) return t('{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.', { vpx: first.label });
-  return t('Ajoutez un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».', { table: c.table });
+  return t('Ajoute un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisis-le dans Gérer la table, « Jouée avec ».', { table: c.table });
 }
 
 /** Message qui remplace la partie, avant de lancer VPX (même forme qu'otherVpxRefusal). */

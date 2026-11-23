@@ -34,7 +34,7 @@
 // constate aussi seul l'expiration et le départ de l'autre hors ligne. L'invité garde la fin de
 // chaque invitation (inviteEnd) : son écran et sa notification la disent.
 //
-// Partie instantanée (packages/core/src/instantgames.ts, 16/11/2026) : la même partie, ouverte à
+// Partie en direct (packages/core/src/instantgames.ts, 16/11/2026) : la même partie, ouverte à
 // tous. L'hôte l'annonce à toutes les bornes (social-net.ts, announceInstant) avec le nombre de
 // joueurs choisi ; un joueur, ami ou non, qui a la même version de la table la rejoint (game-join) et
 // entre aussitôt dans la salle ; complète, elle part d'elle-même. Les joueurs de la partie sont ses
@@ -200,16 +200,16 @@ export interface LiveGames {
   inviteEnd(id: string): (LiveInviteEndInfo & { next?: string }) | undefined;
   /** Crée un salon sur cette table (l'empreinte du .vpx se calcule d'abord). */
   create(table: TableEntry): Promise<LiveGame>;
-  /** Ouvre une partie instantanée sur cette table, à `max` joueurs (2 à 4, moi compris), annoncée à toutes les bornes. */
+  /** Ouvre une partie en direct sur cette table, à `max` joueurs (2 à 4, moi compris), annoncée à toutes les bornes. */
   openInstant(table: TableEntry, max: number): Promise<LiveGame>;
-  /** Les parties instantanées ouvertes par d'autres, en ce moment. */
+  /** Les parties en direct ouvertes par d'autres, en ce moment. */
   instantGames(): InstantGame[];
   /**
-   * Rejoindre une partie instantanée annoncée : ma table vérifiée (la même version), puis j'entre
+   * Rejoindre une partie en direct annoncée : ma table vérifiée (la même version), puis j'entre
    * dans la salle de l'hôte ; sinon ce que j'ai de sa table, et rien ne part.
    */
   joinInstant(game: InstantGame): Promise<LiveTableFound>;
-  /** Partie instantanée rejointe : la salle de l'hôte ne me compte pas encore (sa borne se rejoint). */
+  /** Partie en direct rejointe : la salle de l'hôte ne me compte pas encore (sa borne se rejoint). */
   joinPending(): boolean;
   /** Invite un ami dans mon salon ; false : salon plein, ami pas relié, ou partie déjà partie. */
   invite(key: string, name: string): boolean;
@@ -243,7 +243,7 @@ export interface LiveTableFound {
 const TICK_MS = 1000;
 /** Une invitation sans réponse repart à ce rythme : l'invité la lit peut-être encore, elle ne sonne pas deux fois. */
 const INVITE_RESEND_MS = 10_000;
-/** Partie instantanée : « je rejoins » redit à ce rythme tant que l'hôte ne m'a pas compté… */
+/** Partie en direct : « je rejoins » redit à ce rythme tant que l'hôte ne m'a pas compté… */
 const JOIN_RESEND_MS = 3000;
 /** … et abandonné au-delà (borne de l'hôte injoignable). */
 const JOIN_GIVE_UP_MS = 45_000;
@@ -288,9 +288,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   };
   /** La carte de l'attente avait quelque chose à montrer au dernier tour : sa fin aussi doit être portée (essai réel du 01/11/2026). */
   let waitWas = false;
-  /** Ma dernière annonce de partie instantanée (hôte), pour la fermer quand la partie s'en va. */
+  /** Ma dernière annonce de partie en direct (hôte), pour la fermer quand la partie s'en va. */
   let announced: Parameters<NonNullable<SocialNet['announceInstant']>>[0];
-  /** Invité d'une partie instantanée : « je rejoins » envoyé (le premier, le dernier), et la salle de l'hôte m'a compté. */
+  /** Invité d'une partie en direct : « je rejoins » envoyé (le premier, le dernier), et la salle de l'hôte m'a compté. */
   let joining: { id: string; since: number; sentAt: number; message: Extract<LiveMessage, { t: 'game-join' }>; seen: boolean } | undefined;
   const strict = createTableVersions(opts.dataDir);
   // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
@@ -341,7 +341,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   };
 
   /**
-   * Partie instantanée : les joueurs de la partie rejoints par leur clé (l'hôte pour un invité, tous
+   * Partie en direct : les joueurs de la partie rejoints par leur clé (l'hôte pour un invité, tous
    * pour l'hôte), et mon annonce à jour (ouverte pendant le salon, fermée dès le départ ou l'annulation).
    */
   function syncInstant(): void {
@@ -675,12 +675,12 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         const before = game.players.find((p) => p.key === key);
         const joined = joinGame(game, { key, name }, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }, now());
         if ('refused' in joined) {
-          log(`Partie instantanée : ${name} ne peut pas entrer (${joined.refused}).`); // i18n-ignore : journal
+          log(`Partie en direct : ${name} ne peut pas entrer (${joined.refused}).`); // i18n-ignore : journal
           net.send(key, { t: 'game-cancel', game: m.game, why: joined.refused });
           return;
         }
         const fresh = !before || before.state !== 'accepted';
-        if (fresh) log(`Partie instantanée : ${name} a rejoint la partie (${joined.game.players.filter((p) => p.state === 'accepted').length} sur ${game.instant!.max}).`); // i18n-ignore : journal
+        if (fresh) log(`Partie en direct : ${name} a rejoint la partie (${joined.game.players.filter((p) => p.state === 'accepted').length} sur ${game.instant!.max}).`); // i18n-ignore : journal
         // Déjà là (message renvoyé) : la salle repart vers lui seul.
         if (!fresh) return broadcastRoom(key);
         setGame(joined.game);
@@ -688,7 +688,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         if (mine) sendSettings(key, game.id, mine);
         // Complète : le départ, pour tout le monde.
         if (instantComplete(game)) {
-          log('Partie instantanée : complète, départ automatique.'); // i18n-ignore : journal
+          log('Partie en direct : complète, départ automatique.'); // i18n-ignore : journal
           start();
         }
         return;
@@ -718,7 +718,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
           const after = game;
           if (joining?.id === after.id && !joining.seen && after.players.some((p) => p.key === me().key && p.state !== 'left')) {
             joining.seen = true;
-            log('Partie instantanée : entré dans la salle de l’hôte.'); // i18n-ignore : journal
+            log('Partie en direct : entré dans la salle de l’hôte.'); // i18n-ignore : journal
           }
           if (after.goAt && !before.goAt) log(`Départ commun : « partez » reçu de l'hôte (${after.goWhy === 'timeout' ? `délai passé, sans ${after.players.filter((p) => after.goLate?.includes(p.key)).map((p) => p.name).join(', ') || 'personne'}` : 'tous prêts'}).`); // i18n-ignore : journal
           // « game-start » perdu : la salle dit que la partie est lancée, elle part d'ici.
@@ -804,15 +804,15 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const expired = expireInvites(offline, now());
       tellEnds(before, expired, (p) => (p.offline ? 'offline' : 'expired'));
       setGame(closeIfDone(expired, now()));
-      // Partie instantanée : un joueur entré puis passé hors ligne libère sa place ; trente minutes sans être complète, elle se ferme.
+      // Partie en direct : un joueur entré puis passé hors ligne libère sa place ; trente minutes sans être complète, elle se ferme.
       if (game?.instant && game.phase === 'gathering') {
         for (const p of game.players) {
           if (p.host || p.state !== 'accepted' || net.online(p.key)) continue;
-          log(`Partie instantanée : ${p.name} est passé hors ligne, sa place est libérée.`); // i18n-ignore : journal
+          log(`Partie en direct : ${p.name} est passé hors ligne, sa place est libérée.`); // i18n-ignore : journal
           setGame(gameStatus(game, p.key, { state: 'left' }, now()));
         }
         if (game && now().getTime() - Date.parse(game.instant!.opened) > INSTANT_OPEN_MS) {
-          log('Partie instantanée : pas complète en trente minutes, fermée.'); // i18n-ignore : journal
+          log('Partie en direct : pas complète en trente minutes, fermée.'); // i18n-ignore : journal
           cancelAsHost(game, []);
           setGame({ ...game, phase: 'cancelled', endWhy: 'expired' });
         }
@@ -850,10 +850,10 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const back = online && own().wasOnline.get(game.host) === false;
       own().wasOnline.set(game.host, online);
       if (online) resendStatus(back ? 'retour' : 'tour');
-      // Partie instantanée : « je rejoins » redit tant que la salle de l'hôte ne me compte pas ; sans nouvelles, j'abandonne.
+      // Partie en direct : « je rejoins » redit tant que la salle de l'hôte ne me compte pas ; sans nouvelles, j'abandonne.
       if (joining?.id === game.id && !joining.seen && game.phase === 'gathering') {
         if (now().getTime() - joining.since > JOIN_GIVE_UP_MS) {
-          log('Partie instantanée : pas de réponse de l’hôte, partie abandonnée.'); // i18n-ignore : journal
+          log('Partie en direct : pas de réponse de l’hôte, partie abandonnée.'); // i18n-ignore : journal
           game = { ...game, phase: 'cancelled', endWhy: 'expired' };
           joining = undefined;
           changed();
@@ -884,7 +884,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     }
   }
 
-  /** Départ commun (celui qui invite ; tout seul quand une partie instantanée est complète). */
+  /** Départ commun (celui qui invite ; tout seul quand une partie en direct est complète). */
   function start(): boolean {
     if (!game || !isHost()) return false;
     const next = startGame(game, now());
@@ -897,7 +897,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     return true;
   }
 
-  /** Un nouveau salon sur cette table ; `max` : une partie instantanée, ouverte à tous. */
+  /** Un nouveau salon sur cette table ; `max` : une partie en direct, ouverte à tous. */
   async function createGame(table: TableEntry, max?: number): Promise<LiveGame> {
     if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
     // Un salon encore ouvert : ses invités apprennent sa fin (inviteAll l'a déjà fermé d'ordinaire).
@@ -933,7 +933,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     create: (table) => createGame(table),
     async openInstant(table, max) {
       const g = await createGame(table, instantMax(max));
-      log(`Partie instantanée : ouverte à tous sur ${table.title}, ${g.instant!.max} joueurs.`); // i18n-ignore : journal
+      log(`Partie en direct : ouverte à tous sur ${table.title}, ${g.instant!.max} joueurs.`); // i18n-ignore : journal
       return g;
     },
     instantGames: () => (net.instantGames?.() ?? []).filter((g) => g.id !== game?.id),
@@ -961,7 +961,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       // Les partenaires d'abord : la borne de l'hôte se rejoint, « je rejoins » part dès qu'elle est reliée (renvoyé au besoin).
       changed();
       const sent = net.send(ad.key, message);
-      log(`Partie instantanée : je rejoins la partie de ${ad.name} sur « ${ad.title} »${sent ? '' : ' (sa borne pas encore reliée : redit toutes les 3 s)'}.`); // i18n-ignore : journal
+      log(`Partie en direct : je rejoins la partie de ${ad.name} sur « ${ad.title} »${sent ? '' : ' (sa borne pas encore reliée : redit toutes les 3 s)'}.`); // i18n-ignore : journal
       return found;
     },
     invite(key, name) {

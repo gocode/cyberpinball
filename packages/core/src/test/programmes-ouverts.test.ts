@@ -32,7 +32,7 @@ test('cadence : les programmes ouverts écrits au journal et gardés avec la par
   assert.deepEqual(tableCadence(logs, file)[0]!.others, ['PinUP Popper', 'dmdext']);
   const finding = slowTableFinding(logs, file)!;
   assert.match(finding.detail, /PinUP Popper et dmdext étaient ouverts pendant la partie/);
-  assert.match(finding.detail, /retirez-les du démarrage de Windows/);
+  assert.match(finding.detail, /retire-les du démarrage de Windows/);
   // Partie suivante sans eux, toujours lente : plus de mention.
   recordGameCadence(logs, file, c, 60, new Date(Date.now() + 60_000));
   assert.doesNotMatch(slowTableFinding(logs, file)!.detail, /ouverts? pendant la partie/);

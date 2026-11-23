@@ -187,7 +187,7 @@
     const head = el('header', 'jb-poster-head');
     head.append(brand(), el('span', 'jb-poster-edition', t('La musique habite ici')));
     const copy = el('div', 'jb-poster-copy');
-    copy.append(el('p', 'jb-label', t('Votre borne. Votre musique.')), el('h1', 'jb-poster-title', t('JUKE-BOX')), statsLine(p.stats), el('div', 'jb-poster-rule'), el('p', 'jb-eyebrow', p.eyebrow));
+    copy.append(el('p', 'jb-label', t('Ta borne. Ta musique.')), el('h1', 'jb-poster-title', t('JUKE-BOX')), statsLine(p.stats), el('div', 'jb-poster-rule'), el('p', 'jb-eyebrow', p.eyebrow));
     const heading = el('h2', 'jb-poster-heading', p.heading);
     heading.title = p.heading;
     copy.append(heading);
@@ -204,7 +204,7 @@
       const foot = el('footer', 'jb-poster-foot');
       const go = el('span', 'jb-poster-go');
       go.append(el('span', 'jb-keycap', t('Start')), document.createTextNode(t('Ouvrir le Juke-box')));
-      foot.append(el('span', '', t('Vos playlists prennent la scène.')), go);
+      foot.append(el('span', '', t('Tes playlists prennent la scène.')), go);
       stage.append(foot);
     }
     box.append(stage);
@@ -419,9 +419,9 @@
     bubble.append(icon('music'));
     box.append(bubble);
     if (view.empty === 'library') {
-      box.append(el('h2', '', t('Votre musique, à portée de flipper.')), el('p', 'jb-muted', t('Importez votre première playlist YouTube.')));
+      box.append(el('h2', '', t('Ta musique, à portée de flipper.')), el('p', 'jb-muted', t('Importe ta première playlist YouTube.')));
     } else {
-      box.append(el('h2', '', t('Le prochain morceau est à vous.')), el('p', 'jb-muted', t('Cette playlist est vide. Ajoutez des morceaux depuis la gestion du Juke-box.')));
+      box.append(el('h2', '', t('Le prochain morceau est à toi.')), el('p', 'jb-muted', t('Cette playlist est vide. Ajoute des morceaux depuis la gestion du Juke-box.')));
     }
     if (!desk) box.append(emptyHelp(view));
     return box;

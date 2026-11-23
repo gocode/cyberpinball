@@ -122,7 +122,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
   }
 
   function noCabinet(): void {
-    library.openNotice(t('Borne à configurer'), [t('Les choix du DMD réel sont gardés avec la configuration de la borne : faites d’abord l’assistant d’écrans (Menu système > Ma borne > Configuration de la borne).')], () => open());
+    library.openNotice(t('Borne à configurer'), [t('Les choix du DMD réel sont gardés avec la configuration de la borne : fais d’abord l’assistant d’écrans (Menu système > Ma borne > Configuration de la borne).')], () => open());
   }
 
   function build(): Built {
@@ -198,7 +198,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
               },
       );
     }
-    if (!found.length) found.push({ icon: 'info', text: t('Aucun DMD réel branché en USB'), detail: t('ZeDMD, PIN2DMD, Pixelcade : branchez-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });
+    if (!found.length) found.push({ icon: 'info', text: t('Aucun DMD réel branché en USB'), detail: t('ZeDMD, PIN2DMD, Pixelcade : branche-le, puis « Vérifier de nouveau ».'), tone: 'quiet' });
     sections.push({ title: t('Reconnus'), rows: found });
 
     // À vérifier : les pilotes d'abord (ils laissent le DMD noir), puis les puces USB-série courantes.
@@ -212,7 +212,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       if (hardwareDmdChoice(s, d.model) !== 'auto' || !d.generic || hardwareDmdDriverProblem(d)) continue;
       checks.push({
         icon: 'info',
-        text: t('{usb} est une puce USB-série courante : si ce n’est pas un {model} (carte Arduino, contrôleur de boutons…), choisissez « {model} : non ».', { usb: d.usb, model: d.model }),
+        text: t('{usb} est une puce USB-série courante : si ce n’est pas un {model} (carte Arduino, contrôleur de boutons…), choisis « {model} : non ».', { usb: d.usb, model: d.model }),
         tone: 'info',
       });
     }
@@ -222,7 +222,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       const choice = hardwareDmdChoice(s, model);
       return {
         label: t('{model} : {choice}', { model, choice: choiceWord(choice) }),
-        detail: cabinet ? choiceDetail(model, choice, detected.filter((d) => d.model === model)) : t('Indisponible : configurez d’abord la borne (assistant d’écrans)'),
+        detail: cabinet ? choiceDetail(model, choice, detected.filter((d) => d.model === model)) : t('Indisponible : configure d’abord la borne (assistant d’écrans)'),
         icon: MODEL_ICONS[model],
         key: `choice-${model}`,
         ...(cabinet ? {} : { tone: 'quiet' as const }),
@@ -238,7 +238,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     actions.push({
       label: wifi?.enabled ? t('ZeDMD en wifi : {address}', { address: wifi.address }) : t('ZeDMD en wifi : non'),
       detail: !cabinet
-        ? t('Indisponible : configurez d’abord la borne (assistant d’écrans)')
+        ? t('Indisponible : configure d’abord la borne (assistant d’écrans)')
         : wifi?.enabled
           ? t('VPX s’y connecte au début de chaque partie (Start : changer l’adresse, ou la vider pour couper)')
           : t('Un ZeDMD relié par le réseau, que l’USB ne voit pas (Start : indiquer son adresse)'),
@@ -254,11 +254,11 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
     actions.push({
       label: menuOn ? t('Image du front-end : oui') : t('Image du front-end : non'),
       detail: !cabinet
-        ? t('Indisponible : configurez d’abord la borne (assistant d’écrans)')
+        ? t('Indisponible : configure d’abord la borne (assistant d’écrans)')
         : menuOn
           ? t('Le DMD réel montre aussi le DMD du front-end ; VPX le reprend pendant les parties (Start : non)')
           : !anyOn
-            ? t('Indisponible : aucun DMD réel allumé (branchez-le, ou choisissez « oui » pour son modèle)')
+            ? t('Indisponible : aucun DMD réel allumé (branche-le, ou choisis « oui » pour son modèle)')
             : serverProblem
               ? t('Indisponible : {problem}', { problem: serverProblem })
               : t('Le DMD réel montre aussi le DMD du front-end, entre les parties (Start : oui)'),
@@ -300,7 +300,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
         save({ ...s, zedmdWifi: { enabled: true, address } }, t('ZeDMD en wifi : {address}. Appliqué au lancement de la prochaine partie.', { address }));
         open();
       },
-      t('Le ZeDMD et la borne sur le même réseau local. Sans réglage, le ZeDMD s’annonce sous le nom {name}. Laissez vide pour couper le wifi.', { name: ZEDMD_WIFI_DEFAULT_ADDR }),
+      t('Le ZeDMD et la borne sur le même réseau local. Sans réglage, le ZeDMD s’annonce sous le nom {name}. Laisse vide pour couper le wifi.', { name: ZEDMD_WIFI_DEFAULT_ADDR }),
     );
   }
 
@@ -312,7 +312,7 @@ export function createHardwareDmdMenu(host: HardwareDmdMenuHost) {
       return open();
     }
     if (!anyOn) {
-      return library.openNotice(t('Image du front-end'), [t('Aucun DMD réel n’est allumé : branchez-le (puis « Vérifier de nouveau »), ou choisissez « oui » pour son modèle, ou indiquez un ZeDMD en wifi.')], () => open());
+      return library.openNotice(t('Image du front-end'), [t('Aucun DMD réel n’est allumé : branche-le (puis « Vérifier de nouveau »), ou choisis « oui » pour son modèle, ou indique un ZeDMD en wifi.')], () => open());
     }
     const problem = host.menuServer.problem();
     if (problem) return library.openNotice(t('Image du front-end'), [problem, t('Le DMD réel reste piloté par VPX pendant les parties.')], () => open());

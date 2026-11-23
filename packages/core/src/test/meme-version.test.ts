@@ -35,7 +35,7 @@ test('réponse : accepter avec une autre version compte comme un refus ; le salo
   game = answerGame(game, 'bruno', 'accept', 'other-version');
   game = answerGame(game, 'chloe', 'accept', 'same');
   assert.equal(game.players[1]!.state, 'declined', 'une borne d’avant le 30/10/2026 acceptait une autre version');
-  assert.equal(livePlayerStateLabel(game.players[1]!), 'N’a pas la même version : il peut récupérer la vôtre');
+  assert.equal(livePlayerStateLabel(game.players[1]!), 'N’a pas la même version : il peut récupérer la tienne');
   assert.equal(game.players[2]!.state, 'accepted');
   // Le script voyage avec l'invitation ; « version proche » n'existe plus.
   const invite = parseLiveMessage({ t: 'game-invite', game: { id: '0123456789abcdef', title: 'T2', players: [], table: { table: T2, print: A, script: S, id: B, rules: 'rom:t2_l8' } } }) as Extract<LiveMessage, { t: 'game-invite' }>;

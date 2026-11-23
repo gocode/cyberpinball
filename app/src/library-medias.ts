@@ -619,8 +619,8 @@ export function createMedias(ctx: MediasContext) {
     if (ctx.download) {
       actions.push({
         label: t('Chercher les médias'),
-        detail: n ? t('Enregistrez ou annulez d’abord les changements en cours') : t('Sur VPinMediaDB : logo, plateau, fronton, afficheur… avec un plan à valider'),
-        run: () => (n ? notify(s, t('Enregistrez ou annulez d’abord les changements en cours : « Chercher les médias » a son propre plan.')) : searchOnline(s, table)),
+        detail: n ? t('Enregistre ou annule d’abord les changements en cours') : t('Sur VPinMediaDB : logo, plateau, fronton, afficheur… avec un plan à valider'),
+        run: () => (n ? notify(s, t('Enregistre ou annule d’abord les changements en cours : « Chercher les médias » a son propre plan.')) : searchOnline(s, table)),
       });
     }
     if (n) {
@@ -640,7 +640,7 @@ export function createMedias(ctx: MediasContext) {
     return {
       heading: t('Médias du jeu'),
       subheading: table.title,
-      lead: t('Ce que le front-end montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».'),
+      lead: t('Ce que le front-end montre pour ce jeu, écran par écran. Choisis un média pour le remplacer, le retirer ou le régler, ou glisse un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».'),
       sections,
       actions,
       back: leave,
@@ -797,7 +797,7 @@ export function createMedias(ctx: MediasContext) {
       if (web) actions.push(webAction(s, table, type));
       actions.push(
         { label: t('Ajouter une page depuis le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'add' }) },
-        { label: t('Ajouter une page : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
+        { label: t('Ajouter une page : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glisse-le ici'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
       );
       if (pages.length) {
         actions.push({
@@ -845,7 +845,7 @@ export function createMedias(ctx: MediasContext) {
       if (romAction) actions.push(romAction);
       actions.push(
         { label: file ? t('Remplacer depuis le dossier d’import') : t('Prendre dans le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
-        { label: file ? t('Remplacer : choisir un fichier…') : t('Choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
+        { label: file ? t('Remplacer : choisir un fichier…') : t('Choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glisse-le ici'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
       );
       if (file) actions.push({ label: t('Mettre à la corbeille'), detail: t('Ensuite : {after}', { after: afterRemoval(s, table, type) }), tone: 'error', run: () => remove(s, table, type) });
     }
@@ -875,7 +875,7 @@ export function createMedias(ctx: MediasContext) {
       subheading: `(${info.type}) · ${table.title}`,
       // À quoi il sert et où il s'affiche, toujours visibles en haut de l'écran.
       lead: info.pages
-        ? t('{description} Où : {where}. Choisissez une page pour la déplacer, la remplacer ou la retirer.', { description: info.description, where: lowerFirst(placeInfo.where) })
+        ? t('{description} Où : {where}. Choisis une page pour la déplacer, la remplacer ou la retirer.', { description: info.description, where: lowerFirst(placeInfo.where) })
         : t('{description} Où : {where}.', { description: info.description, where: lowerFirst(placeInfo.where) }),
       sections,
       actions,
@@ -963,7 +963,7 @@ export function createMedias(ctx: MediasContext) {
     if (index < pages.length - 1) actions.push({ label: t('Descendre'), detail: t('Devient la page {page}', { page: index + 2 }), run: () => move(index + 1) });
     actions.push(
       { label: t('Remplacer depuis le dossier d’import'), run: () => openPick(s, type, { kind: 'replace', index }) },
-      { label: t('Remplacer : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
+      { label: t('Remplacer : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glisse-le ici'), run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
       {
         label: t('Mettre cette page à la corbeille'),
         detail: pages.length > 1 ? t('Les pages suivantes remontent') : undefined,
@@ -1047,7 +1047,7 @@ export function createMedias(ctx: MediasContext) {
     if (!accepted.length) {
       rows.push({
         text: t('Aucun fichier qui convienne'),
-        detail: t('Copiez dans {dir} un fichier {formats}, depuis une clé USB par exemple, puis « Actualiser ».', { dir, formats: info.formats.join(', ') }),
+        detail: t('Copie dans {dir} un fichier {formats}, depuis une clé USB par exemple, puis « Actualiser ».', { dir, formats: info.formats.join(', ') }),
         tone: 'quiet',
       });
     }
@@ -1121,7 +1121,7 @@ export function createMedias(ctx: MediasContext) {
     }
     const parts = [];
     if (placed.length) parts.push(t('{files}, à enregistrer.', { files: placed.join(t(' ; ')) }));
-    if (refused.length) parts.push(t('Non reconnu : {files}. Choisissez d’abord le média, puis déposez le fichier.', { files: refused.join(', ') }));
+    if (refused.length) parts.push(t('Non reconnu : {files}. Choisis d’abord le média, puis dépose le fichier.', { files: refused.join(', ') }));
     s.notice = { text: parts.join(' ') || t('Aucun fichier dans ce dépôt.'), tone: refused.length ? 'warning' : 'info' };
     ctx.changed();
   }

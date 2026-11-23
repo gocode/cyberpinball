@@ -67,8 +67,8 @@ export function createVpxTrialMenu(host: VpxTrialMenuHost): { item: ProvidedSyst
     const archive = await findLocalArchive(entry, archiveDirs());
     if (!archive) {
       return host.library.openNotice(t('Archive de {vpx} introuvable', { vpx: trialVpxLabel(entry.version) }), [
-        t('Téléchargez-la depuis GitHub, connecté à un compte : {url}', { url: entry.homepage }),
-        t('Puis posez-la dans les Téléchargements, sans la décompresser ({size} Mo).', { size: Math.round(entry.size / 1e6) }),
+        t('Télécharge-la depuis GitHub, connecté à un compte : {url}', { url: entry.homepage }),
+        t('Puis pose-la dans les Téléchargements, sans la décompresser ({size} Mo).', { size: Math.round(entry.size / 1e6) }),
       ], () => open());
     }
     await installComponent(root, entry, undefined, { archive, activate: false });

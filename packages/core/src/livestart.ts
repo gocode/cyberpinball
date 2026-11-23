@@ -193,29 +193,29 @@ export function liveWaitView(game: LiveGame, me: string, now = new Date(), opts:
     // « Partez ! » se montre quand ma table part : au signal, ou plus tard si elle chargeait encore.
     const from = Math.max(Date.parse(game.goAt), opts.readyAt ?? 0);
     if (opts.readyAt === undefined && !mine?.ready && mine?.state !== 'playing') {
-      return { mode: 'wait', title: t('Les autres sont partis'), go: false, lead: t('Votre table part dès qu’elle est chargée'), rows };
+      return { mode: 'wait', title: t('Les autres sont partis'), go: false, lead: t('Ta table part dès qu’elle est chargée'), rows };
     }
     if (now.getTime() - from > LIVE_GO_SHOW_MS) return undefined;
     const late = players.filter((p) => game.goLate?.includes(p.key) && p.key !== me);
     const lead =
       game.goWhy === 'host-behind'
-        ? t('{name} a une ancienne version de Cyber Pinball : votre table part sans attendre les autres', { name: host?.name ?? '?' })
+        ? t('{name} a une ancienne version de Cyber Pinball : ta table part sans attendre les autres', { name: host?.name ?? '?' })
         : game.goWhy === 'no-signal'
-          ? t('Plus de nouvelles de {name} : votre table part seule', { name: host?.name ?? '?' })
+          ? t('Plus de nouvelles de {name} : ta table part seule', { name: host?.name ?? '?' })
           : game.goLate?.includes(me)
-            ? t('Les autres sont déjà partis : à vous !')
+            ? t('Les autres sont déjà partis : à toi !')
             : late.length
               ? t('Départ sans {names} : table pas prête à temps, départ dès qu’elle le sera', { names: names(late) })
               : t('Tout le monde est prêt');
-    return { mode: 'wait', title: t('Partez !'), go: true, lead: opts.manual ? t('{lead} · Appuyez sur Start', { lead }) : lead, ...(opts.manual ? { note: liveManualHint() } : {}), rows };
+    return { mode: 'wait', title: t('Pars !'), go: true, lead: opts.manual ? t('{lead} · Appuie sur Start', { lead }) : lead, ...(opts.manual ? { note: liveManualHint() } : {}), rows };
   }
   const awaited = players.filter((p) => !waitStatus(p, game).ready && !waitStatus(p, game).out);
   const others = awaited.filter((p) => p.key !== me);
   const meWaiting = awaited.some((p) => p.key === me);
   const lead = meWaiting
     ? others.length
-      ? t('Votre table se charge ; en attente aussi : {names}', { names: names(others) })
-      : t('Votre table se charge…')
+      ? t('Ta table se charge ; en attente aussi : {names}', { names: names(others) })
+      : t('Ta table se charge…')
     : others.length === 1
       ? t('En attente : {name} — {status}', { name: others[0]!.name, status: waitStatus(others[0]!, game).status })
       : others.length
@@ -224,7 +224,7 @@ export function liveWaitView(game: LiveGame, me: string, now = new Date(), opts:
   const deadline = liveGoDeadline(game);
   const left = deadline !== undefined && others.length ? Math.max(0, Math.ceil((deadline - now.getTime()) / 1000)) : undefined;
   const note = left !== undefined && !meWaiting ? t('Départ sans {names} dans {s} s si sa table n’est pas prête', { names: names(others), s: left }) : undefined;
-  const hint = opts.manual ? `${t('Attendez « Partez ! » pour appuyer sur Start')} · ${liveManualHint()}` : undefined;
+  const hint = opts.manual ? `${t('Attends « Pars ! » pour appuyer sur Start')} · ${liveManualHint()}` : undefined;
   return { mode: 'wait', title: t('En attente des joueurs'), go: false, lead, ...(note || hint ? { note: [note, hint].filter(Boolean).join(' · ') } : {}), rows };
 }
 
@@ -234,7 +234,7 @@ export function liveWaitView(game: LiveGame, me: string, now = new Date(), opts:
  * son score compte s'il entre au tableau d'honneur de la table (lu dans le double à la fermeture).
  */
 export function liveManualHint(): string {
-  return t('Table sans relevé : quittez-la à la fin de votre partie ; votre score compte s’il entre à son tableau d’honneur');
+  return t('Table sans relevé : quitte-la à la fin de ta partie ; ton score compte s’il entre à son tableau d’honneur');
 }
 
 /**
@@ -251,7 +251,7 @@ export function liveManualLabel(reason: LiveManualReason): { text: string; detai
         : reason === 'inspector'
           ? t('il faudrait l’inspector de VPX : Menu système > Communauté > Réglages de la communauté > Partage et réseau, règle du pare-feu de VPX')
           : t('le relevé ne s’ajoute pas à son script');
-  return { text, detail: t('{why} ; chacun appuie sur Start à « Partez ! », et son score compte s’il entre au tableau d’honneur', { why }) };
+  return { text, detail: t('{why} ; chacun appuie sur Start à « Pars ! », et son score compte s’il entre au tableau d’honneur', { why }) };
 }
 
 /** Aux résultats : pourquoi le score d'un joueur sur une table sans relevé n'est pas connu. */

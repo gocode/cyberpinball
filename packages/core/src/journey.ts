@@ -229,7 +229,7 @@ export function hostDetail(host: LinkHost): string {
 // ---------------------------------------------------------------------------
 // Le parcours
 
-const RIGHTS_NOTE = () => t('Protégée par le droit d’auteur : ne la récupérez que si vous y avez droit.');
+const RIGHTS_NOTE = () => t('Protégée par le droit d’auteur : ne la récupère que si tu y as droit.');
 
 /** Éléments de la liste d'attente encore utiles pour cette étape (attendus ou reçus). */
 function activeItems(input: JourneyInput, test: (i: WaitItem) => boolean): WaitItem[] {
@@ -289,10 +289,10 @@ function waitState(items: WaitItem[]): { state: JourneyState; detail: string; ch
   const host = linkHost(waiting.page);
   return {
     state: 'waiting',
-    detail: t('Page ouverte le {date} sur {site} : téléchargez-y le fichier, il sera rattaché à cette table tout seul.', { date: formatDate(Date.parse(waiting.addedAt), { day: '2-digit', month: '2-digit' }), site: host.label }),
+    detail: t('Page ouverte le {date} sur {site} : télécharges-y le fichier, il sera rattaché à cette table tout seul.', { date: formatDate(Date.parse(waiting.addedAt), { day: '2-digit', month: '2-digit' }), site: host.label }),
     choices: [
       { action: { kind: 'reopen', item: waiting }, label: t('Rouvrir la page : {label}', { label: waiting.label }), detail: hostDetail(host), primary: true },
-      { action: { kind: 'scanDownloads' }, label: t('Chercher dans Téléchargements'), detail: t('Si vous l’avez téléchargé dans votre propre navigateur') },
+      { action: { kind: 'scanDownloads' }, label: t('Chercher dans Téléchargements'), detail: t('Si tu l’as téléchargé dans ton propre navigateur') },
     ],
   };
 }
@@ -389,7 +389,7 @@ function romStep(input: JourneyInput): JourneyStep | undefined {
     detail = waiting.detail;
     choices.push(...waiting.choices);
   } else if (exact.length) {
-    detail = t('La table ne démarre pas sans {rom}.zip. Ouvrez sa page sur {site}, connectez-vous et téléchargez-la : elle sera rattachée à cette table, puis installée.', { rom, site: exact[0]!.host.label });
+    detail = t('La table ne démarre pas sans {rom}.zip. Ouvre sa page sur {site}, connecte-toi et télécharge-la : elle sera rattachée à cette table, puis installée.', { rom, site: exact[0]!.host.label });
   } else if (aliasHere) {
     detail = t('La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. {neighbour}.zip, du même jeu, est déjà sur la borne : un alias peut la faire charger à sa place.', { rom, neighbour: aliasHere.neighbour ?? '' });
     note = neighbourWarning();
@@ -398,8 +398,8 @@ function romStep(input: JourneyInput): JourneyStep | undefined {
     note = `${RIGHTS_NOTE()} ${neighbourWarning()}`;
   } else {
     detail = input.vps
-      ? t('La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. Cherchez-la dans le catalogue, ou ajoutez le fichier si vous l’avez.', { rom })
-      : t('La table ne démarre pas sans {rom}.zip. La base VPS n’est pas sur cette borne (jamais téléchargée, pas de réseau) : ajoutez le fichier si vous l’avez.', { rom });
+      ? t('La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. Cherche-la dans le catalogue, ou ajoute le fichier si tu l’as.', { rom })
+      : t('La table ne démarre pas sans {rom}.zip. La base VPS n’est pas sur cette borne (jamais téléchargée, pas de réseau) : ajoute le fichier si tu l’as.', { rom });
   }
   for (const s of exact.slice(0, 2)) choices.push(fetchChoice(s, exact.length > 1 ? t('Récupérer la ROM {rom} ({site})', { rom: s.rom!, site: s.host.label }) : t('Récupérer la ROM {rom}', { rom: s.rom! })));
   if (!waiting && exact.length > 2) choices.push(...chooseChoice(exact));

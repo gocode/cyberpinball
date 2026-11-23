@@ -11,7 +11,7 @@ export const messages: Record<string, string> = {
   'Pourquoi ? La raison est jointe, et dite au joueur s’il est sanctionné.': 'Why? The reason is attached, and told to the player if they are sanctioned.',
 
   // Le joueur sanctionné
-  'Décision de la modération : vous ne pouvez pas écrire pour l’instant': 'Moderation decision: you cannot write for now',
+  'Décision de la modération : tu ne peux pas écrire pour l’instant': 'Moderation decision: you cannot write for now',
   'En sourdine jusqu’à {time}': 'Muted until {time}',
   'Exclu des salons par la modération': 'Banned from the rooms by the moderators',
   'décision de la modération': 'moderation decision',
@@ -60,7 +60,7 @@ export const messages: Record<string, string> = {
   '{n} signalements': '{n} reports',
   '{n} message à traiter': '{n} message to handle',
   '{n} messages à traiter': '{n} messages to handle',
-  'Vos décisions sont signées de votre clé de modérateur et appliquées par toutes les bornes. Le joueur signalé ne sait pas qui l’a signalé.': 'Your decisions are signed with your moderator key and applied by every cabinet. The reported player does not know who reported them.',
+  'Tes décisions sont signées de ta clé de modérateur et appliquées par toutes les bornes. Le joueur signalé ne sait pas qui l’a signalé.': 'Your decisions are signed with your moderator key and applied by every cabinet. The reported player does not know who reported them.',
   'Rien à traiter': 'Nothing to handle',
   'Déjà traité': 'Already handled',
   'Ligne de {name}': '{name}’s line',

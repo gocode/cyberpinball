@@ -159,8 +159,8 @@ export function proposeAudioSetups(input: SetupInputs): AudioSetup[] {
     else if (jacks) badges.push({ text: t('La carte ne détecte pas les câbles de ses prises : à vérifier par le son'), tone: 'info' });
     else badges.push({ text: t('La carte annonce {channels} canaux : à vérifier par le son', { channels: o.channels }), tone: 'info' });
     if (o.channels < needs) badges.push({ text: needs === 8 ? t('Réglage Windows nécessaire avant le test : stéréo → 7.1, l’essai ouvre le panneau') : t('Réglage Windows nécessaire avant le test : stéréo → 5.1, l’essai ouvre le panneau'), tone: 'warn' });
-    if (exciters === 2 && o.channels >= 8) badges.push({ text: t('Deux exciters : réglez la carte en 5.1, ils recevront tout le son du plateau'), tone: 'info' });
-    if (exciters === 2 && !rear) badges.push({ text: t('Branchez plutôt ces exciters sur la sortie arrière'), tone: 'warn' });
+    if (exciters === 2 && o.channels >= 8) badges.push({ text: t('Deux exciters : règle la carte en 5.1, ils recevront tout le son du plateau'), tone: 'info' });
+    if (exciters === 2 && !rear) badges.push({ text: t('Branche plutôt ces exciters sur la sortie arrière'), tone: 'warn' });
     const where = bgOnScreen ? t('le fronton sur les haut-parleurs de {screen}', { screen: shortName(screenBg) }) : t('le fronton sur la {jack}', { jack: jackLabel('front') });
     ssf = {
       id: bgOnScreen ? 'ssf-screen' : 'ssf',

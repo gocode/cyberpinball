@@ -406,7 +406,7 @@ export function invitationLines(lines: readonly GroupLine[], now = new Date()): 
 /**
  * Annonce d'un groupe public, signée par un de ses membres : ses lignes d'appartenance et sa table
  * de la semaine (invitationLines), chacune signée par son auteur, jamais les messages. Elle passe de
- * borne en borne comme une partie instantanée ; une annonce plus récente remplace la précédente. Un
+ * borne en borne comme une partie en direct ; une annonce plus récente remplace la précédente. Un
  * groupe redevenu privé s'annonce une dernière fois ainsi : chaque borne le retire de son annuaire.
  */
 export interface GroupAnnounce {

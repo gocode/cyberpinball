@@ -20,14 +20,14 @@ export const messages: Record<string, string> = {
   'page web': 'web page',
 
   // app/src/acquire-window.ts, app/renderer/acquire.html, acquire.js
-  'Repris là où vous en étiez. « Retour à la recherche » revient à la première page de résultats.': 'Resumed where you left off. “Back to the search” returns to the first results page.',
+  'Repris là où tu en étais. « Retour à la recherche » revient à la première page de résultats.': 'Resumed where you left off. “Back to the search” returns to the first results page.',
   'Vidéo {site} : « {title} »{duration}': '{site} video: “{title}”{duration}',
   'Vidéo de la page : « {title} »{duration}': 'Video on the page: “{title}”{duration}',
   'La page lit un fichier vidéo : « Télécharger cette vidéo » le rend au média, son son compris.': 'The page plays a video file: “Download this video” hands it to the media, sound included.',
   'La page lit un fichier vidéo : « Télécharger cette vidéo » le range dans la liste d’attente.': 'The page plays a video file: “Download this video” adds it to the download queue.',
-  '« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table).':
+  '« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvre la recherche depuis ce média (fiche de la table).':
     '“Add to the Juke-box” keeps it for the Juke-box. To make it a table’s media, open the search from that media (the table’s page).',
-  'Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.':
+  'Pour en faire le média d’une table, ouvre la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.':
     'To make it a table’s media, open the search from that media (the table’s page): yt-dlp then gets its sound or video.',
   'Page inaccessible ({error}) : {url}. Lien mort ? « Précédent », ou une autre recherche.': 'Page unreachable ({error}): {url}. Dead link? “Back”, or another search.',
   Chercher: 'Search',
@@ -36,8 +36,8 @@ export const messages: Record<string, string> = {
 
   // app/src/media-sites.ts
   'Média : {label} ({formats})': 'Media: {label} ({formats})',
-  'Recherche libre · fichiers que vous choisissez': 'Free search · files you choose',
-  'Cherchez, ouvrez une page, téléchargez : le fichier est vérifié puis proposé pour « {label} ». Fermer (Échap) garde la page.':
+  'Recherche libre · fichiers que tu choisis': 'Free search · files you choose',
+  'Cherche, ouvre une page, télécharge : le fichier est vérifié puis proposé pour « {label} ». Fermer (Échap) garde la page.':
     'Search, open a page, download: the file is checked, then offered for “{label}”. Close (Esc) keeps the page.',
 
   // app/src/library-medias.ts
@@ -55,10 +55,10 @@ export const messages: Record<string, string> = {
   'conversion sans résultat': 'conversion produced nothing',
 
   // app/src/media-web.ts
-  'Navigateur intégré ouvert : cherchez, téléchargez, le fichier est vérifié puis proposé ici. Fermer (Échap) garde la page.':
+  'Navigateur intégré ouvert : cherche, télécharge, le fichier est vérifié puis proposé ici. Fermer (Échap) garde la page.':
     'Built-in browser open: search, download, the file is checked, then offered here. Close (Esc) keeps the page.',
   'Téléchargement en cours : {got}': 'Downloading: {got}',
-  'Reprend la page où vous en étiez ; ce que vous téléchargez revient ici': 'Resumes the page where you left off; what you download comes back here',
+  'Reprend la page où tu en étais ; ce que tu télécharges revient ici': 'Resumes the page where you left off; what you download comes back here',
   'Navigateur intégré, recherche libre : « {query} »': 'Built-in browser, free search: “{query}”',
   'le web': 'the web',
   'Lecture du son…': 'Reading the sound…',
@@ -78,16 +78,16 @@ export const messages: Record<string, string> = {
   'Reçu : rien d’utilisable pour « {label} »': 'Received: nothing usable for “{label}”',
   'Le fichier a bien été reçu, mais rien dedans ne peut servir de {label} ({formats}). Rien n’a été gardé.': 'The file was received, but nothing in it can serve as {label} ({formats}). Nothing was kept.',
   'Retour à la recherche': 'Back to the search',
-  'Vos comptes': 'Your accounts',
+  'Tes comptes': 'Your accounts',
   connecté: 'signed in',
   'se connecter': 'sign in',
-  'Chercher le texte sur {site}, avec votre compte': 'Search the text on {site}, with your account',
+  'Chercher le texte sur {site}, avec ton compte': 'Search the text on {site}, with your account',
   'Ouvrir la page de connexion de {site}': 'Open the {site} sign-in page',
-  'Reprend la page où vous en étiez': 'Resumes the page where you left off',
+  'Reprend la page où tu en étais': 'Resumes the page where you left off',
   'Garder pour plus tard': 'Keep for later',
   'Restent proposés dans « Voir les propositions »': 'They stay offered in “See suggestions”',
   'Reçu pour « {label} » : {n} fichiers': 'Received for “{label}”: {n} files',
-  'Choisissez celui à affecter : son aperçu, ce qui sera écrit et ce qui part à la corbeille sont montrés avant toute écriture.':
+  'Choisis celui à affecter : son aperçu, ce qui sera écrit et ce qui part à la corbeille sont montrés avant toute écriture.':
     'Choose the one to assign: its preview, what will be written and what goes to the trash are shown before anything is written.',
   'Accepté · à découper si besoin': 'Accepted · trim if needed',
   'Accepté tel quel': 'Accepted as is',
@@ -101,8 +101,8 @@ export const messages: Record<string, string> = {
   '« {file} » est une image .{ext} que « {label} » ne lit pas : elle sera redessinée en PNG, à l’identique, puis rangée.':
     '“{file}” is a .{ext} image that “{label}” does not read: it will be redrawn as an identical PNG, then stored.',
   'Ce format n’a pas de transparence : le logo gardera son fond.': 'This format has no transparency: the logo will keep its background.',
-  '« {file} » est une vidéo : son son sera extrait en WAV, découpé à votre guise, puis rangé.': '“{file}” is a video: its sound will be extracted to WAV, trimmed as you like, then stored.',
-  '« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à votre guise, puis rangé.':
+  '« {file} » est une vidéo : son son sera extrait en WAV, découpé à ta guise, puis rangé.': '“{file}” is a video: its sound will be extracted to WAV, trimmed as you like, then stored.',
+  '« {file} » est un son .{ext} que le front-end ne lit pas : il sera converti en WAV, découpé à ta guise, puis rangé.':
     '“{file}” is a .{ext} sound the menu does not play: it will be converted to WAV, trimmed as you like, then stored.',
   'Découper puis affecter…': 'Trim, then assign…',
   'Début, fin, fondu de fin : l’extrait s’écoute avant d’être écrit': 'Start, end, fade-out: you hear the excerpt before it is written',
@@ -143,7 +143,7 @@ export const messages: Record<string, string> = {
   'Découper : {label}': 'Trim: {label}',
   'Le son de lancement accompagne le départ de la partie : quelques secondes suffisent. Rien n’est écrit avant « Affecter cet extrait ».':
     'The launch sound goes with the start of the game: a few seconds are enough. Nothing is written before “Assign this excerpt”.',
-  'La musique du jeu joue en boucle tant que la table est choisie : gardez le passage qui la fait reconnaître. Rien n’est écrit avant « Affecter cet extrait ».':
+  'La musique du jeu joue en boucle tant que la table est choisie : garde le passage qui la fait reconnaître. Rien n’est écrit avant « Affecter cet extrait ».':
     'The game music loops while the table is selected: keep the passage that makes it recognisable. Nothing is written before “Assign this excerpt”.',
   '{name} (extrait)': '{name} (excerpt)',
   'Découpe impossible : {error}. Rien n’a été écrit.': 'Trimming failed: {error}. Nothing was written.',
@@ -182,11 +182,11 @@ export const messages: Record<string, string> = {
   'empreinte de {name} absente de {sums}': '{name} hash missing from {sums}',
   'empreinte SHA-256 différente de {sums}': 'SHA-256 hash differs from {sums}',
   'empreinte SHA-256 différente de celle annoncée par GitHub': 'SHA-256 hash differs from the one GitHub announces',
-  'YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard, ou prenez un fichier proposé par un site': 'YouTube asks to prove you are not a robot: try again later, or take a file a site offers',
+  'YouTube demande de prouver qu’on n’est pas un robot : réessaie plus tard, ou prends un fichier proposé par un site': 'YouTube asks to prove you are not a robot: try again later, or take a file a site offers',
   'vidéo privée': 'private video',
   'vidéo réservée aux abonnés de la chaîne': 'video for channel members only',
   'vidéo soumise à une limite d’âge': 'age-restricted video',
-  'vidéo indisponible dans votre pays': 'video not available in your country',
+  'vidéo indisponible dans ton pays': 'video not available in your country',
   'vidéo indisponible': 'video unavailable',
   'page que yt-dlp ne sait pas lire': 'page yt-dlp cannot read',
   'aucun format d’un seul tenant pour cette vidéo (il faudrait ffmpeg)': 'no single-file format for this video (ffmpeg would be needed)',

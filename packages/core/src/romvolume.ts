@@ -238,9 +238,9 @@ export function romVolumeLine(s: RomVolumeStatus, choice: number | undefined): {
   }
   if (target !== undefined) {
     const from = now !== undefined ? romVolumeText(now, s.spot) : t('d’usine');
-    return { detail: choice !== undefined ? t('{from} : remis à {to} (votre réglage) avant la partie', { from, to: target }) : t('{from}, d’usine, faible : monté à {to} avant la partie', { from, to: target }), tone: 'ok', low: false };
+    return { detail: choice !== undefined ? t('{from} : remis à {to} (ton réglage) avant la partie', { from, to: target }) : t('{from}, d’usine, faible : monté à {to} avant la partie', { from, to: target }), tone: 'ok', low: false };
   }
   if (now === undefined) return { detail: t('d’usine'), tone: 'quiet', low: false };
-  if (choice !== undefined) return { detail: t('{now} (votre réglage)', { now: romVolumeText(now, s.spot) }), tone: 'ok', low: false };
+  if (choice !== undefined) return { detail: t('{now} (ton réglage)', { now: romVolumeText(now, s.spot) }), tone: 'ok', low: false };
   return low ? { detail: t('{now} : bas', { now: romVolumeText(now, s.spot) }), tone: 'warning', low: true } : { detail: romVolumeText(now, s.spot), tone: 'ok', low: false };
 }

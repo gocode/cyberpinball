@@ -167,8 +167,8 @@ export function createTableRankings(opts: TableRankingsOptions): TableRankings {
         { board: version.board, ...(version.balls ? { balls: version.balls } : {}), period, scope, ...(country ? { country } : {}), friends: new Set(state.friends.map((f) => f.key)), me: state.key.publicKey },
         now,
       );
-      const same = version.balls ? t('Même version de la table que la vôtre, {n} billes par partie', { n: version.balls }) : t('Même version de la table que la vôtre');
-      const shared = state.shareScores === false ? t('vos scores ne sont pas publiés') : undefined;
+      const same = version.balls ? t('Même version de la table que la tienne, {n} billes par partie', { n: version.balls }) : t('Même version de la table que la tienne');
+      const shared = state.shareScores === false ? t('tes scores ne sont pas publiés') : undefined;
       const offline = opts.net.status().running ? undefined : t('hors ligne : d’après les scores déjà reçus');
       return { ...board, lines: board.lines.map((l) => dressed(l, state, now)), note: [same, shared, offline].filter(Boolean).join(' · ') };
     },

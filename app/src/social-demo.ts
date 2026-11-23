@@ -42,7 +42,7 @@
 // CYBERPINBALL_RESEAU_DEMO=moderation : la même chose, et la borne est modératrice d'une charte
 // d'essai (signée par une clé de projet créée pour l'essai, jamais la vraie) ; Kiko écrit une ligne
 // injurieuse, Dora et Ressort la signalent.
-// CYBERPINBALL_RESEAU_DEMO=instantanees (Communauté > Parties instantanées) : les mêmes joueurs ;
+// CYBERPINBALL_RESEAU_DEMO=instantanees (Communauté > Parties en direct) : les mêmes joueurs ;
 // Kiko ouvre une partie à quatre sur une table de la borne, que Ressort rejoint ; Vortex en ouvre une
 // sur une table que la borne n'a pas (grisée) ; Tiltman rejoint la partie que la borne ouvre.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
@@ -321,7 +321,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
 
   /** Minuteurs posés avant ceux des scénarios (le « J'aime » de Dora) : arrêtés avec eux. */
   const timersLater: NodeJS.Timeout[] = [];
-  /** Services des parties instantanées des bornes fictives : arrêtés avec elles. */
+  /** Services des parties en direct des bornes fictives : arrêtés avec elles. */
   const instantStops: (() => void)[] = [];
   const community = mode === 'communaute' || mode === 'moderation' || mode === 'instantanees' || mode === 'groupes';
   const dora = await bot(dataDir, 'Dora', true, bootstrap, community ? { country: 'FR' } : {});
@@ -376,7 +376,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     react(dora, ressort!, 'love', 10_900);
     // Une ligne plus tard, quand la borne a quitté le salon : la notification « nouveau message ».
     say(ressort!, 'tournoi vendredi soir sur Thunder Reef, qui est partant ?', ROOM_DEMO_LATE_MS); // i18n-ignore : ligne d'un joueur fictif
-    // Parties instantanées : Kiko ouvre une partie à quatre sur une table de la borne (la même version),
+    // Parties en direct : Kiko ouvre une partie à quatre sur une table de la borne (la même version),
     // Ressort la rejoint ; Vortex en annonce une sur une table que la borne n'a pas ; Tiltman rejoint
     // la partie que la borne ouvre (une place reste libre : elle ne part pas pendant les captures).
     if (mode === 'instantanees') {
@@ -392,7 +392,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         const vpx = mine().filter((t) => t.emulator === 'vpx');
         const table = vpx.find((t) => /Atlas Rising/.test(t.title)) ?? vpx[0];
         if (!table) return log('Réseau simulé : aucune table pour la partie de Kiko.'); // i18n-ignore : journal
-        void kikoGames.openInstant(table, 4).then(() => log(`Réseau simulé : Kiko ouvre une partie instantanée sur ${table.title}.`)); // i18n-ignore : journal
+        void kikoGames.openInstant(table, 4).then(() => log(`Réseau simulé : Kiko ouvre une partie en direct sur ${table.title}.`)); // i18n-ignore : journal
       }, 2000));
       // Ressort rejoint la partie de Kiko dès qu'elle lui arrive.
       const ressortWatch = setInterval(() => {

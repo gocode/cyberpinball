@@ -169,7 +169,7 @@ export function remoteNameSummary(f: RemoteNameFacts): { state: 'ok' | 'check'; 
       title: f.phone.result === 'other' ? t('Le nom {name} mène à une autre borne', { name: f.name }) : t('Un téléphone ne trouve pas la borne par son nom'),
       detail:
         f.phone.result === 'other'
-          ? t('{device} reste sur l’adresse IP de la borne : relancez Cyber Pinball sur l’une des deux bornes, chacune prend alors un nom à elle.', { device: f.phone.device })
+          ? t('{device} reste sur l’adresse IP de la borne : relance Cyber Pinball sur l’une des deux bornes, chacune prend alors un nom à elle.', { device: f.phone.device })
           : f.phone.android
             ? t('{device} : les navigateurs d’Android ne trouvent pas les noms en « .local ». Il reste sur l’adresse IP, et devra scanner le QR une fois si le routeur la change.', { device: f.phone.device })
             : t('{device} ne trouve pas le nom (Wi-Fi qui isole les appareils, ou navigateur sans mDNS) : il reste sur l’adresse IP, et devra scanner le QR une fois si elle change.', { device: f.phone.device }),

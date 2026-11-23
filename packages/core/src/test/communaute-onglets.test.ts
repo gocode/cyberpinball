@@ -151,7 +151,7 @@ test('Communauté à onglets : le curseur dans la barre d’onglets, les flipper
   assert.equal(h.current(), 'messages');
   assert.ok(h.inTabs());
   assert.equal(h.at(), 1);
-  assert.equal(h.built().hub.sections[0]!.title, 'Ils vous attendent', 'le contenu de l’onglet est déjà là');
+  assert.equal(h.built().hub.sections[0]!.title, 'Ils t’attendent', 'le contenu de l’onglet est déjà là');
   h.built().keys!({ code: 'FlipperLeft' });
   h.built().keys!({ code: 'FlipperLeft' });
   assert.equal(h.current(), 'profile', 'la barre boucle');
@@ -172,15 +172,16 @@ test('Accueil : un récapitulatif par onglet ; Start ouvre l’onglet sur la mê
   h.run('tab:home');
   const titles = h.built().hub.sections.map((s) => s.title);
   // Dans l'ordre des onglets : Messages, Joueurs, Groupes, Salons, Profil ; « Ça bouge » à part.
-  assert.deepEqual(titles.slice(0, 5), ['Ils vous attendent', 'Joueurs à découvrir', 'Mes groupes', 'Salon France', 'Mon profil']);
-  assert.ok(!titles.includes('Faites découvrir Cyber Pinball'), 'l’invitation est dans l’onglet Joueurs');
+  assert.deepEqual(titles.slice(0, 5), ['Ils t’attendent', 'Joueurs à découvrir', 'Mes groupes', 'Salon France', 'Mon profil']);
+  assert.ok(!titles.includes('Fais découvrir Cyber Pinball'), 'l’invitation est dans l’onglet Joueurs');
   // Start sur « En ligne » : l'onglet Joueurs, le curseur dans sa première bande, la même.
   h.enter('Joueurs à découvrir');
   assert.equal(h.current(), 'players');
   assert.equal(h.built().hub.sections[1]!.title, 'Joueurs à découvrir');
   assert.ok(h.inList() && !h.inTabs(), 'dans la liste de l’onglet');
   assert.equal(h.at(), 1, 'le curseur sur le premier élément de la bande (après la barre d’onglets)');
-  assert.ok(h.built().actions.some((a) => a.label === 'Ajouter'), 'on y ajoute un joueur d’un appui');
+  assert.ok(h.built().actions.some((a) => a.label === 'Ajouter en ami'), 'on y ajoute un joueur d’un appui');
+  assert.ok(h.built().actions.some((a) => a.label === 'Voir le profil'), 'et on voit d’abord son profil (jamais d’ajout à l’aveugle)');
   // Exit : retour à l'accueil, le curseur sur ce récapitulatif (la barre d'onglets, puis Messages, puis En ligne).
   h.built().back();
   assert.equal(h.current(), 'home');
@@ -198,14 +199,14 @@ test('Accueil : le message qui attend, trois réponses toutes prêtes ; une rép
   const nina = h.built().hub.sections[0]!.cards[0]!;
   assert.equal(nina.bubble?.text, 'On fait une partie ce soir ?');
   assert.deepEqual(nina.buttons!.filter((x) => x.quick).map((x) => x.label), ['Partant !', 'Quelle table ?', 'Plus tard']);
-  h.enter('Ils vous attendent');
+  h.enter('Ils t’attendent');
   assert.equal(h.current(), 'messages');
   h.built().actions.find((a) => a.label === 'Partant !')!.run();
   assert.deepEqual(h.sent, ['nina:Partant !']);
   assert.equal(h.built().hub.sections[0]!.note, 'Envoyé à Nina', 'le constat en note du titre');
 });
 
-test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui, +25 XP par nouvel ami ; niveau sur chacun ; « Tous les joueurs »', () => {
+test('« En ligne » = amis puis joueurs suggérés ; « Ajouter en ami » d’un appui, +25 XP par nouvel ami ; niveau sur chacun ; « Tous les joueurs »', () => {
   const h = hub();
   h.menu.openHome(() => undefined);
   h.run('tab:home');
@@ -227,7 +228,7 @@ test('« En ligne » = amis puis joueurs suggérés ; « Ajouter » d’un appui
   // Dans la bande : un ami ouvre son profil (un seul écran par joueur), « Ajouter », « Tous les joueurs ».
   h.enter('Joueurs à découvrir');
   h.built().actions.find((a) => a.label === 'Alto')!.run();
-  h.built().actions.find((a) => a.label === 'Ajouter')!.run();
+  h.built().actions.find((a) => a.label === 'Ajouter en ami')!.run();
   h.built().actions.find((a) => a.label === 'Tous les joueurs')!.run();
   assert.deepEqual(h.sent, ['demande:Inès']);
   assert.deepEqual(h.events, ['profil:alto', 'joueurs:all']);
@@ -250,7 +251,7 @@ test('Joueurs : la bande « En ligne » d’abord, puis les demandes reçues, l�
   h.tab('players');
   const titles = h.built().hub.sections.map((s) => s.title);
   // « Connectés en ce moment » : ceux que la bande ne montre pas, et la liste complète d'un appui.
-  assert.deepEqual(titles, ['Connectés en ce moment', 'Joueurs à découvrir', 'Demandes d’ami', 'Faites découvrir Cyber Pinball', 'Tout voir']);
+  assert.deepEqual(titles, ['Connectés en ce moment', 'Joueurs à découvrir', 'Demandes d’ami', 'Fais découvrir Cyber Pinball', 'Tout voir']);
   assert.deepEqual(h.built().hub.sections[0]!.cards.map((c) => c.title), ['Alto'], 'les connectés restent visibles même si déjà suggérés');
   h.built().actions.find((a) => a.label === 'Tous les connectés')!.run();
   assert.deepEqual(h.events.splice(0), ['joueurs:all']);

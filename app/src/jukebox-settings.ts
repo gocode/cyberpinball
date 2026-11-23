@@ -63,7 +63,7 @@ const PROFILE_DETAILS: Record<JukeboxAudioProfile, string> = {
     return t('Tout sauf les basses, au-dessus de 120 Hz : pour de petits haut-parleurs, à côté d’un caisson');
   },
   get custom() {
-    return t('Vos basses, médiums et aigus, de −12 à +12 dB');
+    return t('Tes basses, médiums et aigus, de −12 à +12 dB');
   },
 };
 
@@ -127,7 +127,7 @@ export function createJukeboxSettings(host: JukeboxSettingsHost) {
         label: v.jukebox ? t('Juke-box dans la roue : affiché') : t('Juke-box dans la roue : masqué'),
         detail: v.jukebox
           ? t('Le médaillon Juke-box ouvre chaque collection de la roue, avant les tables (Start : le masquer)')
-          : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
+          : t('La roue ne montre que les tables ; tes playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
         icon: 'wheel',
         run: () => set({ jukebox: !v.jukebox }),
       },
@@ -234,7 +234,7 @@ export function createJukeboxSettings(host: JukeboxSettingsHost) {
         enabled: {
           label: on ? t('Juke-box sur cette sortie : oui') : t('Juke-box sur cette sortie : non'),
           icon: on ? 'check' : 'volume-mute',
-          ...(last ? quiet(t('Seule sortie du Juke-box : activez-en une autre avant de couper celle-ci')) : { detail: on ? t('Start : couper') : t('Start : l’ajouter aux sorties du Juke-box') }),
+          ...(last ? quiet(t('Seule sortie du Juke-box : actives-en une autre avant de couper celle-ci')) : { detail: on ? t('Start : couper') : t('Start : l’ajouter aux sorties du Juke-box') }),
           run: () => {
             const next = toggleJukeboxOutput(audio(), menu, name);
             if (next) set({ jukeboxAudio: next });

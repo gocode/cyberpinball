@@ -195,7 +195,7 @@ export const BADGES: readonly BadgeDefinition[] = [
   { id: 'world-top10', icon: 'globe', family: 'rankings', rarity: 'epic', get label() { return t('Top 10 mondial'); }, get detail() { return t('Finir une semaine dans les dix premiers au monde sur une table'); }, measure: (f) => n(f.worldTop10), target: 1 },
   { id: 'world-first', icon: 'medal', family: 'rankings', rarity: 'legendary', get label() { return t('Numéro un mondial'); }, get detail() { return t('Finir une semaine premier au monde sur une table'); }, measure: (f) => n(f.worldFirst), target: 1 },
   { id: 'still-there', icon: 'repeat', family: 'rankings', rarity: 'epic', get label() { return t('Toujours là'); }, get detail() { return t('Rester dans le top 100 mondial d’une table quatre semaines de suite'); }, measure: (f) => n(f.top100Streak), target: 4 },
-  // En ligne : parties en direct entre amis, instantanées ou de groupe
+  // En ligne : parties en direct entre amis, ouvertes à tous ou de groupe
   { id: 'live-game', icon: 'friends', family: 'online', rarity: 'common', get label() { return t('En direct'); }, get detail() { return t('Mener au bout une partie en ligne'); }, measure: (f) => n(f.live), target: 1 },
   { id: 'full-table', icon: 'friend-list', family: 'online', rarity: 'common', get label() { return t('Table pleine'); }, get detail() { return t('Jouer une partie en ligne à quatre'); }, measure: (f) => n(f.liveFull), target: 1 },
   { id: 'online-regular', icon: 'friends', family: 'online', rarity: 'rare', get label() { return t('Habitué du direct'); }, get detail() { return t('Mener au bout 25 parties en ligne'); }, measure: (f) => n(f.live), target: 25 },

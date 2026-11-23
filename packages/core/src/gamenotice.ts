@@ -53,10 +53,10 @@ export function gameNoticeView(invite: LiveInvite, shownAt: Date, now = new Date
   const seconds = Math.ceil(left / 1000);
   return {
     mode: now.getTime() - shownAt.getTime() < GAME_NOTICE_FULL_MS ? 'full' : 'compact',
-    title: t('{name} vous invite à jouer', { name: invite.host.name }),
+    title: t('{name} t’invite à jouer', { name: invite.host.name }),
     short: t('Invitation de {name}', { name: invite.host.name }),
     table: invite.title,
-    hint: t('Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule'),
+    hint: t('Quitte la partie pour le rejoindre, ou continue : elle s’efface seule'),
     left: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
     progress: Math.round((left / LIVE_INVITE_MS) * 1000) / 1000,
     host: { key: invite.host.key, name: invite.host.name },

@@ -1,4 +1,4 @@
-// Groupes et parties instantanées au téléphone, lot 4 (18/11/2026) : les messages du téléphone bornés
+// Groupes et parties en direct au téléphone, lot 4 (18/11/2026) : les messages du téléphone bornés
 // par le cœur (group-act, instant-act) ; ce que la borne envoie (groups-menu.ts : remoteGroups, la tête
 // d'un groupe ouvert ; instant-menu.ts : remote) et les gestes qu'elle vérifie (remoteAct), avec des
 // services d'essai ; la page du téléphone servie avec son script. Le parcours dans la vraie page :
@@ -175,7 +175,7 @@ test('groupes au téléphone : un groupe ouvert, sa table de la semaine, son cla
   assert.ok(head, 'la tête du groupe part avec son fil');
   assert.equal(head.week?.title, 'Star Courier');
   assert.equal(head.week?.reason, undefined, 'la table est dans la borne : « Jouer »');
-  assert.deepEqual(head.ranking.map((x) => x.name), ['Kiko', 'Vous']);
+  assert.deepEqual(head.ranking.map((x) => x.name), ['Kiko', 'Toi']);
   assert.equal(head.ranking[1]?.me, true);
   assert.deepEqual(head.members.map((m) => m.name), ['Camille', 'Kiko']);
   assert.deepEqual(head.invitable.map((f) => f.name), ['Bruno'], 'les amis pas encore membres');
@@ -258,7 +258,7 @@ function instantHarness() {
   return { menu, calls, tables, ids: { SAME, OTHER }, keys: { ME, KIKO, BRUNO }, host, setBusy: (b: string | undefined) => (busy = b) };
 }
 
-test('parties instantanées au téléphone : rejoindre (ou pourquoi pas), ouvrir sur la table de la borne, ma partie', async () => {
+test('parties en direct au téléphone : rejoindre (ou pourquoi pas), ouvrir sur la table de la borne, ma partie', async () => {
   const h = instantHarness();
   h.menu.remote();
   // La vérification de la table chez moi arrive après coup (matchFor).
@@ -287,7 +287,7 @@ test('parties instantanées au téléphone : rejoindre (ou pourquoi pas), ouvrir
   h.calls.length = 0;
   h.host([{ key: h.keys.ME, name: 'Camille', state: 'accepted', host: true }, { key: h.keys.KIKO, name: 'Kiko', state: 'accepted' }]);
   const mine = h.menu.remote().mine;
-  assert.deepEqual(mine?.seats.map((s) => s.name), ['Vous', 'Kiko']);
+  assert.deepEqual(mine?.seats.map((s) => s.name), ['Toi', 'Kiko']);
   assert.equal(mine?.max, 3);
   assert.ok(mine?.closes.includes(':'), 'l’heure de fermeture');
   assert.deepEqual(mine?.invitable.map((f) => f.key), [h.keys.BRUNO], 'inviter : mes amis en ligne, pas déjà là');
@@ -300,7 +300,7 @@ test('parties instantanées au téléphone : rejoindre (ou pourquoi pas), ouvrir
   assert.deepEqual(h.calls, ['invite:c', 'leave'], 'Kiko déjà dans la partie, une seconde partie : rien');
 });
 
-test('parties instantanées au téléphone : la page, son script servi par la borne', () => {
+test('parties en direct au téléphone : la page, son script servi par la borne', () => {
   const page = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'telephone', 'telephone.html'), 'utf8');
   const script = (name: string) => page.indexOf(`<script src="${name}"></script>`);
   assert.ok(script('telephone-community.js') > -1 && script('telephone-community.js') < script('telephone-groupes.js') && script('telephone-groupes.js') < script('telephone.js'), 'telephone-groupes.js après la Communauté, avant telephone.js');

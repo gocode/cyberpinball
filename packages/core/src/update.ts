@@ -497,7 +497,7 @@ export async function checkForUpdate(opts: {
         privateRelease = await newestRelease(releasesApiUrl(channel.repository, channel.api, PRIVATE_RELEASES_LISTED), get, opts.signal, true, opts.patience);
       } catch (error) {
         if (opts.signal?.aborted) throw error;
-        throw new Error(t('Canal d’essai {repository} illisible : {message} Vérifiez le jeton de canal-essai.json, ou revenez aux versions publiques.', { repository: channel.repository, message: (error as Error).message }));
+        throw new Error(t('Canal d’essai {repository} illisible : {message} Vérifie le jeton de canal-essai.json, ou reviens aux versions publiques.', { repository: channel.repository, message: (error as Error).message }));
       }
       if (privateRelease && (!pub || compareAppVersions(privateRelease.version, pub.version) > 0)) url = privateRelease.feed;
       else privateRelease = undefined;

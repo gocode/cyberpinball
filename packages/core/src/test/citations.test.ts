@@ -134,9 +134,9 @@ test('messages privés : l’original supprimé ou disparu, la citation garde so
   const first = writeLine(newChatState(), alice, bruno.publicKey, { text: 'Je supprimerai ce message' }, T0);
   const quote = quoteOf({ id: first.line!.id, by: alice.publicKey, name: 'Alice', text: first.line!.text! })!;
   const reply = writeLine(first.state, alice, bruno.publicKey, { text: 'Et je me cite', reply: quote }, at(5));
-  const nameOf = (out: boolean) => (out ? 'Vous' : 'Bruno');
+  const nameOf = (out: boolean) => (out ? 'Toi' : 'Bruno');
   let c = reply.state.conversations[bruno.publicKey]!;
-  assert.deepEqual(chatQuoteView(c, quote, nameOf), { name: 'Vous', text: 'Je supprimerai ce message' });
+  assert.deepEqual(chatQuoteView(c, quote, nameOf), { name: 'Toi', text: 'Je supprimerai ce message' });
   const del = deleteMine(reply.state, alice, bruno.publicKey, first.line!.id, at(9));
   c = del.state.conversations[bruno.publicKey]!;
   assert.deepEqual(chatQuoteView(c, quote, nameOf), { name: 'Alice', text: 'Je supprimerai ce message', missing: 'deleted' });

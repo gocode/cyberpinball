@@ -44,7 +44,7 @@ export interface NewsItem {
   readonly detail: string;
   /** Le texte entier, lu une fois la nouveauté agrandie. */
   readonly more: readonly string[];
-  /** Où la trouver, en clair (« Communauté › Parties instantanées »). */
+  /** Où la trouver, en clair (« Communauté › Parties en direct »). */
   readonly where: string;
   readonly reach: NewsReach;
   /** Fonction encore en essai : badge « BÊTA ». */
@@ -99,10 +99,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Le point de vue de chaque table'); },
-    get detail() { return t('Gardez le cadrage de la borne, utilisez le POV fourni avec la table ou importez le vôtre, table par table.'); },
+    get detail() { return t('Garde le cadrage de la borne, utilise le POV fourni avec la table ou importe le tien, table par table.'); },
     get more() {
       return [
-        t('Dans « Gérer la table… › Point de vue », choisissez le cadrage de la borne ou le POV de cette table. Vous pouvez aussi importer un fichier .pov ou le .ini d’un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque.'),
+        t('Dans « Gérer la table… › Point de vue », choisis le cadrage de la borne ou le POV de cette table. Tu peux aussi importer un fichier .pov ou le .ini d’un POV pour VPX 10.8, depuis Téléchargements, une clé USB ou un disque.'),
         t('Le POV importé est rangé avec la table et appliqué à elle seule. Une vue qui mettrait la table de travers sur la borne est refusée, avec la raison.'),
       ];
     },
@@ -132,11 +132,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Pré-réglages de qualité'); },
-    get detail() { return t('Une belle image sans régler VPX : le mode Auto choisit la qualité qui convient à votre machine.'); },
+    get detail() { return t('Une belle image sans régler VPX : le mode Auto choisit la qualité qui convient à ta machine.'); },
     get more() {
       return [
-        t('Auto part de votre carte graphique et de votre playfield, puis s’ajuste après chaque partie d’après le temps que la carte graphique met à dessiner une image : plus beau s’il reste de la marge, plus léger si elle peine.'),
-        t('Ou choisissez vous-même : Performance, Équilibré, Qualité ou Ultra. Un réglage changé à la main dans Réglages de VPX passe en Personnalisé : Cyber Pinball n’y touche plus.'),
+        t('Auto part de ta carte graphique et de ton playfield, puis s’ajuste après chaque partie d’après le temps que la carte graphique met à dessiner une image : plus beau s’il reste de la marge, plus léger si elle peine.'),
+        t('Ou choisis toi-même : Performance, Équilibré, Qualité ou Ultra. Un réglage changé à la main dans Réglages de VPX passe en Personnalisé : Cyber Pinball n’y touche plus.'),
       ];
     },
     get where() { return t('Menu système › Ma borne › VPX › Pré-réglages'); },
@@ -150,11 +150,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Les défis'); },
-    get detail() { return t('Défiez un joueur sur une table : 48 h pour battre votre score, chacun quand il veut.'); },
+    get detail() { return t('Défie un joueur sur une table : 48 h pour battre ton score, chacun quand il veut.'); },
     get more() {
       return [
-        t('Sur la fiche d’une table, « Jouer ensemble… › Défier un joueur… » : un ami ou un joueur classé sur la même version. Votre meilleur score est celui à battre ; essais illimités, et chacun peut encore monter le sien.'),
-        t('À l’échéance, le plus haut score gagne 40 XP, puis « Revanche » d’un geste. Les défis arrivent même si vos bornes ne sont jamais allumées en même temps.'),
+        t('Sur la fiche d’une table, « Jouer ensemble… › Défier un joueur… » : un ami ou un joueur classé sur la même version. Ton meilleur score est celui à battre ; essais illimités, et chacun peut encore monter le sien.'),
+        t('À l’échéance, le plus haut score gagne 40 XP, puis « Revanche » d’un geste. Les défis arrivent même si tes bornes ne sont jamais allumées en même temps.'),
       ];
     },
     get where() { return t('Arène › Défis'); },
@@ -167,11 +167,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Lunettes 3D'); },
-    get detail() { return t('La table en relief avec de simples lunettes rouge et cyan, et avec la Vision 3D si vous voulez.'); },
+    get detail() { return t('La table en relief avec de simples lunettes rouge et cyan, et avec la Vision 3D si tu veux.'); },
     get more() {
       return [
-        t('Mettez des lunettes à filtres colorés : rouge / cyan, vert / magenta ou ambre / bleu. Le plateau sort de l’écran ; avec la Vision 3D, le relief suit aussi votre tête.'),
-        t('Calibrez vos lunettes aux boutons de la borne, un œil fermé à chaque fois : moins d’images fantômes, des couleurs plus justes.'),
+        t('Mets des lunettes à filtres colorés : rouge / cyan, vert / magenta ou ambre / bleu. Le plateau sort de l’écran ; avec la Vision 3D, le relief suit aussi ta tête.'),
+        t('Calibre tes lunettes aux boutons de la borne, un œil fermé à chaque fois : moins d’images fantômes, des couleurs plus justes.'),
       ];
     },
     get where() { return t('Menu système › Ma borne › Réalité virtuelle et vision 3D › Lunettes 3D'); },
@@ -185,11 +185,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('L’Arène'); },
-    get detail() { return t('Un médaillon pour se mesurer aux autres : parties ouvertes, places à reprendre, votre niveau.'); },
+    get detail() { return t('Un médaillon pour se mesurer aux autres : parties ouvertes, places à reprendre, ton niveau.'); },
     get more() {
       return [
-        t('Dans la roue, à côté de la Communauté. Son affiche fait tourner vos records et les places qu’on vient de vous prendre ; Start ouvre l’Arène, ses onglets se changent aux MagnaSave.'),
-        t('En tête, votre niveau et le plus pressant (une place à reprendre, une partie qui vous attend), puis le classement mondial. Une partie que vous ouvrez et que d’autres rejoignent rapporte des XP, une fois par groupe.'),
+        t('Dans la roue, à côté de la Communauté. Son affiche fait tourner tes records et les places qu’on vient de te prendre ; Start ouvre l’Arène, ses onglets se changent aux MagnaSave.'),
+        t('En tête, ton niveau et le plus pressant (une place à reprendre, une partie qui t’attend), puis le classement mondial. Une partie que tu ouvres et que d’autres rejoignent rapporte des XP, une fois par groupe.'),
       ];
     },
     get where() { return t('Roue › Arène'); },
@@ -202,10 +202,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Les tables du jour'); },
-    get detail() { return t('Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant vous.'); },
+    get detail() { return t('Les tables les plus jouées aujourd’hui, le record du jour et le joueur juste devant toi.'); },
     get more() {
       return [
-        t('Dans le monde, votre pays ou entre amis : chaque table montre son record du jour, votre place et ce qu’il vous manque. Start lance la table.'),
+        t('Dans le monde, ton pays ou entre amis : chaque table montre son record du jour, ta place et ce qu’il te manque. Start lance la table.'),
         t('La fiche d’une table dit qui battre, qui y joue en ce moment, et regroupe les parties à plusieurs dans « Jouer ensemble… ». Sans vidéo de chargement, l’objectif s’affiche aussi au lancement.'),
       ];
     },
@@ -220,11 +220,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-22',
     version: '0.2.3',
     get title() { return t('Un échange avec l’équipe'); },
-    get detail() { return t('Envoyez un rapport : l’équipe vous répond sur la borne, et vous pouvez lui répondre.'); },
+    get detail() { return t('Envoie un rapport : l’équipe te répond sur la borne, et tu peux lui répondre.'); },
     get more() {
       return [
-        t('Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans vos messages en attente.'),
-        t('Vos rapports partent avec votre pseudo, ou anonymement si vous le choisissez : l’équipe peut vous répondre dans les deux cas. Tout reste chiffré entre la borne et l’équipe.'),
+        t('Chaque rapport, plantage automatique compris, ouvre un échange. La réponse de l’équipe arrive avec une notification, dans tes messages en attente.'),
+        t('Tes rapports partent avec ton pseudo, ou anonymement si tu le choisis : l’équipe peut te répondre dans les deux cas. Tout reste chiffré entre la borne et l’équipe.'),
       ];
     },
     get where() { return t('Menu système › Aide et infos › Retours et propositions › Mes échanges avec l’équipe'); },
@@ -254,10 +254,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-20',
     version: '0.2.2',
     get title() { return t('Le son de la borne se règle presque seul'); },
-    get detail() { return t('Cyber Pinball regarde ce qui est branché, propose la configuration du son et la vérifie avec vous.'); },
+    get detail() { return t('Cyber Pinball regarde ce qui est branché, propose la configuration du son et la vérifie avec toi.'); },
     get more() {
       return [
-        t('L’étape « Son de la borne » lit les prises de la carte son et les haut-parleurs de vos écrans, puis propose quelques configurations, la plus probable en tête, avec un schéma de la borne.'),
+        t('L’étape « Son de la borne » lit les prises de la carte son et les haut-parleurs de tes écrans, puis propose quelques configurations, la plus probable en tête, avec un schéma de la borne.'),
         t('Essayer une configuration la vérifie paire par paire. Carte en stéréo dans Windows : le panneau Son s’ouvre et l’assistant attend le 5.1 ou le 7.1. Sinon, « Régler pas à pas » reste là.'),
       ];
     },
@@ -270,11 +270,11 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-20',
     version: '0.2.1',
     get title() { return t('Future Pinball sur la roue'); },
-    get detail() { return t('Vos tables Future Pinball (.fpt) à côté de vos tables VPX, lancées en un appui.'); },
+    get detail() { return t('Tes tables Future Pinball (.fpt) à côté de tes tables VPX, lancées en un appui.'); },
     get more() {
       return [
         t('Cyber Pinball trouve Future Pinball sur ce PC et liste les tables de son dossier Tables ; Start en ajoute une, avec son nom et ses médias.'),
-        t('La partie passe par BAM s’il est installé et revient à la roue quand vous quittez la table ; un appui long sur Exit la ferme.'),
+        t('La partie passe par BAM s’il est installé et revient à la roue quand tu quittes la table ; un appui long sur Exit la ferme.'),
         t('« Trouver une table en ligne » propose aussi ses tables : l’archive reçue est rangée dans le jeu, sans rien écraser.'),
       ];
     },
@@ -288,7 +288,7 @@ export const NEWS: readonly NewsItem[] = [
     id: 'reprise-sans-duplication',
     date: '2026-11-20',
     version: '0.2.1',
-    get title() { return t('Reprendre vos tables sans les dupliquer'); },
+    get title() { return t('Reprendre tes tables sans les dupliquer'); },
     get detail() { return t('Les tables de PinUP Popper, PinballX ou PinballY rejoignent la roue sans être dupliquées sur le disque.'); },
     get more() {
       return [
@@ -305,12 +305,12 @@ export const NEWS: readonly NewsItem[] = [
     id: 'communaute-telephone',
     date: '2026-11-18',
     version: '0.2.0',
-    get title() { return t('La Communauté dans votre téléphone'); },
-    get detail() { return t('Joueurs, profils, groupes, parties instantanées, salons, classements et niveau, comme à la borne.'); },
+    get title() { return t('La Communauté dans ton téléphone'); },
+    get detail() { return t('Joueurs, profils, groupes, parties en direct, salons, classements et niveau, comme à la borne.'); },
     get more() {
       return [
-        t('L’onglet Communauté du téléphone reprend celle de la borne : ouvrez le profil d’un joueur, répondez à une demande d’ami, rejoignez un groupe public, ouvrez une partie instantanée, choisissez votre salon.'),
-        t('Dans Scores : votre niveau et vos badges, les classements de toutes vos tables, et la cloche de l’Activité récente en haut.'),
+        t('L’onglet Communauté du téléphone reprend celle de la borne : ouvre le profil d’un joueur, réponds à une demande d’ami, rejoins un groupe public, ouvre une partie en direct, choisis ton salon.'),
+        t('Dans Scores : ton niveau et tes badges, les classements de toutes tes tables, et la cloche de l’Activité récente en haut.'),
       ];
     },
     get where() { return t('Menu système › Ma borne › Télécommande du téléphone'); },
@@ -321,12 +321,12 @@ export const NEWS: readonly NewsItem[] = [
     id: 'mon-compte',
     date: '2026-11-18',
     version: '0.2.0',
-    get title() { return t('Votre compte vous suit'); },
-    get detail() { return t('Pseudo, niveau, badges et amis : vous retrouvez tout sur un autre PC ou après une réinstallation.'); },
+    get title() { return t('Ton compte te suit'); },
+    get detail() { return t('Pseudo, niveau, badges et amis : tu retrouves tout sur un autre PC ou après une réinstallation.'); },
     get more() {
       return [
-        t('Cyber Pinball garde d’office une copie de secours de votre compte sur ce PC, hors de son dossier : une réinstallation la retrouve et vous propose de la reprendre.'),
-        t('Notez votre code de récupération, 24 mots ou leur QR à photographier, pour retrouver votre compte sur n’importe quel PC. Un mot de passe est possible aussi : votre pseudo devient votre identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.'),
+        t('Cyber Pinball garde d’office une copie de secours de ton compte sur ce PC, hors de son dossier : une réinstallation la retrouve et te propose de la reprendre.'),
+        t('Note ton code de récupération, 24 mots ou leur QR à photographier, pour retrouver ton compte sur n’importe quel PC. Un mot de passe est possible aussi : ton pseudo devient ton identifiant, et le serveur ne garde qu’une copie chiffrée qu’il ne peut pas ouvrir.'),
       ];
     },
     get where() { return t('Menu système › Communauté › Mon profil › Mon compte'); },
@@ -340,7 +340,7 @@ export const NEWS: readonly NewsItem[] = [
     get detail() { return t('Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.'); },
     get more() {
       return [
-        t('Ajoutez un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.'),
+        t('Ajoute un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisis-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.'),
         t('Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.'),
       ];
     },
@@ -352,7 +352,7 @@ export const NEWS: readonly NewsItem[] = [
     id: 'dof-repris',
     date: '2026-11-18',
     version: '0.2.0',
-    get title() { return t('Votre configuration DOF reprise'); },
+    get title() { return t('Ta configuration DOF reprise'); },
     get detail() { return t('Une borne venue d’un autre front-end retrouve ses LED et ses toys, sans rien refaire dans le configtool.'); },
     get more() {
       return [
@@ -369,10 +369,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-17',
     version: '0.1.14',
     get title() { return t('Niveaux'); },
-    get detail() { return t('Vos parties, vos progrès, vos badges et la vie entre joueurs vous font monter de niveau.'); },
+    get detail() { return t('Tes parties, tes progrès, tes badges et la vie entre joueurs te font monter de niveau.'); },
     get more() {
       return [
-        t('Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Votre niveau monte et ne baisse jamais ; votre carte de joueur, en haut de l’écran des tables, le montre avec sa barre.'),
+        t('Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Ton niveau monte et ne baisse jamais ; ta carte de joueur, en haut de l’écran des tables, le montre avec sa barre.'),
         t('Un badge reçu a son moment au retour de la partie, avec son animation et sa musique, et le passage de niveau a ses rayons. « Mon niveau » dit ce qui rapporte des XP et quels badges sont les plus proches.'),
       ];
     },
@@ -383,15 +383,15 @@ export const NEWS: readonly NewsItem[] = [
     id: 'parties-instantanees',
     date: '2026-11-17',
     version: '0.1.14',
-    get title() { return t('Parties instantanées'); },
+    get title() { return t('Parties en direct'); },
     get detail() { return t('Une partie en direct ouverte à tous, qui part d’elle-même dès qu’elle est complète.'); },
     get more() {
       return [
-        t('Choisissez une table et le nombre de joueurs, de 2 à 4 : votre partie s’affiche chez tous les joueurs en ligne, et part toute seule dès qu’elle est complète.'),
-        t('Amis ou non, il suffit d’avoir la même version de la table. Vous êtes prévenu de chaque arrivée, et une partie s’ouvre aussi depuis la fiche d’une table.'),
+        t('Choisis une table et le nombre de joueurs, de 2 à 4 : ta partie s’affiche chez tous les joueurs en ligne, et part toute seule dès qu’elle est complète.'),
+        t('Amis ou non, il suffit d’avoir la même version de la table. Tu es prévenu de chaque arrivée, et une partie s’ouvre aussi depuis la fiche d’une table.'),
       ];
     },
-    get where() { return t('Communauté › Parties instantanées'); },
+    get where() { return t('Communauté › Parties en direct'); },
     reach: { kind: 'community', door: 'instant' },
   },
   {
@@ -399,10 +399,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-17',
     version: '0.1.14',
     get title() { return t('Groupes'); },
-    get detail() { return t('Vos cercles, publics ou privés : une discussion et une table de la semaine, avec son classement.'); },
+    get detail() { return t('Tes cercles, publics ou privés : une discussion et une table de la semaine, avec son classement.'); },
     get more() {
       return [
-        t('Créez un groupe avec vos amis : privé, il ne paraît nulle part et l’on y entre sur invitation ; public, n’importe quel joueur le rejoint d’un appui. Chaque semaine, une table choisie pour tous : Start la lance, et le classement du groupe se remplit tout seul.'),
+        t('Crée un groupe avec tes amis : privé, il ne paraît nulle part et l’on y entre sur invitation ; public, n’importe quel joueur le rejoint d’un appui. Chaque semaine, une table choisie pour tous : Start la lance, et le classement du groupe se remplit tout seul.'),
         t('Chaque membre peut inviter ses amis. Tout passe d’une borne à l’autre, sans serveur : un membre absent reçoit les messages à son retour.'),
       ];
     },
@@ -414,10 +414,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-16',
     version: '0.1.13',
     get title() { return t('Pinball FX sur la roue'); },
-    get detail() { return t('Vos tables Pinball FX, achetées sur Steam ou Epic, à côté de vos tables VPX.'); },
+    get detail() { return t('Tes tables Pinball FX, achetées sur Steam ou Epic, à côté de tes tables VPX.'); },
     get more() {
       return [
-        t('Choisissez les tables que vous possédez : elles rejoignent la roue avec leurs médias, vos collections, vos favoris et vos statistiques.'),
+        t('Choisis les tables que tu possèdes : elles rejoignent la roue avec leurs médias, tes collections, tes favoris et tes statistiques.'),
         t('Un appui long sur Exit ferme le jeu et ramène au front-end. Ce que Pinball FX ne fournit pas (scores, partie avec un ami, réalité virtuelle) reste grisé sur la fiche, avec la raison.'),
       ];
     },
@@ -430,10 +430,10 @@ export const NEWS: readonly NewsItem[] = [
     date: '2026-11-16',
     version: '0.1.13',
     get title() { return t('Retours et propositions'); },
-    get detail() { return t('Les idées des joueurs, les plus demandées en tête : votez, ou proposez la vôtre.'); },
+    get detail() { return t('Les idées des joueurs, les plus demandées en tête : vote, ou propose la tienne.'); },
     get more() {
       return [
-        t('Un tableau public des idées et des problèmes signalés par les joueurs. Votez pour une proposition, ou publiez la vôtre au clavier à l’écran ou au téléphone : les propositions proches s’affichent pendant que vous écrivez.'),
+        t('Un tableau public des idées et des problèmes signalés par les joueurs. Vote pour une proposition, ou publie la tienne au clavier à l’écran ou au téléphone : les propositions proches s’affichent pendant que tu écris.'),
         t('Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.'),
       ];
     },
@@ -448,7 +448,7 @@ export const NEWS: readonly NewsItem[] = [
     get detail() { return t('Les joueurs en ligne du monde entier, et un salon de discussion par pays.'); },
     get more() {
       return [
-        t('Un médaillon de la roue ouvre la Communauté : les joueurs en ligne, amis ou non, avec leur drapeau ; vos messages ; les classements de toutes vos tables.'),
+        t('Un médaillon de la roue ouvre la Communauté : les joueurs en ligne, amis ou non, avec leur drapeau ; tes messages ; les classements de toutes tes tables.'),
         t('Chaque pays a son salon, plus « Monde » : une ligne par message, avec l’heure, le drapeau et le pseudo de chacun. On écrit avec des phrases d’un appui, le clavier à l’écran ou le téléphone.'),
       ];
     },

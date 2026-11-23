@@ -15,7 +15,7 @@ export function importSpaceSection(space: ImportSpace | undefined, before: Row[]
     d.short
       ? {
           text: t('Pas assez de place sur {disk} : il faut {need}, {free} libres', { disk: d.root, need: formatSize(d.need + IMPORT_SPACE_MARGIN), free: formatSize(d.free ?? 0) }),
-          detail: t('{copied} à copier, et {margin} gardé libre pour Windows. Libérez de la place sur ce disque, ou choisissez moins de tables.', { copied: formatSize(d.need), margin: formatSize(IMPORT_SPACE_MARGIN) }),
+          detail: t('{copied} à copier, et {margin} gardé libre pour Windows. Libère de la place sur ce disque, ou choisis moins de tables.', { copied: formatSize(d.need), margin: formatSize(IMPORT_SPACE_MARGIN) }),
           tone: 'error',
         }
       : {

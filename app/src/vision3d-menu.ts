@@ -110,14 +110,14 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
         readiness.ready
           ? { icon: 'check', text: t('{sensor} prête', { sensor: readiness.label }), ...(readiness.note && { detail: readiness.note }), tone: 'ok' as const }
           : { icon: 'alert', text: readiness.reason, tone: 'warning' as const },
-        { icon: 'eye', text: vision3d.mode === 'on' ? t('Vision 3D activée : la perspective des tables suit votre tête') : t('Vision 3D désactivée'), tone: vision3d.mode === 'on' ? ('ok' as const) : ('quiet' as const) },
+        { icon: 'eye', text: vision3d.mode === 'on' ? t('Vision 3D activée : la perspective des tables suit ta tête') : t('Vision 3D désactivée'), tone: vision3d.mode === 'on' ? ('ok' as const) : ('quiet' as const) },
       ];
       const configuration = loadCabinet(loc.dataDir);
       const calibrated = configuration ? vision3d.neutral[configuration.id] : undefined;
       const progress = headTracker.calibrationProgress;
       rows.push(
         progress !== undefined
-          ? { icon: 'pin', text: t('Calibrage : restez immobile en position de jeu… {p} %', { p: Math.round(progress * 100) }), tone: 'info' as const, progress: { value: progress, tone: 'info' as const } }
+          ? { icon: 'pin', text: t('Calibrage : reste immobile en position de jeu… {p} %', { p: Math.round(progress * 100) }), tone: 'info' as const, progress: { value: progress, tone: 'info' as const } }
           : vision3dCalibrationDone
             ? { icon: 'pin', text: t('Position de jeu enregistrée pour cette configuration'), tone: 'ok' as const }
             : calibrated
@@ -135,10 +135,10 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
               ? {
                   icon: 'pulse',
                   text: t('Essai : tête vue à {d} m', { d: (last.z / 100).toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR', { maximumFractionDigits: 2 }) }),
-                  detail: t('{x} cm à droite, {y} cm en hauteur (depuis le capteur) · penchez-vous : les valeurs suivent', { x: Math.round(last.x), y: Math.round(last.y) }),
+                  detail: t('{x} cm à droite, {y} cm en hauteur (depuis le capteur) · penche-toi : les valeurs suivent', { x: Math.round(last.x), y: Math.round(last.y) }),
                   tone: 'ok' as const,
                 }
-              : { icon: 'pulse', text: vision3dTest.seen ? t('Essai : tête perdue, revenez devant le capteur') : t('Essai : capteur allumé, mettez-vous devant lui…'), tone: 'info' as const },
+              : { icon: 'pulse', text: vision3dTest.seen ? t('Essai : tête perdue, reviens devant le capteur') : t('Essai : capteur allumé, mets-toi devant lui…'), tone: 'info' as const },
         );
       }
       const actions: { label: string; detail?: string; icon: IconName; run: () => void }[] = [];
@@ -157,7 +157,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
         });
         actions.push({
           label: t('Calibrer la position de jeu'),
-          detail: t('Mettez-vous en position de jeu, regardez le milieu du plateau et ne bougez plus pendant deux secondes'),
+          detail: t('Mets-toi en position de jeu, regarde le milieu du plateau et ne bouge plus pendant deux secondes'),
           icon: 'pin',
           run: () => calibrateVision3d(readiness.source),
         });
@@ -175,7 +175,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
         });
         actions.push({
           label: vision3dTest ? t('Arrêter l’essai') : t('Tester le capteur'),
-          detail: vision3dTest ? undefined : t('Sans lancer de table : la position de votre tête, en direct, pendant {s} s', { s: VISION3D_TEST_MS / 1000 }),
+          detail: vision3dTest ? undefined : t('Sans lancer de table : la position de ta tête, en direct, pendant {s} s', { s: VISION3D_TEST_MS / 1000 }),
           icon: 'pulse',
           run: () => (vision3dTest ? (stopVision3dTest(), openVision3dScreen(library.cursor())) : startVision3dTest(readiness.source)),
         });
@@ -188,7 +188,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
       if (!readiness.ready && readiness.memoryIntegrity) {
         actions.push({
           label: t('Ouvrir « Isolation du noyau »'),
-          detail: t('Dans Sécurité Windows : vous décidez ; puis redémarrez le PC'),
+          detail: t('Dans Sécurité Windows : tu décides ; puis redémarre le PC'),
           icon: 'lock',
           run: () => {
             console.log('Vision 3D : ouverture de « Isolation du noyau » (Sécurité Windows).'); // i18n-ignore : journal
@@ -203,7 +203,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
       return {
         heading: SYSTEM_ITEMS.vision3d.label,
         icon: SYSTEM_ITEMS.vision3d.icon,
-        lead: t('La perspective des tables suit votre tête, comme une fenêtre ouverte sur le plateau. Une webcam suffit ; une Kinect pour Xbox 360 vise seule votre tête. Les images restent sur ce PC.'),
+        lead: t('La perspective des tables suit ta tête, comme une fenêtre ouverte sur le plateau. Une webcam suffit ; une Kinect pour Xbox 360 vise seule ta tête. Les images restent sur ce PC.'),
         sections: [{ rows }],
         actions,
         back,
@@ -288,7 +288,7 @@ export function createVision3dMenu(ctx: Vision3dMenuContext) {
     if (!file) return;
     let installed = false;
     pointAtElevationPrompt();
-    await library.task(t('Windows demande son accord : choisissez « Oui » à la souris (le pointeur est posé sur sa fenêtre) ou au clavier, Alt+O'), async () => {
+    await library.task(t('Windows demande son accord : choisis « Oui » à la souris (le pointeur est posé sur sa fenêtre) ou au clavier, Alt+O'), async () => {
       const result = await installKinectDriver(file!);
       console.log(`Vision 3D : pilote de la Kinect ${result.ok ? 'installé' : `pas installé (${result.reason})`}.`); // i18n-ignore : journal
       if (!result.ok) throw new Error(result.cancelled ? t('Autorisation refusée dans la fenêtre de Windows : rien n’a changé') : t('Pilote de la Kinect pas installé : {reason}', { reason: result.reason }));

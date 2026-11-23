@@ -87,7 +87,7 @@ export function restoreButtons(): ButtonsReset | undefined {
 
 /** Ce que fait la remise, dit avant de la confirmer. */
 export function resetConsequences(): string {
-  return t('Chaque bouton de la borne, du jeu comme de l’interface, reprend la touche que les encodeurs envoient d’office : Maj pour les flippers, 1 pour Start, Échap pour Exit, 5 pour le crédit, Entrée pour le lanceur. À choisir seulement si vos boutons envoient ces touches de clavier. Le relevé actuel est gardé : « Rétablir les boutons d’avant » le remet.');
+  return t('Chaque bouton de la borne, du jeu comme de l’interface, reprend la touche que les encodeurs envoient d’office : Maj pour les flippers, 1 pour Start, Échap pour Exit, 5 pour le crédit, Entrée pour le lanceur. À choisir seulement si tes boutons envoient ces touches de clavier. Le relevé actuel est gardé : « Rétablir les boutons d’avant » le remet.');
 }
 
 /** Compte rendu en clair, pour le menu, les réglages et la console. */

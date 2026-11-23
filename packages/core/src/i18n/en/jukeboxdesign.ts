@@ -8,7 +8,7 @@ export const messages: Record<string, string> = {
   // app/renderer/jukebox.js (affiche)
   'La musique habite ici': 'Music lives here',
   'Ouvrir le Juke-box': 'Open the Juke-box',
-  'Vos playlists prennent la scène.': 'Your playlists take the stage.',
+  'Tes playlists prennent la scène.': 'Your playlists take the stage.',
   // app/src/menu-settings.ts
   'Visualiseur du Juke-box : {mode}': 'Juke-box visualiser: {mode}',
   'Le DMD prend les couleurs de la pochette du morceau, en dégradé ; multicolore sans pochette (Start : changer)': "The DMD takes on the colours of the track's cover, as a gradient; multicolour when there is no cover (Start: change)",

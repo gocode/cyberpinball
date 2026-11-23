@@ -78,6 +78,8 @@ export interface CommunityHubHost {
   library: { openCustom(build: () => Built, at?: number): void; openSystemGroupFrom(group: 'modifier-profil' | 'confidentialite' | 'compte', back: () => void): void };
   zoneKeys(): readonly string[];
   net: Pick<SocialNet, 'state' | 'status' | 'publicCard' | 'friendsOf' | 'cardFirstSeen' | 'avatarFile' | 'request' | 'accept' | 'decline' | 'presenceOf' | 'like' | 'likedByMe' | 'country'>;
+  /** « Régler le partage » : Partage et réseau (Menu système), le retour ramène ici. */
+  openSharing?(back: () => void): void;
   /** Mon niveau (level-tracker.ts). */
   myLevel(): number;
   /** Les joueurs en ligne, amis compris (community-menu.ts), et tous les joueurs connus. */
@@ -267,7 +269,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const avatars = keys.slice(0, MUTUAL_SHOWN).map((k) => face(k, s.friends.find((f) => f.key === k)?.name ?? '?'));
     return { mutual: { avatars, note: tn(keys.length, '{n} ami en commun', '{n} amis en commun') } };
   }
-  /** Un joueur suggéré en tuile : pourquoi, et « Ajouter » d'un appui (+25 XP à l'amitié acceptée). */
+  /** Un joueur suggéré en tuile : pourquoi, « Voir le profil » d'abord, puis « Ajouter en ami » (+25 XP à l'amitié acceptée). */
   function suggestedTile(p: OnlinePlayer, reason: SuggestReason, here: () => void, section: string): HubCardSpec {
     const lv = levelChip(levelOf(p.key));
     const sent = net.state().outgoing.some((r) => r.key === p.key);
@@ -282,10 +284,13 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     return {
       ...base,
       ...(why ? { detail: why } : {}),
+      // Voir qui c'est avant de l'ajouter : le premier arrêt ouvre son profil, le second envoie la demande.
       buttons: [
+        { label: t('Voir le profil'), key: 'profile', icon: 'friend-list', run: () => host.profile.open(p.key, here) },
         {
-          label: t('Ajouter'),
+          label: t('Ajouter en ami'),
           key: 'add',
+          xp: xpText(XP.friend),
           primary: true,
           run: () => {
             net.request({ key: p.key, name: p.name });
@@ -363,7 +368,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   function waitingSection(max: number, here: () => void): HubSectionSpec | undefined {
     const list = host.messages.waiting().slice(0, max);
     if (!list.length) return undefined;
-    return { title: t('Ils vous attendent'), ...(said?.section === 'threads' ? { note: said.text } : {}), layout: 'cards', column: 'left', cards: list.map((x) => threadCard(x, here)) };
+    return { title: t('Ils t’attendent'), ...(said?.section === 'threads' ? { note: said.text } : {}), layout: 'cards', column: 'left', cards: list.map((x) => threadCard(x, here)) };
   }
 
   // ---------- Salon ----------
@@ -374,7 +379,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     const peek = problem ? undefined : host.room.peek();
     const name = peek?.name ?? t('Salon');
     const open = { label: t('Ouvrir le salon'), key: 'open', run: () => host.room.open(here) };
-    if (!peek) return { title: name, layout: 'list', column: 'right', cards: [{ key: 'room:off', icon: 'globe', title: t('Salon de votre pays'), detail: problem!, quiet: true }] };
+    if (!peek) return { title: name, layout: 'list', column: 'right', cards: [{ key: 'room:off', icon: 'globe', title: t('Salon de ton pays'), detail: problem!, quiet: true }] };
     const phrases = peek.blocked
       ? []
       : peek.phrases.slice(0, 3).map((text, i) => ({
@@ -436,7 +441,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
             primary: true,
             run: () => {
               net.like(x.key, x.e.id, true);
-              said = { section: 'news', text: t('{name} a reçu votre « J’aime »', { name: x.name }) };
+              said = { section: 'news', text: t('{name} a reçu ton « J’aime »', { name: x.name }) };
               here();
             },
           },
@@ -488,11 +493,11 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     host.library.openCustom(() => ({
       heading: t('Inviter quelqu’un'),
       icon: 'friend-add',
-      subheading: t('Faites découvrir Cyber Pinball'),
+      subheading: t('Fais découvrir Cyber Pinball'),
       remote: { phase: 'offer' as const, qr: qrRows(url), url, title: '', line: '' },
       remoteWording: {
         offer: t('Cyber Pinball sur son téléphone'),
-        offerLines: [t('La personne vise ce code avec son téléphone : la page de téléchargement s’ouvre.'), t('À son arrivée, elle dit que c’est vous : {xp} pour vous à sa première partie.', { xp: xpText(XP.invited) }), url.replace(/^https?:\/\//, '')],
+        offerLines: [t('La personne vise ce code avec son téléphone : la page de téléchargement s’ouvre.'), t('À son arrivée, elle dit que c’est toi : {xp} pour toi à sa première partie.', { xp: xpText(XP.invited) }), url.replace(/^https?:\/\//, '')],
       },
       sections: [],
       actions: [{ label: t('Retour'), icon: 'back', run: back }],
@@ -503,14 +508,14 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   function inviteSection(here: () => void, column: 'left' | 'right'): HubSectionSpec {
     const n = host.invite.count();
     return {
-      title: t('Faites découvrir Cyber Pinball'),
+      title: t('Fais découvrir Cyber Pinball'),
       layout: 'list',
       column,
       cards: [
         {
           key: 'invite',
           icon: 'friend-add',
-          title: n ? tn(n, '{n} personne invitée', '{n} personnes invitées') : t('Invitez un ami à installer Cyber Pinball'),
+          title: n ? tn(n, '{n} personne invitée', '{n} personnes invitées') : t('Invite un ami à installer Cyber Pinball'),
           detail: t('{xp} par personne invitée, à sa première partie', { xp: xpText(XP.invited) }),
           buttons: [{ label: t('Inviter quelqu’un'), key: 'open', primary: true, run: () => openInvite(here) }],
         },
@@ -570,7 +575,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
   function profileBand(here: () => void): HubSectionSpec {
     const s = net.state();
     const lv = levelChip(host.myLevel());
-    return { title: t('Mon profil'), layout: 'cards', column: 'right', cards: [{ key: 'mine', avatar: face(me(), s.name), title: s.name, ...(lv ? { level: lv } : {}), detail: t('Ce que voient les autres joueurs, et qui a aimé votre activité'), run: () => host.profile.openMine(here) }] };
+    return { title: t('Mon profil'), layout: 'cards', column: 'right', cards: [{ key: 'mine', avatar: face(me(), s.name), title: s.name, ...(lv ? { level: lv } : {}), detail: t('Ce que voient les autres joueurs, et qui a aimé ton activité'), run: () => host.profile.openMine(here) }] };
   }
 
   /** L'accueil : la bande de chaque onglet en récapitulatif, puis ce qui bouge. */
@@ -629,7 +634,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
             ...mutualStrip(r.key),
             ...sharedStrip(r.key),
             buttons: [
-              { label: t('Accepter'), key: 'accept', xp: xpText(XP.friend), primary: true, run: () => { net.accept(r.key); said = { section: 'requests', text: t('{name} est maintenant votre ami', { name: r.name }) }; here(); } },
+              { label: t('Accepter'), key: 'accept', xp: xpText(XP.friend), primary: true, run: () => { net.accept(r.key); said = { section: 'requests', text: t('{name} est maintenant ton ami', { name: r.name }) }; here(); } },
               { label: t('Son profil'), key: 'profile', run: () => host.profile.open(r.key, here) },
               { label: t('Refuser'), key: 'decline', run: () => { net.decline(r.key); said = { section: 'requests', text: t('Demande de {name} refusée', { name: r.name }) }; here(); } },
             ],
@@ -690,6 +695,13 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     ];
   }
 
+  /** Partage coupé : rien d'autre à montrer que de quoi le régler, sur place (jamais un chemin de réglage à retrouver). */
+  function sharingOffSections(reopen: () => void): HubSectionSpec[] {
+    const cards: HubCardSpec[] = [{ key: 'sharing-off', icon: 'network', title: t('Partage désactivé : personne ne te voit, tu ne vois personne'), detail: t('Active le partage pour voir les joueurs, écrire et jouer avec eux'), quiet: true }];
+    const choices: HubCardSpec[] = host.openSharing ? [{ key: 'fix-sharing', icon: 'network', title: t('Régler le partage'), detail: t('Activer le partage, le réseau local et la présence publique'), run: () => host.openSharing!(reopen) }] : [];
+    return [{ layout: 'list', cards, choices }];
+  }
+
   const TABS = (): HubTabSpec[] => {
     const s = net.state();
     const waiting = host.messages.waiting();
@@ -723,8 +735,7 @@ export function createCommunityHub(host: CommunityHubHost): CommunityHub {
     if (tab !== last) said = undefined;
     last = tab;
     const spec: HubSpec = { heading: t('Communauté'), icon: 'friends', medallion: 'communaute', title: t('COMMUNAUTÉ'), facts: facts(), tabs: TABS(), sections: [] };
-    if (!net.state().enabled)
-      return { ...spec, sections: [], empty: { title: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Le réactiver : Menu système › Communauté › Réglages de la communauté › Partage et réseau') } };
+    if (!net.state().enabled) return { ...spec, sections: sharingOffSections(reopen) };
     // Hors Accueil, une liste parcourue aux flippers, sans blocs (règle du mainteneur, 22/11/2026) : les blocs
     // restent aux récapitulatifs de l'Accueil.
     switch (tab) {

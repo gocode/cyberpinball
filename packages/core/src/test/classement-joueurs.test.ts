@@ -116,23 +116,23 @@ test('écran « Joueurs » : trois portées, la semaine d’abord ; flippers pou
   menu.open(() => undefined);
   const home = screen!();
   const door = home.actions.find((a) => a.label === 'Joueurs')!;
-  assert.match(door.detail ?? '', /Vous : niveau \d+ · 3ᵉ au monde cette semaine · 3ᵉ dans votre pays/);
+  assert.match(door.detail ?? '', /Toi : niveau \d+ · 3ᵉ au monde cette semaine · 3ᵉ dans ton pays/);
   door.run();
   let b = screen!();
   assert.equal(b.heading, 'Joueurs');
   assert.equal(b.subheading, 'National · Cette semaine');
   assert.deepEqual(b.scoreboard?.scopes?.map((s) => s.label), ['Amis', 'National', 'Mondial']);
   assert.deepEqual(b.scoreboard?.tabs.map((t) => [t.label, t.count]), [['Cette semaine', '3 joueurs'], ['Tout temps', '3 joueurs']]);
-  assert.deepEqual(b.scoreboard?.lines.map((l) => [l.rank, l.name]), [['1', 'Bille'], ['2', 'Aster'], ['3', 'Moi (vous)']]);
+  assert.deepEqual(b.scoreboard?.lines.map((l) => [l.rank, l.name]), [['1', 'Bille'], ['2', 'Aster'], ['3', 'Moi (toi)']]);
   assert.deepEqual(b.scoreboard?.lines.map((l) => /^\d.?\d* XP$/u.test(l.score)), [true, true, true]);
   assert.match(b.scoreboard?.lines[0]!.score ?? '', /^2.015 XP$/u);
   assert.match(b.scoreboard?.lines[0]!.when ?? '', /au total$/);
-  assert.match(b.scoreboard?.position ?? '', /^National · Cette semaine : votre place, 3 sur 3 joueurs$/);
+  assert.match(b.scoreboard?.position ?? '', /^National · Cette semaine : ta place, 3 sur 3 joueurs$/);
   // Flipper : tout temps ; MagnaSave droite : le monde.
   assert.ok(b.keys?.({ code: 'ShiftRight' }));
   b = screen!();
   assert.equal(b.subheading, 'National · Tout temps');
-  assert.deepEqual(b.scoreboard?.lines.map((l) => l.name), ['Aster', 'Bille', 'Moi (vous)']);
+  assert.deepEqual(b.scoreboard?.lines.map((l) => l.name), ['Aster', 'Bille', 'Moi (toi)']);
   assert.match(b.scoreboard?.lines[0]!.when ?? '', /cette semaine$/);
   assert.ok(b.keys?.({ code: 'ControlRight' }));
   assert.equal(screen!().subheading, 'Mondial · Tout temps');

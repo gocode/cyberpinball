@@ -331,7 +331,7 @@ function renderLibrary(v) {
     // Pastille rouge : cette entrée attend l'utilisateur (une mise à jour disponible…). En haut
     // à droite de son icône, sinon après le libellé.
     const dot = a.attention ? libEl('span', 'lib-attention') : undefined;
-    if (dot) dot.title = t('Attend votre intervention');
+    if (dot) dot.title = t('Attend ton intervention');
     if (a.icon || a.flag) {
       const glyph = libEl('span', 'lib-action-glyph');
       // Le choix du pays : le drapeau de chacun dans la colonne des icônes.
@@ -376,7 +376,7 @@ function renderLibrary(v) {
     qr.className = 'lib-actions-qr-code';
     qr.setAttribute('aria-label', v.actionQr.title || t('QR code de la page'));
     // `hint` : un QR qui n'est pas une page (code de récupération du compte) dit lui-même à quoi il sert.
-    li.append(libEl('p', 'lib-actions-qr-title', v.actionQr.title), qr, libEl('p', 'lib-actions-qr-url', v.actionQr.url), libEl('p', 'lib-actions-qr-hint', v.actionQr.hint || t('Start l’ouvre ici. Visez ce code pour l’ouvrir sur votre téléphone.')));
+    li.append(libEl('p', 'lib-actions-qr-title', v.actionQr.title), qr, libEl('p', 'lib-actions-qr-url', v.actionQr.url), libEl('p', 'lib-actions-qr-hint', v.actionQr.hint || t('Start l’ouvre ici. Vise ce code pour l’ouvrir sur ton téléphone.')));
     actions.append(li);
   }
   body.append(actions);
@@ -1217,7 +1217,7 @@ function renderRuleVideo(h) {
   const qr = remoteQr(h.qr);
   qr.className = 'rule-video-qr';
   qr.setAttribute('aria-label', t('QR code de la vidéo'));
-  side.append(qr, libEl('p', 'rule-video-hint', t('Visez ce code avec votre téléphone pour regarder la vidéo.')));
+  side.append(qr, libEl('p', 'rule-video-hint', t('Vise ce code avec ton téléphone pour regarder la vidéo.')));
   box.append(shot, side, helpSource(h));
   return box;
 }
@@ -1806,7 +1806,7 @@ function placeDropHint() {
     hint.className = 'drop-hint';
     root.append(hint);
   }
-  const text = root.querySelector('.lib-media') ? t('Déposez le fichier du média ici') : t('Déposez les fichiers de la table ici');
+  const text = root.querySelector('.lib-media') ? t('Dépose le fichier du média ici') : t('Dépose les fichiers de la table ici');
   if (hint.textContent !== text) hint.textContent = text;
 }
 // Créé au premier geste seulement : le rendu des tests (linkedom) n'a pas de MutationObserver.

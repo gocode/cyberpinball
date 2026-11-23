@@ -45,15 +45,15 @@ export function collectionsPoster(collections: Pick<CollectionsMenu, 'list' | 'c
   const named = others.slice(0, POSTER_OTHERS).map((c) => c.label);
   const more = others.length - named.length;
   return {
-    edition: t('Toutes vos tables, rangées'),
-    label: t('Votre borne. Vos tables.'),
+    edition: t('Toutes tes tables, rangées'),
+    label: t('Ta borne. Tes tables.'),
     title: t('COLLECTIONS'),
     stats: [tn(list.length, '{n} collection', '{n} collections'), tn(all.tables.length, '{n} table', '{n} tables')].join(' · '),
     empty: false,
     eyebrow: t('Affichée sur la roue'),
     heading: `${current.label} · ${tn(current.tables.length, '{n} table', '{n} tables')}`,
     ...(named.length ? { detail: t('Aussi : {names}', { names: [...named, ...(more ? [`+${more}`] : [])].join(', ') }) } : {}),
-    tagline: t('Favoris, fabricants, décennies, les vôtres.'),
+    tagline: t('Favoris, fabricants, décennies, les tiennes.'),
     start: t('Start'),
     open: t('Choisir une collection'),
   };
@@ -246,7 +246,7 @@ export function tableCollectionsAction(host: {
     const inside = host.collections.mine().filter((m) => host.collections.holds(m.id, table));
     return {
       label: t('Ajouter à une collection…'),
-      detail: inside.length ? t('Dans : {names}', { names: inside.map((m) => m.name).join(', ') }) : t('Vos collections personnelles'),
+      detail: inside.length ? t('Dans : {names}', { names: inside.map((m) => m.name).join(', ') }) : t('Tes collections personnelles'),
       icon: 'list',
       key: 'collections',
       run: () => {

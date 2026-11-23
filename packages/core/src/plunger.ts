@@ -426,7 +426,7 @@ export function proposedAnalog(axis: DetectedAxis): CabinetAnalog {
  */
 export function restProblem(rest: number): string | undefined {
   if (Math.abs(rest) <= 0.1) return undefined;
-  return t('Au repos, l’axe vaut {value} % au lieu de 0 : VPX croira le lanceur tiré. Calibrez le lanceur sur la carte (bouton de calibration du Pinscape, ou son outil de configuration).', { value: Math.round(rest * 100) });
+  return t('Au repos, l’axe vaut {value} % au lieu de 0 : VPX croira le lanceur tiré. Calibre le lanceur sur la carte (bouton de calibration du Pinscape, ou son outil de configuration).', { value: Math.round(rest * 100) });
 }
 
 // ---------------------------------------------------------------------------

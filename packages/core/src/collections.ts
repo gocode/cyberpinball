@@ -112,7 +112,7 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
           ? t('Aucun ami en ligne pour l’instant')
           : friends.state === 'searching'
             ? t('Recherche des amis…')
-            : t('Aucune de vos tables chez un ami en ligne, dans la même version');
+            : t('Aucune de tes tables chez un ami en ligne, dans la même version');
 
   const fixed: Collection<T>[] = [
     { id: 'all', group: 'fixed', label: t('Toutes les tables'), icon: 'tables', tables: [...tables], ...(tables.length ? {} : { reason: t('Aucune table installée') }) },
@@ -139,7 +139,7 @@ export function buildCollections<T extends Shelved & { id?: string }>(tables: re
       label: t('Jamais jouées'),
       icon: 'sparkle',
       tables: unplayed,
-      ...(unplayed.length ? {} : { reason: t('Toutes vos tables ont déjà été jouées') }),
+      ...(unplayed.length ? {} : { reason: t('Toutes tes tables ont déjà été jouées') }),
     },
     {
       id: 'friends',

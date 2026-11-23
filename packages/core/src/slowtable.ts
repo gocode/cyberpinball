@@ -29,7 +29,7 @@ export function slowTableFinding(logsDir: string | undefined, tableFile: string)
   // Autres programmes de borne ouverts pendant cette partie (coexistence.ts, programsDuringGame) : une cause à écarter d'abord.
   if (last.others?.length)
     parts.push(
-      tn(last.others.length, '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Fermez-le, ou retirez-le du démarrage de Windows.', '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Fermez-les, ou retirez-les du démarrage de Windows.', { names: formatList(last.others) }),
+      tn(last.others.length, '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Ferme-le, ou retire-le du démarrage de Windows.', '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Ferme-les, ou retire-les du démarrage de Windows.', { names: formatList(last.others) }),
     );
   parts.push(t('Chaque partie est mesurée : ce constat disparaît dès qu’une partie tient la cadence.'));
   return {
@@ -48,7 +48,7 @@ function screenCapFinding(last: TableCadenceEntry, cap: NonNullable<TableCadence
   const parts = [
     t('À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.', { date: formatDateTime(new Date(last.at)), fps: num(last.fps), target: num(last.targetFps ?? 60) }),
     t('La table n’y est pour rien : VPX dessine aussi sur l’écran « {screen} », réglé à {hz} Hz, et sa version 10.8.1 cale toute la partie sur l’écran le plus lent, playfield compris.', { screen: cap.display, hz: num(cap.hz) }),
-    t('Choisissez la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.'),
+    t('Choisis la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.'),
   ];
   if (last.stutters) parts.push(tn(last.stalls, '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', '{n} arrêts de l’image d’au moins un dixième de seconde (le plus long : {max} ms).', { n: last.stalls, max: last.max }));
   return {

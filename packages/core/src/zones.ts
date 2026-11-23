@@ -588,7 +588,7 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
     if (zone && !isValidZone(zone)) {
       findings.push({
         severity: 'warning',
-        message: t("{role} : zone d'écran invalide dans cabinet.json ({zone}). L'écran entier est utilisé ; refaites la disposition des écrans.", { role: label(role), zone: JSON.stringify(zone) }),
+        message: t("{role} : zone d'écran invalide dans cabinet.json ({zone}). L'écran entier est utilisé ; refais la disposition des écrans.", { role: label(role), zone: JSON.stringify(zone) }),
       });
     }
   }
@@ -609,7 +609,7 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
       findings.push({
         severity: accidental ? 'warning' : 'info',
         message: accidental
-          ? t("{first} et {second} se recouvrent sur l'écran « {screen} » : {front}. Refaites la disposition des écrans pour leur donner chacun sa zone.", { first: label(a), second: label(b), screen, front })
+          ? t("{first} et {second} se recouvrent sur l'écran « {screen} » : {front}. Refais la disposition des écrans pour leur donner chacun sa zone.", { first: label(a), second: label(b), screen, front })
           : t("{first} et {second} se chevauchent sur l'écran « {screen} » : {front}.", { first: label(a), second: label(b), screen, front }),
       });
     }
@@ -620,7 +620,7 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
     if (sameZone(zones[role], zones.playfield)) {
       findings.push({
         severity: 'warning',
-        message: t('{role} incrusté sur tout le playfield : la table sera cachée derrière. Refaites la disposition des écrans pour lui donner une zone.', { role: label(role) }),
+        message: t('{role} incrusté sur tout le playfield : la table sera cachée derrière. Refais la disposition des écrans pour lui donner une zone.', { role: label(role) }),
       });
     }
   }

@@ -150,7 +150,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
             const said = gainText(g, badgeLabel);
             return { icon: GAIN_ICON[g.kind], text: said.text, ...(said.detail ? { detail: said.detail } : {}), aside: `+${fmt(g.xp)}`, tone: 'ok' as const };
           })
-        : [{ text: t('Rien pour l’instant : jouez une partie jusqu’au bout'), tone: 'quiet' }],
+        : [{ text: t('Rien pour l’instant : joue une partie jusqu’au bout'), tone: 'quiet' }],
     });
     const week = weekPreview(state, now());
     sections.push({
@@ -214,7 +214,7 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
       heading: t('Mes badges'),
       icon: 'medal',
       subheading: t('{n} sur {total}', { n: s.badges.length, total: BADGES.length }),
-      lead: t('Gagnés sur cette borne à partir des parties, des records, des classements et de la vie entre joueurs. Visibles sur votre profil public.'),
+      lead: t('Gagnés sur cette borne à partir des parties, des records, des classements et de la vie entre joueurs. Visibles sur ton profil public.'),
       sections,
       actions: [{ label: t('Retour'), icon: 'back', run: back }],
       back,
@@ -248,14 +248,14 @@ export function createLevelMenu(host: LevelMenuHost): LevelMenu {
               row('star', t('Meilleur score de la table'), `${XP.champion}`),
               row('friends', t('Partie en ligne menée au bout'), `${XP.live}`, t('+{n} en cas de victoire', { n: XP.liveWin })),
               row('trophy', t('Défi gagné'), `${XP.challengeWin}`, tn(CHALLENGE_WINS_PER_DAY, 'Au plus {n} défi par jour', 'Au plus {n} défis par jour')),
-              row('rocket', t('Votre partie rejointe'), `${XP.hosted}`, t('Une fois par groupe de joueurs : rejouer avec les mêmes ne rapporte plus')),
+              row('rocket', t('Ta partie rejointe'), `${XP.hosted}`, t('Une fois par groupe de joueurs : rejouer avec les mêmes ne rapporte plus')),
             ],
           },
           {
             title: t('Classements de la semaine · versés le mardi'),
             rows: [
               row('globe', t('Monde'), places('world'), t('Dix joueurs classés au moins')),
-              row('language', t('Votre pays'), places('country'), t('Cinq joueurs classés au moins')),
+              row('language', t('Ton pays'), places('country'), t('Cinq joueurs classés au moins')),
               row('friend-list', t('Entre amis'), places('friends'), t('Trois joueurs classés au moins')),
             ],
           },

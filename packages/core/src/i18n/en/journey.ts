@@ -3,7 +3,7 @@
 // partie). Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
   // packages/core/src/journey.ts
-  'Protégée par le droit d’auteur : ne la récupérez que si vous y avez droit.': 'Protected by copyright: only get it if you are entitled to it.',
+  'Protégée par le droit d’auteur : ne la récupère que si tu y as droit.': 'Protected by copyright: only get it if you are entitled to it.',
   'Réparé sur place ; ce qui est retiré part dans la corbeille': 'Fixed in place; anything removed goes to the recycle bin',
   'J’ai déjà le fichier': 'I already have the file',
   'Le glisser sur cet écran, ou le choisir sur ce PC': 'Drop it on this screen, or pick it on this PC',
@@ -11,9 +11,9 @@ export const messages: Record<string, string> = {
   'Installer le fichier reçu': 'Install the received file',
   'Installer les {n} fichiers reçus': 'Install the {n} received files',
   'Plan, puis vérification de la table': 'Plan, then the table is checked',
-  'Page ouverte le {date} sur {site} : téléchargez-y le fichier, il sera rattaché à cette table tout seul.': 'Page opened on {date} on {site}: download the file there, it will be attached to this table by itself.',
+  'Page ouverte le {date} sur {site} : télécharges-y le fichier, il sera rattaché à cette table tout seul.': 'Page opened on {date} on {site}: download the file there, it will be attached to this table by itself.',
   'Rouvrir la page : {label}': 'Reopen the page: {label}',
-  'Si vous l’avez téléchargé dans votre propre navigateur': 'If you downloaded it in your own browser',
+  'Si tu l’as téléchargé dans ton propre navigateur': 'If you downloaded it in your own browser',
   'Installer Visual Pinball X': 'Install Visual Pinball X',
   'Téléchargé depuis GitHub et vérifié': 'Downloaded from GitHub and verified',
   'Configurer la borne': 'Set up the cabinet',
@@ -30,15 +30,15 @@ export const messages: Record<string, string> = {
   'Présente : la table la trouve.': 'Present: the table finds it.',
   'Révision voisine {neighbour} chargée à la place de {rom}, par un alias.': 'Neighbouring revision {neighbour} loaded instead of {rom}, through an alias.',
   'Dans la bibliothèque de ROM ; la table la trouve par le dossier commun de PinMAME.': 'In the ROM library; the table finds it through PinMAME’s shared folder.',
-  'La table ne démarre pas sans {rom}.zip. Ouvrez sa page sur {site}, connectez-vous et téléchargez-la : elle sera rattachée à cette table, puis installée.':
+  'La table ne démarre pas sans {rom}.zip. Ouvre sa page sur {site}, connecte-toi et télécharge-la : elle sera rattachée à cette table, puis installée.':
     'The table won’t start without {rom}.zip. Open its page on {site}, sign in and download it: it will be attached to this table, then installed.',
   'La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. {neighbour}.zip, du même jeu, est déjà sur la borne : un alias peut la faire charger à sa place.':
     'The table won’t start without {rom}.zip, and the VPS database knows no link for it. {neighbour}.zip, from the same game, is already on the cabinet: an alias can load it instead.',
   'La table ne démarre pas sans {rom}.zip, que la base VPS ne propose pas. Elle donne {neighbour}, une autre révision du même jeu : un alias la fera charger à la place.':
     'The table won’t start without {rom}.zip, which the VPS database doesn’t offer. It gives {neighbour}, another revision of the same game: an alias will load it instead.',
-  'La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. Cherchez-la dans le catalogue, ou ajoutez le fichier si vous l’avez.':
+  'La table ne démarre pas sans {rom}.zip, et la base VPS ne connaît aucun lien pour elle. Cherche-la dans le catalogue, ou ajoute le fichier si tu l’as.':
     'The table won’t start without {rom}.zip, and the VPS database knows no link for it. Search for it in the catalog, or add the file if you have it.',
-  'La table ne démarre pas sans {rom}.zip. La base VPS n’est pas sur cette borne (jamais téléchargée, pas de réseau) : ajoutez le fichier si vous l’avez.':
+  'La table ne démarre pas sans {rom}.zip. La base VPS n’est pas sur cette borne (jamais téléchargée, pas de réseau) : ajoute le fichier si tu l’as.':
     'The table won’t start without {rom}.zip. The VPS database isn’t on this cabinet (never downloaded, no network): add the file if you have it.',
   'Récupérer la ROM {rom} ({site})': 'Get the {rom} ROM ({site})',
   'Récupérer la ROM {rom}': 'Get the {rom} ROM',

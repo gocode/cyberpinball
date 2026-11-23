@@ -67,8 +67,8 @@ export function futurePinballPlan(table: Pick<TableEntry, 'file'>, opts: FutureP
     ...(dmdMirror ? { dmdMirror } : {}),
     launchGame: command?.bam ? FUTURE_PINBALL_BAM_LAUNCH_GAME : FUTURE_PINBALL_LAUNCH_GAME,
     failureHint: command?.bam
-      ? t('Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.')
-      : t('Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
+      ? t('Vérifie que la table s’ouvre en lançant BAM\\FPLoader.exe toi-même : ses bibliothèques (.fpl), sa version de BAM.')
+      : t('Vérifie que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.', { game: name }),
   };
 }
 

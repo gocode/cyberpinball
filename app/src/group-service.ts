@@ -427,7 +427,7 @@ export function createGroupService(opts: GroupServiceOptions): GroupService {
         const merged = mergeAnnounces(state, list, now());
         if (!merged.fresh.length) return;
         commit(merged.state);
-        // Relayées aux autres bornes reliées : elles font le tour du réseau comme une partie instantanée.
+        // Relayées aux autres bornes reliées : elles font le tour du réseau comme une partie en direct.
         opts.net.sendGroupDirectory({ t: 'grp-pub', ann: merged.fresh }, undefined, key);
         return;
       }

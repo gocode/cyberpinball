@@ -290,7 +290,7 @@ export function createGameParts(ctx: GamePartsContext) {
           heading: t('Quel jeu est-ce ?'),
           subheading: table.title,
           lead: t('Le jeu reconnu donne les fichiers connus de chaque partie et le titre cherché sur les sites. Il est retenu avec la table.'),
-          sections: leads.length ? [] : [{ rows: [{ text: t('Aucun jeu connu ne correspond'), detail: t('« Chercher un titre… », ou cherchez les parties par le titre de la table.'), tone: 'quiet' }] }],
+          sections: leads.length ? [] : [{ rows: [{ text: t('Aucun jeu connu ne correspond'), detail: t('« Chercher un titre… », ou cherche les parties par le titre de la table.'), tone: 'quiet' }] }],
           actions,
           back,
         };
@@ -458,7 +458,7 @@ export function createGameParts(ctx: GamePartsContext) {
     // Toujours : chercher soi-même sur le web, puis le reste.
     actions.push(ctx.catalog.webAction('parts.part', { query: partWebQuery(titleOf(table), part), target: target(table, kind) }, after));
     for (const site of MEDIA_SITES) {
-      if (p?.sites[site.id]?.state === 'login' && ctx.sites) actions.push({ label: t('Se connecter à {site}…', { site: site.name }), detail: t('Le site réserve sa recherche aux membres ; votre mot de passe reste au site'), run: () => ctx.sites!.signIn(site.id) });
+      if (p?.sites[site.id]?.state === 'login' && ctx.sites) actions.push({ label: t('Se connecter à {site}…', { site: site.name }), detail: t('Le site réserve sa recherche aux membres ; ton mot de passe reste au site'), run: () => ctx.sites!.signIn(site.id) });
     }
     if (kind) actions.push({ label: t('Tous les fichiers téléchargés…'), detail: t('Ceux qui ne conviennent pas compris'), run: () => openCandidates(table, kind, from) });
     if (ctx.pick) actions.push({ label: t('Chercher un fichier ou un dossier…'), detail: PART_FOLDERS.has(part) ? t('Un fichier, ou tout un dossier (« Prendre ce dossier entier ») : Téléchargements, clé USB, disques, une autre installation') : t('Téléchargements de Cyber Pinball, clé USB, disques ; un dossier aussi'), run: () => void pickFile(table, part, from) });
@@ -485,7 +485,7 @@ export function createGameParts(ctx: GamePartsContext) {
       ? `${tn(cards.length, '{n} proposition', '{n} propositions')} · ${t('Start ouvre sa page dans « Récupérer » ; le fichier reçu est rangé pour cette table.')}`
       : searchingSites(part, p)
         ? t('Recherche en cours…')
-        : t('Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver vous-même.');
+        : t('Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver toi-même.');
     return {
       heading: partLabel(part),
       subheading: [table.title, here ? t('présent') : item?.received ? t('reçu, à installer') : item ? t('attendu') : t('absent')].join(' · '),
@@ -651,7 +651,7 @@ export function createGameParts(ctx: GamePartsContext) {
       view.blocked || !view.sw.disabled.length
         ? { label: t('Réactiver le PuP-Pack'), detail: view.blocked ?? t('Aucun pack désactivé à ce nom'), tone: 'quiet', run: () => undefined }
         : { label: t('Réactiver le PuP-Pack'), detail: t('Ses vidéos reviennent dès la prochaine partie, telles qu’avant'), tone: 'ok', run: () => confirmPup(table, true, from) },
-      { label: t('Options du PuP-Pack'), detail: t('PuP-Pack désactivé : réactivez-le d’abord'), tone: 'quiet', run: () => undefined },
+      { label: t('Options du PuP-Pack'), detail: t('PuP-Pack désactivé : réactive-le d’abord'), tone: 'quiet', run: () => undefined },
       { label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, 'pup', from) },
       { label: t('Retour : parties du jeu'), run: back },
     ];

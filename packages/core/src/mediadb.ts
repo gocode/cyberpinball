@@ -63,11 +63,11 @@ export const MEDIADB_INDEX_URL = 'https://raw.githubusercontent.com/superhac/vpi
  * d'acceptation (texte de référence, qui ne suit pas la langue). À l'écran : mediaDbNotice().
  */
 export const MEDIADB_NOTICE =
-  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.'; // i18n-ignore : texte de référence noté dans mediadb.json ; à l'écran, mediaDbNotice()
+  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur ta borne seulement : ne les redistribue pas.'; // i18n-ignore : texte de référence noté dans mediadb.json ; à l'écran, mediaDbNotice()
 
 /** Avertissement montré au premier usage et en tête de chaque plan, dans la langue de l'interface. */
 export function mediaDbNotice(): string {
-  return t('VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.');
+  return t('VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur ta borne seulement : ne les redistribue pas.');
 }
 
 /** « VPinMediaDB (github.com/superhac/vpinmediadb) », pour citer la source. */

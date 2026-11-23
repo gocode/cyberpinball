@@ -280,9 +280,9 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     return {
       absent,
       detail: absent
-        ? t('{tables}, {absent}', { tables: tn(n, '{n} table', '{n} tables'), absent: tn(absent, 'dont {n} absente de votre borne', 'dont {n} absentes de votre borne') })
+        ? t('{tables}, {absent}', { tables: tn(n, '{n} table', '{n} tables'), absent: tn(absent, 'dont {n} absente de ta borne', 'dont {n} absentes de ta borne') })
         : n
-          ? t('{tables}, toutes déjà sur votre borne : leurs parties et médias à prendre', { tables: tn(n, '{n} table', '{n} tables') })
+          ? t('{tables}, toutes déjà sur ta borne : leurs parties et médias à prendre', { tables: tn(n, '{n} table', '{n} tables') })
           : t('Aucune table dans sa bibliothèque'),
     };
   }
@@ -324,7 +324,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
           text: titleOf(m.entry.table),
           detail: [m.entry.version, tn(m.entry.medias.length, '{n} média', '{n} médias'), missing ? tn(missing, '{n} manquant', '{n} manquants') : undefined].filter(Boolean).join(' · '),
           tone: missing ? 'ok' : undefined,
-          ...(m.mine ? {} : { badges: [t('Pas sur votre borne')] }),
+          ...(m.mine ? {} : { badges: [t('Pas sur ta borne')] }),
           action: index,
           pick: true,
         };
@@ -335,8 +335,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       // Depuis « Ajouter une table » : ses tables qu'on n'a pas d'abord. Les lignes (et leurs actions)
       // naissent dans l'ordre de l'écran : le curseur arrive sur la première montrée.
       const groups: [LibraryMatch[], string][] = [
-        [both, t('Sur votre borne ({n})', { n: both.length })],
-        [other, t('Absentes de votre borne ({n})', { n: other.length })],
+        [both, t('Sur ta borne ({n})', { n: both.length })],
+        [other, t('Absentes de ta borne ({n})', { n: other.length })],
       ];
       for (const [list, title] of forAdd ? groups.reverse() : groups) {
         if (list.length) sections.push({ title, rows: list.slice(0, SHOWN).map(row), ...(list.length > SHOWN ? { more: list.length - SHOWN } : {}) });
@@ -348,8 +348,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       heading: t('Bibliothèque de {name}', { name: plain }),
       icon: 'tables',
       lead: forAdd
-        ? t('Ses tables absentes de votre borne d’abord : choisissez-en une pour la récupérer. Chaque fichier est vérifié à l’arrivée, puis le plan d’ajout montre tout avant d’installer.')
-        : t('Récupérez les médias de {name}. Retrouvez ses autres tables dans le catalogue.', { name: plain }),
+        ? t('Ses tables absentes de ta borne d’abord : choisis-en une pour la récupérer. Chaque fichier est vérifié à l’arrivée, puis le plan d’ajout montre tout avant d’installer.')
+        : t('Récupère les médias de {name}. Retrouve ses autres tables dans le catalogue.', { name: plain }),
       sections,
       actions,
       back,
@@ -400,26 +400,26 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     if (!reception(tableReception(key, tableId, owned), true))
       actions.push(
         owned
-          ? { label: t('Choisir les parties de sa table'), detail: t('Fronton, PuP-Pack, sons… : les siennes ou les vôtres'), icon: 'layers', run: () => openParts(key, tableId, here) }
+          ? { label: t('Choisir les parties de sa table'), detail: t('Fronton, PuP-Pack, sons… : les siennes ou les tiennes'), icon: 'layers', run: () => openParts(key, tableId, here) }
           : { label: t('Récupérer toute la table'), detail: t('Table, fronton, sons et médias ; la ROM et le PuP-Pack au choix'), icon: 'table-add', tone: 'ok', run: () => openParts(key, tableId, here) },
       );
     if (owned) {
       const missing = missingMedias(entry, has!);
       if (!reception(downloads.manager.pending(mediaKey(key, tableId)), false)) {
         if (missing.length) actions.push({ label: tn(missing.length, 'Récupérer le média manquant', 'Récupérer les {n} médias manquants'), detail: formatSize(librarySize(missing)), icon: 'image-download', tone: 'ok', run: () => startFetch(key, owned, entry.id, missing, here) });
-        if (entry.medias.length && missing.length < entry.medias.length) actions.push({ label: tn(entry.medias.length, 'Récupérer son média', 'Récupérer les {n} médias'), detail: t('{size} · remplaceront les vôtres après vérification et enregistrement', { size: formatSize(librarySize(entry.medias)) }), icon: 'download', run: () => startFetch(key, owned, entry.id, entry.medias, here) });
+        if (entry.medias.length && missing.length < entry.medias.length) actions.push({ label: tn(entry.medias.length, 'Récupérer son média', 'Récupérer les {n} médias'), detail: t('{size} · remplaceront les tiennes après vérification et enregistrement', { size: formatSize(librarySize(entry.medias)) }), icon: 'download', run: () => startFetch(key, owned, entry.id, entry.medias, here) });
       }
       // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
       actions.push(
         host.net.online(key)
           ? { label: t('Inviter {name} à jouer', { name: plain }), detail: t('Partie en direct sur cette table'), icon: 'gamepad', run: () => host.live.inviteOn(owned, key, () => openTable(key, tableId, back)) }
-          : { label: t('Inviter {name} à jouer', { name: plain }), detail: t('Hors ligne : invitez-le quand il sera connecté'), icon: 'gamepad', tone: 'quiet', run: () => undefined },
+          : { label: t('Inviter {name} à jouer', { name: plain }), detail: t('Hors ligne : invite-le quand il sera connecté'), icon: 'gamepad', tone: 'quiet', run: () => undefined },
       );
     } else {
       actions.push({ label: t('Trouver cette table dans le catalogue'), detail: t('Sur son site, comme toute table'), icon: 'search', run: () => host.library.catalogFor(entry.table) });
     }
     actions.push({ label: t('Retour'), icon: 'back', run: back });
-    if (!owned && !tableReception(key, tableId, owned)) sections.push({ rows: [{ text: t('Vous n’avez pas cette table'), detail: t('« Récupérer toute la table » l’installe, avec ses médias'), tone: 'info' }] });
+    if (!owned && !tableReception(key, tableId, owned)) sections.push({ rows: [{ text: t('Tu n’as pas cette table'), detail: t('« Récupérer toute la table » l’installe, avec ses médias'), tone: 'info' }] });
     sections.push({ title: t('Ses médias'), rows: rows.length ? rows : [{ text: t('Aucun média pour cette table'), tone: 'quiet' }] });
     return {
       heading: entry.table.title,
@@ -470,8 +470,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
    */
   function partNote(rights: boolean, taken: boolean, mineHas: boolean): Pick<Row, 'note'> {
     if (taken) return rights ? { note: { sign: '✓', text: t('Droits attestés : elle part avec les autres'), tone: 'ok' } } : {};
-    if (rights) return { note: { sign: '!', text: t('Disponible, à cocher vous-même : Start, puis l’attestation de vos droits'), tone: 'warning' } };
-    return { note: { sign: '+', text: mineHas ? t('Disponible : Start pour prendre la sienne à la place de la vôtre') : t('Disponible : Start pour la cocher'), tone: 'info' } };
+    if (rights) return { note: { sign: '!', text: t('Disponible, à cocher toi-même : Start, puis l’attestation de tes droits'), tone: 'warning' } };
+    return { note: { sign: '+', text: mineHas ? t('Disponible : Start pour prendre la sienne à la place de la tienne') : t('Disponible : Start pour la cocher'), tone: 'info' } };
   }
 
   function matchOf(key: string, tableId: string): LibraryMatch | undefined {
@@ -527,7 +527,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         text: partLabel(p.part),
         detail: [
           t('La sienne : {what}', { what: his }),
-          owned ? (mineHas ? (taken ? t('remplacera la vôtre ({size})', { size: formatSize(mineHas.size) }) : t('vous gardez la vôtre ({size})', { size: formatSize(mineHas.size) })) : t('vous ne l’avez pas')) : undefined,
+          owned ? (mineHas ? (taken ? t('remplacera la tienne ({size})', { size: formatSize(mineHas.size) }) : t('tu gardes la tienne ({size})', { size: formatSize(mineHas.size) })) : t('tu ne l’as pas')) : undefined,
           partRightsNote(p.part),
         ]
           .filter(Boolean)
@@ -560,7 +560,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         ? [
             {
               text: t('ROM {rom} : pas proposée par sa borne', { rom: wantedRom }),
-              detail: t('La table ne démarre pas sans elle. Une fois la table installée, « Ce qu’il manque pour jouer » vous aide à la récupérer.'),
+              detail: t('La table ne démarre pas sans elle. Une fois la table installée, « Ce qu’il manque pour jouer » t’aide à la récupérer.'),
               tone: 'warning',
               icon: 'alert',
             },
@@ -570,7 +570,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     sections.push({
       rows: [
         ...romNotOffered,
-        { text: t('Une table contient un script que VPX exécute'), detail: t('Ne prenez que les tables d’amis en qui vous avez confiance'), tone: 'warning', icon: 'alert' },
+        { text: t('Une table contient un script que VPX exécute'), detail: t('Ne prends que les tables d’amis en qui tu as confiance'), tone: 'warning', icon: 'alert' },
         ...(room ? [] : [{ text: t('Pas assez de place : {size} libres pour {need}', { size: formatSize(free!), need: formatSize(bytes) }), tone: 'error' as const, icon: 'drive' as const }]),
       ],
     });
@@ -580,8 +580,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       icon: owned ? 'layers' : 'table-add',
       subheading: [title, t('de {name}', { name: plain })].join(' · '),
       lead: owned
-        ? t('Cochée : la sienne remplace la vôtre ; non cochée : vous gardez la vôtre. La ROM et le PuP-Pack se cochent après l’attestation de vos droits. Le plan d’ajout montre tout avant d’installer.')
-        : t('Toutes ses parties sont cochées d’office, sauf la ROM et le PuP-Pack : chacun se coche après l’attestation de vos droits. Le plan d’ajout montre tout avant d’installer.'),
+        ? t('Cochée : la sienne remplace la tienne ; non cochée : tu gardes la tienne. La ROM et le PuP-Pack se cochent après l’attestation de tes droits. Le plan d’ajout montre tout avant d’installer.')
+        : t('Toutes ses parties sont cochées d’office, sauf la ROM et le PuP-Pack : chacun se coche après l’attestation de tes droits. Le plan d’ajout montre tout avant d’installer.'),
       sections,
       actions,
       back,
@@ -617,7 +617,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         },
         {
           label: text.take,
-          detail: agreed ? t('Elle rejoint les parties choisies') : t('Cochez d’abord l’attestation'),
+          detail: agreed ? t('Elle rejoint les parties choisies') : t('Coche d’abord l’attestation'),
           icon: 'download',
           tone: agreed ? 'ok' : undefined,
           run: () => {
@@ -718,7 +718,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     const plain = job.source.label;
     const origin: MediaOriginDraft = { origin: t('la borne de {name}', { name: plain }), url: `cyberpinball:ami/${key}` };
     const media = (f: DownloadFile) => f.meta?.media as LibraryMedia;
-    const notice = got.length === 1 ? t('{label} reçu de {name} : vérifiez-le, puis enregistrez.', { label: mediaTypeInfo(media(got[0]!).type).label, name: plain }) : t('{n} médias reçus de {name} : vérifiez-les, puis enregistrez.', { n: got.length, name: plain });
+    const notice = got.length === 1 ? t('{label} reçu de {name} : vérifie-le, puis enregistre.', { label: mediaTypeInfo(media(got[0]!).type).label, name: plain }) : t('{n} médias reçus de {name} : vérifie-les, puis enregistre.', { n: got.length, name: plain });
     ownedTypes.delete(table.file);
     host.library.openMediasWith(table, got.map((f) => ({ type: media(f).type, file: f.file!, ...(media(f).page ? { page: media(f).page } : {}) })), origin, notice);
     return true;
@@ -764,7 +764,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     installed(job) ? undefined : { state: t('Reçue, pas encore installée'), label: t('Installer dans ma bibliothèque'), detail: t('Le plan d’ajout de cette table montre tout avant d’installer'), icon: 'table-add' },
   );
   downloads.nextStep?.('friend-media', (job) =>
-    job.delivered ? undefined : { state: t('Reçus, pas encore enregistrés'), label: t('Vérifier et enregistrer les médias'), detail: t('Le brouillon de « Médias du jeu » : vérifiez, puis enregistrez'), icon: 'image' },
+    job.delivered ? undefined : { state: t('Reçus, pas encore enregistrés'), label: t('Vérifier et enregistrer les médias'), detail: t('Le brouillon de « Médias du jeu » : vérifie, puis enregistre'), icon: 'image' },
   );
 
   // Le téléchargement finit sous les yeux de l'utilisateur (son écran de réception ouvert) : rendu tout de suite.
@@ -811,7 +811,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       else if (job.state === 'paused') rows.push({ text: t('Réception en pause'), detail: amount, icon: 'pause', tone: 'quiet', progress: bar });
       else if (job.state === 'failed') rows.push({ text: t('Réception arrêtée'), detail: downloadReasonText(job), icon: 'alert', tone: 'error' });
       else if (job.state === 'cancelled') rows.push({ text: t('Réception annulée'), tone: 'info' });
-      else if (job.state === 'done') rows.push({ text: whole ? (installed(job) ? t('Table reçue et installée') : t('Reçue, pas encore installée')) : t('Médias reçus et vérifiés'), detail: [amount, whole && !installed(job) ? t('chaque fichier vérifié ; elle n’est pas encore dans votre bibliothèque') : undefined].filter(Boolean).join(' · '), icon: 'check', tone: 'ok' });
+      else if (job.state === 'done') rows.push({ text: whole ? (installed(job) ? t('Table reçue et installée') : t('Reçue, pas encore installée')) : t('Médias reçus et vérifiés'), detail: [amount, whole && !installed(job) ? t('chaque fichier vérifié ; elle n’est pas encore dans ta bibliothèque') : undefined].filter(Boolean).join(' · '), icon: 'check', tone: 'ok' });
       else if (jobBytes(job).received || job.state === 'running') rows.push({ text: t('Réception en cours'), detail: amount, icon: 'download', tone: 'info', progress: bar });
       else rows.push({ text: t('Demande à sa borne…'), detail: amount, icon: 'clock', tone: 'quiet', progress: { tone: 'info' } });
       // Un fichier facultatif refusé : sauté, avec sa raison exacte ; les autres sont arrivés.
@@ -821,7 +821,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       if (active)
         rows.push({
           text: t('Lancée à {time} : rien d’autre à faire', { time: downloadClock(job.created) }),
-          detail: t('Elle continue si vous quittez cet écran. La table le montre dans la bibliothèque de {name} : Start dessus revient ici, sans la relancer.', { name: plain }),
+          detail: t('Elle continue si tu quittes cet écran. La table le montre dans la bibliothèque de {name} : Start dessus revient ici, sans la relancer.', { name: plain }),
           icon: 'info',
           tone: 'quiet',
         });
@@ -833,7 +833,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       actions.push({ label: t('Annuler la réception'), detail: t('Ce qui est reçu est effacé'), icon: 'close', tone: 'error', run: () => { downloads.manager.cancel(id); flash = { text: t('Réception annulée'), tone: 'info' }; transfer = undefined; back(); } });
     } else if (job?.state === 'done') {
       // La suite d'abord : l'installer, ou vérifier ses médias ; jamais revenir d'où l'on vient.
-      if (!whole || !installed(job)) actions.push({ label: whole ? t('Installer dans ma bibliothèque') : t('Vérifier et enregistrer les médias'), detail: whole ? t('Le plan d’ajout de cette table montre tout avant d’installer') : t('Le brouillon de « Médias du jeu » : vérifiez, puis enregistrez'), icon: whole ? 'table-add' : 'image', tone: 'ok', run: () => downloads.deliver(job) });
+      if (!whole || !installed(job)) actions.push({ label: whole ? t('Installer dans ma bibliothèque') : t('Vérifier et enregistrer les médias'), detail: whole ? t('Le plan d’ajout de cette table montre tout avant d’installer') : t('Le brouillon de « Médias du jeu » : vérifie, puis enregistre'), icon: whole ? 'table-add' : 'image', tone: 'ok', run: () => downloads.deliver(job) });
       // Déjà reçue : la reprendre est un choix, jamais un second Start sur la table.
       const key = job.source.key;
       const tableId = typeof job.data?.table === 'string' ? job.data.table : undefined;
@@ -847,7 +847,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       subheading: job ? t('de {name} · {table}', { name: plain, table: say(job.title) }) : undefined,
       lead: whole
         ? t('Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain })
-        : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain }),
+        : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de ta table. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain }),
       sections: [{ rows }],
       actions,
       back: leave,

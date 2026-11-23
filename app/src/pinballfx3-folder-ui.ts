@@ -132,14 +132,14 @@ export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
         tn(report.placed.length, '{n} fronton déposé', '{n} frontons déposés'),
         report.present.length ? tn(report.present.length, '{n} déjà là, gardé', '{n} déjà là, gardés') : undefined,
         report.missing.length ? tn(report.missing.length, '{n} absent du catalogue', '{n} absents du catalogue') : undefined,
-        report.failed.length ? tn(report.failed.length, '{n} en échec : réessayez, le téléchargement reprendra', '{n} en échec : réessayez, le téléchargement reprendra') : undefined,
+        report.failed.length ? tn(report.failed.length, '{n} en échec : réessaie, le téléchargement reprendra', '{n} en échec : réessaie, le téléchargement reprendra') : undefined,
       ].filter(Boolean);
       backglass = parts.join(' · ');
       console.log(
         `${GAME} : frontons, ${report.placed.length} déposé(s) dans ${install.tablesDir}, ${report.present.length} déjà là, absents du catalogue : ${report.missing.join(', ') || 'aucun'}${report.failed.length ? `, en échec : ${report.failed.map((f) => `${f.target} (${f.reason})`).join(', ')}` : ''}.`, // i18n-ignore : journal
       );
     } catch (error) {
-      backglass = t('Catalogue des frontons injoignable : vérifiez la connexion, puis réessayez.');
+      backglass = t('Catalogue des frontons injoignable : vérifie la connexion, puis réessaie.');
       console.log(`${GAME} : catalogue des frontons injoignable (${(error as Error).message}).`); // i18n-ignore : journal
     } finally {
       fetching = false;
@@ -167,7 +167,7 @@ export function createPinballFx3FolderUi(host: PinballFx3FolderUiHost) {
    */
   function use(install: PinballFx3Install, opts: { via?: 'import'; show?: boolean } = {}): void {
     const steamDir = host.setup().steamDir;
-    const recognized = opts.via === 'import' ? `${t('Dossier de {game} reconnu dans votre sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.', { game: GAME })} ` : '';
+    const recognized = opts.via === 'import' ? `${t('Dossier de {game} reconnu dans ta sélection : ses tables ne s’installent pas comme des tables VPX, elles se choisissent ici.', { game: GAME })} ` : '';
     if (steamDir && samePath(steamDir, install.gameDir)) {
       // Le dossier de Steam lancé directement : Steam demanderait une confirmation à chaque partie.
       writePinballFx3Folder(host.dataDir(), undefined);

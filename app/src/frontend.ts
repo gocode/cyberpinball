@@ -973,7 +973,7 @@ function introFor(role: RoleId) {
     // (le shader se plie à toutes les proportions) ; une image ou une vidéo d'ouverture du fronton
     // choisie par le joueur garde sa place, plein écran.
     desktop: role === 'playfield' ? desktopIntro(viewOf) : undefined,
-    hint: introRun.returnTo === 'library' ? t('Appuyez sur un bouton pour revenir aux réglages') : t('Appuyez sur un bouton pour choisir une table'),
+    hint: introRun.returnTo === 'library' ? t('Appuie sur un bouton pour revenir aux réglages') : t('Appuie sur un bouton pour choisir une table'),
   };
 }
 
@@ -1112,7 +1112,7 @@ function startCollectionCapture(back: () => void): void {
     return {
       heading: t('Boutons des collections'),
       icon: 'button',
-      lead: !c ? '' : c.previous ? t('Appuyez maintenant sur le bouton de la collection suivante.') : t('Appuyez sur le bouton qui affichera la collection précédente, sur la roue.'),
+      lead: !c ? '' : c.previous ? t('Appuie maintenant sur le bouton de la collection suivante.') : t('Appuie sur le bouton qui affichera la collection précédente, sur la roue.'),
       sections: [
         {
           rows: [
@@ -1961,7 +1961,7 @@ function wheelEntries(media = false): MenuEntries {
   };
   const chosen = selectedMedallion();
   const current = chosen ? leads.indexOf(chosen) : shelf.tables.length ? leads.length + shelf.index : -1;
-  const again = wheelPlays() ? t('Touchez une table pour la choisir, puis touchez-la encore pour jouer.') : t('Touchez une table pour la choisir, puis touchez-la encore pour ouvrir sa fiche.');
+  const again = wheelPlays() ? t('Touche une table pour la choisir, puis touche-la encore pour jouer.') : t('Touche une table pour la choisir, puis touche-la encore pour ouvrir sa fiche.');
   return { kind: 'wheel', title: collections.current().label || t('Écran des tables'), icon: 'tables', items, current, note: items.length ? again : t('Aucune table dans cette collection.'), collections: choices };
 }
 
@@ -2041,7 +2041,7 @@ function remoteGroupAct(act: RemoteGroupAct, g: string | undefined, key: string 
   if (!guest.active) groupsMenu.remoteAct(act, g, key, () => library.leave());
 }
 
-/** Un geste fait au téléphone sur les parties instantanées (instant-menu.ts, remoteAct) ; jamais en mode invité. */
+/** Un geste fait au téléphone sur les parties en direct (instant-menu.ts, remoteAct) ; jamais en mode invité. */
 function remoteInstantAct(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }): void {
   if (!guest.active) instantMenu.remoteAct(act, opts, () => library.leave());
 }
@@ -2641,7 +2641,7 @@ library.provideSystemItem('start-relaunch', {
   },
   get detail() {
     if (shellSession()) return t('Inutile en borne dédiée : Cyber Pinball y est relancé de lui-même');
-    if (!joystickStartCode(buttons)) return t('Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relevez-le dans l’étape « Boutons »');
+    if (!joystickStartCode(buttons)) return t('Start doit être un bouton de joystick (Pinscape, encodeur en mode manette) : relève-le dans l’étape « Boutons »');
     return relaunchEnabled(loc.dataDir)
       ? t('Appui long ({seconds} s) sur Start : rouvre Cyber Pinball fermé, ou le front-end depuis le bureau Windows', { seconds: START_HOLD_MS / 1000 })
       : t('Désactivée : Start ne rouvre pas Cyber Pinball depuis Windows');
@@ -2936,9 +2936,9 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       return { run: () => openJukebox() };
     case 'sheet': {
       const table = tables[state.index];
-      if (!table) return { gone: t('Choisissez d’abord une table sur la roue') };
+      if (!table) return { gone: t('Choisis d’abord une table sur la roue') };
       if (target.part === 'pov') {
-        if (table.emulator !== 'vpx') return { gone: t('Indisponible : choisissez une table VPX sur la roue') };
+        if (table.emulator !== 'vpx') return { gone: t('Indisponible : choisis une table VPX sur la roue') };
         return { run: () => library.openPov(table, back) };
       }
       if (target.part === 'credits') return { run: () => library.credits.open(table) };
@@ -3269,7 +3269,7 @@ const avatarMenu = createAvatarMenu({
       url,
       game: t('Mon avatar'),
       expected: t('Une image : photo, dessin, logo'),
-      host: t('Recherche libre · image que vous choisissez'),
+      host: t('Recherche libre · image que tu choisis'),
       status: t('Clic droit sur une image : « Télécharger cette image ». Elle revient à « Mon avatar » pour le recadrage. Fermer (Échap) garde la page.'),
       search: { query: t('avatar flipper'), engine: 'images' },
       claim: {
@@ -3416,6 +3416,7 @@ const profileMenu = createProfileMenu({
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   myLevel: () => levelTracker.view().level,
   system: { open: (group, back) => library.openSystemGroupFrom(group, back) },
+  openSharing: (back) => library.runSystemItem('sharing', back),
   table: wheelTable,
   commonTables: (key) => communityMenu.everyone().find((p) => p.key === key)?.commonTables,
   welcome: (name) => roomsMenu.write(roomsMenu.defaultRoom(), welcomeLine(name)),
@@ -3516,6 +3517,8 @@ const challengesMenu = createChallengesMenu({
   myBest: (v) => myVersionBest(v),
   candidates: (v) => challengeCandidates(v),
   recentTables: () => [...tables].filter((x) => lastRunOf(x) > 0).sort((a, b) => lastRunOf(b) - lastRunOf(a)),
+  sharingOff: () => !socialNet.state().enabled,
+  openSharing: (back) => library.runSystemItem('sharing', back),
 });
 // Activité récente (créée plus haut) : Start sur la ligne d'un défi ouvre son écran.
 challengeScreens = {
@@ -3569,7 +3572,7 @@ const rankingsMenu = createRankingsMenu({
   redraw: () => (library.isActive() ? library.changed() : broadcast()),
 });
 // Communauté (community-menu.ts) : l'accueil du médaillon de la roue, et « Joueurs en ligne », amis ou non.
-// Parties instantanées (instant-menu.ts) : ouvertes à tous, dans la Communauté et sur la fiche d'une table.
+// Parties en direct (instant-menu.ts) : ouvertes à tous, dans la Communauté et sur la fiche d'une table.
 const instantMenu = createInstantMenu({
   library,
   net: socialNet,
@@ -3740,6 +3743,7 @@ function communityRoomPeek(): CommunityRoomPeek {
 }
 const communityHub = createCommunityHub({
   library,
+  openSharing: (back) => library.runSystemItem('sharing', back),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   net: socialNet,
   myLevel: () => levelTracker.view().level,
@@ -3772,7 +3776,7 @@ const communityHub = createCommunityHub({
 });
 
 // Arène (arena-menu.ts, 21/11/2026) : le médaillon de ce qui se joue contre les autres. Son affiche et
-// son écran à onglets ; la rubrique Arène du Menu système range Parties instantanées, Classements et
+// son écran à onglets ; la rubrique Arène du Menu système range Parties en direct, Classements et
 // Progression (fournis ci-dessus et par level-menu.ts).
 /** Une table des classements (son nom, sa référence VPS) dans la collection montrée par la roue. */
 function shelfTableOf(table: PresenceTable): TableEntry | undefined {
@@ -3784,7 +3788,7 @@ const arenaMenu = createArenaMenu({
   levels: levelTracker,
   instant: instantMenu,
   rankings: rankingsMenu,
-  daily: { detail: () => dailyTablesMenu.detail(), open: (back) => dailyTablesMenu.open(back) },
+  daily: { detail: () => dailyTablesMenu.detail(), open: (back, from) => dailyTablesMenu.open(back, from) },
   level: levelMenu,
   history: { open: (back) => library.runSystemItem('game-history', back) },
   players: () => communityMenu.players(),
@@ -4765,7 +4769,7 @@ export function startFrontend(): void {
             ],
             action: 'install-vpx',
           }
-        : { title: t("VPX n'est pas installé"), lines: [t('Lancez « Installer » depuis le lanceur, puis revenez ici.')] },
+        : { title: t("VPX n'est pas installé"), lines: [t('Lance « Installer » depuis le lanceur, puis reviens ici.')] },
     };
   } else if (loc.root && !(runtime = vcRuntimeReady()).ok) {
     // Windows neuf : VPX est là, mais pas le runtime Visual C++ sans lequel il ne démarre pas (vc-runtime.ts).
@@ -5705,8 +5709,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
             : fx3?.store === 'folder'
             ? pinballFx3DirectFailureHint(fx3.gameDir)
             : zenKey === 'pinballfx3'
-            ? t('Vérifiez que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.', { game: zenName })
-            : t('Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
+            ? t('Vérifie que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.', { game: zenName })
+            : t('Vérifie que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.'),
           t('Start ou Exit : revenir au front-end.'),
         ],
       },
@@ -5764,7 +5768,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
               title: t('{names} sont ouverts', { names }),
               lines: [
                 t('Pendant la partie, {names} réagiraient aussi aux boutons de la borne et pourraient prendre les écrans ou l’afficheur DMD.', { names }),
-                t('Fermez {names} depuis leur menu (Quitter), puis relancez la partie.', { names }),
+                t('Ferme {names} depuis leur menu (Quitter), puis relance la partie.', { names }),
                 t('Start : jouer quand même · Exit : revenir au front-end'),
               ],
               action: 'otherFrontend',
@@ -5773,7 +5777,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
               title: t('{names} est ouvert', { names }),
               lines: [
                 t('Pendant la partie, {names} réagirait aussi aux boutons de la borne et pourrait prendre les écrans ou l’afficheur DMD.', { names }),
-                t('Fermez {names} depuis son menu (Quitter), puis relancez la partie.', { names }),
+                t('Ferme {names} depuis son menu (Quitter), puis relance la partie.', { names }),
                 t('Start : jouer quand même · Exit : revenir au front-end'),
               ],
               action: 'otherFrontend',
@@ -5846,7 +5850,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     cinema.stop();
   }
   if (choose) {
-    configurations.openChooser(t('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.'));
+    configurations.openChooser(t('Avant de jouer, choisis la configuration branchée : elle décide des écrans de VPX.'));
     return undefined;
   }
   if (problem) {
@@ -5932,7 +5936,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
     dressing = undefined;
     cinema.stop();
-    state = { ...state, phase: 'message', message: { title: t('Partie entre amis impossible sur cette table : {reason}', { reason: doubled.reason }), lines: [t('Votre table habituelle reste intacte : rien n’a été lancé.')] } };
+    state = { ...state, phase: 'message', message: { title: t('Partie entre amis impossible sur cette table : {reason}', { reason: doubled.reason }), lines: [t('Ta table habituelle reste intacte : rien n’a été lancé.')] } };
     broadcast();
     return undefined;
   }
@@ -6027,7 +6031,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     vrGame && !vrFront.headset?.worn
       ? {
           status: t('Partie dans le casque'),
-          text: t('Mettez le casque : la table démarre quand il est sur la tête'),
+          text: t('Mets le casque : la table démarre quand il est sur la tête'),
           // Une consigne par ligne (essai.30 : les deux sur une ligne, coupée avant « : », illisible).
           keys: [t('Exit : arrêter (au clavier : {keys} ou Échap)', { keys: shortcutLabel(SHORTCUTS.forceStop) }), t('Pour jouer sur les écrans : Menu système > Ma borne > Réalité virtuelle et vision 3D')],
         }
@@ -6037,7 +6041,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrFront.headsetExitNote = undefined;
   if (vrGame && vrFront.headset?.inUse && !vrFront.airLinkWarned && airLinkOverWifi(vrFront.linkMode, vrFront.pcNetwork)) {
     vrFront.airLinkWarned = true;
-    vrFront.headsetExitNote = t('Air Link avec un PC en Wi-Fi : des images se perdent. Reliez le PC au routeur par un câble Ethernet, ou utilisez le câble USB Link.');
+    vrFront.headsetExitNote = t('Air Link avec un PC en Wi-Fi : des images se perdent. Relie le PC au routeur par un câble Ethernet, ou utilise le câble USB Link.');
     console.log(`Casque : Air Link sur un PC en Wi-Fi (${vrFront.pcNetwork!.adapter}), avertissement donné au chargement.`); // i18n-ignore : journal
   }
   if (vrGame) vrFront.refreshVrNetwork();
@@ -6866,7 +6870,7 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
   if (known) {
     console.log(known.journal);
     const lines = [...known.lines];
-    if (live) lines.push(t('Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.'));
+    if (live) lines.push(t('Partie entre amis : les autres continuent ; ton score compte jusqu’à l’arrêt.'));
     lines.push(...result.notices);
     if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
     // VPX arrêté en démarrant, ses fichiers modifiés : Start les remet (startVpxInstall).
@@ -6874,7 +6878,7 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
     return { title: known.title, lines, action, table: table.file, report: failureReport(result, table, known.title, known.startup) };
   }
   const lines = [result.message ?? t('Erreur inconnue.')];
-  if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.', { fix: repaired }));
+  if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relance-la.', { fix: repaired }));
   if (result.message && /can't start game/i.test(result.message)) {
     lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
   }
@@ -6981,7 +6985,7 @@ function startVpxInstall(): boolean {
   // VPX là, mais des fichiers remplacés hors de Cyber Pinball (un autre VPX copié par-dessus) : leurs originaux, tirés de l'archive.
   if (vpxInstall(loc) && vpxFilesStatus(loc)?.changed.length) {
     show([t('Préparation…')]);
-    restoreVpxFiles(loc, (received, total) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: Math.floor((received / total) * 100), received: Math.round(received / 1e6), total: Math.round(total / 1e6) }), t('Ne débranchez pas la borne.')]), library.downloads.manager)
+    restoreVpxFiles(loc, (received, total) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: Math.floor((received / total) * 100), received: Math.round(received / 1e6), total: Math.round(total / 1e6) }), t('Ne débranche pas la borne.')]), library.downloads.manager)
       .then((n) => vpxReady(tn(n, 'Le fichier d’origine de VPX est remis.', 'Les {n} fichiers d’origine de VPX sont remis.')))
       .catch((error: Error) => show([t('Les fichiers de VPX n’ont pas été remis : {error}', { error: error.message }), t('Start : réessayer · Exit : plus tard')], 'install-vpx'));
     return true;
@@ -6989,7 +6993,7 @@ function startVpxInstall(): boolean {
   show([t('Préparation…')]);
   installVpx(
     root,
-    (p) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranchez pas la borne.')]),
+    (p) => show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranche pas la borne.')]),
     library.downloads.manager,
   )
     .then((version) => {
@@ -7010,7 +7014,7 @@ function vpxReady(done: string): void {
   const joysticks = retryJoysticks();
   const devices = joysticks.state === 'ready' ? joysticks.devices : [];
   const redo = joystickButtonsUnrecorded(loadCabinet(loc.dataDir)?.buttons, devices.length)
-    ? [t('Joystick lu : {names}. Relevez ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».', { names: devices.map((d) => d.name || d.id).join(', ') })]
+    ? [t('Joystick lu : {names}. Relève ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».', { names: devices.map((d) => d.name || d.id).join(', ') })]
     : [];
   if (tables.length) state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines: [done, ...redo, t('Start ou Exit : aller aux tables.')] } };
   // Pas encore de table : on enchaîne sur l'ajout.
@@ -7024,7 +7028,7 @@ function vcRuntimeMessage(status: VcRuntimeStatus): Message {
     title: t('Il manque le runtime Visual C++ à Windows'),
     lines: [
       t('VPX ne peut pas démarrer sans le runtime Visual C++ de Microsoft ({detail}).', { detail: describeVcRuntime(status) }),
-      t('Cyber Pinball installe la version officielle de Microsoft (19 Mo) ; Windows demande votre accord une fois.'),
+      t('Cyber Pinball installe la version officielle de Microsoft (19 Mo) ; Windows demande ton accord une fois.'),
       t('Start : l’installer maintenant · Exit : plus tard'),
     ],
     action: 'install-vpx',
@@ -7454,8 +7458,8 @@ function levelMomentView() {
       unlocked: t('Badge débloqué'),
       secret: t('Secret dévoilé'),
       level: t('Niveau'),
-      start: t('Votre niveau de départ'),
-      startDetail: t('Calculé sur vos parties d’avant les niveaux'),
+      start: t('Ton niveau de départ'),
+      startDetail: t('Calculé sur tes parties d’avant les niveaux'),
       badgesSoFar: tn(pending.badges.length, '{n} badge déjà mérité', '{n} badges déjà mérités'),
       continue: t('Un bouton pour continuer'),
     },

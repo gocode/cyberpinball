@@ -139,7 +139,7 @@ test('Toutes les tables au téléphone : le calcul de l’écran « Tables », c
   const all = menu.remoteTables('world', 'all');
   assert.deepEqual(all.sections.map((s) => s.title), ['Jouées récemment', 'Toutes les autres tables · A–Z']);
   const atlas = all.sections[1]!.rows.find((r) => r.title === 'Atlas Rising');
-  assert.ok(atlas?.lead?.includes('Kiko') && atlas.mine === 'vous êtes 2ᵉ', `une ligne par table : le premier, ma place ${JSON.stringify(atlas)}`);
+  assert.ok(atlas?.lead?.includes('Kiko') && atlas.mine === 'tu es 2ᵉ', `une ligne par table : le premier, ma place ${JSON.stringify(atlas)}`);
   assert.ok(all.sections[1]!.rows.find((r) => r.title === 'Copper Comet')?.reason, 'une table sans score : sa raison');
   // Au téléphone : la liste envoyée (ici deux tables seulement, comme en mode invité) ; jamais un fichier.
   const remote = createRemoteRanks({ tables: () => TABLES.slice(0, 2), current: () => undefined, scores: () => undefined, rankings: () => undefined, images: { src: () => undefined, get: () => undefined, reset: () => undefined }, all: (sc: string, p: string) => menu.remoteTables(sc, p) });

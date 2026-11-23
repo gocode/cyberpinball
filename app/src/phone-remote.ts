@@ -325,7 +325,7 @@ export interface RemoteGroups {
   notice?: { text: string; tone: 'ok' | 'warning' };
 }
 
-/** Les parties instantanées au téléphone (instant-menu.ts, remote), en tête de « Joueurs ». */
+/** Les parties en direct au téléphone (instant-menu.ts, remote), en tête de « Joueurs ». */
 export interface RemoteInstant {
   /** Rien n'est possible (partage coupé, réseau en connexion) : pourquoi. */
   blocked?: string;
@@ -352,7 +352,7 @@ export interface RemoteCommunity {
   profile?: RemoteProfile;
   /** Groupes (groups-menu.ts) : créer, les invitations reçues, les groupes publics. */
   groups?: RemoteGroups;
-  /** Parties instantanées (instant-menu.ts) : celles des autres, en ouvrir une, la mienne. */
+  /** Parties en direct (instant-menu.ts) : celles des autres, en ouvrir une, la mienne. */
   instant?: RemoteInstant;
   /** Mon niveau en résumé, en tête des Scores (level-menu.ts). */
   level?: RemoteLevel;
@@ -377,7 +377,7 @@ export interface RemotePerson {
 /** La liste « Joueurs » : les demandes reçues, puis chaque filtre de la borne et ses groupes titrés. */
 export interface RemotePeople {
   requests: { key: string; name: string; avatar: AvatarView; flag: string; detail: string }[];
-  /** Les filtres (Tous, Mon pays, À proximité, Mêmes tables) : le nombre, ou pourquoi il ne montre rien. */
+  /** Les filtres (Tous, Mon pays, Sur mon réseau local, Mêmes tables) : le nombre, ou pourquoi il ne montre rien. */
   filters: { id: string; label: string; count?: string; disabled?: boolean }[];
   /** Pour chaque filtre, ses groupes : « Amis en ligne (2) », « Hors ligne (4) »… */
   groups: Record<string, { title: string; rows: RemotePerson[] }[]>;
@@ -482,7 +482,7 @@ export interface MenuTarget {
   friendAnswer?(key: string, yes: boolean): void;
   /** Un geste sur un groupe (groups-menu.ts, remoteAct) ; la borne vérifie tout. */
   groupAct?(act: RemoteGroupAct, g?: string, key?: string): void;
-  /** Un geste sur les parties instantanées (instant-menu.ts, remoteAct) ; la borne vérifie tout. */
+  /** Un geste sur les parties en direct (instant-menu.ts, remoteAct) ; la borne vérifie tout. */
   instantAct?(act: RemoteInstantAct, opts: { id?: string; table?: string; count?: number; key?: string }): void;
   /** Juke-box : le lecteur de la borne pour l'onglet du téléphone, et ses commandes (vérifiées par la borne). */
   jukebox?(): RemoteJukebox;
@@ -825,7 +825,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
           ? t('Port habituel pris par un autre programme : les téléphones gardés doivent scanner ce QR une fois')
           : addressMoved
             ? t('Adresse de la borne changée : un téléphone gardé par l’ancienne adresse doit scanner ce QR une fois')
-            : t('Scannez avec votre téléphone, sur le même Wi-Fi que la borne'),
+            : t('Scanne avec ton téléphone, sur le même Wi-Fi que la borne'),
       };
     }
     const device = view.device === 'Téléphone' ? t('Téléphone') : view.device; // i18n-ignore : nom par défaut (remote.ts, deviceLabel)
@@ -2030,14 +2030,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const no = (text: string) => {
       if (active === link) sendTo(link, { t: 'up-no', text });
     };
-    if (!menu) return no(t('Envoi indisponible : ouvrez le front-end de la borne.'));
+    if (!menu) return no(t('Envoi indisponible : ouvre le front-end de la borne.'));
     if (upload) return no(t('Un envoi est déjà en cours.'));
     const where = menu.uploadDir();
     if ('refused' in where) return no(where.refused);
     if (m.size < 1) return no(t('Fichier vide : rien à envoyer.'));
     if (m.size > REMOTE_UPLOAD_MAX) return no(t('Fichier trop volumineux. Maximum : {max}.', { max: formatSize(REMOTE_UPLOAD_MAX) }));
     const name = cleanUploadName(m.name);
-    if (!name) return no(t('Nom de fichier illisible : renommez-le sur le téléphone.'));
+    if (!name) return no(t('Nom de fichier illisible : renomme-le sur le téléphone.'));
     const dir = path.resolve(where.dir);
     let file: fs.promises.FileHandle;
     const id = toBase64Url(crypto.randomBytes(8));

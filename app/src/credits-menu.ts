@@ -146,7 +146,7 @@ export function createCreditsMenu(host: CreditsMenuHost) {
       if (row.authors.length) sections.push({ title: row.authors.length > 1 ? t('{n} auteurs', { n: row.authors.length }) : t('Auteur'), rows: [{ text: row.authors.join(', ') }] });
       else sections.push({ rows: [{ text: creditText(row), detail: row.unknown ?? row.detail, ...(row.unknown ? { tone: 'quiet' as const } : {}) }] });
       const elsewhere = row.authors.length ? alsoHere(row.authors, table) : [];
-      if (elsewhere.length) sections.push({ title: t('Leur travail sur votre borne'), rows: elsewhere });
+      if (elsewhere.length) sections.push({ title: t('Leur travail sur ta borne'), rows: elsewhere });
       return {
         heading: row.role,
         icon: 'credits',
@@ -157,7 +157,7 @@ export function createCreditsMenu(host: CreditsMenuHost) {
               remote: { phase: 'offer' as const, qr: qrRows(row.url), url: row.url, title: '', line: '' },
               remoteWording: {
                 offer: t('Sa page sur {site}', { site: siteName(row.url) }),
-                offerLines: [t('Visez ce code avec votre téléphone : la page, ses mises à jour, ses commentaires. Un merci y fait toujours plaisir.'), shortUrl(row.url)],
+                offerLines: [t('Vise ce code avec ton téléphone : la page, ses mises à jour, ses commentaires. Un merci y fait toujours plaisir.'), shortUrl(row.url)],
               },
             }
           : {}),
@@ -211,13 +211,13 @@ export function createCreditsMenu(host: CreditsMenuHost) {
     const sections: Section[] = [];
     if (shown.length) {
       sections.push({
-        title: t('Sur votre borne'),
+        title: t('Sur ta borne'),
         kind: 'spec',
         rows: shown.map((a, i) => ({ label: a.name, text: a.roles, action: i, pick: true })),
         ...(list.length > shown.length ? { more: list.length - shown.length } : {}),
       });
     } else {
-      sections.push({ title: t('Sur votre borne'), rows: [{ text: t('Aucun auteur connu pour l’instant'), detail: t('Les auteurs sont notés à l’installation depuis le catalogue ; ceux écrits dans une table s’affichent dans ses crédits.'), tone: 'quiet' }] });
+      sections.push({ title: t('Sur ta borne'), rows: [{ text: t('Aucun auteur connu pour l’instant'), detail: t('Les auteurs sont notés à l’installation depuis le catalogue ; ceux écrits dans une table s’affichent dans ses crédits.'), tone: 'quiet' }] });
     }
     sections.push({ title: t('Les logiciels'), kind: 'spec', rows: SOFTWARE.map(([name, role, detail]) => ({ label: name, text: role(), detail: detail() })) });
     sections.push({ title: t('Les bases et les sites'), kind: 'spec', rows: SITES.map(([name, role]) => ({ label: name, text: role() })) });
@@ -241,7 +241,7 @@ export function createCreditsMenu(host: CreditsMenuHost) {
       heading: author.name,
       icon: 'credits',
       subheading: author.roles,
-      sections: [{ title: t('Ses tables sur votre borne'), rows: author.tables.map((title) => ({ text: title })) }],
+      sections: [{ title: t('Ses tables sur ta borne'), rows: author.tables.map((title) => ({ text: title })) }],
       actions: [{ label: t('Retour à la communauté'), icon: 'back', run: back }],
       back,
     }));
@@ -257,7 +257,7 @@ export function createCreditsMenu(host: CreditsMenuHost) {
     attractLine: (table: TableEntry) => attractCredits(credits(table, 'quick')),
     systemItem: {
       get detail() {
-        return t('Les auteurs de vos tables, les logiciels, les sites');
+        return t('Les auteurs de tes tables, les logiciels, les sites');
       },
       run: () => openCommunity(() => host.library.openSystem()),
     } satisfies ProvidedSystemItem,

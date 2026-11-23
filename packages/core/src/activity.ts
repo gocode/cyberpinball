@@ -355,7 +355,7 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
   }
   switch (e.kind as ActivityNoteKind) {
     case 'update-available':
-      return { title: t('Cyber Pinball {version} est disponible', { version: e.version ?? '?' }), ...(e.previous ? { detail: t('Vous avez la version {version}', { version: e.previous }) } : {}) };
+      return { title: t('Cyber Pinball {version} est disponible', { version: e.version ?? '?' }), ...(e.previous ? { detail: t('Tu as la version {version}', { version: e.previous }) } : {}) };
     case 'update-installed':
       return { title: t('Cyber Pinball {version} est installé', { version: e.version ?? '?' }), ...(e.previous ? { detail: t('Avant : {version}', { version: e.previous }) } : {}) };
     case 'update-failed':

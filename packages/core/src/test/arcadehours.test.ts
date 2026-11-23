@@ -305,7 +305,7 @@ test('rendu : voile de nuit en attente, préavis au-dessus avec son compte et sa
   const notice = document.querySelector('#stop .stop-notice')!;
   assert.ok(notice, 'préavis dans sa couche, au-dessus du voile');
   assert.match(notice.textContent!, /Mise en veille dans\s*22\s*s/);
-  assert.match(notice.textContent!, /Appuyez sur un bouton pour garder la borne allumée/);
+  assert.match(notice.textContent!, /Appuie sur un bouton pour garder la borne allumée/);
   assert.equal(document.querySelector('#root .attract-hint'), null, 'une seule consigne à la fois');
   // Vu au bureau (fenêtre paysage) : le préavis recouvrait le fabricant et l'année ; l'attente lui laisse sa place.
   assert.ok(document.querySelector('#root .attract.has-stop'));

@@ -142,13 +142,13 @@ export function createChallengeService(host: ChallengeServiceHost): ChallengeSer
         case 'received':
           return tLater('Score à battre : {score} · 48 h pour jouer', { score: score(c.theirs ?? c.target) });
         case 'beaten':
-          return tLater('{their} contre vos {mine}', { their: score(c.theirs), mine: score(c.mine) });
+          return tLater('{their} contre tes {mine}', { their: score(c.theirs), mine: score(c.mine) });
         case 'expiring':
           return c.theirs !== undefined ? tLater('Score à battre : {score}', { score: score(c.theirs) }) : undefined;
         case 'won':
           return xp > 0 ? tLater('{mine} contre {their} · +{xp} XP', { mine: score(c.mine), their: score(c.theirs), xp }) : tLater('{mine} contre {their}', { mine: score(c.mine), their: score(c.theirs) });
         case 'lost':
-          return tLater('{their} contre vos {mine}', { their: score(c.theirs), mine: score(c.mine) });
+          return tLater('{their} contre tes {mine}', { their: score(c.theirs), mine: score(c.mine) });
         default:
           return undefined;
       }
@@ -229,7 +229,7 @@ export function createChallengeService(host: ChallengeServiceHost): ChallengeSer
     offer(to, table, score, source) {
       const reason = blocked(to.key, table);
       if (reason) return { reason };
-      if (!(score > 0)) return { reason: t('Pas encore de score sur cette version : jouez d’abord une partie') };
+      if (!(score > 0)) return { reason: t('Pas encore de score sur cette version : joue d’abord une partie') };
       const s = host.net.state();
       const country = host.net.country();
       const note = offerChallenge({ key: s.key, name: s.name, ...(country ? { country } : {}) }, to, table, score, source, now());

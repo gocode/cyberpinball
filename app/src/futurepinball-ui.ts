@@ -254,7 +254,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
   async function addArchives(dirs: string[], opts: { show?: boolean; vpsGameId?: string } = {}): Promise<TableEntry[]> {
     const game = refresh();
     if (!game) {
-      notice = t('{game} est introuvable sur ce PC : choisissez son dossier, puis installez de nouveau la table (le fichier reçu est gardé).', { game: FUTURE_PINBALL_NAME });
+      notice = t('{game} est introuvable sur ce PC : choisis son dossier, puis installe de nouveau la table (le fichier reçu est gardé).', { game: FUTURE_PINBALL_NAME });
       console.log(`${FUTURE_PINBALL_NAME} : archive pas rangée, jeu introuvable (${dirs.join(', ')}).`); // i18n-ignore : journal
       if (opts.show !== false) open(host.cursor());
       return [];

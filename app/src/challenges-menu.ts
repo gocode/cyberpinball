@@ -63,6 +63,9 @@ export interface ChallengesMenuHost {
   candidates(version: { board: string; balls?: number }): ChallengeCandidate[];
   /** Mes tables jouées, la plus récente d'abord (défier depuis un profil). */
   recentTables(): readonly TableEntry[];
+  /** Le partage est coupé : « Régler le partage » à la place du long chemin dans les réglages. */
+  sharingOff?(): boolean;
+  openSharing?(back: () => void): void;
   now?(): Date;
 }
 
@@ -109,7 +112,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
     if (local.state === 'pending') return { off: t('Version de la table en calcul') };
     const holder = host.versionHolders?.(c.table.board)[0];
     if (holder) return { fetch: { name: holder.name, run: () => holder.fetch(back) } };
-    return { off: local.state === 'other' ? t('Autre version que la vôtre') : t('Table absente de cette borne') };
+    return { off: local.state === 'other' ? t('Autre version que la tienne') : t('Table absente de cette borne') };
   }
 
   /** « Jouer » (ou « Récupérer cette version », ou grisé) et « Refuser » d'un défi ouvert. */
@@ -133,10 +136,10 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
 
   /** Ce que dit un défi ouvert, sous son titre. */
   function openDetail(c: Challenge): string {
-    const time = t('Il vous reste {left}', { left: left(c) });
+    const time = t('Il te reste {left}', { left: left(c) });
     if (c.role === 'sent' && c.theirs === undefined) return t('{name} n’a pas encore joué · reste {left}', { name: c.opponent.name, left: left(c) });
-    if (c.leader === 'me') return t('Vous menez : {mine} contre {theirs} · reste {left}', { mine: fmt(c.mine), theirs: fmt(c.theirs), left: left(c) });
-    return t('{time} · si vous gagnez {xp}', { time, xp: xpText(XP.challengeWin) });
+    if (c.leader === 'me') return t('Tu mènes : {mine} contre {theirs} · reste {left}', { mine: fmt(c.mine), theirs: fmt(c.theirs), left: left(c) });
+    return t('{time} · si tu gagnes {xp}', { time, xp: xpText(XP.challengeWin) });
   }
 
   /** La carte d'un défi ouvert : « Défi de Nina », la table, le score à battre, le temps qui passe. */
@@ -153,7 +156,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
       aside: fmt(target),
       ...(toPlay ? { asideTone: 'warning' as const } : {}),
       progress: challengeElapsed(c, now()),
-      detail: [openDetail(c), playable(c, back).fetch ? t('Autre version que la vôtre : récupérez-la chez {name}', { name: playable(c, back).fetch!.name }) : undefined].filter(Boolean).join(' · '),
+      detail: [openDetail(c), playable(c, back).fetch ? t('Autre version que la tienne : récupère-la chez {name}', { name: playable(c, back).fetch!.name }) : undefined].filter(Boolean).join(' · '),
       ...(toPlay ? { buttons: playButtons(c, back, after) } : { run: () => openChallenge(c.id, back) }),
     };
   }
@@ -173,7 +176,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
   }
 
   function resultDetail(c: Challenge): string {
-    if (c.state === 'expired') return c.role === 'sent' ? t('{name} n’a pas joué', { name: c.opponent.name }) : t('Vous n’avez pas joué');
+    if (c.state === 'expired') return c.role === 'sent' ? t('{name} n’a pas joué', { name: c.opponent.name }) : t('Tu n’as pas joué');
     if (c.state === 'declined') return t('Contre {name}', { name: c.opponent.name });
     return t('{mine} contre {theirs} · {name}', { mine: fmt(c.mine), theirs: fmt(c.theirs), name: c.opponent.name });
   }
@@ -197,21 +200,46 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
     };
   }
 
+  /** « Lancer un défi » : la carte qui mène au choix de la table, puis du joueur (plus de chemin à deviner). */
+  function launchCard(here: () => void): HubCardSpec {
+    const reason = tablesToChallenge().length ? undefined : t('Joue d’abord une partie : ton meilleur score sera celui à battre');
+    return {
+      key: 'challenge:how',
+      icon: 'trophy',
+      title: t('Choisir une table, puis un joueur'),
+      detail: t('48 h pour battre ton score, chacun quand il veut'),
+      buttons: [{ label: t('Lancer un défi'), icon: 'trophy', xp: xpText(XP.challengeWin), primary: true, key: 'launch', run: () => host.library.openCustom(() => buildTables(here)), ...(reason ? { off: reason } : {}) }],
+    };
+  }
+
   function sections(here: () => void): { sections: HubSectionSpec[]; empty?: { title: string; detail: string } } {
     const off = svc.unavailable();
-    if (off) return { sections: [{ layout: 'list', cards: [{ key: 'challenges:off', icon: 'network', title: t('Défis'), detail: off, quiet: true }] }] };
+    if (off) {
+      const fix = host.sharingOff?.() && host.openSharing;
+      return {
+        sections: [
+          {
+            layout: 'list',
+            cards: [
+              { key: 'challenges:off', icon: 'network', title: t('Défis'), detail: off, quiet: true },
+              ...(fix ? [{ key: 'challenges:sharing', icon: 'network' as const, title: t('Régler le partage'), detail: t('Activer le partage, le réseau local et la présence publique'), run: () => fix(here) }] : []),
+            ],
+          },
+        ],
+      };
+    }
     const list = svc.list();
     const out: HubSectionSpec[] = [];
     const toPlay = list.filter(challengeToPlay);
     const waiting = list.filter((c) => challengeOpen(c) && !challengeToPlay(c));
     const done = list.filter((c) => !challengeOpen(c)).slice(0, RESULTS_MAX);
-    if (toPlay.length) out.push({ title: t('À jouer'), note: tn(toPlay.length, '{n} défi vous attend', '{n} défis vous attendent'), layout: 'cards', cards: toPlay.map((c) => openCard(c, here, here)) });
-    if (waiting.length) out.push({ title: t('En attente'), note: t('Envoyés, ou vous menez'), layout: 'list', cards: waiting.map((c) => openCard(c, here, here)) });
+    if (toPlay.length) out.push({ title: t('À jouer'), note: tn(toPlay.length, '{n} défi t’attend', '{n} défis t’attendent'), layout: 'cards', cards: toPlay.map((c) => openCard(c, here, here)) });
+    if (waiting.length) out.push({ title: t('En attente'), note: t('Envoyés, ou tu mènes'), layout: 'list', cards: waiting.map((c) => openCard(c, here, here)) });
     out.push({
       title: t('Défier un joueur'),
       layout: 'list',
       cards: [
-        { key: 'challenge:how', icon: 'trophy', title: t('Choisir une table, puis un joueur'), detail: t('Fiche d’une table › Jouer ensemble… › Défier un joueur… : 48 h pour battre votre score, chacun quand il veut'), aside: xpText(XP.challengeWin) },
+        launchCard(here),
         ...(sentTo ? [{ key: 'challenge:sent', icon: 'check' as const, title: t('Défi envoyé à {name}', { name: sentTo }), detail: t('Il arrive dès que sa borne est jointe') }] : []),
       ],
     });
@@ -284,7 +312,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
     const v = host.versionOf(entry);
     if (v.state === 'pending') return t('Empreinte de la table en calcul…');
     if (v.state === 'none') return t('Version de la table illisible : pas de défi possible');
-    if (!host.myBest(v)) return t('Jouez d’abord une partie : votre meilleur score sera celui à battre');
+    if (!host.myBest(v)) return t('Joue d’abord une partie : ton meilleur score sera celui à battre');
     return undefined;
   }
 
@@ -311,7 +339,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
           pick: true,
         });
       }
-      if (!list.length) rows.push({ text: t('Personne à défier pour l’instant'), detail: t('Vos amis et les joueurs classés sur cette version apparaissent ici'), icon: 'info', tone: 'quiet' });
+      if (!list.length) rows.push({ text: t('Personne à défier pour l’instant'), detail: t('Tes amis et les joueurs classés sur cette version apparaissent ici'), icon: 'info', tone: 'quiet' });
     } else rows.push({ text: t('Défi impossible pour l’instant'), detail: reason ?? '', icon: 'info', tone: 'quiet' });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     const best = v.state === 'ok' ? host.myBest(v) : undefined;
@@ -319,7 +347,7 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
       heading: t('Défier un joueur'),
       icon: 'trophy',
       subheading: entry.title,
-      lead: best ? t('Score à battre : votre meilleur sur cette version, {score}. Il a 48 h, essais illimités ; le plus haut gagne {xp}.', { score: fmt(best), xp: xpText(XP.challengeWin) }) : t('48 h pour battre votre score, chacun quand il veut.'),
+      lead: best ? t('Score à battre : ton meilleur sur cette version, {score}. Il a 48 h, essais illimités ; le plus haut gagne {xp}.', { score: fmt(best), xp: xpText(XP.challengeWin) }) : t('48 h pour battre ton score, chacun quand il veut.'),
       sections: [{ ...(sentTo ? { title: t('Défi envoyé à {name}', { name: sentTo }) } : {}), rows }],
       actions,
       back,
@@ -328,7 +356,41 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
 
   function sheetAction(entry: TableEntry, back: () => void): Action {
     const reason = sheetReason(entry);
-    return { label: t('Défier un joueur…'), detail: reason ?? t('48 h pour battre votre score, chacun quand il veut'), icon: 'trophy', ...(reason ? { tone: 'quiet' as const } : {}), run: () => host.library.openCustom(() => buildPick(entry, back)) };
+    return { label: t('Défier un joueur…'), detail: reason ?? t('48 h pour battre ton score, chacun quand il veut'), icon: 'trophy', ...(reason ? { tone: 'quiet' as const } : {}), run: () => host.library.openCustom(() => buildPick(entry, back)) };
+  }
+
+  // ---------- Lancer un défi depuis l'Arène : le choix de la table ----------
+
+  /** Mes tables jouées dont la version est lisible et qui ont un meilleur score à battre. */
+  function tablesToChallenge(): { entry: TableEntry; best: number }[] {
+    const out: { entry: TableEntry; best: number }[] = [];
+    for (const entry of host.recentTables().slice(0, TABLES_MAX * 2)) {
+      if (out.length >= TABLES_MAX) break;
+      const v = host.versionOf(entry);
+      if (v.state !== 'ok') continue;
+      const best = host.myBest(v);
+      if (best) out.push({ entry, best });
+    }
+    return out;
+  }
+
+  function buildTables(back: () => void): Built {
+    const actions: Action[] = [];
+    const rows: Row[] = [];
+    for (const { entry, best } of tablesToChallenge()) {
+      const action = actions.push({ label: entry.title, key: `table:${entry.id}`, icon: 'trophy', run: () => host.library.openCustom(() => buildPick(entry, () => host.library.openCustom(() => buildTables(back)))) }) - 1;
+      rows.push({ text: entry.title, detail: t('Ton meilleur : {score}', { score: fmt(best) }), icon: 'trophy', action, pick: true });
+    }
+    if (!rows.length) rows.push({ text: t('Aucune table à proposer'), detail: t('Joue d’abord une partie : ton meilleur score sera celui à battre'), icon: 'info', tone: 'quiet' });
+    actions.push({ label: t('Retour'), icon: 'back', run: back });
+    return {
+      heading: t('Lancer un défi'),
+      icon: 'trophy',
+      lead: t('Choisis la table : ton meilleur score sur cette version est celui à battre. Tu choisiras ensuite le joueur.'),
+      sections: [{ ...(sentTo ? { title: t('Défi envoyé à {name}', { name: sentTo }) } : {}), rows }],
+      actions,
+      back,
+    };
   }
 
   // ---------- Défier depuis un profil : le choix de la table ----------
@@ -348,16 +410,16 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
         if (!best) continue;
         const b = button(p, tableOf(entry, v), best, 'best', `table:${entry.id}`, here);
         const action = actions.push({ label: t('Défier sur {table}', { table: entry.title }), key: `table:${entry.id}`, icon: 'trophy', run: b.run, ...(b.off ? { tone: 'quiet' as const } : {}) }) - 1;
-        rows.push({ text: entry.title, detail: t('Votre meilleur : {score}', { score: fmt(best) }), ...(b.off ? { sub: b.off, tone: 'quiet' as const } : {}), icon: 'trophy', aside: b.off ? '—' : xpText(XP.challengeWin), action, pick: true });
+        rows.push({ text: entry.title, detail: t('Ton meilleur : {score}', { score: fmt(best) }), ...(b.off ? { sub: b.off, tone: 'quiet' as const } : {}), icon: 'trophy', aside: b.off ? '—' : xpText(XP.challengeWin), action, pick: true });
       }
-      if (!rows.length) rows.push({ text: t('Aucune table à proposer'), detail: t('Jouez d’abord une partie : votre meilleur score sera celui à battre'), icon: 'info', tone: 'quiet' });
+      if (!rows.length) rows.push({ text: t('Aucune table à proposer'), detail: t('Joue d’abord une partie : ton meilleur score sera celui à battre'), icon: 'info', tone: 'quiet' });
     }
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return {
       heading: t('Défier {name}', { name: p.name }),
       icon: 'trophy',
       avatar: host.face(p),
-      lead: t('Choisissez la table : votre meilleur score sur cette version est celui à battre. 48 h, essais illimités ; le plus haut gagne {xp}.', { xp: xpText(XP.challengeWin) }),
+      lead: t('Choisis la table : ton meilleur score sur cette version est celui à battre. 48 h, essais illimités ; le plus haut gagne {xp}.', { xp: xpText(XP.challengeWin) }),
       sections: [{ ...(sentTo ? { title: t('Défi envoyé à {name}', { name: sentTo }) } : {}), rows }],
       actions,
       back,
@@ -369,17 +431,17 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
   function stateLead(c: Challenge): string {
     switch (c.state) {
       case 'received':
-        return t('{name} vous défie : battez {score} avant l’échéance. Essais illimités, votre meilleur score compte.', { name: c.opponent.name, score: fmt(c.theirs ?? c.target) });
+        return t('{name} te défie : bats {score} avant l’échéance. Essais illimités, ton meilleur score compte.', { name: c.opponent.name, score: fmt(c.theirs ?? c.target) });
       case 'sent':
         return t('{name} n’a pas encore joué. Le défi lui arrive dès que sa borne est jointe.', { name: c.opponent.name });
       case 'running':
-        return c.leader === 'me' ? t('Vous menez. {name} peut encore jouer jusqu’à l’échéance.', { name: c.opponent.name }) : t('{name} a battu votre score : à vous.', { name: c.opponent.name });
+        return c.leader === 'me' ? t('Tu mènes. {name} peut encore jouer jusqu’à l’échéance.', { name: c.opponent.name }) : t('{name} a battu ton score : à toi.', { name: c.opponent.name });
       case 'won':
         return t('Défi gagné contre {name}.', { name: c.opponent.name });
       case 'lost':
         return t('Défi perdu contre {name}.', { name: c.opponent.name });
       case 'declined':
-        return c.role === 'sent' ? t('{name} a refusé votre défi.', { name: c.opponent.name }) : t('Vous avez refusé ce défi.');
+        return c.role === 'sent' ? t('{name} a refusé ton défi.', { name: c.opponent.name }) : t('Tu as refusé ce défi.');
       case 'expired':
         return resultDetail(c);
     }
@@ -390,11 +452,11 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
     const c = svc.list().find((x) => x.id === id) ?? svc.get(id);
     if (!c) return { heading: t('Défi'), icon: 'trophy', lead: svc.unavailable() ?? t('Ce défi n’est plus sur cette borne.'), sections: [], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
     const rows: Row[] = [
-      { text: t('Vous'), aside: c.mine !== undefined ? fmt(c.mine) : '—', ...(c.leader === 'me' ? { tone: 'ok' as const } : {}), icon: 'star' },
+      { text: t('Toi'), aside: c.mine !== undefined ? fmt(c.mine) : '—', ...(c.leader === 'me' ? { tone: 'ok' as const } : {}), icon: 'star' },
       { text: c.opponent.name, aside: c.theirs !== undefined ? fmt(c.theirs) : '—', avatar: host.face(c.opponent), ...(c.leader === 'them' ? { tone: 'warning' as const } : {}) },
     ];
     if (challengeOpen(c)) rows.push({ text: t('Temps restant'), aside: left(c), icon: 'clock', progress: { value: challengeElapsed(c, now()), tone: 'warning' } });
-    rows.push({ text: t('Si vous gagnez'), aside: xpText(XP.challengeWin), icon: 'trophy', ...(c.state === 'won' ? { tone: 'ok' as const } : {}) });
+    rows.push({ text: t('Si tu gagnes'), aside: xpText(XP.challengeWin), icon: 'trophy', ...(c.state === 'won' ? { tone: 'ok' as const } : {}) });
     const actions: Action[] = [];
     const fromButton = (b: HubButtonSpec, icon: Action['icon']): Action => ({ label: b.label, key: b.key, icon, run: b.run, ...(b.off ? { detail: b.off, tone: 'quiet' as const } : b.xp ? { detail: b.xp } : {}) });
     if (challengeOpen(c)) {

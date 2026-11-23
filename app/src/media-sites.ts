@@ -170,8 +170,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
     ctx.acquirer.show({
       url: source.login,
       game: t('Compte {site}', { site: mediaSite(site).name }),
-      expected: t('Connectez-vous, cochez « Se souvenir de moi », puis Fermer (Échap)'),
-      host: t('{site} · votre propre compte', { site: source.label }),
+      expected: t('Connecte-toi, coche « Se souvenir de moi », puis Fermer (Échap)'),
+      host: t('{site} · ton propre compte', { site: source.label }),
     });
   }
 
@@ -409,7 +409,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       url: job.hit.url,
       game: job.hit.title,
       expected: t('Média : {title}', { title: job.hit.title }),
-      host: t('{site} · votre propre compte', { site: source.label }),
+      host: t('{site} · ton propre compte', { site: source.label }),
       status: t('Cyber Pinball télécharge ce fichier pour le média : sa progression s’affiche dans le bandeau, inutile de cliquer dans la page.'),
       info: true,
     });
@@ -464,10 +464,10 @@ export function createMediaSites(ctx: MediaSitesContext) {
           if (other !== job && other.hit.site === job.hit.site && other.state === 'queued') Object.assign(other, { state: 'failed', error: result.reason });
       if (result.login || result.quota || job.cancelled || stop.signal.aborted) return fail(result.reason, { login: result.login });
       console.log(`Médias des sites : ${source.label}, « ${job.hit.title} » : pas de téléchargement direct (${result.reason}) ; la page affichée le rendra au média.`); // i18n-ignore : journal
-      const status = t('À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason: result.reason });
+      const status = t('À faire toi-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason: result.reason });
       const claim = { dir: incoming, title: t('{type} : {title}', { type: mediaTypeInfo(job.type).label, title: job.hit.title }), signal: stop.signal, progress: claimProgress, done: claimDone };
       if (!ctx.acquirer.adopt(job.hit.url, claim, status))
-        ctx.acquirer.show({ url: job.hit.url, game: job.hit.title, expected: t('Média : {title}', { title: job.hit.title }), host: t('{site} · votre propre compte', { site: source.label }), status, claim });
+        ctx.acquirer.show({ url: job.hit.url, game: job.hit.title, expected: t('Média : {title}', { title: job.hit.title }), host: t('{site} · ton propre compte', { site: source.label }), status, claim });
       handed = true;
     }
     job.state = 'downloading';
@@ -578,8 +578,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       url: hit.url,
       game: hit.title,
       expected: t('Média : {title}', { title: hit.title }),
-      host: t('{site} · votre propre compte', { site: source.label }),
-      status: reason ? t('À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason }) : undefined,
+      host: t('{site} · ton propre compte', { site: source.label }),
+      status: reason ? t('À faire toi-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason }) : undefined,
       claim: {
         dir: path.join(folder, 'recu'),
         title: t('{type} : {title}', { type: mediaTypeInfo(type).label, title: hit.title }),
@@ -688,8 +688,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       url: request.url,
       game: request.title,
       expected: t('Média : {label} ({formats})', { label: request.label, formats: info.formats.join(', ') }),
-      host: t('Recherche libre · fichiers que vous choisissez'),
-      status: t('Cherchez, ouvrez une page, téléchargez : le fichier est vérifié puis proposé pour « {label} ». Fermer (Échap) garde la page.', { label: request.label }),
+      host: t('Recherche libre · fichiers que tu choisis'),
+      status: t('Cherche, ouvre une page, télécharge : le fichier est vérifié puis proposé pour « {label} ». Fermer (Échap) garde la page.', { label: request.label }),
       // Sur une page vidéo, yt-dlp propose d'abord le son pour une musique, la vidéo pour un écran.
       search: { query: request.query, engine: request.engine, want: info.formats.some((f) => mediaKind(`x.${f}`) === 'video') ? 'video' : 'audio' },
       claim: {

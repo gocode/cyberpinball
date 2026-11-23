@@ -219,7 +219,7 @@ export interface LiveGame {
   goWhy?: LiveGoReason;
   goLate?: string[];
   /**
-   * Partie instantanée (instantgames.ts) : ouverte à tous, `max` joueurs au plus (l'hôte compris),
+   * Partie en direct (instantgames.ts) : ouverte à tous, `max` joueurs au plus (l'hôte compris),
    * ouverte le `opened` (ISO) ; elle part d'elle-même quand elle est complète.
    */
   instant?: { max: number; opened: string };
@@ -262,7 +262,7 @@ export type LiveMessage =
    */
   | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[]; readyFor?: number; go?: { why: 'all-ready' | 'timeout'; late: string[] }; startIn?: number; max?: number }
   /**
-   * Partie instantanée : un joueur, ami ou non, rejoint la partie annoncée (instantgames.ts) ; il a
+   * Partie en direct : un joueur, ami ou non, rejoint la partie annoncée (instantgames.ts) ; il a
    * la même version de la table (vérifiée chez lui, comme pour accepter une invitation).
    */
   | { t: 'game-join'; game: string; name: string; balls?: number; proto?: number; app?: string }
@@ -292,7 +292,7 @@ const MATCHES: readonly LiveTableMatch[] = ['same', 'other-version', 'missing'];
 const MANUAL: readonly LiveManualReason[] = ['script', 'rom', 'inspector', 'other'];
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 
-/** La table d'une partie (invitation, annonce d'une partie instantanée), vérifiée champ par champ. */
+/** La table d'une partie (invitation, annonce d'une partie en direct), vérifiée champ par champ. */
 export function parseLiveTable(raw: unknown): LiveTable | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
@@ -522,20 +522,20 @@ export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, matc
 }
 
 // ---------------------------------------------------------------------------
-// Partie instantanée (instantgames.ts) : ouverte à tous, elle part d'elle-même quand elle est complète
+// Partie en direct (instantgames.ts) : ouverte à tous, elle part d'elle-même quand elle est complète
 
 /** Places prises : l'hôte, ceux qui ont rejoint ou accepté, et les invitations en cours. */
 export function liveSeats(game: Pick<LiveGame, 'players'>): number {
   return game.players.filter((p) => !['declined', 'busy', 'expired', 'left'].includes(p.state)).length;
 }
 
-/** Joueurs au plus dans cette partie : le nombre choisi pour une partie instantanée, sinon quatre. */
+/** Joueurs au plus dans cette partie : le nombre choisi pour une partie en direct, sinon quatre. */
 export function liveMax(game: Pick<LiveGame, 'instant'>): number {
   return game.instant?.max ?? LIVE_MAX_PLAYERS;
 }
 
 /**
- * Un joueur rejoint ma partie instantanée : il y entre, prêt (il a vérifié la même version chez lui) ;
+ * Un joueur rejoint ma partie en direct : il y entre, prêt (il a vérifié la même version chez lui) ;
  * sinon pourquoi pas : complète (`full`), déjà partie (`started`), ou plus ouverte (`cancelled`).
  * Le même joueur revenu (message renvoyé) : la partie telle qu'elle est.
  */
@@ -558,7 +558,7 @@ export function joinGame(game: LiveGame, peer: { key: string; name: string }, ba
   return { game: { ...game, players: [...game.players.filter((p) => p.key !== peer.key), player] } };
 }
 
-/** Partie instantanée complète, pas encore partie : le départ se donne tout seul. */
+/** Partie en direct complète, pas encore partie : le départ se donne tout seul. */
 export function instantComplete(game: LiveGame): boolean {
   return !!game.instant && game.phase === 'gathering' && game.players.filter((p) => p.state === 'accepted').length >= game.instant.max;
 }
@@ -734,7 +734,7 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'ba
       if (liveOtherBalls(p, hostBalls)) return t('Prêt, {balls} : score hors classement', { balls: liveBallsAgainst(p.balls!, hostBalls!) });
       return p.host ? t('Prêt') : t('Prêt, réglages de l’hôte reçus');
     case 'declined':
-      return p.match === 'missing' ? t('N’a pas cette table') : p.match === 'other-version' ? t('N’a pas la même version : il peut récupérer la vôtre') : t('A refusé');
+      return p.match === 'missing' ? t('N’a pas cette table') : p.match === 'other-version' ? t('N’a pas la même version : il peut récupérer la tienne') : t('A refusé');
     case 'busy':
       return t('Occupé pour l’instant');
     case 'expired':
@@ -780,11 +780,11 @@ export function liveBallsAgainst(mine: number, host: number): string {
 export function liveMatchLabel(match: LiveTableMatch): string {
   switch (match) {
     case 'same':
-      return t('Vous avez cette table');
+      return t('Tu as cette table');
     case 'other-version':
-      return t('Vous avez cette table dans une autre version : la partie se joue sur la même version pour tous, récupérez la sienne');
+      return t('Tu as cette table dans une autre version : la partie se joue sur la même version pour tous, récupère la sienne');
     case 'missing':
-      return t('Vous n’avez pas cette table : récupérez-la par le catalogue, puis demandez une nouvelle invitation');
+      return t('Tu n’as pas cette table : récupère-la par le catalogue, puis demande une nouvelle invitation');
   }
 }
 

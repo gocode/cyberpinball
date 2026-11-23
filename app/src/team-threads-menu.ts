@@ -25,7 +25,7 @@ const ORIGIN_ICON: Record<ThreadOrigin, IconName> = { report: 'report', crash: '
 
 /** D'où vient un fil, en quelques mots. */
 export function originText(origin: ThreadOrigin): string {
-  return origin === 'crash' ? t('Rapport de plantage') : origin === 'proposal' ? t('Votre proposition') : t('Votre rapport');
+  return origin === 'crash' ? t('Rapport de plantage') : origin === 'proposal' ? t('Ta proposition') : t('Ton rapport');
 }
 
 export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
@@ -53,7 +53,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
     const last = x.lines[x.lines.length - 1];
     if (!last) return originText(x.origin);
     const text = last.text.replace(/\s*\n\s*/g, ' ');
-    return last.from === 'team' ? t('Équipe : {text}', { text }) : t('Vous : {text}', { text });
+    return last.from === 'team' ? t('Équipe : {text}', { text }) : t('Toi : {text}', { text });
   };
 
   // ---------- La liste ----------
@@ -83,10 +83,10 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
         heading: t('Mes échanges avec l’équipe'),
         icon: 'message',
         subheading: t('Retours et propositions'),
-        lead: t('Chaque rapport que vous envoyez ouvre un échange : l’équipe peut vous y répondre, et vous lui répondre en retour. Une réponse arrive avec une notification et dans vos messages en attente.'),
+        lead: t('Chaque rapport que tu envoies ouvre un échange : l’équipe peut t’y répondre, et toi lui répondre en retour. Une réponse arrive avec une notification et dans tes messages en attente.'),
         sections: rows.length
           ? [{ title: t('Les plus récents d’abord'), rows }]
-          : [{ rows: [{ icon: 'info', text: t('Aucun échange pour l’instant'), detail: t('Envoyez un rapport ou signalez un problème : la réponse de l’équipe s’affichera ici.'), tone: 'quiet' }] }],
+          : [{ rows: [{ icon: 'info', text: t('Aucun échange pour l’instant'), detail: t('Envoie un rapport ou signale un problème : la réponse de l’équipe s’affichera ici.'), tone: 'quiet' }] }],
         actions,
         back,
         listStart: t('ouvrir l’échange'),
@@ -99,7 +99,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
     const anonymous = host.anonymous();
     return {
       label: t('Mes rapports'),
-      detail: anonymous ? t('Anonymes : l’équipe peut vous répondre sans savoir qui vous êtes') : t('Avec mon pseudo : l’équipe sait à qui elle répond'),
+      detail: anonymous ? t('Anonymes : l’équipe peut te répondre sans savoir qui tu es') : t('Avec mon pseudo : l’équipe sait à qui elle répond'),
       icon: anonymous ? 'lock' : 'account',
       key: 'team-threads:anonymous',
       run: () => {
@@ -127,7 +127,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
           day = d;
           rows.push({ text: formatDateTime(line.at, { dateStyle: 'full' }), bubble: 'day' });
         }
-        const who = line.from === 'team' ? t('Équipe Cyber Pinball') : t('Vous');
+        const who = line.from === 'team' ? t('Équipe Cyber Pinball') : t('Toi');
         const time = formatDateTime(line.at, { timeStyle: 'short' });
         rows.push({ text: line.text, detail: line.queued ? t('{who} · {time} · part à la prochaine connexion', { who, time }) : `${who} · ${time}`, bubble: line.from === 'team' ? 'in' : line.queued ? 'pending' : 'out' });
       }
@@ -136,7 +136,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
       const actions: Action[] = [
         {
           label: t('Répondre à l’équipe…'),
-          detail: state === 'sending' ? t('Envoi en cours…') : state === 'failed' ? t('Pas parti : écriture impossible dans les données de la borne') : t('Clavier à l’écran, ou votre téléphone appairé · chiffré pour l’équipe'),
+          detail: state === 'sending' ? t('Envoi en cours…') : state === 'failed' ? t('Pas parti : écriture impossible dans les données de la borne') : t('Clavier à l’écran, ou ton téléphone appairé · chiffré pour l’équipe'),
           icon: 'keyboard',
           tone: state === 'sending' ? 'quiet' : 'ok',
           key: 'team-thread:write',
@@ -165,7 +165,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
   function compose(fil: string, reopen: () => void): void {
     host.prompt(
       t('Répondre à l’équipe'),
-      t('Votre message'),
+      t('Ton message'),
       '',
       (value) => {
         if (!value?.trim()) return reopen();
@@ -191,7 +191,7 @@ export function createTeamThreadsMenu(host: TeamThreadsMenuHost) {
       const n = host.threads.visible().length;
       return {
         label: t('Mes échanges avec l’équipe'),
-        detail: unread ? tn(unread, '{n} réponse de l’équipe à lire', '{n} réponses de l’équipe à lire') : n ? tn(n, '{n} échange · vos rapports et les réponses de l’équipe', '{n} échanges · vos rapports et les réponses de l’équipe') : t('Vos rapports et les réponses de l’équipe'),
+        detail: unread ? tn(unread, '{n} réponse de l’équipe à lire', '{n} réponses de l’équipe à lire') : n ? tn(n, '{n} échange · tes rapports et les réponses de l’équipe', '{n} échanges · tes rapports et les réponses de l’équipe') : t('Tes rapports et les réponses de l’équipe'),
         icon: 'message',
         ...(unread ? { attention: true, tone: 'ok' as const } : {}),
         key: 'feedback:threads',

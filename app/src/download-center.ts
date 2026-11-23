@@ -183,7 +183,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     if (active.length) sections.push({ title: t('En cours et en attente'), rows: active });
     if (finished.length) sections.push({ title: t('Terminés et bloqués'), rows: finished });
     if (!active.length && !finished.length)
-      sections.push({ rows: [{ text: t('Aucun téléchargement en cours'), detail: t('Ce que vous demandez à un site ou à un ami arrive ici : vous le suivez, il reprend seul après une coupure, et il vous ramène là où vous l’avez demandé.'), tone: 'quiet' }] });
+      sections.push({ rows: [{ text: t('Aucun téléchargement en cours'), detail: t('Ce que tu demandes à un site ou à un ami arrive ici : tu le suis, il reprend seul après une coupure, et il te ramène là où tu l’as demandé.'), tone: 'quiet' }] });
 
     const all = [...jobs.values()];
     const pausable = all.filter((j) => isActive(j) && j.state !== 'paused' && !j.attached);
@@ -212,7 +212,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
       heading: t('Téléchargements'),
       icon: 'download',
       subheading: [summaryText(s), left].filter(Boolean).join(' · '),
-      lead: t('Vos téléchargements, leurs reprises et les écrans où continuer.'),
+      lead: t('Tes téléchargements, leurs reprises et les écrans où continuer.'),
       sections,
       actions,
       back: () => ctx.back(),
@@ -274,7 +274,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     const actions: Action[] = [];
     const returnAction = (primary: boolean): Action => ({
       label: t('Revenir à {screen}', { screen: to }),
-      detail: j.state === 'done' ? (j.kind === 'friend-media' ? t('Vérifiez, puis enregistrez') : j.kind === 'friend-table' ? t('Le plan d’ajout, avant toute installation') : undefined) : t('Le téléchargement continue'),
+      detail: j.state === 'done' ? (j.kind === 'friend-media' ? t('Vérifie, puis enregistre') : j.kind === 'friend-table' ? t('Le plan d’ajout, avant toute installation') : undefined) : t('Le téléchargement continue'),
       icon: 'back',
       tone: primary ? 'ok' : undefined,
       key: 'return',

@@ -195,7 +195,7 @@ test('automatique : un volume d’usine bas est monté au volume conseillé ; un
   assert.equal(romVolumeTarget(status(), 8), 8);
   setRomVolume(status(), 8);
   assert.equal(romVolumeTarget(status(), 8), undefined);
-  assert.deepEqual(romVolumeLine(status(), 8), { detail: '8 sur 31 (votre réglage)', tone: 'ok', low: false });
+  assert.deepEqual(romVolumeLine(status(), 8), { detail: '8 sur 31 (ton réglage)', tone: 'ok', low: false });
   // Choix hors plage (mémoire d'une autre ROM) : ignoré.
   assert.equal(romVolumeTarget(status(), 99), undefined);
   // Sans mémoire : la ROM la crée à sa première partie, au volume d'usine ; la fiche dit la suite.

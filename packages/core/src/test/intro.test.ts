@@ -241,14 +241,14 @@ const view = (role: string, screen: keyof typeof INTRO_FALLBACKS, extra: Record<
 test('rendu : du noir avant le départ, puis chaque couche monte la scène de son rôle ; l’invite paraît à la fin', async () => {
   const p = page();
   const pf = view('playfield', 'playfield');
-  p.send(introState('playfield', { id: 1, startedAt: undefined, screens: { playfield: pf }, desktop: view('playfield', 'backglass'), hint: 'Appuyez sur un bouton pour choisir une table' }));
+  p.send(introState('playfield', { id: 1, startedAt: undefined, screens: { playfield: pf }, desktop: view('playfield', 'backglass'), hint: 'Appuie sur un bouton pour choisir une table' }));
   assert.deepEqual(p.mounted, [], 'rien avant que toutes les fenêtres soient prêtes');
   assert.ok(p.document.documentElement.classList.contains('intro-phase'));
-  p.send(introState('playfield', { id: 1, startedAt: Date.now(), screens: { playfield: pf }, desktop: view('playfield', 'backglass'), hint: 'Appuyez sur un bouton pour choisir une table' }));
+  p.send(introState('playfield', { id: 1, startedAt: Date.now(), screens: { playfield: pf }, desktop: view('playfield', 'backglass'), hint: 'Appuie sur un bouton pour choisir une table' }));
   assert.deepEqual(p.mounted, ['playfield:1']);
   assert.equal(p.document.querySelector('.intro-hint'), null, 'pas d’invite pendant l’animation');
   await new Promise((r) => setTimeout(r, 80));
-  assert.equal(p.document.querySelector('.intro-hint')?.textContent, 'Appuyez sur un bouton pour choisir une table');
+  assert.equal(p.document.querySelector('.intro-hint')?.textContent, 'Appuie sur un bouton pour choisir une table');
   // Le même état renvoyé ne remonte pas la scène.
   p.send(introState('playfield', { id: 1, startedAt: Date.now(), screens: { playfield: pf }, hint: 'x' }));
   assert.deepEqual(p.mounted, ['playfield:1']);

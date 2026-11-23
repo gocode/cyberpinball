@@ -190,7 +190,7 @@ export function pinballFx3FolderProblemText(problem: PinballFx3FolderProblem, di
     case 'absent':
       return t('« {dir} » est introuvable (disque débranché, dossier déplacé ?).', { dir });
     case 'no-exe':
-      return t('« {dir} » : ni « Pinball FX Classic.exe » ni « Pinball FX3.exe » ici. Choisissez le dossier qui contient l’exécutable de {game}.', { dir, game });
+      return t('« {dir} » : ni « Pinball FX Classic.exe » ni « Pinball FX3.exe » ici. Choisis le dossier qui contient l’exécutable de {game}.', { dir, game });
     case 'no-tables':
       return t('« {dir} » : l’exécutable est là, mais aucune table dans son dossier data\\steam.', { dir });
   }
@@ -214,5 +214,5 @@ export function pinballFx3FolderProblemReason(problem: PinballFx3FolderProblem):
  */
 export function pinballFx3DirectFailureHint(gameDir: string): string {
   const game = 'Pinball FX3';
-  return t('{game} a été lancé depuis le dossier choisi ({dir}), sans passer par Steam. S’il exige Steam, il refuse de s’ouvrir ainsi : « Oublier ce dossier » (Ajouter une table > Tables de {game}) revient au jeu de Steam. Sinon, vérifiez que le mode borne est activé dans le jeu et que la table est achetée sur votre compte.', { game, dir: gameDir });
+  return t('{game} a été lancé depuis le dossier choisi ({dir}), sans passer par Steam. S’il exige Steam, il refuse de s’ouvrir ainsi : « Oublier ce dossier » (Ajouter une table > Tables de {game}) revient au jeu de Steam. Sinon, vérifie que le mode borne est activé dans le jeu et que la table est achetée sur ton compte.', { game, dir: gameDir });
 }

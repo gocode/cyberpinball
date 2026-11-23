@@ -188,7 +188,7 @@ test('Kinect : chaque raison de ne pas servir est dite (sans courant, sans pilot
   assert.ok(!noPower.ready && /adaptateur secteur/.test(noPower.reason));
   // Pilote posé, mais Windows ne l'a pas chargé (intégrité de la mémoire désactivée sans redémarrer) : redémarrer.
   const notLoaded = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 52 }, true));
-  assert.ok(!notLoaded.ready && notLoaded.restart && /code 52/.test(notLoaded.reason) && /redémarrez/.test(notLoaded.reason));
+  assert.ok(!notLoaded.ready && notLoaded.restart && /code 52/.test(notLoaded.reason) && /redémarre/.test(notLoaded.reason));
   // Le périphérique n'a aucun pilote (code 28), même si Kinect10.dll est là : réinstaller.
   const missing = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 28 }, true));
   assert.ok(!missing.ready && missing.installKinectDriver);

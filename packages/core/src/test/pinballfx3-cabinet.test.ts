@@ -85,7 +85,7 @@ test('avertissement du changement d’orientation : une seule fois, et seulement
   const notice = takePinballFx3OrientationNotice(dir, true, change);
   assert.ok(notice);
   assert.match(notice.title, /Pinball FX3 : orientation à changer/);
-  assert.match(notice.lines.join('\n'), /passez Orientation de 270° à 90°/);
+  assert.match(notice.lines.join('\n'), /passe Orientation de 270° à 90°/);
   assert.match(notice.lines.at(-1)!, /^Start : ouvrir Pinball FX3 · Exit : revenir au front-end$/);
   assert.ok(fs.existsSync(path.join(dir, PINBALLFX3_ORIENTATION_NOTICE_FILE)));
   assert.equal(takePinballFx3OrientationNotice(dir, true, change), undefined, 'montré une fois');

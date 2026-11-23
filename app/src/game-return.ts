@@ -132,7 +132,7 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
         },
       }));
       actions.push({ label: t('Retour'), icon: 'back', run: reopen });
-      return { heading: t('Un mot à {name}', { name: rival.name }), icon: 'message', lead: t('Une phrase toute prête, envoyée dans votre conversation.'), sections: [], actions, back: reopen };
+      return { heading: t('Un mot à {name}', { name: rival.name }), icon: 'message', lead: t('Une phrase toute prête, envoyée dans ta conversation.'), sections: [], actions, back: reopen };
     }, 0);
   }
 
@@ -154,10 +154,10 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
           {
             key: 'score',
             icon: 'star',
-            eyebrow: n.record ? t('Record personnel battu') : t('Votre score'),
+            eyebrow: n.record ? t('Record personnel battu') : t('Ton score'),
             tone: 'signal',
             title: fmt(score),
-            ...(n.record ? { aside: t('+{n}', { n: fmt(n.record.score - n.record.previous) }), detail: t('Votre record d’avant : {n}', { n: fmt(n.record.previous) }) } : {}),
+            ...(n.record ? { aside: t('+{n}', { n: fmt(n.record.score - n.record.previous) }), detail: t('Ton record d’avant : {n}', { n: fmt(n.record.previous) }) } : {}),
           },
         ],
       });
@@ -166,10 +166,10 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
       const cards: HubCardSpec[] = [];
       const others = o.passed.length - 1;
       const gainedPlaces = o.previous !== undefined ? o.previous - o.rank : undefined;
-      const detail = [gainedPlaces ? tn(gainedPlaces, '{n} place de gagnée', '{n} places de gagnées') : gainedPlaces === undefined ? t('Vous entrez au classement') : undefined, others > 0 ? tn(others, 'et {n} autre joueur dépassé', 'et {n} autres joueurs dépassés') : undefined].filter(Boolean).join(' · ');
-      cards.push({ key: 'passed', avatar: host.daily.face(rival), title: t('Vous passez devant {name}', { name: rival.name }), ...levelChip(rival), aside: placeText(o.rank, o.period), ...(detail ? { detail } : {}) });
-      if (o.next) cards.push({ key: 'next', avatar: host.daily.face(o.next), title: t('Prochain : {name}', { name: o.next.name }), ...levelChip(o.next), aside: fmt(o.next.score), detail: t('{place} · il vous manque {gap}', { place: placeText(o.next.rank, o.period), gap: fmt(o.gap ?? 0) }) });
-      else cards.push({ key: 'first', icon: 'trophy', title: t('Personne devant vous'), detail: t('Vous êtes premier : gardez votre place') });
+      const detail = [gainedPlaces ? tn(gainedPlaces, '{n} place de gagnée', '{n} places de gagnées') : gainedPlaces === undefined ? t('Tu entres au classement') : undefined, others > 0 ? tn(others, 'et {n} autre joueur dépassé', 'et {n} autres joueurs dépassés') : undefined].filter(Boolean).join(' · ');
+      cards.push({ key: 'passed', avatar: host.daily.face(rival), title: t('Tu passes devant {name}', { name: rival.name }), ...levelChip(rival), aside: placeText(o.rank, o.period), ...(detail ? { detail } : {}) });
+      if (o.next) cards.push({ key: 'next', avatar: host.daily.face(o.next), title: t('Prochain : {name}', { name: o.next.name }), ...levelChip(o.next), aside: fmt(o.next.score), detail: t('{place} · il te manque {gap}', { place: placeText(o.next.rank, o.period), gap: fmt(o.gap ?? 0) }) });
+      else cards.push({ key: 'first', icon: 'trophy', title: t('Personne devant toi'), detail: t('Tu es premier : garde ta place') });
       const where = o.scope === 'country' && host.daily.input().country ? countryName(host.daily.input().country!, locale()) : o.scope === 'friends' ? t('Amis') : t('Monde');
       sections.push({ title: o.period === 'today' ? t('Classement du jour') : t('Classement de tout temps'), note: where, layout: 'list', cards });
     }

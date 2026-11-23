@@ -47,7 +47,7 @@ function host(over: Record<string, unknown> = {}) {
             lines: [{ rank: 1, key: KEY, id: SCORE_ID, name: 'Bruno', country: 'FR', score: 952_100_000, at: NOW.toISOString(), how: 'rom', face: avatarView(KEY, 'Bruno', AVATAR), status: { state: 'playing', label: 'En partie' } }],
             players: 1,
             complete: true,
-            note: 'Même version de la table que la vôtre',
+            note: 'Même version de la table que la tienne',
           },
     now: () => NOW,
     images: createRemoteImages(),

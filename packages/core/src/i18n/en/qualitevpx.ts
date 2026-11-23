@@ -22,8 +22,8 @@ export const messages: Record<string, string> = {
     'Like Balanced, with reflections and shading that follow what moves. Powerful graphics card.',
   'Image calculée en plus haute définition puis réduite : la plus belle, la plus coûteuse. Très grosse carte graphique.':
     'Image computed at a higher resolution then scaled down: the most beautiful, the most demanding. Very large graphics card.',
-  'Vos propres réglages (Réglages de VPX) : Cyber Pinball n’y touche pas. Choisissez un mode pour reprendre.':
+  'Tes propres réglages (Réglages de VPX) : Cyber Pinball n’y touche pas. Choisis un mode pour reprendre.':
     'Your own settings (VPX settings): Cyber Pinball leaves them alone. Choose a mode to switch back.',
-  'Qualité de l’image et fluidité de VPX en un choix. Les réglages un par un restent dans Réglages de VPX ; en changer un vous fait passer en Personnalisé.':
+  'Qualité de l’image et fluidité de VPX en un choix. Les réglages un par un restent dans Réglages de VPX ; en changer un te fait passer en Personnalisé.':
     'VPX image quality and smoothness in one choice. The individual settings stay in VPX settings; changing one of them switches you to Custom.',
 };

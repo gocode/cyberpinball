@@ -114,6 +114,8 @@ export interface ProfileMenuHost {
   zoneKeys?(): readonly string[];
   /** Flippers : changer d'onglet dans la barre, contenu affiché immédiatement. */
   navKeys?(): { previous: readonly string[]; next: readonly string[] };
+  /** Régler le partage, sur place depuis mon profil quand il est coupé (le réglage « Partage et réseau »). */
+  openSharing?(back: () => void): void;
   /** Mon niveau (level-tracker.ts) : l'anneau de ma pastille, même quand mon profil public est coupé. */
   myLevel?(): number;
   /** Compteurs actuels des badges du joueur local, jamais ceux d'un autre profil. */
@@ -160,6 +162,10 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
   onGesture(() => (flash = undefined));
   const flashSections = (): Section[] => (flash ? [{ rows: [flash] }] : []);
 
+  /** Un niveau trop élevé pour l'ancienneté connue du joueur : « en cours de vérification » (jamais « ? », qui ne dit rien). */
+  const levelChecking = () => t('Niveau en cours de vérification');
+  const levelCheckingWhy = () => t('Il s’affichera quand ta borne connaîtra ce joueur depuis assez longtemps');
+
   const me = () => net.state().key.publicKey;
   const isFriend = (key: string) => net.state().friends.some((f) => f.key === key);
   /** Le dernier nom connu de chaque joueur montré : un ami qu'on retire garde son nom à l'écran. */
@@ -182,14 +188,14 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const { count, players } = invitedOf(key, card.invited, card.invitedTotal);
     // Ce que rapporte une personne invitée : rappelé à moi seul, pour donner envie d'en inviter.
     const reward = t('+{xp} XP par personne invitée, +{tier} XP à chacun de ses paliers ; badge Ambassadeur dès la première', { xp: XP.invited, tier: XP.inviteeTier });
-    if (!count) return mine ? [{ title: t('Personnes invitées'), rows: [{ text: t('Faites découvrir Cyber Pinball à vos amis'), detail: t('À son arrivée, chacun peut dire que c’est vous : {reward}', { reward }), icon: 'friend-add', tone: 'info' }] }] : [];
+    if (!count) return mine ? [{ title: t('Personnes invitées'), rows: [{ text: t('Fais découvrir Cyber Pinball à tes amis'), detail: t('À son arrivée, chacun peut dire que c’est toi : {reward}', { reward }), icon: 'friend-add', tone: 'info' }] }] : [];
     const shown = [...players].reverse().slice(0, 8).map((p) => avatarOf(p.me, nameOf(p.me, net.publicCard(p.me)) || p.name, net.publicCard(p.me)));
     const text = mine
-      ? tn(count, 'Vous avez fait découvrir Cyber Pinball à {n} joueur', 'Vous avez fait découvrir Cyber Pinball à {n} joueurs')
+      ? tn(count, 'Tu as fait découvrir Cyber Pinball à {n} joueur', 'Tu as fait découvrir Cyber Pinball à {n} joueurs')
       : tn(count, 'A fait découvrir Cyber Pinball à {n} joueur', 'A fait découvrir Cyber Pinball à {n} joueurs');
     return [{ title: t('Personnes invitées'), rows: [{ text, icon: 'friend-add', tone: 'ok', avatars: shown, ...(mine ? { detail: reward } : {}), ...(count > shown.length ? { aside: `+${count - shown.length}` } : {}) }] }];
   }
-  const levelLine = (level: number | '?' | undefined) => (level === undefined ? undefined : level === '?' ? t('Niveau ?') : t('{tier} · niveau {level}', { tier: tierLabel(tierOf(level)), level }));
+  const levelLine = (level: number | '?' | undefined) => (level === undefined ? undefined : level === '?' ? levelChecking() : t('{tier} · niveau {level}', { tier: tierLabel(tierOf(level)), level }));
   const avatarOf = (key: string, name: string, card?: PublicCard) => {
     const level = levelOfCard(key, card);
     return { ...avatarView(key, name, net.avatarFile(key) ?? (card?.avatar ? net.rankingAvatar(key, card.avatar) : undefined)), ...(typeof level === 'number' ? { level } : {}) };
@@ -208,7 +214,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     else {
       const v = levelOf(card.xp);
       const level = trusted ? v.level : levelOfCard(key, card);
-      if (level === '?') out.push({ rows: [{ icon: 'gauge', text: t('Niveau ?'), detail: t('Plus haut que ce que permet son ancienneté sur le réseau : pas montré'), tone: 'quiet' }] });
+      if (level === '?') out.push({ rows: [{ icon: 'gauge', text: levelChecking(), detail: levelCheckingWhy(), tone: 'quiet' }] });
       else out.push({ kind: 'profile-level', rows: [{ icon: 'gauge', text: t('{tier} · niveau {level}', { tier: tierLabel(v.tier), level: v.level }), detail: t('{into} / {need} XP', { into: v.into.toLocaleString(), need: v.need.toLocaleString() }), progress: { value: v.progress, tone: 'ok' } }] });
     }
     const rank = { legendary: 0, epic: 1, rare: 2, common: 3 } as const;
@@ -234,7 +240,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     if (!list.length) return [];
     const rows: Row[] = list.map((g) => {
       const index = actions.push({ label: g.name, key: `group:${g.id}`, icon: 'group', run: () => host.groups!.open(g.id, g.mine, () => here(index)) }) - 1;
-      const detail = [tn(g.members, '{n} membre', '{n} membres'), g.week ? t('table de la semaine : {table}', { table: g.week }) : undefined, g.mine ? t('vous en êtes') : undefined].filter(Boolean).join(' · ');
+      const detail = [tn(g.members, '{n} membre', '{n} membres'), g.week ? t('table de la semaine : {table}', { table: g.week }) : undefined, g.mine ? t('tu en es') : undefined].filter(Boolean).join(' · ');
       return { text: g.name, detail, icon: 'group' as const, action: index, pick: true };
     });
     return [{ title: t('Groupes publics'), kind: 'profile-groups', rows }];
@@ -300,25 +306,25 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       name,
       ...(levelChip(level) ? { level: levelChip(level)! } : {}),
       ...eyebrow,
-      ...(mine ? { status: mineStatus(card) } : head?.status ? { status: head.status } : !card && !friend ? { status: { text: t('Profil public pas encore reçu'), tone: 'quiet' as const } } : {}),
+      ...(mine ? { status: mineStatus(card) } : head?.status ? { status: head.status } : hidden ? { status: { text: t('Activité masquée sur cette borne'), tone: 'quiet' as const } } : !card && !friend ? { status: { text: t('Profil public pas encore reçu'), tone: 'quiet' as const } } : {}),
       buttons: mine ? mineButtons(reopen) : playerButtons(key, name, friend, part!, reopen, level),
     };
 
     const tabs: HubTabSpec[] = [
       { id: 'activity', label: t('Activité'), icon: 'history' },
       { id: 'records', label: t('Records'), icon: 'trophy', ...(records.length ? {} : { disabled: t('Aucun encore') }) },
-      { id: 'badges', label: t('Badges'), icon: 'medal', ...(card?.badges.length && !hidden ? {} : { disabled: t('Aucun encore') }) },
+      { id: 'badges', label: t('Badges'), icon: 'medal', ...(hidden || card?.badges.length ? {} : { disabled: t('Aucun encore') }) },
       { id: 'about', label: t('À propos'), icon: 'info' },
     ];
     // Des onglets en liste (règle du 22/11/2026 : hors de l'accueil, pas de blocs) : chaque publication, record ou option est un arrêt des flippers.
     const spec: HubSpec = { heading: mine ? t('Mon profil') : name, icon: 'friend-list', medallion: 'communaute', title: name, facts, person, tabs, sections: [], list: true, readableCards: true };
     // Partage coupé (mon profil) : personne ne me voit ; rien d'autre à montrer.
-    if (mine && !s.enabled) return { ...spec, sections: [], empty: { title: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »') } };
+    if (mine && !s.enabled) return { ...spec, sections: sharingOffSections(reopen) };
     switch (tab) {
       case 'records':
         return { ...spec, sections: recordsSections(records, mine) };
       case 'badges':
-        return { ...spec, sections: !mine && !card ? [] : profileBadgeSections(mine ? net.state().badges.map((b) => b.id) : card?.badges ?? [], mine ? host.badgeFacts?.() : undefined) };
+        return { ...spec, sections: hidden ? hiddenSections(key, reopen) : !mine && !card ? [] : profileBadgeSections(mine ? net.state().badges.map((b) => b.id) : card?.badges ?? [], mine ? host.badgeFacts?.() : undefined) };
       case 'about':
         return { ...spec, sections: aboutSections(key, name, card, mine, friend, part, groups, reopen, back) };
       default:
@@ -326,9 +332,23 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     }
   }
 
-  /** Sous mon nom : mon profil public activé (et les « J'aime » reçus), ou coupé. */
+  /** Partage coupé (mon profil) : personne ne me voit ; la seule suite possible est de le régler, sur place. */
+  function sharingOffSections(reopen: () => void): HubSectionSpec[] {
+    const cards: HubCardSpec[] = [{ key: 'sharing-off', icon: 'network', title: t('Partage désactivé : personne ne te voit, tu ne vois personne'), detail: t('Tant qu’il est coupé, le profil public n’est pas publié'), quiet: true }];
+    const choices: HubCardSpec[] = host.openSharing ? [{ key: 'sharing', icon: 'network', title: t('Régler le partage'), detail: t('Activer le partage, le réseau local et la présence publique'), run: () => host.openSharing!(reopen) }] : [];
+    return [{ layout: 'list', cards, choices }];
+  }
+
+  /** Activité masquée sur cette borne : le dire, et de quoi l'afficher de nouveau d'un geste (jamais un chemin à retrouver). */
+  function hiddenSections(key: string, reopen: () => void): HubSectionSpec[] {
+    return [{ title: t('Activité'), layout: 'list', column: 'left', cards: [{ key: 'hidden', icon: 'eye', title: t('Activité masquée sur cette borne'), detail: t('Ses évènements, ses badges et ses « J’aime » ne s’affichent plus ici. Start : l’afficher de nouveau'), run: () => { net.hideActivity(key, false); reopen(); } }] }];
+  }
+
+  /** Sous mon nom : le partage coupé, mon profil public activé (et les « J'aime » reçus), coupé, ou pas encore prêt. */
   function mineStatus(card: PublicCard | undefined): HubPersonSpec['status'] {
-    if (net.state().publicProfile === false || !card) return { text: t('Profil public désactivé : les autres ne voient que votre pseudo'), tone: 'warning' };
+    if (!net.state().enabled) return { text: t('Partage désactivé : personne ne te voit, tu ne vois personne'), tone: 'warning' };
+    if (net.state().publicProfile === false) return { text: t('Profil public désactivé : les autres ne voient que ton pseudo'), tone: 'warning' };
+    if (!card) return { text: t('Profil public en cours de préparation'), tone: 'quiet' };
     const likes = Object.values(card.likes).reduce((a, b) => a + b, 0);
     return { text: likes ? tn(likes, 'Profil public activé · {n} « J’aime » reçu', 'Profil public activé · {n} « J’aime » reçus') : t('Profil public activé'), tone: 'signal' };
   }
@@ -370,8 +390,8 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const cancel = act('cancel-request');
     if (accept) out.push({ label: t('Accepter'), key: 'accept', icon: 'check', xp: xpText(XP.friend), primary: true, run: accept.run });
     if (decline) out.push({ label: t('Refuser'), key: 'decline', icon: 'close', run: decline.run });
-    if (request) out.push({ label: t('Ajouter'), key: 'request', icon: 'friend-add', xp: xpText(XP.friend), primary: true, run: request.run });
-    if (cancel) out.push({ label: t('Ajouter'), key: 'request', icon: 'friend-add', off: t('Demande envoyée'), run: () => undefined }, { label: t('Annuler la demande'), key: 'cancel-request', icon: 'close', run: cancel.run });
+    if (request) out.push({ label: t('Ajouter en ami'), key: 'request', icon: 'friend-add', xp: xpText(XP.friend), primary: true, run: request.run });
+    if (cancel) out.push({ label: t('Ajouter en ami'), key: 'request', icon: 'friend-add', off: t('Demande envoyée'), run: () => undefined }, { label: t('Annuler la demande'), key: 'cancel-request', icon: 'close', run: cancel.run });
     // Un nouveau venu en ligne : un mot de bienvenue dans le salon (comme « Saluer » de la Communauté).
     const online = net.livePlayers().some((b) => b.key === key);
     if (host.welcome && online && typeof level === 'number' && level <= NEWCOMER_LEVEL)
@@ -396,10 +416,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
    */
   function activitySections(key: string, card: PublicCard | undefined, part: PlayerPart | undefined, mine: boolean, friend: boolean, hidden: boolean, level: number | '?' | undefined, reopen: () => void, show: (tab: ProfileTab) => void): HubSectionSpec[] {
     const out: HubSectionSpec[] = [];
-    if (hidden) {
-      out.push({ title: t('Activité'), layout: 'list', column: 'left', cards: [{ key: 'hidden', icon: 'eye', title: t('Activité masquée sur cette borne'), detail: t('Ses évènements et ses « J’aime » ne s’affichent plus ici : À propos › Afficher son activité'), quiet: true }] });
-      return out;
-    }
+    if (hidden) return hiddenSections(key, reopen);
     const since = now().getTime() - 30 * 86_400_000;
     const items: { at: string; event: PublicEvent | SocialEvent; likable: boolean }[] = [
       ...(card?.events ?? []).map((event) => ({ at: event.at, event, likable: true })),
@@ -412,9 +429,9 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       if (mine)
         return { ...base, detail: n ? socialAgo(e.at, now()) : t('{ago} · pas encore de « J’aime »', { ago: socialAgo(e.at, now()) }), aside: String(n), asideIcon: n ? 'thumb-up-filled' : 'thumb-up', run: () => openLikers(e as PublicEvent, reopen) };
       const liked = net.likedByMe(key, e.id);
-      return { ...base, detail: liked ? t('{ago} · vous aimez', { ago: socialAgo(e.at, now()) }) : socialAgo(e.at, now()), aside: String(n), asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', run: () => { net.like(key, e.id, !liked); reopen(); } };
+      return { ...base, detail: liked ? t('{ago} · tu aimes', { ago: socialAgo(e.at, now()) }) : socialAgo(e.at, now()), aside: String(n), asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', run: () => { net.like(key, e.id, !liked); flash = { text: liked ? t('Tu n’aimes plus cette publication') : t('Tu aimes cette publication'), tone: 'ok' }; reopen(); } };
     });
-    if (posts.length) out.push({ title: mine ? t('Mon activité') : t('Activité'), note: mine ? t('Start : qui a aimé') : t('{n} derniers jours', { n: 30 }), layout: 'list', column: 'left', cards: posts });
+    if (posts.length) out.push({ title: mine ? t('Mon activité') : t('Activité'), note: mine ? t('Start : qui a aimé') : t('Start : aimer ou ne plus aimer · {n} derniers jours', { n: 30 }), layout: 'list', column: 'left', cards: posts });
     else if (card || friend || mine)
       out.push({ title: mine ? t('Mon activité') : t('Activité'), layout: 'list', column: 'left', cards: [{ key: 'none', icon: 'history', title: friend ? t('Rien encore : ses records, badges et parties s’afficheront ici') : t('Ni record ni badge ces derniers jours'), quiet: true }] });
     // Sa carte publique n'est pas encore arrivée : le dire, plutôt qu'un fil vide.
@@ -430,18 +447,18 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
         cards: week.map((p) => {
           const table = { title: p.title };
           const have = !mine && host.table?.has(table);
-          return { key: `week:${p.board}`, icon: 'tables' as const, title: p.title, detail: tn(p.n, '{n} partie', '{n} parties'), ...(have ? { aside: t('Vous l’avez') } : {}), ...(host.table?.has(table) ? { run: () => host.table!.go(table) } : {}) };
+          return { key: `week:${p.board}`, icon: 'tables' as const, title: p.title, detail: tn(p.n, '{n} partie', '{n} parties'), ...(have ? { aside: t('Tu l’as') } : {}), ...(host.table?.has(table) ? { run: () => host.table!.go(table) } : {}) };
         }),
       });
     // Ce qui reste entre amis, dit sans rien inventer.
-    if (!mine && !friend) out.push({ title: t('Entre amis'), layout: 'list', column: 'right', cards: [{ key: 'lock', icon: 'lock', title: t('Inviter à jouer, sa bibliothèque, sa table en cours'), detail: t('Une fois amis : envoyez-lui une demande'), quiet: true }] });
+    if (!mine && !friend) out.push({ title: t('Entre amis'), layout: 'list', column: 'right', cards: [{ key: 'lock', icon: 'lock', title: t('Inviter à jouer, sa bibliothèque, sa table en cours'), detail: t('Une fois amis : envoie-lui une demande'), quiet: true }] });
     // En bref : son niveau et ses trois badges les plus rares ; Start sur les badges ouvre leur onglet.
     if (card) {
       const brief: HubCardSpec[] = [];
       if (card.xp !== undefined && typeof level === 'number') {
         const v = levelOf(card.xp);
         brief.push({ key: 'level', icon: 'gauge', title: t('{tier} · niveau {level}', { tier: tierLabel(v.tier), level: v.level }), detail: t('{into} / {need} XP', { into: fmt(v.into), need: fmt(v.need) }), progress: v.progress });
-      } else if (level === '?') brief.push({ key: 'level', icon: 'gauge', title: t('Niveau ?'), detail: t('Plus haut que ce que permet son ancienneté sur le réseau : pas montré'), quiet: true });
+      } else if (level === '?') brief.push({ key: 'level', icon: 'gauge', title: levelChecking(), detail: levelCheckingWhy(), quiet: true });
       const medals = medalsOf(card);
       if (medals.length) brief.push({ key: 'badges', icon: 'medal', title: t('{n} badges sur {total}', { n: card.badges.length, total: BADGES.length }), detail: t('Les plus rares'), medals: medals.slice(0, 3), run: () => show('badges') });
       if (brief.length) out.push({ title: t('En bref'), layout: 'list', column: 'right', cards: brief });
@@ -454,15 +471,15 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     const card = (r: PlayerRecord): HubCardSpec => {
       const go = host.table?.has(r.table) ? () => host.table!.go(r.table) : undefined;
       const place = r.rank === 1 ? t('1ᵉʳ sur {n}', { n: r.players }) : t('{rank}ᵉ sur {n}', { rank: r.rank, n: r.players });
-      const detail = mine ? `${fmt(r.score)} · ${place}` : r.mine !== undefined ? t('{score} · {place} · vous : {mine}', { score: fmt(r.score), place, mine: fmt(r.mine) }) : go ? t('{score} · {place} · pas encore joué', { score: fmt(r.score), place }) : `${fmt(r.score)} · ${place}`;
-      const aside = mine || (r.mine === undefined && !go) ? {} : r.mine === undefined ? { aside: t('À essayer') } : r.mine >= r.score ? { aside: t('Vous menez') } : { aside: `${fmt(r.score - r.mine)}\n${t('à rattraper')}`, asideTone: 'warning' as const };
+      const detail = mine ? `${fmt(r.score)} · ${place}` : r.mine !== undefined ? t('{score} · {place} · toi : {mine}', { score: fmt(r.score), place, mine: fmt(r.mine) }) : go ? t('{score} · {place} · pas encore joué', { score: fmt(r.score), place }) : `${fmt(r.score)} · ${place}`;
+      const aside = mine || (r.mine === undefined && !go) ? {} : r.mine === undefined ? { aside: t('À essayer') } : r.mine >= r.score ? { aside: t('Tu mènes') } : { aside: `${fmt(r.score - r.mine)}\n${t('à rattraper')}`, asideTone: 'warning' as const };
       return { key: `record:${r.board}`, icon: 'trophy', title: r.table.title, detail, ...aside, ...(go ? { run: go } : {}) };
     };
     if (mine) return [{ title: t('Mes records'), note: t('Publiés aux classements'), layout: 'list', column: 'left', cards: records.map(card) }];
     const yours = records.filter((r) => r.mine !== undefined || host.table?.has(r.table));
     const others = records.filter((r) => !yours.includes(r));
     const out: HubSectionSpec[] = [];
-    if (yours.length) out.push({ title: t('Sur vos tables'), note: t('à battre'), layout: 'list', column: 'left', cards: yours.map(card) });
+    if (yours.length) out.push({ title: t('Sur tes tables'), note: t('à battre'), layout: 'list', column: 'left', cards: yours.map(card) });
     if (others.length) out.push({ title: yours.length ? t('Ses autres records') : t('Ses records'), layout: 'list', column: yours.length ? 'right' : 'left', cards: others.map(card) });
     return out;
   }
@@ -485,7 +502,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       const { count, players } = invitedOf(key, card.invited, card.invitedTotal);
       if (count) {
         const shown = [...players].reverse().slice(0, 8).map((p) => avatarOf(p.me, nameOf(p.me, net.publicCard(p.me)) || p.name, net.publicCard(p.me)));
-        info.push({ key: 'invited', icon: 'friend-add', title: mine ? tn(count, 'Vous avez fait découvrir Cyber Pinball à {n} joueur', 'Vous avez fait découvrir Cyber Pinball à {n} joueurs') : tn(count, 'A fait découvrir Cyber Pinball à {n} joueur', 'A fait découvrir Cyber Pinball à {n} joueurs'), seats: shown, ...(mine ? { detail: t('{xp} par personne invitée', { xp: xpText(XP.invited) }) } : {}) });
+        info.push({ key: 'invited', icon: 'friend-add', title: mine ? tn(count, 'Tu as fait découvrir Cyber Pinball à {n} joueur', 'Tu as fait découvrir Cyber Pinball à {n} joueurs') : tn(count, 'A fait découvrir Cyber Pinball à {n} joueur', 'A fait découvrir Cyber Pinball à {n} joueurs'), seats: shown, ...(mine ? { detail: t('{xp} par personne invitée', { xp: xpText(XP.invited) }) } : {}) });
       }
     }
     const out: HubSectionSpec[] = [{ title: t('À propos'), layout: 'list', column: 'left', cards: info }];
@@ -494,19 +511,19 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
         title: t('Groupes publics'),
         layout: 'list',
         column: 'right',
-        cards: groups.map((g) => ({ key: `group:${g.id}`, icon: 'group' as const, title: g.name, detail: [tn(g.members, '{n} membre', '{n} membres'), g.week ? t('table de la semaine : {table}', { table: g.week }) : undefined, g.mine ? t('vous en êtes') : undefined].filter(Boolean).join(' · '), run: () => host.groups!.open(g.id, g.mine, reopen) })),
+        cards: groups.map((g) => ({ key: `group:${g.id}`, icon: 'group' as const, title: g.name, detail: [tn(g.members, '{n} membre', '{n} membres'), g.week ? t('table de la semaine : {table}', { table: g.week }) : undefined, g.mine ? t('tu en es') : undefined].filter(Boolean).join(' · '), run: () => host.groups!.open(g.id, g.mine, reopen) })),
       });
     const choices: HubCardSpec[] = [];
     if (mine) {
       const s = net.state();
       if (host.invite && (host.invite.asked() || host.invite.chosen())) {
         const chosen = host.invite.chosen();
-        choices.push({ key: 'invited-by', icon: 'friend-add', title: chosen ? t('Découvert grâce à {name}', { name: chosen }) : t('Qui vous a fait découvrir Cyber Pinball ?'), detail: t('Il le verra sur son profil ; le vôtre n’en dit rien'), run: () => host.invite!.open(reopen) });
+        choices.push({ key: 'invited-by', icon: 'friend-add', title: chosen ? t('Découvert grâce à {name}', { name: chosen }) : t('Qui t’a fait découvrir Cyber Pinball ?'), detail: t('Il le verra sur son profil ; le tien n’en dit rien'), run: () => host.invite!.open(reopen) });
       }
       if (s.enabled)
         choices.push(
           s.publicProfile !== false
-            ? { key: 'public', icon: 'eye', title: t('Désactiver mon profil public'), detail: t('Les autres ne verront plus que votre pseudo dans l’annuaire'), run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; reopen(); } }
+            ? { key: 'public', icon: 'eye', title: t('Désactiver mon profil public'), detail: t('Les autres ne verront plus que ton pseudo dans l’annuaire'), run: () => { net.setPublicProfile(false); flash = { text: t('Profil public désactivé'), tone: 'ok' }; reopen(); } }
             : { key: 'public', icon: 'eye', title: t('Activer mon profil public'), detail: t('Pays, badges, records et activité récente, visibles de tous'), run: () => { net.setPublicProfile(true); flash = { text: t('Profil public activé'), tone: 'ok' }; reopen(); } },
         );
     } else {
@@ -542,7 +559,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
     // En tête : la relation (présence, bibliothèque ; ou où on l'a vu), les faits de sa carte, son identifiant.
     const head: Row[] = [...part.rows];
     if (card) head.push({ text: facts.join(' · '), detail: seen ? t('Profil actualisé {ago}', { ago: socialAgo(seen, now()) }) : undefined, icon: 'friends' });
-    else if (!friend && !hidden) head.push({ text: t('Profil public pas encore reçu'), detail: t('Il arrive quand sa borne, ou une borne qui l’a vu, est reliée à la vôtre'), tone: 'info', icon: 'clock' });
+    else if (!friend && !hidden) head.push({ text: t('Profil public pas encore reçu'), detail: t('Il arrive quand sa borne, ou une borne qui l’a vu, est reliée à la tienne'), tone: 'info', icon: 'clock' });
     if (part.id) head.push(part.id);
     if (head.length) sections.push({ kind: 'profile-head', rows: head });
     // Puis son niveau et ses badges, ses groupes, et une seule liste d'activité.
@@ -557,7 +574,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       ...part.actions,
       friend && host.openThread
         ? { label: t('Écrire un message'), key: 'write', icon: 'message', ...(host.writeDetail ? { detail: host.writeDetail(key) } : {}), run: () => host.openThread!(key, () => openProfile(key, back)) }
-        : { label: t('Écrire un message'), key: 'write', icon: 'message', tone: 'quiet', detail: t('Indisponible : entre amis seulement, envoyez d’abord une demande d’ami'), run: () => undefined },
+        : { label: t('Écrire un message'), key: 'write', icon: 'message', tone: 'quiet', detail: t('Indisponible : entre amis seulement, envoie d’abord une demande d’ami'), run: () => undefined },
       net.activityHidden(key)
         ? { label: t('Afficher son activité'), key: 'activity', icon: 'eye', run: () => { net.hideActivity(key, false); here(Number.MAX_SAFE_INTEGER); } }
         : { label: t('Masquer son activité'), key: 'activity', icon: 'eye', detail: t('Ses évènements et ses « J’aime » ne s’affichent plus sur cette borne'), run: () => { net.hideActivity(key, true); here(Number.MAX_SAFE_INTEGER); } },
@@ -566,7 +583,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       { label: t('Retour'), key: 'back', icon: 'back', run: back },
     );
     const level = levelLine(levelOfCard(key, card));
-    const relationText = friend ? t('Votre ami') : t('Profil public · pas votre ami');
+    const relationText = friend ? t('Ton ami') : t('Profil public · pas ton ami');
     return { heading: name, icon: 'friend-list', avatar: avatarOf(key, name, card), subheading: level ? `${level} · ${relationText}` : relationText, sections, actions, back, listStart: t('j’aime · ne plus aimer') };
   }
 
@@ -585,7 +602,7 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       if (!likable || !card) return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), tone: e.kind === 'played' ? 'quiet' : 'ok' };
       const liked = net.likedByMe(key, e.id);
       const index = actions.push({ label: eventText(e, badgeLabel), key: `like:${e.id}`, icon: liked ? 'thumb-up-filled' : 'thumb-up', run: () => { net.like(key, e.id, !liked); here(index); } }) - 1;
-      return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `${card.likes[e.id] ?? 0}`, asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', ...(liked ? { badges: [t('Vous aimez')] } : {}), action: index, pick: true };
+      return { text: eventText(e, badgeLabel), detail: socialAgo(e.at, now()), icon: eventIcon(e), aside: `${card.likes[e.id] ?? 0}`, asideIcon: liked ? 'thumb-up-filled' : 'thumb-up', ...(liked ? { badges: [t('Tu aimes')] } : {}), action: index, pick: true };
     });
     const empty = friend ? t('Rien encore : ses records, badges et parties s’afficheront ici') : t('Ni record ni badge ces derniers jours');
     return { kind: 'profile-activity', title: card ? t('Activité récente · {n} derniers jours', { n: 30 }) : t('Activité récente'), rows: rows.length ? rows : [{ text: empty, tone: 'quiet' }] };
@@ -611,14 +628,14 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       const actions: Action[] = [];
       const rows: Row[] = likers.map((l) => {
         const index = actions.push({ label: l.name, key: `liker:${l.from}`, icon: 'friend-list', run: () => openProfile(l.from, () => openLikers(e, back)) }) - 1;
-        return { text: l.name, avatar: avatarView(l.from, l.name, net.avatarFile(l.from)), detail: [socialAgo(l.at, now()), isFriend(l.from) ? t('ami') : t('pas votre ami')].join(' · '), action: index, pick: true };
+        return { text: l.name, avatar: avatarView(l.from, l.name, net.avatarFile(l.from)), detail: [socialAgo(l.at, now()), isFriend(l.from) ? t('ami') : t('pas ton ami')].join(' · '), action: index, pick: true };
       });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       return {
         heading: t('Ont aimé'),
         icon: 'thumb-up',
         subheading: eventText(e, badgeLabel),
-        lead: t('Vous seul voyez qui a aimé ; les autres joueurs voient le nombre.'),
+        lead: t('Toi seul vois qui a aimé ; les autres joueurs voient le nombre.'),
         sections: [{ rows: rows.length ? rows : [{ text: t('Personne pour l’instant'), tone: 'quiet' }] }],
         actions,
         back,
@@ -635,10 +652,10 @@ export function createProfileMenu(host: ProfileMenuHost): ProfileMenu {
       get detail() {
         const s = net.state();
         if (!s.enabled) return t('Indisponible : partage désactivé (Partage et réseau)');
-        if (s.publicProfile === false) return t('Désactivé · les autres ne voient que votre pseudo');
+        if (s.publicProfile === false) return t('Désactivé · les autres ne voient que ton pseudo');
         const card = net.publicCard(me());
         const likes = Object.values(card?.likes ?? {}).reduce((a, b) => a + b, 0);
-        return likes ? tn(likes, 'Activé · {n} « J’aime » sur votre activité', 'Activé · {n} « J’aime » sur votre activité') : t('Activé · ce que voient les joueurs qui ne sont pas vos amis');
+        return likes ? tn(likes, 'Activé · {n} « J’aime » sur ton activité', 'Activé · {n} « J’aime » sur ton activité') : t('Activé · ce que voient les joueurs qui ne sont pas tes amis');
       },
       run: () => openMine(() => lib.openSystem()),
     },

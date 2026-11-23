@@ -448,7 +448,7 @@ export function createProposals(ctx: ProposalsContext) {
               : r.reason === 'down'
                 ? t('le site ne répond pas pour l’instant')
                 : r.reason === 'flood'
-                  ? t('le site impose d’attendre entre deux recherches : réessayez dans {n} s', { n: r.wait })
+                  ? t('le site impose d’attendre entre deux recherches : réessaie dans {n} s', { n: r.wait })
                   : t('page de résultats illisible');
       }
     }
@@ -570,7 +570,7 @@ export function createProposals(ctx: ProposalsContext) {
     let progress: number | undefined;
     if (receipt) {
       state = { label: t('Reçu : rien pour ce média'), tone: 'quiet' };
-      extra.push(tn(receipt.files.length, 'Le site a envoyé {n} fichier, pour un autre écran que celui-ci.', 'Le site a envoyé {n} fichiers, aucun pour ce média : voyez les autres écrans.'));
+      extra.push(tn(receipt.files.length, 'Le site a envoyé {n} fichier, pour un autre écran que celui-ci.', 'Le site a envoyé {n} fichiers, aucun pour ce média : vois les autres écrans.'));
     } else if (job && job.state !== 'failed') {
       const queued = ctx.sites!.jobs().filter((j) => j.hit.site === hit.site && j.state === 'queued');
       const place = queued.indexOf(job) + 1;
@@ -587,7 +587,7 @@ export function createProposals(ctx: ProposalsContext) {
       extra.push(job.state === 'waiting' ? t('Le téléchargement part seul à la fin du décompte. Start : retirer de la file.') : t('Start : retirer de la file.'));
     } else if (job?.state === 'failed') {
       state = { label: job.login ? t('Connexion nécessaire') : t('Échec'), tone: job.login ? 'warning' : 'error' };
-      extra.push(job.login ? t('Start ouvre la page de connexion du site.') : t('{error}. Start ouvre la page du site, pour le faire vous-même.', { error: job.error ?? t('raison inconnue') }));
+      extra.push(job.login ? t('Start ouvre la page de connexion du site.') : t('{error}. Start ouvre la page du site, pour le faire toi-même.', { error: job.error ?? t('raison inconnue') }));
     } else if (account && !account.connected) {
       state = { label: t('Connexion nécessaire'), tone: 'warning' };
       extra.push(t('Start ouvre la page de connexion du site.'));
@@ -622,7 +622,7 @@ export function createProposals(ctx: ProposalsContext) {
     const own = table.info.Info?.VPSId;
     if (lead && own && lead.game.id !== own) {
       const yours = [table.info.Info?.Manufacturer, table.info.Info?.Year].filter(Boolean).join(' ');
-      extra.push(t('Autre jeu que votre table : {game}, même titre, autres auteurs ; la vôtre : {own}.', { game: vpsLabel(lead.game), own: yours ? `${table.title} (${yours})` : table.title }));
+      extra.push(t('Autre jeu que ta table : {game}, même titre, autres auteurs ; la tienne : {own}.', { game: vpsLabel(lead.game), own: yours ? `${table.title} (${yours})` : table.title }));
     }
     // Une ligne au plus sur ce que le fichier est : pas de jargon (identifiant, .info, base), pas de chemin interne.
     if (choice.source === 'vps') extra.push(t('Petite vignette, à défaut d’autre chose.'));
@@ -630,7 +630,7 @@ export function createProposals(ctx: ProposalsContext) {
       if (choice.offer && st.dead.has(choice.offer.file.url)) extra.push(t('Lien mort : Dropbox a renvoyé une page au lieu du fichier.'));
     } else if (choice.offer?.kind === 'video' && !current) extra.push(t('Aperçu : image fixe ; la vidéo arrive au téléchargement.'));
     else if (choice.offer?.quality === '4k') extra.push(t('Aperçu en 1k ; le fichier 4k arrive au téléchargement.'));
-    if (choice.source === 'web') extra.push(t('Téléchargé par vous dans « Récupérer ».'));
+    if (choice.source === 'web') extra.push(t('Téléchargé par toi dans « Récupérer ».'));
     else if (choice.source === 'rom') extra.push(t('Tirée de la ROM de la table, sur cette borne.'));
     else if (choice.site?.received) {
       const hit = choice.site.hit;
@@ -711,7 +711,7 @@ export function createProposals(ctx: ProposalsContext) {
     if (partner && !placement.shown && ctx.placement(partner).shown) {
       actions.push({
         label: t('Propositions : {label}', { label: mediaTypeInfo(partner).label }),
-        detail: t('Le média que votre borne montre'),
+        detail: t('Le média que ta borne montre'),
         tone: 'ok',
         run: () => open(table, partner),
       });
@@ -726,7 +726,7 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         key,
         label: key === 'next-type' ? t('Média suivant : {label}', { label }) : t('Média précédent : {label}', { label }),
-        detail: pending(table, other) ? t('Un choix en attente d’enregistrement') : t('Vos choix restent dans le brouillon'),
+        detail: pending(table, other) ? t('Un choix en attente d’enregistrement') : t('Tes choix restent dans le brouillon'),
         run: () => open(table, other),
       });
     }
@@ -792,7 +792,7 @@ export function createProposals(ctx: ProposalsContext) {
       if (!found || found.account.connected) continue;
       actions.push({
         label: t('Se connecter à {site}…', { site: site.name }),
-        detail: found.login ? t('Le site réserve sa recherche aux membres ; votre mot de passe reste au site') : t('Pour télécharger ses fichiers ; votre mot de passe reste au site'),
+        detail: found.login ? t('Le site réserve sa recherche aux membres ; ton mot de passe reste au site') : t('Pour télécharger ses fichiers ; ton mot de passe reste au site'),
         tone: found.login ? 'ok' : undefined,
         run: () => signIn(table, type, site.id),
       });
@@ -834,13 +834,13 @@ export function createProposals(ctx: ProposalsContext) {
     // Avant les tuiles, seulement ce qui vient d'arriver et ce qu'il faut savoir avant de choisir.
     const rows: Row[] = [];
     if (st.notice) rows.push({ text: st.notice.text, tone: st.notice.tone });
-    if (!placement.shown && placement.note) rows.push({ text: t('Pas montré sur votre borne'), detail: placement.note, tone: 'warning' });
+    if (!placement.shown && placement.note) rows.push({ text: t('Pas montré sur ta borne'), detail: placement.note, tone: 'warning' });
     // Ce que les filtres masquent : un écran vide ne doit pas passer pour une source vide.
     const hidden = allChoicesFor(st, type).length - choices.length;
     if (!choices.length) {
       rows.push({
         text: t('Aucune proposition pour ce média'),
-        detail: hidden ? tn(hidden, '{n} masquée par les filtres (« Animés seulement », « Mots ajoutés »).', '{n} masquées par les filtres (« Animés seulement », « Mots ajoutés »).') : t('Essayez « Chercher plus », ou « Chercher sur le web… ».'),
+        detail: hidden ? tn(hidden, '{n} masquée par les filtres (« Animés seulement », « Mots ajoutés »).', '{n} masquées par les filtres (« Animés seulement », « Mots ajoutés »).') : t('Essaie « Chercher plus », ou « Chercher sur le web… ».'),
         tone: 'quiet',
       });
     }
@@ -873,7 +873,7 @@ export function createProposals(ctx: ProposalsContext) {
     if (choice.site && !choice.site.received) return pickSite(table, type, choice);
     // Le fichier montré aujourd'hui, sans autre choix en attente : l'enregistrer réécrirait le même.
     if (isCurrent(table, choice) && !ctx.pages(table, type).some((e) => 'from' in e)) {
-      state!.notice = { text: t('C’est déjà le média actuel : rien ne changerait. Choisissez une autre proposition.'), tone: 'info' };
+      state!.notice = { text: t('C’est déjà le média actuel : rien ne changerait. Choisis une autre proposition.'), tone: 'info' };
       return ctx.show(() => build(type), ctx.cursor());
     }
     // Choix fait maintenant : un fichier d'un site qui arriverait ensuite ne le remplace pas.
@@ -948,7 +948,7 @@ export function createProposals(ctx: ProposalsContext) {
     const st = state!;
     // La connexion se relit à la prochaine ouverture des propositions.
     st.sites = {};
-    st.notice = { text: t('Connexion à {site} ouverte : fermez la fenêtre une fois connecté, puis revenez aux propositions.', { site: mediaSite(site).name }), tone: 'info' };
+    st.notice = { text: t('Connexion à {site} ouverte : ferme la fenêtre une fois connecté, puis reviens aux propositions.', { site: mediaSite(site).name }), tone: 'info' };
     ctx.show(() => build(type), ctx.cursor());
     void table;
   }
@@ -988,13 +988,13 @@ export function createProposals(ctx: ProposalsContext) {
     if (job?.state === 'failed') {
       expect(key, table, type);
       sites.openPage(hit, type, job.error);
-      return stay(t('Page de la fiche ouverte : téléchargez-y le fichier, il reviendra ici.'));
+      return stay(t('Page de la fiche ouverte : télécharges-y le fichier, il reviendra ici.'));
     }
     expect(key, table, type);
     sites.enqueue(hit, type);
     stay(
       site.wait
-        ? t('Ajouté à la file : {site} impose environ {n} s d’attente avant chaque fichier. Continuez ailleurs si vous voulez : la carte dira quand c’est reçu.', { site: site.name, n: site.wait })
+        ? t('Ajouté à la file : {site} impose environ {n} s d’attente avant chaque fichier. Continue ailleurs si tu veux : la carte dira quand c’est reçu.', { site: site.name, n: site.wait })
         : t('Téléchargement lancé depuis {site} : la carte dira quand c’est reçu.', { site: site.name }),
     );
   }
@@ -1011,7 +1011,7 @@ export function createProposals(ctx: ProposalsContext) {
     // dossier d'import, de ce PC, glissé, retiré, recherche web) : celui-ci reste proposé,
     // sans le remplacer.
     if (lastPick.get(`${wanted.file}|${wanted.type}`) !== wanted.pick || pagesSignature(ctx.pages(table, wanted.type)) !== wanted.pages) {
-      state.notice = { text: t('Reçu de {site} : « {title} », à choisir si vous le préférez.', { site: mediaSite(job.hit.site).name, title: job.hit.title }), tone: 'info' };
+      state.notice = { text: t('Reçu de {site} : « {title} », à choisir si tu le préfères.', { site: mediaSite(job.hit.site).name, title: job.hit.title }), tone: 'info' };
       return;
     }
     const files = allChoicesFor(state, wanted.type).filter((c) => c.site?.received && jobKey(c.site.hit) === job.key);
@@ -1049,7 +1049,7 @@ export function createProposals(ctx: ProposalsContext) {
         st.extra = undefined;
         searchTitle(table, type, typed);
       },
-      t('La recherche en cours, titre du jeu en tête : ajoutez après lui un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Cherchés sur VPForums et VPUniverse et dans « Chercher sur le web… » ; les propositions qui ne les ont pas sont masquées. Le titre seul : mots retirés ; un autre titre : nouvelle recherche.'),
+      t('La recherche en cours, titre du jeu en tête : ajoute après lui un style (« tarcisio », « diagonal », « glass orb »), un auteur, une couleur, « animated ». Cherchés sur VPForums et VPUniverse et dans « Chercher sur le web… » ; les propositions qui ne les ont pas sont masquées. Le titre seul : mots retirés ; un autre titre : nouvelle recherche.'),
     );
   }
 
@@ -1143,7 +1143,7 @@ export function createProposals(ctx: ProposalsContext) {
     });
     const without = (st.deep?.leads ?? []).filter((l) => !st.games.some((g) => g.lead.game.id === l.game.id)).slice(0, 6);
     const sections: Section[] = [];
-    if (!st.games.length) sections.push({ rows: [{ text: t('Aucun jeu avec des médias'), detail: t('Cherchez un autre titre : en anglais, ses initiales ou le nom de sa ROM.'), tone: 'quiet' }] });
+    if (!st.games.length) sections.push({ rows: [{ text: t('Aucun jeu avec des médias'), detail: t('Cherche un autre titre : en anglais, ses initiales ou le nom de sa ROM.'), tone: 'quiet' }] });
     if (without.length) {
       sections.push({
         title: t('Reconnus aussi, sans aucun média en ligne'),
@@ -1157,7 +1157,7 @@ export function createProposals(ctx: ProposalsContext) {
     return {
       heading: t('Jeux dont les médias sont proposés'),
       subheading: `${table.title}${st.query ? ` · ${t('recherche « {query} »', { query: st.query })}` : ''}`,
-      lead: t('Les jeux que désignent la table ou votre recherche, le plus probable d’abord. Start ajoute ou retire un jeu des propositions.'),
+      lead: t('Les jeux que désignent la table ou ta recherche, le plus probable d’abord. Start ajoute ou retire un jeu des propositions.'),
       sections,
       actions,
       back,

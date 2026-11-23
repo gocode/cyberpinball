@@ -76,7 +76,7 @@ export function pinballFx3FirstRunMessage(gameDir: string, name: string): { titl
     title: t('Première ouverture de {game} sur ce PC', { game }),
     lines: [
       t('{game} n’a encore jamais été ouvert ici : son mode borne n’y est pas activé. Sans lui, le jeu s’ouvre sur son écran d’accueil, en paysage, et pas sur la table.', { game }),
-      t('Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Fermez ensuite le jeu (Exit tenu) et relancez la table.'),
+      t('Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Ferme ensuite le jeu (Exit tenu) et relance la table.'),
       ...(purchase ? [purchase] : []),
       t('Start : ouvrir {game} · Exit : revenir au front-end', { game }),
     ],
@@ -138,7 +138,7 @@ export function takePinballFx3OrientationNotice(dataDir: string, playedBefore: b
     title: t('{game} : orientation à changer', { game }),
     lines: [
       t('Depuis cette version, {game} démarre sur l’écran du playfield tel que Windows l’oriente, comme avec un autre front-end. Son orientation réglée avec Cyber Pinball ne vaut plus : l’image serait à l’envers.', { game }),
-      t('Dans {game}, mode borne : passez Orientation de {before}° à {after}°.', { game, before: change.before, after: change.after }),
+      t('Dans {game}, mode borne : passe Orientation de {before}° à {after}°.', { game, before: change.before, after: change.after }),
       t('Start : ouvrir {game} · Exit : revenir au front-end', { game }),
     ],
   };

@@ -874,7 +874,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       .sort((a, b) => b.parents.length - a.parents.length)[0];
     if (home) return path.join(...item.parents.slice(home.parents.length), name);
     if (item.parents.length) {
-      warnings.push(t('« {name} » était dans « {folder} » : il est rangé à la racine de la table. Si la table ne le trouve pas, rangez-le à la main.', { name, folder: item.parents.join('\\') }));
+      warnings.push(t('« {name} » était dans « {folder} » : il est rangé à la racine de la table. Si la table ne le trouve pas, range-le à la main.', { name, folder: item.parents.join('\\') }));
     }
     return name;
   };
@@ -956,7 +956,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       case 'script':
         if (!item.isDir && vpxBases.includes(stem.toLowerCase())) {
           item.kind = 'scriptOverride';
-          warnings.push(t("« {name} » remplace le script de la table : gardez-le seulement si l'auteur le demande.", { name }));
+          warnings.push(t("« {name} » remplace le script de la table : garde-le seulement si l'auteur le demande.", { name }));
           add(item, name);
         } else add(item, item.isDir ? 'scripts' : path.join('scripts', name));
         break;
@@ -1130,7 +1130,7 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
           : t('{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.', params),
       );
     } else if (sw) {
-      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : mettez {enables} dans son script.', params));
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : mets {enables} dans son script.', params));
     } else if (wanted) {
       warnings.push(t('Le script de « {table} » coupe le PuP-Pack : il faudra l’allumer dans son script.', params));
     }

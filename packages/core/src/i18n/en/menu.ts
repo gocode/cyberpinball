@@ -85,9 +85,9 @@ export const messages: Record<string, string> = {
   Remplacer: 'Replace',
   'Boutons d’avant rétablis': 'Previous buttons restored',
   'Les boutons relevés avant la remise aux touches par défaut répondent de nouveau.': 'The buttons mapped before the reset to default keys respond again.',
-  'Chaque bouton de la borne, du jeu comme de l’interface, reprend la touche que les encodeurs envoient d’office : Maj pour les flippers, 1 pour Start, Échap pour Exit, 5 pour le crédit, Entrée pour le lanceur. À choisir seulement si vos boutons envoient ces touches de clavier. Le relevé actuel est gardé : « Rétablir les boutons d’avant » le remet.':
+  'Chaque bouton de la borne, du jeu comme de l’interface, reprend la touche que les encodeurs envoient d’office : Maj pour les flippers, 1 pour Start, Échap pour Exit, 5 pour le crédit, Entrée pour le lanceur. À choisir seulement si tes boutons envoient ces touches de clavier. Le relevé actuel est gardé : « Rétablir les boutons d’avant » le remet.':
     'Every cabinet button, game and interface alike, goes back to the key encoders send by default: Shift for the flippers, 1 for Start, Esc for Exit, 5 for credit, Enter for the plunger. Only choose this if your buttons send these keyboard keys. The current mapping is kept: “Restore the previous buttons” puts it back.',
-  'Les boutons de cette borne sont des boutons de joystick ({n}, Pinscape ou encodeur en mode manette) : des touches de clavier ne peuvent pas les remplacer, et plus aucun bouton ne répondrait. Pour changer un bouton, refaites l’étape « Boutons ».':
+  'Les boutons de cette borne sont des boutons de joystick ({n}, Pinscape ou encodeur en mode manette) : des touches de clavier ne peuvent pas les remplacer, et plus aucun bouton ne répondrait. Pour changer un bouton, refais l’étape « Boutons ».':
     'This cabinet’s buttons are joystick buttons ({n}, Pinscape or encoder in gamepad mode): keyboard keys can’t replace them, and no button would respond anymore. To change a button, redo the “Buttons” step.',
   'Chaque étape se refait seule, puis revient à l’écran des tables. Exit maintenu 2 s (ou le bouton « Quitter sans enregistrer » des boutons de l’interface) en sort sans rien changer, à toute étape.':
     'Each step can be redone on its own, then returns to the table menu. Holding Exit for 2 s (or the “Quit without saving” interface button) leaves without changing anything, at any step.',
@@ -111,7 +111,7 @@ export const messages: Record<string, string> = {
     'Cyber Pinball needs Visual Pinball X to play. Its archive is already on the cabinet: no internet needed to install.',
   'Cyber Pinball a besoin de Visual Pinball X pour jouer (téléchargement d’environ 173 Mo).': 'Cyber Pinball needs Visual Pinball X to play (download of about 173 MB).',
   'Start : l’installer maintenant · Exit : plus tard': 'Start: install it now · Exit: later',
-  'Lancez « Installer » depuis le lanceur, puis revenez ici.': 'Run “Install” from the launcher, then come back here.',
+  'Lance « Installer » depuis le lanceur, puis reviens ici.': 'Run “Install” from the launcher, then come back here.',
   'Le test d’endurance': 'The endurance test',
   'Aucune table': 'No tables',
   'Start : ajouter une table.': 'Start: add a table.',
@@ -126,7 +126,7 @@ export const messages: Record<string, string> = {
   'Lancer une partie de VPX': 'Launching a VPX game',
   'Partie impossible hors écran': 'Can’t play off-screen',
   'Start ou Exit : revenir au front-end.': 'Start or Exit: back to the menu.',
-  'Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.': 'Before playing, choose the connected configuration: it sets VPX’s screens.',
+  'Avant de jouer, choisis la configuration branchée : elle décide des écrans de VPX.': 'Before playing, choose the connected configuration: it sets VPX’s screens.',
   'Erreur inconnue.': 'Unknown error.',
   'La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.': 'This table’s ROM is missing: it must be in the table’s pinmame\\roms folder.',
   'Fin du journal de VPX :': 'End of the VPX log:',
@@ -158,17 +158,17 @@ export const messages: Record<string, string> = {
     'Cyber Pinball’s VPX fixes it since patch set {fixed}, and it was in place (patch set {patch}): this crash has another cause. The report will help find it.',
   'C’est corrigé dans le VPX de Cyber Pinball à partir de la série {fixed} (« patched Cyber Pinball {fixed} »), posé avant chaque partie sur VPX 10.8.1-5436.':
     'It is fixed in Cyber Pinball’s VPX from patch set {fixed} on (“patched Cyber Pinball {fixed}”), installed before every game on VPX 10.8.1-5436.',
-  'Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.': 'Game with friends: the others carry on; your score counts up to the stop.',
+  'Partie entre amis : les autres continuent ; ton score compte jusqu’à l’arrêt.': 'Game with friends: the others carry on; your score counts up to the stop.',
   'Start : rejouer la table': 'Start: play the table again',
   'Start : voir la partie entre amis': 'Start: see the game with friends',
-  'Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.': 'Cyber Pinball fixed the table’s script ({fix}): start it again.',
+  'Cyber Pinball a corrigé le script de la table ({fix}) : relance-la.': 'Cyber Pinball fixed the table’s script ({fix}): start it again.',
   'Installation de VPX': 'Installing VPX',
   'Préparation…': 'Preparing…',
   'Téléchargement : {percent} % ({received} / {total} Mo)': 'Downloading: {percent}% ({received} / {total} MB)',
-  'Ne débranchez pas la borne.': 'Don’t unplug the cabinet.',
+  'Ne débranche pas la borne.': 'Don’t unplug the cabinet.',
   'Visual Pinball X {version} est installé et vérifié.': 'Visual Pinball X {version} is installed and verified.',
   'Start ou Exit : aller aux tables.': 'Start or Exit: go to the tables.',
-  'Joystick lu : {names}. Relevez ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».': 'Joystick found: {names}. Set up its buttons in System menu > “My cabinet” > “Cabinet setup” > “Buttons” > “Game buttons”, then “Analog plunger”.',
+  'Joystick lu : {names}. Relève ses boutons dans Menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Boutons du jeu », puis « Lanceur analogique ».': 'Joystick found: {names}. Set up its buttons in System menu > “My cabinet” > “Cabinet setup” > “Buttons” > “Game buttons”, then “Analog plunger”.',
   'L’installation a échoué : {error}': 'Installation failed: {error}',
   'Start : réessayer · Exit : plus tard': 'Start: retry · Exit: later',
 
@@ -371,10 +371,10 @@ export const messages: Record<string, string> = {
   'Table sélectionnée': 'Selected table',
   'Commandes de la partie': 'Game controls',
   'Chargement de la table…': 'Loading table…',
-  'Appuyez sur un bouton pour revenir au front-end': 'Press any button to return to the menu',
+  'Appuie sur un bouton pour revenir au front-end': 'Press any button to return to the menu',
   'Menu système (Tab)': 'System menu (Tab)',
-  'Menu système (Tab) : un élément attend votre intervention': 'System menu (Tab): something needs your attention',
-  'Attend votre intervention': 'Needs your attention',
+  'Menu système (Tab) : un élément attend ton intervention': 'System menu (Tab): something needs your attention',
+  'Attend ton intervention': 'Needs your attention',
   Commandes: 'Controls',
   'Dans le front-end': 'In the menu',
   'Pendant une partie': 'During a game',
@@ -418,9 +418,9 @@ export const messages: Record<string, string> = {
   // app/src/frontend-gate.ts, app/src/frontend.ts : autre menu de borne ouvert
   '{names} est ouvert': '{names} is running',
   '{names} sont ouverts': '{names} are running',
-  'Les deux front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.':
+  'Les deux front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Ferme {names} depuis son menu (Quitter) : Cyber Pinball démarre tout seul dès qu’il est fermé.':
     'The two frontends would fight over the screens, the DMD display and the cabinet buttons. Close {names} from its menu (Quit): Cyber Pinball starts on its own as soon as it is closed.',
-  'Les front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Fermez {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.':
+  'Les front-ends se disputeraient les écrans, l’afficheur DMD et les boutons de la borne. Ferme {names} depuis leur menu (Quitter) : Cyber Pinball démarre tout seul dès qu’ils sont fermés.':
     'The frontends would fight over the screens, the DMD display and the cabinet buttons. Close {names} from their menus (Quit): Cyber Pinball starts on its own as soon as they are closed.',
   'Rien n’est fermé ni modifié chez {names}.': 'Nothing is closed or changed in {names}.',
   'Start : continuer quand même · Exit : quitter Cyber Pinball': 'Start: continue anyway · Exit: quit Cyber Pinball',
@@ -430,8 +430,8 @@ export const messages: Record<string, string> = {
     'During the game, {names} would also react to the cabinet buttons and could take over the screens or the DMD display.',
   'Pendant la partie, {names} réagiraient aussi aux boutons de la borne et pourraient prendre les écrans ou l’afficheur DMD.':
     'During the game, {names} would also react to the cabinet buttons and could take over the screens or the DMD display.',
-  'Fermez {names} depuis son menu (Quitter), puis relancez la partie.': 'Close {names} from its menu (Quit), then start the game again.',
-  'Fermez {names} depuis leur menu (Quitter), puis relancez la partie.': 'Close {names} from their menus (Quit), then start the game again.',
+  'Ferme {names} depuis son menu (Quitter), puis relance la partie.': 'Close {names} from its menu (Quit), then start the game again.',
+  'Ferme {names} depuis leur menu (Quitter), puis relance la partie.': 'Close {names} from their menus (Quit), then start the game again.',
   'Start : jouer quand même · Exit : revenir au front-end': 'Start: play anyway · Exit: back to the menu',
   // app/src/frontend.ts : réglage de l’affichage en partie
   'Réglage de l’affichage': 'Display adjustment',
@@ -542,15 +542,15 @@ export const messages: Record<string, string> = {
   // Runtime Visual C++ de VPX (app/src/vc-runtime.ts, install-vpx.ts, frontend.ts ; vpxfailure.ts)
   'Il manque le runtime Visual C++ à Windows': 'Windows is missing the Visual C++ runtime',
   'VPX ne peut pas démarrer sans le runtime Visual C++ de Microsoft ({detail}).': 'VPX can’t start without Microsoft’s Visual C++ runtime ({detail}).',
-  'Cyber Pinball installe la version officielle de Microsoft (19 Mo) ; Windows demande votre accord une fois.': 'Cyber Pinball installs Microsoft’s official version (19 MB); Windows asks for your approval once.',
+  'Cyber Pinball installe la version officielle de Microsoft (19 Mo) ; Windows demande ton accord une fois.': 'Cyber Pinball installs Microsoft’s official version (19 MB); Windows asks for your approval once.',
   '{dll} absente': '{dll} missing',
   '{dll} en version {version}': '{dll} at version {version}',
   'Runtime Visual C++ (Microsoft)': 'Visual C++ runtime (Microsoft)',
   'Téléchargement du runtime Visual C++ de Microsoft…': 'Downloading Microsoft’s Visual C++ runtime…',
   'Téléchargement du runtime Visual C++ de Microsoft : {percent} %': 'Downloading Microsoft’s Visual C++ runtime: {percent}%',
   'signature inattendue de l’installateur de Microsoft ({status}), fichier supprimé': 'unexpected signature on Microsoft’s installer ({status}), file deleted',
-  'Installation du runtime Visual C++ : Windows demande votre accord.': 'Installing the Visual C++ runtime: Windows asks for your approval.',
-  'Windows n’a pas reçu votre accord': 'Windows did not receive your approval',
+  'Installation du runtime Visual C++ : Windows demande ton accord.': 'Installing the Visual C++ runtime: Windows asks for your approval.',
+  'Windows n’a pas reçu ton accord': 'Windows did not receive your approval',
   'l’installateur de Microsoft a répondu {code}': 'Microsoft’s installer returned {code}',
   'runtime toujours insuffisant après l’installation : {detail}': 'runtime still insufficient after installation: {detail}',
   'bibliothèque (DLL) introuvable': 'library (DLL) not found',

@@ -1,7 +1,7 @@
 // Catalogue anglais : tables. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
   'Script complémentaire non chargé': 'Companion script not loaded',
-  'VPX n’a pas pu charger : {files}. Vérifiez les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.': 'VPX could not load: {files}. Check the scripts supplied with this version of the table and with VPX. Subsequent variable or object errors may follow from this failure.',
+  'VPX n’a pas pu charger : {files}. Vérifie les scripts fournis avec cette version de la table et ceux de VPX. Les erreurs de variables ou d’objets qui suivent peuvent en découler.': 'VPX could not load: {files}. Check the scripts supplied with this version of the table and with VPX. Subsequent variable or object errors may follow from this failure.',
   'Erreur du script pendant la dernière partie': 'Script error during the last game',
   'Première erreur, ligne {line} : « {message} ». {count} Les erreurs suivantes peuvent en découler.':
     'First error, line {line}: “{message}”. {count} Subsequent errors may result from it.',
@@ -17,11 +17,11 @@ export const messages: Record<string, string> = {
   'À la dernière partie, le DMD n’a pas su lire {list} dans « {folder} » : le fichier est là, mais son format ne passe pas (image abîmée, ou enregistrée sous un autre format que son extension).':
     'During the last game, the DMD could not read {list} in “{folder}”: the file is there, but its format does not work (damaged image, or saved in another format than its extension).',
   'Images du DMD absentes': 'DMD images missing',
-  'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».':
+  'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».':
     'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
-  'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».':
+  'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».':
     'During the last game, the DMD did not find {n} images in “{folder}” ({list}): it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
-  'La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprenez-le en entier.':
+  'La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprends-le en entier.':
     'The table’s music comes from this pack ({list}): without it, the table is silent. Its videos and music are often a separate download from the pack; take it again in full.',
   'Script arrêté par le fronton B2S de VPX': 'Script stopped by VPX’s B2S backglass',
   'Le script envoie au fronton B2S de VPX un texte là où il attend un nombre : le fronton refuse l’appel, et la procédure qui l’appelait s’arrête, avec la suite de la table.':
@@ -35,7 +35,7 @@ export const messages: Record<string, string> = {
   'Rendre le son à cette table': 'Give this table its sound back',
   'Musique introuvable': 'Music not found',
   'Musiques introuvables': 'Music files not found',
-  'À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mettez-la dans le dossier d’import puis « Ajouter une table ».':
+  'À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mets-la dans le dossier d’import puis « Ajouter une table ».':
     'During the last game, VPX did not find {names}: it looks for the table’s music in “{where}”. It comes with the original table; put it in the import folder, then “Add a table”.',
   'VPX range chaque table dans son dossier, avec sa ROM, son backglass et ses vidéos. Celle-ci est en vrac dans {dir}.': 'VPX keeps each table in its own folder, with its ROM, backglass and videos. This one sits loose in {dir}.',
   'Déplacer ses {n} fichiers dans « {folder} »': 'Move its {n} files to “{folder}”',
@@ -104,7 +104,7 @@ export const messages: Record<string, string> = {
     'The FlexDMD plugin of VPX 10.8.1 decodes each video whole, in one go, every time a scene shows it: the game freezes for one to several seconds, flippers included, and VPX takes more memory each time.',
   'Le DMD n’a que 128 × 32 points : Cyber Pinball les ramène à cette taille avant la prochaine partie, où elles s’afficheront pareil, sans arrêt ; les originaux vont à sa corbeille.':
     'The DMD only has 128 × 32 dots: Cyber Pinball brings them down to that size before the next game, where they will look the same, without freezing; the originals go to its recycle bin.',
-  'Le DMD n’a que 128 × 32 points : Cyber Pinball ramène à cette taille, avant la prochaine partie, celles qu’il sait lire (mp4, mov, webm) ; les autres (wmv, avi) restent telles quelles : remplacez-les par des mp4 à la taille du DMD.':
+  'Le DMD n’a que 128 × 32 points : Cyber Pinball ramène à cette taille, avant la prochaine partie, celles qu’il sait lire (mp4, mov, webm) ; les autres (wmv, avi) restent telles quelles : remplace-les par des mp4 à la taille du DMD.':
     'The DMD only has 128 × 32 dots: before the next game, Cyber Pinball brings down to that size the ones it can read (mp4, mov, webm); the others (wmv, avi) stay as they are: replace them with mp4 files at the DMD size.',
   'Cadrage réglé pour cette table': 'Framing set for this table',
   '{file} garde le cadrage réglé pour cette table dans l’installation d’où elle vient, que VPX 10.8.1 n’applique qu’en cadrage manuel. Il est repris pour cette table seule ; « Régler l’affichage en partie » permet de le retoucher ou de passer au cadrage automatique.':
@@ -116,7 +116,7 @@ export const messages: Record<string, string> = {
   'Pièce VR dessinée hors du casque': 'VR room drawn without the headset',
   'Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.':
     'VR version of the table: its script turns on its VR room (cabinet, room, 3D backglass) even without a headset ({flags}). On the screens, VPX draws it every frame although it is only of use in the headset.',
-  'Le script de la table est protégé : prenez sa version sans VR, ou mettez cet interrupteur à 0 dans l’éditeur de VPX.': 'The table’s script is protected: use its non-VR version, or set this switch to 0 in the VPX editor.',
+  'Le script de la table est protégé : prends sa version sans VR, ou mets cet interrupteur à 0 dans l’éditeur de VPX.': 'The table’s script is protected: use its non-VR version, or set this switch to 0 in the VPX editor.',
   'Corrigé dans {file}, le script que VPX joue à la place de celui de la table : la pièce ne s’allume plus que dans le casque.': 'Fixed in {file}, the script VPX plays instead of the table’s: the room now only turns on in the headset.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où la pièce ne s’allume que dans le casque.': 'The table is not modified: VPX plays {file}, a copy of its script where the room only turns on in the headset.',
   'Réserver la pièce VR au casque (dans {file})': 'Keep the VR room for the headset (in {file})',
@@ -139,15 +139,15 @@ export const messages: Record<string, string> = {
   'Partie limitée à {hz} images par seconde par l’écran « {screen} »': 'Game limited to {hz} frames per second by the “{screen}” screen',
   'La table n’y est pour rien : VPX dessine aussi sur l’écran « {screen} », réglé à {hz} Hz, et sa version 10.8.1 cale toute la partie sur l’écran le plus lent, playfield compris.':
     'The table is not to blame: VPX also draws on the “{screen}” screen, set to {hz} Hz, and its version 10.8.1 paces the whole game on the slowest screen, playfield included.',
-  'Choisissez la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.':
+  'Choisis la fréquence la plus haute de cet écran dans les paramètres d’affichage de Windows (Affichage avancé). Une version à venir de VPX supprime ce bridage.':
     'Choose the highest refresh rate of this screen in the Windows display settings (Advanced display). An upcoming version of VPX removes this limit.',
   'À la dernière partie ({date}), VPX a tenu {fps} images par seconde pour {target} visées.': 'In the last game ({date}), VPX held {fps} frames per second for a target of {target}.',
   'Au pire moment : {worst} images par seconde.': 'At its worst: {worst} frames per second.',
   '{n} arrêt de l’image d’au moins un dixième de seconde (le plus long : {max} ms).': '{n} freeze of the picture of at least a tenth of a second (longest: {max} ms).',
   '{n} arrêts de l’image d’au moins un dixième de seconde (le plus long : {max} ms).': '{n} freezes of the picture of at least a tenth of a second (longest: {max} ms).',
-  '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Fermez-le, ou retirez-le du démarrage de Windows.':
+  '{names} était ouvert pendant la partie : il peut prendre le processeur, le disque ou le DMD réel par moments. Ferme-le, ou retire-le du démarrage de Windows.':
     '{names} was open during the game: it may take the processor, the disk or the real DMD at times. Close it, or remove it from Windows startup.',
-  '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Fermez-les, ou retirez-les du démarrage de Windows.':
+  '{names} étaient ouverts pendant la partie : ils peuvent prendre le processeur, le disque ou le DMD réel par moments. Ferme-les, ou retire-les du démarrage de Windows.':
     '{names} were open during the game: they may take the processor, the disk or the real DMD at times. Close them, or remove them from Windows startup.',
   'Chaque partie est mesurée : ce constat disparaît dès qu’une partie tient la cadence.': 'Every game is measured: this notice goes away as soon as a game keeps up.',
   'VPX a planté sur cette table le {date} ({reason}). {files} : {size}.': 'VPX crashed on this table on {date} ({reason}). {files}: {size}.',
@@ -193,7 +193,7 @@ export const messages: Record<string, string> = {
   'Importer un POV…': 'Import a POV…',
   'Un fichier .pov, ou le .ini d’un POV pour VPX 10.8 : Téléchargements, clé USB, disques': 'A .pov file, or the .ini of a POV for VPX 10.8: Downloads, USB stick, drives',
   'Point de vue fourni pour un autre écran (bêta)': 'Point of view made for another screen (beta)',
-  '{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que vous êtes {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.':
+  '{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que tu es {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.':
     '{file} is the point of view prepared for this table, but VPX would draw it with the flippers {played}, while you are {edge} of the screen: it is not applied, the table keeps the cabinet’s framing.',
   '{file} est le point de vue préparé pour cette table, mais il ne dit pas dans quel sens la tourner : il n’est pas appliqué, la table garde le cadrage de la borne.':
     '{file} is the point of view prepared for this table, but it does not say which way to turn it: it is not applied, the table keeps the cabinet’s framing.',
@@ -213,13 +213,13 @@ export const messages: Record<string, string> = {
   'Le plugin PUP cherche {paths} à côté de la table.': 'The PUP plugin looks for {paths} next to the table.',
   '« {name} » ne sera pas chargé sous ce nom.': '“{name}” won’t be loaded under that name.',
   'Présents : {list}.': 'Found: {list}.',
-  'Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.': 'Add the pack with “Add a table”: it will be filed and named correctly.',
+  'Ajoute le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.': 'Add the pack with “Add a table”: it will be filed and named correctly.',
   'La table se joue sans ses vidéos.': 'The table plays without its videos.',
   'Renommer « {from} » en « {to} »': 'Rename “{from}” to “{to}”',
   'Le script ne lance pas ce pack : il est fait pour PinUP Player, qui le cherchait sous le nom du jeu pour B2S Server, pupvideos\\{name}. Cyber Pinball le lance sous ce nom.':
     'The script doesn’t start this pack: it was made for PinUP Player, which looked for it under the game name given to B2S Server, pupvideos\\{name}. Cyber Pinball starts it under that name.',
   'PuP-Pack jamais chargé': 'PuP-Pack never loaded',
-  'Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; gardez un seul pack dans pupvideos.':
+  'Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; garde un seul pack dans pupvideos.':
     'Neither the script nor a ROM starts a PuP-Pack, and nothing says which of these folders to start: {list}. The table plays without its videos; keep a single pack in pupvideos.',
   'PuP-Pack jamais lancé': 'PuP-Pack never started',
   'PuP-Pack fait pour une autre version de la table': 'PuP-Pack made for another version of the table',
@@ -229,7 +229,7 @@ export const messages: Record<string, string> = {
   'Le script de cette version n’en envoie aucun : seulement {sent}, pour les effets DOF de la borne.':
     'This version’s script sends none of them: only {sent}, for the cabinet’s DOF effects.',
   'Le script de cette version n’en envoie aucun.': 'This version’s script sends none of them.',
-  'Le fronton et l’écran du pack restent noirs. Installez la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retirez le pack.':
+  'Le fronton et l’écran du pack restent noirs. Installe la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retire le pack.':
     'The pack’s backglass and screen stay black. Install the version of the game that asks for this pack (“incl. PuP” or a VPS note in the catalog), or remove the pack.',
   'Le script de la table ne lance jamais de PuP-Pack, et la table ne joue pas de ROM : le plugin PUP de VPX 10.8.1 ne charge alors rien de lui-même, même avec pupvideos\\{pack} bien rangé. Ce pack est fait pour PinUP Player, que B2S Server lançait sans rien demander au script.':
     'The table’s script never starts a PuP-Pack, and the table plays no ROM: the VPX 10.8.1 PUP plugin then loads nothing by itself, even with pupvideos\\{pack} in place. This pack was made for PinUP Player, which B2S Server started without the script asking.',
@@ -313,7 +313,7 @@ export const messages: Record<string, string> = {
   'Journal de VPX : pack sans screens.pup': 'VPX log: pack without screens.pup',
   'À la dernière partie, VPX a chargé « {path} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.': 'In the last game, VPX loaded “{path}” but found no screens.pup there: the pack’s screens stayed dark.',
   'Journal de VPX : pack non chargé': 'VPX log: pack not loaded',
-  'À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\{pack}). Si le pack a été ajouté ou réparé depuis, relancez une partie.': 'In the last game, the PUP plugin loaded no pack (it looked for pupvideos\\{pack}). If the pack was added or fixed since, play again.',
+  'À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\{pack}). Si le pack a été ajouté ou réparé depuis, relance une partie.': 'In the last game, the PUP plugin loaded no pack (it looked for pupvideos\\{pack}). If the pack was added or fixed since, play again.',
   'Journal de VPX : fonctions PuP non prises en charge': 'VPX log: unsupported PuP functions',
   'La table a demandé au plugin PUP des fonctions qu’il ne gère pas encore ({list}) : une partie du pack peut manquer.': 'The table asked the PUP plugin for functions it doesn’t handle yet ({list}): part of the pack may be missing.',
   '{n} autre': '{n} other',
@@ -328,8 +328,8 @@ export const messages: Record<string, string> = {
   'erreur de lecture': 'read error',
   'Média dans un format que le front-end ne lit pas': 'Media file in a format the menu can’t play',
   'Médias dans un format que le front-end ne lit pas': 'Media files in a format the menu can’t play',
-  '{files} : {exts}, ancien format de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.': '{files}: {exts}, an old PinUP Popper format the menu (Chromium) can’t play. Convert to mp4 (H.264) or webm, with HandBrake for example.',
-  '{files} : {exts}, anciens formats de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.': '{files}: {exts}, old PinUP Popper formats the menu (Chromium) can’t play. Convert to mp4 (H.264) or webm, with HandBrake for example.',
+  '{files} : {exts}, ancien format de PinUP Popper que le front-end (Chromium) ne lit pas. Convertis en mp4 (H.264) ou en webm, par exemple avec HandBrake.': '{files}: {exts}, an old PinUP Popper format the menu (Chromium) can’t play. Convert to mp4 (H.264) or webm, with HandBrake for example.',
+  '{files} : {exts}, anciens formats de PinUP Popper que le front-end (Chromium) ne lit pas. Convertis en mp4 (H.264) ou en webm, par exemple avec HandBrake.': '{files}: {exts}, old PinUP Popper formats the menu (Chromium) can’t play. Convert to mp4 (H.264) or webm, with HandBrake for example.',
   '« {name} » : un média « {type} » se lit en {formats}.': '“{name}”: “{type}” media must be {formats}.',
   '{files} : une version lisible porte le même nom, c’est elle qui est montrée.': '{files}: a playable version has the same name, and that one is shown.',
   'En attendant, le front-end passe au média suivant ou à l’affichage par défaut.': 'Meanwhile, the menu moves on to the next media or the default display.',
@@ -347,7 +347,7 @@ export const messages: Record<string, string> = {
   'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} ne sont pas montrés.': 'The menu looks for media under the .vpx name (“{vpx}”) or the folder name (“{folder}”): {files} aren’t shown.',
   'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») : {files} n’est pas montré.': 'The menu looks for media under the .vpx name (“{vpx}”): {files} isn’t shown.',
   'Le front-end cherche les médias sous le nom du .vpx (« {vpx} ») : {files} ne sont pas montrés.': 'The menu looks for media under the .vpx name (“{vpx}”): {files} aren’t shown.',
-  '« {name} » : « {shown} » porte déjà le bon nom et c’est lui qui est montré ; gardez l’un des deux.': '“{name}”: “{shown}” already has the right name and is the one shown; keep one of them.',
+  '« {name} » : « {shown} » porte déjà le bon nom et c’est lui qui est montré ; garde l’un des deux.': '“{name}”: “{shown}” already has the right name and is the one shown; keep one of them.',
   '{files} : le nom attendu est déjà pris dans medias\\.': '{files}: the expected name is already taken in medias\\.',
   '{files} : type inconnu. Le nom doit commencer par le type entre parenthèses, « (Backglass) {folder}.mp4 » par exemple.': '{files}: unknown type. The name must start with the type in brackets, “(Backglass) {folder}.mp4” for example.',
   'Renommer les {n} fichiers « (Type) {folder} »': 'Rename the {n} files “(Type) {folder}”',
@@ -355,7 +355,7 @@ export const messages: Record<string, string> = {
   'Médias rangés hors de medias\\': 'Media files outside medias\\',
   'Le front-end ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} n’est pas montré (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).': 'The menu only looks for media in medias\\, named “(Type) {folder}”: {files} isn’t shown (PinUP Popper or PinballX layout, or a file left next to the table).',
   'Le front-end ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} ne sont pas montrés (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).': 'The menu only looks for media in medias\\, named “(Type) {folder}”: {files} aren’t shown (PinUP Popper or PinballX layout, or a file left next to the table).',
-  '« {file} » : medias\\ montre déjà « {shown} » ; gardez l’un des deux, rien n’est déplacé.': '“{file}”: medias\\ already shows “{shown}”; keep one of them, nothing is moved.',
+  '« {file} » : medias\\ montre déjà « {shown} » ; garde l’un des deux, rien n’est déplacé.': '“{file}”: medias\\ already shows “{shown}”; keep one of them, nothing is moved.',
   '« {file} » : le nom attendu est déjà pris dans medias\\, il n’est pas déplacé.': '“{file}”: the expected name is already taken in medias\\, so it isn’t moved.',
   'Ranger les {n} médias dans medias\\ sous le nom « (Type) {folder} »': 'Move the {n} media files to medias\\ as “(Type) {folder}”',
   'Ranger le média dans medias\\ sous le nom « (Type) {folder} »': 'Move the media file to medias\\ as “(Type) {folder}”',
@@ -395,7 +395,7 @@ export const messages: Record<string, string> = {
   'Médias que le front-end n’a pas pu lire': 'Media files the menu couldn’t play',
   '« {file} » : {error}, {count} fois, la dernière le {date}{message}.': '“{file}”: {error}, {count} times, last on {date}{message}.',
   '« {file} » : {error}, le {date}{message}.': '“{file}”: {error}, on {date}{message}.',
-  'Le front-end passe alors au média suivant, ou à l’affichage par défaut. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.': 'The menu then moves on to the next media, or the default display. Replace the file with an mp4 (H.264) or a webm, or re-encode it.',
+  'Le front-end passe alors au média suivant, ou à l’affichage par défaut. Remplace le fichier par un mp4 (H.264) ou un webm, ou réencode-le.': 'The menu then moves on to the next media, or the default display. Replace the file with an mp4 (H.264) or a webm, or re-encode it.',
   'Mettre les {n} fichiers illisibles à la corbeille': 'Move the {n} unreadable files to the trash',
   'Mettre « {name} » à la corbeille': 'Move “{name}” to the trash',
   'Alias inutile : {rom} est là, mais {loaded} est chargée': 'Unneeded alias: {rom} is here, but {loaded} is loaded',
@@ -407,11 +407,11 @@ export const messages: Record<string, string> = {
   'pinmame\\alias.txt fait charger {rom} pour {asked} ; elle est dans la bibliothèque, mais pas dans pinmame\\roms.': 'pinmame\\alias.txt loads {rom} for {asked}; it’s in the library, but not in pinmame\\roms.',
   'Lier la ROM de la bibliothèque dans pinmame\\roms': 'Link the library ROM into pinmame\\roms',
   'ROM « {rom} » absente': 'ROM “{rom}” missing',
-  'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoutez-la (dossier d’import, puis « Ajouter une table »), ou retirez l’alias.': 'pinmame\\alias.txt loads {rom} when the script asks for {asked}, but {rom}.zip is nowhere to be found. Add it (import folder, then “Add a table”), or remove the alias.',
+  'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoute-la (dossier d’import, puis « Ajouter une table »), ou retire l’alias.': 'pinmame\\alias.txt loads {rom} when the script asks for {asked}, but {rom}.zip is nowhere to be found. Add it (import folder, then “Add a table”), or remove the alias.',
   'Retirer l’alias « {line} »': 'Remove the alias “{line}”',
   '« {asked} » : ancien nom de la ROM {rom}': '“{asked}”: old name of ROM {rom}',
   'Le script demande {asked}, que VPinMAME traduisait de lui-même en {rom} ; le plugin PinMAME de VPX 10.8.1 ne connaît plus ces anciens noms : sans alias, la table ne démarre pas.': 'The script asks for {asked}, which VPinMAME translated to {rom} on its own; the VPX 10.8.1 PinMAME plugin no longer knows these old names: without an alias, the table won’t start.',
-  'Il faut aussi {rom}.zip : ajoutez-la (dossier d’import, puis « Ajouter une table »).': 'You also need {rom}.zip: add it (import folder, then “Add a table”).',
+  'Il faut aussi {rom}.zip : ajoute-la (dossier d’import, puis « Ajouter une table »).': 'You also need {rom}.zip: add it (import folder, then “Add a table”).',
   'Écrire l’alias « {line} » dans pinmame\\alias.txt': 'Write the alias “{line}” to pinmame\\alias.txt',
   'ROM « {rom} » absente de pinmame\\roms': 'ROM “{rom}” missing from pinmame\\roms',
   'Elle est dans la bibliothèque de ROM ({dir}), mais la table a son propre dossier pinmame\\roms, sans elle : PinMAME ne cherche alors que là, jamais dans son dossier commun. La table ne démarre pas.': 'It’s in the ROM library ({dir}), but the table has its own pinmame\\roms folder without it: PinMAME then only looks there, never in its shared folder. The table won’t start.',
@@ -427,7 +427,7 @@ export const messages: Record<string, string> = {
   'La table ne démarrera pas sans {rom}.zip. {neighbour}.zip, du même jeu, est {where} : un alias peut la faire charger à sa place. {warning}': 'The table won’t start without {rom}.zip. {neighbour}.zip, from the same game, is {where}: an alias can load it instead. {warning}',
   'Jouer avec {neighbour} (alias « {line} » dans pinmame\\alias.txt)': 'Play with {neighbour} (alias “{line}” in pinmame\\alias.txt)',
   '(ou {list})': '(or {list})',
-  'La table ne démarrera pas sans {rom}.zip{others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour savoir où la trouver, étape par étape : « Ce qu’il manque pour jouer ».': 'The table won’t start without {rom}.zip{others}. Put the file in the import folder (or drop it on this window), then “Add a table”: it will go into the ROM library and be linked in pinmame\\roms. To learn where to find it, step by step: “What’s missing to play”.',
+  'La table ne démarrera pas sans {rom}.zip{others}. Mets le fichier dans le dossier d’import (ou glisse-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour savoir où la trouver, étape par étape : « Ce qu’il manque pour jouer ».': 'The table won’t start without {rom}.zip{others}. Put the file in the import folder (or drop it on this window), then “Add a table”: it will go into the ROM library and be linked in pinmame\\roms. To learn where to find it, step by step: “What’s missing to play”.',
   'Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.': 'The table’s pinmame\\roms folder is empty: as long as it exists, PinMAME looks nowhere else.',
   'Copie de ROM au lieu d’un lien': 'ROM copy instead of a link',
   'pinmame\\roms\\{name} est une copie de la ROM de la bibliothèque : {size} de trop sur le disque.': 'pinmame\\roms\\{name} is a copy of the library ROM: {size} wasted on disk.',
@@ -441,14 +441,14 @@ export const messages: Record<string, string> = {
   'Ranger ces {n} fichiers dans « {folder} »': 'Move these {n} files to “{folder}”',
   'Ranger ce fichier dans « {folder} »': 'Move this file to “{folder}”',
   'Dossier « {folder} » absent': '“{folder}” folder missing',
-  'Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».': 'This folder comes with the original table; put it in the import folder, then “Add a table”.',
+  'Ce dossier est fourni avec la table d’origine ; mets-le dans le dossier d’import puis « Ajouter une table ».': 'This folder comes with the original table; put it in the import folder, then “Add a table”.',
   // packages/core/src/tableimport.ts
   'Je ne sais pas à quelle table il appartient : il reste où il est.': 'I can’t tell which table it belongs to: it stays where it is.',
   'bibliothèque': 'library',
   '{source} : un autre fichier va déjà à « {target} », celui-ci reste où il est.': '{source}: another file already goes to “{target}”, this one stays where it is.',
-  '« {name} » était dans « {folder} » : il est rangé à la racine de la table. Si la table ne le trouve pas, rangez-le à la main.': '“{name}” was in “{folder}”: it’s filed at the root of the table folder. If the table can’t find it, move it by hand.',
+  '« {name} » était dans « {folder} » : il est rangé à la racine de la table. Si la table ne le trouve pas, range-le à la main.': '“{name}” was in “{folder}”: it’s filed at the root of the table folder. If the table can’t find it, move it by hand.',
   'Backglass supplémentaire « {name} » : VPX ne l\'affichera pas, il est rangé quand même.': 'Extra backglass “{name}”: VPX won’t show it, but it’s filed anyway.',
-  '« {name} » remplace le script de la table : gardez-le seulement si l\'auteur le demande.': '“{name}” overrides the table script: keep it only if the author says so.',
+  '« {name} » remplace le script de la table : garde-le seulement si l\'auteur le demande.': '“{name}” overrides the table script: keep it only if the author says so.',
   '{source} : {reason}': '{source}: {reason}',
   'La ROM « {rom} » n\'est pas dans l\'import : la table ne démarrera pas sans elle.': 'ROM “{rom}” isn’t in the import: the table won’t start without it.',
   'Rien à ajouter à cette table.': 'Nothing to add to this table.',
@@ -507,26 +507,26 @@ export const messages: Record<string, string> = {
   'Fenêtre « Table audit » de VPX fermée.': 'VPX “Table audit” window closed.',
   'Fenêtre d’options de la table « {title} » validée telle quelle (bouton OK) : la partie continue avec ses choix enregistrés.': 'Table options window “{title}” accepted as is (OK button): the game goes on with its saved choices.',
   'Message du script de la table validé par OK, la partie continue : « {message} »': 'Message from the table’s script accepted with OK, the game goes on: “{message}”',
-  'VPX demande s\'il peut créer l\'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n\'est pas à 0. Remettez {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).': 'VPX asks whether it may create the ActiveX object “{object}” the table needs: its [Player] SecurityLevel setting isn’t 0. Set {setting} again in VPinballX.ini (at startup, Cyber Pinball offers to restore it).',
-  'VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez {setting} dans VPinballX.ini, et dans le .ini de la table s\'il la surcharge.': 'VPX is looking for a VR headset: VR is forced ([PlayerVR] AskToTurnOn = 0). Set {setting} again in VPinballX.ini, and in the table’s .ini if it overrides it.',
+  'VPX demande s\'il peut créer l\'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n\'est pas à 0. Remets {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).': 'VPX asks whether it may create the ActiveX object “{object}” the table needs: its [Player] SecurityLevel setting isn’t 0. Set {setting} again in VPinballX.ini (at startup, Cyber Pinball offers to restore it).',
+  'VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remets {setting} dans VPinballX.ini, et dans le .ini de la table s\'il la surcharge.': 'VPX is looking for a VR headset: VR is forced ([PlayerVR] AskToTurnOn = 0). Set {setting} again in VPinballX.ini, and in the table’s .ini if it overrides it.',
   // packages/core/src/sync.ts
-  '{role} : écran « {screen} » retrouvé par son modèle seulement (pas de numéro de série). Vérifiez qu\'il s\'agit bien du bon écran.': '{role}: screen “{screen}” found by its model only (no serial number). Check that it’s the right screen.',
+  '{role} : écran « {screen} » retrouvé par son modèle seulement (pas de numéro de série). Vérifie qu\'il s\'agit bien du bon écran.': '{role}: screen “{screen}” found by its model only (no serial number). Check that it’s the right screen.',
   '{role} : l\'écran « {screen} » est introuvable. Est-il allumé et branché ?': '{role}: screen “{screen}” not found. Is it on and plugged in?',
-  '{name} est mis à l\'échelle à {scale} %. VPX repère les écrans en coordonnées logiques : gardez 100 % sur une borne.': '{name} is scaled to {scale}%. VPX locates screens in logical coordinates: keep 100% on a cabinet.',
+  '{name} est mis à l\'échelle à {scale} %. VPX repère les écrans en coordonnées logiques : garde 100 % sur une borne.': '{name} is scaled to {scale}%. VPX locates screens in logical coordinates: keep 100% on a cabinet.',
   '{name} n\'a pas de nom convivial : VPX le nommera « {vpxName} », un libellé générique que plusieurs écrans peuvent partager.': '{name} has no friendly name: VPX will call it “{vpxName}”, a generic label several screens may share.',
   '{role} : {n} écrans s\'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; le {role} peut s\'ouvrir sur le mauvais écran.': '{role}: {n} screens are named “{name}”. This VPX version finds screens by name only and will take the first one; the {role} may open on the wrong screen.',
   '{role} : {n} écrans s\'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; Cyber Pinball ramène la fenêtre du {role} sur son écran pendant la partie.':
     '{role}: {n} screens are named “{name}”. This VPX version finds screens by name only and will take the first one; Cyber Pinball moves the {role} window back to its screen during the game.',
-  'Playfield : taille de l\'écran inconnue. Relancez l\'assistant d\'écrans et indiquez sa diagonale pour que VPX cadre les tables à la bonne échelle.': 'Playfield: screen size unknown. Run the setup wizard again and enter its screen size (diagonal) so VPX fits tables at the right scale.',
-  'Playfield : flippers {edge} de l\'image, mais VPX les place toujours {expected}. Les tables s\'afficheront à l\'envers : relancez l\'assistant d\'écrans, il tournera l\'écran du playfield dans Windows pour VPX.': 'Playfield: flippers {edge} in the image, but VPX always puts them {expected}. Tables will show upside down: run the setup wizard again, it will rotate the playfield screen in Windows for VPX.',
-  'Playfield : orientation non renseignée. Relancez l\'assistant d\'écrans pour que les tables soient cadrées automatiquement.': 'Playfield: orientation not set. Run the setup wizard again so tables are fitted automatically.',
+  'Playfield : taille de l\'écran inconnue. Relance l\'assistant d\'écrans et indique sa diagonale pour que VPX cadre les tables à la bonne échelle.': 'Playfield: screen size unknown. Run the setup wizard again and enter its screen size (diagonal) so VPX fits tables at the right scale.',
+  'Playfield : flippers {edge} de l\'image, mais VPX les place toujours {expected}. Les tables s\'afficheront à l\'envers : relance l\'assistant d\'écrans, il tournera l\'écran du playfield dans Windows pour VPX.': 'Playfield: flippers {edge} in the image, but VPX always puts them {expected}. Tables will show upside down: run the setup wizard again, it will rotate the playfield screen in Windows for VPX.',
+  'Playfield : orientation non renseignée. Relance l\'assistant d\'écrans pour que les tables soient cadrées automatiquement.': 'Playfield: orientation not set. Run the setup wizard again so tables are fitted automatically.',
   ' ; ': '; ',
-  'Boutons de la borne incohérents dans cabinet.json ({issues}) : l\'interface suit les touches par défaut des encodeurs et [Input] n\'est pas touché. Refaites l\'étape « Boutons » ou remettez les touches par défaut.': 'Inconsistent cabinet buttons in cabinet.json ({issues}): the interface follows the encoder default keys and [Input] is left alone. Redo the “Buttons” step or restore the default keys.',
+  'Boutons de la borne incohérents dans cabinet.json ({issues}) : l\'interface suit les touches par défaut des encodeurs et [Input] n\'est pas touché. Refais l\'étape « Boutons » ou remets les touches par défaut.': 'Inconsistent cabinet buttons in cabinet.json ({issues}): the interface follows the encoder default keys and [Input] is left alone. Redo the “Buttons” step or restore the default keys.',
   '{action} ({key}, désormais {button})': '{action} ({key}, now {button})',
   'Touches de VPX reprises par les boutons de la borne : {list}.': 'VPX keys taken over by the cabinet buttons: {list}.',
   'le même objet': 'the same object',
-  '{plugin} et {other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent {object}, et le dernier chargé l\'emporte. Remettez [Plugin.{other}] Enable = 0.': '{plugin} and {other} both enabled in VPinballX.ini: both answer tables that ask for {object}, and the last one loaded wins. Set [Plugin.{other}] Enable = 0 again.',
-  'VPinballX.ini modifié à la main : {edits}. Cyber Pinball n\'y a pas touché : gardez ces valeurs ou remettez les siennes.': 'VPinballX.ini edited by hand: {edits}. Cyber Pinball left it alone: keep these values or restore its own.',
+  '{plugin} et {other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent {object}, et le dernier chargé l\'emporte. Remets [Plugin.{other}] Enable = 0.': '{plugin} and {other} both enabled in VPinballX.ini: both answer tables that ask for {object}, and the last one loaded wins. Set [Plugin.{other}] Enable = 0 again.',
+  'VPinballX.ini modifié à la main : {edits}. Cyber Pinball n\'y a pas touché : garde ces valeurs ou remets les siennes.': 'VPinballX.ini edited by hand: {edits}. Cyber Pinball left it alone: keep these values or restore its own.',
   '[{section}] {key} = {current} au lieu de {value}': '[{section}] {key} = {current} instead of {value}',
   // packages/core/src/dmd.ts
   'ESP32-S3, USB natif': 'ESP32-S3, native USB',
@@ -573,7 +573,7 @@ export const messages: Record<string, string> = {
   '{path} est un vrai dossier, pas une jonction : je ne le remplace pas.': '{path} is a real folder, not a junction: I won’t replace it.',
   // packages/installer/src/index.ts
   'Il reste {free} Go sur ce disque ; il en faut au moins 2 pour VPX et quelques tables.': 'Only {free} GB left on this drive; VPX and a few tables need at least 2.',
-  '{name} ne peut pas être redistribué : téléchargez-le depuis {homepage} et décompressez-le dans {folder}.': '{name} can’t be redistributed: download it from {homepage} and unzip it into {folder}.',
+  '{name} ne peut pas être redistribué : télécharge-le depuis {homepage} et décompresse-le dans {folder}.': '{name} can’t be redistributed: download it from {homepage} and unzip it into {folder}.',
   'Aucun exécutable correspondant à {pattern} dans l\'archive de {name}.': 'No executable matching {pattern} in the {name} archive.',
   // packages/installer/src/manifest.ts
   'Composant inconnu dans le manifeste : {id}': 'Unknown component in the manifest: {id}',
@@ -608,7 +608,7 @@ export const messages: Record<string, string> = {
   'Windows n’a pas tourné {label} à {rotation}° : {reason}': 'Windows did not rotate {label} to {rotation}°: {reason}',
   'À la dernière fermeture de Cyber Pinball : {problem}': 'When Cyber Pinball last closed: {problem}',
   // packages/win-displays/src/usb.ts
-  'La liste des périphériques USB change sans cesse : réessayez.': 'The USB device list keeps changing: try again.',
+  'La liste des périphériques USB change sans cesse : réessaie.': 'The USB device list keeps changing: try again.',
   'La détection des périphériques USB ne fonctionne que sous Windows pour le moment.': 'USB device detection only works on Windows for now.',
   // doctor.ts : écrans placés pour une table (menu de VPX)
   Fronton: 'Backglass',
@@ -618,7 +618,7 @@ export const messages: Record<string, string> = {
   'incrusté dans le plateau': 'inset in the playfield',
   '{window} ({state})': '{window} ({state})',
   'Écrans placés pour cette table': 'Screens placed for this table',
-  '{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, revenez à la disposition générale.':
+  '{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, reviens à la disposition générale.':
     '{file} places {windows} for this table only, over the cabinet layout (VPX menu, “Display Settings”, saved for the table). After a screen change, go back to the general layout.',
   'Revenir à la disposition générale': 'Back to the general layout',
   // packages/core/src/doctor.ts : cadrage manuel
@@ -664,12 +664,12 @@ export const messages: Record<string, string> = {
   // packages/core/src/sync.ts, doctor.ts : sens des tables (cadrage automatique exigé en vue borne)
   '[Player] {key} = {value}': '[Player] {key} = {value}',
   'Table de travers sur cette borne': 'Table sideways on this cabinet',
-  '{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que vous êtes {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans votre sens.': '{name} sets {keys}: VPX will draw this table with the flippers {played}, while you stand {edge} of the screen. Without these keys, the cabinet\'s automatic framing turns it your way again.',
-  '{name} règle {keys} : VPX reprend la vue de l’auteur de la table, avec sa rotation, souvent pour un autre écran : la table peut s’afficher de travers. Sans ces clés, le cadrage automatique de la borne la met dans votre sens.': '{name} sets {keys}: VPX uses the table author\'s view, with its rotation, often made for another screen: the table may show sideways. Without these keys, the cabinet\'s automatic framing turns it your way.',
+  '{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que tu es {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans ton sens.': '{name} sets {keys}: VPX will draw this table with the flippers {played}, while you stand {edge} of the screen. Without these keys, the cabinet\'s automatic framing turns it your way again.',
+  '{name} règle {keys} : VPX reprend la vue de l’auteur de la table, avec sa rotation, souvent pour un autre écran : la table peut s’afficher de travers. Sans ces clés, le cadrage automatique de la borne la met dans ton sens.': '{name} sets {keys}: VPX uses the table author\'s view, with its rotation, often made for another screen: the table may show sideways. Without these keys, the cabinet\'s automatic framing turns it your way.',
   'Remettre la table dans le sens de la borne': 'Turn the table the cabinet\'s way again',
   'Playfield : cadrage automatique de VPX rétabli ([Player] CabinetAutofitMode = {before} → {value}). En cadrage manuel, chaque table garde la rotation réglée par son auteur et peut s\'afficher de travers sur cette borne.': 'Playfield: VPX automatic framing restored ([Player] CabinetAutofitMode = {before} → {value}). With manual framing, each table keeps the rotation set by its author and may show sideways on this cabinet.',
-  'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX les dessinera {played}. Les tables s\'afficheront de travers : remettez les valeurs de Cyber Pinball.': 'Playfield: flippers {edge} in the image, but with {keys}, VPX will draw them {played}. Tables will show sideways: restore the Cyber Pinball values.',
-  'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s\'afficher de travers. Remettez le cadrage automatique (CabinetAutofitMode = 1).': 'Playfield: flippers {edge} in the image, but with {keys}, VPX keeps for each table the rotation set by its author, often for another screen: tables may show sideways. Restore automatic framing (CabinetAutofitMode = 1).',
+  'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX les dessinera {played}. Les tables s\'afficheront de travers : remets les valeurs de Cyber Pinball.': 'Playfield: flippers {edge} in the image, but with {keys}, VPX will draw them {played}. Tables will show sideways: restore the Cyber Pinball values.',
+  'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s\'afficher de travers. Remets le cadrage automatique (CabinetAutofitMode = 1).': 'Playfield: flippers {edge} in the image, but with {keys}, VPX keeps for each table the rotation set by its author, often for another screen: tables may show sideways. Restore automatic framing (CabinetAutofitMode = 1).',
   'Facultatif : le script dessine un DMD avec les images, vidéos et polices du dossier « {folder} », mais la table se lance sans lui.': 'Optional: the script draws a DMD with the images, videos and fonts in the “{folder}” folder, but the table starts without it.',
   'Le DMD de la ROM s’affiche à l’emplacement du DMD ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'The ROM’s DMD shows in the DMD’s place; if the script stops on “Type mismatch”, this folder is what’s missing.',
   'Sans lui, ce DMD reste vide ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'Without it, this DMD stays empty; if the script stops on “Type mismatch”, this folder is what’s missing.',
@@ -685,20 +685,20 @@ export const messages: Record<string, string> = {
     'The script calls vpmInit {n} times. Older core.vbs versions let it through; the one in VPX 10.8 stops the game as soon as it starts (“cvpmFlips2.Init is called twice”).',
   'Le script appelle vpmInit plus d’une fois pendant la partie. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie (« cvpmFlips2.Init is called twice »).':
     'The script calls vpmInit more than once during the game. Older core.vbs versions let it through; the one in VPX 10.8 stops the game (“cvpmFlips2.Init is called twice”).',
-  'Le script de la table est protégé : retirez l’appel en trop à vpmInit dans l’éditeur de VPX.': 'The table’s script is protected: remove the extra vpmInit call in the VPX editor.',
+  'Le script de la table est protégé : retire l’appel en trop à vpmInit dans l’éditeur de VPX.': 'The table’s script is protected: remove the extra vpmInit call in the VPX editor.',
   'Corrigé dans {file}, le script que VPX joue à la place de celui de la table.': 'Fixed in {file}, the script VPX plays instead of the table’s own.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où vpmInit ne s’exécute qu’une fois.': 'The table is not modified: VPX plays {file}, a copy of its script where vpmInit runs only once.',
   'N’exécuter vpmInit qu’une fois (dans {file})': 'Run vpmInit only once (in {file})',
   'Le script met {variable} = {value} : il ne lance jamais le PuP-Pack, et la partie n’affiche que le fronton et le DMD habituels, même avec pupvideos\\{pack} bien rangé.': 'The script sets {variable} = {value}: it never starts the PuP-Pack, and the game shows only the usual backglass and DMD, even with pupvideos\\{pack} in the right place.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où seules ces valeurs changent.': 'The table is not modified: VPX plays {file}, a copy of its script where only these values change.',
-  'Mettez {enables} dans le script de la table (éditeur de VPX).': 'Set {enables} in the table’s script (VPX editor).',
+  'Mets {enables} dans le script de la table (éditeur de VPX).': 'Set {enables} in the table’s script (VPX editor).',
   'Le script met {variable} = {value} : la PuP-DMD (le score que le pack écrit sur son écran DMD) reste éteinte, et le DMD ne montrerait que le cadre vide du pack.': 'The script sets {variable} = {value}: the PuP-DMD (the score the pack writes on its DMD screen) stays off, and the DMD would show only the pack’s empty frame.',
   'PuP-DMD coupée par le script de la table': 'PuP-DMD switched off by the table’s script',
   'PuP-Pack coupé par le script de la table': 'PuP-Pack switched off by the table’s script',
   'Allumer le PuP-Pack ({enables}, dans {file})': 'Switch the PuP-Pack on ({enables}, in {file})',
   'Le script de « {table} » coupe le PuP-Pack ({values}) : Cyber Pinball l’allume dans {file}, sans modifier la table.': 'The script of “{table}” switches the PuP-Pack off ({values}): Cyber Pinball switches it on in {file}, without modifying the table.',
   '{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.': '{file}, written by Cyber Pinball for the old version of the table, goes to the trash: the new script no longer switches the PuP-Pack off.',
-  'Le script de « {table} » coupe le PuP-Pack ({values}) : mettez {enables} dans son script.': 'The script of “{table}” switches the PuP-Pack off ({values}): set {enables} in its script.',
+  'Le script de « {table} » coupe le PuP-Pack ({values}) : mets {enables} dans son script.': 'The script of “{table}” switches the PuP-Pack off ({values}): set {enables} in its script.',
   'Le script de « {table} » coupe le PuP-Pack : il faudra l’allumer dans son script.': 'The script of “{table}” switches the PuP-Pack off: it will have to be switched on in its script.',
   'Le PuP-Pack cacherait le DMD de la table': 'The PuP-Pack would hide the table’s DMD',
   'pupvideos\\{pack} occupe la fenêtre du DMD, où le plugin PUP ne dessine jamais le DMD de la table : son score n’apparaîtrait pas. Pour cette table, le DMD passera devant le pack ({file}) ; le pack garde le fronton et le topper.': 'pupvideos\\{pack} takes the DMD window, where the PUP plugin never draws the table’s DMD: its score would not show. For this table, the DMD will go in front of the pack ({file}); the pack keeps the backglass and the topper.',
@@ -771,7 +771,7 @@ export const messages: Record<string, string> = {
   'Couleurs du DMD mal nommées : VPX ne les charge pas': 'Misnamed DMD colors: VPX does not load them',
   '{folder} : VPX cherche les couleurs dans {target}, au nom de la ROM que joue la table, avec les noms de fichiers qu’il connaît. Il n’y a rien à cocher : rangées là, le DMD passe en couleur.':
     '{folder}: VPX looks for the colors in {target}, named after the ROM the table plays, with the file names it knows. There is nothing to tick: stored there, the DMD turns to color.',
-  '{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renommez ce dossier.':
+  '{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renomme ce dossier.':
     '{folder}: VPX only looks for the colors in a folder named after the ROM the table plays ({rom}). Rename this folder.',
   'Ranger dans {target}': 'Move to {target}',
   'couleurs du DMD que VPX ne lit pas (.pac, .cROM)': 'DMD colors VPX does not read (.pac, .cROM)',

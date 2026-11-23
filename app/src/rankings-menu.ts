@@ -220,7 +220,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   /** Heure de la relecture prévue (0 : aucune). */
   let trailingAt = 0;
 
-  const place = (rank: number, beyond?: number) => (beyond ? t('au-delà de la {n}ᵉ place', { n: beyond }) : rank === 1 ? t('vous êtes 1ᵉʳ') : t('vous êtes {n}ᵉ', { n: rank }));
+  const place = (rank: number, beyond?: number) => (beyond ? t('au-delà de la {n}ᵉ place', { n: beyond }) : rank === 1 ? t('tu es 1ᵉʳ') : t('tu es {n}ᵉ', { n: rank }));
 
   // ---------- Tables ----------
 
@@ -445,7 +445,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
       heading: t('Tables'),
       icon: 'trophy',
       subheading: `${scopeLabel(scope)} · ${periodLabel(period)}`,
-      lead: t('Toutes vos tables, le premier de chacune et votre place. Start sur une table : son tableau des scores.'),
+      lead: t('Toutes tes tables, le premier de chacune et ta place. Start sur une table : son tableau des scores.'),
       tabs,
       sections,
       actions,
@@ -537,7 +537,7 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     return {
       rank: String(line.rank),
       ...(apart ? { apart: true } : {}),
-      name: line.mine ? t('{name} (vous)', { name: line.name }) : line.name,
+      name: line.mine ? t('{name} (toi)', { name: line.name }) : line.name,
       score: xpText(line.xp),
       when: other,
       ...(line.rank === 1 ? { first: true } : {}),
@@ -552,8 +552,8 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
   /** Ma place dans un classement des joueurs, en une ligne (porte « Joueurs », sous le tableau). */
   function playerPosition(board: PlayerBoard, sc: PlayerScope, p: PlayerPeriod): string {
     const where = t('{scope} · {period}', { scope: playerScopeLabel(sc), period: playerPeriodLabel(p) });
-    if (!board.me) return p === 'week' ? t('{where} : pas encore d’XP pour vous cette semaine', { where }) : t('{where} : pas encore d’XP pour vous', { where });
-    return t('{where} : votre place, {rank} sur {players}', { where, rank: board.me.rank, players: tn(board.players, '{n} joueur', '{n} joueurs') });
+    if (!board.me) return p === 'week' ? t('{where} : pas encore d’XP pour toi cette semaine', { where }) : t('{where} : pas encore d’XP pour toi', { where });
+    return t('{where} : ta place, {rank} sur {players}', { where, rank: board.me.rank, players: tn(board.players, '{n} joueur', '{n} joueurs') });
   }
 
   function buildPlayers(): Built {
@@ -672,12 +672,12 @@ export function createRankingsMenu(host: RankingsMenuHost): RankingsMenu {
     const s = host.players.state();
     const parts: string[] = [];
     const level = playersOf('world', 'all').lines.find((l) => l.mine)?.level;
-    if (level) parts.push(t('Vous : niveau {n}', { n: level }));
+    if (level) parts.push(t('Toi : niveau {n}', { n: level }));
     const week = playersOf('world', 'week');
     if (week.me) parts.push(week.me.rank === 1 ? t('1ᵉʳ au monde cette semaine') : t('{n}ᵉ au monde cette semaine', { n: week.me.rank }));
     if (s.country) {
       const national = playersOf('country', 'week');
-      if (national.me) parts.push(national.me.rank === 1 ? t('1ᵉʳ dans votre pays') : t('{n}ᵉ dans votre pays', { n: national.me.rank }));
+      if (national.me) parts.push(national.me.rank === 1 ? t('1ᵉʳ dans ton pays') : t('{n}ᵉ dans ton pays', { n: national.me.rank }));
     }
     return parts.length ? parts.join(' · ') : t('Classés par XP : amis, national, mondial ; cette semaine ou de tout temps');
   }

@@ -411,14 +411,14 @@ export function tiltView(step: TiltStep, saveLabel: string, keys: TiltViewKeys, 
   if (simulated) {
     line = v.tilts
       ? t('Contacts avec l’anneau : {n} · depuis le dernier, {pct} % du contact, secousse de {g} g', { n: v.tilts, pct: Math.round(v.peak * 100), g: formatNumber(v.accel, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
-      : t('Secouez la borne : {pct} % du contact au plus, secousse de {g} g', { pct: Math.round(v.peak * 100), g: formatNumber(v.accel, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+      : t('Secoue la borne : {pct} % du contact au plus, secousse de {g} g', { pct: Math.round(v.peak * 100), g: formatNumber(v.accel, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
   } else if (step.tilt.mode === 'bob') {
-    line = step.bobContacts ? t('Contacts du balancier : {n}', { n: step.bobContacts }) : t('Faites toucher l’anneau au balancier pour l’essayer');
+    line = step.bobContacts ? t('Contacts du balancier : {n}', { n: step.bobContacts }) : t('Fais toucher l’anneau au balancier pour l’essayer');
   } else line = t('La borne ne tiltera pas.');
   return {
     prompt: 'Tilt',
     measure: undefined,
-    name: step.vpx ? t('Réglage actuel de VPX : {what}', { what: vpxLine(step.vpx) }) : t('Essayez : le balancier suit ce que VPX calculera'),
+    name: step.vpx ? t('Réglage actuel de VPX : {what}', { what: vpxLine(step.vpx) }) : t('Essaie : le balancier suit ce que VPX calculera'),
     details: rowHelp(step, selected),
     notice: simulated && !step.nudge ? t('Pas d’accéléromètre : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.') : simulated && drawing.missing ? t('Accéléromètre introuvable : est-il branché ?') : undefined,
     plumb: { ...drawing, caption: accelerometer ?? '' },

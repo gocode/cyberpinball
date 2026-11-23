@@ -10,8 +10,8 @@ export const messages: Record<string, string> = {
   '{game} est introuvable sur ce PC. Menu système > Tables > Ajouter une table > « Tables de {game} » : choisir son dossier.': '{game} can’t be found on this PC. System menu > Tables > Add a table > "{game} tables": choose its folder.',
   'Le fichier de la table est introuvable : {file}.': 'The table file can’t be found: {file}.',
   'Ce chemin ne peut pas être donné à {game} : {file}.': 'This path can’t be passed to {game}: {file}.',
-  'Vérifiez que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.': 'Check that the table opens in {game} itself: its libraries (.fpl) and its game version.',
-  'Vérifiez que la table s’ouvre en lançant BAM\\FPLoader.exe vous-même : ses bibliothèques (.fpl), sa version de BAM.': 'Check that the table opens when you start BAM\\FPLoader.exe yourself: its libraries (.fpl), its BAM version.',
+  'Vérifie que la table s’ouvre dans {game} lui-même : ses bibliothèques (.fpl) et sa version du jeu.': 'Check that the table opens in {game} itself: its libraries (.fpl) and its game version.',
+  'Vérifie que la table s’ouvre en lançant BAM\\FPLoader.exe toi-même : ses bibliothèques (.fpl), sa version de BAM.': 'Check that the table opens when you start BAM\\FPLoader.exe yourself: its libraries (.fpl), its BAM version.',
   // app/src/pinballfx-launcher.ts
   '{game} s’est fermé sans ouvrir la table.': '{game} closed without opening the table.',
   '{game} ne s’est pas ouvert : son lanceur (BAM) s’est arrêté avant.': '{game} didn’t open: its launcher (BAM) stopped first.',
@@ -47,7 +47,7 @@ export const messages: Record<string, string> = {
   'Ses médias arrivent (Téléchargements).': 'Its media are on the way (Downloads).',
   '{n} déjà dans le front-end.': '{n} already in the menu.',
   'Pas ajoutées : {list}': 'Not added: {list}',
-  '{game} est introuvable sur ce PC : choisissez son dossier, puis installez de nouveau la table (le fichier reçu est gardé).':
+  '{game} est introuvable sur ce PC : choisis son dossier, puis installe de nouveau la table (le fichier reçu est gardé).':
     '{game} can’t be found on this PC: choose its folder, then install the table again (the received file is kept).',
   'Rangement dans {game}…': 'Putting files into {game}…',
   '{n} fichier rangé dans {game} (bibliothèques, musique…).': '{n} file put into {game} (libraries, music…).',

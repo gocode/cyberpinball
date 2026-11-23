@@ -153,13 +153,13 @@ export function zedmdDoubt(d: DetectedDmd, hints: DmdPortHints | undefined, setu
   if (has(hints.failed)) {
     return {
       reason: 'failed',
-      message: t('{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être votre contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).', { port, yes }),
+      message: t('{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être ton contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).', { port, yes }),
     };
   }
   if (hints.addressable) {
     return {
       reason: 'addressable',
-      message: t('{port} : pont USB-série courant, et votre configuration DOF a des LED adressables : c’est peut-être leur contrôleur. ZeDMD n’y est pas allumé d’office ({yes}).', { port, yes }),
+      message: t('{port} : pont USB-série courant, et ta configuration DOF a des LED adressables : c’est peut-être leur contrôleur. ZeDMD n’y est pas allumé d’office ({yes}).', { port, yes }),
     };
   }
   return undefined;
@@ -214,7 +214,7 @@ export function withHardwareDmdChoice(setup: HardwareDmdSetup | undefined, model
 /** Adresse du ZeDMD en wifi : nom (zedmd-wifi.local) ou adresse IPv4, sans espace ni schéma. */
 export function zedmdWifiAddressProblem(address: string): string | undefined {
   const a = address.trim();
-  if (!a) return t('Indiquez le nom ou l’adresse IP du ZeDMD.');
+  if (!a) return t('Indique le nom ou l’adresse IP du ZeDMD.');
   if (/^[a-z]+:\/\//i.test(a) || a.includes('/')) return t('Le nom ou l’adresse seuls, sans « http:// » ni chemin : par exemple {example} ou 192.168.1.50.', { example: ZEDMD_WIFI_DEFAULT_ADDR });
   if (!/^[A-Za-z0-9.-]+$/.test(a)) return t('Lettres, chiffres, points et tirets seulement : par exemple {example} ou 192.168.1.50.', { example: ZEDMD_WIFI_DEFAULT_ADDR });
   if (/^\d+(\.\d+){3}$/.test(a) && a.split('.').some((n) => Number(n) > 255)) return t('Adresse IP impossible : chaque nombre va de 0 à 255.');
@@ -236,7 +236,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
     const service = device.service?.toLowerCase();
     if (problem || !service || !LIBUSB_SERVICES.includes(service)) {
       return t(
-        'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Installez ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».',
+        'PIN2DMD : Windows ne lui a pas donné de pilote USB générique (WinUSB ou libusbK){why}. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Installe ce pilote avec l’outil fourni avec le PIN2DMD ou avec Zadig, puis « Vérifier de nouveau ».',
         { why: code ? ` (${code})` : service ? t(' (pilote actuel : {service})', { service: device.service! }) : '' },
       );
     }
@@ -244,7 +244,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
     // libusbK.dll ; sans elle, seul WinUSB marche (libusb, windows_winusb.c, winusbx_init).
     if (service !== 'winusb' && device.libusbKDll === false) {
       return t(
-        'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».',
+        'PIN2DMD : son pilote {service} ne s’ouvre que par libusbK.dll, absente de Windows. Cyber Pinball ne pourra pas l’ouvrir et le DMD restera noir. Remplace ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».',
         { service: device.service! },
       );
     }
@@ -253,7 +253,7 @@ export function hardwareDmdDriverProblem(d: DetectedDmd): string | undefined {
   // ZeDMD et Pixelcade : un port série. Sans port, le pilote du convertisseur manque.
   if (problem || !device.port) {
     const chip = d.usb.includes('CH34') ? t('pilote CH340/CH343 de WCH') : d.usb.includes('CP210x') ? t('pilote CP210x de Silicon Labs') : t('pilote du port série USB');
-    return t('{model} : Windows ne lui a pas donné de port COM{why}. VPX ne pourra pas l’ouvrir. Installez le {chip} (souvent proposé par Windows Update), débranchez et rebranchez, puis « Vérifier de nouveau ».', {
+    return t('{model} : Windows ne lui a pas donné de port COM{why}. VPX ne pourra pas l’ouvrir. Installe le {chip} (souvent proposé par Windows Update), débranche et rebranche, puis « Vérifier de nouveau ».', {
       model: d.model,
       why: code ? ` (${code})` : '',
       chip,
@@ -304,32 +304,32 @@ export const PIN2DMD_PRODUCTS: readonly string[] = ['PIN2DMD', 'PIN2DMD XL', 'PI
  */
 export function pin2dmdProbeProblem(probe: LibusbProbe | undefined, service?: string): string | undefined {
   if (!probe || probe.stage === 'ok') return undefined;
-  if (probe.stage === 'list') return t('PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau ».');
+  if (probe.stage === 'list') return t('PIN2DMD : Windows le voit, mais la libusb de VPX ne le trouve pas. Débranche-le, rebranche-le, puis « Vérifier de nouveau ».');
   if (probe.stage === 'name') {
     // Lu, mais refusé : rien ne se règle sur la borne, libdmdutil compare le nom à sa liste.
     if (probe.code >= 0 && probe.product) {
       return t(
-        'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoyez un rapport (Menu système > Aide et infos > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.',
+        'PIN2DMD : la carte se présente sous le nom « {product} », que le module DMD de VPX (libdmdutil) ne connaît pas : il n’accepte que {known}. VPX ne la pilotera pas et le DMD restera noir. Cyber Pinball ne peut pas le contourner : envoie un rapport (Menu système > Aide et infos > Retours et propositions) pour que ce nom soit signalé aux auteurs de VPX.',
         { product: probe.product, known: formatList(PIN2DMD_PRODUCTS.map((p) => `« ${p} »`)) },
       );
     }
     return t(
-      'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranchez-la, rebranchez-la, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).',
+      'PIN2DMD : la carte s’ouvre, mais ne donne pas son nom à la libusb de VPX ({why}). Le module DMD de VPX (libdmdutil) ne la pilote qu’après l’avoir lu : le DMD restera noir. Débranche-la, rebranche-la, puis « Vérifier de nouveau » ; si rien ne change, envoie un rapport (Menu système > Aide et infos > Retours et propositions).',
       { why: probe.code < 0 ? t('erreur {code}', { code: probe.code }) : t('nom vide') },
     );
   }
   if (probe.code === LIBUSB_ERROR_ACCESS || probe.code === LIBUSB_ERROR_BUSY) {
     const holders = probe.holders ?? [];
     return holders.length
-      ? t('PIN2DMD : déjà ouvert par un autre programme ({programs}). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».', { programs: formatList(holders) })
-      : t('PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Fermez-le, ou retirez-le du démarrage de Windows, puis « Vérifier de nouveau ».');
+      ? t('PIN2DMD : déjà ouvert par un autre programme ({programs}). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Ferme-le, ou retire-le du démarrage de Windows, puis « Vérifier de nouveau ».', { programs: formatList(holders) })
+      : t('PIN2DMD : déjà ouvert par un autre programme (dmdext, un autre front-end, l’éditeur du PIN2DMD…). Cyber Pinball ne pourra pas l’allumer et le DMD restera noir. Ferme-le, ou retire-le du démarrage de Windows, puis « Vérifier de nouveau ».');
   }
   if (probe.code === LIBUSB_ERROR_NOT_SUPPORTED) {
-    return t('PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplacez ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».', {
+    return t('PIN2DMD : la libusb de VPX ne sait pas l’ouvrir avec son pilote actuel ({service}). Le DMD restera noir. Remplace ce pilote par WinUSB avec Zadig (Options > List All Devices, choisir le PIN2DMD, WinUSB, Replace Driver), puis « Vérifier de nouveau ».', {
       service: service ?? t('inconnu'),
     });
   }
-  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranchez-le, rebranchez-le, puis « Vérifier de nouveau » ; si rien ne change, envoyez un rapport (Menu système > Aide et infos > Retours et propositions).', {
+  return t('PIN2DMD : la libusb de VPX n’arrive pas à l’ouvrir (erreur {code}, étape {stage}). Le DMD restera sans doute noir. Débranche-le, rebranche-le, puis « Vérifier de nouveau » ; si rien ne change, envoie un rapport (Menu système > Aide et infos > Retours et propositions).', {
     code: probe.code,
     stage: probe.stage,
   });
@@ -409,7 +409,7 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
   if (lit && holders.length) {
     findings.push({
       severity: 'warning',
-      message: tn(holders.length, 'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-le avant de jouer.', 'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Fermez-les avant de jouer.', {
+      message: tn(holders.length, 'DMD réel : {programs} est ouvert et garde peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Ferme-le avant de jouer.', 'DMD réel : {programs} sont ouverts et gardent peut-être le DMD réel ; VPX ne pourrait pas l’allumer. Ferme-les avant de jouer.', {
         programs: formatList(holders),
       }),
     });
@@ -455,7 +455,7 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
       findings.push({
         severity: 'info',
         message: t(
-          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisissez « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.",
+          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : choisis « {model} : non » dans Menu système > Ma borne > DMD et LED > DMD réel.",
           { model: d.model, usb: usbIdLabel(d.device.vid, d.device.pid) },
         ),
       });

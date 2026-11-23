@@ -45,15 +45,15 @@ export interface OrientationVerdict {
 export function orientationVerdict(facts: OrientationFacts): OrientationVerdict {
   const windows = t('Windows en {rotation}°', { rotation: facts.current });
   if (facts.played === facts.player) {
-    return { state: 'ok', title: t('Tables dans votre sens, flippers {player}', { player: EDGE_LABELS[facts.player] }), detail: windows };
+    return { state: 'ok', title: t('Tables dans ton sens, flippers {player}', { player: EDGE_LABELS[facts.player] }), detail: windows };
   }
   const why =
     facts.playing !== undefined && facts.playing !== facts.current
       ? t('orientation de jeu : {playing}°, que Windows n’a pas reprise', { playing: facts.playing })
-      : t('relancez « Orientation et taille du playfield »');
+      : t('relance « Orientation et taille du playfield »');
   return {
     state: 'blocking',
-    title: t('Tables à l’envers : VPX les dessinera flippers {played}, vous êtes {player}', { played: EDGE_LABELS[facts.played], player: EDGE_LABELS[facts.player] }),
+    title: t('Tables à l’envers : VPX les dessinera flippers {played}, tu es {player}', { played: EDGE_LABELS[facts.played], player: EDGE_LABELS[facts.player] }),
     detail: t('{windows} ; {why}', { windows, why }),
   };
 }

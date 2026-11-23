@@ -211,7 +211,7 @@ test('bibliothèque partagée : active par défaut entre amis, coupée et remise
   menu.items.sharing!.run();
   assert.equal(net.state().shareLibrary, true);
   const rows = () => last().build().sections.flatMap((s) => s.rows.map((r) => r.text));
-  assert.ok(rows().includes('Bibliothèque partagée avec vos amis'));
+  assert.ok(rows().includes('Bibliothèque partagée avec tes amis'));
   await last().build().actions.find((a) => a.label === 'Ne plus partager ma bibliothèque')!.run();
   assert.equal(net.state().shareLibrary, false);
   assert.equal(last().at, Number.MAX_SAFE_INTEGER);
@@ -305,7 +305,7 @@ test('un seul écran par joueur : le profil, enrichi pour un ami ; plus de « Vo
   await last().build().actions.find((a) => a.label === 'Retirer')!.run();
   const after = last().build();
   assert.equal(after.heading, 'Bruno');
-  assert.equal(hubOf(after).person.eyebrow, 'Bruno retiré de vos amis', 'le constat, en tête');
+  assert.equal(hubOf(after).person.eyebrow, 'Bruno retiré de tes amis', 'le constat, en tête');
   assert.equal(headButton(after, 'Ajouter')?.off, undefined, 'la demande d’ami, possible');
   assert.equal(headButton(after, 'Écrire')?.off, 'Entre amis seulement', 'Écrire grisé, sa raison');
   // Aucun écran ne renvoie plus vers un second écran du même joueur.
@@ -371,7 +371,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     createdAt: new Date().toISOString(),
   };
   const phases: [LiveGame, string][] = [
-    [base, 'Partie en direct'],
+    [base, 'Partie entre amis'],
     [{ ...base, phase: 'countdown', startAt: new Date(Date.now() + 2500).toISOString() }, 'Départ commun'],
     [{ ...base, phase: 'playing', players: [{ ...base.players[0]!, state: 'done', seconds: 300, records: [{ score: 1_000_000, rank: 1 }] }, { ...base.players[1]!, state: 'playing' }] }, 'Partie en direct en cours'],
     [{ ...base, phase: 'finished', players: [{ ...base.players[0]!, state: 'done', seconds: 300 }, { ...base.players[1]!, state: 'done', seconds: 200, records: [{ score: 2_000_000, rank: 3 }] }] }, 'Résultats'],
@@ -391,7 +391,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu).
     if (game.phase === 'finished') {
       const texts = built.sections.flatMap((s) => s.rows.map((r) => r.text));
-      assert.match(texts.join('|'), /(^|\|)1\. Bruno — 2\s?000\s?000\|Alice \(vous\) — Score non disponible\|Aucun score classé pour l’instant$/u);
+      assert.match(texts.join('|'), /(^|\|)1\. Bruno — 2\s?000\s?000\|Alice \(toi\) — Score non disponible\|Aucun score classé pour l’instant$/u);
       // La même version, mais 5 billes par partie contre 3 : hors classement, avec la raison.
       games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.host ? { ...p, balls: 3 } : { ...p, balls: 5 })) };
       menu.live.open(() => undefined);
@@ -487,7 +487,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   await built.actions[rows.find((r) => r.text === 'ROM')!.action!]!.run();
   type Shown = { heading: string; lead?: string; actions: Action[]; sections: { rows: { text: string; action?: number; badges?: string[]; pick?: boolean }[] }[] };
   const attest = () => last().build() as unknown as Shown;
-  assert.equal(attest().heading, 'La ROM : vos droits');
+  assert.equal(attest().heading, 'La ROM : tes droits');
   assert.ok(!last().at, 'le curseur sur l’attestation');
   const pledge = attest().sections.flatMap((x) => x.rows).find((r) => r.pick)!;
   assert.match(pledge.text, /^J’atteste avoir le droit de détenir ce contenu/);
@@ -516,7 +516,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   // Le PuP-Pack demande sa propre attestation.
   const pupRow = (last().build() as unknown as Shown).sections.flatMap((x) => x.rows).find((r) => r.text === 'PuP-Pack')!;
   await last().build().actions[pupRow.action!]!.run();
-  assert.equal(attest().heading, 'Le PuP-Pack : vos droits');
+  assert.equal(attest().heading, 'Le PuP-Pack : tes droits');
   await attest().actions.find((a) => a.label === 'Retour')!.run();
   // La réception : la ROM attestée part, avec la trace de l'attestation ; le PuP-Pack non attesté, jamais.
   await last().build().actions.find((a) => a.label.startsWith('Récupérer les '))!.run();
@@ -622,8 +622,8 @@ test('« Ajouter une table > Depuis un ami » : les amis qui ont des tables à p
   const rows = friends.sections.flatMap((s) => s.rows).filter((r) => r.action !== undefined);
   assert.deepEqual(rows.map((r) => r.text), ['Émile', 'Bruno'], 'celle qui a des tables à prendre d’abord');
   assert.deepEqual(rows[0]!.badges, ['2 à prendre']);
-  assert.match(rows[0]!.detail!, /^3 tables, dont 2 absentes de votre borne$/);
-  assert.match(rows[1]!.detail!, /toutes déjà sur votre borne/);
+  assert.match(rows[0]!.detail!, /^3 tables, dont 2 absentes de ta borne$/);
+  assert.match(rows[1]!.detail!, /toutes déjà sur ta borne/);
   for (const row of rows) assert.equal(friends.actions[row.action!]!.label, row.text, `la ligne « ${row.text} » mène à sa propre action`);
   assert.equal(friends.actions.at(-1)!.label, 'Retour');
   await friends.actions.at(-1)!.run();
@@ -633,7 +633,7 @@ test('« Ajouter une table > Depuis un ami » : les amis qui ont des tables à p
   await (last().build() as unknown as Shown).actions[rows[0]!.action!]!.run();
   const library = last().build() as unknown as Shown;
   assert.equal(library.heading, 'Bibliothèque de Émile');
-  assert.deepEqual(library.sections.map((s) => s.title), ['Absentes de votre borne (2)', 'Sur votre borne (1)']);
+  assert.deepEqual(library.sections.map((s) => s.title), ['Absentes de ta borne (2)', 'Sur ta borne (1)']);
   assert.match(library.actions[0]!.label, /^(Fish Tales|Medieval Madness)/, 'la première action est la première table absente');
   for (const row of library.sections.flatMap((s) => s.rows).filter((r) => r.action !== undefined)) assert.equal(library.actions[row.action!]!.label, row.text);
   // Son « Retour » ramène à la liste des amis de l'ajout.

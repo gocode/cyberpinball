@@ -314,13 +314,13 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       sections.push({
         rows: [
           s.destination
-            ? { icon: 'usb', text: t('Branchez la clé ou le disque choisi : {where}', { where: s.destination.label ?? s.destination.path }), detail: t('Il est reconnu même si sa lettre change'), tone: 'info' }
-            : { icon: 'usb', text: t('Branchez une clé USB ou un disque externe'), detail: t('Les réglages et les scores tiennent sur n’importe quelle clé'), tone: 'info' },
+            ? { icon: 'usb', text: t('Branche la clé ou le disque choisi : {where}', { where: s.destination.label ?? s.destination.path }), detail: t('Il est reconnu même si sa lettre change'), tone: 'info' }
+            : { icon: 'usb', text: t('Branche une clé USB ou un disque externe'), detail: t('Les réglages et les scores tiennent sur n’importe quelle clé'), tone: 'info' },
           { icon: 'alert', text: t('Le disque de la borne ne protège pas d’une panne de ce disque'), detail: t('Possible quand même, par « Choisir une destination »'), tone: 'warning' },
         ],
       });
     }
-    const noDest = t('Choisissez d’abord une clé, un disque ou un dossier');
+    const noDest = t('Choisis d’abord une clé, un disque ou un dossier');
     const actions: Action[] = [
       job && !job.auto
         ? { label: job.kind === 'backup' ? t('Sauvegarde en cours') : t('Restauration en cours'), detail: jobLine(), icon: 'drive', run: showJob }
@@ -479,7 +479,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       hint: t('Flippers ou Tab : choisir · Start ou Entrée : choisir ce niveau · Exit ou Échap : revenir · souris'),
       sections: [
         { title: t('Ce qu’on sauvegarde'), options: true, rows },
-        { rows: [{ icon: 'info', text: t('Cyber Pinball lui-même n’est pas dans la sauvegarde'), detail: t('Sur un autre PC : installez d’abord Cyber Pinball, puis restaurez. Jamais copiés : cache, corbeille, journaux'), tone: 'info' }] },
+        { rows: [{ icon: 'info', text: t('Cyber Pinball lui-même n’est pas dans la sauvegarde'), detail: t('Sur un autre PC : installe d’abord Cyber Pinball, puis restaure. Jamais copiés : cache, corbeille, journaux'), tone: 'info' }] },
       ],
       actions,
       back: () => host.library.openCustom(buildMain, 0),
@@ -617,7 +617,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       subheading: `${levelLabel(job.level ?? 'settings')} · ${jobLine()}`,
       sections: [
         { rows: p?.phase === 'scan' ? [{ text: t('Recherche des fichiers…'), tone: 'info', progress: { busy: true } }] : rows },
-        { rows: [{ icon: 'info', text: t('Parties indisponibles pendant la sauvegarde'), detail: t('Une partie écrit ses scores : vous pourrez jouer dès la fin de la copie et de sa vérification'), tone: 'info' }] },
+        { rows: [{ icon: 'info', text: t('Parties indisponibles pendant la sauvegarde'), detail: t('Une partie écrit ses scores : tu pourras jouer dès la fin de la copie et de sa vérification'), tone: 'info' }] },
       ],
       actions: [
         { label: t('Retour au front-end'), detail: t('La sauvegarde continue ; son avancée reste sur « Sauvegardes »'), icon: 'back', run: back },
@@ -648,12 +648,12 @@ export function createBackupsMenu(host: BackupsMenuHost) {
         { text: f.info.dir, tone: 'quiet' },
       ];
       const keyRows: Row[] = LEVEL_PARTS[f.level].includes('friends')
-        ? [{ icon: 'lock', text: t('Elle contient l’identité de la borne sur le réseau des amis'), detail: t('Qui la restaure se présente à vos amis comme cette borne : gardez-la pour vous'), tone: 'warning' }]
+        ? [{ icon: 'lock', text: t('Elle contient l’identité de la borne sur le réseau des amis'), detail: t('Qui la restaure se présente à tes amis comme cette borne : garde-la pour toi'), tone: 'warning' }]
         : [];
-      if (drive && drive.type === 'usb') keyRows.push({ icon: 'usb', text: t('Rangez-la hors de la borne'), detail: t('Une sauvegarde qui reste branchée partage le sort du PC (surtension, vol, dégât des eaux)'), tone: 'info' });
+      if (drive && drive.type === 'usb') keyRows.push({ icon: 'usb', text: t('Range-la hors de la borne'), detail: t('Une sauvegarde qui reste branchée partage le sort du PC (surtension, vol, dégât des eaux)'), tone: 'info' });
       const eject: Action =
         drive && drive.type === 'usb'
-          ? { label: t('Éjecter la clé'), detail: t('Attendez le message avant de la débrancher'), icon: 'usb', tone: 'ok', run: () => void ejectDrive(drive) }
+          ? { label: t('Éjecter la clé'), detail: t('Attends le message avant de la débrancher'), icon: 'usb', tone: 'ok', run: () => void ejectDrive(drive) }
           : { label: t('Éjecter la clé'), detail: t('Cette destination ne s’éjecte pas'), icon: 'usb', tone: 'quiet', run: () => undefined };
       return {
         heading: t('Sauvegarde terminée'),
@@ -667,7 +667,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const done = f.info?.manifest.partsDone ?? [];
     const rows: Row[] = [
       f.reason === 'stopped'
-        ? { text: t('Sauvegarde arrêtée à votre demande'), tone: 'warning', badges: [t('Incomplète')] }
+        ? { text: t('Sauvegarde arrêtée à ta demande'), tone: 'warning', badges: [t('Incomplète')] }
         : { text: t('La copie s’est arrêtée : {error}', { error: f.error ?? t('erreur inconnue') }), detail: drive ? undefined : t('{where} n’est plus là', { where: f.where }), tone: 'error', badges: [t('Incomplète')] },
       ...(done.length
         ? [{ text: t('Déjà copié et vérifié : {parts}', { parts: done.map((p) => backupPartLabel(p).toLowerCase()).join(', ') }), detail: t('Ces parties se restaurent déjà depuis cette sauvegarde'), tone: 'ok' as const, badges: [t('Vérifié')] }]
@@ -681,7 +681,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       actions: [
         destinationDrive()
           ? { label: t('Reprendre la sauvegarde'), detail: t('Seul ce qui manque est copié'), icon: 'refresh', tone: 'ok', run: () => void startBackup(f.level, destinationDrive()!) }
-          : { label: t('Reprendre la sauvegarde'), detail: t('Rebranchez la destination : seul ce qui manque sera copié'), icon: 'refresh', tone: 'quiet', run: () => void readDrives().then(() => host.broadcast()) },
+          : { label: t('Reprendre la sauvegarde'), detail: t('Rebranche la destination : seul ce qui manque sera copié'), icon: 'refresh', tone: 'quiet', run: () => void readDrives().then(() => host.broadcast()) },
         { label: t('Changer de destination'), icon: 'usb', run: openDestination },
         backAction(() => leaveFinished()),
       ],
@@ -700,7 +700,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     await host.library.task(t('Windows termine l’écriture sur {where}…', { where: driveName(drive) }), async () => {
       ok = await host.eject(drive);
     });
-    host.notify?.(ok ? t('Vous pouvez débrancher {where}', { where: driveName(drive) }) : t('{where} est encore utilisée : attendez un peu, puis réessayez', { where: driveName(drive) }));
+    host.notify?.(ok ? t('Tu peux débrancher {where}', { where: driveName(drive) }) : t('{where} est encore utilisée : attends un peu, puis réessaie', { where: driveName(drive) }));
     if (ok) {
       drives = drives.filter((d) => d.letter !== drive.letter);
       finished = undefined;
@@ -775,7 +775,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     }
     const sections: Section[] = [];
     if (destError) sections.push({ rows: [{ icon: 'alert', text: destError, tone: 'error' }] });
-    sections.push(rows.length ? { options: true, rows } : { rows: [{ icon: 'usb', text: t('Aucune clé ni aucun disque trouvé'), detail: t('Branchez-en un, puis « Chercher de nouveau »'), tone: 'info' }] });
+    sections.push(rows.length ? { options: true, rows } : { rows: [{ icon: 'usb', text: t('Aucune clé ni aucun disque trouvé'), detail: t('Branches-en un, puis « Chercher de nouveau »'), tone: 'info' }] });
     return {
       heading: t('Destination'),
       icon: 'usb',
@@ -786,7 +786,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
         ...actions,
         host.library.pick
           ? { label: t('Choisir un dossier…'), detail: t('Sur une clé, un disque ou un lecteur réseau : {dir} y est créé', { dir: BACKUP_DIR_NAME }), icon: 'folder', run: () => void chooseFolder() }
-          : { label: t('Choisir un dossier…'), detail: t('Indisponible ici : choisissez un lecteur'), icon: 'folder', tone: 'quiet', run: () => undefined },
+          : { label: t('Choisir un dossier…'), detail: t('Indisponible ici : choisis un lecteur'), icon: 'folder', tone: 'quiet', run: () => undefined },
         { label: t('Chercher de nouveau'), detail: t('Une clé ou un disque qui vient d’être branché'), icon: 'refresh', run: openDestination },
         backAction(() => ((destError = undefined), host.library.openCustom(buildMain, 0))),
       ],
@@ -818,7 +818,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       host.library.openCustom(buildDestination, 0);
     };
     if ((host.root && isInside(dir, path.resolve(host.root))) || isInside(dir, path.resolve(host.dataDir)))
-      return refuse(t('« {dir} » est dans l’installation de Cyber Pinball : choisissez un dossier en dehors', { dir }));
+      return refuse(t('« {dir} » est dans l’installation de Cyber Pinball : choisis un dossier en dehors', { dir }));
     if (!drive) return refuse(t('« {dir} » n’est sur aucune clé ni aucun disque de ce PC', { dir }));
     const dest = path.join(dir, BACKUP_DIR_NAME);
     try {
@@ -900,7 +900,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
         rows: others.map((b) => ({ ...backupRow(b, ordered.indexOf(b)), text: `« ${b.manifest.cabinet.name} » · ${when(b.manifest.createdAt)}`, detail: `${levelLabel(b.manifest.level)} · ${backupRow(b, 0).detail}` })),
       });
     }
-    if (!ordered.length) sections.push({ rows: [{ icon: 'usb', text: t('Aucune sauvegarde trouvée'), detail: t('Branchez la clé ou le disque qui la contient, puis « Chercher de nouveau »'), tone: 'info' }] });
+    if (!ordered.length) sections.push({ rows: [{ icon: 'usb', text: t('Aucune sauvegarde trouvée'), detail: t('Branche la clé ou le disque qui la contient, puis « Chercher de nouveau »'), tone: 'info' }] });
     const { undo, last } = lastRestore;
     const actions: Action[] = [
       ...ordered.map((b) => ({ label: `${b.manifest.cabinet.name} ${b.manifest.createdAt}`, key: b.dir, run: () => void openPlan(b) })),
@@ -914,7 +914,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       heading: t('Restaurer une sauvegarde'),
       icon: 'restore',
       subheading: ordered.length ? tn(ordered.length, '{n} sauvegarde trouvée', '{n} sauvegardes trouvées') : t('Aucune sauvegarde trouvée'),
-      lead: t('Choisissez une sauvegarde pour voir ce qui sera restauré. Rien ne change avant votre validation.'),
+      lead: t('Choisis une sauvegarde pour voir ce qui sera restauré. Rien ne change avant ta validation.'),
       listStart: t('voir le plan'),
       sections,
       actions,
@@ -956,7 +956,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   function partEffect(part: BackupPart, c: Choice): string {
     const p = c.plan?.parts.find((x) => x.part === part);
     if (!c.parts.has(part) && !(part === 'friends' && !c.same)) {
-      if (part === 'cabinet' && !c.same) return t('Exclus : vos écrans, vos boutons et votre son restent ; inclus, ceux de l’autre borne les remplacent');
+      if (part === 'cabinet' && !c.same) return t('Exclus : tes écrans, tes boutons et ton son restent ; inclus, ceux de l’autre borne les remplacent');
       return t('Exclu : rien ne change ici');
     }
     if (!p) return t('Rien à restaurer');
@@ -1126,7 +1126,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
             { text: t('Redémarrage de Cyber Pinball, qui pose les fichiers'), detail: t('En attente'), tone: 'quiet', progress: { value: 0, tone: 'quiet' } },
           ],
         },
-        { rows: [{ icon: 'alert', text: t('Ne débranchez pas la clé pendant la copie'), detail: t('Rien n’est encore changé : coupée en route, la restauration n’a simplement pas lieu'), tone: 'warning' }] },
+        { rows: [{ icon: 'alert', text: t('Ne débranche pas la clé pendant la copie'), detail: t('Rien n’est encore changé : coupée en route, la restauration n’a simplement pas lieu'), tone: 'warning' }] },
       ],
       actions: [job.stop ? { label: t('Arrêt demandé'), icon: 'close', tone: 'quiet', run: () => undefined } : { label: t('Arrêter la restauration'), detail: t('Rien n’a encore changé'), icon: 'close', run: stopJob }],
       back: () => undefined,

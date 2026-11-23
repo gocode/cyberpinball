@@ -90,9 +90,9 @@ export async function ensureVcRuntime(downloadsDir: string, opts: { downloads?: 
     fs.rmSync(file, { force: true });
     return { ok: false, reason: t('signature inattendue de l’installateur de Microsoft ({status}), fichier supprimé', { status: signature.status || '?' }) };
   }
-  opts.onStep?.(t('Installation du runtime Visual C++ : Windows demande votre accord.'));
+  opts.onStep?.(t('Installation du runtime Visual C++ : Windows demande ton accord.'));
   const run = await startElevated(file, component.installArguments ?? []);
-  if (run.status === CANCELLED) return { ok: false, cancelled: true, reason: t('Windows n’a pas reçu votre accord') };
+  if (run.status === CANCELLED) return { ok: false, cancelled: true, reason: t('Windows n’a pas reçu ton accord') };
   if (!OK_CODES.includes(run.status ?? -1)) return { ok: false, reason: t('l’installateur de Microsoft a répondu {code}', { code: String(run.status) }) + (run.stderr ? ` (${run.stderr})` : '') };
   const after = vcRuntimeReady();
   if (!after.ok) return { ok: false, reason: t('runtime toujours insuffisant après l’installation : {detail}', { detail: describeVcRuntime(after) }) };

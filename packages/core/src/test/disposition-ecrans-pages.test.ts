@@ -107,7 +107,7 @@ function stateOf(host, s, index, rotation) {
     highlight: panelHere,
     prompt: panelHere ? '' : (assignedLabel ?? core.t('Aucun rôle')),
     step: panelHere ? '' : core.t('Disposition des écrans en cours'),
-    hint: panelHere ? '' : core.t('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner'),
+    hint: panelHere ? '' : core.t('Tire une zone pour la déplacer, jusque sur un autre écran · tire un coin pour la redimensionner'),
     arrange: panelHere ? { ...arrange.arrangePanel(host, s, (codes) => codes.join(' / ')), findings: [] } : undefined,
   };
 }
@@ -205,7 +205,7 @@ test('disposition des écrans : sur chaque fenêtre de l’éditeur, de la borne
     }
     const fronton = found['fr borne ouverture écran 2 (1920 × 1080)']!;
     assert.deepEqual(fronton.labels, ['Backglass · 1920 × 1080 · plein écran']);
-    assert.equal(fronton.hint, 'Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner');
+    assert.equal(fronton.hint, 'Tire une zone pour la déplacer, jusque sur un autre écran · tire un coin pour la redimensionner');
     assert.equal(found['en borne ouverture écran 2 (1920 × 1080)']!.hint, 'Drag an area to move it, even onto another screen · drag a corner to resize it');
     assert.equal(found['fr borne ouverture écran 1 (3840 × 2160)']!.hint, '', 'l’écran du panneau dit le geste dans le panneau');
   } finally {

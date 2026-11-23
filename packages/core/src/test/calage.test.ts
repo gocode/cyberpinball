@@ -69,7 +69,7 @@ test('calage : coins mal touchés refusés, précision mesurée au milieu', () =
 test('entrée « Caler la borne » : grisée avec sa raison hors du casque ; sinon l’état, la manière et la limite du Quest', () => {
   assert.deepEqual(calibrateMenuText({ vrReady: false }), { detail: 'Réalité virtuelle indisponible : rien à caler', unavailable: true });
   assert.equal(calibrateMenuText({ vrReady: true, headset: 'waiting' }).unavailable, true);
-  assert.match(calibrateMenuText({ vrReady: true, headset: 'waiting' }).detail, /Mettez le casque/);
+  assert.match(calibrateMenuText({ vrReady: true, headset: 'waiting' }).detail, /Mets le casque/);
   const fresh = calibrateMenuText({ vrReady: true, headset: 'shown' });
   assert.equal(fresh.unavailable, false);
   assert.match(fresh.detail, /^Pas encore calée · .*coin gauche, coin droit, puis le milieu.*≡ de la manette gauche · .*limite de pièce ; en limite fixe, il déplace la pièce chaque fois que le casque est remis/);
@@ -164,7 +164,7 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.deepEqual(desk, { x: 0.1, z: -0.2, yaw: 0.3, lockbarHeight: DESK_LOCKBAR_HEIGHT_M, lockbarWidth: 0.7, free: true });
   assert.ok(isCalibrated(desk));
   assert.ok(DESK_LOCKBAR_HEIGHT_M >= 0.85 && DESK_LOCKBAR_HEIGHT_M <= 0.9);
-  assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant vous \(A\)/);
+  assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant toi \(A\)/);
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const frontend = frontendSource();
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);

@@ -66,7 +66,7 @@ export const messages: Record<string, string> = {
   'Table enregistrée par VPX {table}': 'Table saved with VPX {table}',
   '{vpx} ne sait pas ouvrir une table enregistrée par VPX {table} : la partie échouerait.': '{vpx} cannot open a table saved with VPX {table}: the game would fail.',
   '{vpx} sait la jouer : Gérer la table, puis « Jouée avec », pour le choisir.': '{vpx} can play it: Manage table, then “Played with”, to choose it.',
-  'Ajoutez un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisissez-le dans Gérer la table, « Jouée avec ».':
+  'Ajoute un VPX {table} ou plus récent (Menu système > Ma borne > VPX > Autres versions de VPX), puis choisis-le dans Gérer la table, « Jouée avec ».':
     'Add a VPX {table} or newer (System menu > My cabinet > VPX > Other VPX versions), then choose it in Manage table, “Played with”.',
   '{vpx} ne peut pas ouvrir cette table': '{vpx} cannot open this table',
   'Elle a été enregistrée par VPX {table}, plus récent.': 'It was saved with VPX {table}, a newer version.',
@@ -74,7 +74,7 @@ export const messages: Record<string, string> = {
   'Table enregistrée par VPX {table}, que ce VPX ne sait pas ouvrir : le script n’a pas pu être lu.': 'Table saved with VPX {table}, which this VPX cannot open: the script could not be read.',
   // Nouveautés du front-end (news.ts)
   'Les tables qui tournent mieux avec VPX 10.8.0 se jouent avec lui, table par table.': 'Tables that run better with VPX 10.8.0 are played with it, table by table.',
-  'Ajoutez un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisissez-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.':
+  'Ajoute un VPX déjà installé sur ce PC (ceux des autres installations sont proposés d’office), puis choisis-le dans la fiche d’une table ou quand elle s’installe. Une table reprise d’une autre installation garde le VPX qui la jouait.':
     'Add a VPX already installed on this PC (those of other installations are offered right away), then choose it on a table’s sheet or when it is installed. A table taken over from another installation keeps the VPX that played it.',
   'Cyber Pinball le lance avec ses propres réglages ; la réalité virtuelle, le réglage de l’affichage et les parties entre amis restent avec le VPX de Cyber Pinball.':
     'Cyber Pinball launches it with its own settings; virtual reality, display adjustment and games with friends stay with Cyber Pinball’s VPX.',
@@ -89,8 +89,8 @@ export const messages: Record<string, string> = {
   'Cyber Pinball redémarre pour lancer les parties avec cette version.': 'Cyber Pinball restarts to launch games with this version.',
   'Pas de racine Cyber Pinball : rien à installer.': 'No Cyber Pinball root folder: nothing to install.',
   'Archive de {vpx} introuvable': '{vpx} archive not found',
-  'Téléchargez-la depuis GitHub, connecté à un compte : {url}': 'Download it from GitHub, signed in to an account: {url}',
-  'Puis posez-la dans les Téléchargements, sans la décompresser ({size} Mo).': 'Then put it in Downloads, without unzipping it ({size} MB).',
+  'Télécharge-la depuis GitHub, connecté à un compte : {url}': 'Download it from GitHub, signed in to an account: {url}',
+  'Puis pose-la dans les Téléchargements, sans la décompresser ({size} Mo).': 'Then put it in Downloads, without unzipping it ({size} MB).',
   'Toutes les fonctions de Cyber Pinball, réglages habituels': 'All Cyber Pinball features, usual settings',
   'Toutes les fonctions de Cyber Pinball · choix actuel': 'All Cyber Pinball features · current choice',
   'Réglages de VPX à part · choix actuel': 'Separate VPX settings · current choice',

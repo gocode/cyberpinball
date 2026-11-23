@@ -383,11 +383,11 @@ export function plungerView(step: PlungerStep, saveLabel: string, keys: PlungerV
     const devices = step.readings.length;
     return {
       ...common,
-      prompt: t('Tirez le lanceur à fond, puis lâchez-le'),
+      prompt: t('Tire le lanceur à fond, puis lâche-le'),
       measure: t('Lanceur'),
       name: devices ? t('Axes lus : {names}', { names: step.readings.map((r) => r.name || r.device).join(', ') }) : t('Aucun joystick à axes branché'),
       details: step.initial ? t('Réglage actuel : {what}', { what: initialLine(step) }) : t('Plunger à capteur (potentiomètre…) lu par un Pinscape ou un contrôleur en mode joystick.'),
-      notice: step.notice ?? (devices ? undefined : t('Branchez le Pinscape, ou choisissez « Pas de lanceur analogique » si le lanceur est un simple bouton.')),
+      notice: step.notice ?? (devices ? undefined : t('Branche le Pinscape, ou choisis « Pas de lanceur analogique » si le lanceur est un simple bouton.')),
       step: t('L’axe qui bouge le plus devient le lanceur.'),
       hint: t('Flippers ({left} / {right}) : choisir · Start ({start}) : valider · Exit ({exit}) : quitter sans enregistrer ?', { left: keys.previous, right: keys.next, start: keys.confirm, exit: keys.exit }),
     };
@@ -397,10 +397,10 @@ export function plungerView(step: PlungerStep, saveLabel: string, keys: PlungerV
     ...common,
     prompt: t('Lanceur analogique'),
     measure: undefined,
-    name: step.origin === 'vpx' && JSON.stringify(step.analog) === JSON.stringify(step.initial) ? t('Réglage trouvé dans VPX') : t('Essayez le lanceur : la jauge suit ce que VPX lira'),
+    name: step.origin === 'vpx' && JSON.stringify(step.analog) === JSON.stringify(step.initial) ? t('Réglage trouvé dans VPX') : t('Essaie le lanceur : la jauge suit ce que VPX lira'),
     details: rowHelp(step, selected),
     notice: step.notice ?? (g?.missing ? t('Joystick du lanceur introuvable : est-il branché ?') : step.rest !== undefined ? restProblem(step.rest) : undefined),
-    step: shot === undefined ? t('Tirez et lâchez le lanceur pour l’essayer') : t('Dernier tir : force {n} %', { n: shot }),
+    step: shot === undefined ? t('Tire et lâche le lanceur pour l’essayer') : t('Dernier tir : force {n} %', { n: shot }),
     hint: step.editing
       ? t('Flippers ({left} / {right}) : moins / plus · Start ({start}) : terminer', { left: keys.previous, right: keys.next, start: keys.confirm })
       : t('Flippers ({left} / {right}) : choisir · Start ({start}) : changer ou valider · Clic sur une ligne : la changer', { left: keys.previous, right: keys.next, start: keys.confirm }),

@@ -184,7 +184,7 @@ test('joueur à gauche : VPX tournerait la table à l’envers, on le signale', 
   const finding = plan.findings.find((f) => f.severity === 'warning' && f.message.includes("à l'envers"));
   assert.ok(finding);
   // Plus de manipulation dans Windows : c'est l'assistant qui retourne l'écran.
-  assert.ok(finding.message.includes("relancez l'assistant d'écrans"));
+  assert.ok(finding.message.includes("relance l'assistant d'écrans"));
   assert.ok(!finding.message.includes('paramètres'));
 });
 

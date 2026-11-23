@@ -241,9 +241,9 @@ test('ma place : sous chaque classement, exacte dans ce que la borne garde, « a
 test('ma place, en clair : la portée et la période nommées', () => {
   const { positionText } = require(path.join(REPO_ROOT, 'app', 'dist', 'scoreboard-menu.js')) as { positionText(v: object, scope: string, period: string): string };
   require(path.join(REPO_ROOT, 'packages', 'core', 'dist', 'i18n.js')).setLanguage('fr');
-  assert.equal(positionText({ lines: [], players: 340, complete: true, me: { rank: 12 } }, 'world', 'week'), 'Mondial · Cette semaine : votre place, 12 sur 340 joueurs');
-  assert.equal(positionText({ lines: [], players: 100, complete: false, me: { rank: 101, beyond: 100 } }, 'country', 'today'), 'National · Aujourd’hui : votre place, au-delà de la 100ᵉ');
-  assert.equal(positionText({ lines: [], players: 4 }, 'friends', 'year'), 'Amis · Cette année : pas encore de score pour vous');
+  assert.equal(positionText({ lines: [], players: 340, complete: true, me: { rank: 12 } }, 'world', 'week'), 'Mondial · Cette semaine : ta place, 12 sur 340 joueurs');
+  assert.equal(positionText({ lines: [], players: 100, complete: false, me: { rank: 101, beyond: 100 } }, 'country', 'today'), 'National · Aujourd’hui : ta place, au-delà de la 100ᵉ');
+  assert.equal(positionText({ lines: [], players: 4 }, 'friends', 'year'), 'Amis · Cette année : pas encore de score pour toi');
 });
 
 /** En-tête PNG d'une image carrée, suivi d'octets propres à `n` : assez pour le contrôle, qui ne décode pas. */

@@ -8,7 +8,7 @@ export const messages: Record<string, string> = {
   '{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».': '{game} isn’t installed on this PC. System menu > Tables > Add a table > "Install {game}".',
   'Partie impossible': 'Can’t play',
   '{game} n’a pas ouvert la table': '{game} didn’t open the table',
-  'Vérifiez que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.': 'Check that the table is owned in Pinball FX and that Steam (or Epic) is signed in.',
+  'Vérifie que la table est achetée dans Pinball FX et que Steam (ou Epic) est connecté.': 'Check that the table is owned in Pinball FX and that Steam (or Epic) is signed in.',
   '{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter {game}': '{keys} or Exit: stop · during the game, hold Exit: quit {game}',
   // app/src/pinballfx-launcher.ts
   'Impossible de lancer {game} : {error}': 'Couldn’t start {game}: {error}',
@@ -33,19 +33,19 @@ export const messages: Record<string, string> = {
   // app/src/library.ts : écran « Tables de Pinball FX »
   'Tables de {game}': '{game} tables',
   'Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé': 'Downloading in Steam: the table list opens once the game is installed',
-  'Ni Steam ni Epic sur ce PC : installez l’un des deux, puis {game}': 'Neither Steam nor Epic on this PC: install one of them, then {game}',
+  'Ni Steam ni Epic sur ce PC : installe l’un des deux, puis {game}': 'Neither Steam nor Epic on this PC: install one of them, then {game}',
   'Installer {game}': 'Install {game}',
   'Bêta : {game} est en phase de test dans Cyber Pinball': 'Beta: {game} is being tested in Cyber Pinball',
-  'Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite': 'Opened in {store}: install it there, its tables then show up here',
-  'Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables': 'Opens {store} on its installation; the game and its tables are bought there',
-  '{n} table dans le front-end · choisir celles que vous possédez': '{n} table in the menu · choose the ones you own',
-  '{n} tables dans le front-end · choisir celles que vous possédez': '{n} tables in the menu · choose the ones you own',
-  'Choisir les tables que vous possédez dans {game}': 'Choose the tables you own in {game}',
+  'Ouvert dans {store} : installe-le là-bas, ses tables apparaissent ici ensuite': 'Opened in {store}: install it there, its tables then show up here',
+  'Ouvre {store} sur son installation ; tu y achètes le jeu et ses tables': 'Opens {store} on its installation; the game and its tables are bought there',
+  '{n} table dans le front-end · choisir celles que tu possèdes': '{n} table in the menu · choose the ones you own',
+  '{n} tables dans le front-end · choisir celles que tu possèdes': '{n} tables in the menu · choose the ones you own',
+  'Choisir les tables que tu possèdes dans {game}': 'Choose the tables you own in {game}',
   '« {title} » ajoutée au front-end.': '“{title}” added to the menu.',
   '« {title} » ajoutée au front-end : ses médias arrivent (Téléchargements).': '“{title}” added to the menu: its media are on their way (Downloads).',
   '« {title} » ajoutée au front-end, avec {n} média.': '“{title}” added to the menu, with {n} media file.',
   '« {title} » ajoutée au front-end, avec {n} médias.': '“{title}” added to the menu, with {n} media files.',
-  'Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.':
+  'Pour le reste ({missing}) : connecte ton compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.':
     'For the rest ({missing}): sign in to your {site} account (Add a table > Site accounts), then "Find missing media" here.',
   'Introuvable : {missing}. Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.': 'Not found: {missing}. Start opens its page, "Game media" searches the web for some.',
   // app/src/library.ts : fiche d'ajout d'une table de Pinball FX (ses médias à prendre ou laisser)
@@ -55,7 +55,7 @@ export const messages: Record<string, string> = {
   'avec {n} médias': 'with {n} media files',
   'environ {size} depuis VPinMediaDB': 'about {size} from VPinMediaDB',
   'sans média : le titre seul sur la roue': 'no media: just the title on the wheel',
-  'Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.': 'Played by {game}: it is bought in the game, Cyber Pinball can’t check that you own it.',
+  'Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que tu l’as.': 'Played by {game}: it is bought in the game, Cyber Pinball can’t check that you own it.',
   'Introuvable': 'Not found',
   'Pris': 'Taken',
   'Laissé': 'Left out',
@@ -65,29 +65,29 @@ export const messages: Record<string, string> = {
   'Déjà reçu : « {file} », rien à télécharger': 'Already received: “{file}”, nothing to download',
   'Pack commun à {n} tables : Cyber Pinball n’y prend que le fichier de celle-ci.': 'Pack shared by {n} tables: Cyber Pinball only takes this table’s file from it.',
   '{size} à télécharger': '{size} to download',
-  'Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans votre quota du jour sur ce site.':
+  'Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans ton quota du jour sur ce site.':
     'Taken: the {site} page opens for its waiting time, and the file counts toward your daily quota on that site.',
   'Pack de {n} tables': 'Pack of {n} tables',
   '{site} : {title}': '{site}: {title}',
   'Ni VPinMediaDB ni la base VPS : après l’ajout, « Médias du jeu » en cherche sur le web': 'Neither VPinMediaDB nor the VPS database: after adding, "Game media" searches the web',
-  'Connectez votre compte : Ajouter une table > Comptes des sites.': 'Sign in to your account: Add a table > Site accounts.',
+  'Connecte ton compte : Ajouter une table > Comptes des sites.': 'Sign in to your account: Add a table > Site accounts.',
   '{type} : laisser': '{type}: leave out',
   '{type} : prendre': '{type}: take',
   '{game} (bêta)': '{game} (beta)',
   'Start sur un média : le prendre, le laisser ou en choisir un autre. « Ajouter au front-end » ajoute la table ; ses médias arrivent ensuite en arrière-plan (Téléchargements). Rien n’est écrit avant.':
     'Start on a media file: take it, leave it out or choose another one. "Add to the menu" adds the table; its media then arrive in the background (Downloads). Nothing is written before.',
   // app/src/library.ts : après l'ajout, les médias de la table ouverts et relus à l'arrivée des fichiers
-  '« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisissez un média pour en prendre un autre ou le régler.':
+  '« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisis un média pour en prendre un autre ou le régler.':
     '"{title}" added to the menu. Its chosen media arrive in the background and show here as they arrive. Choose a media to take another one or adjust it.',
-  '« {title} » ajoutée au front-end, sans média. Choisissez un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.':
+  '« {title} » ajoutée au front-end, sans média. Choisis un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.':
     '"{title}" added to the menu, without media. Choose a media to get one: VPinMediaDB, sites, web or a file from this PC.',
   '{n} média arrivé ; les autres sont en route (Téléchargements).': '{n} media file arrived; the others are on their way (Downloads).',
   '{n} médias arrivés ; les autres sont en route (Téléchargements).': '{n} media files arrived; the others are on their way (Downloads).',
   '{n} média arrivé.': '{n} media file arrived.',
   '{n} médias arrivés.': '{n} media files arrived.',
-  'Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), ou choisissez ce média pour en prendre un autre.':
+  'Pour le reste ({missing}) : connecte ton compte {site} (Ajouter une table > Comptes des sites), ou choisis ce média pour en prendre un autre.':
     'For the rest ({missing}): sign in to your {site} account (Add a table > Site accounts), or choose that media to take another one.',
-  'Sans fichier : {missing}. Choisissez ce média pour en prendre un autre : sites, web ou fichier de ce PC.':
+  'Sans fichier : {missing}. Choisis ce média pour en prendre un autre : sites, web ou fichier de ce PC.':
     'No file: {missing}. Choose that media to take another one: sites, web or a file from this PC.',
   'Catalogue « {title} » (archive.org), créé par des joueurs': 'Catalog "{title}" (archive.org), made by players',
   'fronton du catalogue pas reçu': 'backglass from the catalog not received',
@@ -110,27 +110,27 @@ export const messages: Record<string, string> = {
   'Recherche en cours…': 'Searching…',
   '{n} média reçu': '{n} media file received',
   '{n} médias reçus': '{n} media files received',
-  'le reste ({missing}) demande votre compte {site} : Ajouter une table > Comptes des sites': 'the rest ({missing}) needs your {site} account: Add a table > Site accounts',
+  'le reste ({missing}) demande ton compte {site} : Ajouter une table > Comptes des sites': 'the rest ({missing}) needs your {site} account: Add a table > Site accounts',
   'introuvable : {missing}': 'not found: {missing}',
   'Base VPS…': 'VPS database…',
   'Dans le front-end': 'In the menu',
   '{n} table dans le front-end': '{n} table in the menu',
   '{n} tables dans le front-end': '{n} tables in the menu',
-  'Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.':
+  'Start : ajouter au front-end une table que tu possèdes dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.':
     'Start: add to the menu a table you own in Pinball FX. A table already in the menu: Start opens its page. Screens and DMD are set in Pinball FX’s cabinet mode.',
   // Pinball FX3 (17/11/2026) : fiche, écran « Tables de Pinball FX3 », partie trop courte
-  'Vérifiez que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.': 'Check that Steam is signed in, that the table is on this Steam account and that cabinet mode is turned on in {game}.',
+  'Vérifie que Steam est connecté, que la table est sur ce compte Steam et que le mode borne est activé dans {game}.': 'Check that Steam is signed in, that the table is on this Steam account and that cabinet mode is turned on in {game}.',
   'Fiche illisible : nom de table absent': 'Unreadable entry: no table name',
   'Mode borne': 'Cabinet mode',
   'À activer une fois dans {game} : icône de borne à côté du profil. Sans lui, ou sans la table sur ce compte Steam, le jeu s’ouvre sur son écran d’accueil.': 'Turn it on once in {game}: cabinet icon next to the profile. Without it, or without the table on this Steam account, the game opens on its home screen.',
   'Mode classique': 'Classic mode',
   'Règles de la machine, sans les améliorations de Zen': 'The machine’s rules, without Zen’s upgrades',
-  'Steam absent de ce PC : installez-le, puis {game}': 'No Steam on this PC: install it, then {game}',
+  'Steam absent de ce PC : installe-le, puis {game}': 'No Steam on this PC: install it, then {game}',
   'Pinball FX3, fichier « {name} »': 'Pinball FX3, file “{name}”',
   'Lancée dans son mode classique : les règles de la machine, sans les améliorations de Zen.': 'Started in its classic mode: the machine’s rules, without Zen’s upgrades.',
-  'Start : ajouter au front-end une table que vous possédez dans {game}. Le jeu installe toutes ses tables, même celles que vous n’avez pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à vous. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.': 'Start: add to the menu a table you own in {game}. The game installs all its tables, even the ones you haven’t bought: Cyber Pinball can’t tell which ones are yours. Cabinet mode: turn it on once in the game (cabinet icon next to the profile), no code to ask Zen for; Zen’s help: {url}.',
+  'Start : ajouter au front-end une table que tu possèdes dans {game}. Le jeu installe toutes ses tables, même celles que tu n’as pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à toi. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.': 'Start: add to the menu a table you own in {game}. The game installs all its tables, even the ones you haven’t bought: Cyber Pinball can’t tell which ones are yours. Cabinet mode: turn it on once in the game (cabinet icon next to the profile), no code to ask Zen for; Zen’s help: {url}.',
   'Aucune table trouvée': 'No table found',
-  'Le dossier des tables de {game} est vide ou illisible : vérifiez le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).': '{game}’s table folder is empty or unreadable: verify the game in Steam (Properties > Installed files > Verify).',
+  'Le dossier des tables de {game} est vide ou illisible : vérifie le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).': '{game}’s table folder is empty or unreadable: verify the game in Steam (Properties > Installed files > Verify).',
   '{game} est resté sur son écran d’accueil ?': 'Did {game} stay on its home screen?',
   'La partie a duré {n} s. Si {game} s’est ouvert sur son écran d’accueil au lieu de la table :': 'The game lasted {n} s. If {game} opened on its home screen instead of the table:',
   'la table n’est peut-être pas sur ce compte Steam : seules les tables achetées s’ouvrent directement, les autres restent en essai dans le jeu ;': 'the table may not be on this Steam account: only bought tables open directly, the others stay as trials in the game;',
@@ -140,7 +140,7 @@ export const messages: Record<string, string> = {
   'Première ouverture de {game} sur ce PC': 'First time {game} opens on this PC',
   '{game} n’a encore jamais été ouvert ici : son mode borne n’y est pas activé. Sans lui, le jeu s’ouvre sur son écran d’accueil, en paysage, et pas sur la table.':
     '{game} has never been opened here: its cabinet mode isn’t turned on. Without it, the game opens on its home screen, in landscape, and not on the table.',
-  'Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Fermez ensuite le jeu (Exit tenu) et relancez la table.':
+  'Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Ferme ensuite le jeu (Exit tenu) et relance la table.':
     'In the game: cabinet icon next to the profile, "Activate", then the playfield rotation and the backglass and DMD screens. Cyber Pinball can’t do it for you: these settings are encrypted. Then close the game (hold Exit) and start the table again.',
   'Seules Fish Tales et Sorcerer’s Lair sont gratuites : les autres tables ne s’ouvrent que si elles sont achetées sur ce compte Steam, sinon le jeu reste sur son écran d’accueil.':
     'Only Fish Tales and Sorcerer’s Lair are free: the other tables only open if they are bought on this Steam account, otherwise the game stays on its home screen.',
@@ -149,7 +149,7 @@ export const messages: Record<string, string> = {
   '{game} : orientation à changer': '{game}: orientation to change',
   'Depuis cette version, {game} démarre sur l’écran du playfield tel que Windows l’oriente, comme avec un autre front-end. Son orientation réglée avec Cyber Pinball ne vaut plus : l’image serait à l’envers.':
     'Since this version, {game} starts on the playfield screen as Windows orients it, as with another front-end. The orientation you set with Cyber Pinball no longer fits: the picture would be upside down.',
-  'Dans {game}, mode borne : passez Orientation de {before}° à {after}°.': 'In {game}, cabinet mode: change Orientation from {before}° to {after}°.',
+  'Dans {game}, mode borne : passe Orientation de {before}° à {after}°.': 'In {game}, cabinet mode: change Orientation from {before}° to {after}°.',
   // Frontons de Pinball FX3 téléchargés (app/src/pinballfx3-folder-ui.ts, 20/11/2026)
   'Télécharger les frontons des tables': 'Download the tables’ backglasses',
   'Frontons de Pinball FX3': 'Pinball FX3 backglasses',
@@ -163,6 +163,6 @@ export const messages: Record<string, string> = {
   '{n} déjà là, gardés': '{n} already there, kept',
   '{n} absent du catalogue': '{n} not in the catalog',
   '{n} absents du catalogue': '{n} not in the catalog',
-  '{n} en échec : réessayez, le téléchargement reprendra': '{n} failed: try again, the download will resume',
-  'Catalogue des frontons injoignable : vérifiez la connexion, puis réessayez.': 'Backglass catalog unreachable: check the connection, then try again.',
+  '{n} en échec : réessaie, le téléchargement reprendra': '{n} failed: try again, the download will resume',
+  'Catalogue des frontons injoignable : vérifie la connexion, puis réessaie.': 'Backglass catalog unreachable: check the connection, then try again.',
 };

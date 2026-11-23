@@ -186,7 +186,7 @@ export function silentPairNotices(output: Pick<ObservedAudioOutput, 'formFactor'
   if (!isAnalogOutput(output) || output.bus.toUpperCase() !== 'HDAUDIO') return [];
   // Une seule paire muette : souvent deux exciters seulement (playfieldModeFromTest le dit).
   if (places.rear !== 'none' || (places.side !== undefined && places.side !== 'none')) return [];
-  return [t('Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffectez la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branchez sur la prise casque en façade ; vérifiez aussi les câbles des prises noire et grise.')];
+  return [t('Rien entendu sur l’arrière ou les côtés : sur une carte mère à trois prises, réaffecte la prise bleue ou rose dans la console audio du fabricant (Realtek Audio Console), ou branche sur la prise casque en façade ; vérifie aussi les câbles des prises noire et grise.')];
 }
 
 // ---------------------------------------------------------------------------
@@ -331,16 +331,16 @@ export function playfieldModeFromTest(places: Partial<Record<SpeakerPair, Speake
   if (!onPlayfield('front') && back) {
     // Guide Pinscape : exciters côté joueur sur la prise arrière, côté fronton sur la prise latérale.
     if (places.rear === 'top' && places.side === 'lockbar') {
-      notices.push(t('Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échangez les prises « arrière » et « côté » de la carte son.'));
+      notices.push(t('Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échange les prises « arrière » et « côté » de la carte son.'));
     }
     if (places.front === 'none') notices.push(t('Rien entendu sur l’avant : en SSF, VPX y envoie seulement le son du fronton si la même carte le joue.'));
     // SoundPlayer.cpp de VPX 10.8.1 : en 7.1, le SSF partage chaque son entre la paire arrière et
     // celle des côtés selon sa place sur le plateau ; en 5.1, il l'envoie entier, en stéréo, sur la
     // seule paire arrière. Deux exciters seulement : le 5.1 leur donne tout le son.
     if (places.side === 'none' && onPlayfield('rear')) {
-      notices.push(t('Deux exciters seulement, sur la prise arrière : réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.'));
+      notices.push(t('Deux exciters seulement, sur la prise arrière : règle la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise des côtés, muette ici.'));
     } else if (places.rear === 'none' && onPlayfield('side')) {
-      notices.push(t('Deux exciters seulement, sur la prise des côtés : branchez-les sur la prise arrière et réglez la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.'));
+      notices.push(t('Deux exciters seulement, sur la prise des côtés : branche-les sur la prise arrière et règle la carte en 5.1 dans Windows. En 7.1, VPX garde une part de chaque son pour la prise arrière, muette ici.'));
     }
     return { playfieldMode: 'ssf', notices };
   }
@@ -417,7 +417,7 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
     if (sameName.length > 1) {
       findings.push({
         severity: 'warning',
-        message: t('{role} : {n} sorties s’appellent « {name} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renommez l’une d’elles dans le panneau Son de Windows (Propriétés), puis relancez l’assistant.', { role: role.label, n: sameName.length, name: output.friendlyName }),
+        message: t('{role} : {n} sorties s’appellent « {name} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renomme l’une d’elles dans le panneau Son de Windows (Propriétés), puis relance l’assistant.', { role: role.label, n: sameName.length, name: output.friendlyName }),
       });
     }
   }
@@ -432,12 +432,12 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
       // SoundPlayer.cpp de VPX 10.8.1 : le SSF en 5.1 joue le plateau en stéréo sur la paire arrière.
       findings.push({
         severity: 'info',
-        message: t('Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, réglez la carte en 7.1 (Panneau de configuration > Son > Configurer).', { name: playfield.friendlyName }),
+        message: t('Son du plateau : SSF en 5.1 sur « {name} ». VPX joue le plateau en stéréo sur la paire arrière : parfait pour deux exciters ; pour quatre, règle la carte en 7.1 (Panneau de configuration > Son > Configurer).', { name: playfield.friendlyName }),
       });
     } else if (playfield && channels > 0 && channels < needed) {
       findings.push({
         severity: 'warning',
-        message: t('Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : réglez-la en {needed} (Panneau de configuration > Son > Configurer).', {
+        message: t('Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : règle-la en {needed} (Panneau de configuration > Son > Configurer).', {
           mode: PLAYFIELD_MODE_LABELS[audio.playfieldMode],
           name: playfield.friendlyName,
           channels: channelsLabel(channels),

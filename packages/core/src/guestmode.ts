@@ -55,7 +55,7 @@ export const GUEST_DOORS = {
   // Fiche d'une table (app/src/library.ts, buildSheet)
   'sheet.play': true, // Jouer
   'sheet.friends': false, // Jouer avec un ami (les amis du propriétaire de la borne)
-  'sheet.instant': false, // Partie instantanée, ouverte à tous (au nom du propriétaire de la borne)
+  'sheet.instant': false, // Partie en direct, ouverte à tous (au nom du propriétaire de la borne)
   'sheet.favorite': false, // Ajouter aux favoris, retirer des favoris
   'sheet.collections': false, // Ajouter à une collection personnelle, l'en retirer, en créer une
   'sheet.read': true, // Prospectus et règles, page par page

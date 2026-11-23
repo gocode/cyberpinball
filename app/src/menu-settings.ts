@@ -178,7 +178,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
       },
       intro: {
         label: t('Ouverture au démarrage : {summary}', { summary: host.intro.summary() }),
-        detail: t('Une animation sur chaque écran, gardée sur sa dernière image jusqu’au premier bouton ; vos images, vidéos et musique de fond (Start : régler)'),
+        detail: t('Une animation sur chaque écran, gardée sur sa dernière image jusqu’au premier bouton ; tes images, vidéos et musique de fond (Start : régler)'),
         icon: 'play',
         run: () => host.intro.open(() => open(row('intro'))),
       },
@@ -493,7 +493,7 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
             ? t('Périphériques autorisés par Windows : {devices}', { devices: devices.join(', ') })
             : t('Aucun périphérique autorisé détecté');
     return [
-      ...(v.stopBy === 'shutdown' ? [{ text: t('Après extinction, rallumez la borne avec le bouton d’alimentation du PC. Les autorisations ci-dessous concernent uniquement la veille.') }] : []),
+      ...(v.stopBy === 'shutdown' ? [{ text: t('Après extinction, rallume la borne avec le bouton d’alimentation du PC. Les autorisations ci-dessous concernent uniquement la veille.') }] : []),
       { text: t('Bouton d’alimentation du PC') },
       { text: allowed, tone: devices === null ? ('warning' as const) : undefined },
       { text: t('Informations lues dans Windows ; aucun réglage modifié ici.'), tone: 'quiet' as const },
@@ -599,8 +599,8 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
                 ? t('choix actuel')
                 : clash
                   ? key === 'nightFrom'
-                    ? t('Heure de la fin de la nuit : choisissez deux heures différentes')
-                    : t('Heure du début de la nuit : choisissez deux heures différentes')
+                    ? t('Heure de la fin de la nuit : choisis deux heures différentes')
+                    : t('Heure du début de la nuit : choisis deux heures différentes')
                   : outside
                     ? t('hors de la nuit')
                     : undefined,

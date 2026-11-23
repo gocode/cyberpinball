@@ -296,7 +296,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
       triggersTimer = undefined;
       if (!triggersHold.due(Date.now()) || calibration || controllerWizard || ctx.playing || ctx.launch) return;
       console.log(`Casque : les deux gâchettes tenues ${TRIGGERS_HINT_S} s dans le front-end ; aide « les sticks, pas les gâchettes » montrée.`); // i18n-ignore : journal
-      if (!showGestureCard()) showBanner(t('Pour recaler la borne : enfoncez les deux sticks, pas les gâchettes'));
+      if (!showGestureCard()) showBanner(t('Pour recaler la borne : enfonce les deux sticks, pas les gâchettes'));
     }, TRIGGERS_HINT_S * 1000 + 20);
   }
 
@@ -450,13 +450,13 @@ export function createVrFrontend(ctx: VrFrontendContext) {
           schema: [proposed],
           proposedLabel: t('Proposé :'),
           proposed: elementLabel(proposed),
-          hint: t('appuyez sur le bouton voulu'),
+          hint: t('appuie sur le bouton voulu'),
           ...(back && f.id !== 'retour' && { back: f.optional ? t('{retour} : passer (facultatif)', { retour: elementLabel(back) }) : t('{retour} : étape précédente', { retour: elementLabel(back) }) }),
           ...(w.problem && { problem: w.problem }),
         };
       lines = [
         t('Étape {n} sur {total} : {fonction}', { n: w.index + 1, total: list.length, fonction: f.label }),
-        f.id === 'lanceur' ? t('Tirez vers vous le joystick ou le pavé voulu.') : f.axis ? t('Poussez le joystick ou le pavé voulu.') : t('Appuyez sur le bouton voulu.'),
+        f.id === 'lanceur' ? t('Tire vers toi le joystick ou le pavé voulu.') : f.axis ? t('Pousse le joystick ou le pavé voulu.') : t('Appuie sur le bouton voulu.'),
         ...(w.problem ? [w.problem] : []),
         ...(back && f.id !== 'retour' ? [f.optional ? t('{retour} : passer (facultatif)', { retour: elementLabel(back) }) : t('{retour} : étape précédente', { retour: elementLabel(back) })] : []),
       ];
@@ -659,7 +659,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     get detail() {
       if (calibrateUnavailable()) return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state }).detail;
       const profile = headset?.profile;
-      if (!profile) return t('Manettes pas encore reconnues : prenez-les en main, casque porté');
+      if (!profile) return t('Manettes pas encore reconnues : prends-les en main, casque porté');
       return t('{casque} · {etat} · Dans le casque : ≡ > « Manettes »', { casque: HEADSET_PROFILES[profile].label, etat: fs.existsSync(controllerFile(profile)) ? t('boutons réglés') : t('boutons proposés par défaut') });
     },
     get tone() {
@@ -752,7 +752,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     const profile = headset?.profile;
     const combo = calibrationCombo(profile ?? 'touch');
     if (!combo || !schemaProfile(profile)) return false;
-    headsetCardView = { schema: [...combo], text: t('Enfoncez les deux sticks, 3 s'), detail: t('Sous les pouces, jusqu’au clic · pas les gâchettes') };
+    headsetCardView = { schema: [...combo], text: t('Enfonce les deux sticks, 3 s'), detail: t('Sous les pouces, jusqu’au clic · pas les gâchettes') };
     if (headsetCardTimer) clearTimeout(headsetCardTimer);
     headsetCardTimer = setTimeout(() => {
       headsetCardView = undefined;
@@ -778,7 +778,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
       // Dossier de la VR en lecture seule : l'astuce reviendra, sans gravité.
     }
     console.log('Casque : limite fixe vue pour la première fois ; le passage en limite de pièce est conseillé une fois.'); // i18n-ignore : journal
-    showBanner(t('Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisissez « Pièce » et tracez le contour (environ 3 minutes).'));
+    showBanner(t('Le Quest est en limite fixe : la borne se décale chaque fois que le casque est remis. Pour qu’elle reste en place : dans le Quest, réglages de la limite, choisis « Pièce » et trace le contour (environ 3 minutes).'));
   }
 
 
@@ -1196,7 +1196,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
             back();
             openCalibration();
           } },
-          { label: t('Recentrer la borne'), icon: 'restore' as const, detail: t('Devant vous, tournée comme votre regard ; elle ne bouge plus ensuite'), run: () => {
+          { label: t('Recentrer la borne'), icon: 'restore' as const, detail: t('Devant toi, tournée comme ton regard ; elle ne bouge plus ensuite'), run: () => {
             console.log('Casque : recentrage demandé au menu du casque.'); // i18n-ignore : journal
             headset?.recenter();
             back();
@@ -1770,16 +1770,16 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     // Une consigne courte, en très gros au milieu du regard (fronton : headsetPrompt) ; un seul bouton
     // valide et sort (A), B sort sans rien changer (demande du 10 novembre 2026).
     const desk = headsetSetting() === 'bureau';
-    const text = c.placing ? t('Pose de la borne…') : c.place ? t('Borne placée') : p.left ? t('Touchez l’autre coin') : desk ? t('Regardez droit devant vous') : t('Manettes sur les coins de la barre');
+    const text = c.placing ? t('Pose de la borne…') : c.place ? t('Borne placée') : p.left ? t('Touche l’autre coin') : desk ? t('Regarde droit devant toi') : t('Manettes sur les coins de la barre');
     const keys = c.placing ? '' : t('Gâchette : placer · A : valider');
     // Un vrai problème seulement, le premier : point refusé, pièce de VPX différente, limite changée, table hors de portée.
     const issue =
       problem ??
       vrRoomProblem ??
-      (headset?.keyRenewed ? t('Vérifiez la place de la borne.') : undefined) ??
-      (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
-      (noContourNotice ? t('Calez la borne une fois : elle se replacera ensuite seule.') : undefined) ??
-      (originNotice ? t('Le Quest a déplacé la pièce en remettant le casque : recalez.') : undefined) ??
+      (headset?.keyRenewed ? t('Vérifie la place de la borne.') : undefined) ??
+      (roomNotice ? t('La limite du Quest a changé : recale.') : undefined) ??
+      (noContourNotice ? t('Cale la borne une fois : elle se replacera ensuite seule.') : undefined) ??
+      (originNotice ? t('Le Quest a déplacé la pièce en remettant le casque : recale.') : undefined) ??
       // Le geste est dit par la bande du bas quand les manettes l'ont : le conseil ne le répète pas.
       (c.intro ? roomKeepingAdvice(headset?.roomKeeping, calibrationCombo(headset?.profile ?? 'touch') ? undefined : calibrationComboLabel(headset?.profile)) : undefined) ??
       (c.place ? vpxPlaceProblem(placeVpxSettings(c.place)) : undefined);
@@ -1794,7 +1794,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
       keys: c.place && keys ? t('A : valider · Gâchette : replacer') : keys,
       ...(schema && { schema, keysLead: lead }),
       ...(issue && { problem: issue }),
-      ...(combo && !desk && { band: { ...(drawn && { schema: [...combo] }), text: t('À tout moment, enfoncez les deux sticks 3 s'), detail: t('pour recaler la borne, dans le front-end comme en partie') } }),
+      ...(combo && !desk && { band: { ...(drawn && { schema: [...combo] }), text: t('À tout moment, enfonce les deux sticks 3 s'), detail: t('pour recaler la borne, dans le front-end comme en partie') } }),
     };
     ctx.state = { ...ctx.state, phase: 'message', help: false, message: { title: t('Caler la borne'), lines: [text, ...(issue ? [issue] : []), ...(keys ? [keys] : [])], prompt } };
     broadcast();
@@ -1830,7 +1830,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     if (!room) {
       c.points = {};
       c.place = undefined;
-      return showCalibration(t('Le casque n’a pas d’espace de la pièce (limite du Quest non définie) : le calage ne tiendrait pas d’une session à l’autre. Définissez la limite dans le Quest, puis recommencez.'));
+      return showCalibration(t('Le casque n’a pas d’espace de la pièce (limite du Quest non définie) : le calage ne tiendrait pas d’une session à l’autre. Définis la limite dans le Quest, puis recommence.'));
     }
     // Les deux manettes sur les deux coins : la paire d'un coup, si elle fait une barre avant plausible ;
     // sinon le point de la gâchette pressée, second d'une paire, ou premier d'une nouvelle.
@@ -2194,7 +2194,7 @@ export function createVrFrontend(ctx: VrFrontendContext) {
     const mismatch = roomMismatchProblem(summary);
     if (mismatch) console.warn('Réalité virtuelle : le joueur a joué dos à la borne calée : la table de VPX n’était pas sur elle ; VPX avait une autre pièce que le compagnon.'); // i18n-ignore : journal
     if (changes) console.warn(`Réalité virtuelle : VPX a reçu ${changes} changement(s) de pièce pendant la partie (« Réinitialiser la vue » de Link en jeu) ; le runtime le garde pour VPX : la borne du casque est à recaler.`); // i18n-ignore : journal
-    vrRoomProblem = mismatch ?? (changes ? t('« Réinitialiser la vue » a été fait pendant la dernière partie : le runtime garde ce recentrage pour VPX, et la table n’est plus sur la borne du casque. Recalez.') : undefined);
+    vrRoomProblem = mismatch ?? (changes ? t('« Réinitialiser la vue » a été fait pendant la dernière partie : le runtime garde ce recentrage pour VPX, et la table n’est plus sur la borne du casque. Recale.') : undefined);
   }
 
   return {

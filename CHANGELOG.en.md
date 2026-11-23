@@ -9,6 +9,17 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Challenges: the Arena tab finally has its "Lancer un défi" (Start a challenge) button: it opens the choice of the table, then of the player, instead of explaining a path through the table sheets; with no game played yet it is greyed out with its reason.
+- Sharing off: "Régler le partage" (Set up sharing) opens on the spot from the Challenges tab, the Community and my profile, no long path through the settings to follow.
+- Players to discover: each suggestion offers "Voir le profil" (View profile) before "Ajouter en ami" (Add as friend); the profile button is also called "Ajouter en ami".
+- My profile tells the truth about its state: "Partage désactivé" (Sharing off), "Profil public désactivé" (Public profile off) or "Profil public en cours de préparation" (Public profile being prepared), three situations that are no longer mixed up.
+- Profile of a player whose activity is hidden: the header says so, the Badges tab no longer shows a false "Aucun encore" (None yet), and Start on the card shows the activity again in one gesture.
+- A level too high for the known seniority shows "Niveau en cours de vérification" (Level being checked) instead of "Niveau ?".
+- Start on another player's post announces "Tu aimes cette publication" (You like this post) or "Tu n'aimes plus cette publication" (You no longer like this post), and the title note says what Start does.
+- The daily tables opened from the Arena offer "Retour : Arène" (Back: Arena) rather than "Retour : Classements".
+- "À proximité" (Nearby) becomes "Sur mon réseau local" (On my local network) in the player filter and in the "Find a player" section.
+- "Instantanée" (Instant) becomes "Parties en direct" (Live games) everywhere (menus, sheets, notes); the generic labels of a game between friends are now called "Partie entre amis" (Game between friends), so they are no longer mixed up with a live game.
+- The whole interface now addresses the player informally in French: no more formal "vous", "votre", "vos", "veuillez" or plural imperatives in screens, phone page and messages; a test guards the rule.
 - Table framing and Point of view: the framing pictures now show. VPX rendered them, but the front-end refused to display them (empty cards).
 - Fixed: when playing alone at a table, leaving the table in the middle of a game no longer passes what the ROM had at the moment of the stop off as a final score. The score is only read when VPX closes (the ROM only writes its memory then): if it says the game was not over, the score is kept on your cabinet, marked "game left" in the table's score board, but it is not published to the rankings, not counted in a challenge and not kept as a level record.
 - A game played to the end, or whose score enters the table's high score list, counts as before. When the ROM's map does not say whether the game is over (some machines), the game also counts as before.

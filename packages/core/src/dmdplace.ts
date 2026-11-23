@@ -364,7 +364,7 @@ function itemBlocked(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string 
   if (id === 'vpx' || id === 'framing') return host.vpxMenuBlocked;
   if (id === 'recenter3d' && typeof host.vision3d === 'string') return host.vision3d;
   if (id === 'screen' && host.screens.length < 2) return t('Un seul écran branché.');
-  if (['moveX', 'moveY', 'width', 'height', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD »).');
+  if (['moveX', 'moveY', 'width', 'height', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affiche-le d’abord (ligne « DMD »).');
   return undefined;
 }
 
@@ -635,7 +635,7 @@ export function dmdMenuAction(host: DmdMenuHost, s: DmdMenuState, action: DmdMen
         others: () => [],
       });
       s.spot = { ...s.spot, screen: plan.display, zone: plan.zone };
-      s.notice = plan.display !== origin ? t('DMD sur l’écran {n} : relâchez pour l’y laisser.', { n: plan.display + 1 }) : undefined;
+      s.notice = plan.display !== origin ? t('DMD sur l’écran {n} : relâche pour l’y laisser.', { n: plan.display + 1 }) : undefined;
       return 'handled';
     }
   }
@@ -718,7 +718,7 @@ export function dmdMenuPanel(host: DmdMenuHost, s: DmdMenuState, keyLabel: (code
     hint,
     ...(s.notice && { notice: s.notice }),
     ...(host.live !== true && { live: host.live }),
-    mouse: t('Souris : tirez le DMD pour le déplacer, jusque sur un autre écran ; tirez un coin pour le redimensionner ; Alt maintenu : sans aimantation.'),
+    mouse: t('Souris : tire le DMD pour le déplacer, jusque sur un autre écran ; tire un coin pour le redimensionner ; Alt maintenu : sans aimantation.'),
   };
 }
 

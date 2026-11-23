@@ -5,7 +5,7 @@
 // Activé : le réseau des bornes s'arrête (social.ts, `enabled` faux), la rubrique Communauté ne garde
 // que cette entrée et, dans Mon profil, ce qui est à soi (pseudo, avatar, pays, compte) ; le
 // médaillon Communauté, le médaillon et la rubrique Arène, la carte du joueur, les moments de badge et de niveau, la pastille des
-// messages, la Communauté au téléphone, « Jouer avec un ami » et « Partie instantanée » sur la fiche,
+// messages, la Communauté au téléphone, « Jouer avec un ami » et « Partie en direct » sur la fiche,
 // les classements en ligne au tableau des scores disparaissent (app/src/frontend.ts, library.ts).
 // Les XP continuent de se compter en silence : remise, la communauté revient avec tout.
 //
@@ -22,7 +22,7 @@ const KEPT_IN_LOCAL_PLAY: readonly SystemItemId[] = ['local-play', 'player-name'
 
 /**
  * Entrées du Menu système retirées en jeu local : toute la rubrique Communauté (l'accueil du
- * médaillon) sauf ce qui précède, et toute la rubrique Arène (21/11/2026 : parties instantanées,
+ * médaillon) sauf ce qui précède, et toute la rubrique Arène (21/11/2026 : parties en direct,
  * classements, niveau, badges, historique ; « niveaux compris »). Une rubrique dont il ne reste rien
  * disparaît (library.ts) ; jouer-en-local.test.ts le fixe.
  */

@@ -108,7 +108,7 @@ export interface LibraryHost {
    * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.
    */
   playWithFriend?(table: TableEntry, back: () => void): Action;
-  /** « Partie instantanée » (instant-menu.ts) : ouverte à tous ; grisée avec sa raison (partage coupé, Pinball FX). */
+  /** « Partie en direct » (instant-menu.ts) : ouverte à tous ; grisée avec sa raison (partage coupé, Pinball FX). */
   instantGame?(table: TableEntry, back: () => void): Action;
   /**
    * La fiche côté joueurs (table-social.ts) : « Sur cette table » à la place des fichiers, mon record
@@ -198,7 +198,7 @@ export interface LibraryHost {
   guest: Pick<GuestMode, 'active' | 'allows' | 'knock'>;
   /**
    * « Jouer en local » (localplay.ts) : vrai, le Menu système perd la partie sociale (LOCAL_PLAY_HIDDEN),
-   * la fiche « Jouer avec un ami » et « Partie instantanée », le tableau des scores ses classements en ligne.
+   * la fiche « Jouer avec un ami » et « Partie en direct », le tableau des scores ses classements en ligne.
    */
   localPlay?(): boolean;
   /**

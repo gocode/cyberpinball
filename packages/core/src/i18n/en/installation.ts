@@ -40,7 +40,7 @@ export const messages: Record<string, string> = {
   'Ses tables': 'Its tables',
   'Aucune table dans {dir}': 'No table in {dir}',
   'cocher ou décocher la table': 'tick or untick the table',
-  'Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Sur le même disque que Cyber Pinball, les gros fichiers (tables, frontons, vidéos, images, sons, ROM) sont liés sans place en plus, et le reste est copié ; l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.':
+  'Seules les tables cochées sont reprises, chacune avec tout son dossier quand elle en a un, et ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, sa sauvegarde, ses couleurs et ses sons (VPinMAME), sa musique, son dossier DMD, son fronton et ses médias (Popper, PinballX, PinballY), sous tous les noms que l’installation leur donne. Sur le même disque que Cyber Pinball, les gros fichiers (tables, frontons, vidéos, images, sons, ROM) sont liés sans place en plus, et le reste est copié ; l’installation d’origine ne change pas. Rien n’est installé avant que tu aies validé le plan.':
     'Only the ticked tables are brought in, each with its whole folder when it has one, and what the installation keeps elsewhere: its PuP-Pack (PUPVideos), its ROM, save, colours and sounds (VPinMAME), its music, its DMD folder, its backglass and its media (Popper, PinballX, PinballY), under every name the installation gives them. On the same drive as Cyber Pinball, the big files (tables, backglasses, videos, images, sounds, ROMs) are linked without using more space, and the rest is copied; the original installation does not change. Nothing is installed before you have approved the plan.',
   'Autre disque que Cyber Pinball ({from}, {to}) : tout sera copié': 'Not the same drive as Cyber Pinball ({from}, {to}): everything will be copied',
   'Le plan d’ajout dit la place que prendra la copie. Cyber Pinball installé sur le même disque que l’installation reprendrait ses tables sans rien dupliquer.':
@@ -56,10 +56,10 @@ export const messages: Record<string, string> = {
   'Dans aucune liste de lecture': 'In no playlist',
   'Cocher la liste « {name} »': 'Tick the “{name}” list',
   'Déjà toutes cochées': 'All already ticked',
-  'Seulement les tables de vos listes de lecture': 'Only the tables in your playlists',
+  'Seulement les tables de tes listes de lecture': 'Only the tables in your playlists',
   'Montrer toutes les tables du disque': 'Show every table on the drive',
   '{n} de plus, absentes des listes de lecture': '{n} more, not in any playlist',
-  '{n} dans vos listes de lecture': '{n} in your playlists',
+  '{n} dans tes listes de lecture': '{n} in your playlists',
   'Ses tables jouées (listes de lecture)': 'Its played tables (playlists)',
   // app/src/library.ts
   'Dossier de l’autre installation': 'Folder of the other installation',

@@ -185,7 +185,7 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
     return {
       kind: 'dialog',
       message: t(
-        "VPX demande s'il peut créer l'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n'est pas à 0. Remettez {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).",
+        "VPX demande s'il peut créer l'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n'est pas à 0. Remets {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).",
         { object: activeX[1]!, setting: setting('SecurityLevel') },
       ),
     };
@@ -194,7 +194,7 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
     return {
       kind: 'dialog',
       message: t(
-        "VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez {setting} dans VPinballX.ini, et dans le .ini de la table s'il la surcharge.",
+        "VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remets {setting} dans VPinballX.ini, et dans le .ini de la table s'il la surcharge.",
         { setting: setting('AskToTurnOn') },
       ),
     };

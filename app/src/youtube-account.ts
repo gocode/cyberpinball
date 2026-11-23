@@ -151,7 +151,7 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
       // Liste illisible : les deux playlists personnelles restent proposées.
       if (!error) return { ok: true, lists: parseAccountPlaylists(undefined) };
       if (/sign in|login|cookies/i.test(error)) {
-        set({ connected: false, problem: t('YouTube ne reconnaît plus la connexion : reconnectez-vous dans Edge') });
+        set({ connected: false, problem: t('YouTube ne reconnaît plus la connexion : reconnecte-toi dans Edge') });
         return { ok: false, reason: state.problem! };
       }
       return { ok: false, reason: error.replace(/^ERROR:\s*/, '').slice(0, 200) };
@@ -187,9 +187,9 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     opts.show?.({
       url: youtubePlaylistSearchUrl(query),
       game: t('Juke-box'),
-      expected: t('Ouvrez une playlist ou une vidéo, puis « Ajouter au Juke-box »'),
+      expected: t('Ouvre une playlist ou une vidéo, puis « Ajouter au Juke-box »'),
       host: 'youtube.com',
-      status: t('Ouvrez une playlist ou une vidéo, puis « Ajouter au Juke-box » : l’import du Juke-box s’ouvre sur ce lien.'),
+      status: t('Ouvre une playlist ou une vidéo, puis « Ajouter au Juke-box » : l’import du Juke-box s’ouvre sur ce lien.'),
       search: { query: query.trim(), engine: 'youtube', playlists: true },
     });
   }

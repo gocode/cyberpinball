@@ -33,7 +33,7 @@ export function isGoogleSignIn(url: string): boolean {
 
 /** Pourquoi la connexion à Google ne se fait pas dans « Récupérer », et la voie qui marche. */
 export function googleRefusesText(): string {
-  return t('Google refuse la connexion dans le navigateur intégré : connectez-vous dans Microsoft Edge (gestion du Juke-box > « Compte YouTube » > « Se connecter à YouTube »).');
+  return t('Google refuse la connexion dans le navigateur intégré : connecte-toi dans Microsoft Edge (gestion du Juke-box > « Compte YouTube » > « Se connecter à YouTube »).');
 }
 
 /** Les playlists du compte, telles que yt-dlp les lit avec ses cookies. */
@@ -97,7 +97,7 @@ export function parseDevToolsActivePort(text: string): { port: number; path: str
 }
 
 export function edgeMissingText(): string {
-  return t('Microsoft Edge est introuvable sur ce PC : il sert à se connecter à YouTube. Installez-le depuis microsoft.com/edge, puis réessayez.');
+  return t('Microsoft Edge est introuvable sur ce PC : il sert à se connecter à YouTube. Installe-le depuis microsoft.com/edge, puis réessaie.');
 }
 
 // ---------------------------------------------------------------------------

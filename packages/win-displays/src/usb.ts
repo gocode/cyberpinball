@@ -65,7 +65,7 @@ export function presentDeviceIds(enumerator = 'USB'): string[] {
       .split('\0')
       .filter((id) => id.length > 0);
   }
-  throw new Error(t('La liste des périphériques USB change sans cesse : réessayez.'));
+  throw new Error(t('La liste des périphériques USB change sans cesse : réessaie.'));
 }
 
 /**

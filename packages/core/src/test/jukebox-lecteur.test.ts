@@ -272,8 +272,8 @@ test('affiche du médaillon : la dernière écoute, ou l’invitation à importe
     detail: 'Vesper Avenue · album Fréquences parallèles',
   });
   const empty = jukeboxPoster({ stats: 'Aucune playlist', empty: true });
-  assert.equal(empty.heading, 'Importez une playlist YouTube');
-  assert.equal(empty.detail, 'Depuis votre téléphone ou la fenêtre Récupérer.');
+  assert.equal(empty.heading, 'Importe une playlist YouTube');
+  assert.equal(empty.detail, 'Depuis ton téléphone ou la fenêtre Récupérer.');
 });
 
 test('DMD : JUKE-BOX et ses chiffres sur la roue, le spectre en lecture, tout dans la grille', () => {

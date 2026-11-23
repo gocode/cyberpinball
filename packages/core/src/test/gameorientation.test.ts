@@ -163,16 +163,16 @@ test('« Santé de la borne » : la ligne du sens des tables', () => {
   const set = addConfiguration(undefined, cabinet, 'Borne').set;
   const sense = (observed: ObservedDisplay[]) => screensLines(screensFacts(set, observed))[1]!;
   assert.equal(sense([flipped]).state, 'ok');
-  assert.match(sense([flipped]).title, /Tables dans votre sens, flippers à droite/);
+  assert.match(sense([flipped]).title, /Tables dans ton sens, flippers à droite/);
   assert.equal(sense([flipped]).detail, 'Windows en 180°');
   // Windows n'a pas repris l'orientation de jeu : à l'envers, et pourquoi.
   assert.equal(sense([landscape]).state, 'blocking');
-  assert.match(sense([landscape]).title, /flippers à droite, vous êtes à gauche/);
+  assert.match(sense([landscape]).title, /flippers à droite, tu es à gauche/);
   assert.match(sense([landscape]).detail!, /Windows en 0° ; orientation de jeu : 180°, que Windows n’a pas reprise/);
   assert.deepEqual(sense([landscape]).target, { kind: 'system', item: 'cabinet' });
   // L'assistant n'a pas retourné (refus) : rien à reprendre, il faut le relancer.
   const kept = wizardCabinet(landscape, 'left', false);
-  assert.match(orientationVerdict(orientationFacts(kept, [landscape])!).detail, /relancez « Orientation et taille du playfield »/);
+  assert.match(orientationVerdict(orientationFacts(kept, [landscape])!).detail, /relance « Orientation et taille du playfield »/);
   // Sans playfield branché : pas de ligne.
   assert.equal(orientationFacts(kept, devPcDisplays().slice(0, 1)), undefined);
 });

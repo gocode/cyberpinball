@@ -28,7 +28,7 @@ export interface SourceSite {
   login: string;
   /** Moteur du forum : il dit quels cookies signalent un membre connecté. */
   engine: 'invision' | 'ipboard3' | 'xenforo';
-  /** Recherche du site, dans ses fichiers quand il le permet (« Vos comptes » de la recherche libre) ; `{q}` : le texte cherché. */
+  /** Recherche du site, dans ses fichiers quand il le permet (« Tes comptes » de la recherche libre) ; `{q}` : le texte cherché. */
   search: string;
 }
 
@@ -114,21 +114,21 @@ export type ProbeResult =
 export function probeReasonText(probe: { reason: ProbeReason; count?: number }): string {
   switch (probe.reason) {
     case 'challenge':
-      return t('le site fait une vérification (Cloudflare) : à faire vous-même');
+      return t('le site fait une vérification (Cloudflare) : à faire toi-même');
     case 'down':
       return t('le site ne répond pas pour l’instant');
     case 'captcha':
-      return t('le site demande un CAPTCHA : à faire vous-même');
+      return t('le site demande un CAPTCHA : à faire toi-même');
     case 'forbidden':
-      return t('votre compte n’a pas le droit de télécharger ce fichier');
+      return t('ton compte n’a pas le droit de télécharger ce fichier');
     case 'choice':
-      return tn(probe.count ?? 2, '{n} fichier au choix : choisissez celui qu’il faut', '{n} fichiers au choix : choisissez celui qu’il faut');
+      return tn(probe.count ?? 2, '{n} fichier au choix : choisis celui qu’il faut', '{n} fichiers au choix : choisis celui qu’il faut');
     case 'delay':
       return t('le site impose un délai avant le téléchargement');
     case 'elsewhere':
       return t('le fichier est sur un autre site');
     case 'terms':
-      return t('des conditions sont à accepter : à faire vous-même');
+      return t('des conditions sont à accepter : à faire toi-même');
     case 'no-button':
       return t('pas de bouton de téléchargement reconnu sur la page');
     case 'proxy':

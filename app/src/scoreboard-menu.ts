@@ -166,7 +166,7 @@ function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): Scor
   return {
     rank: line.beyond ? `${line.beyond}+` : String(line.rank),
     ...(apart ? { apart: true } : {}),
-    name: line.mine ? t('{name} (vous)', { name: line.name }) : line.name,
+    name: line.mine ? t('{name} (toi)', { name: line.name }) : line.name,
     score: formatNumber(line.score),
     when: whenLabel({ at: line.at }, now),
     ...(line.rank === 1 ? { first: true } : {}),
@@ -194,7 +194,7 @@ export function rankingScoreboardView(views: (period: ScorePeriod) => RankingVie
   const lines = view.lines.map((l, i) => rankingLineView(l, now, Boolean(l.mine) && i > 0 && view.lines[i - 1]!.rank + 1 < l.rank));
   const legend = presenceLegend(lines);
   if (lines.length) return { ...base, lines, position, ...(legend ? { legend } : {}), ...(view.note ? { note: view.note } : {}) };
-  const where = scope === 'world' ? t('dans le monde') : scope === 'country' ? t('dans votre pays') : t('entre amis');
+  const where = scope === 'world' ? t('dans le monde') : scope === 'country' ? t('dans ton pays') : t('entre amis');
   return {
     ...base,
     lines: [],
@@ -211,11 +211,11 @@ export function rankingScoreboardView(views: (period: ScorePeriod) => RankingVie
  */
 export function positionText(view: RankingView, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod): string {
   const where = t('{scope} · {period}', { scope: scopeLabel(scope), period: periodLabel(period) });
-  if (!view.me) return t('{where} : pas encore de score pour vous', { where });
-  if (view.me.beyond) return t('{where} : votre place, au-delà de la {n}ᵉ', { where, n: view.me.beyond });
+  if (!view.me) return t('{where} : pas encore de score pour toi', { where });
+  if (view.me.beyond) return t('{where} : ta place, au-delà de la {n}ᵉ', { where, n: view.me.beyond });
   return view.complete
-    ? t('{where} : votre place, {rank} sur {players}', { where, rank: view.me.rank, players: tn(view.players, '{n} joueur', '{n} joueurs') })
-    : t('{where} : votre place, {rank} sur au moins {players}', { where, rank: view.me.rank, players: tn(view.players, '{n} joueur', '{n} joueurs') });
+    ? t('{where} : ta place, {rank} sur {players}', { where, rank: view.me.rank, players: tn(view.players, '{n} joueur', '{n} joueurs') })
+    : t('{where} : ta place, {rank} sur au moins {players}', { where, rank: view.me.rank, players: tn(view.players, '{n} joueur', '{n} joueurs') });
 }
 
 /** Ce que dit l'entrée de la fiche : le record, et les parties du jour. */

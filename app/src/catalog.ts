@@ -526,7 +526,7 @@ export function createCatalog(ctx: CatalogContext) {
             : t('Reçu pour {game} : {kind}, {label} (« {file} », {size}).', { game: item.gameLabel, kind: NEED_LABELS[item.kind], label: item.label, file: facts.filename, size }),
           routed.instead && routed.instead.state === 'waiting' ? t('{item} reste attendu.', { item: itemName(routed.instead) }) : '',
           routed.covered.length ? t('Il apporte aussi {parts} : plus attendus à part.', { parts: formatList(routed.covered.map((c) => NEED_LABELS[c.kind])) }) : '',
-          place.verdict === 'unknown' ? t('Contenu non vérifié (archive illisible) : regardez le plan avant d’installer.') : '',
+          place.verdict === 'unknown' ? t('Contenu non vérifié (archive illisible) : regarde le plan avant d’installer.') : '',
           routed.replaced ? t('L’ancien, « {file} », est gardé de côté.', { file: path.basename(routed.replaced) }) : '',
         ]
           .filter(Boolean)
@@ -662,7 +662,7 @@ export function createCatalog(ctx: CatalogContext) {
             { text: t('Droits'), detail: acquisitionNotice(), tone: 'warning' },
             {
               text: t('Comptes'),
-              detail: t('Les tables se téléchargent sur des forums (vpuniverse.com, vpforums.org…) qui demandent un compte. Créez le vôtre et connectez-vous vous-même dans la fenêtre « Récupérer » : Cyber Pinball ne voit ni ne garde aucun mot de passe.'),
+              detail: t('Les tables se téléchargent sur des forums (vpuniverse.com, vpforums.org…) qui demandent un compte. Crée le tien et connecte-toi toi-même dans la fenêtre « Récupérer » : Cyber Pinball ne voit ni ne garde aucun mot de passe.'),
               tone: 'info',
             },
             { text: t('Clavier et souris'), detail: t('Indispensables pour se connecter et télécharger sur ces sites ; le reste se fait aux boutons de la borne.'), tone: 'quiet' },
@@ -686,7 +686,7 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   function open(): void {
-    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée les dossiers des tables et des téléchargements.')]);
+    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lance « Installer » depuis le lanceur : il crée les dossiers des tables et des téléchargements.')]);
     withNotice(() => openCatalog());
   }
 
@@ -820,7 +820,7 @@ export function createCatalog(ctx: CatalogContext) {
     }
     void ctx.task(t('Catalogue de la base VPS…'), async () => {
       const db = await vpsDb();
-      if (!db) return ctx.openNotice(t('Base VPS indisponible'), [t('La base VPS n’a jamais été téléchargée, et GitHub ne répond pas. Réessayez quand la borne est reliée à Internet.')], () => ctx.home());
+      if (!db) return ctx.openNotice(t('Base VPS indisponible'), [t('La base VPS n’a jamais été téléchargée, et GitHub ne répond pas. Réessaie quand la borne est reliée à Internet.')], () => ctx.home());
       await needMediaIds();
       const found = games(db);
       // Pendant une recherche, chaque jeu suivi de ses éditions (catalogLines) : une ligne chacune.
@@ -955,7 +955,7 @@ export function createCatalog(ctx: CatalogContext) {
     actions.push({ label: t('Récupérés et attendus'), detail: waiting ? summary() : t('vide'), icon: 'inbox', run: () => openWaitList(undefined, () => openCatalog()) }, { label: t('Retour'), icon: 'back', run: () => ctx.home() });
     const sections: Section[] = noticeSection();
     if (!found.length) {
-      const why = filter.support === 'media' && mediaIds === null ? t('L’index de VPinMediaDB n’a pas pu être téléchargé : réessayez quand la borne est reliée à Internet.') : t('Changez la recherche ou les filtres.');
+      const why = filter.support === 'media' && mediaIds === null ? t('L’index de VPinMediaDB n’a pas pu être téléchargé : réessaie quand la borne est reliée à Internet.') : t('Change la recherche ou les filtres.');
       sections.push({ rows: [{ text: t('Aucun jeu ne correspond'), detail: why, tone: 'quiet' }] });
     }
     return {
@@ -966,8 +966,8 @@ export function createCatalog(ctx: CatalogContext) {
         .filter(Boolean)
         .join(' · '),
       lead: db.updatedAt
-        ? t('Base VPS du {date}. Choisissez un jeu pour voir ses versions et l’installer.', { date: formatDay(db.updatedAt.getTime()) })
-        : t('Base VPS. Choisissez un jeu pour voir ses versions et l’installer.'),
+        ? t('Base VPS du {date}. Choisis un jeu pour voir ses versions et l’installer.', { date: formatDay(db.updatedAt.getTime()) })
+        : t('Base VPS. Choisis un jeu pour voir ses versions et l’installer.'),
       sections,
       actions,
       back: () => ctx.home(),
@@ -1044,7 +1044,7 @@ export function createCatalog(ctx: CatalogContext) {
     return {
       heading: t('Filtres du catalogue'),
       subheading: t('{count} sur {total}', { count: tn(count, '{n} jeu', '{n} jeux'), total: formatNumber(total) }),
-      lead: t('Start ouvre les choix d’un filtre, avec le nombre de jeux de chacun. Vos choix sont gardés pour la prochaine fois. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers).'),
+      lead: t('Start ouvre les choix d’un filtre, avec le nombre de jeux de chacun. Tes choix sont gardés pour la prochaine fois. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers).'),
       sections: [],
       actions,
       back: see,
@@ -1176,7 +1176,7 @@ export function createCatalog(ctx: CatalogContext) {
             ? t('{n} versions pour VPX : la conseillée, puis la plus récente (les {shown} plus récentes montrées).', { n: count - fpCount, shown: versions.length })
             : tn(count - fpCount, '{n} version pour VPX : la conseillée, puis la plus récente.', '{n} versions pour VPX : la conseillée, puis la plus récente.'),
         fpCount && fpCount < count ? tn(fpCount, 'Puis {n} version pour Future Pinball, marquée comme telle.', 'Puis {n} versions pour Future Pinball, marquées comme telles.') : undefined,
-        t('Choisissez-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.'),
+        t('Choisis-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.'),
       ]
         .filter(Boolean)
         .join(' '),
@@ -1340,7 +1340,7 @@ export function createCatalog(ctx: CatalogContext) {
       try {
         file = await ctx.search.stage(offer.file);
       } catch {
-        return ctx.openNotice(t('Lecture impossible'), [t('VPinMediaDB ne répond pas : réessayez quand la borne est reliée à Internet.')], () => openNeeds(game.id, version.id, at));
+        return ctx.openNotice(t('Lecture impossible'), [t('VPinMediaDB ne répond pas : réessaie quand la borne est reliée à Internet.')], () => openNeeds(game.id, version.id, at));
       }
       allowPreview(file);
       const url = mediaUrl(file);
@@ -1594,7 +1594,7 @@ export function createCatalog(ctx: CatalogContext) {
             ? t('dans « {file} », reçu avec {kind}', { file: path.basename(cover.received.file), kind: NEED_LABELS[cover.kind] })
             : need.detail,
         extra: [
-          ...(need.kind === 'rom' && need.state === 'todo' ? [t('Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupérez que si vous y avez droit.')] : []),
+          ...(need.kind === 'rom' && need.state === 'todo' ? [t('Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupère que si tu y as droit.')] : []),
         ],
         thumb: need.kind === 'table' ? thumbOf(imageOf(version), t('Table')) : need.kind === 'b2s' ? thumbOf(need.files.map(imageOf).find(Boolean), t('Fronton')) : { kind: 'fallback', rotation: 0, text: label },
       };
@@ -1651,10 +1651,10 @@ export function createCatalog(ctx: CatalogContext) {
       heading: t('Ce qu’il faut : {game}', { game: vpsLabel(game) }),
       subheading: version.updatedAt ? t('Version {version}, du {date}', { version: versionLabel(version), date: formatDay(version.updatedAt) }) : t('Version {version}', { version: versionLabel(version) }),
       lead: running
-        ? t('Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connectez-vous, téléchargez. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.')
+        ? t('Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connecte-toi, télécharge. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.')
         : missing.length
           ? // Ce qui manque est dit par le bandeau en tête des cartes (needsSummary) : ici, comment l'obtenir.
-            t('Start sur une carte ouvre sa page dans la fenêtre « Récupérer » : connectez-vous, téléchargez ; le fichier est rangé tout seul dans la liste d’attente.')
+            t('Start sur une carte ouvre sa page dans la fenêtre « Récupérer » : connecte-toi, télécharge ; le fichier est rangé tout seul dans la liste d’attente.')
           : received.length
             ? t('Tout l’indispensable est là ou attendu. « Préparer l’installation » montre le plan avant d’écrire quoi que ce soit.')
             : t('Tout l’indispensable est là ou attendu : un fichier téléchargé arrive tout seul dans « Récupérés et attendus ».'),
@@ -1778,11 +1778,11 @@ export function createCatalog(ctx: CatalogContext) {
     acquirer.show({
       url: webEngineUrl(req.query, 'web'),
       game: target?.gameLabel ?? t('Recherche libre'),
-      expected: target?.kind ? t('{kind} : le fichier que vous choisirez', { kind: NEED_LABELS[target.kind] }) : t('Ce que vous choisirez : table, fronton, PuP-Pack, ROM, médias…'),
-      host: t('Recherche libre · fichiers que vous choisissez'),
+      expected: target?.kind ? t('{kind} : le fichier que tu choisiras', { kind: NEED_LABELS[target.kind] }) : t('Ce que tu choisiras : table, fronton, PuP-Pack, ROM, médias…'),
+      host: t('Recherche libre · fichiers que tu choisis'),
       status: target
-        ? t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.', { game: target.gameLabel })
-        : t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis proposé à l’ajout.'),
+        ? t('Cherche, ouvre une page, télécharge : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.', { game: target.gameLabel })
+        : t('Cherche, ouvre une page, télécharge : le fichier est reconnu, puis proposé à l’ajout.'),
       search: { query: req.query, engine: 'web' },
       // Les sites des tables, sous la recherche : connecté, on y cherche directement ; sinon, on s'y connecte.
       accounts: true,
@@ -1902,7 +1902,7 @@ export function createCatalog(ctx: CatalogContext) {
       }
       const { get: wanted, blocked } = quickNeeds(needsOf(game, version));
       if (blocked.length) {
-        notice = { text: t('Installation rapide impossible : {items} introuvable pour cette version. Choisissez-en une autre.', { items: blocked.map((n) => NEED_LABELS[n.kind]).join(', ') }), tone: 'warning' };
+        notice = { text: t('Installation rapide impossible : {items} introuvable pour cette version. Choisis-en une autre.', { items: blocked.map((n) => NEED_LABELS[n.kind]).join(', ') }), tone: 'warning' };
         return openNeeds(game.id, version.id);
       }
       // L'indispensable d'abord (playable.ts) : le fronton conseillé vient après, et ne retient jamais le plan.
@@ -2100,7 +2100,7 @@ export function createCatalog(ctx: CatalogContext) {
     actions.push(
       {
         label: watching ? t('Surveiller Téléchargements : oui') : t('Surveiller Téléchargements : non'),
-        detail: watching ? t('Ce qui arrive dans votre dossier Téléchargements est rapproché de la liste') : t('Pour ce que vous téléchargez dans votre propre navigateur'),
+        detail: watching ? t('Ce qui arrive dans ton dossier Téléchargements est rapproché de la liste') : t('Pour ce que tu télécharges dans ton propre navigateur'),
         run: () => {
           l.watchDownloads = !watching || undefined;
           save();
@@ -2118,7 +2118,7 @@ export function createCatalog(ctx: CatalogContext) {
     return {
       heading: t('Récupérés et attendus'),
       subheading: [tn(waitingCount, '{n} attendu', '{n} attendus'), tn(receivedCount, '{n} reçu', '{n} reçus'), issues.length ? tn(issues.length, '{n} à corriger', '{n} à corriger') : undefined, strays.length ? tn(strays.length, '{n} sans élément', '{n} sans élément') : undefined].filter(Boolean).join(' · '),
-      lead: t('Ce que vous récupérez, jeu par jeu. Chaque fichier va dans la partie que dit son contenu, quel que soit l’élément qu’on attendait ; s’il y a un doute, on vous le demande. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Rien n’est installé avant le plan.'),
+      lead: t('Ce que tu récupères, jeu par jeu. Chaque fichier va dans la partie que dit son contenu, quel que soit l’élément qu’on attendait ; s’il y a un doute, on te le demande. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Rien n’est installé avant le plan.'),
       sections,
       actions,
       back: () => waitBack(),
@@ -2172,11 +2172,11 @@ export function createCatalog(ctx: CatalogContext) {
     actions.push({ label: t('Retour à la liste'), run: back });
     const lead = issue
       ? issue.problem === 'missing'
-        ? t('Le fichier reçu a disparu (déplacé ou effacé) : videz l’élément pour le récupérer de nouveau.')
+        ? t('Le fichier reçu a disparu (déplacé ou effacé) : vide l’élément pour le récupérer de nouveau.')
         : t('Le fichier reçu est {content}, pas {expected} : il ne pourrait pas s’installer comme tel.', { content: CONTENT_LABELS[issue.content ?? 'unknown'], expected: CONTENT_LABELS[item.kind] })
       : r
         ? t('Reçu : il sera installé avec le jeu, après le plan.')
-        : t('Pas encore reçu : rouvrez la page pour le télécharger, ou choisissez un fichier déjà téléchargé. À la souris, glissez-le sur la fenêtre.');
+        : t('Pas encore reçu : rouvre la page pour le télécharger, ou choisis un fichier déjà téléchargé. À la souris, glisse-le sur la fenêtre.');
     return {
       heading: itemName(item),
       subheading: item.gameLabel,
@@ -2402,7 +2402,7 @@ export function createCatalog(ctx: CatalogContext) {
         return {
           heading: item.received ? t('Remplacer : {item}', { item: itemName(item) }) : t('Choisir un fichier : {item}', { item: itemName(item) }),
           subheading: item.gameLabel,
-          lead: t('Ceux qui conviennent d’abord ({expected}). À la souris, vous pouvez aussi glisser un fichier sur la fenêtre.', { expected: EXPECTED_LABELS[item.kind] }),
+          lead: t('Ceux qui conviennent d’abord ({expected}). À la souris, tu peux aussi glisser un fichier sur la fenêtre.', { expected: EXPECTED_LABELS[item.kind] }),
           sections,
           actions,
           back,
@@ -2465,7 +2465,7 @@ export function createCatalog(ctx: CatalogContext) {
       subheading: (expected ?? suggested)?.gameLabel,
       lead: expected
         ? t('« {file} » est arrivé alors que {item} était attendu, mais c’est {content}. Où le ranger ?', { file: path.basename(stray.file), item: itemName(expected), content: CONTENT_LABELS[stray.content ?? 'unknown'] })
-        : t('Reçu sans élément qui lui corresponde. Rattachez-le à ce qu’il remplit, ou mettez-le à la corbeille.'),
+        : t('Reçu sans élément qui lui corresponde. Rattache-le à ce qu’il remplit, ou mets-le à la corbeille.'),
       sections: [...noticeSection(), { rows }],
       actions,
       back,
@@ -2482,7 +2482,7 @@ export function createCatalog(ctx: CatalogContext) {
     attachFile(l, item, { file: stray.file, via: stray.via, url: stray.url, at: stray.at, content: stray.content, summary: stray.summary, parts: stray.parts, forced: true });
     save();
     updateWatch();
-    notice = { text: t('« {file} » rattaché à {item}, à votre demande.', { file: path.basename(file), item: itemName(item) }), tone: 'warning' };
+    notice = { text: t('« {file} » rattaché à {item}, à ta demande.', { file: path.basename(file), item: itemName(item) }), tone: 'warning' };
     openWaitList(itemAction(id));
   }
 
@@ -2618,7 +2618,7 @@ export function createCatalog(ctx: CatalogContext) {
       detail: state.connected
         ? state.remembered
           ? t('connecté, connexion gardée jusqu’au {date}', { date: formatDay(state.expires!.getTime()) })
-          : t('connecté pour cette fois seulement : reconnectez-vous en cochant « Se souvenir de moi » pour la garder')
+          : t('connecté pour cette fois seulement : reconnecte-toi en cochant « Se souvenir de moi » pour la garder')
         : t('pas connecté'),
       badges: [state.connected ? t('Connecté') : t('Pas connecté')],
       tone: state.connected ? (state.remembered ? 'ok' : 'warning') : 'quiet',
@@ -2636,17 +2636,17 @@ export function createCatalog(ctx: CatalogContext) {
           }
         : {
             label: t('Se connecter : {site}', { site: site.label }),
-            detail: t('Dans la fenêtre « Récupérer » ; cochez « Se souvenir de moi »'),
+            detail: t('Dans la fenêtre « Récupérer » ; coche « Se souvenir de moi »'),
             tone: 'ok' as const,
             run: () => {
               windowItem = undefined;
               acquirer.show({
                 url: site.login,
                 game: t('Compte {site}', { site: site.label }),
-                expected: t('Connectez-vous, cochez « Se souvenir de moi », puis Fermer (Échap)'),
-                host: t('{site} · votre propre compte', { site: site.label }),
+                expected: t('Connecte-toi, coche « Se souvenir de moi », puis Fermer (Échap)'),
+                host: t('{site} · ton propre compte', { site: site.label }),
               });
-              notice = { text: t('Connexion à {site} ouverte : fermez la fenêtre une fois connecté, l’état se met à jour.', { site: site.label }), tone: 'info' };
+              notice = { text: t('Connexion à {site} ouverte : ferme la fenêtre une fois connecté, l’état se met à jour.', { site: site.label }), tone: 'info' };
               openAccounts(ctx.cursor());
             },
           },
@@ -2698,7 +2698,7 @@ export function createCatalog(ctx: CatalogContext) {
     return {
       heading: t('Comptes des sites'),
       subheading: tn(states.filter((s) => s.state.connected).length + (youtube?.connected ? 1 : 0), '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length + (youtube ? 1 : 0) }),
-      lead: t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.'),
+      lead: t('Connecte-toi une fois à chaque site, avec ton propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est toi qui cliques sur Télécharger.'),
       sections: [...noticeSection(), { rows }],
       actions,
       back: () => ctx.home(),
@@ -2710,7 +2710,7 @@ export function createCatalog(ctx: CatalogContext) {
   function openUpdates(): void {
     void ctx.task(t('Recherche des mises à jour…'), async () => {
       const db = await vpsDb();
-      if (!db) return ctx.openNotice(t('Base VPS indisponible'), [t('Réessayez quand la borne est reliée à Internet.')], () => ctx.home());
+      if (!db) return ctx.openNotice(t('Base VPS indisponible'), [t('Réessaie quand la borne est reliée à Internet.')], () => ctx.home());
       const found: { table: TableEntry; update: TableUpdate }[] = [];
       const seen = new Set<string>();
       for (const [i, table] of host.tables().entries()) {

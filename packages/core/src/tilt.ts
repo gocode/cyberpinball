@@ -189,12 +189,12 @@ export function tiltFindings(cabinet: Pick<Cabinet, 'buttons' | 'analog' | 'tilt
   const bob = cabinet.buttons?.tilt;
   const where = t('menu système > « Ma borne » > « Configuration de la borne » > « Boutons » > « Tilt »');
   if (tilt?.mode === 'bob' && !bob) {
-    findings.push({ severity: 'warning', message: t('Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relevez-le à l’étape « Boutons du jeu », ou choisissez le balancier simulé ({where}).', { where }) });
+    findings.push({ severity: 'warning', message: t('Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relève-le à l’étape « Boutons du jeu », ou choisis le balancier simulé ({where}).', { where }) });
   }
   if (!tilt && bob && plumb.simulated) {
     findings.push({
       severity: 'warning',
-      message: t('Tilt : le balancier de la borne ({key}) et celui que VPX simule à partir des secousses sont actifs ensemble : un même coup peut compter deux fois. Choisissez l’un des deux ({where}).', { key: keyLabel(bob), where }),
+      message: t('Tilt : le balancier de la borne ({key}) et celui que VPX simule à partir des secousses sont actifs ensemble : un même coup peut compter deux fois. Choisis l’un des deux ({where}).', { key: keyLabel(bob), where }),
     });
   }
   if (tilt?.mode === 'simulated') {
@@ -209,7 +209,7 @@ export function tiltFindings(cabinet: Pick<Cabinet, 'buttons' | 'analog' | 'tilt
   if (nudge && (nudge.gain ?? NUDGE_GAIN.default) < NUDGE_GAIN.pinscape) {
     findings.push({
       severity: 'warning',
-      message: t('Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Réglez la force des secousses à l’essai ({where}).', {
+      message: t('Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Règle la force des secousses à l’essai ({where}).', {
         gain: gainLabel(nudge.gain ?? NUDGE_GAIN.default),
         floor: Math.round(nudgeFloor(nudge.gain ?? NUDGE_GAIN.default) * 100),
         where,

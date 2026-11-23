@@ -1493,7 +1493,7 @@ function runButtonsAction(action: ButtonsAction): void {
       const problems = keyProblems(set, capture.keys);
       const untried = keysToTry(set, capture.keys, capture.reference).filter((id) => !capture.tried.has(id));
       if (problems.length) capture.notice = t('Impossible de valider : {problems}.', { problems: problems.join(' ; ') });
-      else if (untried.length) capture.notice = t('Essayez d’abord sur la borne : {buttons}.', { buttons: untried.map((id) => itemLabel(set, id)).join(', ') });
+      else if (untried.length) capture.notice = t('Essaie d’abord sur la borne : {buttons}.', { buttons: untried.map((id) => itemLabel(set, id)).join(', ') });
       else acceptButtons();
     }
   }
@@ -1508,7 +1508,7 @@ const itemLabel = (set: KeySet, id: string) => set.items.find((b) => b.id === id
 function skipButton(capture: ButtonCapture): void {
   const button = capture.set.items[capture.index]!;
   if (button.required) {
-    capture.notice = t('{button} est obligatoire : appuyez dessus sur la borne.', { button: button.label });
+    capture.notice = t('{button} est obligatoire : appuie dessus sur la borne.', { button: button.label });
     return;
   }
   console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} : passé à la souris`); // i18n-ignore : journal
@@ -1900,7 +1900,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     return {
       ...common,
       // Le nom de l'étape est dans la frise du haut.
-      prompt: toTry.length ? t('Essayez les boutons') : stepTitle,
+      prompt: toTry.length ? t('Essaie les boutons') : stepTitle,
       details: !game
         ? t('Touches de secours du clavier toujours actives : Tab, flèches, Entrée, Échap.')
         : silenced.length
@@ -1910,7 +1910,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
       // Boutons encore à presser : dits une seule fois, sous « Valider » (« Faire : … ») ; la liste coche ✓.
       step: untried.length
         ? ''
-        : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
+        : t('{last} · choisis un bouton pour lui donner une autre touche.', {
             last:
               capture.last === FROM_INTERFACE_LAST
                 ? t('Mêmes boutons que précédent, suivant, valider et retour de l’interface')
@@ -1934,7 +1934,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
         {
           label: t('Finir'),
           text: untried.length
-            ? t('pressez sur la borne les boutons marqués ○, puis « {save} »', { save: only ? t('Enregistrer') : t('Valider') })
+            ? t('presse sur la borne les boutons marqués ○, puis « {save} »', { save: only ? t('Enregistrer') : t('Valider') })
             : t('« {save} »', { save: only ? t('Enregistrer') : t('Valider') }),
         },
         { label: t('Corriger'), text: t('un bouton de la liste pour le refaire, ou « Tout modifier »') },
@@ -1950,7 +1950,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const back = redoingOne(capture) ? t('annuler') : capture.index > 0 ? t('bouton précédent') : previousStepOf(set) ? t('étape précédente') : t('rien avant');
   return {
     ...common,
-    prompt: ('prompt' in button && button.prompt) || t('Appuyez sur le bouton'),
+    prompt: ('prompt' in button && button.prompt) || t('Appuie sur le bouton'),
     measure: button.label,
     // Le nom de l'étape et « Bouton 1 sur 4 » : dans la frise du haut (progressCount).
     name: '',
@@ -1998,7 +1998,7 @@ function captureGuide(capture: ButtonCapture, button: KeySet['items'][number], e
     {
       label: t('Passer'),
       text: button.required
-        ? t('impossible, bouton obligatoire : appuyez dessus sur la borne')
+        ? t('impossible, bouton obligatoire : appuie dessus sur la borne')
         : game
           ? t('pas ce bouton sur la borne : Exit ({exit}) ou « Passer ce bouton »', { exit })
           : t('pas de bouton pour ce rôle : Retour ({exit}) ou « Passer ce bouton »', { exit }),
@@ -2027,7 +2027,7 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
   const offer = joystickOffer();
   return {
     ...common,
-    prompt: t('Vos boutons sont-ils déjà les bons ?'),
+    prompt: t('Tes boutons sont-ils déjà les bons ?'),
     // Le nom de l'étape est dans la frise du haut (wizard-progress.ts).
     name: '',
     details: t('Ceux qui font circuler dans le front-end et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
@@ -2121,7 +2121,7 @@ function handleLayoutKey(is: (group: string[]) => boolean): boolean {
     else if (back && wizard.flipWarning === wizard.flipperEdge) {
       wizard.flipWarning = undefined;
       wizard.keepEdge = wizard.flipperEdge;
-      wizard.notice = t('Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour vous. Start : continuer.', { names: frontendNames(otherFrontends) });
+      wizard.notice = t('Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour toi. Start : continuer.', { names: frontendNames(otherFrontends) });
     }
     // Orientation seule : rien avant cette question, Exit propose de quitter sans enregistrer.
     else if (back) {
@@ -2213,8 +2213,8 @@ async function revertFlip(timedOut: boolean): Promise<void> {
   wizard.keepEdge = wizard.flipperEdge;
   if (done) {
     wizard.notice = timedOut
-      ? t('Pas de réponse : orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.')
-      : t('Orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.');
+      ? t('Pas de réponse : orientation d’origine rétablie. Start : continuer, tables à l’envers pour toi.')
+      : t('Orientation d’origine rétablie. Start : continuer, tables à l’envers pour toi.');
   }
   broadcast();
 }
@@ -2776,7 +2776,7 @@ function soundNotice(): string | undefined {
   }
   switch (status.reason) {
     case 'not-found':
-      return t('Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Répondez quand même si vous savez où elle est branchée.');
+      return t('Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Réponds quand même si tu sais où elle est branchée.');
     case 'no-labels':
       return t('Electron ne donne pas le nom des sorties audio : aucun son joué.');
     case 'channels':
@@ -3111,7 +3111,7 @@ function save(): void {
       {
         severity: 'info',
         message: created
-          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu système > Ma borne > Configuration de la borne > Configurations de la borne.', { name: configuration.name })
+          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renomme-la dans Menu système > Ma borne > Configuration de la borne > Configurations de la borne.', { name: configuration.name })
           : t('Configuration « {name} » mise à jour.', { name: configuration.name }),
       },
       ...channelNotices(),
@@ -3382,10 +3382,10 @@ function viewFor(index: number) {
             ? undefined
             : fix
               ? fix.delta === 180
-                ? t('VPX afficherait les tables flippers {edge} : Start retourne l’écran dans Windows pour les mettre de votre côté.', { edge: EDGE_LABELS[vpxEdge] })
-                : t('VPX afficherait les tables flippers {edge} : Start tourne l’écran dans Windows pour les mettre de votre côté.', { edge: EDGE_LABELS[vpxEdge] })
-              : t('VPX affichera les tables flippers {edge}, à l’envers pour vous.', { edge: EDGE_LABELS[vpxEdge] })),
-        hint: t('Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de votre côté · Start : {confirm} · Exit : revenir', {
+                ? t('VPX afficherait les tables flippers {edge} : Start retourne l’écran dans Windows pour les mettre de ton côté.', { edge: EDGE_LABELS[vpxEdge] })
+                : t('VPX afficherait les tables flippers {edge} : Start tourne l’écran dans Windows pour les mettre de ton côté.', { edge: EDGE_LABELS[vpxEdge] })
+              : t('VPX affichera les tables flippers {edge}, à l’envers pour toi.', { edge: EDGE_LABELS[vpxEdge] })),
+        hint: t('Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de ton côté · Start : {confirm} · Exit : revenir', {
           confirm: fix ? t('retourner l’écran pour VPX') : t('valider'),
         }),
         // Orientation seule : rien avant, Exit propose de quitter (bouton du haut).
@@ -3405,7 +3405,7 @@ function viewFor(index: number) {
         highlight: true,
         prompt: flip.turn === 180 ? t('Écran retourné') : t('Écran tourné'),
         measure: `${seconds} s`,
-        step: t('Les tables auront leurs flippers de votre côté. Ce texte est-il toujours à l’endroit ?'),
+        step: t('Les tables auront leurs flippers de ton côté. Ce texte est-il toujours à l’endroit ?'),
         notice: base.notice ?? t('Sans réponse, retour à l’orientation d’origine dans {n} s.', { n: seconds }),
         hint: t('Start : garder cette orientation · Exit : revenir à l’orientation d’origine'),
         actions: controls([
@@ -3422,9 +3422,9 @@ function viewFor(index: number) {
       measure: `${wizard.diagonal}″`,
       step:
         fromEdid === undefined
-          ? t('L’écran ne donne pas sa taille : indiquez la diagonale de l’image, en pouces.')
+          ? t('L’écran ne donne pas sa taille : indique la diagonale de l’image, en pouces.')
           : wizard.diagonal === fromEdid
-            ? t('{cm} cm, taille annoncée par l’écran. Vérifiez-la : certains téléviseurs se trompent.', { cm: Math.round(wizard.diagonal * 2.54) })
+            ? t('{cm} cm, taille annoncée par l’écran. Vérifie-la : certains téléviseurs se trompent.', { cm: Math.round(wizard.diagonal * 2.54) })
             : t('{cm} cm. L’écran annonce {inches}″.', { cm: Math.round(wizard.diagonal * 2.54), inches: fromEdid }),
       hint: t('Flippers : moins / plus · Start : valider · Exit : revenir'),
       actions: controls([
@@ -3449,7 +3449,7 @@ function viewFor(index: number) {
       // Sur les autres écrans, le geste à la souris : dans la ligne d'aide, à sa place dans le
       // flux de la page. Posé en bandeau par-dessus l'écran, il recouvrait l'étiquette de la zone
       // du haut (« BACKGLASS · 1920 × 1080 · PLEIN ÉC… », novembre 2026).
-      hint: panelHere ? '' : t('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner'),
+      hint: panelHere ? '' : t('Tire une zone pour la déplacer, jusque sur un autre écran · tire un coin pour la redimensionner'),
       notice: undefined,
       arrange: panelHere ? { ...arrangePanel(host, wizard.arrange, (codes) => formatList(codes.map(keyLabel).slice(0, 2), 'or')), findings: arrangeFindings() } : undefined,
     };
@@ -3477,7 +3477,7 @@ function viewFor(index: number) {
           : t('{role} ?', { role: named }),
       // « Rôle 1 sur 4 » : dans la frise du haut (progressCount).
       step: option?.free
-        ? t('L’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.', { role: role.label })
+        ? t('L’éditeur de disposition, pour placer le {role} où tu veux, puis retour ici.', { role: role.label })
         : option?.dmdKind === 'fulldmd'
           ? t('Un FullDMD montre l’image du jeu sur tout l’écran, son DMD incrusté.')
           : option?.dmdKind === 'dmd'
@@ -3677,7 +3677,7 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
       name: '',
       details,
       notice,
-      step: tn(beeps, '{n} bip : où l’entendez-vous ? Actuellement : {role}{reason}.', '{n} bips : où l’entendez-vous ? Actuellement : {role}{reason}.', {
+      step: tn(beeps, '{n} bip : où l’entends-tu ? Actuellement : {role}{reason}.', '{n} bips : où l’entends-tu ? Actuellement : {role}{reason}.', {
         role: audioRoleLabel(output.endpointId),
         reason: reason ? t(' (proposé : {reason})', { reason }) : '',
       }),
@@ -3760,10 +3760,10 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
     details,
     notice,
     step: t('Un bip à gauche, puis un plus aigu à droite : où sont ces haut-parleurs ?{answered}', { answered: answered ? ` (${answered})` : '' }),
-    hint: t('Flipper gauche : plateau, près de vous · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu'),
+    hint: t('Flipper gauche : plateau, près de toi · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu'),
     actions: controls([
       { role: 'back', label: t('Revenir') },
-      { role: 'previous', label: t('Plateau, près de vous') },
+      { role: 'previous', label: t('Plateau, près de toi') },
       { role: 'next', label: t('Plateau, côté fronton') },
       { role: 'confirm', label: t('Dans le fronton') },
       { role: 'exit', label: t('Rien entendu') },

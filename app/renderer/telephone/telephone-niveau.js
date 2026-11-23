@@ -388,7 +388,7 @@ function openActivity() {
   const box = document.createElement('div');
   box.className = 'activity-list';
   if (!days) box.append(profileLine({ text: t('La borne envoie l’activité récente…'), tone: 'quiet' }));
-  else if (!days.length) box.append(profileLine({ text: t('Aucune activité récente'), detail: t('Vos prochaines notifications apparaîtront ici.'), tone: 'info', icon: 'info' }));
+  else if (!days.length) box.append(profileLine({ text: t('Aucune activité récente'), detail: t('Tes prochaines notifications apparaîtront ici.'), tone: 'info', icon: 'info' }));
   for (const day of days ?? []) {
     const h = document.createElement('div');
     h.className = 'activity-day';
@@ -427,7 +427,7 @@ function openActivity() {
           {
             label: t('Effacer l’activité récente'),
             danger: true,
-            run: () => openSheet(t('Effacer toute l’activité récente ?'), [{ label: t('Effacer'), danger: true, run: () => send({ t: 'activity-act', a: 'clear' }) }], { text: t('Vos amis, téléchargements et parties restent.') }),
+            run: () => openSheet(t('Effacer toute l’activité récente ?'), [{ label: t('Effacer'), danger: true, run: () => send({ t: 'activity-act', a: 'clear' }) }], { text: t('Tes amis, téléchargements et parties restent.') }),
           },
         ]
       : [],

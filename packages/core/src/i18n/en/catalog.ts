@@ -16,7 +16,7 @@ export const messages: Record<string, string> = {
   'Start : choisir ({n} au choix, avec le nombre de jeux)': 'Start: choose ({n} choices, with the number of games)',
   'Déjà les choix d’origine': 'Already the original choices',
   'Tous les jeux, pas encore installés, les plus populaires d’abord': 'All games, not installed yet, most popular first',
-  'Start ouvre les choix d’un filtre, avec le nombre de jeux de chacun. Vos choix sont gardés pour la prochaine fois. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers).': 'Start opens a filter’s choices, with the number of games for each. Your choices are kept for next time. “Files”: what the game offers for download; “Site”: where the table (or those files) is downloaded.',
+  'Start ouvre les choix d’un filtre, avec le nombre de jeux de chacun. Tes choix sont gardés pour la prochaine fois. « Fichiers » : ce que le jeu propose au téléchargement ; « Site » : où se télécharge la table (ou ces fichiers).': 'Start opens a filter’s choices, with the number of games for each. Your choices are kept for next time. “Files”: what the game offers for download; “Site”: where the table (or those files) is downloaded.',
   'En cours : {value}': 'Current: {value}',
   'L’ordre des jeux dans le catalogue.': 'The order of games in the catalog.',
   'Le nombre de jeux de chaque choix tient compte des autres filtres.': 'The number of games for each choice takes the other filters into account.',
@@ -44,7 +44,7 @@ export const messages: Record<string, string> = {
     'The VPS database catalog: every game, its VPX versions, and what it takes to play it on this cabinet.',
   Droits: 'Rights',
   Comptes: 'Accounts',
-  'Les tables se téléchargent sur des forums (vpuniverse.com, vpforums.org…) qui demandent un compte. Créez le vôtre et connectez-vous vous-même dans la fenêtre « Récupérer » : Cyber Pinball ne voit ni ne garde aucun mot de passe.':
+  'Les tables se téléchargent sur des forums (vpuniverse.com, vpforums.org…) qui demandent un compte. Crée le tien et connecte-toi toi-même dans la fenêtre « Récupérer » : Cyber Pinball ne voit ni ne garde aucun mot de passe.':
     'Tables are downloaded from forums (vpuniverse.com, vpforums.org…) that require an account. Create your own and sign in yourself in the “Get” window: Cyber Pinball never sees or keeps any password.',
   'Clavier et souris': 'Keyboard and mouse',
   'Indispensables pour se connecter et télécharger sur ces sites ; le reste se fait aux boutons de la borne.':
@@ -52,7 +52,7 @@ export const messages: Record<string, string> = {
   'J’ai compris : ouvrir le catalogue': 'Got it: open the catalog',
   Retour: 'Back',
   'Cyber Pinball n’est pas installé': 'Cyber Pinball is not installed',
-  'Lancez « Installer » depuis le lanceur : il crée les dossiers des tables et des téléchargements.': 'Run “Install” from the launcher: it creates the tables and downloads folders.',
+  'Lance « Installer » depuis le lanceur : il crée les dossiers des tables et des téléchargements.': 'Run “Install” from the launcher: it creates the tables and downloads folders.',
   Vignettes: 'Thumbnails',
   électromécanique: 'electromechanical',
   mécanique: 'mechanical',
@@ -60,7 +60,7 @@ export const messages: Record<string, string> = {
   'type inconnu': 'unknown type',
   'Catalogue de la base VPS…': 'VPS database catalog…',
   'Base VPS indisponible': 'VPS database unavailable',
-  'La base VPS n’a jamais été téléchargée, et GitHub ne répond pas. Réessayez quand la borne est reliée à Internet.':
+  'La base VPS n’a jamais été téléchargée, et GitHub ne répond pas. Réessaie quand la borne est reliée à Internet.':
     'The VPS database has never been downloaded, and GitHub isn’t responding. Try again once the cabinet is online.',
   '{n} version VPX': '{n} VPX version',
   '{n} versions VPX': '{n} VPX versions',
@@ -98,7 +98,7 @@ export const messages: Record<string, string> = {
   '{n} éléments': '{n} items',
   vide: 'empty',
   'Aucun jeu ne correspond': 'No matching game',
-  'Changez la recherche ou les filtres.': 'Change the search or the filters.',
+  'Change la recherche ou les filtres.': 'Change the search or the filters.',
   '{n} jeu': '{n} game',
   '{n} jeux': '{n} games',
   'page {page} sur {pages}': 'page {page} of {pages}',
@@ -118,13 +118,13 @@ export const messages: Record<string, string> = {
     '{n} VPX versions: the recommended one, then the newest (the {shown} newest shown).',
   '{n} version pour VPX : la conseillée, puis la plus récente.': '{n} VPX version: the recommended one, then the newest.',
   '{n} versions pour VPX : la conseillée, puis la plus récente.': '{n} VPX versions: the recommended one, then the newest.',
-  'Choisissez-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.':
+  'Choisis-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.':
     'Pick one to see what it takes. MOD: rework of another version; VR: playable in virtual reality; nFozzy, Fleep: redone physics and sounds.',
   'conseillée d’abord': 'recommended first',
   'Ce qu’il faut…': 'What it takes…',
   indispensable: 'required',
   'reçu : {file}': 'received: {file}',
-  'Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupérez que si vous y avez droit.':
+  'Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupère que si tu y as droit.':
     'Copyrighted: Cyber Pinball provides none; only get it if you have the right to.',
   Table: 'Table',
   Fronton: 'Backglass',
@@ -141,7 +141,7 @@ export const messages: Record<string, string> = {
   'Ce qu’il faut : {game}': 'What it takes: {game}',
   'Version {version}, du {date}': 'Version {version}, from {date}',
   'Version {version}': 'Version {version}',
-  'Start sur une carte ouvre sa page dans la fenêtre « Récupérer » : connectez-vous, téléchargez ; le fichier est rangé tout seul dans la liste d’attente.':
+  'Start sur une carte ouvre sa page dans la fenêtre « Récupérer » : connecte-toi, télécharge ; le fichier est rangé tout seul dans la liste d’attente.':
     'Start on a card opens its page in the “Get” window: sign in, download; the file goes into the download queue by itself.',
   'Tout l’indispensable est là ou attendu. « Préparer l’installation » montre le plan avant d’écrire quoi que ce soit.':
     'Everything required is here or on its way. “Prepare installation” shows the plan before writing anything.',
@@ -182,8 +182,8 @@ export const messages: Record<string, string> = {
   'Trouver une table, puis « Récupérer » sur ce qu’il faut : chaque fichier ouvert vient ici.': 'Find a table, then “Get” what it takes: every file you open lands here.',
   'Surveiller Téléchargements : oui': 'Watch Downloads: on',
   'Surveiller Téléchargements : non': 'Watch Downloads: off',
-  'Ce qui arrive dans votre dossier Téléchargements est rapproché de la liste': 'Files arriving in your Downloads folder are matched against the queue',
-  'Pour ce que vous téléchargez dans votre propre navigateur': 'For what you download in your own browser',
+  'Ce qui arrive dans ton dossier Téléchargements est rapproché de la liste': 'Files arriving in your Downloads folder are matched against the queue',
+  'Pour ce que tu télécharges dans ton propre navigateur': 'For what you download in your own browser',
   'Chercher dans Téléchargements': 'Search Downloads',
   'Ce qui y est arrivé depuis l’ajout à la liste': 'What arrived there since it was queued',
   'Oublier les éléments installés': 'Clear installed items',
@@ -197,7 +197,7 @@ export const messages: Record<string, string> = {
   'Les fichiers reçus ont disparu (déplacés ou effacés) : ils sont de nouveau attendus.': 'The received files are gone (moved or deleted): they’re back in the queue.',
   'Comptes des sites…': 'Site accounts…',
   'connecté, connexion gardée jusqu’au {date}': 'signed in, kept until {date}',
-  'connecté pour cette fois seulement : reconnectez-vous en cochant « Se souvenir de moi » pour la garder':
+  'connecté pour cette fois seulement : reconnecte-toi en cochant « Se souvenir de moi » pour la garder':
     'signed in for this session only: sign in again with “Remember me” checked to keep it',
   'pas connecté': 'not signed in',
   Connecté: 'Signed in',
@@ -206,11 +206,11 @@ export const messages: Record<string, string> = {
   'Efface la connexion gardée par Cyber Pinball pour ce site': 'Clears the sign-in Cyber Pinball keeps for this site',
   'Déconnecté de {site}.': 'Signed out of {site}.',
   'Se connecter : {site}': 'Sign in: {site}',
-  'Dans la fenêtre « Récupérer » ; cochez « Se souvenir de moi »': 'In the “Get” window; check “Remember me”',
+  'Dans la fenêtre « Récupérer » ; coche « Se souvenir de moi »': 'In the “Get” window; check “Remember me”',
   'Compte {site}': '{site} account',
-  'Connectez-vous, cochez « Se souvenir de moi », puis Fermer (Échap)': 'Sign in, check “Remember me”, then Close (Esc)',
-  '{site} · votre propre compte': '{site} · your own account',
-  'Connexion à {site} ouverte : fermez la fenêtre une fois connecté, l’état se met à jour.': '{site} sign-in opened: close the window once signed in, the status updates.',
+  'Connecte-toi, coche « Se souvenir de moi », puis Fermer (Échap)': 'Sign in, check “Remember me”, then Close (Esc)',
+  '{site} · ton propre compte': '{site} · your own account',
+  'Connexion à {site} ouverte : ferme la fenêtre une fois connecté, l’état se met à jour.': '{site} sign-in opened: close the window once signed in, the status updates.',
   'Comptes des sites': 'Site accounts',
   // packages/core/src/adblock.ts
   'Bloquer les publicités : non': 'Block ads: off',
@@ -221,10 +221,10 @@ export const messages: Record<string, string> = {
   'Publicités retirées des pages et des vidéos (YouTube compris) ; jamais sur les forums des tables': 'Ads removed from pages and videos (YouTube included); never on the table forums',
   '{n} connecté sur {total}': '{n} of {total} signed in',
   '{n} connectés sur {total}': '{n} of {total} signed in',
-  'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.':
+  'Connecte-toi une fois à chaque site, avec ton propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est toi qui cliques sur Télécharger.':
     'Sign in once to each site, with your own account: the sign-in is kept from one start to the next, as in a browser. Cyber Pinball never sees or keeps any password. “Get” opens the site’s page, and you click Download yourself.',
   'Recherche des mises à jour…': 'Checking for updates…',
-  'Réessayez quand la borne est reliée à Internet.': 'Try again once the cabinet is online.',
+  'Réessaie quand la borne est reliée à Internet.': 'Try again once the cabinet is online.',
   'Mises à jour : table {n} sur {total}…': 'Updates: table {n} of {total}…',
   'Mises à jour des tables': 'Table updates',
   '{n} table à mettre à jour': '{n} table to update',
@@ -246,18 +246,18 @@ export const messages: Record<string, string> = {
   '{pct} %': '{pct}%',
   'Start de nouveau : annuler · flippers : un autre · Exit : garder': 'Start again: cancel · flippers: another one · Exit: keep',
   'Annuler ?': 'Cancel?',
-  'Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.':
+  'Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou télécharge autre chose.':
     'Received: {file}, added to the download queue. Close (Esc) to go back, or download something else.',
   'Téléchargement annulé : {file}': 'Download cancelled: {file}',
   'Téléchargement interrompu : {file}': 'Download interrupted: {file}',
-  'Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.': 'Sign in if the site asks, then download the file: it will be filed by itself.',
+  'Connecte-toi si le site le demande, puis télécharge le fichier : il sera rangé tout seul.': 'Sign in if the site asks, then download the file: it will be filed by itself.',
   'Récupérer : {game}': 'Get: {game}',
-  'Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.': 'Back where you left off. “Back to file page” returns to the starting page.',
+  'Repris là où tu en étais. « Retour à la fiche » revient à la page de départ.': 'Back where you left off. “Back to file page” returns to the starting page.',
   'Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.': 'Page unreachable ({error}): {url}. Dead link? “Back to file page” or another source.',
-  'vous n’êtes plus connecté à {site}': 'you’re no longer signed in to {site}',
+  'tu n’es plus connecté à {site}': 'you’re no longer signed in to {site}',
   'trop de pages avant le fichier': 'too many pages before the file',
   'La page a planté : elle est rechargée.': 'The page crashed: it is being reloaded.',
-  'La page ne répond plus : Fermer (Échap ou Exit), ou attendez son rechargement.': 'The page no longer responds: Close (Esc or Exit), or wait for it to reload.',
+  'La page ne répond plus : Fermer (Échap ou Exit), ou attends son rechargement.': 'The page no longer responds: Close (Esc or Exit), or wait for it to reload.',
   'La page a de nouveau planté : « Précédent », « Retour à la fiche » ou Fermer (Échap).': 'The page crashed again: “Back”, “Back to file page” or Close (Esc).',
 
   // app/src/updates-menu.ts
@@ -321,7 +321,7 @@ export const messages: Record<string, string> = {
   'Fichier {file} absent ou incomplet : les préversions publiques sont suivies': '{file} missing or incomplete: public pre-releases are followed',
   'Version {version} installée, préversions reçues': 'Version {version} installed, pre-releases received',
   'Version {version} installée, essais privés reçus': 'Version {version} installed, private tests received',
-  'Canal d’essai {repository} illisible : {message} Vérifiez le jeton de canal-essai.json, ou revenez aux versions publiques.':
+  'Canal d’essai {repository} illisible : {message} Vérifie le jeton de canal-essai.json, ou reviens aux versions publiques.':
     'Test channel {repository} unreadable: {message} Check the token in canal-essai.json, or go back to public versions.',
   'La mise à jour légère n’a pas démarré : {message}': 'The light update didn’t start: {message}',
   'Mise à jour légère, {size}': 'Light update, {size}',
@@ -366,7 +366,7 @@ export const messages: Record<string, string> = {
   'Point de vue (POV)': 'Point of view (POV)',
   'déjà installée sur cette borne': 'already installed on this cabinet',
   '{version}, à récupérer': '{version}, to get',
-  'aucun lien vivant pour cette version : choisissez-en une autre': 'no working link for this version: pick another one',
+  'aucun lien vivant pour cette version : choisis-en une autre': 'no working link for this version: pick another one',
   'fourni avec la table': 'included with the table',
   'cette borne n’a pas d’écran de fronton': 'this cabinet has no backglass screen',
   'conseillé : {n} fronton, le premier va avec les écrans de la borne': 'recommended: {n} backglass, the first suits the cabinet’s screens',
@@ -381,7 +381,7 @@ export const messages: Record<string, string> = {
   'annoncé avec la table par VPS, mais absent de son archive, et aucun lien connu': 'announced with the table by VPS, but missing from its archive, and no known link',
   'La table est arrivée sans {items}, annoncé avec elle : récupéré à part, à la suite.': 'The table arrived without {items}, announced with it: fetched separately, next.',
   '{roms} : déjà sur la borne': '{roms}: already on the cabinet',
-  '{roms} : à récupérer, si vous y avez droit': '{roms}: to get, if you have the right to',
+  '{roms} : à récupérer, si tu y as droit': '{roms}: to get, if you have the right to',
   'nom inconnu de VPS : le script de la table le dira une fois installée': 'name unknown to VPS: the table script will tell once installed',
   'facultatif : vidéos sur le fronton et l’afficheur pendant la partie': 'optional: videos on the backglass and DMD during play',
   'facultatif : sons du jeu remasterisés': 'optional: remastered game sounds',
@@ -389,7 +389,7 @@ export const messages: Record<string, string> = {
   'facultatif : musique pour la table': 'optional: music for the table',
   'facultatif : animation du topper': 'optional: topper animation',
   'facultatif : réglage du point de vue de la caméra': 'optional: camera point of view setting',
-  'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à votre place : il ouvre les pages, vous vous connectez et téléchargez vous-même, puis il range ce que vous avez récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupérez une ROM que si vous y avez droit.':
+  'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à ta place : il ouvre les pages, tu te connectes et télécharges toi-même, puis il range ce que tu as récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupère une ROM que si tu y as droit.':
     'Tables belong to their authors, ROMs to the game manufacturers. Cyber Pinball downloads nothing for you: it opens the pages, you sign in and download yourself, then it files what you got. No manufacturer allows its ROMs to be distributed for emulation: only get a ROM if you have the right to.',
   'version {from} → {to}': 'version {from} → {to}',
   'mise à jour chez VPS le {date}': 'updated on VPS {date}',
@@ -400,15 +400,15 @@ export const messages: Record<string, string> = {
   'GitHub ne répond pas': 'GitHub isn’t responding',
 
   // packages/core/src/sitesessions.ts
-  'le site fait une vérification (Cloudflare) : à faire vous-même': 'the site is running a check (Cloudflare): do it yourself',
+  'le site fait une vérification (Cloudflare) : à faire toi-même': 'the site is running a check (Cloudflare): do it yourself',
   'le site ne répond pas pour l’instant': 'the site isn’t responding right now',
-  'le site demande un CAPTCHA : à faire vous-même': 'the site asks for a CAPTCHA: do it yourself',
-  'votre compte n’a pas le droit de télécharger ce fichier': 'your account isn’t allowed to download this file',
-  '{n} fichier au choix : choisissez celui qu’il faut': '{n} file to choose from: pick the right one',
-  '{n} fichiers au choix : choisissez celui qu’il faut': '{n} files to choose from: pick the right one',
+  'le site demande un CAPTCHA : à faire toi-même': 'the site asks for a CAPTCHA: do it yourself',
+  'ton compte n’a pas le droit de télécharger ce fichier': 'your account isn’t allowed to download this file',
+  '{n} fichier au choix : choisis celui qu’il faut': '{n} file to choose from: pick the right one',
+  '{n} fichiers au choix : choisis celui qu’il faut': '{n} files to choose from: pick the right one',
   'le site impose un délai avant le téléchargement': 'the site makes you wait before the download',
   'le fichier est sur un autre site': 'the file is on another site',
-  'des conditions sont à accepter : à faire vous-même': 'there are terms to accept: do it yourself',
+  'des conditions sont à accepter : à faire toi-même': 'there are terms to accept: do it yourself',
   'pas de bouton de téléchargement reconnu sur la page': 'no download button found on the page',
   'le site refuse les connexions par proxy ou VPN': 'the site refuses proxy or VPN connections',
   'plafond de téléchargements du compte atteint': 'the account’s download limit is reached',
@@ -469,9 +469,9 @@ export const messages: Record<string, string> = {
   'ordre de la recherche': 'search order',
   '{state}, {sort} · Start pour les changer': '{state}, {sort} · Start to change them',
   'Récupérés et attendus': 'Received and expected',
-  'L’index de VPinMediaDB n’a pas pu être téléchargé : réessayez quand la borne est reliée à Internet.': 'The VPinMediaDB index could not be downloaded: try again when the cabinet is connected to the Internet.',
-  'Base VPS du {date}. Choisissez un jeu pour voir ses versions et l’installer.': 'VPS database of {date}. Pick a game to see its versions and install it.',
-  'Base VPS. Choisissez un jeu pour voir ses versions et l’installer.': 'VPS database. Pick a game to see its versions and install it.',
+  'L’index de VPinMediaDB n’a pas pu être téléchargé : réessaie quand la borne est reliée à Internet.': 'The VPinMediaDB index could not be downloaded: try again when the cabinet is connected to the Internet.',
+  'Base VPS du {date}. Choisis un jeu pour voir ses versions et l’installer.': 'VPS database of {date}. Pick a game to see its versions and install it.',
+  'Base VPS. Choisis un jeu pour voir ses versions et l’installer.': 'VPS database. Pick a game to see its versions and install it.',
   Jeux: 'Games',
   'Fichiers : {value}': 'Files: {value}',
   Site: 'Site',
@@ -499,7 +499,7 @@ export const messages: Record<string, string> = {
   '{version} : tout est déjà là ou attendu ; puis ses médias de VPinMediaDB': '{version}: everything is already here or expected; then its VPinMediaDB media',
   'Installation rapide…': 'Quick install…',
   'Aucune version de ce jeu n’a de lien vivant : rien à récupérer.': 'No version of this game has a live link: nothing to get.',
-  'Installation rapide impossible : {items} introuvable pour cette version. Choisissez-en une autre.': 'Quick install not possible: {items} not found for this version. Pick another one.',
+  'Installation rapide impossible : {items} introuvable pour cette version. Choisis-en une autre.': 'Quick install not possible: {items} not found for this version. Pick another one.',
   'Installation rapide arrêtée : ce qui est reçu reste dans la liste d’attente.': 'Quick install stopped: what was received stays in the queue.',
   'peu importe': 'any',
   'avec un fronton (.directb2s)': 'with a backglass (.directb2s)',
@@ -518,7 +518,7 @@ export const messages: Record<string, string> = {
   'le fronton': 'the backglass',
   'la ROM': 'the ROM',
   'Tout l’indispensable est là ou attendu : un fichier téléchargé arrive tout seul dans « Récupérés et attendus ».': 'All the essentials are here or expected: a downloaded file lands in “Received and expected” by itself.',
-  'Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connectez-vous, téléchargez. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.': 'Quick install: each page opens by itself in the “Get” window, the essentials first; sign in, download. As soon as the essentials are here, “Install without waiting” opens the plan.',
+  'Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connecte-toi, télécharge. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.': 'Quick install: each page opens by itself in the “Get” window, the essentials first; sign in, download. As soon as the essentials are here, “Install without waiting” opens the plan.',
   'Installer sans attendre': 'Install without waiting',
   '{kind} : facultatif, reste dans la liste d’attente': '{kind}: optional, stays in the waiting list',
 
@@ -575,7 +575,7 @@ export const messages: Record<string, string> = {
   'Start : la lire': 'Start: play it',
   'Musique de VPinMediaDB…': 'VPinMediaDB music…',
   'Vidéo de VPinMediaDB…': 'VPinMediaDB video…',
-  'VPinMediaDB ne répond pas : réessayez quand la borne est reliée à Internet.': 'VPinMediaDB is not answering: try again when the cabinet is connected to the Internet.',
+  'VPinMediaDB ne répond pas : réessaie quand la borne est reliée à Internet.': 'VPinMediaDB is not answering: try again when the cabinet is connected to the Internet.',
   'sons remasterisés': 'remastered sounds',
   'topper animé': 'animated topper',
   '{group} : autres choix': '{group}: other choices',

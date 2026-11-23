@@ -1686,8 +1686,8 @@ export function createLibrary(host: LibraryHost) {
         url,
         game: t('Configuration DOF de la borne'),
         expected: t('ZIP de « Generate Config »'),
-        host: t('configtool.vpuniverse.com · votre compte VPUniverse'),
-        status: t('Décrivez la borne, puis « Generate Config » : le ZIP téléchargé revient à « LED et retours (DOF) » et s’importe.'),
+        host: t('configtool.vpuniverse.com · ton compte VPUniverse'),
+        status: t('Décris la borne, puis « Generate Config » : le ZIP téléchargé revient à « LED et retours (DOF) » et s’importe.'),
         claim: {
           dir: path.join(dofStaging(), 'recu'),
           title: t('Configuration DOF'),
@@ -2068,7 +2068,7 @@ export function createLibrary(host: LibraryHost) {
 
   function openAdd(): void {
     if (!layout()) {
-      go({ kind: 'notice', heading: t('Cyber Pinball n’est pas installé'), lines: [t('Lancez « Installer » depuis le lanceur : il crée le dossier des tables et le dossier d’import.')], then: leave });
+      go({ kind: 'notice', heading: t('Cyber Pinball n’est pas installé'), lines: [t('Lance « Installer » depuis le lanceur : il crée le dossier des tables et le dossier d’import.')], then: leave });
       return;
     }
     fs.mkdirSync(layout()!.import, { recursive: true });
@@ -2728,7 +2728,7 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
-      // « Jouer ensemble… » regroupe ami et partie instantanée (table-social.ts) ; sans lui, les deux entrées d'avant.
+      // « Jouer ensemble… » regroupe ami et partie en direct (table-social.ts) ; sans lui, les deux entrées d'avant.
       ...(social
         ? [notFx({ ...social.together, door: 'sheet.friends' as const }, t('Parties entre amis : tables VPX seulement'))]
         : [
@@ -3783,13 +3783,13 @@ export function createLibrary(host: LibraryHost) {
     sections.push({
       // Le chemin en clair, pas dans le titre : en capitales, il prendrait trois lignes.
       title: t('Dossier d’import'),
-      rows: rows.length ? rows.slice(0, 12) : [{ text: t('Vide pour le moment'), detail: t('{dir} : copiez-y les fichiers d’une table (depuis une clé USB), ils apparaissent ici.', { dir: importDir }), tone: 'quiet' }],
+      rows: rows.length ? rows.slice(0, 12) : [{ text: t('Vide pour le moment'), detail: t('{dir} : copies-y les fichiers d’une table (depuis une clé USB), ils apparaissent ici.', { dir: importDir }), tone: 'quiet' }],
       more: rows.length - Math.min(rows.length, 12),
     });
     actions.push(
       { label: t('Trouver une table en ligne'), detail: t('Catalogue VPS : versions, filtres, installation rapide'), icon: 'search', run: () => catalogUi.open() },
       { label: t('Reprendre un fichier téléchargé'), detail: downloadsDetail(), icon: 'download', run: () => void pick('downloads') },
-      { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
+      { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glisse-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
       zenAction('pinballfx'),
       zenAction('pinballfx3'),
@@ -3808,7 +3808,7 @@ export function createLibrary(host: LibraryHost) {
       subheading: [ready.length ? tn(ready.length, '{n} jeu prêt à installer', '{n} jeux prêts à installer') : undefined, entries.length ? tn(entries.length, '{n} élément dans le dossier d’import', '{n} éléments dans le dossier d’import') : undefined]
         .filter(Boolean)
         .join(' · ') || undefined,
-      lead: t('Toutes les façons d’ajouter une table, au même endroit. Sur la borne : copiez les fichiers dans le dossier d’import (depuis une clé USB) ; sur un PC : choisissez-les, ou glissez-les sur cette fenêtre. Rien n’est installé avant que vous ayez validé le plan.'),
+      lead: t('Toutes les façons d’ajouter une table, au même endroit. Sur la borne : copie les fichiers dans le dossier d’import (depuis une clé USB) ; sur un PC : choisis-les, ou glisse-les sur cette fenêtre. Rien n’est installé avant que tu aies validé le plan.'),
       sections,
       actions,
       back: () => openSystem(),
@@ -3866,7 +3866,7 @@ export function createLibrary(host: LibraryHost) {
         return {
           ...base,
           detail: ui.storeOpened
-            ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' })
+            ? t('Ouvert dans {store} : installe-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' })
             : setup.getter
               ? t('Introuvable sur ce PC : l’installer avec Steam, ou choisir le dossier du jeu')
               : t('Steam absent de ce PC : choisir le dossier du jeu, ou installer Steam puis {game}', { game: name }),
@@ -3876,7 +3876,7 @@ export function createLibrary(host: LibraryHost) {
       if (!getter)
         return {
           ...base,
-          detail: game === 'pinballfx' ? t('Ni Steam ni Epic sur ce PC : installez l’un des deux, puis {game}', { game: name }) : t('Steam absent de ce PC : installez-le, puis {game}', { game: name }),
+          detail: game === 'pinballfx' ? t('Ni Steam ni Epic sur ce PC : installe l’un des deux, puis {game}', { game: name }) : t('Steam absent de ce PC : installe-le, puis {game}', { game: name }),
           tone: 'quiet',
           run: () => undefined,
         };
@@ -3886,16 +3886,16 @@ export function createLibrary(host: LibraryHost) {
         icon,
         badge: 'beta',
         detail: ui.storeOpened
-          ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store })
-          : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store }),
+          ? t('Ouvert dans {store} : installe-le là-bas, ses tables apparaissent ici ensuite', { store })
+          : t('Ouvre {store} sur son installation ; tu y achètes le jeu et ses tables', { store }),
         run: () => openZenStore(game, getter),
       };
     }
     return {
       ...base,
       detail: inMenu
-        ? tn(inMenu, '{n} table dans le front-end · choisir celles que vous possédez', '{n} tables dans le front-end · choisir celles que vous possédez')
-        : t('Choisir les tables que vous possédez dans {game}', { game: name }),
+        ? tn(inMenu, '{n} table dans le front-end · choisir celles que tu possèdes', '{n} tables dans le front-end · choisir celles que tu possèdes')
+        : t('Choisir les tables que tu possèdes dans {game}', { game: name }),
       run: () => openZen(game),
     };
   }
@@ -4124,9 +4124,9 @@ export function createLibrary(host: LibraryHost) {
     const arrived = tn(n, '{n} média arrivé.', '{n} médias arrivés.');
     medias.refresh(file, {
       text: sites.login.length
-        ? `${arrived} ${t('Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), ou choisissez ce média pour en prendre un autre.', { missing: what, site: sites.login.join(', ') })}`
+        ? `${arrived} ${t('Pour le reste ({missing}) : connecte ton compte {site} (Ajouter une table > Comptes des sites), ou choisis ce média pour en prendre un autre.', { missing: what, site: sites.login.join(', ') })}`
         : sites.missing.length || failed.length
-          ? `${arrived} ${t('Sans fichier : {missing}. Choisissez ce média pour en prendre un autre : sites, web ou fichier de ce PC.', { missing: what || failed.join(' ; ') })}`
+          ? `${arrived} ${t('Sans fichier : {missing}. Choisis ce média pour en prendre un autre : sites, web ou fichier de ce PC.', { missing: what || failed.join(' ; ') })}`
           : arrived,
       tone: sites.missing.length || failed.length || sites.login.length ? 'warning' : 'ok',
     });
@@ -4136,7 +4136,7 @@ export function createLibrary(host: LibraryHost) {
       : t('« {title} » ajoutée au front-end.', { title: fx.title });
     const missing = sites.missing.map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
     ui.flash = sites.login.length
-      ? `${got} ${t('Pour le reste ({missing}) : connectez votre compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.', { missing, site: sites.login.join(', ') })}`
+      ? `${got} ${t('Pour le reste ({missing}) : connecte ton compte {site} (Ajouter une table > Comptes des sites), puis « Chercher les médias manquants » ici.', { missing, site: sites.login.join(', ') })}`
       : sites.missing.length
         ? `${got} ${t('Introuvable : {missing}. Start ouvre sa fiche, « Médias du jeu » en cherche sur le web.', { missing })}`
         : got;
@@ -4295,8 +4295,8 @@ export function createLibrary(host: LibraryHost) {
       ...(e.shared && e.shared > 1 ? [t('Pack commun à {n} tables : Cyber Pinball n’y prend que le fichier de celle-ci.', { n: e.shared })] : []),
       ...(bytes ? [t('{size} à télécharger', { size: formatSize(bytes) })] : []),
       e.login
-        ? t('Connectez votre compte : Ajouter une table > Comptes des sites.')
-        : t('Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans votre quota du jour sur ce site.', { site }),
+        ? t('Connecte ton compte : Ajouter une table > Comptes des sites.')
+        : t('Pris : la page de {site} s’ouvre le temps de son attente, et le fichier compte dans ton quota du jour sur ce site.', { site }),
     ];
   }
 
@@ -4355,7 +4355,7 @@ export function createLibrary(host: LibraryHost) {
         state: { label: name, tone: 'ok' },
         facts: zenTableFacts(fx),
         extra: [
-          t('Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que vous l’avez.', { game: name }),
+          t('Jouée par {game} : elle s’achète dans le jeu, Cyber Pinball ne peut pas vérifier que tu l’as.', { game: name }),
           ...(fx.williams ? [t('Lancée dans son mode classique : les règles de la machine, sans les améliorations de Zen.')] : []),
         ],
         thumb: thumbOf(d.elements.find((e) => e.source === 'local') ?? d.elements.find((e) => e.source === 'vps') ?? d.elements.find((e) => e.type === 'Playfield'), fx.title),
@@ -4508,8 +4508,8 @@ export function createLibrary(host: LibraryHost) {
     sheetReturn = () => openZen(fx.game, fx.key);
     medias.open(table, {
       text: types.length
-        ? t('« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisissez un média pour en prendre un autre ou le régler.', { title: fx.title })
-        : t('« {title} » ajoutée au front-end, sans média. Choisissez un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.', { title: fx.title }),
+        ? t('« {title} » ajoutée au front-end. Ses médias choisis arrivent en arrière-plan et s’affichent ici à leur arrivée. Choisis un média pour en prendre un autre ou le régler.', { title: fx.title })
+        : t('« {title} » ajoutée au front-end, sans média. Choisis un média pour en prendre un : VPinMediaDB, sites, web ou fichier de ce PC.', { title: fx.title }),
       tone: 'ok',
     });
   }
@@ -4554,7 +4554,7 @@ export function createLibrary(host: LibraryHost) {
     const got = tn(count, '{n} média reçu', '{n} médias reçus');
     const what = [...missing].map((type) => lowerFirst(mediaTypeInfo(type).label)).join(', ');
     ui.hunt = login.size
-      ? `${got} · ${t('le reste ({missing}) demande votre compte {site} : Ajouter une table > Comptes des sites', { missing: what, site: [...login].join(', ') })}`
+      ? `${got} · ${t('le reste ({missing}) demande ton compte {site} : Ajouter une table > Comptes des sites', { missing: what, site: [...login].join(', ') })}`
       : missing.size
         ? `${got} · ${t('introuvable : {missing}', { missing: what })}`
         : got;
@@ -4692,7 +4692,7 @@ export function createLibrary(host: LibraryHost) {
       const getter = fx3Setup.getter;
       actions.push({
         label: t('Installer {game}', { game: name }),
-        detail: ui.storeOpened ? t('Ouvert dans {store} : installez-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' }) : t('Ouvre {store} sur son installation ; vous y achetez le jeu et ses tables', { store: 'Steam' }),
+        detail: ui.storeOpened ? t('Ouvert dans {store} : installe-le là-bas, ses tables apparaissent ici ensuite', { store: 'Steam' }) : t('Ouvre {store} sur son installation ; tu y achètes le jeu et ses tables', { store: 'Steam' }),
         icon: 'download',
         key: `${game}:install`,
         run: () => openZenStore(game, getter),
@@ -4705,8 +4705,8 @@ export function createLibrary(host: LibraryHost) {
     // borne, activé une fois dans le jeu (plus de code à demander à Zen depuis le 4 novembre 2024).
     const lead =
       game === 'pinballfx'
-        ? t('Start : ajouter au front-end une table que vous possédez dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.')
-        : t('Start : ajouter au front-end une table que vous possédez dans {game}. Le jeu installe toutes ses tables, même celles que vous n’avez pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à vous. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.', { game: name, url: PINBALLFX3_CABINET_HELP_URL.replace(/^https:\/\/(www\.)?/, '') });
+        ? t('Start : ajouter au front-end une table que tu possèdes dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.')
+        : t('Start : ajouter au front-end une table que tu possèdes dans {game}. Le jeu installe toutes ses tables, même celles que tu n’as pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à toi. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.', { game: name, url: PINBALLFX3_CABINET_HELP_URL.replace(/^https:\/\/(www\.)?/, '') });
     return {
       heading: t('Tables de {game}', { game: name }),
       icon: 'table-add',
@@ -4720,10 +4720,10 @@ export function createLibrary(host: LibraryHost) {
             ? rows
             : [
                 fx3Setup && !fx3Setup.install
-                  ? { text: t('Aucune table à lister'), detail: t('Installez {game} avec Steam, ou choisissez le dossier du jeu : ses tables apparaissent ici.', { game: name }), tone: 'quiet' }
+                  ? { text: t('Aucune table à lister'), detail: t('Installe {game} avec Steam, ou choisis le dossier du jeu : ses tables apparaissent ici.', { game: name }), tone: 'quiet' }
                   : fx3Setup?.install?.store === 'folder'
                     ? { text: t('Aucune table trouvée'), detail: t('Le dossier des tables du dossier choisi est vide ou illisible : {dir}.', { dir: fx3Setup.install.tablesDir ?? '' }), tone: 'quiet' }
-                    : { text: t('Aucune table trouvée'), detail: t('Le dossier des tables de {game} est vide ou illisible : vérifiez le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).', { game: name }), tone: 'quiet' },
+                    : { text: t('Aucune table trouvée'), detail: t('Le dossier des tables de {game} est vide ou illisible : vérifie le jeu dans Steam (Propriétés > Fichiers installés > Vérifier).', { game: name }), tone: 'quiet' },
               ],
         },
       ],
@@ -5040,7 +5040,7 @@ export function createLibrary(host: LibraryHost) {
       heading: t('Quel jeu est-ce ?'),
       subheading: tp.isNew ? undefined : t('Complément pour {folder}', { folder: path.relative(tablesDir(), tp.folder) }),
       lead: v.confident
-        ? t('La base VPS (Virtual Pinball Spreadsheet) a reconnu ce jeu ; vous pouvez en choisir un autre. Le jeu choisi donne le nom du dossier et les informations de la table. Rien n’est installé avant « Installer ».')
+        ? t('La base VPS (Virtual Pinball Spreadsheet) a reconnu ce jeu ; tu peux en choisir un autre. Le jeu choisi donne le nom du dossier et les informations de la table. Rien n’est installé avant « Installer ».')
         : t('La base VPS (Virtual Pinball Spreadsheet) propose plusieurs jeux pour ces fichiers. Le jeu choisi donne le nom du dossier et les informations de la table. Rien n’est installé avant « Installer ».'),
       sections: [{ title: t('Fichiers de la table'), rows: files }],
       actions,
@@ -5070,12 +5070,12 @@ export function createLibrary(host: LibraryHost) {
     }));
     const rows: Row[] = pack.failedBats.map((b) => ({
       text: t('« {bat} » non reconnu', { bat: b.bat }),
-      detail: t('{reason} : il n’est pas exécuté. Choisissez l’option parmi les dossiers trouvés dans le pack.', { reason: b.reason ?? '' }),
+      detail: t('{reason} : il n’est pas exécuté. Choisis l’option parmi les dossiers trouvés dans le pack.', { reason: b.reason ?? '' }),
       tone: 'warning' as const,
     }));
     rows.push({
       text: s.cabinet ? t('Borne : {cabinet}', { cabinet: describePupCabinet(s.cabinet) }) : t('Borne non configurée'),
-      detail: s.cabinet ? t('Option proposée d’après les écrans de la borne.') : t('Lancez l’assistant de configuration pour que l’option soit choisie d’office.'),
+      detail: s.cabinet ? t('Option proposée d’après les écrans de la borne.') : t('Lance l’assistant de configuration pour que l’option soit choisie d’office.'),
       tone: 'quiet',
     });
     return {
@@ -5257,7 +5257,7 @@ export function createLibrary(host: LibraryHost) {
     const actions: Action[] = count ? [first, { label: t('Annuler'), run: cancel }, ...choiceActions] : [{ label: t('Retour'), run: cancel }];
     return {
       heading: count ? t('Plan d’installation') : t('Rien à installer'),
-      subheading: s.acquisition?.quick && count ? t('Installation rapide : vérifiez, puis « Installer »') : undefined,
+      subheading: s.acquisition?.quick && count ? t('Installation rapide : vérifie, puis « Installer »') : undefined,
       lead: !plan
         ? undefined
         : count
@@ -5265,8 +5265,8 @@ export function createLibrary(host: LibraryHost) {
             ? t('Les fichiers quittent le dossier d’import ; les archives déballées et les fichiers remplacés vont à la corbeille.')
             : // Des gros fichiers liés (même disque, import-links-menu.ts) : « copiés » contredisait le plan juste dessous.
               s.links?.linkedFiles
-              ? t('Les gros fichiers sont liés, les autres copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
-              : t('Les fichiers sont copiés : vos fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
+              ? t('Les gros fichiers sont liés, les autres copiés : tes fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
+              : t('Les fichiers sont copiés : tes fichiers d’origine ne sont pas modifiés. Les fichiers remplacés vont à la corbeille.')
           : t('Aucune table (.vpx) ni complément reconnu dans cette sélection.'),
       sections,
       actions,
@@ -6099,8 +6099,8 @@ export function createLibrary(host: LibraryHost) {
           : editorView.remoteBar?.phase === 'pending'
             ? t('Start : accepter le téléphone · Exit : le refuser')
             : host.phoneRemote?.connected() === 'menu'
-              ? t('Tapez sur le téléphone · ou flippers : choisir une touche · Start : la taper · Exit : annuler')
-              : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
+              ? t('Tape sur le téléphone · ou flippers : choisir une touche · Start : la taper · Exit : annuler')
+              : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tape au clavier, Entrée pour valider')
         : read?.active
           ? t('Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran')
         : zone?.active === 'list'

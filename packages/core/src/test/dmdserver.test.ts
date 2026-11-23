@@ -574,7 +574,7 @@ test('santé et « DMD réel » : le serveur qui ne trouve pas l’afficheur le 
   assert.match(facts.problems[0]!, /« PIN2DMD EVO »/);
   assert.equal(facts.problems[1], `Image du front-end sur le DMD réel : ${known}`);
   // Sans cause trouvée : un rapport.
-  assert.match(dmdServerNotFoundProblem([{ ...PIN2DMD, libusbProbe: { stage: 'ok', code: 0, product: 'PIN2DMD' } }], { menu: true }, 20), /sans cause trouvée : envoyez un rapport/);
+  assert.match(dmdServerNotFoundProblem([{ ...PIN2DMD, libusbProbe: { stage: 'ok', code: 0, product: 'PIN2DMD' } }], { menu: true }, 20), /sans cause trouvée : envoie un rapport/);
   // La cause d'un modèle éteint ne compte pas.
   assert.match(dmdServerNotFoundProblem([refused, ZEDMD], { menu: true, models: { PIN2DMD: 'off' } }, 20), /sans cause trouvée/);
 });

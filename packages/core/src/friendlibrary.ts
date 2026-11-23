@@ -272,8 +272,8 @@ export function defaultPartChoice(part: GamePart, mineHas: boolean): boolean {
 
 /** La mention des droits d'une partie sous droits, montrée à côté de sa case. */
 export function partRightsNote(part: GamePart): string | undefined {
-  if (part === 'rom') return t('l’œuvre du fabricant : à ne prendre que si vous en avez le droit');
-  if (part === 'pup') return t('vidéos et musiques souvent tirées du jeu : à ne prendre que si vous en avez le droit');
+  if (part === 'rom') return t('l’œuvre du fabricant : à ne prendre que si tu en as le droit');
+  if (part === 'pup') return t('vidéos et musiques souvent tirées du jeu : à ne prendre que si tu en as le droit');
   return undefined;
 }
 
@@ -295,11 +295,11 @@ export interface RightsAttestation {
  * la ROM et le PuP-Pack d'un ami ne se cochent pas. undefined : partie libre.
  */
 export function rightsAttestation(part: GamePart, friend: string): RightsAttestation | undefined {
-  const source = t('Ce contenu vient directement de la borne de {name} : Cyber Pinball ne le fournit pas et ne vérifie pas vos droits. Vous en êtes seul responsable.', { name: friend });
+  const source = t('Ce contenu vient directement de la borne de {name} : Cyber Pinball ne le fournit pas et ne vérifie pas tes droits. Tu en es seul responsable.', { name: friend });
   const pledge = t('J’atteste avoir le droit de détenir ce contenu (par exemple la machine d’origine ou une licence) et je m’engage à respecter le droit d’auteur et les conditions d’utilisation de ses ayants droit.');
   if (part === 'rom')
     return {
-      heading: t('La ROM : vos droits'),
+      heading: t('La ROM : tes droits'),
       what: t('Une ROM est le programme d’origine de la machine : elle reste protégée par le droit d’auteur de son fabricant ou de ses ayants droit.'),
       source,
       pledge,
@@ -307,7 +307,7 @@ export function rightsAttestation(part: GamePart, friend: string): RightsAttesta
     };
   if (part === 'pup')
     return {
-      heading: t('Le PuP-Pack : vos droits'),
+      heading: t('Le PuP-Pack : tes droits'),
       what: t('Un PuP-Pack rassemble des vidéos, des images et des musiques souvent tirées du jeu, de films ou de séries, et le travail de ses auteurs : chacun garde ses droits et ses conditions d’utilisation.'),
       source,
       pledge,
@@ -459,7 +459,7 @@ export function fileRefusalLabel(reason: FileRefusal | 'offline' | 'check' | 'si
     case 'refused':
       return t('le fichier ne passe pas les contrôles de sa borne');
     case 'busy':
-      return t('sa borne envoie déjà un autre fichier ; réessayez dans un instant');
+      return t('sa borne envoie déjà un autre fichier ; réessaie dans un instant');
     case 'offline':
       return t('sa borne n’est plus en ligne');
     case 'check':

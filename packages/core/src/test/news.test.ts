@@ -199,7 +199,7 @@ test('nouveautés, écran : la date une fois par jour, « Nouveau » sur ce qui 
   assert.equal(rows.at(-1)!.news!.last, true);
   const newest = newestNewsDate();
   for (const [i, r] of rows.entries()) assert.equal(r.news!.badges.some((b) => b.kind === 'new'), NEWS[i]!.date === newest, `${NEWS[i]!.id} : « Nouveau » sur la dernière date seulement`);
-  assert.match(view.subheading!, /nouvelles? depuis votre dernière visite/);
+  assert.match(view.subheading!, /nouvelles? depuis ta dernière visite/);
   // Revenue plus tard : plus rien de nouveau, plus de pastille, le fichier l'a gardé.
   const later = newsScreen(dir);
   assert.equal(later.menu.item.attention, false);

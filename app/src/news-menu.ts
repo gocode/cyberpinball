@@ -86,7 +86,7 @@ export interface NewsMenu {
 /** L'aperçu d'une nouveauté, dans la langue de l'interface (app/renderer/nouveautes). */
 export const newsPreview = (n: NewsItem): string | undefined => (!n.noPreview ?`nouveautes/${n.id}-${language() === 'en' ? 'en' : 'fr'}.webp` : undefined);
 
-/** Le bout du chemin, pour le bouton : « Communauté › Parties instantanées » donne « Parties instantanées ». */
+/** Le bout du chemin, pour le bouton : « Communauté › Parties en direct » donne « Parties en direct ». */
 const lastStep = (where: string) => where.split(' › ').at(-1) ?? where;
 
 export function createNewsMenu(host: NewsMenuHost): NewsMenu {
@@ -114,7 +114,7 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
   function listReactions(n: NewsItem): NonNullable<NonNullable<Row['news']>['reactions']> | undefined {
     const s = newsReactionSummary(host.reactions?.of(n.id));
     if (!s) return undefined;
-    const label = s.mine ? tn(s.total, '{n} réaction, dont la vôtre', '{n} réactions, dont la vôtre') : tn(s.total, '{n} réaction', '{n} réactions');
+    const label = s.mine ? tn(s.total, '{n} réaction, dont la tienne', '{n} réactions, dont la tienne') : tn(s.total, '{n} réaction', '{n} réactions');
     return { emojis: s.top.map((k) => REACTION_EMOJI[k]), total: s.total, mine: s.mine, label };
   }
 
@@ -149,7 +149,7 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
     return {
       heading: t('Nouveautés'),
       icon: 'sparkle',
-      subheading: was.size ? tn(was.size, '{n} nouvelle depuis votre dernière visite', '{n} nouvelles depuis votre dernière visite') : t('Les grandes nouveautés de Cyber Pinball, une ligne chacune'),
+      subheading: was.size ? tn(was.size, '{n} nouvelle depuis ta dernière visite', '{n} nouvelles depuis ta dernière visite') : t('Les grandes nouveautés de Cyber Pinball, une ligne chacune'),
       sections: [{ kind: 'news', rows }],
       actions,
       back,
@@ -211,7 +211,7 @@ export function createNewsMenu(host: NewsMenuHost): NewsMenu {
       };
     });
     const total = REACTIONS.reduce((s, k) => s + (mine.counts[k] ?? 0), 0);
-    const note = closed ?? (net === 'loading' && !total ? t('Lecture des réactions…') : mine.mine ? t('Votre réaction : {reaction} · Start sur elle la retire', { reaction: reactionText(mine.mine) }) : total ? tn(total, '{n} joueur a réagi', '{n} joueurs ont réagi') : t('Soyez le premier à réagir'));
+    const note = closed ?? (net === 'loading' && !total ? t('Lecture des réactions…') : mine.mine ? t('Ta réaction : {reaction} · Start sur elle la retire', { reaction: reactionText(mine.mine) }) : total ? tn(total, '{n} joueur a réagi', '{n} joueurs ont réagi') : t('Sois le premier à réagir'));
     return { section: { title: t('Réagir'), kind: 'news-reactions', options: true, rows }, note };
   }
 

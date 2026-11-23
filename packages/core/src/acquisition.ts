@@ -728,7 +728,7 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
       ? t('déjà installée sur cette borne')
       : liveLinks(version).length
         ? t('{version}, à récupérer', { version: versionLabel(version) })
-        : t('aucun lien vivant pour cette version : choisissez-en une autre'),
+        : t('aucun lien vivant pour cette version : choisis-en une autre'),
     files: [version],
   });
   // Table de Future Pinball : son .fpt (et les bibliothèques de son archive) suffit ; ni fronton
@@ -767,7 +767,7 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
         // rapide de la Galaxy Edition (PinCab, 20/11/2026).
         required: roms.length > 0 && requiredForPlay('rom'),
         state: files.length ? 'todo' : 'unavailable',
-        detail: roms.length ? t('{roms} : à récupérer, si vous y avez droit', { roms: formatList(roms, 'or') }) : t('nom inconnu de VPS : le script de la table le dira une fois installée'),
+        detail: roms.length ? t('{roms} : à récupérer, si tu y as droit', { roms: formatList(roms, 'or') }) : t('nom inconnu de VPS : le script de la table le dira une fois installée'),
         files,
         roms,
       });
@@ -894,7 +894,7 @@ export interface WaitList {
 /** Avertissement montré au premier usage du catalogue. */
 export function acquisitionNotice(): string {
   return t(
-    'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à votre place : il ouvre les pages, vous vous connectez et téléchargez vous-même, puis il range ce que vous avez récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupérez une ROM que si vous y avez droit.',
+    'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à ta place : il ouvre les pages, tu te connectes et télécharges toi-même, puis il range ce que tu as récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupère une ROM que si tu y as droit.',
   );
 }
 

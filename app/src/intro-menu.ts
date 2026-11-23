@@ -75,7 +75,7 @@ export function createIntroMenu(host: IntroMenuHost) {
     if (source.source === 'file') {
       const name = path.basename(source.file);
       const value =
-        source.kind === 'video' ? t('votre vidéo « {name} »', { name }) : source.kind === 'image' ? t('votre image « {name} »', { name }) : t('votre musique « {name} »', { name });
+        source.kind === 'video' ? t('ta vidéo « {name} »', { name }) : source.kind === 'image' ? t('ton image « {name} »', { name }) : t('ta musique « {name} »', { name });
       return { value, custom: true };
     }
     const kept = source.kept ? path.basename(source.kept) : undefined;
@@ -122,11 +122,11 @@ export function createIntroMenu(host: IntroMenuHost) {
       music: slotAction('music'),
       defaults: {
         label: t('Tout revenir aux animations de Cyber Pinball'),
-        detail: t('Sans musique de fond ; vos fichiers restent dans le dossier media de la borne, prêts à reprendre'),
+        detail: t('Sans musique de fond ; tes fichiers restent dans le dossier media de la borne, prêts à reprendre'),
         icon: 'restore',
         run: () => {
           host.save(introDefaults(s()));
-          notice = { text: t('Animations de Cyber Pinball sur chaque écran, sans musique. Vos fichiers sont gardés.'), tone: 'info' };
+          notice = { text: t('Animations de Cyber Pinball sur chaque écran, sans musique. Tes fichiers sont gardés.'), tone: 'info' };
           open(rowOf('defaults'));
         },
       },
@@ -139,7 +139,7 @@ export function createIntroMenu(host: IntroMenuHost) {
     return {
       heading: t('Ouverture au démarrage'),
       icon: 'play',
-      lead: t('Quand Cyber Pinball s’ouvre, chaque écran joue son animation une fois et garde sa dernière image ; le premier bouton affiche la roue. Remplacez une animation par une image ou une vidéo : celles de Cyber Pinball ne sont jamais effacées.'),
+      lead: t('Quand Cyber Pinball s’ouvre, chaque écran joue son animation une fois et garde sa dernière image ; le premier bouton affiche la roue. Remplace une animation par une image ou une vidéo : celles de Cyber Pinball ne sont jamais effacées.'),
       sections: shown ? [{ rows: [{ text: shown.text, tone: shown.tone }] }] : [],
       actions: [...actions(), { label: t('Retour'), icon: 'back', run: () => back() }],
       back: () => back(),
@@ -182,7 +182,7 @@ export function createIntroMenu(host: IntroMenuHost) {
           }
         })();
         list.push({
-          label: t('Votre fichier : {name}', { name: path.basename(file) }),
+          label: t('Ton fichier : {name}', { name: path.basename(file) }),
           detail: [size, usingFile ? t('choix actuel') : t('gardé ; Start : le reprendre')].filter(Boolean).join(' · '),
           tone: usingFile ? 'ok' : undefined,
           icon: music ? 'sound' : 'film',
@@ -259,7 +259,7 @@ export function createIntroMenu(host: IntroMenuHost) {
       const v = s();
       if (!v.enabled) return t('coupée');
       const custom = [...INTRO_SCREENS, 'music' as const].filter((slot) => introSource(v, host.files(), slot).source === 'file').length;
-      return custom ? tn(custom, 'jouée, {n} fichier à vous', 'jouée, {n} fichiers à vous') : t('jouée');
+      return custom ? tn(custom, 'jouée, {n} fichier à toi', 'jouée, {n} fichiers à toi') : t('jouée');
     },
   };
 }

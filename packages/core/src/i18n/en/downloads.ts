@@ -9,14 +9,14 @@ export const messages: Record<string, string> = {
     '{name}, {repo} repository on GitHub: {url}. The URL and date of every downloaded file are noted in the table’s .info.',
   'À lire une fois, avant le premier téléchargement.': 'Read this once, before your first download.',
   'Ce que fait Cyber Pinball': 'What Cyber Pinball does',
-  'Il ne livre aucun de ces médias : il les télécharge à votre demande, après un plan à valider. Un média que vous avez déjà n’est remplacé que si vous le demandez, et l’ancien part à la corbeille.':
+  'Il ne livre aucun de ces médias : il les télécharge à ta demande, après un plan à valider. Un média que tu as déjà n’est remplacé que si tu le demandes, et l’ancien part à la corbeille.':
     'It ships none of this media: it downloads it when you ask, after a plan you confirm. Media you already have is only replaced if you ask, and the old file goes to the trash.',
   'J’ai compris : chercher les médias': 'Got it: find media',
   'taille inconnue': 'unknown size',
   '{size} (et {n} fichier de taille inconnue)': '{size} (plus {n} file of unknown size)',
   '{size} (et {n} fichiers de taille inconnue)': '{size} (plus {n} files of unknown size)',
   'Cyber Pinball n’est pas installé': 'Cyber Pinball is not installed',
-  'Lancez « Installer » depuis le lanceur : il crée le dossier des téléchargements.': 'Run “Install” from the launcher: it creates the downloads folder.',
+  'Lance « Installer » depuis le lanceur : il crée le dossier des téléchargements.': 'Run “Install” from the launcher: it creates the downloads folder.',
   'Recherche de « {query} »…': 'Searching for “{query}”…',
   'Recherche sur VPinMediaDB…': 'Searching VPinMediaDB…',
   'Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…': 'Deep search: name inside the table, ROM, PuP-Pack…',
@@ -28,14 +28,14 @@ export const messages: Record<string, string> = {
   'L’index de VPinMediaDB n’a jamais été téléchargé, et GitHub ne répond pas.': 'The VPinMediaDB index has never been downloaded, and GitHub isn’t responding.',
   'Sans réseau': 'Offline',
   'GitHub injoignable': 'GitHub unreachable',
-  '{problem}. Réessayez quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.':
+  '{problem}. Réessaie quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.':
     '{problem}. Try again once the cabinet is online: the index is then kept and works offline.',
   'Rien sur VPinMediaDB pour ce jeu': 'Nothing on VPinMediaDB for this game',
   '{reason} La recherche approfondie a lu le nom écrit dans la table, son script et ses fichiers.':
     '{reason} The deep search read the name inside the table, its script and its files.',
   'Jeux de la base VPS qui ressemblent, sans médias sur VPinMediaDB': 'Similar VPS games, with no media on VPinMediaDB',
   'Autres sources': 'Other sources',
-  'Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; déposez ensuite le fichier dans le dossier d’import, ou glissez-le sur l’écran des médias.':
+  'Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; dépose ensuite le fichier dans le dossier d’import, ou glisse-le sur l’écran des médias.':
     'Each media type also offers what the table already has (PuP-Pack, DMD folder, .directb2s): Game media, then the media type, then “See suggestions”. VPUniverse media is downloaded from their site (login required); then drop the file in the import folder, or drag it onto the media screen.',
   'Chercher un autre titre…': 'Search for another title…',
   'Retour aux médias': 'Back to media',
@@ -105,7 +105,7 @@ export const messages: Record<string, string> = {
   '{n} médias de {source} rangés, source notée dans le .info.': '{n} media files from {source} installed, source noted in the .info.',
   'Anciens fichiers dans la corbeille : {folder}.': 'Old files in the trash: {folder}.',
   'Non téléchargé (rien n’a été laissé) : {list}.': 'Not downloaded (nothing left behind): {list}.',
-  'Lancez « Installer » depuis le lanceur : il crée le dossier des tables.': 'Run “Install” from the launcher: it creates the tables folder.',
+  'Lance « Installer » depuis le lanceur : il crée le dossier des tables.': 'Run “Install” from the launcher: it creates the tables folder.',
   'Recherche des médias manquants…': 'Looking for missing media…',
   'Recherche des médias manquants : table {i} sur {total}…': 'Looking for missing media: table {i} of {total}…',
   'Pas sur VPinMediaDB.': 'Not on VPinMediaDB.',
@@ -137,7 +137,7 @@ export const messages: Record<string, string> = {
     'Only missing media is downloaded: media already there is never replaced from here. Nothing is downloaded before “Download and install”.',
   'VPinMediaDB n’a rien de plus pour les tables de cette borne.': 'VPinMediaDB has nothing more for this cabinet’s tables.',
   'Voir une table': 'View a table',
-  'Choisissez une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.': 'Choose a table to see its media previews and change what is downloaded.',
+  'Choisis une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.': 'Choose a table to see its media previews and change what is downloaded.',
   'Aperçus…': 'Previews…',
   'Table {i} sur {total}, {title} : {step}': 'Table {i} of {total}, {title}: {step}',
   '{title}, {type} : {reason}': '{title}, {type}: {reason}',
@@ -155,11 +155,11 @@ export const messages: Record<string, string> = {
   '{frontend} : {path}': '{frontend}: {path}',
   'Choisir un dossier sur ce PC…': 'Choose a folder on this PC…',
   'PinUPSystem, POPMedia, PinballX ou son dossier Media': 'PinUPSystem, POPMedia, PinballX or its Media folder',
-  'Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que vous ayez validé le plan.':
+  'Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que tu aies validé le plan.':
     'Media from an existing installation (wheel logos, playfield videos, backglasses, DMDs, rules…) is copied into each table’s folder, under the names Cyber Pinball reads. The original installation is left untouched. Nothing is copied until you confirm the plan.',
   'Installations trouvées sur ce PC': 'Installations found on this PC',
   'Aucune aux emplacements habituels': 'None in the usual locations',
-  'Choisissez le dossier de l’installation.': 'Choose the installation folder.',
+  'Choisis le dossier de l’installation.': 'Choose the installation folder.',
   'Recherche des médias…': 'Searching for media…',
   'Rapprochement avec les tables installées…': 'Matching with installed tables…',
   'Non copié : {n} vidéo dans un format que le front-end ne lit pas': 'Not copied: {n} video in a format the menu can’t play',
@@ -210,7 +210,7 @@ export const messages: Record<string, string> = {
   'Logo de la pièce VR de la table : « {name} », {width} × {height}': 'Logo from the table’s VR room: “{name}”, {width} × {height}',
 
   // packages/core/src/mediadb.ts
-  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.':
+  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur ta borne seulement : ne les redistribue pas.':
     'VPinMediaDB declares no license: its media belongs to its authors, and game artwork to its manufacturers. Personal use on your own cabinet only: don’t redistribute it.',
   'HTTP {status} pour {url}': 'HTTP {status} for {url}',
   'l’index téléchargé n’a pas le format attendu': 'the downloaded index isn’t in the expected format',
@@ -261,7 +261,7 @@ export const messages: Record<string, string> = {
   // packages/core/src/mediaimport.ts
   'nom « (Type) »': '“(Type)” name',
   'Média de « {emulator} », un autre émulateur que Visual Pinball : non repris.': 'Media from “{emulator}”, an emulator other than Visual Pinball: not imported.',
-  'Format {ext} : le front-end ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.':
+  'Format {ext} : le front-end ne sait pas le lire. Non rangé ; convertis-le en mp4 (ou webm) puis importe-le de nouveau.':
     '{ext} format: the menu can’t play it. Not installed; convert it to mp4 (or webm) and import it again.',
   'Format {ext} non prévu pour « {type} » (attendu : {formats}). Non rangé.': '{ext} format not supported for “{type}” (expected: {formats}). Not installed.',
   'Doublon : « {file} » est gardé pour « {type} ».': 'Duplicate: “{file}” is kept for “{type}”.',

@@ -213,7 +213,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   /** Rien ne passe : partage désactivé, ou réseau coupé pour les essais. */
   function offRows(): Row[] {
     const status = net.status();
-    if (!net.state().enabled) return [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }];
+    if (!net.state().enabled) return [{ text: t('Partage désactivé : personne ne te voit, tu ne vois personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }];
     if (status.mode === 'off') return [{ text: t('Réseau coupé pendant les essais sans opérateur'), tone: 'info' }];
     if (status.error) return [{ text: t('Réseau indisponible : {error}', { error: status.error }), tone: 'error', badges: [t('Bloquant')] }];
     if (firewallBlocked()) return [firewallBlockedRow()];
@@ -279,7 +279,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         return {
           text: f.name,
           avatar: avatar(f.key, f.name),
-          detail: !online && blocked ? t('Sa présence ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : presenceText(p, online, f),
+          detail: !online && blocked ? t('Sa présence ne te parvient pas : le pare-feu de Windows bloque le réseau des bornes') : presenceText(p, online, f),
           tone: online ? 'ok' : undefined,
           badges: [online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')],
           note: lastEvent(f.events),
@@ -297,7 +297,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     // Une partie en direct ou une invitation en attente : en tête.
     const pending = live.pendingAction(() => openFriends());
     if (pending) actions.push(pending);
-    if (!s.friends.length) sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info' }] });
+    if (!s.friends.length) sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherche un nom dans l’annuaire, ou une borne de ton réseau local'), tone: 'info' }] });
     if (online.length) sections.push({ title: t('En ligne ({n})', { n: online.length }), rows: rows(online) });
     if (offline.length) sections.push({ title: blocked ? t('Injoignables : pare-feu de Windows ({n})', { n: offline.length }) : t('Hors ligne ({n})', { n: offline.length }), rows: rows(offline) });
     if (s.incoming.length) actions.push({ label: t('Demandes reçues ({n})', { n: s.incoming.length }), detail: tn(s.incoming.length, '{n} à valider', '{n} à valider'), icon: 'friend-request', attention: true, run: () => openRequests() });
@@ -340,7 +340,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       const label = f.name;
       if (!online) {
         // Indisponible : grisé, avec sa raison ; Start ne mène nulle part.
-        const reason = blocked ? t('Sa borne ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : t('Hors ligne : sa bibliothèque se voit quand sa borne est allumée');
+        const reason = blocked ? t('Sa borne ne te parvient pas : le pare-feu de Windows bloque le réseau des bornes') : t('Hors ligne : sa bibliothèque se voit quand sa borne est allumée');
         const index = actions.push({ label, key: `add-friend:${f.key}`, icon: 'friend-list', tone: 'quiet', detail: t('Indisponible : {reason}', { reason }), run: () => undefined }) - 1;
         return { text: label, avatar: avatar(f.key, f.name), detail: reason, tone: 'quiet', badges: [blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')], action: index, pick: true } satisfies Row;
       }
@@ -349,13 +349,13 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     });
     const sections: Section[] = [...(offRows().length ? [{ rows: offRows() }] : [])];
     if (rows.length) sections.push({ rows });
-    else sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info' }] });
+    else sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherche un nom dans l’annuaire, ou une borne de ton réseau local'), tone: 'info' }] });
     if (!rows.length) actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => openFind() });
     actions.push(backAction(back));
     return {
       heading: t('Depuis un ami'),
       icon: 'friend-list',
-      lead: t('Les tables de vos amis qui partagent leur bibliothèque : choisissez un ami, puis une de ses tables absentes de votre borne. Rien n’est installé avant que vous ayez validé le plan.'),
+      lead: t('Les tables de tes amis qui partagent leur bibliothèque : choisis un ami, puis une de ses tables absentes de ta borne. Rien n’est installé avant que tu aies validé le plan.'),
       sections,
       actions,
       back,
@@ -419,9 +419,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           {
             label: t('Retirer de mes amis'),
             key: 'unfriend',
-            detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'),
+            detail: t('Il ne verra plus ta présence, tu ne verras plus la sienne'),
             icon: 'close',
-            run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); ctx.flash({ text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }); ctx.here(); }, () => ctx.here()),
+            run: () => confirm(t('Retirer {name} de tes amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); ctx.flash({ text: t('{name} retiré de tes amis', { name: f.name }), tone: 'ok' }); ctx.here(); }, () => ctx.here()),
           },
         ],
       };
@@ -432,7 +432,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (rel === 'self') return { rows, id, actions };
     const entry = s.directory.find((d) => d.profile.key === key);
     const nearby = nearbyPlayers(s, now()).some((d) => d.profile.key === key);
-    if (entry) rows.push({ text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
+    if (entry) rows.push({ text: nearby ? t('Sur ton réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: nearby ? 'ok' : 'quiet', icon: nearby ? 'network' : 'clock' });
     if (rel === 'none') actions.push({ label: t('Envoyer une demande d’ami'), key: 'request', sends: true, detail: t('Il la verra dans « Demandes d’amis » et pourra l’accepter'), icon: 'friend-add', tone: 'ok', run: () => { net.request({ key, name: plain }); ctx.flash({ text: t('Demande envoyée à {name}', { name: plain }), detail: net.online(key) ? t('Remise à sa borne') : t('Remise dès que sa borne sera en ligne'), tone: 'ok' }); ctx.here(); } });
     const outgoing = s.outgoing.find((r) => r.key === key);
     if (rel === 'outgoing' && outgoing) {
@@ -447,15 +447,15 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const beacon = net.livePlayers().find((b) => b.key === key);
     const incoming = s.incoming.find((r) => r.key === key);
     const head: PlayerHead = {
-      ...(beacon ? { ring: beacon.status === 'playing' ? ('playing' as const) : ('online' as const), status: { text: beacon.status === 'playing' ? t('En partie') : t('En ligne'), tone: 'signal' as const } } : entry ? { status: { text: nearby ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: 'quiet' as const } } : {}),
-      ...(incoming ? { eyebrow: t('Vous a demandé en ami · {ago}', { ago: socialAgo(incoming.at, now()) }), eyebrowTone: 'signal' as const } : outgoing ? { eyebrow: t('Demande envoyée {ago} · en attente de réponse', { ago: socialAgo(outgoing.at, now()) }) } : {}),
+      ...(beacon ? { ring: beacon.status === 'playing' ? ('playing' as const) : ('online' as const), status: { text: beacon.status === 'playing' ? t('En partie') : t('En ligne'), tone: 'signal' as const } } : entry ? { status: { text: nearby ? t('Sur ton réseau local') : t('Vu {ago}', { ago: socialAgo(entry.seen, now()) }), tone: 'quiet' as const } } : {}),
+      ...(incoming ? { eyebrow: t('T’a demandé en ami · {ago}', { ago: socialAgo(incoming.at, now()) }), eyebrowTone: 'signal' as const } : outgoing ? { eyebrow: t('Demande envoyée {ago} · en attente de réponse', { ago: socialAgo(outgoing.at, now()) }) } : {}),
     };
     return { head, rows, id, actions };
   }
 
   function requestActions(key: string, plain: string, after: () => void, say: (row: Row) => void): Action[] {
     return [
-      { label: t('Accepter'), key: 'accept', detail: t('Partager votre présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); say({ text: t('{name} est maintenant votre ami', { name: plain }), tone: 'ok' }); after(); } },
+      { label: t('Accepter'), key: 'accept', detail: t('Partager ta présence avec ce joueur'), icon: 'check', tone: 'ok', run: () => { net.accept(key); say({ text: t('{name} est maintenant ton ami', { name: plain }), tone: 'ok' }); after(); } },
       { label: t('Refuser'), key: 'decline', detail: t('Nouvelle demande impossible pendant 30 jours'), icon: 'close', run: () => { net.decline(key); say({ text: t('Demande de {name} refusée', { name: plain }), tone: 'ok' }); after(); } },
     ];
   }
@@ -494,7 +494,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       return {
         text: d.profile.name,
         avatar: avatar(d.profile.key, d.profile.name),
-        detail: opts.nearby?.has(d.profile.key) ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(d.seen, now()) }),
+        detail: opts.nearby?.has(d.profile.key) ? t('Sur ton réseau local') : t('Vu {ago}', { ago: socialAgo(d.seen, now()) }),
         badges: relationBadge(rel),
         tone: rel === 'friend' ? 'ok' : undefined,
         action: index,
@@ -525,13 +525,13 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       },
     ];
     const lanDown = lanProblem();
-    if (s.lan) sections.push({ title: t('À proximité (réseau local)'), rows: near.length ? playerRows(near, actions, openFind, { nearby: nearKeys }) : lanDown ? [{ text: t('Réseau local indisponible : {reason}', { reason: lanDown }), detail: t('Internet continue sans lui ; nouvel essai tout seul'), tone: 'quiet' }] : [{ text: t('Aucune autre borne sur ce réseau pour l’instant'), tone: 'quiet' }] });
+    if (s.lan) sections.push({ title: t('Sur mon réseau local'), rows: near.length ? playerRows(near, actions, openFind, { nearby: nearKeys }) : lanDown ? [{ text: t('Réseau local indisponible : {reason}', { reason: lanDown }), detail: t('Internet continue sans lui ; nouvel essai tout seul'), tone: 'quiet' }] : [{ text: t('Aucune autre borne sur ce réseau pour l’instant'), tone: 'quiet' }] });
     if (recent.length) sections.push({ title: t('Vus récemment'), rows: playerRows(recent, actions, openFind) });
     actions.push(backAction());
     return {
       heading: t('Trouver un joueur'),
       icon: 'friend-add',
-      lead: t('Cherchez un nom, ou l’identifiant vu sur la fiche d’un joueur. L’annuaire réunit, sans serveur, les bornes dont le partage est activé.'),
+      lead: t('Cherche un nom, ou l’identifiant vu sur la fiche d’un joueur. L’annuaire réunit, sans serveur, les bornes dont le partage est activé.'),
       sections,
       actions,
       back,
@@ -560,7 +560,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       subheading: t('« {query} » · {count}', { query, count: tn(found.length, '{n} joueur', '{n} joueurs') }),
       sections: found.length
         ? [{ rows, ...(found.length > RESULTS_SHOWN ? { more: found.length - RESULTS_SHOWN } : {}) }]
-        : [{ rows: [{ text: t('Personne de ce nom dans l’annuaire'), detail: t('L’annuaire ne connaît que les bornes vues depuis le démarrage du partage : réessayez quand votre ami a sa borne allumée'), tone: 'info' }] }],
+        : [{ rows: [{ text: t('Personne de ce nom dans l’annuaire'), detail: t('L’annuaire ne connaît que les bornes vues depuis le démarrage du partage : réessaie quand ton ami a sa borne allumée'), tone: 'info' }] }],
       actions,
       back: openFind,
     };
@@ -583,7 +583,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         avatar: avatar(r.key, r.name),
         detail: incoming
           ? r.lan
-            ? t('Reçue {ago} · sur votre réseau local', { ago: socialAgo(r.at, now()) })
+            ? t('Reçue {ago} · sur ton réseau local', { ago: socialAgo(r.at, now()) })
             : t('Reçue {ago}', { ago: socialAgo(r.at, now()) })
           : net.online(r.key)
             ? t('Remise à sa borne : en attente de sa réponse')
@@ -613,9 +613,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       heading: t('Mes badges'),
       icon: 'medal',
       subheading: t('{n} sur {total}', { n: got.length, total: BADGES.length }),
-      lead: t('Gagnés sur cette borne à partir des parties et records enregistrés. Visibles par vos amis.'),
+      lead: t('Gagnés sur cette borne à partir des parties et records enregistrés. Visibles par tes amis.'),
       sections: [
-        { title: t('Obtenus'), rows: got.length ? got.map((b) => ({ icon: b.icon, text: b.label, detail: t('{detail} · obtenu le {date}', { detail: b.detail, date: new Date(held.get(b.id)!.at).toLocaleDateString() }), tone: 'ok' as const })) : [{ text: t('Aucun pour l’instant : jouez une partie jusqu’au bout'), tone: 'quiet' }] },
+        { title: t('Obtenus'), rows: got.length ? got.map((b) => ({ icon: b.icon, text: b.label, detail: t('{detail} · obtenu le {date}', { detail: b.detail, date: new Date(held.get(b.id)!.at).toLocaleDateString() }), tone: 'ok' as const })) : [{ text: t('Aucun pour l’instant : joue une partie jusqu’au bout'), tone: 'quiet' }] },
         ...(todo.length ? [{ title: t('À obtenir'), rows: todo.map((b) => ({ icon: b.icon, text: b.label, detail: b.detail })) }] : []),
       ],
       actions: [backAction()],
@@ -684,7 +684,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     return firewallProblems(host.firewall.state(), host.firewall.vpxState()).length > 0 || host.firewall.taskState() === false;
   }
 
-  const allowAction = (after: () => void): Action => ({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => askElevation((build, at) => host.library.openCustom(build, at), { title: t('Pare-feu de Windows'), what: t('Autoriser Cyber Pinball dans le pare-feu de Windows : ouvert aux autres bornes, VPX fermé au réseau.'), go: () => allowFirewall(after), later: after }) });
+  const allowAction = (after: () => void): Action => ({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande ton autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => askElevation((build, at) => host.library.openCustom(build, at), { title: t('Pare-feu de Windows'), what: t('Autoriser Cyber Pinball dans le pare-feu de Windows : ouvert aux autres bornes, VPX fermé au réseau.'), go: () => allowFirewall(after), later: after }) });
 
   function buildSharing(): Built {
     const s = net.state();
@@ -692,16 +692,16 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const near = nearbyPlayers(s, now()).length;
     const lanDown = lanProblem();
     const rows: Row[] = [
-      s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
+      s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne te voit ; tes amis te voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
-        : { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
+        : { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de ton réseau ne te trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
       s.shareLibrary
-        ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
-        : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
+        ? { text: t('Bibliothèque partagée avec tes amis'), detail: t('Ils voient tes tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
+        : { text: t('Bibliothèque pas partagée'), detail: t('Tes amis ne voient pas tes tables'), tone: 'quiet', icon: 'tables' },
       s.downloadRate
-        ? { text: t('Débit des téléchargements : {rate}', { rate: rateLabel(s.downloadRate) }), detail: t('Tables et médias reçus de vos amis, tous envois confondus'), tone: 'ok', badges: [t('Limité')], icon: 'gauge' }
-        : { text: t('Débit des téléchargements : sans limite'), detail: t('Tables et médias reçus de vos amis, aussi vite que vos connexions le permettent'), tone: 'quiet', icon: 'gauge' },
+        ? { text: t('Débit des téléchargements : {rate}', { rate: rateLabel(s.downloadRate) }), detail: t('Tables et médias reçus de tes amis, tous envois confondus'), tone: 'ok', badges: [t('Limité')], icon: 'gauge' }
+        : { text: t('Débit des téléchargements : sans limite'), detail: t('Tables et médias reçus de tes amis, aussi vite que tes connexions le permettent'), tone: 'quiet', icon: 'gauge' },
       firewallRow(),
       vpxRow(),
       ...[repairRow()].filter((r): r is Row => !!r),
@@ -712,39 +712,39 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
     actions.push(
       s.shareLibrary
-        ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Partager ma bibliothèque avec mes amis'), sends: true as const, detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
+        ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Tes amis ne voient plus tes tables ni tes médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
+        : { label: t('Partager ma bibliothèque avec mes amis'), sends: true as const, detail: t('Tes tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec tes amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
     actions.push(
       s.enabled
-        ? { label: t('Désactiver le partage'), detail: t('Plus de présence, plus d’annuaire ; vos amis restent dans la liste'), icon: 'close', run: async () => { await net.setEnabled(false); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
+        ? { label: t('Désactiver le partage'), detail: t('Plus de présence, plus d’annuaire ; tes amis restent dans la liste'), icon: 'close', run: async () => { await net.setEnabled(false); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Activer le partage'), detail: t('Présence, annuaire et demandes d’amis'), icon: 'check', tone: 'ok', run: async () => { await net.setEnabled(true); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
     actions.push(backAction());
     return {
       heading: t('Partage et réseau'),
       icon: 'network',
-      lead: t('Sans serveur : les bornes se trouvent et se parlent directement, par Internet ou sur votre réseau local.'),
+      lead: t('Sans serveur : les bornes se trouvent et se parlent directement, par Internet ou sur ton réseau local.'),
       sections: [
         ...flashSections(),
         { rows },
         {
           title: t('Ce que voient les autres'),
           rows: [
-            { text: t('Réseau : votre nom') },
+            { text: t('Réseau : ton nom') },
             { text: t('Amis : présence, table en cours, records, badges et parties') },
-            { text: t('Réseau : votre avatar'), detail: t('Partout où vous apparaissez : Joueurs en ligne, salons, classements, profil public') },
+            { text: t('Réseau : ton avatar'), detail: t('Partout où tu apparais : Joueurs en ligne, salons, classements, profil public') },
 
             ...(s.shareLibrary
               ? [
-                  { text: t('Amis : vos tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si votre ami les coche en attestant en avoir le droit : ils sont décochés d’office') },
-                  { text: t('Ne partagez que ce que vous avez le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit'), tone: 'warning' as const, icon: 'alert' as const },
+                  { text: t('Amis : tes tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si ton ami les coche en attestant en avoir le droit : ils sont décochés d’office') },
+                  { text: t('Ne partage que ce que tu as le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit'), tone: 'warning' as const, icon: 'alert' as const },
                 ]
               : [{ text: t('Aucun fichier partagé') }]),
-            ...(s.shareScores === false ? [] : [{ text: t('Toutes les bornes : vos scores, avec votre nom et votre pays'), detail: t('Classements national et mondial, seulement les scores relevés par Cyber Pinball ; jamais en mode invité') }]),
+            ...(s.shareScores === false ? [] : [{ text: t('Toutes les bornes : tes scores, avec ton nom et ton pays'), detail: t('Classements national et mondial, seulement les scores relevés par Cyber Pinball ; jamais en mode invité') }]),
             { text: t('Bornes reliées : son adresse IP'), detail: t('Comme dans tout échange de pair à pair') },
           ],
         },
@@ -772,23 +772,23 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           {
             title: t('Effacé de cette borne'),
             rows: [
-              { text: t('Votre compte « {name} » et son identifiant {id}', { name: s.name, id: playerId(s.key.publicKey) }), icon: 'account' },
-              { text: t('Vos amis, vos demandes, vos conversations, vos salons, votre avatar'), icon: 'friend-list' },
-              { text: t('Vos scores publiés et votre profil public'), icon: 'trophy' },
+              { text: t('Ton compte « {name} » et son identifiant {id}', { name: s.name, id: playerId(s.key.publicKey) }), icon: 'account' },
+              { text: t('Tes amis, tes demandes, tes conversations, tes salons, ton avatar'), icon: 'friend-list' },
+              { text: t('Tes scores publiés et ton profil public'), icon: 'trophy' },
             ],
           },
           {
             title: t('Effacé chez les autres joueurs'),
             rows: [
-              { text: t('Votre nom, votre avatar, vos lignes de salon, vos messages, vos scores et vos « J’aime »'), detail: t('Chez les bornes reliées tout de suite, puis chez les autres à mesure qu’elles se relient'), icon: 'network' },
-              { text: t('Vos propositions et vos votes du tableau des retours'), detail: t('Sur le service des retours, qui demande Internet'), icon: 'message' },
+              { text: t('Ton nom, ton avatar, tes lignes de salon, tes messages, tes scores et tes « J’aime »'), detail: t('Chez les bornes reliées tout de suite, puis chez les autres à mesure qu’elles se relient'), icon: 'network' },
+              { text: t('Tes propositions et tes votes du tableau des retours'), detail: t('Sur le service des retours, qui demande Internet'), icon: 'message' },
             ],
           },
           {
             title: t('Gardé'),
             rows: [
-              { text: t('Vos tables, leurs scores et vos réglages'), icon: 'tables' },
-              { text: t('Les sauvegardes déjà faites : elles contiennent votre compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+              { text: t('Tes tables, leurs scores et tes réglages'), icon: 'tables' },
+              { text: t('Les sauvegardes déjà faites : elles contiennent ton compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
             ],
           },
         ],
@@ -804,12 +804,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   /** Écran d'attente pendant une étape : rien à choisir. */
   function deleting(text: string): void {
-    host.library.openCustom(() => ({ heading: t('Suppression du compte…'), icon: 'trash', sections: [{ rows: [{ text, icon: 'clock' }] }], actions: [{ label: t('Patientez…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
+    host.library.openCustom(() => ({ heading: t('Suppression du compte…'), icon: 'trash', sections: [{ rows: [{ text, icon: 'clock' }] }], actions: [{ label: t('Patiente…'), tone: 'quiet', run: () => undefined }], back: () => undefined }), 0);
   }
 
   async function startDelete(): Promise<void> {
     const account = host.account!;
-    deleting(t('Effacement de vos propositions et de vos votes sur le service des retours'));
+    deleting(t('Effacement de tes propositions et de tes votes sur le service des retours'));
     const r = await account.forgetFeedback();
     if (r.ok) return finishDelete(true);
     // Injoignable : le joueur choisit. Après l'effacement de la clé, plus rien ne pourrait les retirer.
@@ -817,8 +817,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       () => ({
         heading: t('Service des retours injoignable'),
         icon: 'alert',
-        lead: r.why === 'offline' ? t('Pas de connexion à Internet pour le moment.') : t('Le service a refusé la demande ; réessayez dans un instant.'),
-        sections: [{ rows: [{ text: t('Sans lui, vos propositions et vos votes y resteraient, sans plus aucun moyen de les retirer'), tone: 'warning', icon: 'alert' }] }],
+        lead: r.why === 'offline' ? t('Pas de connexion à Internet pour le moment.') : t('Le service a refusé la demande ; réessaie dans un instant.'),
+        sections: [{ rows: [{ text: t('Sans lui, tes propositions et tes votes y resteraient, sans plus aucun moyen de les retirer'), tone: 'warning', icon: 'alert' }] }],
         actions: [
           { label: t('Réessayer'), icon: 'refresh', run: () => void startDelete() },
           { label: t('Supprimer quand même'), detail: t('Le reste du compte est effacé'), icon: 'trash', tone: 'warning', run: () => void finishDelete(false) },
@@ -831,7 +831,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   }
 
   async function finishDelete(feedback: boolean): Promise<void> {
-    deleting(t('Avis d’effacement envoyé aux bornes reliées, puis effacement de vos fichiers'));
+    deleting(t('Avis d’effacement envoyé aux bornes reliées, puis effacement de tes fichiers'));
     const report = await host.account!.erase(feedback);
     const relaunch = () => host.account!.relaunch();
     host.library.openCustom(
@@ -844,14 +844,14 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
             rows: [
               report.reached
                 ? { text: tn(report.reached, 'Avis d’effacement remis à {n} borne reliée', 'Avis d’effacement remis à {n} bornes reliées'), detail: t('Elles le transmettent aux autres à mesure qu’elles se relient'), tone: 'ok', icon: 'network' }
-                : { text: t('Aucune borne reliée en ce moment'), detail: t('Vos amis l’apprennent par la fin de votre amitié à leur prochaine connexion avec un joueur qui le sait'), tone: 'quiet', icon: 'network' },
+                : { text: t('Aucune borne reliée en ce moment'), detail: t('Tes amis l’apprennent par la fin de ton amitié à leur prochaine connexion avec un joueur qui le sait'), tone: 'quiet', icon: 'network' },
               report.feedback
                 ? { text: t('Propositions et votes effacés du service des retours'), tone: 'ok', icon: 'message' }
                 : { text: t('Propositions et votes restés sur le service des retours'), tone: 'warning', icon: 'alert' },
               report.failed.length
                 ? { text: tn(report.failed.length, '{n} fichier n’a pas pu être effacé', '{n} fichiers n’ont pas pu être effacés'), detail: report.failed.join(' · '), tone: 'warning', icon: 'alert' }
                 : { text: t('Fichiers du compte effacés de cette borne'), tone: 'ok', icon: 'check' },
-              { text: t('Les sauvegardes déjà faites contiennent encore votre compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
+              { text: t('Les sauvegardes déjà faites contiennent encore ton compte'), detail: t('Menu système > Ma borne > Santé et sauvegardes > Sauvegardes, pour les effacer'), tone: 'warning', icon: 'alert' },
             ],
           },
         ],
@@ -870,7 +870,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       () => ({
         heading: t('Débit des téléchargements'),
         icon: 'gauge',
-        lead: t('Ce que vos amis vous envoient (tables, parties, médias) ne dépasse pas ce débit, tous envois confondus : la connexion reste libre pour le reste de la maison. Un ami dont la borne n’est pas à jour envoie encore à pleine vitesse.'),
+        lead: t('Ce que tes amis t’envoient (tables, parties, médias) ne dépasse pas ce débit, tous envois confondus : la connexion reste libre pour le reste de la maison. Un ami dont la borne n’est pas à jour envoie encore à pleine vitesse.'),
         sections: [],
         actions: [
           ...DOWNLOAD_RATE_CHOICES.map((rate) => ({

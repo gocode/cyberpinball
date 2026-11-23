@@ -41,39 +41,39 @@ export function termsDocument(): TermsDocument {
   return {
     title: t('Conditions d’utilisation'),
     version: t('Version du {date}', { date: formatDate(`${TERMS_VERSION}T12:00:00`) }),
-    lead: t('À lire avant d’utiliser Cyber Pinball. En choisissant « J’accepte », vous déclarez les avoir lues et vous engagez à les respecter.'),
+    lead: t('À lire avant d’utiliser Cyber Pinball. En choisissant « J’accepte », tu déclares les avoir lues et t’engages à les respecter.'),
     sections: [
       {
         title: t('Ce qu’est Cyber Pinball'),
         paragraphs: [
-          t('Cyber Pinball est un logiciel libre et gratuit, publié sous licence GPL-3.0-or-later. Il organise une borne de flipper virtuel : il règle les écrans et les commandes, puis lance des émulateurs et des tables que vous installez vous-même.'),
+          t('Cyber Pinball est un logiciel libre et gratuit, publié sous licence GPL-3.0-or-later. Il organise une borne de flipper virtuel : il règle les écrans et les commandes, puis lance des émulateurs et des tables que tu installes toi-même.'),
           t('Il ne contient aucune table, aucune ROM ni aucun média de jeu commercial, et n’en vend aucun.'),
-          t('Ces conditions ne restreignent aucun des droits que la licence GPL vous donne sur le code de Cyber Pinball : elles disent ce dont vous êtes responsable quand vous l’utilisez.'),
+          t('Ces conditions ne restreignent aucun des droits que la licence GPL te donne sur le code de Cyber Pinball : elles disent ce dont tu es responsable quand tu l’utilises.'),
         ],
       },
       {
-        title: t('Contenus de tiers : votre responsabilité'),
+        title: t('Contenus de tiers : ta responsabilité'),
         paragraphs: [
           t('Les tables, ROM, frontons, vidéos, sons, musiques, PuP-Packs et autres médias appartiennent à leurs auteurs et à leurs ayants droit (fabricants de flippers, studios, éditeurs, artistes). Ils peuvent être protégés par le droit d’auteur, le droit des marques ou une licence.'),
-          t('Cyber Pinball n’héberge, ne fournit et ne distribue aucun de ces contenus. Quand il vous aide à en trouver, il vous oriente vers des sites tiers : c’est vous qui décidez de télécharger, depuis ces sites et, le cas échéant, avec votre propre compte.'),
-          t('Avant de télécharger, d’installer, de conserver ou d’utiliser un contenu, vérifiez que vous en avez le droit, selon la loi de votre pays et les conditions du site d’où il vient. Les ROM, en particulier, restent la propriété des fabricants, qui n’en autorisent pas la diffusion.'),
-          t('N’utilisez pas Cyber Pinball pour copier, diffuser, remettre en ligne ou exploiter un contenu dont vous ne détenez pas les droits.'),
+          t('Cyber Pinball n’héberge, ne fournit et ne distribue aucun de ces contenus. Quand il t’aide à en trouver, il t’oriente vers des sites tiers : c’est toi qui décides de télécharger, depuis ces sites et, le cas échéant, avec ton propre compte.'),
+          t('Avant de télécharger, d’installer, de conserver ou d’utiliser un contenu, vérifie que tu en as le droit, selon la loi de ton pays et les conditions du site d’où il vient. Les ROM, en particulier, restent la propriété des fabricants, qui n’en autorisent pas la diffusion.'),
+          t('N’utilise pas Cyber Pinball pour copier, diffuser, remettre en ligne ou exploiter un contenu dont tu ne détiens pas les droits.'),
         ],
       },
       {
         title: t('Partage entre bornes'),
         paragraphs: [
-          t('Le réseau des bornes est activé d’office : vos amis voient votre pseudo, votre avatar, votre pays, votre présence en ligne et vos scores publiés, et peuvent parcourir votre bibliothèque de tables et de médias.'),
-          t('Vous êtes seul responsable de ce que vous partagez et de ce que vous récupérez : messages, images, médias, tables. Ne partagez rien d’illicite ou d’offensant, ni aucun contenu dont vous n’avez pas le droit de faire profiter d’autres personnes.'),
-          t('Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après votre attestation d’en avoir le droit : cette attestation vous engage.'),
+          t('Le réseau des bornes est activé d’office : tes amis voient ton pseudo, ton avatar, ton pays, ta présence en ligne et tes scores publiés, et peuvent parcourir ta bibliothèque de tables et de médias.'),
+          t('Tu es seul responsable de ce que tu partages et de ce que tu récupères : messages, images, médias, tables. Ne partage rien d’illicite ou d’offensant, ni aucun contenu dont tu n’as pas le droit de faire profiter d’autres personnes.'),
+          t('Une ROM ou un PuP-Pack ne se récupère chez un ami qu’après ton attestation d’en avoir le droit : cette attestation t’engage.'),
           t('Pour tout couper : Menu système > Communauté > Réglages de la communauté > Partage et réseau.'),
         ],
       },
       {
         title: t('Sites, services et logiciels tiers'),
         paragraphs: [
-          t('Visual Pinball X, PinMAME, les sites de téléchargement, les bases de médias, YouTube et les autres services que Cyber Pinball utilise, ou vers lesquels il vous oriente, sont édités par des tiers indépendants. Cyber Pinball n’y est pas affilié et ne répond ni de leur contenu, ni de leur disponibilité.'),
-          t('Leurs propres conditions s’appliquent et vous devez les respecter, par exemple celles de YouTube pour le Juke-box.'),
+          t('Visual Pinball X, PinMAME, les sites de téléchargement, les bases de médias, YouTube et les autres services que Cyber Pinball utilise, ou vers lesquels il t’oriente, sont édités par des tiers indépendants. Cyber Pinball n’y est pas affilié et ne répond ni de leur contenu, ni de leur disponibilité.'),
+          t('Leurs propres conditions s’appliquent et tu dois les respecter, par exemple celles de YouTube pour le Juke-box.'),
           t('Les noms de jeux, de fabricants et de marques cités appartiennent à leurs propriétaires ; les citer n’implique aucun partenariat ni aucune approbation de leur part.'),
         ],
       },
@@ -81,38 +81,38 @@ export function termsDocument(): TermsDocument {
         title: t('Usage commercial'),
         paragraphs: [
           t('L’installeur complet contient Visual Pinball X, dont la licence interdit tout usage commercial : il ne doit être ni vendu, ni fourni avec une borne vendue, louée ou exploitée commercialement.'),
-          t('Sauf mention contraire, les contenus de tiers sont réservés à un usage personnel et privé. Une borne installée dans un lieu ouvert au public (bar, salle de jeux, salon, évènement) demande l’autorisation de leurs ayants droit, y compris pour la musique diffusée : il vous revient de l’obtenir.'),
+          t('Sauf mention contraire, les contenus de tiers sont réservés à un usage personnel et privé. Une borne installée dans un lieu ouvert au public (bar, salle de jeux, salon, évènement) demande l’autorisation de leurs ayants droit, y compris pour la musique diffusée : il te revient de l’obtenir.'),
         ],
       },
       {
         title: t('Santé et sécurité'),
         paragraphs: [
-          t('Épilepsie : les lumières clignotantes, les effets du DMD et des écrans, l’éclairage et les toys de la borne peuvent déclencher une crise chez certaines personnes, même sans antécédent. Si vous ou un membre de votre famille en avez déjà eu, demandez l’avis d’un médecin avant de jouer. Arrêtez immédiatement et consultez en cas de vertige, de trouble de la vue, de contraction musculaire, de mouvement involontaire, de désorientation ou de perte de conscience.'),
-          t('Réalité virtuelle et vision 3D : elles peuvent causer nausées, fatigue visuelle ou perte d’équilibre. Jouez dans un espace dégagé, faites des pauses, et respectez l’âge minimal et les consignes du fabricant de votre casque.'),
-          t('Matériel : Cyber Pinball pilote des écrans, des contrôleurs et des toys (moteurs, solénoïdes, éclairage) et modifie certains réglages de Windows (démarrage, pare-feu, écrans). Le montage, le câblage et l’alimentation électrique de votre borne relèvent de votre seule responsabilité. Gardez des sauvegardes de vos données.'),
+          t('Épilepsie : les lumières clignotantes, les effets du DMD et des écrans, l’éclairage et les toys de la borne peuvent déclencher une crise chez certaines personnes, même sans antécédent. Si toi ou un membre de ta famille en ont déjà eu, demande l’avis d’un médecin avant de jouer. Arrête immédiatement et consulte en cas de vertige, de trouble de la vue, de contraction musculaire, de mouvement involontaire, de désorientation ou de perte de conscience.'),
+          t('Réalité virtuelle et vision 3D : elles peuvent causer nausées, fatigue visuelle ou perte d’équilibre. Joue dans un espace dégagé, fais des pauses, et respecte l’âge minimal et les consignes du fabricant de ton casque.'),
+          t('Matériel : Cyber Pinball pilote des écrans, des contrôleurs et des toys (moteurs, solénoïdes, éclairage) et modifie certains réglages de Windows (démarrage, pare-feu, écrans). Le montage, le câblage et l’alimentation électrique de ta borne relèvent de ta seule responsabilité. Garde des sauvegardes de tes données.'),
         ],
       },
       {
         title: t('Sans garantie'),
         paragraphs: [
-          t('Cyber Pinball est fourni « tel quel », gratuitement, sans aucune garantie, expresse ou implicite : ni de fonctionnement sans erreur, ni d’adéquation à un usage particulier, ni de compatibilité avec votre matériel ou vos tables.'),
-          t('Dans toute la mesure permise par la loi, ni l’auteur ni les contributeurs de Cyber Pinball ne sont responsables d’un dommage, direct ou indirect, lié à son utilisation ou à l’impossibilité de l’utiliser : perte de données, panne ou détérioration de matériel, interruption, ou réclamation d’un tiers à propos des contenus que vous avez installés, utilisés ou partagés. Vous assumez seul les conséquences de cet usage.'),
-          t('Rien dans ces conditions ne vous prive des droits que la loi de votre pays vous accorde de façon impérative, notamment en tant que consommateur.'),
+          t('Cyber Pinball est fourni « tel quel », gratuitement, sans aucune garantie, expresse ou implicite : ni de fonctionnement sans erreur, ni d’adéquation à un usage particulier, ni de compatibilité avec ton matériel ou tes tables.'),
+          t('Dans toute la mesure permise par la loi, ni l’auteur ni les contributeurs de Cyber Pinball ne sont responsables d’un dommage, direct ou indirect, lié à son utilisation ou à l’impossibilité de l’utiliser : perte de données, panne ou détérioration de matériel, interruption, ou réclamation d’un tiers à propos des contenus que tu as installés, utilisés ou partagés. Tu assumes seul les conséquences de cet usage.'),
+          t('Rien dans ces conditions ne te prive des droits que la loi de ton pays t’accorde de façon impérative, notamment en tant que consommateur.'),
         ],
       },
       {
-        title: t('Vos données'),
+        title: t('Tes données'),
         paragraphs: [
-          t('Cyber Pinball ne vous demande aucun compte et n’envoie à son auteur aucune donnée d’utilisation : ni publicité, ni mesure d’audience.'),
-          t('Ce que vous partagez avec d’autres bornes passe de borne à borne. La recherche des mises à jour interroge GitHub, et les services tiers que vous utilisez (YouTube, sites de téléchargement) reçoivent ce que leur usage demande.'),
+          t('Cyber Pinball ne te demande aucun compte et n’envoie à son auteur aucune donnée d’utilisation : ni publicité, ni mesure d’audience.'),
+          t('Ce que tu partages avec d’autres bornes passe de borne à borne. La recherche des mises à jour interroge GitHub, et les services tiers que tu utilises (YouTube, sites de téléchargement) reçoivent ce que leur usage demande.'),
         ],
       },
       {
         title: t('Évolution de ces conditions'),
         paragraphs: [
-          t('Ces conditions peuvent évoluer : une nouvelle version vous est présentée avant de continuer. Elles restent à lire dans Menu système > Aide et infos > Conditions d’utilisation.'),
-          t('Si vous ne les acceptez pas, n’installez pas Cyber Pinball, ou cessez de l’utiliser.'),
-          t('Elles sont régies par le droit français, sans préjudice des règles impératives du pays où vous résidez.'),
+          t('Ces conditions peuvent évoluer : une nouvelle version t’est présentée avant de continuer. Elles restent à lire dans Menu système > Aide et infos > Conditions d’utilisation.'),
+          t('Si tu ne les acceptes pas, n’installe pas Cyber Pinball, ou cesse de l’utiliser.'),
+          t('Elles sont régies par le droit français, sans préjudice des règles impératives du pays où tu résides.'),
         ],
       },
     ],

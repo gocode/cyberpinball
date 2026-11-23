@@ -1,4 +1,4 @@
-// Parties instantanées (instantgames.ts, demandées le 16/11/2026) : « un utilisateur hôte ouvre une
+// Parties en direct (instantgames.ts, demandées le 16/11/2026) : « un utilisateur hôte ouvre une
 // partie multijoueur instantanée, choisit le nombre maximum de joueurs et cela s'affiche dans la
 // communauté, où n'importe qui peut aller la rejoindre. Dès que le nombre maximum est atteint, ça
 // démarre automatiquement pour tout le monde. »

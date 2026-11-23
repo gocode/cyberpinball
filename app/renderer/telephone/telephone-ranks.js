@@ -414,7 +414,7 @@ function renderPicker() {
   list.replaceChildren(...rows);
   if (!ranks.tables) showEmpty('ranks-tables', 'refresh', t('Chargement des tables…'));
   else if (!items.length) showEmpty('ranks-tables', 'info', t('Aucune table sur cette borne'));
-  else if (!rows.length) showEmpty('ranks-tables', 'search', t('Aucune table ne correspond'), t('Essayez un autre mot du titre ou du fabricant.'));
+  else if (!rows.length) showEmpty('ranks-tables', 'search', t('Aucune table ne correspond'), t('Essaie un autre mot du titre ou du fabricant.'));
   else showEmpty('ranks-tables');
   list.querySelector('.entry.current')?.scrollIntoView({ block: 'nearest' });
 }

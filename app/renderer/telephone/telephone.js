@@ -157,21 +157,21 @@ const INPUT_MODES = { email: 'email', number: 'decimal', tel: 'tel', url: 'url',
  */
 const MESSAGES = {
   connecting: { icon: 'network', title: () => t('Connexion à la borne…'), text: () => t('Le téléphone et la borne doivent être sur le même réseau local.') },
-  waiting: { title: () => t('Comparez les codes'), text: () => t('Si ce code est aussi affiché sur la borne, appuyez sur Start pour accepter. Sinon, appuyez sur Exit pour refuser.') },
-  lost: { icon: 'refresh', title: () => t('Reconnexion en cours…'), text: () => t('La liaison a été interrompue. Vérifiez le Wi-Fi du téléphone ; la reconnexion est automatique.') },
+  waiting: { title: () => t('Compare les codes'), text: () => t('Si ce code est aussi affiché sur la borne, appuie sur Start pour accepter. Sinon, appuie sur Exit pour refuser.') },
+  lost: { icon: 'refresh', title: () => t('Reconnexion en cours…'), text: () => t('La liaison a été interrompue. Vérifie le Wi-Fi du téléphone ; la reconnexion est automatique.') },
   // Plusieurs essais sans réponse (autre Wi-Fi, borne éteinte) : la page réessaie toujours, seule.
-  unreachable: { icon: 'network', title: () => t('Borne injoignable'), text: () => t('Vérifiez que le téléphone est sur le même Wi-Fi que la borne, et que Cyber Pinball est ouvert. La reconnexion est automatique.') },
-  refused: { icon: 'close', title: () => t('Connexion refusée'), text: () => t('La borne n’a pas accepté ce téléphone. Pour réessayer, scannez son nouveau QR code.'), again: true },
-  expired: { icon: 'clock', title: () => t('QR code expiré'), text: () => t('Scannez le nouveau QR code affiché dans le bandeau de la borne.'), again: true },
-  used: { icon: 'alert', title: () => t('QR code déjà utilisé'), text: () => t('Ce QR code ne peut plus servir. Scannez celui qui est maintenant affiché sur la borne.'), again: true },
-  busy: { icon: 'alert', title: () => t('Un téléphone est déjà connecté'), text: () => t('Sur la borne, choisissez Déconnecter avant de connecter ce téléphone.'), again: true },
-  ended: { icon: 'phone', title: () => t('Téléphone déconnecté'), text: () => t('Pour reprendre le contrôle, scannez un QR code Télécommande sur la borne.'), again: true },
-  idle: { icon: 'clock', title: () => t('Télécommande déconnectée'), text: () => t('Aucun geste dans le front-end depuis 20 minutes. Scannez un nouveau QR code sur la borne.'), again: true },
-  quit: { icon: 'info', title: () => t('Cyber Pinball fermé'), text: () => t('Une fois Cyber Pinball relancé, scannez un nouveau QR code sur la borne.'), again: true },
-  closed: { icon: 'info', title: () => t('Navigateur de la borne fermé'), text: () => t('Rouvrez-le sur la borne, puis scannez son QR code pour vous reconnecter.'), again: true },
+  unreachable: { icon: 'network', title: () => t('Borne injoignable'), text: () => t('Vérifie que le téléphone est sur le même Wi-Fi que la borne, et que Cyber Pinball est ouvert. La reconnexion est automatique.') },
+  refused: { icon: 'close', title: () => t('Connexion refusée'), text: () => t('La borne n’a pas accepté ce téléphone. Pour réessayer, scanne son nouveau QR code.'), again: true },
+  expired: { icon: 'clock', title: () => t('QR code expiré'), text: () => t('Scanne le nouveau QR code affiché dans le bandeau de la borne.'), again: true },
+  used: { icon: 'alert', title: () => t('QR code déjà utilisé'), text: () => t('Ce QR code ne peut plus servir. Scanne celui qui est maintenant affiché sur la borne.'), again: true },
+  busy: { icon: 'alert', title: () => t('Un téléphone est déjà connecté'), text: () => t('Sur la borne, choisis Déconnecter avant de connecter ce téléphone.'), again: true },
+  ended: { icon: 'phone', title: () => t('Téléphone déconnecté'), text: () => t('Pour reprendre le contrôle, scanne un QR code Télécommande sur la borne.'), again: true },
+  idle: { icon: 'clock', title: () => t('Télécommande déconnectée'), text: () => t('Aucun geste dans le front-end depuis 20 minutes. Scanne un nouveau QR code sur la borne.'), again: true },
+  quit: { icon: 'info', title: () => t('Cyber Pinball fermé'), text: () => t('Une fois Cyber Pinball relancé, scanne un nouveau QR code sur la borne.'), again: true },
+  closed: { icon: 'info', title: () => t('Navigateur de la borne fermé'), text: () => t('Rouvre-le sur la borne, puis scanne son QR code pour te reconnecter.'), again: true },
   replaced: { icon: 'phone', title: () => t('Un autre téléphone a pris la main'), text: () => t('Ce téléphone ne pilote plus la borne.'), again: true },
-  forgotten: { icon: 'alert', title: () => t('Ce téléphone n’est plus reconnu'), text: () => t('La borne l’a oublié. Pour le connecter de nouveau : Menu système > Ma borne > Télécommande du téléphone, puis scannez le QR code.'), again: true },
-  invalid: { icon: 'info', title: () => t('Scannez le QR code de la borne'), text: () => t('Sur la borne : Menu système > Ma borne > Télécommande du téléphone, puis scannez le QR code affiché.'), again: true },
+  forgotten: { icon: 'alert', title: () => t('Ce téléphone n’est plus reconnu'), text: () => t('La borne l’a oublié. Pour le connecter de nouveau : Menu système > Ma borne > Télécommande du téléphone, puis scanne le QR code.'), again: true },
+  invalid: { icon: 'info', title: () => t('Scanne le QR code de la borne'), text: () => t('Sur la borne : Menu système > Ma borne > Télécommande du téléphone, puis scanne le QR code affiché.'), again: true },
 };
 
 /**
@@ -179,11 +179,11 @@ const MESSAGES = {
  * se reconnecte seule à son retour.
  */
 const KEPT_MESSAGES = {
-  ended: () => t('La borne a déconnecté ce téléphone. Il reste gardé : touchez Reprendre pour revenir.'),
-  idle: () => t('Aucun geste dans le front-end depuis 20 minutes. Touchez Reprendre pour revenir.'),
+  ended: () => t('La borne a déconnecté ce téléphone. Il reste gardé : touche Reprendre pour revenir.'),
+  idle: () => t('Aucun geste dans le front-end depuis 20 minutes. Touche Reprendre pour revenir.'),
   quit: () => t('Ce téléphone se reconnectera tout seul dès que Cyber Pinball sera relancé.'),
-  closed: () => t('Touchez Reprendre pour revenir aux commandes du front-end.'),
-  replaced: () => t('Ce téléphone ne pilote plus la borne. Touchez Reprendre pour reprendre la main.'),
+  closed: () => t('Touche Reprendre pour revenir aux commandes du front-end.'),
+  replaced: () => t('Ce téléphone ne pilote plus la borne. Touche Reprendre pour reprendre la main.'),
 };
 
 // --- Téléphone gardé ---------------------------------------------------------
@@ -216,7 +216,7 @@ const standalone = () => window.matchMedia?.('(display-mode: standalone)').match
 /** Comment ajouter la page à l'écran d'accueil, selon le téléphone. */
 function homeScreenHow() {
   const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return t('Dans Safari : touchez Partager, puis « Sur l’écran d’accueil ».');
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return t('Dans Safari : touche Partager, puis « Sur l’écran d’accueil ».');
   if (/Android/.test(ua)) return t('Dans le menu du navigateur (⋮) : « Ajouter à l’écran d’accueil ».');
   return t('Dans le menu du navigateur : « Ajouter à l’écran d’accueil ».');
 }
@@ -244,7 +244,7 @@ function offerRelay(again = false) {
   store(RELAY_HINT_STORE, '1');
   const host = new URL(url).host;
   openSheet(t('Un raccourci qui suit la borne'), [{ id: 'relay', label: t('Créer le raccourci'), current: true, run: goRelay }, { id: 'later', label: t('Plus tard'), run: () => undefined }], {
-    text: t('Si le routeur change l’adresse de la borne, ce raccourci la retrouve sans QR code. Il passe par {host}, qui ne voit ni votre clé ni l’adresse de la borne : tout est chiffré sur ce téléphone.', { host }),
+    text: t('Si le routeur change l’adresse de la borne, ce raccourci la retrouve sans QR code. Il passe par {host}, qui ne voit ni ta clé ni l’adresse de la borne : tout est chiffré sur ce téléphone.', { host }),
     cancel: false,
   });
   return true;
@@ -252,8 +252,8 @@ function offerRelay(again = false) {
 function offerHomeScreen(moved = false) {
   // Sur l'adresse IP avec l'entrée stable : c'est ce raccourci-là qu'il faut ajouter.
   if (offerRelay(true)) return;
-  openSheet(t('Gardez la télécommande sous la main'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], {
-    text: `${moved ? t('La télécommande passe maintenant par le nom de la borne : elle la retrouve même si son adresse change. Ajoutez-la de nouveau à l’écran d’accueil, puis supprimez l’ancien raccourci.') : t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoutez la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
+  openSheet(t('Garde la télécommande sous la main'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], {
+    text: `${moved ? t('La télécommande passe maintenant par le nom de la borne : elle la retrouve même si son adresse change. Ajoute-la de nouveau à l’écran d’accueil, puis supprime l’ancien raccourci.') : t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoute la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
 
 ${homeScreenHow()}`,
     // « Compris » suffit : pas d'« Annuler » en double.
@@ -443,7 +443,7 @@ function openFollow(opener) {
   const list = document.createElement('ul');
   list.className = 'entry-list follow-list';
   for (const l of followLinks()) list.append(entryRow({ label: l.name, detail: l.purpose, icon: l.icon, link: l.url }, { icons: true }));
-  openSheet(t('Nous suivre'), [], { text: t('Tutoriels vidéo, nouveautés, réponses à vos questions : retrouvez Cyber Pinball ici.'), top: [list], opener });
+  openSheet(t('Nous suivre'), [], { text: t('Tutoriels vidéo, nouveautés, réponses à tes questions : retrouve Cyber Pinball ici.'), top: [list], opener });
 }
 
 // ---------- Badges à choisir d'un appui (phrases préparées, réactions) ----------
@@ -575,7 +575,7 @@ function renderEntries() {
     showEmpty('entries', 'clock', t('Opération en cours'), e.note || t('La borne travaille ; la liste revient ensuite.'));
   } else if (!e.items.length) {
     list.replaceChildren();
-    showEmpty('entries', 'info', t('Rien à toucher sur cet écran'), e.note || t('Utilisez la vue Boutons.'));
+    showEmpty('entries', 'info', t('Rien à toucher sur cet écran'), e.note || t('Utilise la vue Boutons.'));
   } else {
     showEmpty('entries');
     const icons = e.items.some((i) => i.icon);
@@ -1156,7 +1156,7 @@ const onAndroid = () => /Android/.test(navigator.userAgent);
  */
 function nameWhy(kind, name = stored(NAME_STORE)) {
   const relay = relayShortcut();
-  const after = relay ? t('Le raccourci qui suit la borne la retrouve même si le routeur change cette adresse (menu ⋮).') : t('Si le routeur change cette adresse, scannez le QR une fois.');
+  const after = relay ? t('Le raccourci qui suit la borne la retrouve même si le routeur change cette adresse (menu ⋮).') : t('Si le routeur change cette adresse, scanne le QR une fois.');
   switch (kind) {
     case 'relay':
       return t('Ce téléphone est venu par le raccourci qui suit la borne ({host}) : il la retrouve même si le routeur change son adresse.', { host: relay ? new URL(relay).host : '' });
@@ -1165,7 +1165,7 @@ function nameWhy(kind, name = stored(NAME_STORE)) {
     case 'unreachable':
       return `${onAndroid() ? t('Les navigateurs d’Android ne trouvent pas la borne par son nom ({name}) : ce téléphone passe par son adresse IP.', { name }) : t('Ce téléphone ne trouve pas la borne par son nom ({name}) : il passe par son adresse IP.', { name })} ${after}`;
     case 'other':
-      return `${t('Le nom {name} mène à une autre borne : ce téléphone reste sur l’adresse de la vôtre.', { name })} ${after}`;
+      return `${t('Le nom {name} mène à une autre borne : ce téléphone reste sur l’adresse de la tienne.', { name })} ${after}`;
     case 'none':
       return `${t('La borne n’annonce pas de nom sur le réseau : ce téléphone passe par son adresse IP.')} ${after}`;
     default:
@@ -1250,7 +1250,7 @@ function connect(force = false) {
     // La borne oublie la vue Scores avec la liaison : la suivante la redemande (message « mode »).
     ranks.live = false;
     // Un envoi est lié à sa connexion : coupée, il s'arrête (la borne efface ce qu'elle avait reçu).
-    if (upload && (upload.phase === 'asking' || upload.phase === 'sending')) failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
+    if (upload && (upload.phase === 'asking' || upload.phase === 'sending')) failUpload(t('La liaison avec la borne a été coupée. Sélectionne à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
     // Téléphone gardé et Cyber Pinball fermé : il revient seul quand la borne écoute de nouveau.
     if (kept && state === 'quit') {
       retryTimer = setTimeout(() => {
@@ -1856,7 +1856,7 @@ function startUpload(file) {
   if (!file || (upload && (upload.phase === 'asking' || upload.phase === 'sending'))) return;
   upload = { name: file.name, size: file.size, sent: 0, phase: 'asking', file };
   showUpload();
-  if (!send({ t: 'up', name: file.name, size: file.size })) failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
+  if (!send({ t: 'up', name: file.name, size: file.size })) failUpload(t('La liaison avec la borne a été coupée. Sélectionne à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
 }
 
 function uploadReady(m) {
@@ -1892,7 +1892,7 @@ async function pump(u) {
     }
     // Tout est parti : la borne range le fichier et le dit (up-done).
   } catch {
-    if (upload === u && u.phase === 'sending') failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
+    if (upload === u && u.phase === 'sending') failUpload(t('La liaison avec la borne a été coupée. Sélectionne à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
   }
 }
 
@@ -1946,15 +1946,15 @@ function reportOffer(m, note) {
       label: t('Préparer un e-mail'),
       run: () => {
         location.href = m.mailto;
-        again(t('Joignez-y le fichier téléchargé avant d’envoyer.'));
+        again(t('Joins-y le fichier téléchargé avant d’envoyer.'));
       },
     });
   }
   if (typeof m.summary === 'string' && m.summary) {
-    items.push({ id: 'report-copy', label: t('Copier le résumé'), run: () => again(copyText(m.summary) ? t('Résumé copié : collez-le dans un forum ou un message.') : t('Copie refusée par le navigateur.')) });
+    items.push({ id: 'report-copy', label: t('Copier le résumé'), run: () => again(copyText(m.summary) ? t('Résumé copié : colle-le dans un forum ou un message.') : t('Copie refusée par le navigateur.')) });
   }
   const size = typeof m.size === 'number' ? ` · ${formatSize(m.size)}` : '';
-  openSheet(t('Rapport de la borne'), items, { text: note ?? `${m.name}${size}\n${t('Téléchargez-le, puis joignez-le à un e-mail ou à un message.')}` });
+  openSheet(t('Rapport de la borne'), items, { text: note ?? `${m.name}${size}\n${t('Télécharge-le, puis joins-le à un e-mail ou à un message.')}` });
 }
 
 function failUpload(text, title) {

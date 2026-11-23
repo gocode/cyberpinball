@@ -123,7 +123,7 @@ const EXIT_HOLD_MS = 2000;
 const HUNG_MS = 8000;
 /** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
 const RESUMED = (request: AcquireRequest) =>
-  request.search ? t('Repris là où vous en étiez. « Retour à la recherche » revient à la première page de résultats.') : t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
+  request.search ? t('Repris là où tu en étais. « Retour à la recherche » revient à la première page de résultats.') : t('Repris là où tu en étais. « Retour à la fiche » revient à la page de départ.');
 /**
  * Hauteurs du bandeau de Cyber Pinball, en pixels de référence : ceux d'un écran dont le petit
  * côté fait 1 080 px (acquire.css, --u), multipliés par la taille de l'écran couvert. En px
@@ -141,7 +141,7 @@ const WIDE_RATIO = 1500 / 1080;
 /** Recherche libre : la ligne du champ de recherche ; sur une page vidéo, la ligne qui la décrit (acquire.css). */
 const SEARCH_ROW = 76;
 const VIDEO_ROW = 62;
-/** Recherche libre d'une table : la ligne « Vos comptes » (acquire.css). */
+/** Recherche libre d'une table : la ligne « Tes comptes » (acquire.css). */
 const ACCOUNTS_ROW = 62;
 /** Une page vidéo se lit après son chargement, puis de nouveau un peu plus tard (YouTube écrit son titre après coup). */
 const VIDEO_PROBE_DELAYS = [700, 3000];
@@ -179,7 +179,7 @@ export interface AcquireRequest {
    */
   search?: { query: string; engine: WebEngine; want?: GrabKind; playlists?: boolean };
   /**
-   * Recherche libre d'une table : la ligne « Vos comptes » sous la recherche, un site par
+   * Recherche libre d'une table : la ligne « Tes comptes » sous la recherche, un site par
    * pastille avec son état (connecté ou non) ; connecté, la pastille cherche le texte sur ce
    * site ; pas encore, elle ouvre sa page de connexion.
    */
@@ -292,7 +292,7 @@ export interface AcquireOpen {
   googleRefused?: boolean;
   /** Recherche libre : la dernière page de résultats vue, dont le champ garde le texte sur les pages suivantes. */
   lastSearch?: { query: string; engine: WebEngine };
-  /** « Vos comptes » : l'état de connexion de chaque site, relu à l'ouverture et à chaque page chargée. */
+  /** « Tes comptes » : l'état de connexion de chaque site, relu à l'ouverture et à chaque page chargée. */
   accounts?: { id: string; label: string; connected: boolean }[];
   /** Un téléphone attend d'être accepté : le bandeau a pris le clavier (Accepter, Refuser). */
   phonePending?: boolean;
@@ -463,7 +463,7 @@ export function createAcquirer(events: AcquireEvents) {
       claim.done({ file: target, filename, urls });
       return;
     }
-    if (open) setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.', { file: filename }));
+    if (open) setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou télécharge autre chose.', { file: filename }));
     events.received(target, { urls, filename });
   }
 
@@ -713,7 +713,7 @@ export function createAcquirer(events: AcquireEvents) {
    */
   function jukeboxLine(): { kind: 'playlist' | 'video' | 'account'; text: string; button: string } | undefined {
     if (!open || !events.jukebox || open.view.webContents.isDestroyed()) return undefined;
-    if (open.googleRefused && events.jukebox.account) return { kind: 'account', text: t('Vos playlists YouTube, privées comprises : connectez-vous dans Microsoft Edge, depuis le compte YouTube du Juke-box.'), button: t('Se connecter à YouTube') };
+    if (open.googleRefused && events.jukebox.account) return { kind: 'account', text: t('Tes playlists YouTube, privées comprises : connecte-toi dans Microsoft Edge, depuis le compte YouTube du Juke-box.'), button: t('Se connecter à YouTube') };
     const kind = events.jukebox.accepts(open.view.webContents.getURL());
     if (!kind) return undefined;
     return { kind, text: kind === 'playlist' ? t('Playlist YouTube : l’importer dans le Juke-box, en ligne ou téléchargée, au choix') : t('Vidéo YouTube : l’ajouter à une playlist du Juke-box'), button: t('Ajouter au Juke-box') };
@@ -754,8 +754,8 @@ export function createAcquirer(events: AcquireEvents) {
     return {
       text,
       hint: jukeboxLine()
-        ? t('« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table).')
-        : t('Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.'),
+        ? t('« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvre la recherche depuis ce média (fiche de la table).')
+        : t('Pour en faire le média d’une table, ouvre la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.'),
       direct: false,
     };
   }
@@ -905,7 +905,7 @@ export function createAcquirer(events: AcquireEvents) {
     sendBar();
   }
 
-  /** Relit l'état de connexion de chaque site (« Vos comptes ») ; le bandeau se redessine s'il a changé. */
+  /** Relit l'état de connexion de chaque site (« Tes comptes ») ; le bandeau se redessine s'il a changé. */
   async function readAccounts(): Promise<void> {
     if (!open?.request.accounts) return;
     const target = open;
@@ -1042,7 +1042,7 @@ export function createAcquirer(events: AcquireEvents) {
       else if (action === 'end') events.remote?.end();
     });
     // Champ de recherche du bandeau : tant qu'on y tape, les touches ne sont pas des boutons de la borne.
-    // « Vos comptes » : la recherche du site sur le texte affiché si l'on y est connecté, sa page de connexion sinon.
+    // « Tes comptes » : la recherche du site sur le texte affiché si l'on y est connecté, sa page de connexion sinon.
     ipcMain.on('acquire:site', (e, id: unknown, query: unknown) => {
       if (!open?.request.accounts || e.sender !== open.win.webContents) return;
       const site = SOURCE_SITES.find((x) => x.id === id);
@@ -1077,7 +1077,7 @@ export function createAcquirer(events: AcquireEvents) {
         open.status = RESUMED(request);
         open.warn = false;
       } else {
-        open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
+        open.status = request.status ?? t('Connecte-toi si le site le demande, puis télécharge le fichier : il sera rangé tout seul.');
         // Le message d'une recherche libre est un mode d'emploi, pas un avertissement.
         open.warn = request.status !== undefined && !request.search && !request.info;
         if (isGoogleSignIn(request.url)) googleRefused();
@@ -1112,7 +1112,7 @@ export function createAcquirer(events: AcquireEvents) {
     win.contentView.addChildView(view);
     open = restore
       ? { win, view, request, status: RESUMED(request) }
-      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined && !request.search && !request.info };
+      : { win, view, request, status: request.status ?? t('Connecte-toi si le site le demande, puis télécharge le fichier : il sera rangé tout seul.'), warn: request.status !== undefined && !request.search && !request.info };
     // Reprise : le texte de la dernière page de résultats de l'historique gardé.
     if (restore) open.lastSearch = restore.entries.slice(0, restore.index + 1).reverse().map((e) => webSearchOf(e.url)).find(Boolean);
     const contents = view.webContents;
@@ -1186,7 +1186,7 @@ export function createAcquirer(events: AcquireEvents) {
       if (open) open.googleRefused = false;
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
-    // « Vos comptes » : une connexion (ou déconnexion) faite sur la page se voit à la page suivante.
+    // « Tes comptes » : une connexion (ou déconnexion) faite sur la page se voit à la page suivante.
     contents.on('did-stop-loading', () => void readAccounts());
     // Recherche libre : chaque page chargée, ou changée sans rechargement (YouTube), est relue.
     contents.on('did-navigate', (_e, url) => {
@@ -1283,7 +1283,7 @@ export function createAcquirer(events: AcquireEvents) {
     let hung: NodeJS.Timeout | undefined;
     contents.on('unresponsive', () => {
       journalIncident(`Navigateur intégré : la page ${hostForLog(contents.getURL())} ne répond plus`); // i18n-ignore : journal
-      setStatus(t('La page ne répond plus : Fermer (Échap ou Exit), ou attendez son rechargement.'), true);
+      setStatus(t('La page ne répond plus : Fermer (Échap ou Exit), ou attends son rechargement.'), true);
       if (!win.isDestroyed()) {
         win.focus();
         win.webContents.focus();
@@ -1601,7 +1601,7 @@ export function createAcquirer(events: AcquireEvents) {
         }
         if (probe.kind === 'login') {
           finish();
-          return { ok: false, login: true, reason: t('vous n’êtes plus connecté à {site}', { site: site.label }) };
+          return { ok: false, login: true, reason: t('tu n’es plus connecté à {site}', { site: site.label }) };
         }
         if (probe.kind === 'show' && probe.reason === 'delay' && opts.onWait && WAIT_PROBES[site.engine]) {
           // Minuteur du site : on clique comme un membre, la page décompte elle-même puis

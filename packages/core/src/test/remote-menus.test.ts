@@ -145,7 +145,7 @@ test('accès direct : les Nouveautés au téléphone, chronologie, sous-titre et
     kind: 'screen',
     title: 'Nouveautés',
     lead: `17 novembre 2026 · version 0.1.16\u0007`,
-    page: { image: 'nouveautes/amis-fr.webp', lines: ['Première ligne', 'x'.repeat(900)], where: 'Communauté › Amis', note: 'Soyez le premier à réagir' },
+    page: { image: 'nouveautes/amis-fr.webp', lines: ['Première ligne', 'x'.repeat(900)], where: 'Communauté › Amis', note: 'Sois le premier à réagir' },
     items: [
       { label: 'Amis', detail: 'Ajoutez des amis', timeline: { date: '17 nov.', version: '0.1.16', first: true, unread: true, badges: [{ text: 'Nouveau', kind: 'new' }], reacts: { faces: '👍❤️', total: 3, mine: true, label: '3 réactions, dont la vôtre' }, image: 'nouveautes/amis-fr.webp' } },
       { label: 'Ailleurs', timeline: { date: '16 nov.', image: '../../secret.webp' } },

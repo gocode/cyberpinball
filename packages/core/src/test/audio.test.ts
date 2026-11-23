@@ -156,7 +156,7 @@ test('deux exciters seulement : le 5.1 conseillé, et le SSF en 5.1 n’est plus
   assert.equal(rearOnly.playfieldMode, 'ssf');
   assert.ok(rearOnly.notices.some((n) => n.includes('5.1') && n.includes('prise arrière')));
   const sideOnly = playfieldModeFromTest({ front: 'backglass', rear: 'none', side: 'top' });
-  assert.ok(sideOnly.notices.some((n) => n.includes('branchez-les sur la prise arrière')));
+  assert.ok(sideOnly.notices.some((n) => n.includes('branche-les sur la prise arrière')));
   assert.equal(playfieldModeFromTest({ front: 'backglass', rear: 'lockbar', side: 'top' }).notices.length, 0, 'quatre exciters : rien à dire');
 
   const observed = devPcAudio();

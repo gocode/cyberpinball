@@ -165,7 +165,7 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   'live-finished': { priority: 0, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-cancelled': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
-  // Un joueur, ami ou non, rejoint ma partie instantanée (instantgames.ts).
+  // Un joueur, ami ou non, rejoint ma partie en direct (instantgames.ts).
   'live-joined': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-declined': { priority: 3, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'info', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-left': { priority: 4, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
@@ -375,17 +375,17 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
   const fit = (r: { title: string; detail?: string }) => (full ? { title: r.title, ...(r.detail ? { detail: r.detail } : {}) } : { title: shortened(r.title, NOTICE_TITLE_MAX), ...(r.detail ? { detail: shortened(r.detail, NOTICE_DETAIL_MAX) } : {}) });
   switch (kind) {
     case 'live-invite':
-      return fit(one ? { title: t('{name} vous invite à rejoindre une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} invitation à une partie', '{n} invitations à une partie'), detail: names() });
+      return fit(one ? { title: t('{name} t’invite à rejoindre une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} invitation à une partie', '{n} invitations à une partie'), detail: names() });
     case 'live-invite-ended': {
       // La dernière fin dit tout : une seule invitation par hôte à la fois.
       const last = events[events.length - 1]!;
       const name = who(last);
       const said: Record<LiveInviteEnd, { title: string; detail?: string }> = {
         cancelled: { title: t('{name} a annulé son invitation', { name }) },
-        started: { title: t('{name} a lancé la partie sans vous', { name }) },
+        started: { title: t('{name} a lancé la partie sans toi', { name }) },
         replaced: { title: t('{name} a changé de table', { name }) },
         expired: { title: t('Invitation de {name} expirée', { name }), detail: t('Pas de réponse en deux minutes') },
-        offline: { title: t('Invitation de {name} retirée', { name }), detail: t('Vous sembliez hors ligne de son côté') },
+        offline: { title: t('Invitation de {name} retirée', { name }), detail: t('Tu semblais hors ligne de son côté') },
         'host-offline': { title: t('{name} est passé hors ligne', { name }), detail: t('Son invitation est retirée') },
         full: { title: t('La partie de {name} est complète', { name }) },
       };
@@ -393,13 +393,13 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       return fit({ title: r.title, ...(r.detail ? { detail: r.detail } : last.subject ? { detail: subject(last) } : {}) });
     }
     case 'live-joined':
-      return fit({ title: one ? t('{name} a rejoint votre partie', { name: who(one) }) : namesTitle((names) => t('{names} ont rejoint votre partie', { names }), () => tn(n, '{n} joueur a rejoint votre partie', '{n} joueurs ont rejoint votre partie'), events), detail: t('Elle part d’elle-même dès qu’elle est complète') });
+      return fit({ title: one ? t('{name} a rejoint ta partie', { name: who(one) }) : namesTitle((names) => t('{names} ont rejoint ta partie', { names }), () => tn(n, '{n} joueur a rejoint ta partie', '{n} joueurs ont rejoint ta partie'), events), detail: t('Elle part d’elle-même dès qu’elle est complète') });
     case 'live-accepted':
-      return fit({ title: one ? t('{name} a accepté votre invitation', { name: who(one) }) : namesTitle((names) => t('{names} ont accepté', { names }), () => tn(n, '{n} invité a accepté', '{n} invités ont accepté'), events), detail: t('Pour lancer : {path}', { path: livePath() }) });
+      return fit({ title: one ? t('{name} a accepté ton invitation', { name: who(one) }) : namesTitle((names) => t('{names} ont accepté', { names }), () => tn(n, '{n} invité a accepté', '{n} invités ont accepté'), events), detail: t('Pour lancer : {path}', { path: livePath() }) });
     case 'live-declined': {
       if (one) {
         const reason = reasonText(one.reason);
-        const title = one.reason === 'expired' ? t('Pas de réponse de {name}', { name: who(one) }) : one.reason === 'offline' ? t('{name} est passé hors ligne', { name: who(one) }) : t('{name} a décliné votre invitation', { name: who(one) });
+        const title = one.reason === 'expired' ? t('Pas de réponse de {name}', { name: who(one) }) : one.reason === 'offline' ? t('{name} est passé hors ligne', { name: who(one) }) : t('{name} a décliné ton invitation', { name: who(one) });
         const detail = one.reason === 'offline' ? t('Invitation retirée') : one.reason !== 'expired' ? reason : undefined;
         return fit({ title, ...(detail ? { detail } : {}) });
       }
@@ -412,9 +412,9 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'live-finished': {
       // La dernière : une seule partie entre amis à la fois.
       const last = events[events.length - 1]!;
-      const title = last.won ? t('Partie entre amis : vous gagnez !') : last.who ? t('Partie entre amis : {name} gagne', { name: who(last) }) : t('Partie entre amis terminée');
+      const title = last.won ? t('Partie entre amis : tu gagnes !') : last.who ? t('Partie entre amis : {name} gagne', { name: who(last) }) : t('Partie entre amis terminée');
       // Le chemin des résultats d'abord : c'est lui qui reste quand la place manque (frontend.js, fitNotice).
-      const place = !last.won && last.place ? t('vous : place {rank} sur {n}', { rank: last.place.rank, n: last.place.of }) : undefined;
+      const place = !last.won && last.place ? t('toi : place {rank} sur {n}', { rank: last.place.rank, n: last.place.of }) : undefined;
       return fit({ title, detail: [t('Menu système > Communauté'), place].filter(Boolean).join(' · ') });
     }
     case 'friend-message': {
@@ -422,12 +422,12 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       const last = events[events.length - 1]!;
       const same = events.every((e) => e.who === last.who);
       if (one) return fit({ title: t('Message de {name}', { name: who(one) }), ...(one.extra ? { detail: one.extra } : {}) });
-      return fit(same ? { title: tn(n, '{n} message de {name}', '{n} messages de {name}', { name: who(last) }), ...(last.extra ? { detail: last.extra } : {}) } : { title: tn(n, '{n} message de vos amis', '{n} messages de vos amis'), detail: names() });
+      return fit(same ? { title: tn(n, '{n} message de {name}', '{n} messages de {name}', { name: who(last) }), ...(last.extra ? { detail: last.extra } : {}) } : { title: tn(n, '{n} message de tes amis', '{n} messages de tes amis'), detail: names() });
     }
     case 'room-mention': {
       // `subject` : le salon ; `extra` : la ligne.
       const last = events[events.length - 1]!;
-      if (one) return fit({ title: t('{name} vous cite · {room}', { name: who(one), room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      if (one) return fit({ title: t('{name} te cite · {room}', { name: who(one), room: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
       return fit({ title: tn(n, '{n} mention dans les salons', '{n} mentions dans les salons'), detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
     case 'room-line': {
@@ -443,37 +443,37 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
       const last = events[events.length - 1]!;
       const groups = [...new Set(events.map((e) => e.subject ?? ''))];
       if (one) return fit({ title: t('{name} · {group}', { name: who(one), group: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
-      const title = groups.length === 1 ? tn(n, '{n} nouveau message · {group}', '{n} nouveaux messages · {group}', { group: groups[0]! }) : tn(n, '{n} nouveau message dans vos groupes', '{n} nouveaux messages dans vos groupes');
+      const title = groups.length === 1 ? tn(n, '{n} nouveau message · {group}', '{n} nouveaux messages · {group}', { group: groups[0]! }) : tn(n, '{n} nouveau message dans tes groupes', '{n} nouveaux messages dans tes groupes');
       return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
     case 'group-mention': {
       // `subject` : le groupe ; `extra` : le message ; `who` : qui me mentionne.
       const last = events[events.length - 1]!;
       const groups = [...new Set(events.map((e) => e.subject ?? ''))];
-      if (one) return fit({ title: t('{name} vous a mentionné dans {group}', { name: who(one), group: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
-      const title = groups.length === 1 ? tn(n, '{n} mention · {group}', '{n} mentions · {group}', { group: groups[0]! }) : tn(n, '{n} mention dans vos groupes', '{n} mentions dans vos groupes');
+      if (one) return fit({ title: t('{name} t’a mentionné dans {group}', { name: who(one), group: one.subject ?? '' }), ...(one.extra ? { detail: one.extra } : {}) });
+      const title = groups.length === 1 ? tn(n, '{n} mention · {group}', '{n} mentions · {group}', { group: groups[0]! }) : tn(n, '{n} mention dans tes groupes', '{n} mentions dans tes groupes');
       return fit({ title, detail: last.extra ? `${who(last)} : ${last.extra}` : names() });
     }
     case 'group-invite':
       // `subject` : le groupe.
-      return fit(one ? { title: t('{name} vous invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
+      return fit(one ? { title: t('{name} t’invite dans « {group} »', { name: who(one), group: one.subject ?? '' }), detail: t('Communauté › Groupes') } : { title: tn(n, '{n} invitation dans un groupe', '{n} invitations dans des groupes'), detail: names() });
     case 'place-taken': {
       // `who` : celui qui me passe devant ; `subject` : la table ; `extra` : les scores et ma place.
       if (one) {
-        const long = t('{name} vous a dépassé sur {table}', { name: who(one), table: one.subject ?? '' });
+        const long = t('{name} t’a dépassé sur {table}', { name: who(one), table: one.subject ?? '' });
         if (full || [...long].length <= NOTICE_TITLE_MAX) return fit({ title: long, ...(one.extra ? { detail: one.extra } : {}) });
-        return fit({ title: t('{name} vous a dépassé', { name: who(one) }), detail: [subject(one), one.extra].filter(Boolean).join(' · ') });
+        return fit({ title: t('{name} t’a dépassé', { name: who(one) }), detail: [subject(one), one.extra].filter(Boolean).join(' · ') });
       }
-      return fit({ title: tn(n, 'On vous a dépassé sur {n} table', 'On vous a dépassé sur {n} tables'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
+      return fit({ title: tn(n, 'On t’a dépassé sur {n} table', 'On t’a dépassé sur {n} tables'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
     }
     case 'challenge': {
       // `who` : l'autre joueur ; `subject` : la table ; `extra` : les scores, le temps qui reste, les XP ; `stage` : l'étape.
-      if (!one) return fit({ title: tn(n, '{n} nouvelle de vos défis', '{n} nouvelles de vos défis'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
+      if (!one) return fit({ title: tn(n, '{n} nouvelle de tes défis', '{n} nouvelles de tes défis'), detail: subjectList(events.map((e) => t('{name} · {table}', { name: who(e), table: subject(e) }))) });
       const name = who(one);
       const title = (() => {
         switch (one.stage) {
           case 'beaten':
-            return t('{name} a battu votre score : à vous', { name });
+            return t('{name} a battu ton score : à toi', { name });
           case 'expiring':
             return t('Défi contre {name} : plus que 6 h', { name });
           case 'won':
@@ -483,9 +483,9 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
           case 'expired':
             return t('Défi expiré : {name} n’a pas joué', { name });
           case 'declined':
-            return t('{name} a refusé votre défi', { name });
+            return t('{name} a refusé ton défi', { name });
           default:
-            return t('{name} vous défie', { name });
+            return t('{name} te défie', { name });
         }
       })();
       return fit({ title, detail: [subject(one), one.extra].filter(Boolean).join(' · ') });
@@ -498,22 +498,22 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'player-like': {
       // `subject` : ce qui est aimé (« Comet Chaser · 14 210 500 », un badge).
       const last = events[events.length - 1]!;
-      if (one) return fit({ title: t('{name} aime votre activité', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) });
-      return fit({ title: namesTitle((names) => t('{names} aiment votre activité', { names }), () => tn(n, '{n} « J’aime » sur votre activité', '{n} « J’aime » sur votre activité'), events), ...(last.subject ? { detail: subject(last) } : {}) });
+      if (one) return fit({ title: t('{name} aime ton activité', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) });
+      return fit({ title: namesTitle((names) => t('{names} aiment ton activité', { names }), () => tn(n, '{n} « J’aime » sur ton activité', '{n} « J’aime » sur ton activité'), events), ...(last.subject ? { detail: subject(last) } : {}) });
     }
     case 'player-invited':
       // `who` : la personne invitée.
-      return fit(one ? { title: t('{name}, que vous avez invité, vient de finir sa première partie', { name: who(one) }), detail: t('Elle compte parmi vos personnes invitées') } : { title: tn(n, '{n} personne invitée a fini sa première partie', '{n} personnes invitées ont fini leur première partie'), detail: names() });
+      return fit(one ? { title: t('{name}, que tu as invité, vient de finir sa première partie', { name: who(one) }), detail: t('Elle compte parmi tes personnes invitées') } : { title: tn(n, '{n} personne invitée a fini sa première partie', '{n} personnes invitées ont fini leur première partie'), detail: names() });
     case 'program-open':
       // `subject` : les programmes ouverts (« PinUP Popper et dmdext »).
-      return fit({ title: t('Ouvert pendant la partie : {names}', { names: events[events.length - 1]!.subject ?? '' }), detail: t('Il peut ralentir la partie : fermez-le') });
+      return fit({ title: t('Ouvert pendant la partie : {names}', { names: events[events.length - 1]!.subject ?? '' }), detail: t('Il peut ralentir la partie : ferme-le') });
     case 'idea-shipped':
       // `subject` : le titre de la proposition.
-      return fit(one ? { title: t('Votre idée est arrivée dans Cyber Pinball'), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} de vos idées est arrivée dans Cyber Pinball', '{n} de vos idées sont arrivées dans Cyber Pinball'), detail: subjectList(events.map(subject)) });
+      return fit(one ? { title: t('Ton idée est arrivée dans Cyber Pinball'), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} de tes idées est arrivée dans Cyber Pinball', '{n} de tes idées sont arrivées dans Cyber Pinball'), detail: subjectList(events.map(subject)) });
     case 'team-reply': {
       // `subject` : le fil (titre du rapport, de la proposition) ; `extra` : la réponse.
       const last = events[events.length - 1]!;
-      if (one) return fit({ title: t('L’équipe vous répond'), detail: one.extra ?? subject(one) });
+      if (one) return fit({ title: t('L’équipe te répond'), detail: one.extra ?? subject(one) });
       return fit({ title: tn(n, '{n} réponse de l’équipe', '{n} réponses de l’équipe'), detail: last.extra ?? subjectList(events.map(subject)) });
     }
     case 'friend-online':
@@ -521,13 +521,13 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'friend-request':
       return fit(one ? { title: t('Demande d’ami : {name}', { name: who(one) }), detail: t('Menu système > Communauté > Joueurs > Demandes d’amis') } : { title: tn(n, '{n} demande d’ami', '{n} demandes d’ami'), detail: names() });
     case 'friend-accepted':
-      return fit(one ? { title: t('{name} a accepté votre demande', { name: who(one) }), detail: t('Vous êtes maintenant amis') } : { title: tn(n, '{n} demande acceptée', '{n} demandes acceptées'), detail: names() });
+      return fit(one ? { title: t('{name} a accepté ta demande', { name: who(one) }), detail: t('Vous êtes maintenant amis') } : { title: tn(n, '{n} demande acceptée', '{n} demandes acceptées'), detail: names() });
     case 'friend-playing':
       return fit(one ? { title: t('{name} lance une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} ami lance une partie', '{n} amis lancent une partie'), detail: names() });
     case 'friend-record':
-      return fit(one ? { title: t('Nouveau record de {name}', { name: who(one) }), detail: [subject(one), one.extra].filter(Boolean).join(' · ') } : { title: tn(n, '{n} record de vos amis', '{n} records de vos amis'), detail: names() });
+      return fit(one ? { title: t('Nouveau record de {name}', { name: who(one) }), detail: [subject(one), one.extra].filter(Boolean).join(' · ') } : { title: tn(n, '{n} record de tes amis', '{n} records de tes amis'), detail: names() });
     case 'friend-badge':
-      return fit(one ? { title: t('Badge de {name}', { name: who(one) }), ...(one.extra ? { detail: one.extra } : {}) } : { title: tn(n, '{n} badge pour vos amis', '{n} badges pour vos amis'), detail: names() });
+      return fit(one ? { title: t('Badge de {name}', { name: who(one) }), ...(one.extra ? { detail: one.extra } : {}) } : { title: tn(n, '{n} badge pour tes amis', '{n} badges pour tes amis'), detail: names() });
     case 'download-done':
       return fit(one ? { title: t('Téléchargement fini'), detail: [subject(one), one.from ? t('de {name}', { name: full ? one.from : shortened(one.from, NAME_MAX) }) : ''].filter(Boolean).join(' · ') } : { title: tn(n, '{n} téléchargement fini', '{n} téléchargements finis'), detail: subjectList(events.map(subject)) });
     case 'download-failed':

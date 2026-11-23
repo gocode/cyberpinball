@@ -25,7 +25,7 @@ const community = {
   /** Le profil ouvert au téléphone (clé d'un joueur), et la vue d'où on l'a ouvert. */
   profile: undefined,
   profileFrom: 'friends',
-  /** Le filtre de « Joueurs » (Tous, Mon pays, À proximité, Mêmes tables), gardé par ce téléphone. */
+  /** Le filtre de « Joueurs » (Tous, Mon pays, Sur mon réseau local, Mêmes tables), gardé par ce téléphone. */
   filter: 'all',
   /** Le salon choisi au téléphone (« monde », « pays-FR »), ou celui de la borne. */
   room: undefined,
@@ -295,14 +295,14 @@ function renderPeople(list, c) {
   const p = c.people;
   if (!p) {
     list.replaceChildren();
-    showEmpty('conv', 'friends', t('Joueurs indisponibles'), t('Mettez la borne à jour pour voir les joueurs ici.'));
+    showEmpty('conv', 'friends', t('Joueurs indisponibles'), t('Mets la borne à jour pour voir les joueurs ici.'));
     return;
   }
   const filters = p.filters ?? [];
   if (!filters.some((f) => f.id === community.filter && !f.disabled)) community.filter = 'all';
   const rows = [];
   if (p.requests.length) rows.push(sectionTitle(tn(p.requests.length, 'Demande d’ami', 'Demandes d’ami')), ...p.requests.map(requestCard));
-  // Les parties instantanées ouvertes, la mienne ou de quoi en ouvrir une (telephone-groupes.js).
+  // Les parties en direct ouvertes, la mienne ou de quoi en ouvrir une (telephone-groupes.js).
   rows.push(...instantHead(c));
   if (p.note) rows.push(sectionTitle(p.note));
   else if (c.instant) rows.push(sectionTitle(t('Joueurs')));
@@ -331,7 +331,7 @@ function renderPeople(list, c) {
   const groups = p.groups[community.filter] ?? [];
   for (const g of groups) rows.push(sectionTitle(g.title), ...g.rows.map(personRow));
   list.replaceChildren(...rows);
-  if (!groups.length && !p.requests.length) showEmpty('conv', 'friend-add', t('Personne ici pour l’instant'), community.filter === 'all' ? t('Les joueurs du réseau des bornes s’affichent ici dès qu’ils sont vus.') : t('Essayez le filtre « Tous ».'));
+  if (!groups.length && !p.requests.length) showEmpty('conv', 'friend-add', t('Personne ici pour l’instant'), community.filter === 'all' ? t('Les joueurs du réseau des bornes s’affichent ici dès qu’ils sont vus.') : t('Essaie le filtre « Tous ».'));
   else showEmpty('conv');
 }
 
@@ -596,7 +596,7 @@ function openLineOptions(r, l) {
         ),
       ];
   const items = own
-    ? [{ label: t('Supprimer ma ligne…'), danger: true, run: () => confirm(t('Supprimer votre ligne ?'), l.text, t('Supprimer'), 'retract') }]
+    ? [{ label: t('Supprimer ma ligne…'), danger: true, run: () => confirm(t('Supprimer ta ligne ?'), l.text, t('Supprimer'), 'retract') }]
     : [
         ...(r.blocked
           ? []
@@ -614,7 +614,7 @@ function openLineOptions(r, l) {
         ...(l.friend ? [] : [{ label: t('Envoyer une demande d’ami'), run: () => act('request') }]),
         { label: t('Ignorer {name} dans les salons', { name: l.nick }), run: () => act('ignore') },
         { label: t('Signaler ce message'), run: () => openSheet(t('Signaler ce message'), (r.reasons ?? []).map((x) => ({ label: x.label, run: () => act('report', { reason: x.id }) })), { text: l.text }) },
-        { label: t('Bloquer {name}', { name: l.nick }), danger: true, run: () => confirm(t('Bloquer {name} ?', { name: l.nick }), t('Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de vos salons. Débloquer : Partage et réseau.'), t('Bloquer'), 'block') },
+        { label: t('Bloquer {name}', { name: l.nick }), danger: true, run: () => confirm(t('Bloquer {name} ?', { name: l.nick }), t('Plus de demande d’ami, plus de connexion avec sa borne, ses lignes disparaissent de tes salons. Débloquer : Partage et réseau.'), t('Bloquer'), 'block') },
       ];
   openSheet(t('Ligne de {name} à {time}', { name: l.nick, time: l.time }), items, { text: l.text, top: reactions });
 }
@@ -701,7 +701,7 @@ function renderRoom() {
   // En bas sur les dernières lignes, à l'arrivée comme au retour sur l'onglet (telephone-bas.js).
   CyberBottom.settle(list, r.room);
   // Le constat du dernier geste (signalement envoyé…), sinon pourquoi on ne peut pas écrire, sinon l'aide.
-  const line = r.notice ?? (r.blocked ? { text: r.blocked, tone: 'warning' } : { text: t('Touchez une ligne : réagir, répondre, voir le profil, signaler.'), tone: 'info' });
+  const line = r.notice ?? (r.blocked ? { text: r.blocked, tone: 'warning' } : { text: t('Touche une ligne : réagir, répondre, voir le profil, signaler.'), tone: 'info' });
   status.hidden = false;
   status.textContent = line.text;
   status.className = `thread-status ${line.tone}`;
@@ -733,7 +733,7 @@ function renderCommunity() {
   count.textContent = String(unread);
   if (!c) {
     list.replaceChildren();
-    showEmpty('conv', 'refresh', t('Chargement de la messagerie…'), t('La borne envoie vos conversations.'));
+    showEmpty('conv', 'refresh', t('Chargement de la messagerie…'), t('La borne envoie tes conversations.'));
     return;
   }
   if (c.closed) {
@@ -746,7 +746,7 @@ function renderCommunity() {
   // En tête : créer un groupe, les groupes publics, les invitations reçues (telephone-groupes.js).
   const head = groupsHead(c);
   list.replaceChildren(...head, ...c.rows.map((r) => communityRow(r, r.last)));
-  if (!c.rows.length && !c.groups?.invitations.length) showEmpty('conv', 'friend-add', t('Pas encore d’ami à qui écrire'), t('Dans « Joueurs », ouvrez un profil pour envoyer une demande d’ami.'));
+  if (!c.rows.length && !c.groups?.invitations.length) showEmpty('conv', 'friend-add', t('Pas encore d’ami à qui écrire'), t('Dans « Joueurs », ouvre un profil pour envoyer une demande d’ami.'));
   else showEmpty('conv');
 }
 
@@ -769,7 +769,7 @@ function renderThread() {
   }
   lines.replaceChildren(
     ...(th.group ? [groupWeekItem(th.group)] : []),
-    ...(th.items.length ? th.items : [{ kind: 'day', text: t('Pas encore de message : écrivez le premier') }]).map((it) => {
+    ...(th.items.length ? th.items : [{ kind: 'day', text: t('Pas encore de message : écris le premier') }]).map((it) => {
       const li = document.createElement('li');
       if (it.kind === 'day') {
         li.className = 'th-day';
@@ -856,7 +856,7 @@ function communityMessage(m) {
     people: m.people && typeof m.people === 'object' && Array.isArray(m.people.requests) && Array.isArray(m.people.filters) && m.people.groups && typeof m.people.groups === 'object' ? m.people : undefined,
     profile: m.profile && typeof m.profile === 'object' && typeof m.profile.key === 'string' && Array.isArray(m.profile.actions) ? m.profile : undefined,
     room: m.room && typeof m.room === 'object' && typeof m.room.name === 'string' && Array.isArray(m.room.lines) ? m.room : undefined,
-    // Groupes (créer, invitations, groupes publics) et parties instantanées : gardés, sinon ces parties restent absentes.
+    // Groupes (créer, invitations, groupes publics) et parties en direct : gardés, sinon ces parties restent absentes.
     groups: m.groups && typeof m.groups === 'object' && m.groups.create && Array.isArray(m.groups.invitations) && Array.isArray(m.groups.publics) ? m.groups : undefined,
     instant: m.instant && typeof m.instant === 'object' && Array.isArray(m.instant.games) ? m.instant : undefined,
     // Mon niveau, la page de niveau ouverte et la cloche de l'Activité récente (telephone-niveau.js).

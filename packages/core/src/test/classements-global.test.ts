@@ -96,7 +96,7 @@ test('« Tables » : toutes les tables, jamais seulement celles qui ont des scor
   const rows = rowsOf(b);
   for (const title of ['Atlas Rising', 'Copper Comet', 'Lunar Diner']) assert.ok(rows.some((r) => r.text === title), `${title} a sa ligne`);
   const atlas = rows.find((r) => r.text === 'Atlas Rising')!;
-  assert.match(atlas.detail ?? '', /^1\. Kiko · 12.345.678 · 14 joueurs · vous êtes 2ᵉ$/u);
+  assert.match(atlas.detail ?? '', /^1\. Kiko · 12.345.678 · 14 joueurs · tu es 2ᵉ$/u);
   const copper = rows.find((r) => r.text === 'Copper Comet')!;
   assert.equal(copper.tone, 'quiet');
   assert.equal(copper.detail, 'Aucun score tout temps');

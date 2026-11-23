@@ -128,10 +128,10 @@ test('tableau à points : une page par donnée réelle, la plus pressante d’ab
   const pages = arenaBoardPages({ ...input, open, rivals, records, standing: { world: { rank: 412, players: 2310 } } });
   assert.deepEqual(pages.map((p) => p.id), ['rival', 'open-game', 'standing', 'records']);
   const rival = pages[0]!;
-  assert.equal(rival.lines[0]!.cells[0]!.text, 'Votre place est prise');
+  assert.equal(rival.lines[0]!.cells[0]!.text, 'Ta place est prise');
   assert.deepEqual(rival.lines[2]!.cells.map((c) => c.text), ['2 Léa', '9.450.000']);
   assert.equal(rival.lines[4]!.cells[0]!.text, 'À reprendre : 537.660');
-  assert.equal(rival.foot, 'Léa vous a dépassé il y a 20 min');
+  assert.equal(rival.foot, 'Léa t’a dépassé il y a 20 min');
   for (const p of pages) assert.ok(p.lines.length <= 5, `${p.id} : cinq lignes au plus sur le tableau`);
   assert.equal(dmdNumber(9_450_000), '9.450.000');
 });
@@ -188,7 +188,7 @@ function arena(overrides: Record<string, unknown> = {}) {
     library: { openCustom: (build: () => HubBuilt, at?: number) => (opened = { build, at }) },
     net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }) }),
     levels: { state: () => levels, facts: () => facts },
-    instant: { door: () => ({ detail: 'Aucune partie ouverte : lancez la vôtre', quiet: false }), arena: () => ({ open: [] }), open: () => events.push('parties'), openNew: () => events.push('ouvrir') },
+    instant: { door: () => ({ detail: 'Aucune partie ouverte : lance la tienne', quiet: false }), arena: () => ({ open: [] }), open: () => events.push('parties'), openNew: () => events.push('ouvrir') },
     rankings: { standing: () => undefined, open: () => events.push('classements') },
     level: { open: () => events.push('niveau'), openBadges: () => events.push('badges'), openRules: () => events.push('barème') },
     history: { open: () => events.push('historique') },
@@ -286,7 +286,7 @@ test('navigation par blocs : les flippers vont de bloc en bloc, Start entre, Exi
   // Les blocs de l'Accueil : la barre d'onglets, la carte du moment, jouer, classements, progression, et
   // sous chacune ses entrées, en lignes d'actions (un arrêt chacune, 21/11/2026) ; le barème des XP se lit
   // seulement : ce n'est pas un bloc (aucun arrêt pour rien).
-  assert.deepEqual(b.actions.map((a) => a.label), ['Onglets', 'vous a dépassé sur Attack from Mars', 'Ouvrir une partie instantanée', 'Toutes les parties instantanées', 'Vos classements', 'Tous les classements', 'Votre progression', 'Mes badges']);
+  assert.deepEqual(b.actions.map((a) => a.label), ['Onglets', 't’a dépassé sur Attack from Mars', 'Ouvrir une partie en direct', 'Toutes les parties en direct', 'Tes classements', 'Tous les classements', 'Ta progression', 'Mes badges']);
   // Start sur un bloc à plusieurs actions : on y entre ; seules ses actions se choisissent.
   h.run('block:section:0');
   const inside = h.built();
@@ -336,14 +336,14 @@ test('Accueil de l’Arène : jouer, les classements et la progression à un Sta
   });
   h.menu.openHome(() => undefined);
   const titles = h.built().hub.sections.map((s) => s.title ?? '');
-  for (const t of ['À jouer maintenant', 'Vos classements', 'Votre progression']) assert.ok(titles.includes(t), `bloc « ${t} »`);
-  for (const [label, event] of [['Tous les classements', 'classements'], ['412ᵉ au monde', 'classements'], ['Les tables du jour', 'du jour'], ['Ouvrir une partie instantanée', 'ouvrir'], ['Toutes les parties instantanées', 'parties'], ['Mes badges', 'badges']] as const) {
+  for (const t of ['À jouer maintenant', 'Tes classements', 'Ta progression']) assert.ok(titles.includes(t), `bloc « ${t} »`);
+  for (const [label, event] of [['Tous les classements', 'classements'], ['412ᵉ au monde', 'classements'], ['Les tables du jour', 'du jour'], ['Ouvrir une partie en direct', 'ouvrir'], ['Toutes les parties en direct', 'parties'], ['Mes badges', 'badges']] as const) {
     h.item(label);
     assert.equal(h.events.at(-1), event, label);
     assert.equal(h.built().hub.tabs.find((t) => t.current)!.label, 'Accueil', `${label} : sans changer d’onglet`);
   }
   // Le joueur juste devant moi sur une autre table que celle de la carte du moment : dans les classements.
-  assert.ok(h.built().hub.sections.find((s) => s.title === 'Vos classements')!.cards.some((c) => /Twilight Zone/.test(c.title)));
+  assert.ok(h.built().hub.sections.find((s) => s.title === 'Tes classements')!.cards.some((c) => /Twilight Zone/.test(c.title)));
 });
 
 test('Accueil de l’Arène : le classement mondial juste sous le moment, les premiers puis moi, chacun ouvre le classement complet', () => {
@@ -367,17 +367,17 @@ test('Accueil de l’Arène : le classement mondial juste sous le moment, les pr
   const sections = h.built().hub.sections;
   assert.equal(sections[0]!.title, 'Classement mondial', 'le premier bloc sous le moment (ici, pas de moment)');
   assert.deepEqual(asked.at(-1), 'world:all:3', 'les trois premiers du monde, de tout temps');
-  assert.deepEqual(sections[0]!.cards.map((c) => c.title), ['1ᵉʳ · Nova', '2ᵉ · Dora', '3ᵉ · Max', '412ᵉ · Vous']);
+  assert.deepEqual(sections[0]!.cards.map((c) => c.title), ['1ᵉʳ · Nova', '2ᵉ · Dora', '3ᵉ · Max', '412ᵉ · Toi']);
   assert.deepEqual((sections[0] as { choices?: { title: string }[] }).choices?.map((c) => c.title), ['Tout le classement mondial'], 'en ligne d’action sous le tableau');
   // Ma place au monde n'est pas répétée dans « Vos classements » ; celle de mon pays y reste, et ouvre son classement.
-  const mine = sections.find((s) => s.title === 'Vos classements')!.cards.map((c) => c.title);
+  const mine = sections.find((s) => s.title === 'Tes classements')!.cards.map((c) => c.title);
   assert.deepEqual(mine, ['France : 37ᵉ']);
   for (const label of ['3ᵉ · Max', 'Tout le classement mondial']) {
     h.item(label);
     assert.equal(h.events.at(-1), 'joueurs world all · Retour : Arène', label);
   }
   // Une seule ligne dans le bloc : Start dessus la fait tout de suite.
-  h.built().actions.find((a) => a.label === 'Vos classements')!.run();
+  h.built().actions.find((a) => a.label === 'Tes classements')!.run();
   assert.equal(h.events.at(-1), 'joueurs country all · Retour : Arène');
 });
 
@@ -423,7 +423,7 @@ test('onglet Scores : les tables jouées récemment, Start ouvre leur tableau ; 
       recentScores: () => ({
         where: 'Mondial · Tout temps',
         rows: [
-          { table: reef, ago: 'hier', lead: '1. Paul · 698 400 120', count: '14 joueurs', mine: 'vous êtes 2ᵉ', ranks: [{ label: 'France', place: '#1' }, { label: 'Mondial', icon: 'globe', place: '#2' }] },
+          { table: reef, ago: 'hier', lead: '1. Paul · 698 400 120', count: '14 joueurs', mine: 'tu es 2ᵉ', ranks: [{ label: 'France', place: '#1' }, { label: 'Mondial', icon: 'globe', place: '#2' }] },
           { table: abyss, ago: 'il y a 3 j', reason: 'Aucun score de tout temps' },
         ],
       }),
@@ -461,7 +461,7 @@ test('écran de l’Arène : les cartes mènent aux écrans complets (parties, c
     assert.equal(h.events.at(-1), event, title);
   }
   h.tab('games');
-  h.item('Ouvrir une partie instantanée');
+  h.item('Ouvrir une partie en direct');
   assert.equal(h.events.at(-1), 'ouvrir');
 });
 
@@ -478,12 +478,12 @@ test('affiche de l’Arène : sans donnée réelle, ni tableau, ni joueurs, ni p
 test('affiche de l’Arène : le podium de la table qui pique, le rival en ambre, moi en vert, ce qu’il manque pour monter', () => {
   const p = arena({ net: fakeSocialNet({ state: () => ({ key: { publicKey: ME }, badges: [] }), rankings: () => store() }) }).menu.poster() as unknown as { podium: { table: string; eyebrow: string; warn: boolean; rows: { rank: string; name: string; me?: true; rival?: true }[]; climb: { label: string; gap: string } } };
   assert.equal(p.podium.table, 'Attack from Mars');
-  assert.equal(p.podium.eyebrow, 'Votre place est prise');
+  assert.equal(p.podium.eyebrow, 'Ta place est prise');
   assert.equal(p.podium.warn, true);
   assert.deepEqual(p.podium.rows.map((r) => [r.rank, r.name, Boolean(r.rival), Boolean(r.me)]), [
     ['1', 'Paul', false, false],
     ['2', 'Léa', true, false],
-    ['3', 'Vous', false, true],
+    ['3', 'Toi', false, true],
   ]);
   assert.equal(p.podium.climb.label, 'Pour la 2ᵉ place');
   assert.match(p.podium.climb.gap, /^\+537.660$/);

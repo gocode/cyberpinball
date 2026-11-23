@@ -4,8 +4,8 @@
 //   semaine ; une table que personne n'a jouée en ligne : « votre prochain score sera le premier »,
 //   jamais un tableau vide ;
 // - mon record et mon groupe (table de la semaine) dans les statistiques ;
-// - une partie instantanée ouverte sur cette version passe avant « Jouer », qui porte l'objectif ;
-// - « Jouer ensemble… » regroupe « Jouer avec un ami », « Partie instantanée » et « Défier un
+// - une partie en direct ouverte sur cette version passe avant « Jouer », qui porte l'objectif ;
+// - « Jouer ensemble… » regroupe « Jouer avec un ami », « Partie en direct » et « Défier un
 //   joueur » (challenges-menu.ts, 22/11/2026).
 //
 // Les données viennent du service des tables du jour (daily-tables.ts) ; library.ts ne fait que
@@ -31,10 +31,10 @@ export interface TableSocialHost {
   myBest(table: TableEntry): number | undefined;
   /** Mes groupes dont cette table est la table de la semaine. */
   groupsOf?(table: TableEntry): { name: string; until: string }[];
-  /** « Jouer avec un ami » (live-game-menu.ts) et « Partie instantanée » (instant-menu.ts), tels que la fiche les avait. */
+  /** « Jouer avec un ami » (live-game-menu.ts) et « Partie en direct » (instant-menu.ts), tels que la fiche les avait. */
   playWithFriend?(table: TableEntry, back: () => void): Action;
   instantGame?(table: TableEntry, back: () => void): Action;
-  /** Une partie instantanée ouverte sur cette version, à rejoindre. */
+  /** Une partie en direct ouverte sur cette version, à rejoindre. */
   joinInstant?(board: string, back: () => void): Action | undefined;
   /** « Défier un joueur… » (challenges-menu.ts) ; absent : grisé « Bientôt ». */
   challenge?(table: TableEntry, back: () => void): Action;
@@ -78,10 +78,10 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     if (goal.state === 'pending') return { text: t('Objectif'), detail: t('Empreinte de la table en calcul…'), icon: 'star', tone: 'quiet' };
     if (goal.state === 'none') return { text: t('En ligne'), detail: t('Version de la table illisible : pas de classement'), icon: 'info', tone: 'quiet' };
     const o = goal.objective;
-    if (!o) return { text: t('En ligne'), detail: t('Personne d’autre ne l’a encore jouée : votre prochain score sera le premier du classement'), icon: 'star', tone: 'info' };
-    if (o.leader) return { text: t('Vous êtes {place}', { place: whereText(1, o.period, o.scope) }), detail: t('Personne au-dessus de vous : défendez votre place'), icon: 'trophy', tone: 'ok' };
+    if (!o) return { text: t('En ligne'), detail: t('Personne d’autre ne l’a encore jouée : ton prochain score sera le premier du classement'), icon: 'star', tone: 'info' };
+    if (o.leader) return { text: t('Tu es {place}', { place: whereText(1, o.period, o.scope) }), detail: t('Personne au-dessus de toi : défends ta place'), icon: 'trophy', tone: 'ok' };
     const target = o.target!;
-    const gap = o.mine ? t('à {gap} de votre record', { gap: formatNumber(o.gap ?? 0) }) : best ? t('à {gap} de votre record', { gap: formatNumber(target.score - best) }) : t('pas encore de score pour vous');
+    const gap = o.mine ? t('à {gap} de ton record', { gap: formatNumber(o.gap ?? 0) }) : best ? t('à {gap} de ton record', { gap: formatNumber(target.score - best) }) : t('pas encore de score pour toi');
     const level = levelLabel(target);
     return {
       text: t('Objectif : {name} · {score}', { name: target.name, score: formatNumber(target.score) }),
@@ -101,7 +101,7 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     const line = svc.board(goal.recordScope, 'today').lines.find((l) => l.board === goal.board && (l.balls ?? undefined) === (goal.balls ?? undefined));
     const level = levelLabel(r);
     return {
-      text: t('Record du jour : {name} · {score}', { name: r.mine ? t('vous') : r.name, score: formatNumber(r.score) }),
+      text: t('Record du jour : {name} · {score}', { name: r.mine ? t('toi') : r.name, score: formatNumber(r.score) }),
       detail: [where, line ? tn(line.plays, '{n} partie aujourd’hui', '{n} parties aujourd’hui') : undefined].filter(Boolean).join(' · '),
       avatar: svc.face(r),
       ...(level ? { aside: level } : {}),
@@ -140,14 +140,14 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     if (record) rows.push(record);
     const week = friendsWeek(goal);
     const playing = friendPlaying(table);
-    if (playing) rows.push({ text: t('{name} y joue en ce moment', { name: playing.name }), ...(week ? { detail: t('Vos amis cette semaine : {list}', { list: week }) } : {}), avatar: svc.face({ key: playing.key, name: playing.name }), badges: [t('En partie')] });
-    else if (week !== undefined) rows.push({ text: t('Vos amis cette semaine'), detail: week || t('Aucun n’y a joué cette semaine'), icon: 'friends' });
+    if (playing) rows.push({ text: t('{name} y joue en ce moment', { name: playing.name }), ...(week ? { detail: t('Tes amis cette semaine : {list}', { list: week }) } : {}), avatar: svc.face({ key: playing.key, name: playing.name }), badges: [t('En partie')] });
+    else if (week !== undefined) rows.push({ text: t('Tes amis cette semaine'), detail: week || t('Aucun n’y a joué cette semaine'), icon: 'friends' });
 
     // Statistiques : mon record (et ma place du jour), mon groupe.
     const stats: Row[] = [];
     const o = goal.state === 'ok' ? goal.objective : undefined;
-    if (best) stats.push({ text: t('Votre record'), detail: [formatNumber(best), o?.myRank && o.period === 'today' ? whereText(o.myRank, 'today', o.scope) : undefined].filter(Boolean).join(' · ') });
-    for (const g of host.groupsOf?.(table) ?? []) stats.push({ text: t('Votre groupe'), detail: t('{group} : table de la semaine {until}', { group: g.name, until: g.until }) });
+    if (best) stats.push({ text: t('Ton record'), detail: [formatNumber(best), o?.myRank && o.period === 'today' ? whereText(o.myRank, 'today', o.scope) : undefined].filter(Boolean).join(' · ') });
+    for (const g of host.groupsOf?.(table) ?? []) stats.push({ text: t('Ton groupe'), detail: t('{group} : table de la semaine {until}', { group: g.name, until: g.until }) });
 
     const first: Action[] = [];
     const join = goal.state === 'ok' ? host.joinInstant?.(goal.board, back) : undefined;
@@ -156,14 +156,14 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     const playDetail =
       goal.state !== 'ok' ? undefined
       : o?.target ? t('Objectif : battre {name}, {score}', { name: o.target.name, score: formatNumber(o.target.score) })
-      : o?.leader ? t('Défendre votre place')
+      : o?.leader ? t('Défendre ta place')
       : t('Premier score en ligne de cette table');
     return {
       section: { title: t('Sur cette table'), rows },
       stats,
       first,
       ...(playDetail ? { playDetail } : {}),
-      together: { label: t('Jouer ensemble…'), detail: t('Avec un ami, partie instantanée, défier un joueur'), icon: 'gamepad', run: () => openTogether(table, back) },
+      together: { label: t('Jouer ensemble…'), detail: t('Avec un ami, partie en direct, défier un joueur'), icon: 'gamepad', run: () => openTogether(table, back) },
     };
   }
 
@@ -175,9 +175,9 @@ export function createTableSocial(host: TableSocialHost): TableSocial {
     const join = goal.state === 'ok' ? host.joinInstant?.(goal.board, here) : undefined;
     if (join) actions.push(join);
     if (host.playWithFriend) actions.push({ ...host.playWithFriend(table, here), label: t('Jouer avec un ami…'), icon: 'friend-list' });
-    if (host.instantGame) actions.push({ ...host.instantGame(table, here), label: t('Ouvrir une partie instantanée…'), icon: 'globe' });
+    if (host.instantGame) actions.push({ ...host.instantGame(table, here), label: t('Ouvrir une partie en direct…'), icon: 'globe' });
     // Défier un joueur (challenges-menu.ts) : les amis et les joueurs classés sur cette version.
-    actions.push(host.challenge?.(table, here) ?? { label: t('Défier un joueur…'), detail: t('Bientôt : 48 h pour battre votre score, chacun quand il veut'), icon: 'trophy', tone: 'quiet', run: () => undefined });
+    actions.push(host.challenge?.(table, here) ?? { label: t('Défier un joueur…'), detail: t('Bientôt : 48 h pour battre ton score, chacun quand il veut'), icon: 'trophy', tone: 'quiet', run: () => undefined });
     actions.push({ label: t('Retour à la fiche'), icon: 'back', run: back });
     const friends = host.net.state().friends.filter((f) => host.net.online(f.key));
     const sections: Section[] = friends.length

@@ -153,7 +153,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         label: v.jukebox ? t('Juke-box dans la roue : affiché') : t('Juke-box dans la roue : masqué'),
         detail: v.jukebox
           ? t('Le médaillon Juke-box ouvre chaque collection de la roue, avant les tables (Start : le masquer)')
-          : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
+          : t('La roue ne montre que les tables ; tes playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
         icon: 'jukebox',
         run: () => set({ jukebox: !v.jukebox }),
       },
@@ -168,7 +168,7 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
       arena: {
         label: v.arena ? t('Arène dans la roue : affichée') : t('Arène dans la roue : masquée'),
         detail: v.arena
-          ? t('Le médaillon Arène suit la Communauté en tête de chaque collection : parties instantanées, classements, progression (Start : le masquer)')
+          ? t('Le médaillon Arène suit la Communauté en tête de chaque collection : parties en direct, classements, progression (Start : le masquer)')
           : t('L’Arène reste dans Menu système › Arène (Start : afficher le médaillon)'),
         icon: 'trophy',
         run: () => set({ arena: !v.arena }),

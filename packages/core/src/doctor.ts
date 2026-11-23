@@ -1009,13 +1009,13 @@ function tableOrientationFinding(tableFile: string, orientation: PlayfieldOrient
     severity: 'warning',
     title: t('Table de travers sur cette borne'),
     detail: played.edge
-      ? t('{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que vous êtes {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans votre sens.', {
+      ? t('{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que tu es {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans ton sens.', {
           name,
           keys: set,
           played: EDGE_LABELS[played.edge],
           edge: EDGE_LABELS[orientation.edge],
         })
-      : t('{name} règle {keys} : VPX reprend la vue de l’auteur de la table, avec sa rotation, souvent pour un autre écran : la table peut s’afficher de travers. Sans ces clés, le cadrage automatique de la borne la met dans votre sens.', {
+      : t('{name} règle {keys} : VPX reprend la vue de l’auteur de la table, avec sa rotation, souvent pour un autre écran : la table peut s’afficher de travers. Sans ces clés, le cadrage automatique de la borne la met dans ton sens.', {
           name,
           keys: set,
         }),
@@ -1088,7 +1088,7 @@ function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefin
     code: 'musicMissing',
     severity: 'warning',
     title: tn(names.length, 'Musique introuvable', 'Musiques introuvables'),
-    detail: t('À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mettez-la dans le dossier d’import puis « Ajouter une table ».', {
+    detail: t('À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mets-la dans le dossier d’import puis « Ajouter une table ».', {
       names: names.map((n) => `« ${n} »`).join(', '),
       where,
     }),
@@ -1128,7 +1128,7 @@ function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | unde
     code: 'dmdImagesMissing',
     severity: 'warning',
     title: tn(names.length, 'Image du DMD absente', 'Images du DMD absentes'),
-    detail: tn(names.length, 'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».', 'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprenez-le en entier, puis « Ajouter une table ».', {
+    detail: tn(names.length, 'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».', 'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».', {
       n: names.length,
       folder,
       list: names.slice(0, 3).map((n) => `« ${n} »`).join(', ') + (names.length > 3 ? '…' : ''),
@@ -1171,7 +1171,7 @@ function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElse
     code: 'tableWindows',
     severity: 'info',
     title: t('Écrans placés pour cette table'),
-    detail: t('{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, revenez à la disposition générale.', { file: name, windows: placed.join(', ') }),
+    detail: t('{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, reviens à la disposition générale.', { file: name, windows: placed.join(', ') }),
     fix: {
       label: t('Revenir à la disposition générale'),
       ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
@@ -1362,7 +1362,7 @@ function notDrivenFinding(dir: string, pack: string, facts: ScriptFacts): Findin
       sent.length
         ? t('Le script de cette version n’en envoie aucun : seulement {sent}, pour les effets DOF de la borne.', { sent: range(sent) })
         : t('Le script de cette version n’en envoie aucun.'),
-      t('Le fronton et l’écran du pack restent noirs. Installez la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retirez le pack.'),
+      t('Le fronton et l’écran du pack restent noirs. Installe la version du jeu qui demande ce pack (« incl. PuP » ou note de VPS dans le catalogue), ou retire le pack.'),
     ].join(' '),
   };
 }
@@ -1559,7 +1559,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     const detail = [
       t('Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.', { flags: formatList(flags.length ? flags : ['VR_Room']) }),
       !content
-        ? t('Le script de la table est protégé : prenez sa version sans VR, ou mettez cet interrupteur à 0 dans l’éditeur de VPX.')
+        ? t('Le script de la table est protégé : prends sa version sans VR, ou mets cet interrupteur à 0 dans l’éditeur de VPX.')
         : foreign
           ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : la pièce ne s’allume plus que dans le casque.', { file })
           : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où la pièce ne s’allume que dans le casque.', { file }),
@@ -1578,7 +1578,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
       ? t('Le script appelle vpmInit {n} fois. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie dès son lancement (« cvpmFlips2.Init is called twice »).', { n: calls })
       : t('Le script appelle vpmInit plus d’une fois pendant la partie. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie (« cvpmFlips2.Init is called twice »).'),
     !content
-      ? t('Le script de la table est protégé : retirez l’appel en trop à vpmInit dans l’éditeur de VPX.')
+      ? t('Le script de la table est protégé : retire l’appel en trop à vpmInit dans l’éditeur de VPX.')
       : foreign
         ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table.', { file })
         : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où vpmInit ne s’exécute qu’une fois.', { file }),
@@ -1661,7 +1661,7 @@ function dofFindingsFor(folder: string, script: ScriptFacts, dof: DofSetup): Fin
         code: 'dofNoConfig',
         severity: 'info',
         title: t('Aucun effet DOF pour cette ROM'),
-        detail: t('La configuration DOF de la borne n’a rien pour « {rom} » : les LED et contacteurs ne réagiront pas. Une table récente manque parfois au configtool : réimportez votre configuration depuis configtool.vpuniverse.com.', {
+        detail: t('La configuration DOF de la borne n’a rien pour « {rom} » : les LED et contacteurs ne réagiront pas. Une table récente manque parfois au configtool : réimporte ta configuration depuis configtool.vpuniverse.com.', {
           rom: script.roms[0]!,
         }),
       },
@@ -1858,7 +1858,7 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
     );
   }
   if (content && !override) detail.push(t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où seules ces valeurs changent.', params));
-  else if (!content && offs.every((s) => s.enable)) detail.push(t('Mettez {enables} dans le script de la table (éditeur de VPX).', params));
+  else if (!content && offs.every((s) => s.enable)) detail.push(t('Mets {enables} dans le script de la table (éditeur de VPX).', params));
   return {
     code: 'pupDisabledByScript',
     severity: 'warning',
@@ -2139,7 +2139,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
           ? t('« {name} » ne sera pas chargé sous ce nom.', { name: candidate })
           : packs.length
             ? t('Présents : {list}.', { list: packs.join(', ') })
-            : t('Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.'),
+            : t('Ajoute le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.'),
         t('La table se joue sans ses vidéos.'),
       ].join(' '),
       fix: candidate ? { label: t('Renommer « {from} » en « {to} »', { from: candidate, to: wanted }), ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }, ...keep] } : undefined,
@@ -2151,7 +2151,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       code: 'pupMissing',
       severity: 'warning',
       title: t('PuP-Pack jamais chargé'),
-      detail: t('Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; gardez un seul pack dans pupvideos.', { list: others.map(quote).join(', ') }),
+      detail: t('Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; garde un seul pack dans pupvideos.', { list: others.map(quote).join(', ') }),
     });
   } else if (matching.length && othersKnown && others.length) {
     const size = others.reduce((sum, p) => sum + sizeOf(path.join(pupvideos, p)), 0);
@@ -2244,7 +2244,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
               n: empty.length,
               list: empty.slice(0, 3).map(quote).join(', ') + (empty.length > 3 ? '…' : ''),
             }),
-            ...(music.length ? [t('La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprenez-le en entier.', { list: music.map(quote).join(', ') })] : []),
+            ...(music.length ? [t('La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprends-le en entier.', { list: music.map(quote).join(', ') })] : []),
           ].join(' '),
         });
       }
@@ -2480,7 +2480,7 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
       code: 'pupLog',
       severity: 'warning',
       title: t('Journal de VPX : pack non chargé'),
-      detail: t('À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\{pack}). Si le pack a été ajouté ou réparé depuis, relancez une partie.', { pack: expected[0]! }),
+      detail: t('À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\{pack}). Si le pack a été ajouté ou réparé depuis, relance une partie.', { pack: expected[0]! }),
     });
   }
   const missing = [
@@ -2722,8 +2722,8 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
         old.length
           ? tn(
               new Set(old.map((i) => i.ext)).size,
-              '{files} : {exts}, ancien format de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
-              '{files} : {exts}, anciens formats de PinUP Popper que le front-end (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              '{files} : {exts}, ancien format de PinUP Popper que le front-end (Chromium) ne lit pas. Convertis en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              '{files} : {exts}, anciens formats de PinUP Popper que le front-end (Chromium) ne lit pas. Convertis en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
               { files: quoteList(old.map((i) => i.name)), exts: [...new Set(old.map((i) => i.ext))].join(', ') },
             )
           : '',
@@ -2841,7 +2841,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
                 { vpx: own[0]!, files: quoteList(misnamed.map((i) => i.name)) },
               )
           : '',
-        ...kept.map((k) => t('« {name} » : « {shown} » porte déjà le bon nom et c’est lui qui est montré ; gardez l’un des deux.', { name: k.item.name, shown: k.shown.name })),
+        ...kept.map((k) => t('« {name} » : « {shown} » porte déjà le bon nom et c’est lui qui est montré ; garde l’un des deux.', { name: k.item.name, shown: k.shown.name })),
         blocked.length ? t('{files} : le nom attendu est déjà pris dans medias\\.', { files: quoteList(blocked.map((i) => i.name)) }) : '',
         typeless.length
           ? t('{files} : type inconnu. Le nom doit commencer par le type entre parenthèses, « (Backglass) {folder}.mp4 » par exemple.', {
@@ -2922,7 +2922,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
         ),
         ...left.map((l) =>
           l.shown
-            ? t('« {file} » : medias\\ montre déjà « {shown} » ; gardez l’un des deux, rien n’est déplacé.', { file: rel(l.s), shown: l.shown })
+            ? t('« {file} » : medias\\ montre déjà « {shown} » ; garde l’un des deux, rien n’est déplacé.', { file: rel(l.s), shown: l.shown })
             : t('« {file} » : le nom attendu est déjà pris dans medias\\, il n’est pas déplacé.', { file: rel(l.s) }),
         ),
       ]
@@ -3133,7 +3133,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           const params = { file: path.relative(folder, e.file), error: MEDIA_ERROR_LABELS[e.kind], count: e.count, date: formatDateTime(e.last), message: e.message ? ` (${e.message})` : '' };
           return e.count > 1 ? t('« {file} » : {error}, {count} fois, la dernière le {date}{message}.', params) : t('« {file} » : {error}, le {date}{message}.', params);
         }),
-        t('Le front-end passe alors au média suivant, ou à l’affichage par défaut. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
+        t('Le front-end passe alors au média suivant, ou à l’affichage par défaut. Remplace le fichier par un mp4 (H.264) ou un webm, ou réencode-le.'),
       ].join(' '),
       fix: broken.length
         ? {
@@ -3219,7 +3219,7 @@ function dmdColorFindings(folder: string, facts: ScriptFacts, ctx: Pick<DoctorCo
         title: t('Couleurs du DMD mal nommées : VPX ne les charge pas'),
         detail: p.target
           ? t('{folder} : VPX cherche les couleurs dans {target}, au nom de la ROM que joue la table, avec les noms de fichiers qu’il connaît. Il n’y a rien à cocher : rangées là, le DMD passe en couleur.', params)
-          : t('{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renommez ce dossier.', params),
+          : t('{folder} : VPX ne cherche les couleurs que dans un dossier au nom de la ROM que joue la table ({rom}). Renomme ce dossier.', params),
         ...(ops.length && { fix: { label: t('Ranger dans {target}', params), ops } }),
       });
     }
@@ -3440,7 +3440,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
             rom: alias.rom,
             title: t('ROM « {rom} » absente', { rom: alias.rom }),
             detail: t(
-              'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoutez-la (dossier d’import, puis « Ajouter une table »), ou retirez l’alias.',
+              'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoute-la (dossier d’import, puis « Ajouter une table »), ou retire l’alias.',
               { rom: alias.rom, asked: alias.alias },
             ),
             fix: { label: t('Retirer l’alias « {line} »', { line: `${alias.alias},${alias.rom}` }), ops: [writeAliases(withoutAlias(aliasText, alias.alias))] },
@@ -3464,7 +3464,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
           asked,
           rom: real,
         }),
-        available ? '' : t('Il faut aussi {rom}.zip : ajoutez-la (dossier d’import, puis « Ajouter une table »).', { rom: real }),
+        available ? '' : t('Il faut aussi {rom}.zip : ajoute-la (dossier d’import, puis « Ajouter une table »).', { rom: real }),
       ]
         .filter(Boolean)
         .join(' '),
@@ -3565,7 +3565,7 @@ function checkRomFiles(folder: string, roms: string[], library: string | undefin
     title: t('ROM « {rom} » absente', { rom }),
     detail: [
       t(
-        'La table ne démarrera pas sans {rom}.zip{others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour savoir où la trouver, étape par étape : « Ce qu’il manque pour jouer ».',
+        'La table ne démarrera pas sans {rom}.zip{others}. Mets le fichier dans le dossier d’import (ou glisse-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour savoir où la trouver, étape par étape : « Ce qu’il manque pour jouer ».',
         { rom, others },
       ),
       dirExists && !files.length ? t('Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.') : '',
@@ -3692,7 +3692,7 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
     code: 'dmdFolderMissing',
     severity: 'warning',
     title: t('Dossier « {folder} » absent', { folder: dmdFolder }),
-    detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».')}`,
+    detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mets-le dans le dossier d’import puis « Ajouter une table ».')}`,
   };
 }
 

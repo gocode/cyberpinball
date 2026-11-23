@@ -328,7 +328,7 @@ export function powerTexts(action: PowerAction): PowerTexts {
         steps: [
           t('Cyber Pinball enregistre ses réglages et se ferme.'),
           t('Windows éteint le PC.'),
-          t('Pour rallumer la borne, appuyez sur le bouton d’alimentation du PC.'),
+          t('Pour rallumer la borne, appuie sur le bouton d’alimentation du PC.'),
         ],
         hint: t('Start : éteindre · Exit : annuler'),
         progress: t('Extinction de la borne…'),
@@ -343,7 +343,7 @@ export function powerTexts(action: PowerAction): PowerTexts {
         steps: [
           t('Cyber Pinball enregistre ses réglages et reste ouvert.'),
           t('Le PC et les écrans passent en veille.'),
-          t('Pour reprendre, appuyez sur le bouton d’alimentation du PC. Le front-end revient au réveil.'),
+          t('Pour reprendre, appuie sur le bouton d’alimentation du PC. Le front-end revient au réveil.'),
         ],
         hint: t('Start : mettre en veille · Exit : annuler'),
         progress: t('Mise en veille…'),

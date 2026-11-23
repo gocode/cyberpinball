@@ -236,7 +236,7 @@ test('réactions aux nouveautés, liste : chaque ligne montre ses réactions en 
   assert.deepEqual(rows()[0]!.news!.reactions, { emojis: ['👍', '❤️'], total: 6, mine: false, label: '6 réactions' });
   assert.ok(rows().slice(1).every((r) => !r.news!.reactions), 'sans réaction, rien sur la ligne');
   s.page().actions[4]!.run();
-  assert.deepEqual(rows()[0]!.news!.reactions, { emojis: ['👍', '❤️', '😮'], total: 7, mine: true, label: '7 réactions, dont la vôtre' });
+  assert.deepEqual(rows()[0]!.news!.reactions, { emojis: ['👍', '❤️', '😮'], total: 7, mine: true, label: '7 réactions, dont la tienne' });
   setLanguage('en');
   try {
     assert.equal(rows()[0]!.news!.reactions!.label, '7 reactions, including yours');
@@ -265,7 +265,7 @@ test('réactions aux nouveautés, écran : sept tuiles avant « Essayer », la m
   const wow = after.sections[0]!.rows[4]!;
   assert.ok(wow.current);
   assert.deepEqual(wow.badges, ['1']);
-  assert.match(after.newsPage!.note!, /^Votre réaction : 😮 Waouh/);
+  assert.match(after.newsPage!.note!, /^Ta réaction : 😮 Waouh/);
   after.actions[4]!.run();
   assert.deepEqual(s.sent.at(-1), { item: NEWS[0]!.id, kind: null });
   assert.ok(!s.page().sections[0]!.rows[4]!.current);

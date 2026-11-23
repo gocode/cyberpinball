@@ -38,7 +38,7 @@ export const messages: Record<string, string> = {
   '{n} tables Future Pinball (.fpt)': '{n} Future Pinball tables (.fpt)',
 
   // app/src/catalog.ts : réception
-  'Contenu non vérifié (archive illisible) : regardez le plan avant d’installer.': 'Content not checked (unreadable archive): look at the plan before installing.',
+  'Contenu non vérifié (archive illisible) : regarde le plan avant d’installer.': 'Content not checked (unreadable archive): look at the plan before installing.',
   'L’ancien, « {file} », est gardé de côté.': 'The previous one, “{file}”, is kept aside.',
   '« {file} » est {content}, pas {expected} : où le ranger ?': '“{file}” is {content}, not {expected}: where should it go?',
   'Reçu « {file} » ({content}), qui ne correspond à rien d’attendu : il est gardé de côté dans la liste d’attente.': 'Received “{file}” ({content}), which matches nothing in the queue: it is kept aside in the download queue.',
@@ -94,10 +94,10 @@ export const messages: Record<string, string> = {
   'Ne plus l’attendre': 'Stop waiting for it',
   'Retire l’élément de la liste': 'Removes the item from the queue',
   'Retirer tout le jeu de la liste': 'Remove the whole game from the queue',
-  'Le fichier reçu a disparu (déplacé ou effacé) : videz l’élément pour le récupérer de nouveau.': 'The received file is gone (moved or deleted): clear the item to get it again.',
+  'Le fichier reçu a disparu (déplacé ou effacé) : vide l’élément pour le récupérer de nouveau.': 'The received file is gone (moved or deleted): clear the item to get it again.',
   'Le fichier reçu est {content}, pas {expected} : il ne pourrait pas s’installer comme tel.': 'The received file is {content}, not {expected}: it could not be installed as such.',
   'Reçu : il sera installé avec le jeu, après le plan.': 'Received: it will be installed with the game, after the plan.',
-  'Pas encore reçu : rouvrez la page pour le télécharger, ou choisissez un fichier déjà téléchargé. À la souris, glissez-le sur la fenêtre.':
+  'Pas encore reçu : rouvre la page pour le télécharger, ou choisis un fichier déjà téléchargé. À la souris, glisse-le sur la fenêtre.':
     'Not received yet: reopen the page to download it, or choose a file already downloaded. With the mouse, drop it on the window.',
   '{item} : de nouveau attendu.': '{item}: waiting again.',
   '{item} : de nouveau attendu ; « {file} » est gardé de côté.': '{item}: waiting again; “{file}” is kept aside.',
@@ -132,7 +132,7 @@ export const messages: Record<string, string> = {
   'Rouvrir la page pour le télécharger de nouveau': 'Reopen the page to download it again',
   'Remplacer : {item}': 'Replace: {item}',
   'Choisir un fichier : {item}': 'Choose a file: {item}',
-  'Ceux qui conviennent d’abord ({expected}). À la souris, vous pouvez aussi glisser un fichier sur la fenêtre.': 'Fitting ones first ({expected}). With the mouse, you can also drop a file on the window.',
+  'Ceux qui conviennent d’abord ({expected}). À la souris, tu peux aussi glisser un fichier sur la fenêtre.': 'Fitting ones first ({expected}). With the mouse, you can also drop a file on the window.',
   // Fichiers reçus sans élément
   'Fichier rangé': 'File filed',
   Reçu: 'Received',
@@ -147,8 +147,8 @@ export const messages: Record<string, string> = {
   'Fichier reçu à vérifier': 'Received file to check',
   'Fichier gardé de côté': 'File kept aside',
   '« {file} » est arrivé alors que {item} était attendu, mais c’est {content}. Où le ranger ?': '“{file}” arrived while {item} was expected, but it is {content}. Where should it go?',
-  'Reçu sans élément qui lui corresponde. Rattachez-le à ce qu’il remplit, ou mettez-le à la corbeille.': 'Received with no matching item. Assign it to what it fits, or put it in the trash.',
-  '« {file} » rattaché à {item}, à votre demande.': '“{file}” assigned to {item}, as you asked.',
+  'Reçu sans élément qui lui corresponde. Rattache-le à ce qu’il remplit, ou mets-le à la corbeille.': 'Received with no matching item. Assign it to what it fits, or put it in the trash.',
+  '« {file} » rattaché à {item}, à ta demande.': '“{file}” assigned to {item}, as you asked.',
   // Retirer un jeu
   '{game} : retiré de la liste d’attente ; ses fichiers reçus sont dans la corbeille de Cyber Pinball.': '{game}: removed from the download queue; its received files are in the Cyber Pinball trash.',
   '{game} : retiré de la liste d’attente ; ses fichiers reçus restent où ils sont.': '{game}: removed from the download queue; its received files stay where they are.',
