@@ -290,6 +290,7 @@ import {
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { createFollowMenu } from './follow-menu';
 import { prepareImport, unpackArchive } from './archives';
+import { cleanupImportStaging } from './import-cleanup';
 import { importLinksRows } from './import-links-menu';
 import { importSpaceSection, importSpaceShort } from './import-space-menu';
 import { createDofMenu } from './dof-menu';
@@ -4797,7 +4798,7 @@ export function createLibrary(host: LibraryHost) {
         );
         if (acquisition && added.length) noteSource(acquisition, added.map((e) => e.file));
         if (alone) {
-          fs.rmSync(s.prepared.staging, { recursive: true, force: true });
+          void cleanupImportStaging(s.prepared.staging, path.join(host.dataDir, 'staging'));
           return;
         }
       }
@@ -5137,7 +5138,7 @@ export function createLibrary(host: LibraryHost) {
 
   function buildAddPlan(s: AddPlan): Built {
     const cancel = () => {
-      if (s.prepared) fs.rmSync(s.prepared.staging, { recursive: true, force: true });
+      if (s.prepared) void cleanupImportStaging(s.prepared.staging, path.join(host.dataDir, 'staging'));
       if (s.back) s.back();
       else if (s.journey && find(s.journey)) journeyUi.open(s.journey);
       else if (s.mode === 'move' || s.fromHub || s.acquisition) go({ kind: 'addSource' });
@@ -5382,7 +5383,7 @@ export function createLibrary(host: LibraryHost) {
         }
       }
       for (const archive of prepared.archives) if (archive.mode === 'move' && fs.existsSync(archive.path)) moveToTrash(archive.path, { trashDir });
-      fs.rmSync(prepared.staging, { recursive: true, force: true });
+      void cleanupImportStaging(prepared.staging, path.join(host.dataDir, 'staging'));
       reloadTables(checked[0]);
       // Les réparations des PuP-Packs que le menu fait avant chaque partie (PUP_PLAY_REPAIRS), faites
       // dès l'installation : pack renommé et lancé, option, images nommées comme des vidéos…

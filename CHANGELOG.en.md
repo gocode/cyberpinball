@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- A temporary file that is still open no longer blocks cancelling or completing a table import. Cleanup retries in the background; if it still fails, temporary files are kept and navigation continues.
 - Colour sampling no longer accumulates videos from tables that have been left: only one sample stays active and replaced subjects are discarded. Temporarily unreadable media wait before being retried.
 - Hidden video sampling players release their decoder after success, failure or timeout. An unresponsive frame seek is stopped, and a conversion page whose renderer crashed is recreated on its next use.
 - After the graphics decoding service disconnects, the front-end retries the video once. This incident no longer marks the file as damaged in diagnostics; previous errors of this type are ignored.

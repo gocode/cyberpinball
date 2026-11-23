@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Un fichier temporaire encore ouvert ne bloque plus l’annulation ni la fin d’un ajout de table. Le nettoyage réessaie en arrière-plan ; s’il reste impossible, les fichiers temporaires sont conservés et la navigation continue.
 - La mesure des couleurs ne cumule plus les vidéos des tables quittées : une seule mesure reste active et les sujets remplacés sont abandonnés. Un média momentanément illisible attend avant d’être réessayé.
 - Les lecteurs cachés utilisés pour mesurer une vidéo libèrent leur décodeur après une réussite, une erreur ou un délai dépassé. Une recherche d’image qui ne répond plus est interrompue et une page de conversion dont le rendu est tombé est recréée au prochain usage.
 - Après une déconnexion du service de décodage graphique, le front-end réessaie une fois la vidéo. Cet incident ne marque plus le fichier comme abîmé dans le diagnostic ; les anciennes erreurs de ce type sont ignorées.
