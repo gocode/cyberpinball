@@ -202,8 +202,19 @@ export function mainBusy(main) {
  * branche. Une suite complète verte reste ainsi valable après une simple intégration.
  */
 export function workFingerprint(cwd = REPO, base = BASE) {
-  const diff = execFileSync('git', ['diff', '-U0', '--no-color', '--no-ext-diff', `${base}...HEAD`], { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  return createHash('sha1').update(diff.replace(/^index [0-9a-f]+\.\.[0-9a-f]+.*$/gm, '')).digest('hex');
+  return fingerprintOfDiff(execFileSync('git', ['diff', '-U0', '--no-color', '--no-ext-diff', `${base}...HEAD`], { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }));
+}
+
+/**
+ * Empreinte d'un diff -U0 : son contenu seul. Les lignes « index » (identifiants d'objets) et les
+ * en-têtes de bloc « @@ -12,3 +14,4 @@ fonction » sont réduits à « @@ » : leurs numéros et la
+ * fonction citée bougent dès que proto/ecrans ajoute des lignes plus haut dans le même fichier, sans
+ * que le travail de la branche change (23/11/2026 : un simple décalage invalidait le certificat et
+ * relançait toute la vérification).
+ */
+export function fingerprintOfDiff(diff) {
+  const content = diff.replace(/^index [0-9a-f]+\.\.[0-9a-f]+.*$/gm, '').replace(/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@.*$/gm, '@@');
+  return createHash('sha1').update(content).digest('hex');
 }
 
 export function certificateFile(branche, dir = coordinationDir()) {

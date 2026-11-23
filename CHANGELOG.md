@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Vérification avant fusion : un test est arrêté quand il ne progresse plus depuis 5 minutes, et non plus quand son fichier de tests dure plus de 5 minutes ; les fichiers longs mais sains ne sont plus interrompus à tort.
+- Une vérification verte reste reconnue après l'intégration de la branche commune quand seuls les numéros de ligne du travail ont bougé.
 - La fiche technique cite toutes les cartes graphiques dans son résumé et nomme la carte concernée par chaque alerte de pilote, sans déduire laquelle est utilisée par la partie.
 - Le diagnostic indique les scripts complémentaires que VPX n’a pas pu charger avant les erreurs de variables ou d’objets qui en découlent, uniquement pour la dernière partie de la table concernée.
 - Les gâchettes analogiques des manettes peuvent être relevées comme boutons de l’interface et du jeu, avec leur axe et leur sens reconnus par SDL et transmis à VPX. Les capteurs analogiques des pincabs ne deviennent pas des boutons.

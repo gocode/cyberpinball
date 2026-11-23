@@ -21,11 +21,17 @@ import { coordinationDir, currentBranch, recordFlaky } from './coordination.mjs'
 import { failedFiles, failureDetails, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
 import { NODE_TEST_ARGS } from './tests-node.mjs';
+import { TEST_FIGE_MS } from './veille-tests.mjs';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Délai d'un test (node --test-timeout) : un test figé échoue au lieu de bloquer toute la suite. */
-export const TEST_TIMEOUT_MS = 5 * 60_000;
+/**
+ * Valeur de node --test-timeout. Node l'applique à chaque fichier de test entier (isolation par
+ * processus), pas à chaque test : c'est un plafond par fichier, large. Un test figé échoue bien avant,
+ * par la veille (veille-tests.mjs : TEST_FIGE_MS, 5 min sans aucun progrès). À 5 min ici, clavier-reel
+ * et telecommande, longs mais sains, étaient interrompus (23/11/2026).
+ */
+export const TEST_TIMEOUT_MS = 4 * TEST_FIGE_MS;
 
 /** Fichiers de test encore en cours sous un lanceur node --test (ceux qui l'empêchent de finir). */
 export function runningTestFiles(pid) {

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Pre-merge check: a test is stopped when it has made no progress for 5 minutes, no longer when its test file runs longer than 5 minutes; long but healthy files are no longer wrongly interrupted.
+- A green check is still recognized after merging the shared branch in when only the line numbers of the work have shifted.
 - The tech sheet lists all graphics cards in its summary and names the card concerned by each driver warning, without assuming which one the game uses.
 - The diagnosis shows companion scripts that VPX could not load before subsequent variable or object errors, only for the last game of the relevant table.
 - Analog gamepad triggers can be assigned to front-end and game buttons, with their SDL axis and direction passed through to VPX. Cabinet analog sensors are not treated as buttons.

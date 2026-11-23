@@ -56,6 +56,8 @@ export function totals(tap) {
 export function failureDetails(tap) {
   const lines = tap.split(/\r?\n/);
   const out = [];
+  const frozen = new Map();
+  for (const m of tap.matchAll(/(test figé \([^)]*\)) : (\S+\.test\.[cm]?js) › (.+?)\s*$/gm)) frozen.set(m[2], `${m[1]} : ${m[3]}`);
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^(\s*)not ok \d+ - (.*)$/);
     if (!m) continue;
@@ -84,6 +86,8 @@ export function failureDetails(tap) {
       if (err && !error) error = err[1].replace(/^['"|>-]+\s*|['"]$/g, '').trim();
     }
     if (wholeFile && !file) file = path.basename(m[2].trim().replace(/\\\\/g, '\\'));
+    // Fichier arrêté par la veille des tests figés (veille-tests.mjs) : le test qui ne finissait pas.
+    if (wholeFile && frozen.has(file)) error = frozen.get(file);
     out.push({ name: wholeFile ? '(le fichier entier)' : m[2].trim(), file, error, wholeFile });
   }
   // La ligne d'un fichier entier n'est gardée que si aucun de ses tests n'est déjà listé (erreur

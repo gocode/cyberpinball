@@ -6,8 +6,12 @@
 // deserialize cloned data due to invalid or unsupported version » : le fichier entier est compté en
 // échec alors que ses tests passent (dedicated-menu, 21/11/2026). Ici, le texte de la console part
 // sur la sortie d'erreur, que le lanceur rend telle quelle sans la mêler à ses messages.
+//
+// Il charge aussi la veille des tests figés (veille-tests.mjs) : un test sans aucun progrès pendant
+// 5 min échoue, sans qu'un fichier long mais sain soit interrompu.
 
 import { format } from 'node:util';
+import './veille-tests.mjs';
 
 for (const name of ['log', 'info', 'debug']) {
   console[name] = (...args) => {
