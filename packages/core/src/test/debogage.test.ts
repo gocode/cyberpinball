@@ -337,6 +337,16 @@ test('sources : la fenêtre est celle des notifications de partie (sans focus, c
   assert.match(own, /if \(!enabled\(\)\) return stop\(\);/);
 });
 
+// Signalement du 24/11/2026 : au bureau (Ctrl+Maj+D), le mode débogage remettait sa fenêtre devant à la seconde (raise) ;
+// le mode bureau la prenait pour une fenêtre rouverte par le joueur (DesktopMode.reopened) et ramenait aussitôt le front-end.
+// Invariant : mode bureau ouvert, la fenêtre est fermée et la mesure ne la recrée ni ne la remonte.
+test('sources : le mode débogage retire sa fenêtre pendant le mode bureau', () => {
+  const own = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'debogage.ts'), 'utf8');
+  assert.match(own, /const hidden = host\.vr\(\) \|\| host\.desktop\?\.\(\) === true/, 'au bureau, la vue est cachée : closeWindow(), jamais present() ni raise()');
+  const front = frontendSource();
+  assert.match(front, /desktop: \(\) => desktop\.active,/, 'frontend.ts dit au mode débogage que le mode bureau est ouvert');
+});
+
 // Incident du PinCab (24/11/2026) : le mode débogage, allumé, faisait sa première mesure dans createDebug, c'est-à-dire
 // pendant l'initialisation de frontend.ts, avant `vrFront` (déclaré plus bas ; `undefined` dans l'application assemblée) :
 // « A JavaScript error occurred in the main process », et la borne restait sur cette boîte d'erreur au démarrage.

@@ -3243,6 +3243,8 @@ const debug = createDebug({
   phase: () => (state.phase === 'playing' ? 'playing' : state.phase === 'loading' ? 'loading' : 'menu'),
   // Une partie dans le casque : le mode débogage n'a rien à montrer sur les écrans.
   vr: () => vrFront.vrGameStop !== undefined,
+  // Au bureau, la fenêtre se retire : remise devant par la mesure, elle ferait revenir le front-end (desktop-mode.ts, reopened).
+  desktop: () => desktop.active,
   windows: () => windows,
   table: () => (state.phase === 'playing' || state.phase === 'loading' ? playing?.title : tables[state.index]?.title),
   // La carte graphique vient de la fiche technique (un fichier) : relue au plus toutes les cinq minutes.

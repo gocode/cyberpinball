@@ -65,6 +65,12 @@ export interface DebugHost {
   phase(): DebugPhase;
   /** Une partie dans le casque : rien à montrer sur les écrans. */
   vr(): boolean;
+  /**
+   * Le mode bureau (Bureau Windows) est ouvert : aucune fenêtre de Cyber Pinball ne doit revenir sur un écran.
+   * Sans cela (signalement du 24/11/2026), la mesure à la seconde remettait la fenêtre devant (raise), et le mode
+   * bureau y voyait une fenêtre rouverte par le joueur : retour immédiat au front-end, le bureau était inaccessible.
+   */
+  desktop?(): boolean;
   /** Les fenêtres du front-end, une par écran. */
   windows(): ReadonlyMap<RoleId, BrowserWindow>;
   /** La table que la roue montre, ou que la partie joue. */
@@ -492,7 +498,7 @@ export function createDebug(host: DebugHost): DebugController {
     if (phase === 'playing') cap = capOf();
     notifyPages(phase === 'menu');
     // La vue : rien en partie dans le casque, ni si le joueur a retiré les parties du mode.
-    const hidden = host.vr() || (phase !== 'menu' && !setting.inGame);
+    const hidden = host.vr() || host.desktop?.() === true || (phase !== 'menu' && !setting.inGame);
     const role = chooseDebugRole(setting.screen, rolesAvailable());
     const layout = role ? debugLayout(setting.mode, role, phase !== 'menu') : undefined;
     if (hidden || !role || !layout) return closeWindow();
