@@ -15,6 +15,9 @@
 // l'application est téléchargé, vérifié et déplié à côté, puis maj-legere.ts le met en place
 // une fois Cyber Pinball fermé et le relance. La source se règle ici aussi (« Versions reçues ») :
 // versions finales, préversions, ou essais d'un canal privé quand ce poste en a un (update.ts).
+// « Mise à jour automatique au lancement » (case cochée par défaut, 24/11/2026) : la première
+// recherche discrète qui aboutit après le démarrage télécharge et installe d'elle-même une version
+// plus récente, sauf pendant une partie ou si la tentative précédente a échoué.
 // GitHub muet ou injoignable : les mêmes fichiers passent par le relais de Cyber Pinball
 // (updaterelay.ts), sans rien demander au joueur ; l'écran d'erreur propose en plus « Installer
 // automatiquement la dernière version », le relais d'abord.
@@ -35,7 +38,9 @@ import {
   layoutOf,
   loadPrivateChannel,
   lightUpdateInterrupted,
+  loadAutoUpdate,
   loadUpdateSource,
+  saveAutoUpdate,
   recordPendingUpdate,
   relaunchArguments,
   removePreviousApp,
@@ -88,6 +93,8 @@ export interface UpdatesHost {
   fetch?: typeof fetch;
   /** Essais : celles du secours « Installer automatiquement la dernière version » (par défaut le relais d'abord). */
   rescueFetch?: typeof fetch;
+  /** Une partie est lancée ou en cours : la mise à jour automatique au lancement n'interrompt rien. */
+  busy?(): boolean;
 }
 
 type State =
@@ -95,7 +102,7 @@ type State =
   | { kind: 'checking' }
   | { kind: 'up-to-date'; latest: UpdateManifest }
   | { kind: 'available'; latest: UpdateManifest }
-  | { kind: 'downloading'; latest: UpdateManifest; received: number; total: number; abort: AbortController }
+  | { kind: 'downloading'; latest: UpdateManifest; received: number; total: number; abort: AbortController; auto?: boolean }
   | { kind: 'installing'; latest: UpdateManifest; light: boolean }
   | { kind: 'error'; message: string; latest?: UpdateManifest };
 
@@ -118,6 +125,8 @@ export const CHECK_EVERY_MS = 30 * 60_000;
 const RETRY_MS = 5 * 60_000;
 /** Au réveil du PC ou au retour d'une partie : une recherche, si la dernière a plus de 5 min. */
 export const SOON_AFTER_MS = 5 * 60_000;
+/** Mise à jour automatique au lancement : la recherche doit aboutir dans ce délai après le démarrage. */
+export const LAUNCH_WINDOW_MS = 15 * 60_000;
 
 export function createUpdatesMenu(host: UpdatesHost) {
   let state: State = { kind: 'idle' };
@@ -210,6 +219,27 @@ export function createUpdatesMenu(host: UpdatesHost) {
     host.library.openCustom(build, at);
   }
 
+  /** Case « Mise à jour automatique au lancement » : cochée tant que rien n'est réglé. */
+  const autoAction = (): Action => {
+    const on = loadAutoUpdate(host.loc.dataDir);
+    return {
+      label: on ? t('Mise à jour automatique au lancement : oui') : t('Mise à jour automatique au lancement : non'),
+      detail: on ? t('Une version plus récente s’installe d’elle-même au démarrage (Start : désactiver)') : t('Au démarrage, une version plus récente est seulement signalée (Start : activer)'),
+      icon: on ? 'check' : 'close',
+      ...(on && { tone: 'ok' as const }),
+      run: () => {
+        try {
+          saveAutoUpdate(host.loc.dataDir, !on);
+        } catch (error) {
+          state = { kind: 'error', message: (error as Error).message };
+          return show();
+        }
+        // Le même écran redessiné : le curseur reste sur la case.
+        host.library.openCustom(build);
+      },
+    };
+  };
+
   const sourceAction = (): Action => ({
     label: t('Versions reçues : {source}', { source: sourceName(source()) }),
     detail: t('Choisir entre versions finales, préversions{essais}', { essais: channel() ? t(' et essais privés') : '' }),
@@ -272,6 +302,13 @@ export function createUpdatesMenu(host: UpdatesHost) {
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
       if (state.kind === 'available') host.available?.(state.latest.version, host.version);
       console.log(`Mise à jour (arrière-plan) : ${describe()}`);
+      const launch = atLaunch && Date.now() - launchedAt < LAUNCH_WINDOW_MS;
+      atLaunch = false;
+      if (launch && state.kind === 'available' && autoInstallAllowed(state.latest)) {
+        console.log(`Mise à jour automatique au lancement : ${state.latest.version}`); // i18n-ignore : journal
+        void download(state.latest, updateFetch, true);
+        return true;
+      }
       host.broadcast();
       return true;
     } catch (error) {
@@ -282,6 +319,29 @@ export function createUpdatesMenu(host: UpdatesHost) {
 
   /** Heure de la dernière recherche discrète lancée (réussie ou non). */
   let quietAt = 0;
+
+  /**
+   * Vrai du démarrage jusqu'à la première recherche discrète qui aboutit (24/11/2026) : celle-là
+   * seule peut installer d'elle-même (« Mise à jour automatique au lancement »), et seulement dans
+   * les premières minutes (réseau lent à venir). Les suivantes, toutes les 30 min, ne font que la
+   * pastille : rien ne ferme Cyber Pinball en cours de route.
+   */
+  let atLaunch = false;
+  let launchedAt = 0;
+
+  /**
+   * Installation automatique permise : case cochée, application installée, version installable,
+   * aucune partie en cours, et la tentative précédente n'a pas échoué (sinon elle recommencerait à
+   * chaque démarrage).
+   */
+  function autoInstallAllowed(latest: UpdateManifest): boolean {
+    if (!loadAutoUpdate(host.loc.dataDir) || failed || !installedRoot() || plan(latest).kind === 'none') return false;
+    if (host.busy?.()) {
+      console.log('Mise à jour automatique au lancement : partie en cours, seulement signalée.'); // i18n-ignore : journal
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Réveil du PC, retour d'une partie : une recherche discrète tout de suite, si la dernière a
@@ -301,6 +361,8 @@ export function createUpdatesMenu(host: UpdatesHost) {
   /** Recherches en arrière-plan, du démarrage à la fermeture : chacune programme la suivante. */
   function startBackgroundChecks(): void {
     if (!host.background) return;
+    atLaunch = true;
+    launchedAt = Date.now();
     const next = (ms: number) => {
       const timer = setTimeout(async () => next((await checkQuietly()) ? CHECK_EVERY_MS : RETRY_MS), ms);
       timer.unref?.();
@@ -345,12 +407,12 @@ export function createUpdatesMenu(host: UpdatesHost) {
     show();
   }
 
-  async function download(latest: UpdateManifest, get: typeof fetch = updateFetch): Promise<void> {
+  async function download(latest: UpdateManifest, get: typeof fetch = updateFetch, auto = false): Promise<void> {
     const root = installedRoot();
     const how = plan(latest);
     if (!root || !host.loc.root || how.kind === 'none') return;
     const abort = new AbortController();
-    state = { kind: 'downloading', latest, received: 0, total: how.asset.size, abort };
+    state = { kind: 'downloading', latest, received: 0, total: how.asset.size, abort, ...(auto && { auto }) };
     show();
     let shown = 0;
     const dir = updateDownloadsDir(layoutOf(host.loc.root).downloads);
@@ -546,7 +608,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
               rows: [{ text: t('Cyber Pinball est à jour'), detail: t('Dernière version publiée : {version}, le {date}', { version: state.latest.version, date: date(state.latest.date) }), tone: 'ok' }],
             },
           ],
-          actions: [{ label: t('Rechercher à nouveau'), icon: 'refresh', run: () => void check() }, sourceAction(), retour],
+          actions: [{ label: t('Rechercher à nouveau'), icon: 'refresh', run: () => void check() }, sourceAction(), autoAction(), retour],
           back,
         };
       case 'available': {
@@ -578,7 +640,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
             tone: 'warning',
           });
         }
-        actions.push(sourceAction(), { label: t('Plus tard'), icon: 'back', run: back });
+        actions.push(sourceAction(), autoAction(), { label: t('Plus tard'), icon: 'back', run: back });
         return {
           heading: t('Cyber Pinball {version} est disponible', { version: latest.version }),
           subheading: t('{subheading} · publiée le {date}', { subheading, date: date(latest.date) }),
@@ -589,15 +651,17 @@ export function createUpdatesMenu(host: UpdatesHost) {
         };
       }
       case 'downloading': {
-        const { received, total, latest, abort } = state;
+        const { received, total, latest, abort, auto } = state;
         const percent = total ? Math.floor((received / total) * 100) : 0;
+        const then =
+          plan(latest).kind === 'light'
+            ? t('Une fois vérifiée, la mise à jour se met en place : Cyber Pinball se ferme puis redémarre.')
+            : t('Une fois vérifié, l’installeur se lance : Cyber Pinball se ferme puis redémarre.');
         return {
           heading: t('Téléchargement de Cyber Pinball {version}', { version: latest.version }),
           subheading,
-          lead:
-            plan(latest).kind === 'light'
-              ? t('Une fois vérifiée, la mise à jour se met en place : Cyber Pinball se ferme puis redémarre.')
-              : t('Une fois vérifié, l’installeur se lance : Cyber Pinball se ferme puis redémarre.'),
+          // Lancée d'elle-même : dire pourquoi, et où la couper.
+          lead: auto ? t('Mise à jour automatique au lancement : « Annuler » la remet à plus tard, et l’écran suivant permet de la couper. {then}', { then }) : then,
           sections: [{ rows: [{ text: t('{received} sur {total}', { received: formatMebibytes(received), total: formatMebibytes(total) }), detail: t('{percent} %', { percent }), tone: 'info' }] }],
           actions: [{ label: t('Annuler'), detail: t('Le téléchargement s’arrête ; rien n’est installé'), icon: 'close', run: () => abort.abort() }],
           back: () => abort.abort(),
@@ -635,6 +699,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
                 ]
               : []),
             sourceAction(),
+            autoAction(),
             retour,
           ],
           back,

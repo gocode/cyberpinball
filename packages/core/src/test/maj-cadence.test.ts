@@ -41,6 +41,24 @@ test('mises à jour : la recherche part dès l’ouverture de l’entrée, sans 
   assert.match(updates, /state = known \?\? \{ kind: 'error'/);
 });
 
+test('mise à jour automatique au lancement : la première recherche seulement, jamais en partie ni après un échec', () => {
+  const updates = read('updates-menu.ts');
+  // Armée au démarrage, consommée par la première recherche discrète qui aboutit, et dans un délai borné.
+  assert.match(updates, /atLaunch = true;\s+launchedAt = Date\.now\(\);/, 'armée par startBackgroundChecks');
+  assert.match(updates, /const launch = atLaunch && Date\.now\(\) - launchedAt < LAUNCH_WINDOW_MS;\s+atLaunch = false;/, 'une seule fois, juste après le démarrage');
+  const window = constant(updates, 'LAUNCH_WINDOW_MS');
+  assert.ok(window <= 30 * 60_000, 'au-delà, ce n’est plus « au lancement »');
+  // Case cochée, pas de tentative ratée (sinon elle recommencerait à chaque démarrage), aucune partie en cours.
+  const allowed = updates.match(/function autoInstallAllowed\([^)]*\): boolean \{([\s\S]*?)\n  \}/);
+  assert.ok(allowed, 'autoInstallAllowed introuvable');
+  assert.match(allowed[1]!, /!loadAutoUpdate\(host\.loc\.dataDir\) \|\| failed \|\| !installedRoot\(\)/);
+  assert.match(allowed[1]!, /host\.busy\?\.\(\)/);
+  const frontend = read('frontend.ts');
+  assert.match(frontend, /busy: \(\) => state\.phase === 'loading' \|\| state\.phase === 'playing',/, 'le front-end dit quand une partie tourne');
+  // La case est sur chaque écran de résultat.
+  assert.equal((updates.match(/sourceAction\(\),\s+autoAction\(\),/g) ?? []).length, 3, 'à jour, disponible, erreur');
+});
+
 test('mises à jour : une recherche au réveil du PC et au retour d’une partie', () => {
   const frontend = read('frontend.ts');
   assert.match(frontend, /powerMonitor\.on\('resume', \(\) => updates\.checkSoon\(\)\);/, 'réveil du PC');

@@ -15,6 +15,8 @@ import {
   loadPrivateChannel,
   loadUpdateSource,
   saveUpdateSource,
+  loadAutoUpdate,
+  saveAutoUpdate,
   downloadAppPackage,
   downloadUpdate,
   installedSocle,
@@ -512,6 +514,29 @@ test('préversions : réglage gardé ; flux de la release la plus récente, pré
   } finally {
     await site.close();
     await api.close();
+  }
+});
+
+test('mise à jour automatique au lancement : cochée par défaut ; elle et la source se gardent l’une l’autre', () => {
+  const dir = temp();
+  try {
+    // Nouvelle installation, ou réglage d'une version qui ne la connaissait pas : cochée.
+    assert.equal(loadAutoUpdate(dir), true);
+    fs.writeFileSync(path.join(dir, 'preversions.json'), JSON.stringify({ preversions: true, source: 'preversions' }));
+    assert.equal(loadAutoUpdate(dir), true);
+    saveAutoUpdate(dir, false);
+    assert.equal(loadAutoUpdate(dir), false);
+    assert.equal(loadUpdateSource(dir), 'preversions', 'la source reste celle choisie');
+    saveUpdateSource(dir, 'finales');
+    assert.equal(loadAutoUpdate(dir), false, 'changer de source ne recoche pas la case');
+    saveAutoUpdate(dir, true);
+    assert.equal(loadAutoUpdate(dir), true);
+    assert.equal(loadUpdateSource(dir), 'finales');
+    // Fichier illisible : cochée, comme à l'installation.
+    fs.writeFileSync(path.join(dir, 'preversions.json'), '{');
+    assert.equal(loadAutoUpdate(dir), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

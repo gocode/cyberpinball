@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- New "Automatic update at launch" checkbox in System menu > Help and info > Cyber Pinball update, checked by default: at startup, a newer version downloads and installs itself (never during a game, and no new attempt if the previous one failed). "Cancel" during the download postpones it; unchecking the box goes back to the red dot only.
 - Point of view previews: what VPX renders as pure black around the table (bands, margins) is painted with a bluish striped pattern, to show where the table edges really begin; the clear outline around the card is kept. Previews are rendered once more with this background.
 - Point of view previews: choosing a framing no longer restarts VPX for the other cards. Under an automatic framing, the view left in the .ini (saved custom view, imported POV) no longer counts in the cache key, since VPX recomputes it.
 - Point of view: new trial preset (beta), "Low eye, wider table", for one table only: the characteristics of a view tuned by hand on a cabinet (lower eye, lowered glass to see the back of the cabinet, table enlarged in width and a little in height, raised). It is a starting point to adjust in the VPX menu; the preview shows the result on the table.

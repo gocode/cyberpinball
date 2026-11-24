@@ -322,10 +322,37 @@ export function loadUpdateSource(dataDir: string): UpdateSource {
   }
 }
 
-/** Saves the source; "preversions" stays written for the versions that do not know "source". */
-export function saveUpdateSource(dataDir: string, source: UpdateSource): void {
+/** Update settings file as written (source, automatic update), or {} when missing or unreadable. */
+function readUpdateSettings(dataDir: string): Record<string, unknown> {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), 'utf8').replace(/^﻿/, '')) as unknown;
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeUpdateSettings(dataDir: string, settings: Record<string, unknown>): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  writeFileAtomic(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: source !== 'finales', source }, null, 2)}\n`);
+  writeFileAtomic(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify(settings, null, 2)}\n`);
+}
+
+/** Saves the source; "preversions" stays written for the versions that do not know "source". Other settings are kept. */
+export function saveUpdateSource(dataDir: string, source: UpdateSource): void {
+  writeUpdateSettings(dataDir, { ...readUpdateSettings(dataDir), preversions: source !== 'finales', source });
+}
+
+/**
+ * Automatic update at launch: the first successful check after start downloads and installs a
+ * newer version by itself. On as long as nothing is set (new installations, 24/11/2026).
+ */
+export function loadAutoUpdate(dataDir: string): boolean {
+  return readUpdateSettings(dataDir).automatique !== false;
+}
+
+/** Saves the automatic update setting; the source is kept. */
+export function saveAutoUpdate(dataDir: string, on: boolean): void {
+  writeUpdateSettings(dataDir, { ...readUpdateSettings(dataDir), automatique: on });
 }
 
 /** Does the cabinet accept pre-releases? No as long as nothing is set. */

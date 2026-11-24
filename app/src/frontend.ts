@@ -2536,6 +2536,8 @@ const updates = createUpdatesMenu({
   },
   // Essais hors écran : seulement vers leur site d'essai, jamais vers GitHub.
   background: !OFFSCREEN || Boolean(process.env.CYBERPINBALL_MAJ_URL),
+  // Mise à jour automatique au lancement : jamais pendant une partie.
+  busy: () => state.phase === 'loading' || state.phase === 'playing',
 });
 library.provideSystemItem('updates', updates.systemItem);
 // Sauvegardes : sur une clé USB ou un disque, à la demande ou chaque semaine (réglages et scores) ;

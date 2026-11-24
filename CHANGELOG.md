@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Nouvelle case « Mise à jour automatique au lancement » dans Menu système > Aide et infos > Mise à jour de Cyber Pinball, cochée par défaut : au démarrage, une version plus récente se télécharge et s'installe d'elle-même (jamais pendant une partie, et pas de nouvel essai si la précédente n'a pas abouti). « Annuler » pendant le téléchargement la remet à plus tard ; décocher la case revient à la simple pastille rouge.
 - Aperçus du Point de vue : ce que VPX rend en noir pur autour de la table (bandes, marges) est peint d'un motif rayé bleuté, pour voir où commencent réellement les bords de la table ; le liseré clair autour de la carte est gardé. Les aperçus sont rendus une fois de plus avec ce fond.
 - Aperçus du Point de vue : choisir un cadrage ne relance plus VPX pour les autres cartes. Sous un cadrage automatique, la vue laissée dans le .ini (vue personnalisée gardée, POV repris) ne compte plus dans la clé du cache, puisque VPX la recalcule.
 - Point de vue : nouveau préréglage d'essai (bêta), "Œil bas, table élargie", pour une table seule : les caractéristiques d'une vue réglée à la main sur une borne (œil plus bas, vitre abaissée pour voir le fond de la caisse, table agrandie en largeur et un peu en hauteur, remontée). C'est un point de départ à ajuster dans le menu de VPX ; l'aperçu montre le résultat sur la table.
