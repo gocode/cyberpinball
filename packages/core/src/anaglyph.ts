@@ -20,6 +20,7 @@
 
 import { t } from './i18n';
 import { IniDocument } from './ini';
+import { nvidia3dVisionGameSettings, STEREO_GLASSES_KINDS, type StereoGlassesKind } from './nvidia3dvision';
 import type { VpxSetting } from './vpx';
 import { VR_REFUSED_FXAA, VR_STEREO_FXAA } from './vr';
 
@@ -41,6 +42,8 @@ export interface AnaglyphCalibration {
 
 export interface AnaglyphSetting {
   mode: AnaglyphMode;
+  /** À filtres colorés, ou actives NVIDIA 3D Vision (bêta, 24/11/2026, nvidia3dvision.ts). */
+  kind: StereoGlassesKind;
   glasses: AnaglyphGlasses;
   /** Profondeur : la distance réelle entre les yeux (63 mm) multipliée par elle. 1 : physiquement juste en borne. */
   depth: number;
@@ -76,7 +79,7 @@ export const GLASSES_PRESETS: Readonly<Record<AnaglyphGlasses, AnaglyphCalibrati
   'amber-blue': { left: [0.61, 0.66, 0.09], right: [0.05, 0.16, 0.96] },
 };
 
-export const DEFAULT_ANAGLYPH: AnaglyphSetting = { mode: 'off', glasses: 'red-cyan', depth: 1, colors: 'comfort', wheel: true };
+export const DEFAULT_ANAGLYPH: AnaglyphSetting = { mode: 'off', kind: 'anaglyph', glasses: 'red-cyan', depth: 1, colors: 'comfort', wheel: true };
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -98,6 +101,7 @@ export function parseAnaglyphSetting(raw: unknown): AnaglyphSetting {
   const right = parseRgb(cal.right);
   return {
     mode: r.mode === 'on' ? 'on' : 'off',
+    kind: STEREO_GLASSES_KINDS.includes(r.kind as StereoGlassesKind) ? (r.kind as StereoGlassesKind) : DEFAULT_ANAGLYPH.kind,
     glasses,
     depth: finite(r.depth) && r.depth >= 0.25 && r.depth <= 2 ? r.depth : DEFAULT_ANAGLYPH.depth,
     colors: ANAGLYPH_COLORS.includes(r.colors as AnaglyphColors) ? (r.colors as AnaglyphColors) : DEFAULT_ANAGLYPH.colors,
@@ -117,7 +121,8 @@ export interface AnaglyphWheelRelief {
 }
 
 export function anaglyphWheelRelief(s: AnaglyphSetting): AnaglyphWheelRelief | undefined {
-  if (s.mode !== 'on' || !s.wheel) return undefined;
+  // Lunettes actives : la roue reste à plat (Electron ne parle pas au pilote 3D de NVIDIA).
+  if (s.mode !== 'on' || !s.wheel || s.kind !== 'anaglyph') return undefined;
   const c = s.calibration;
   // Le verre de gauche, d'ordinaire : rouge (il voit le rouge), vert (le vert), ambre (il voit peu le bleu).
   const swapped = !c ? false : s.glasses === 'red-cyan' ? c.left[0] < c.right[0] : s.glasses === 'green-magenta' ? c.left[1] < c.right[1] : c.left[2] > c.right[2];
@@ -165,7 +170,7 @@ const num = (v: number) => String(Math.round(v * 1000) / 1000);
 export function isAnaglyphKey(section: string, key: string): boolean {
   if (section.toLowerCase() !== 'player') return false;
   const k = key.toLowerCase();
-  return k.startsWith('stereo3d') || k.startsWith(`anaglyph${ANAGLYPH_PROFILE}`) || k === 'fxaa';
+  return k.startsWith('stereo3d') || k.startsWith(`anaglyph${ANAGLYPH_PROFILE}`) || k === 'fxaa' || k === 'gfxbackend';
 }
 
 /**
@@ -175,6 +180,7 @@ export function isAnaglyphKey(section: string, key: string): boolean {
  * qualité, comme pour le casque (vr.ts).
  */
 export function anaglyphGameSettings(s: AnaglyphSetting, table: string, global: string): VpxSetting[] {
+  if (s.kind === 'nvidia') return nvidia3dVisionGameSettings(s, table, global);
   const f = anaglyphFilters(s);
   const p = `Anaglyph${ANAGLYPH_PROFILE}`;
   const player = (key: string, value: string): VpxSetting => ({ section: 'Player', key, value });
@@ -313,7 +319,8 @@ export const ANAGLYPH_FACE: readonly string[] = (() => {
 
 /** Ligne du Menu système (Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D). */
 export function anaglyphMenuText(s: AnaglyphSetting): { label: string; detail: string } {
+  if (s.mode === 'on' && s.kind === 'nvidia') return { label: t('Lunettes 3D : activées'), detail: t('Lunettes actives NVIDIA 3D Vision · profondeur {depth}', { depth: depthLabel(s.depth) }) };
   return s.mode === 'on'
     ? { label: t('Lunettes 3D : activées'), detail: t('Lunettes {glasses} · profondeur {depth}{calibrated}', { glasses: glassesLabel(s.glasses), depth: depthLabel(s.depth), calibrated: s.calibration ? t(' · calibrées') : '' }) }
-    : { label: t('Lunettes 3D : désactivées'), detail: t('La table en relief avec des lunettes à filtres colorés (rouge / cyan…), seules ou avec la Vision 3D') };
+    : { label: t('Lunettes 3D : désactivées'), detail: t('La table en relief avec des lunettes à filtres colorés (rouge / cyan…) ou des lunettes actives NVIDIA 3D Vision') };
 }

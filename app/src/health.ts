@@ -33,6 +33,7 @@ import {
   type DofFacts,
   type HardwareDmdFacts,
   type VrNetworkFacts,
+  type Nvidia3dVisionFacts,
   type Finding,
   type HealthFacts,
   type HealthLine,
@@ -71,6 +72,8 @@ export interface HealthContext {
   hardwareDmd?(): HardwareDmdFacts | undefined;
   /** Le réseau du casque (vr-reseau.ts) : transport de Link et carte réseau du PC ; undefined sans casque. */
   vr?(): VrNetworkFacts | undefined;
+  /** Lunettes actives NVIDIA 3D Vision (nvidia-3dvision.ts) ; undefined si elles ne sont pas choisies et activées. */
+  glasses3d?(): Nvidia3dVisionFacts | undefined;
   /** Le PC et Windows, d'après le dernier relevé de la fiche technique ; undefined avant le premier. */
   pc?(): PcHealthFacts | undefined;
   /** Le nom de la borne sur le réseau pour le téléphone gardé (phone-remote.ts) ; undefined hors réseau local. */
@@ -198,9 +201,15 @@ export function createHealth(ctx: HealthContext) {
       console.error(`Santé de la borne, DMD réel : ${(error as Error).message}`); // i18n-ignore : journal
     }
     const vr = ctx.vr?.();
+    let glasses3d: Nvidia3dVisionFacts | undefined;
+    try {
+      glasses3d = ctx.glasses3d?.();
+    } catch (error) {
+      console.error(`Santé de la borne, lunettes 3D : ${(error as Error).message}`); // i18n-ignore : journal
+    }
     const remote = ctx.remote?.();
     const pc = ctx.pc?.();
-    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(buttons ? { buttons } : {}), ...(hardwareDmd ? { hardwareDmd } : {}), ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(remote ? { remote } : {}), vpx };
+    return { at: new Date().toISOString(), disks, ...(pc ? { pc } : {}), tables, pup, media, screens, ...(buttons ? { buttons } : {}), ...(hardwareDmd ? { hardwareDmd } : {}), ...(dof ? { dof } : {}), ...(vr ? { vr } : {}), ...(glasses3d ? { glasses3d } : {}), ...(remote ? { remote } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

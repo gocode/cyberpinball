@@ -1,0 +1,604 @@
+diff --git a/src/core/Settings_properties.inl b/src/core/Settings_properties.inl
+index 2c43f87..b605119 100644
+--- a/src/core/Settings_properties.inl
++++ b/src/core/Settings_properties.inl
+@@ -477,6 +477,8 @@ PropFloat(Player, Stereo3DSaturation, "Stereo Saturation"s, "Saturation adjustme
+ PropFloat(Player, Stereo3DDefocus, "Anaglyph Defocus"s, "Defocusing of the lesser eye (non dominant eye) applied to anaglyph stereo rendering.\nThis may help to keep the depth perception with less ghosting/retinal rivalry."s, 0.f, 1.f, 0.f);
+ PropFloat(Player, Stereo3DLeftContrast, "Anaglyph Left Contrast"s, "Left eye contrast adjustment applied to anaglyph stereo rendering"s, 0.f, 2.f, 1.f);
+ PropFloat(Player, Stereo3DRightContrast, "Anaglyph Right Contrast"s, "Right eye contrast adjustment applied to anaglyph stereo rendering"s, 0.f, 2.f, 1.f);
++// Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision shutter glasses (direct mode).
++PropBool(Player, Stereo3DNvidiaDirect, "NVIDIA 3D Vision"s, "With 'Side by Side': present each view at the full screen width to NVIDIA 3D Vision shutter glasses (Direct3D 11, exclusive fullscreen, NVIDIA driver 452.06 or older with stereo enabled)"s, false);
+ PropEnum(Player, Anaglyph1Filter, "Anaglyph Filter"s, "Anaglyph filter"s, int, 2, "None"s, "Dubois"s, "Luminance"s, "Deghost"s);
+ PropEnum(Player, Anaglyph2Filter, "Anaglyph Filter"s, "Anaglyph filter"s, int, 2, "None"s, "Dubois"s, "Luminance"s, "Deghost"s);
+ PropEnum(Player, Anaglyph3Filter, "Anaglyph Filter"s, "Anaglyph filter"s, int, 2, "None"s, "Dubois"s, "Luminance"s, "Deghost"s);
+diff --git a/src/renderer/RenderDevice.cpp b/src/renderer/RenderDevice.cpp
+index c6244b5..a29c7ad 100644
+--- a/src/renderer/RenderDevice.cpp
++++ b/src/renderer/RenderDevice.cpp
+@@ -42,6 +42,13 @@
+ #ifdef __STANDALONE__
+ #pragma pop_macro("_WIN64")
+ #endif
++#if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++// Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode
++#include <atomic>
++#include <d3d11_1.h>
++#include <d3dcompiler.h>
++#include "nvapi/nvapi.h"
++#endif
+ 
+ #elif defined(ENABLE_OPENGL)
+ #include "typedefs3D.h"
+@@ -325,6 +332,404 @@ colorFormat RenderDevice::BGFXtoVPXTextureFormat(bgfx::TextureFormat::Enum forma
+ 
+ static const string& bgfxRendererName(const bgfx::RendererType::Enum type);
+ 
++#if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++////////////////////////////////////////////////////////////////////////////////
++// Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode.
++//
++// 3D Vision (NVIDIA driver 452.06 or older for Direct3D 11) needs a Direct3D 11 device, an exclusive fullscreen
++// swapchain, and NvAPI_Stereo_SetDriverMode(DIRECT) called before the device is created (done in the RenderDevice
++// constructor). BGFX does not implement exclusive fullscreen, so the device and the swapchain are created here and
++// given to BGFX, which renders headless into an offscreen side by side target (left view, right view, each at the
++// full window width) used as its backbuffer. On each present, each half is drawn to the stereo backbuffer after
++// selecting the eye with NvAPI_Stereo_SetActiveEye, in a separate device context state so that BGFX's state is
++// left untouched. Everything here runs on the render thread (the only BGFX thread), except the driver mode.
++// Surfaces created after the swapchain are forced mono (only the swapchain backbuffer is stereo).
++
++struct NvStereoDirect
++{
++   HWND hwnd = nullptr;
++   UINT width = 0;
++   UINT height = 0;
++   DXGI_MODE_DESC mode {};
++   ID3D11Device* device = nullptr;
++   ID3D11DeviceContext* context = nullptr;
++   ID3D11DeviceContext1* context1 = nullptr;
++   ID3DDeviceContextState* state = nullptr;
++   IDXGIOutput* output = nullptr;
++   IDXGISwapChain* swapChain = nullptr;
++   ID3D11RenderTargetView* backBufferRTV = nullptr;
++   ID3D11Texture2D* sbsTex = nullptr;
++   ID3D11RenderTargetView* sbsRTV = nullptr;
++   ID3D11ShaderResourceView* sbsSRV = nullptr;
++   ID3D11Texture2D* depthTex = nullptr;
++   ID3D11DepthStencilView* depthDSV = nullptr;
++   ID3D11VertexShader* vs[3] = { nullptr, nullptr, nullptr }; // left half, right half, whole side by side target
++   ID3D11PixelShader* ps = nullptr;
++   ID3D11SamplerState* sampler = nullptr;
++   StereoHandle stereo = nullptr;
++   std::atomic<bool> stopping { false }; // set by the main thread when the player closes: no more fullscreen switch
++   ULONGLONG nextFullscreenTry = 0;
++   unsigned int presentCount = 0;
++   int lastActivated = -1;
++   bool fullscreen = false;
++   bool presentErrorLogged = false;
++   bool eyeErrorLogged = false;
++};
++
++template <class T> static void NvStereoRelease(T*& p)
++{
++   if (p)
++   {
++      p->Release();
++      p = nullptr;
++   }
++}
++
++static void NvStereoDestroy(NvStereoDirect*& s)
++{
++   if (s == nullptr)
++      return;
++   if (s->swapChain)
++   {
++      // A swapchain must leave exclusive fullscreen before being released
++      BOOL fullscreen = FALSE;
++      if (SUCCEEDED(s->swapChain->GetFullscreenState(&fullscreen, nullptr)) && fullscreen)
++         s->swapChain->SetFullscreenState(FALSE, nullptr);
++   }
++   if (s->stereo)
++      NvAPI_Stereo_DestroyHandle(s->stereo);
++   NvStereoRelease(s->sampler);
++   NvStereoRelease(s->ps);
++   for (auto& vs : s->vs)
++      NvStereoRelease(vs);
++   NvStereoRelease(s->depthDSV);
++   NvStereoRelease(s->depthTex);
++   NvStereoRelease(s->sbsSRV);
++   NvStereoRelease(s->sbsRTV);
++   NvStereoRelease(s->sbsTex);
++   NvStereoRelease(s->backBufferRTV);
++   NvStereoRelease(s->swapChain);
++   NvStereoRelease(s->output);
++   NvStereoRelease(s->state);
++   NvStereoRelease(s->context1);
++   NvStereoRelease(s->context);
++   NvStereoRelease(s->device);
++   delete s;
++   s = nullptr;
++}
++
++static void NvStereoStop(NvStereoDirect* s)
++{
++   s->stopping = true;
++}
++
++static bool NvStereoBindBackBuffer(NvStereoDirect* s)
++{
++   ID3D11Texture2D* backBuffer = nullptr;
++   if (FAILED(s->swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer)))
++      return false;
++   const HRESULT hr = s->device->CreateRenderTargetView(backBuffer, nullptr, &s->backBufferRTV);
++   backBuffer->Release();
++   return SUCCEEDED(hr);
++}
++
++// Exclusive fullscreen is required by 3D Vision with Direct3D 11 on GeForce cards. The backbuffer is recreated with
++// automatic surface creation so that the driver makes it stereo, then surface creation is forced mono again.
++// Returns true when the swapchain is in exclusive fullscreen with its backbuffer bound. Otherwise the backbuffer
++// stays bound (when possible) in a window, where the whole side by side target is presented.
++static bool NvStereoEnterFullscreen(NvStereoDirect* s)
++{
++   NvStereoRelease(s->backBufferRTV);
++   NvAPI_Stereo_SetSurfaceCreationMode(s->stereo, NVAPI_STEREO_SURFACECREATEMODE_AUTO);
++   s->swapChain->ResizeTarget(&s->mode);
++   HRESULT hr = s->swapChain->SetFullscreenState(TRUE, s->output);
++   if (SUCCEEDED(hr))
++      hr = s->swapChain->ResizeBuffers(1, s->width, s->height, s->mode.Format, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
++   NvAPI_Stereo_SetSurfaceCreationMode(s->stereo, NVAPI_STEREO_SURFACECREATEMODE_FORCEMONO);
++   BOOL fullscreen = FALSE;
++   s->swapChain->GetFullscreenState(&fullscreen, nullptr);
++   s->fullscreen = SUCCEEDED(hr) && fullscreen;
++   if (!s->fullscreen)
++      PLOGE << "NVIDIA 3D Vision: exclusive fullscreen failed (0x" << std::hex << (uint32_t)hr << std::dec << "), showing both views side by side until the playfield window is in front again";
++   else
++      PLOGI << "NVIDIA 3D Vision: exclusive fullscreen " << s->mode.Width << 'x' << s->mode.Height << " at " << s->mode.RefreshRate.Numerator << '/' << s->mode.RefreshRate.Denominator << " Hz";
++   if (!NvStereoBindBackBuffer(s))
++   {
++      PLOGE << "NVIDIA 3D Vision: failed to bind the swapchain backbuffer";
++      return false;
++   }
++   return s->fullscreen;
++}
++
++static const char nvStereoShader[] = R"(
++struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };
++VSOut vs_main(uint id : SV_VertexID)
++{
++   VSOut o;
++   const float2 t = float2((id << 1) & 2, id & 2);
++   o.pos = float4(t * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
++   o.uv = float2(EYE_OFFSET + t.x * EYE_SCALE, t.y);
++   return o;
++}
++Texture2D tex : register(t0);
++SamplerState smp : register(s0);
++float4 ps_main(VSOut i) : SV_Target { return float4(tex.Sample(smp, i.uv).rgb, 1.0); }
++)";
++
++static NvStereoDirect* NvStereoCreate(HWND hwnd, UINT width, UINT height)
++{
++   NvStereoDirect* s = new NvStereoDirect();
++   s->hwnd = hwnd;
++   const auto fail = [&s](const char* what, long code) -> NvStereoDirect*
++   {
++      PLOGE << "NVIDIA 3D Vision: " << what << " failed (0x" << std::hex << (uint32_t)code << std::dec << "), falling back to plain side by side rendering";
++      NvStereoDestroy(s);
++      return nullptr;
++   };
++
++   // Device on the default adapter (the one driving the main display), Direct3D 11 only
++   static PFN_D3D11_CREATE_DEVICE createDevice = nullptr;
++   if (createDevice == nullptr)
++      if (HMODULE d3d11 = LoadLibraryW(L"d3d11.dll"); d3d11)
++         createDevice = (PFN_D3D11_CREATE_DEVICE)GetProcAddress(d3d11, "D3D11CreateDevice");
++   if (createDevice == nullptr)
++      return fail("loading Direct3D 11", E_FAIL);
++   const D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
++   HRESULT hr = createDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels, 2, D3D11_SDK_VERSION, &s->device, nullptr, &s->context);
++   if (hr == E_INVALIDARG)
++      hr = createDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels + 1, 1, D3D11_SDK_VERSION, &s->device, nullptr, &s->context);
++   if (FAILED(hr))
++      return fail("D3D11CreateDevice", hr);
++   if (FAILED(hr = s->context->QueryInterface(__uuidof(ID3D11DeviceContext1), (void**)&s->context1)))
++      return fail("ID3D11DeviceContext1", hr);
++
++   // Output of the playfield window, which must be driven by that adapter
++   IDXGIDevice* dxgiDevice = nullptr;
++   IDXGIAdapter* adapter = nullptr;
++   IDXGIFactory* factory = nullptr;
++   hr = s->device->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxgiDevice);
++   if (SUCCEEDED(hr))
++      hr = dxgiDevice->GetAdapter(&adapter);
++   if (SUCCEEDED(hr))
++      hr = adapter->GetParent(__uuidof(IDXGIFactory), (void**)&factory);
++   NvStereoRelease(dxgiDevice);
++   if (FAILED(hr))
++   {
++      NvStereoRelease(adapter);
++      return fail("getting the DXGI factory", hr);
++   }
++   const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
++   IDXGIOutput* output = nullptr;
++   for (UINT i = 0; adapter->EnumOutputs(i, &output) != DXGI_ERROR_NOT_FOUND; ++i)
++   {
++      DXGI_OUTPUT_DESC desc;
++      if (SUCCEEDED(output->GetDesc(&desc)) && desc.Monitor == monitor)
++      {
++         s->output = output;
++         break;
++      }
++      NvStereoRelease(output);
++   }
++   NvStereoRelease(adapter);
++   if (s->output == nullptr)
++   {
++      NvStereoRelease(factory);
++      return fail("finding the playfield display on the main graphics adapter (the playfield must be the main display)", DXGI_ERROR_NOT_FOUND);
++   }
++
++   // Display mode: the window size at the current refresh rate of the playfield display
++   UINT refreshRate = 0;
++   MONITORINFOEXW monitorInfo {};
++   monitorInfo.cbSize = sizeof(monitorInfo);
++   DEVMODEW displayMode {};
++   displayMode.dmSize = sizeof(displayMode);
++   if (GetMonitorInfoW(monitor, &monitorInfo) && EnumDisplaySettingsW(monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &displayMode))
++      refreshRate = displayMode.dmDisplayFrequency;
++   DXGI_MODE_DESC wanted {};
++   wanted.Width = width;
++   wanted.Height = height;
++   wanted.RefreshRate.Numerator = refreshRate;
++   wanted.RefreshRate.Denominator = refreshRate ? 1 : 0;
++   wanted.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
++   if (FAILED(hr = s->output->FindClosestMatchingMode(&wanted, &s->mode, s->device)))
++   {
++      NvStereoRelease(factory);
++      return fail("finding a fullscreen display mode", hr);
++   }
++   s->width = s->mode.Width;
++   s->height = s->mode.Height;
++
++   // Swapchain (its backbuffer is made stereo by the driver), then the stereo handle
++   DXGI_SWAP_CHAIN_DESC scd {};
++   scd.BufferDesc = s->mode;
++   scd.SampleDesc.Count = 1;
++   scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
++   scd.BufferCount = 1;
++   scd.OutputWindow = hwnd;
++   scd.Windowed = TRUE;
++   scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
++   scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
++   hr = factory->CreateSwapChain(s->device, &scd, &s->swapChain);
++   if (SUCCEEDED(hr))
++      factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
++   NvStereoRelease(factory);
++   if (FAILED(hr))
++      return fail("CreateSwapChain", hr);
++   if (const NvAPI_Status status = NvAPI_Stereo_CreateHandleFromIUnknown(s->device, &s->stereo); status != NVAPI_OK)
++      return fail("NvAPI_Stereo_CreateHandleFromIUnknown", status);
++   // The playfield window may not be in front yet: while windowed, both views are shown side by side, and
++   // exclusive fullscreen is tried again once the window is in front (see NvStereoPresent)
++   NvStereoEnterFullscreen(s);
++   if (s->backBufferRTV == nullptr)
++      return fail("binding the swapchain backbuffer", E_FAIL);
++
++   // Side by side target and depth buffer given to BGFX as its backbuffer (mono surfaces)
++   D3D11_TEXTURE2D_DESC td {};
++   td.Width = s->width * 2;
++   td.Height = s->height;
++   td.MipLevels = 1;
++   td.ArraySize = 1;
++   td.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
++   td.SampleDesc.Count = 1;
++   td.Usage = D3D11_USAGE_DEFAULT;
++   td.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
++   if (FAILED(hr = s->device->CreateTexture2D(&td, nullptr, &s->sbsTex))
++      || FAILED(hr = s->device->CreateRenderTargetView(s->sbsTex, nullptr, &s->sbsRTV))
++      || FAILED(hr = s->device->CreateShaderResourceView(s->sbsTex, nullptr, &s->sbsSRV)))
++      return fail("creating the side by side target", hr);
++   td.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
++   td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
++   if (FAILED(hr = s->device->CreateTexture2D(&td, nullptr, &s->depthTex))
++      || FAILED(hr = s->device->CreateDepthStencilView(s->depthTex, nullptr, &s->depthDSV)))
++      return fail("creating the depth buffer", hr);
++
++   // Shaders drawing one half of the side by side target (or all of it, while windowed) to the whole backbuffer
++   static pD3DCompile compile = nullptr;
++   if (compile == nullptr)
++      if (HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll"); compiler)
++         compile = (pD3DCompile)GetProcAddress(compiler, "D3DCompile");
++   if (compile == nullptr)
++      return fail("loading d3dcompiler_47.dll", E_FAIL);
++   for (int i = 0; i < 4; i++)
++   {
++      const bool vertex = i < 3;
++      const D3D_SHADER_MACRO defines[] = { { "EYE_OFFSET", i == 1 ? "0.5" : "0.0" }, { "EYE_SCALE", i == 2 ? "1.0" : "0.5" }, { nullptr, nullptr } };
++      ID3DBlob* code = nullptr;
++      ID3DBlob* errors = nullptr;
++      hr = compile(nvStereoShader, sizeof(nvStereoShader) - 1, "NvStereoDirect", defines, nullptr, vertex ? "vs_main" : "ps_main", vertex ? "vs_5_0" : "ps_5_0", 0, 0, &code, &errors);
++      if (SUCCEEDED(hr))
++         hr = vertex ? s->device->CreateVertexShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &s->vs[i])
++                     : s->device->CreatePixelShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &s->ps);
++      if (errors)
++         PLOGE << "NVIDIA 3D Vision: " << (const char*)errors->GetBufferPointer();
++      NvStereoRelease(code);
++      NvStereoRelease(errors);
++      if (FAILED(hr))
++         return fail("compiling the present shaders", hr);
++   }
++   D3D11_SAMPLER_DESC sd {};
++   sd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT; // 1:1 texel to pixel mapping
++   sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
++   sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
++   sd.MaxLOD = D3D11_FLOAT32_MAX;
++   if (FAILED(hr = s->device->CreateSamplerState(&sd, &s->sampler)))
++      return fail("CreateSamplerState", hr);
++
++   // Separate device context state, swapped in only while presenting
++   ID3D11Device1* device1 = nullptr;
++   hr = s->device->QueryInterface(__uuidof(ID3D11Device1), (void**)&device1);
++   if (SUCCEEDED(hr))
++   {
++      const D3D_FEATURE_LEVEL level = s->device->GetFeatureLevel();
++      hr = device1->CreateDeviceContextState(0, &level, 1, D3D11_SDK_VERSION, __uuidof(ID3D11Device), nullptr, &s->state);
++   }
++   NvStereoRelease(device1);
++   if (FAILED(hr))
++      return fail("CreateDeviceContextState", hr);
++
++   PLOGI << "NVIDIA 3D Vision: direct mode ready, " << s->width << 'x' << s->height << " per eye";
++   return s;
++}
++
++static void NvStereoPresent(NvStereoDirect* s)
++{
++   // Exclusive fullscreen is lost when another window takes the focus: take it back once the playfield is in front again
++   // (never while the player is closing: the main thread is then waiting for this thread, see ~RenderDevice)
++   BOOL fullscreen = FALSE;
++   s->swapChain->GetFullscreenState(&fullscreen, nullptr);
++   if (s->fullscreen && !fullscreen)
++   {
++      s->fullscreen = false;
++      PLOGI << "NVIDIA 3D Vision: exclusive fullscreen lost, showing both views side by side until the playfield window is in front again";
++   }
++   if (!fullscreen && !s->stopping && GetForegroundWindow() == s->hwnd && GetTickCount64() >= s->nextFullscreenTry)
++   {
++      s->nextFullscreenTry = GetTickCount64() + 2000;
++      NvStereoEnterFullscreen(s);
++   }
++   if (s->backBufferRTV == nullptr)
++      return;
++
++   ID3DDeviceContextState* bgfxState = nullptr;
++   s->context1->SwapDeviceContextState(s->state, &bgfxState);
++   const D3D11_VIEWPORT viewport = { 0.f, 0.f, (float)s->width, (float)s->height, 0.f, 1.f };
++   s->context->OMSetRenderTargets(1, &s->backBufferRTV, nullptr);
++   s->context->RSSetViewports(1, &viewport);
++   s->context->IASetInputLayout(nullptr);
++   s->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++   s->context->PSSetShader(s->ps, nullptr, 0);
++   s->context->PSSetShaderResources(0, 1, &s->sbsSRV);
++   s->context->PSSetSamplers(0, 1, &s->sampler);
++   // Each eye selected then drawn; without fullscreen, or if the driver refuses an eye, the whole side by side
++   // target is drawn instead (a single mono view would otherwise replace the other one)
++   bool stereoPresent = s->fullscreen;
++   for (int eye = 0; eye < 2 && stereoPresent; eye++)
++   {
++      const NvAPI_Status status = NvAPI_Stereo_SetActiveEye(s->stereo, eye == 0 ? NVAPI_STEREO_EYE_LEFT : NVAPI_STEREO_EYE_RIGHT);
++      if (status != NVAPI_OK)
++      {
++         stereoPresent = false;
++         if (!s->eyeErrorLogged)
++         {
++            s->eyeErrorLogged = true;
++            PLOGE << "NVIDIA 3D Vision: NvAPI_Stereo_SetActiveEye error " << (int)status << ", showing both views side by side";
++         }
++         break;
++      }
++      s->context->VSSetShader(s->vs[eye], nullptr, 0);
++      s->context->Draw(3, 0);
++   }
++   if (!stereoPresent)
++   {
++      if (s->fullscreen)
++         NvAPI_Stereo_SetActiveEye(s->stereo, NVAPI_STEREO_EYE_MONO);
++      s->context->VSSetShader(s->vs[2], nullptr, 0);
++      s->context->Draw(3, 0);
++   }
++   ID3D11ShaderResourceView* const noSRV = nullptr;
++   s->context->PSSetShaderResources(0, 1, &noSRV);
++   s->context->OMSetRenderTargets(0, nullptr, nullptr);
++   s->context1->SwapDeviceContextState(bgfxState, nullptr);
++   NvStereoRelease(bgfxState);
++
++   const HRESULT hr = s->swapChain->Present(1, 0);
++   if (FAILED(hr) && !s->presentErrorLogged)
++   {
++      s->presentErrorLogged = true;
++      PLOGE << "NVIDIA 3D Vision: Present failed (0x" << std::hex << (uint32_t)hr << std::dec << ')';
++   }
++   if ((s->presentCount++ % 120) == 0)
++   {
++      NvU8 activated = 0;
++      if (NvAPI_Stereo_IsActivated(s->stereo, &activated) == NVAPI_OK && (int)activated != s->lastActivated)
++      {
++         s->lastActivated = activated;
++         PLOGI << "NVIDIA 3D Vision: stereo " << (activated ? "activated" : "not activated (check the glasses, the emitter and the NVIDIA control panel, Ctrl+T toggles it)");
++      }
++   }
++}
++#endif
++
+ void RenderDevice::RenderThread(RenderDevice* rd, bgfx::Init init)
+ {
+    SetThreadName("RenderThread"s);
+@@ -395,6 +800,25 @@ void RenderDevice::RenderThread(RenderDevice* rd, bgfx::Init init)
+ #endif
+    }
+ 
++#if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++   // Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode. BGFX runs headless on our
++   // Direct3D 11 device and renders the side by side frame (twice the window width) to our offscreen target.
++   if (rd->m_nvStereoRequested)
++   {
++      rd->m_nvStereo = NvStereoCreate((HWND)init.platformData.nwh, init.resolution.width, init.resolution.height);
++      if (rd->m_nvStereo)
++      {
++         init.type = bgfx::RendererType::Direct3D11;
++         init.platformData.nwh = nullptr;
++         init.platformData.context = rd->m_nvStereo->device;
++         init.platformData.backBuffer = rd->m_nvStereo->sbsRTV;
++         init.platformData.backBufferDS = rd->m_nvStereo->depthDSV;
++         init.resolution.width = rd->m_nvStereo->width * 2;
++         init.resolution.height = rd->m_nvStereo->height;
++      }
++   }
++#endif
++
+    // BGFX default behavior is to set its 'API' thread (the one where bgfx API calls are allowed)
+    // as the one from which init is called, and spawn a BGFX render thread in charge of submitting
+    // render queue from the CPU to the GPU.
+@@ -526,6 +950,10 @@ void RenderDevice::RenderThread(RenderDevice* rd, bgfx::Init init)
+    // Wait until main thread has released all native resources
+    rd->m_rendererInitialized.acquire();
+    bgfx::shutdown();
++#if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++   // Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): leave exclusive fullscreen while the main thread still processes window messages
++   NvStereoDestroy(rd->m_nvStereo);
++#endif
+    rd->m_renderDeviceAlive = true;
+ }
+ 
+@@ -825,6 +1253,8 @@ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+          // Handle swapchain resize while we hold the mutex on the render frame and before the backbuffer rendertarget are used for rendering
+          for (VPX::Window* wnd : m_outputWnd)
+          {
++            if (m_nvStereo && wnd == m_outputWnd[0])
++               continue; // Modified by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision, fixed side by side backbuffer
+             const int windowWidth = wnd->GetPixelWidth();
+             const int windowHeight = wnd->GetPixelHeight();
+             const bool isMainSwpachain = wnd == m_outputWnd[0];
+@@ -1337,6 +1767,32 @@ RenderDevice::RenderDevice(
+             << " (valid values: " << validBackends << ')';
+    }
+ 
++   #if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++   // Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode, side by side stereo presented
++   // eye by eye (Direct3D 11 only). The driver mode must be set before the device is created (on the render thread).
++   if (isStereo && !isAnaglyph && !isVR && g_pplayer->m_ptable->m_settings.GetPlayer_Stereo3D() == STEREO_SBS
++      && g_pplayer->m_ptable->m_settings.GetPlayer_Stereo3DNvidiaDirect())
++   {
++      NvU8 stereoEnabled = 0;
++      NvAPI_Status status = NvAPI_Initialize();
++      if (status == NVAPI_OK)
++         status = NvAPI_Stereo_IsEnabled(&stereoEnabled);
++      if (status == NVAPI_OK && stereoEnabled)
++         status = NvAPI_Stereo_SetDriverMode(NVAPI_STEREO_DRIVER_MODE_DIRECT);
++      if (status == NVAPI_OK && stereoEnabled)
++      {
++         m_nvStereoRequested = true;
++         init.type = bgfx::RendererType::Direct3D11;
++         syncMode = VideoSyncMode::VSM_VSYNC;
++         PLOGI << "NVIDIA 3D Vision: direct mode requested (Direct3D 11, exclusive fullscreen)";
++      }
++      else if (status != NVAPI_OK)
++         PLOGE << "NVIDIA 3D Vision: NVAPI error " << (int)status << " (NVIDIA driver missing or too recent?), using plain side by side rendering";
++      else
++         PLOGE << "NVIDIA 3D Vision: stereo is disabled in the NVIDIA control panel, using plain side by side rendering";
++   }
++   #endif
++
+    #ifndef __LIBVPINBALL__
+    m_useLowPrecision = init.type == bgfx::RendererType::OpenGLES;
+    #else
+@@ -1875,11 +2331,25 @@ RenderDevice::~RenderDevice()
+ {
+    #if defined(ENABLE_BGFX)
+       // Suspend rendering before deleting anything that could be used
++      #if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++      // Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision, no more fullscreen switch once closing
++      if (m_nvStereo)
++         NvStereoStop(m_nvStereo);
++      #endif
+       m_renderDeviceAlive = false;
+       m_frameReadySem.release();
+       // Wait for the render thread to actually leave its render loop: it may still be mid-frame (using the
+       // shaders, meshes and textures freed below) since it only re-checks m_renderDeviceAlive between frames
+-      m_renderThreadStopped.acquire();
++      #if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++      // Modified by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): with NVIDIA 3D Vision, the render thread owns
++      // an exclusive fullscreen swapchain whose calls (Present, SetFullscreenState) may wait for this thread to process
++      // the window messages: process them while waiting, as DXGI requires
++      if (m_nvStereo)
++         while (!m_renderThreadStopped.try_acquire_for(std::chrono::milliseconds(5)))
++            g_pplayer->ProcessOSMessages(false);
++      else
++      #endif
++         m_renderThreadStopped.acquire();
+    #endif
+ 
+    m_quadMeshBuffer = nullptr;
+@@ -2277,6 +2747,11 @@ void RenderDevice::SubmitAndFlipFrame(bool present)
+    const uint32_t frameIdx = bgfx::frame(present ? BGFX_FRAME_NONE : BGFX_FRAME_FLUSH);
+    if (present)
+       m_lastPresentFrameIdx = frameIdx;
++#if BX_PLATFORM_WINDOWS && !defined(__STANDALONE__)
++   // Added by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision, present each eye
++   if (present && m_nvStereo)
++      NvStereoPresent(m_nvStereo);
++#endif
+    ResetActiveView();
+ }
+ #endif
+diff --git a/src/renderer/RenderDevice.h b/src/renderer/RenderDevice.h
+index 2fa31d1..1b3b24b 100644
+--- a/src/renderer/RenderDevice.h
++++ b/src/renderer/RenderDevice.h
+@@ -289,7 +289,13 @@ public:
+    struct PresentMonProvider* m_presentMonProvider = nullptr;
+ #endif
+ 
++   // Modified by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode (see RenderDevice.cpp)
++   bool IsNvStereoDirect() const { return m_nvStereo != nullptr; }
++
+ private:
++   bool m_nvStereoRequested = false;
++   struct NvStereoDirect* m_nvStereo = nullptr;
++
+    void SubmitAndFlipFrame(bool present);
+    bgfx::TextureFormat::Enum SelectBackBufferFormat(const VPX::Window* wnd, bgfx::TextureFormat::Enum defaultFormat, bool isWCG) const;
+    static colorFormat BGFXtoVPXTextureFormat(bgfx::TextureFormat::Enum format);
+diff --git a/src/renderer/Renderer.cpp b/src/renderer/Renderer.cpp
+index ad1a803..6b57e11 100644
+--- a/src/renderer/Renderer.cpp
++++ b/src/renderer/Renderer.cpp
+@@ -119,6 +119,15 @@ Renderer::Renderer(PinTable* const table, VPX::Window* wnd, VideoSyncMode& syncM
+       // Side by side fits the 2 views along the output width, so each view is rendered at half the output width
+       m_renderWidth = wnd->GetPixelWidth() / 2;
+       m_renderHeight = wnd->GetPixelHeight();
++      #if defined(ENABLE_BGFX)
++      // Modified by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): NVIDIA 3D Vision direct mode presents each view
++      // at the full output width (the side by side backbuffer is twice as wide as the window).
++      if (m_renderDevice->IsNvStereoDirect())
++      {
++         m_renderWidth = m_renderDevice->GetOutputBackBuffer()->GetWidth() / 2;
++         m_renderHeight = m_renderDevice->GetOutputBackBuffer()->GetHeight();
++      }
++      #endif
+    }
+    else if (m_stereo3D == STEREO_TB || m_stereo3D == STEREO_INT || m_stereo3D == STEREO_FLIPPED_INT)
+    {
+@@ -942,6 +951,11 @@ void Renderer::DrawBackground()
+ 
+ int Renderer::GetDisplayWidth() const
+ {
++   #if defined(ENABLE_BGFX)
++   // Modified by Cyber Pinball, 2026-11-24 (patched Cyber Pinball 7): with NVIDIA 3D Vision, each view is displayed unstretched
++   if (m_renderDevice->IsNvStereoDirect())
++      return GetBackBufferTexture()->GetWidth();
++   #endif
+    return m_stereo3D == STEREO_SBS ? (GetBackBufferTexture()->GetWidth() * 2) : GetBackBufferTexture()->GetWidth();
+ }
+ 

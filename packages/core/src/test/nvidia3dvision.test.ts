@@ -1,0 +1,205 @@
+// Lunettes actives NVIDIA 3D Vision (nvidia3dvision.ts) : un manque par constat, avec sa marche à suivre ;
+// les réglages de la partie (mode direct, Direct3D 11) ; le bilan tiré du journal du VPX corrigé ;
+// le choix des lunettes gardé dans le réglage des Lunettes 3D ; le journal relu depuis le lancement de la
+// partie (app/src/anaglyph.ts, chargé compilé).
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { test } from 'node:test';
+import { REPO_ROOT } from './i18n-scan';
+import { anaglyphGameSettings, anaglyphWheelRelief, DEFAULT_ANAGLYPH, isAnaglyphKey, parseAnaglyphSetting, type AnaglyphSetting } from '../anaglyph';
+import {
+  isNvidia3dVisionEmitter,
+  NVIDIA_3DVISION_LAST_DRIVER,
+  NVIDIA_STEREO_MODE,
+  nvidia3dVisionGameSettings,
+  nvidia3dVisionIssues,
+  nvidia3dVisionOutcome,
+  nvidia3dVisionOutcomeText,
+  nvidia3dVisionReadyText,
+  nvidia3dVisionUnchecked,
+  nvidiaDriverLabel,
+  playfieldOnPrimary,
+  type Nvidia3dVisionFacts,
+} from '../nvidia3dvision';
+import { VR_REFUSED_FXAA, VR_STEREO_FXAA } from '../vr';
+
+const NV: AnaglyphSetting = { ...DEFAULT_ANAGLYPH, mode: 'on', kind: 'nvidia' };
+const READY: Nvidia3dVisionFacts = { nvapi: true, driver: 45206, stereo: true, emitter: true, playfieldPrimary: true, vpxSupported: true };
+const ids = (f: Nvidia3dVisionFacts, platform = 'win32') => nvidia3dVisionIssues(f, platform).map((i) => i.id);
+const get = (settings: { key: string; value: string }[], key: string) => settings.find((s) => s.key === key)?.value;
+
+test('tout est là : aucun manque', () => {
+  assert.deepEqual(ids(READY), []);
+});
+
+test('hors Windows, ou sans pilote NVIDIA, un seul constat : le reste ne se lit pas', () => {
+  assert.deepEqual(ids(READY, 'linux'), ['not-windows']);
+  assert.deepEqual(ids({ nvapi: false, emitter: false, playfieldPrimary: false }), ['no-nvidia']);
+});
+
+test('un pilote après le 452.06 : à remplacer, sans constat sur la stéréo qu’il ne peut pas avoir', () => {
+  assert.equal(NVIDIA_3DVISION_LAST_DRIVER, 45206);
+  assert.deepEqual(ids({ ...READY, driver: 58092, stereo: undefined }), ['driver-too-new']);
+  const [issue] = nvidia3dVisionIssues({ ...READY, driver: 58092 }, 'win32');
+  assert.ok(issue);
+  assert.match(issue.title, /580\.92/);
+  assert.ok(issue.steps.some((s) => s.includes('452.06')));
+  assert.ok(issue.steps.some((s) => s.includes('Enable Driver Hack')));
+  assert.deepEqual(ids({ ...READY, driver: 42531 }), [], 'un pilote plus ancien convient');
+});
+
+test('stéréo désactivée ou muette, émetteur, écran principal, version de VPX : chacun son constat et sa marche à suivre', () => {
+  assert.deepEqual(ids({ ...READY, stereo: false }), ['stereo-disabled']);
+  assert.deepEqual(ids({ ...READY, stereo: undefined }), ['stereo-disabled']);
+  assert.deepEqual(ids({ ...READY, emitter: false }), ['no-emitter']);
+  assert.deepEqual(ids({ ...READY, playfieldPrimary: false }), ['playfield-not-primary']);
+  assert.deepEqual(ids({ ...READY, vpxSupported: false }), ['vpx-unsupported']);
+  assert.deepEqual(ids({ ...READY, emitter: undefined, playfieldPrimary: undefined, vpxSupported: undefined }), [], 'ce qui n’a pas pu être lu ne bloque pas');
+  const all = nvidia3dVisionIssues({ nvapi: true, driver: 45206, stereo: false, emitter: false, playfieldPrimary: false, vpxSupported: false }, 'win32');
+  assert.deepEqual(
+    all.map((i) => i.id),
+    ['stereo-disabled', 'no-emitter', 'playfield-not-primary', 'vpx-unsupported'],
+  );
+  for (const i of all) {
+    assert.ok(i.title.length > 0, i.id);
+    assert.ok(i.steps.length > 0 && i.steps.every((s) => s.length > 0), i.id);
+  }
+});
+
+test('ce qui n’a pas pu être vérifié est dit : jamais « prête » sans tout avoir vu', () => {
+  assert.deepEqual(nvidia3dVisionUnchecked(READY), []);
+  assert.deepEqual(nvidia3dVisionUnchecked({ nvapi: false }), [], 'sans pilote, le manque suffit');
+  assert.deepEqual(nvidia3dVisionUnchecked({ nvapi: true, stereo: true }), ['version du pilote', 'émetteur', 'écran du playfield', 'VPX']);
+  const ready = nvidia3dVisionReadyText(READY);
+  assert.ok(ready.complete);
+  assert.equal(ready.text, 'NVIDIA 3D Vision prête');
+  assert.match(ready.detail, /452\.06/);
+  const partial = nvidia3dVisionReadyText({ ...READY, emitter: undefined, vpxSupported: undefined });
+  assert.ok(!partial.complete);
+  assert.doesNotMatch(partial.text, /prête/);
+  assert.match(partial.detail, /émetteur, VPX/);
+});
+
+test('version du pilote écrite comme NVIDIA', () => {
+  assert.equal(nvidiaDriverLabel(45206), '452.06');
+  assert.equal(nvidiaDriverLabel(58092), '580.92');
+  assert.equal(nvidiaDriverLabel(42531), '425.31');
+});
+
+test('playfield en écran principal : la position [0, 0] du PlayfieldDisplay de VPX', () => {
+  assert.equal(playfieldOnPrimary(undefined), true);
+  assert.equal(playfieldOnPrimary('  '), true, 'vide : VPX prend l’écran principal');
+  assert.equal(playfieldOnPrimary('G4380 [0, 0]'), true);
+  assert.equal(playfieldOnPrimary('G4380 [3840, 0]'), false);
+  assert.equal(playfieldOnPrimary('DMD [-1920, 0]'), false);
+  assert.equal(playfieldOnPrimary('Écran sans position'), undefined);
+  const twoScreens = [{ x: 0, y: 0 }, { x: 3840, y: 0 }];
+  assert.equal(playfieldOnPrimary('G4380 [3840, 0]', twoScreens), false);
+  assert.equal(playfieldOnPrimary('G4380 [3840, 0]', [{ x: 0, y: 0 }]), true, 'écran absent : VPX prend l’écran principal');
+  assert.equal(playfieldOnPrimary('G4380 [0, 0]', twoScreens), true);
+});
+
+test('l’émetteur : NVIDIA 0955:0007, ou un périphérique NVIDIA qui se dit 3D Vision', () => {
+  const usb = (vid: number, pid: number, name?: string) => ({ instanceId: `USB\\VID_${vid.toString(16)}&PID_${pid.toString(16)}\\1`, vid, pid, name });
+  assert.ok(isNvidia3dVisionEmitter(usb(0x0955, 0x0007)));
+  assert.ok(isNvidia3dVisionEmitter(usb(0x0955, 0x7002, 'NVIDIA 3D Vision Controller')));
+  assert.ok(!isNvidia3dVisionEmitter(usb(0x0955, 0x7210, 'NVIDIA Shield Controller')));
+  assert.ok(!isNvidia3dVisionEmitter(usb(0x1a86, 0x0007, '3D Vision')), 'un autre constructeur');
+});
+
+test('réglages de la partie : Side by Side de VPX, mode direct, Direct3D 11, profondeur des Lunettes 3D', () => {
+  const s = nvidia3dVisionGameSettings(NV, '', '');
+  assert.equal(get(s, 'Stereo3D'), String(NVIDIA_STEREO_MODE));
+  assert.equal(get(s, 'Stereo3DEnabled'), '1');
+  assert.equal(get(s, 'Stereo3DNvidiaDirect'), '1');
+  assert.equal(get(s, 'GfxBackend'), 'Direct3D11');
+  assert.equal(get(s, 'Stereo3DEyeSeparation'), '63');
+  assert.equal(get(nvidia3dVisionGameSettings({ ...NV, depth: 1.5 }, '', ''), 'Stereo3DEyeSeparation'), '94.5');
+  assert.ok(!s.some((x) => x.key.startsWith('Anaglyph')), 'aucun profil de couleurs');
+  assert.ok(s.every((x) => x.section === 'Player'));
+  assert.equal(get(nvidia3dVisionGameSettings(NV, '', `[Player]\nFXAA = ${VR_REFUSED_FXAA}\n`), 'FXAA'), VR_STEREO_FXAA);
+  assert.equal(get(nvidia3dVisionGameSettings(NV, '[Player]\nFXAA = 2\n', ''), 'FXAA'), undefined);
+});
+
+test('les Lunettes 3D passent la main au mode NVIDIA, et rien de lui ne reste dans le fichier de la table', () => {
+  assert.deepEqual(anaglyphGameSettings(NV, '', ''), nvidia3dVisionGameSettings(NV, '', ''));
+  for (const s of anaglyphGameSettings(NV, '', `[Player]\nFXAA = ${VR_REFUSED_FXAA}\n`)) assert.ok(isAnaglyphKey(s.section, s.key), s.key);
+  assert.equal(anaglyphWheelRelief(NV), undefined, 'pas de relief à filtres colorés dans la roue');
+});
+
+test('le choix des lunettes est gardé ; une valeur inconnue revient aux filtres colorés', () => {
+  assert.equal(parseAnaglyphSetting({ mode: 'on', kind: 'nvidia' }).kind, 'nvidia');
+  assert.equal(parseAnaglyphSetting({ mode: 'on', kind: 'shutter' }).kind, 'anaglyph');
+  assert.equal(parseAnaglyphSetting({ mode: 'on' }).kind, 'anaglyph');
+  assert.equal(DEFAULT_ANAGLYPH.kind, 'anaglyph');
+});
+
+const LOG = (lines: string[]) => lines.map((l, i) => `2026-11-24 21:00:0${i}.000 INFO [RenderDevice.cpp:1] ${l}`).join('\r\n');
+
+test('bilan d’une partie : les lignes du VPX corrigé après la dernière demande', () => {
+  assert.equal(nvidia3dVisionOutcome(LOG(['Startup done'])), undefined);
+  const requested = 'NVIDIA 3D Vision: direct mode requested (Direct3D 11, exclusive fullscreen)';
+  const ready = 'NVIDIA 3D Vision: direct mode ready, 3840x2160 per eye';
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, ready]))?.state, 'ready');
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, ready, 'NVIDIA 3D Vision: stereo activated']))?.state, 'active');
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, ready, 'NVIDIA 3D Vision: stereo not activated (check the emitter and the glasses)']))?.state, 'not-activated');
+  const fallback = nvidia3dVisionOutcome(LOG([requested, 'NVIDIA 3D Vision: creating the stereo swapchain failed (0x887A0004), falling back to plain side by side rendering', 'NVIDIA 3D Vision: stereo activated']));
+  assert.equal(fallback?.state, 'fallback', 'un repli l’emporte');
+  assert.match(fallback?.line ?? '', /^creating the stereo swapchain failed/);
+  // Le plein écran exclusif : raté au départ puis obtenu, ou perdu en cours de partie, ce n'est pas un repli.
+  const failed = 'NVIDIA 3D Vision: exclusive fullscreen failed (0x887A0004), showing both views side by side until the playfield window is in front again';
+  const fullscreen = 'NVIDIA 3D Vision: exclusive fullscreen 3840x2160 at 120000/1001 Hz';
+  const lost = 'NVIDIA 3D Vision: exclusive fullscreen lost, showing both views side by side until the playfield window is in front again';
+  const activated = 'NVIDIA 3D Vision: stereo activated';
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, failed, ready, fullscreen, activated]))?.state, 'active');
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, fullscreen, ready, activated, lost]))?.state, 'active');
+  const never = nvidia3dVisionOutcome(LOG([requested, failed, ready]));
+  assert.equal(never?.state, 'fallback', 'plein écran jamais obtenu');
+  assert.match(never?.line ?? '', /^exclusive fullscreen failed/);
+  assert.equal(nvidia3dVisionOutcome(LOG([requested, fullscreen, ready, 'NVIDIA 3D Vision: NvAPI_Stereo_SetActiveEye error -140, showing both views side by side']))?.state, 'fallback');
+  assert.equal(nvidia3dVisionOutcome(LOG(['NVIDIA 3D Vision: NVAPI error -2 (NvAPI_Initialize), using plain side by side rendering']))?.state, 'fallback');
+  assert.equal(nvidia3dVisionOutcome(LOG(['NVIDIA 3D Vision: stereo is disabled in the NVIDIA control panel, using plain side by side rendering']))?.state, 'fallback');
+  // Une partie plus ancienne, repliée, ne compte plus après une nouvelle demande.
+  assert.equal(nvidia3dVisionOutcome(LOG(['NVIDIA 3D Vision: NVAPI error -2 (NvAPI_Initialize), using plain side by side rendering', requested, ready, 'NVIDIA 3D Vision: stereo activated']))?.state, 'active');
+});
+
+test('le bilan ne lit que la partie lancée : journal ajouté, recréé ou tourné à 5 Mo', () => {
+  type Mark = { file: string; size: number };
+  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'anaglyph.js')) as {
+    markVpxLog(file: string | undefined): Mark | undefined;
+    readVpxLogSince(file: string | undefined, since: Mark | undefined): string | undefined;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-nv3d-'));
+  try {
+    const log = path.join(dir, 'vpinball.log');
+    assert.equal(app.markVpxLog(undefined), undefined);
+    assert.deepEqual(app.markVpxLog(log), { file: log, size: 0 }, 'pas encore de journal');
+    assert.equal(app.readVpxLogSince(log, undefined), undefined, 'toujours pas de journal');
+    const old = 'partie précédente : NVIDIA 3D Vision: stereo activated\n';
+    fs.writeFileSync(log, old);
+    const mark = app.markVpxLog(log);
+    fs.appendFileSync(log, 'cette partie\n');
+    assert.equal(app.readVpxLogSince(log, mark), 'cette partie\n');
+    assert.equal(app.readVpxLogSince(log, { file: path.join(dir, 'autre.log'), size: 3 }), old + 'cette partie\n', 'autre journal : tout');
+    // Rotation pendant la partie : le début est à la fin de vpinball.1.log.
+    fs.renameSync(log, path.join(dir, 'vpinball.1.log'));
+    fs.writeFileSync(log, 'suite\n');
+    assert.equal(app.readVpxLogSince(log, mark), 'cette partie\n\nsuite\n');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('le bilan dit au joueur, avec le bon ton', () => {
+  assert.equal(nvidia3dVisionOutcomeText({ state: 'active', line: '' }).tone, 'ok');
+  assert.equal(nvidia3dVisionOutcomeText({ state: 'not-activated', line: '' }).tone, 'warning');
+  const fb = nvidia3dVisionOutcomeText({ state: 'fallback', line: 'exclusive fullscreen failed' });
+  assert.equal(fb.tone, 'warning');
+  assert.equal(fb.detail, 'exclusive fullscreen failed');
+  assert.equal(nvidia3dVisionOutcomeText({ state: 'ready', line: '' }).tone, 'quiet');
+  const unknown = nvidia3dVisionOutcomeText({ state: 'unknown', line: '' });
+  assert.equal(unknown.tone, 'warning');
+  assert.match(unknown.text, /inconnu/);
+});

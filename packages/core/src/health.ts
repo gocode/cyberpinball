@@ -33,11 +33,12 @@ import { remoteNameSummary, type RemoteNameFacts } from './remote-name';
 import { pcLines, type PcHealthFacts, type TechBlockId } from './techsheet';
 import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 import { airLinkOverWifi, type LinkTransport, type PcNetwork } from './vr-reseau';
+import { nvidia3dVisionIssues, nvidia3dVisionReadyText, type Nvidia3dVisionFacts } from './nvidia3dvision';
 
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'buttons', 'dmd', 'dof', 'remote', 'vr', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'pc', 'tables', 'pup', 'media', 'screens', 'buttons', 'dmd', 'dof', 'remote', 'vr', 'glasses3d', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -203,6 +204,8 @@ export interface HealthFacts {
   dof?: DofFacts;
   /** Le réseau du casque (vr-reseau.ts) ; absent sans casque relevé. */
   vr?: VrNetworkFacts;
+  /** Lunettes actives NVIDIA 3D Vision (nvidia3dvision.ts) ; absent tant qu'elles ne sont pas choisies dans Lunettes 3D. */
+  glasses3d?: Nvidia3dVisionFacts;
   /** Le nom de la borne sur le réseau pour le téléphone gardé (remote-name.ts) ; absent hors réseau local. */
   remote?: RemoteNameFacts;
   /** Le PC et Windows, d'après le relevé de la fiche technique ; absent avant le premier. */
@@ -735,6 +738,20 @@ function vrLinkLines(facts: VrNetworkFacts): HealthLine[] {
 }
 
 /**
+ * Lunettes actives NVIDIA 3D Vision, choisies dans Lunettes 3D : une ligne « à vérifier » par manque
+ * (pilote, stéréo, émetteur, écran principal), avec sa marche à suivre ; sinon une ligne « prêt ».
+ */
+export function glasses3dLines(facts: Nvidia3dVisionFacts): HealthLine[] {
+  const go = t('Ouvrir Lunettes 3D');
+  const target = SYSTEM('anaglyph');
+  const issues = nvidia3dVisionIssues(facts);
+  if (issues.length) return issues.map((issue) => ({ check: 'glasses3d', state: 'check', title: issue.title, detail: issue.steps.join(t(' ; ')), go, target }));
+  // Rien ne manque : « prête » seulement si tout a été vérifié, sinon ce qui ne l'a pas été (à vérifier).
+  const ready = nvidia3dVisionReadyText(facts);
+  return [{ check: 'glasses3d', state: ready.complete ? 'ok' : 'check', title: ready.text, detail: ready.detail, go, target }];
+}
+
+/**
  * Télécommande du téléphone : le nom de la borne sur le réseau (remote-name.ts). Un cas qui le fait
  * tomber, ou un téléphone qui ne le trouve pas, est à vérifier ; tout mène à l'écran de la
  * télécommande, qui porte la correction possible (« Rouvrir le nom dans le pare-feu »).
@@ -804,6 +821,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.dof ? dofLines(facts.dof) : []),
     ...(facts.remote ? remoteLines(facts.remote) : []),
     ...(facts.vr ? vrLines(facts.vr) : []),
+    ...(facts.glasses3d ? glasses3dLines(facts.glasses3d) : []),
     ...vpxLines(facts.vpx),
   ];
 }
@@ -836,6 +854,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Télécommande du téléphone'), icon: 'phone' };
     case 'vr':
       return { title: t('Casque'), icon: 'vr' };
+    case 'glasses3d':
+      return { title: t('Lunettes 3D'), icon: 'glasses' };
     case 'vpx':
       return { title: 'Visual Pinball X', icon: 'play' }; // i18n-ignore : nom du logiciel
     case 'pc':

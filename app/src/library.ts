@@ -1559,6 +1559,7 @@ export function createLibrary(host: LibraryHost) {
       return devices ? hardwareDmdFacts(devices, loadCabinet(host.dataDir)?.hardwareDmd, dmdServerProblem(), dmdHints(locations())) : undefined;
     },
     vr: () => host.vrNetwork?.(),
+    glasses3d: () => host.glasses3d?.(),
     remote: () => host.phoneRemote?.nameFacts(),
     pc: () => {
       const facts = techSheet.facts();

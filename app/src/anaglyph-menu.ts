@@ -20,14 +20,23 @@ import {
   nextColors,
   nextDepth,
   nextGlasses,
+  findTableIni,
+  nvidia3dVisionIssues,
+  nvidia3dVisionOutcome,
+  nvidia3dVisionOutcomeText,
+  nvidia3dVisionReadyText,
+  nvidia3dVisionUnchecked,
+  stereoGlassesKindLabel,
   SYSTEM_ITEMS,
   t,
   type AnaglyphCalibration,
   type AnaglyphSetting,
   type NavigationKeys,
+  type Nvidia3dVisionFacts,
+  type Nvidia3dVisionOutcome,
 } from '@cyberpinball/core';
 import type { Input } from 'electron';
-import { prepareAnaglyphGame, readAnaglyph, restoreAnaglyphGame, writeAnaglyph, type AnaglyphGame } from './anaglyph';
+import { markVpxLog, prepareAnaglyphGame, readAnaglyph, readNvidiaOutcome, readVpxLogSince, restoreAnaglyphGame, writeAnaglyph, writeNvidiaOutcome, type AnaglyphGame, type VpxLogMark } from './anaglyph';
 import type { createLibrary, Row } from './library';
 
 /** Ce que le front-end prête aux Lunettes 3D. */
@@ -41,7 +50,17 @@ export interface AnaglyphMenuContext {
   vision3dOn(): boolean;
   /** La VR est activée (une partie dans le casque se joue sans les lunettes). */
   vrOn(): boolean;
+  /**
+   * Lunettes actives NVIDIA 3D Vision : pilote, stéréo, émetteur, écran, VPX (nvidia-3dvision.ts) ; `fresh`
+   * relit le pilote ; `inis` : les réglages que la partie lira (fichier de la table d'abord).
+   */
+  nvidia(fresh?: boolean, inis?: string[]): Nvidia3dVisionFacts;
+  /** Le journal de VPX de la version jouée (vpinball.log), pour le bilan d'une partie en 3D Vision. */
+  vpxLog(): string | undefined;
 }
+
+/** Place de « Calibrer les lunettes » dans les réglages (après Activer, le type et les couleurs des verres). */
+const CALIBRATE_ROW = 3;
 
 export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
   const { dataDir, library } = ctx;
@@ -66,10 +85,34 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     console.log(`Lunettes 3D : ${journal}.`); // i18n-ignore : journal
   }
 
+  /** Le type de lunettes, en tête des réglages des deux écrans. */
+  const kindAction = () => ({
+    label: t('Lunettes : {kind}', { kind: stereoGlassesKindLabel(setting.kind) }),
+    detail: t('Choisir pour passer des lunettes à filtres colorés aux lunettes actives NVIDIA 3D Vision (bêta), et inversement'),
+    icon: 'glasses' as const,
+    run: () => {
+      const kind = setting.kind === 'nvidia' ? 'anaglyph' : 'nvidia';
+      save({ kind }, `lunettes ${kind}`);
+      if (kind === 'nvidia') ctx.nvidia(true);
+      openScreen(library.cursor());
+    },
+  });
+
+  const depthAction = () => ({
+    label: t('Profondeur : {v}', { v: depthLabel(setting.depth) }),
+    detail: t('Choisir pour la changer, de 50 % (douce) à 150 % (marquée) ; 100 % : l’écart réel entre tes yeux'),
+    icon: 'gauge' as const,
+    run: () => {
+      save({ depth: nextDepth(setting.depth) }, `profondeur ${depthLabel(nextDepth(setting.depth))}`);
+      openScreen(library.cursor());
+    },
+  });
+
   /** Écran « Lunettes 3D » : état, cumul avec la Vision 3D, et les réglages. */
   function openScreen(at = 0): void {
     const back = () => library.openSystem();
     library.openCustom(() => {
+      if (setting.kind === 'nvidia') return nvidiaScreen(back);
       const on = setting.mode === 'on';
       const rows: Row[] = [
         { icon: 'glasses', text: on ? t('Lunettes 3D activées : les tables se jouent en relief') : t('Lunettes 3D désactivées'), tone: on ? ('ok' as const) : ('quiet' as const) },
@@ -88,8 +131,9 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
             openScreen(library.cursor());
           },
         },
+        kindAction(),
         {
-          label: t('Lunettes : {glasses}', { glasses: glassesLabel(setting.glasses) }),
+          label: t('Couleurs des verres : {glasses}', { glasses: glassesLabel(setting.glasses) }),
           detail: t('Choisir pour changer de couleurs ; le calibrage repart des réglages d’usine'),
           icon: 'palette' as const,
           run: () => {
@@ -104,15 +148,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
           icon: 'sliders' as const,
           run: () => openCalibration(),
         },
-        {
-          label: t('Profondeur : {v}', { v: depthLabel(setting.depth) }),
-          detail: t('Choisir pour la changer, de 50 % (douce) à 150 % (marquée) ; 100 % : l’écart réel entre tes yeux'),
-          icon: 'gauge' as const,
-          run: () => {
-            save({ depth: nextDepth(setting.depth) }, `profondeur ${depthLabel(nextDepth(setting.depth))}`);
-            openScreen(library.cursor());
-          },
-        },
+        depthAction(),
         {
           label: t('Couleurs : {v}', { v: colorsLabel(setting.colors) }),
           detail: t('Confortables : ce qu’un seul œil verrait passe en gris, moins de fatigue ; vives : toutes les couleurs, plus d’images fantômes'),
@@ -157,6 +193,70 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     }, at);
   }
 
+  /** Bilan de la dernière partie en 3D Vision (journal de VPX), gardé d'un démarrage à l'autre. */
+  let nvidiaOutcome: Nvidia3dVisionOutcome | undefined = readNvidiaOutcome(dataDir);
+  /** Le journal de VPX au lancement d'une partie en 3D Vision : seul ce qui s'y ajoute ensuite compte. */
+  let nvidiaLogStart: VpxLogMark | undefined;
+
+  /** Rien ne manque : ce qui a été vérifié, ou ce qui n'a pas pu l'être (jamais affirmé). */
+  function nvidiaReadyRow(facts: Nvidia3dVisionFacts): Row {
+    const r = nvidia3dVisionReadyText(facts);
+    return { icon: r.complete ? 'check' : 'info', text: r.text, detail: r.detail, tone: r.complete ? 'ok' : 'warning' };
+  }
+
+  /**
+   * Écran « Lunettes 3D » avec les lunettes actives NVIDIA 3D Vision : la détection (pilote, stéréo,
+   * émetteur, écran principal), une ligne et sa marche à suivre par manque, le bilan de la dernière
+   * partie, et les réglages qui valent pour elles (activer, type de lunettes, profondeur).
+   */
+  function nvidiaScreen(back: () => void) {
+    const on = setting.mode === 'on';
+    const facts = ctx.nvidia();
+    const issues = nvidia3dVisionIssues(facts);
+    const rows: Row[] = [
+      { icon: 'glasses', text: on ? t('Lunettes 3D activées : les tables se jouent en relief') : t('Lunettes 3D désactivées'), tone: on ? ('ok' as const) : ('quiet' as const) },
+      ...(issues.length
+        ? issues.map((issue) => ({ icon: 'alert' as const, text: issue.title, detail: issue.steps.join(t(' ; ')), tone: 'warning' as const }))
+        : [nvidiaReadyRow(facts)]),
+    ];
+    if (nvidiaOutcome) {
+      const o = nvidia3dVisionOutcomeText(nvidiaOutcome);
+      rows.push({ icon: o.tone === 'ok' ? 'check' : 'info', text: o.text, detail: o.detail, tone: o.tone });
+    }
+    rows.push({ icon: 'info', text: t('Écran pas reconnu pour la 3D ?'), detail: t('Le pilote ne montre la 3D que sur un écran qu’il connaît : CRU et NvTimingsEd lui font accepter le tien'), tone: 'quiet' as const });
+    if (on && issues.length) rows.push({ icon: 'info', text: t('Tant qu’il manque quelque chose, les parties se jouent à plat'), tone: 'quiet' as const });
+    if (on && ctx.vrOn()) rows.push({ icon: 'vr', text: t('Une partie dans le casque se joue sans les lunettes'), tone: 'quiet' as const });
+    return {
+      heading: SYSTEM_ITEMS.anaglyph.label,
+      icon: SYSTEM_ITEMS.anaglyph.icon,
+      lead: t('Lunettes actives NVIDIA 3D Vision (bêta) : chaque œil voit la table à la pleine définition. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec la 3D activée, l’émetteur, et le playfield en écran principal. Le fronton et le DMD restent à plat.'),
+      sections: [{ rows }],
+      actions: [
+        {
+          label: on ? t('Désactiver les lunettes 3D') : t('Activer les lunettes 3D'),
+          icon: 'power' as const,
+          run: () => {
+            save({ mode: on ? 'off' : 'on' }, on ? 'désactivées' : 'activées'); // i18n-ignore : journal
+            openScreen(library.cursor());
+          },
+        },
+        kindAction(),
+        depthAction(),
+        {
+          label: t('Vérifier à nouveau'),
+          detail: t('Relit le pilote NVIDIA, l’émetteur et les écrans'),
+          icon: 'restore' as const,
+          run: () => {
+            ctx.nvidia(true);
+            openScreen(library.cursor());
+          },
+        },
+        { label: t('Retour'), icon: 'back' as const, run: back },
+      ],
+      back,
+    };
+  }
+
   /**
    * Calibrage des lunettes (le même que celui de VPX, packages/core/src/anaglyph.ts) : six étapes,
    * les flippers éclaircissent ou assombrissent le gris, Start passe à l'étape suivante, Exit revient
@@ -169,7 +269,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     const name = (codes: string[], id: 'leftFlipper' | 'rightFlipper' | 'start' | 'exit') => (codes.length ? buttonInfo(id).label : '');
     const finish = () => {
       save({ calibration: cal }, `calibrées (gauche ${cal.left.join(' / ')}, droite ${cal.right.join(' / ')})`); // i18n-ignore : journal
-      openScreen(2);
+      openScreen(CALIBRATE_ROW);
     };
     const show = () =>
       library.openCustom(() => {
@@ -208,7 +308,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
                 show();
               },
             },
-            { label: t('Abandonner'), icon: 'close' as const, run: () => openScreen(2) },
+            { label: t('Abandonner'), icon: 'close' as const, run: () => openScreen(CALIBRATE_ROW) },
           ],
           keys: (input: Input) => {
             if (input.type !== 'keyDown') return false;
@@ -218,7 +318,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
             return true;
           },
           back: () => {
-            if (step === 0) return openScreen(2);
+            if (step === 0) return openScreen(CALIBRATE_ROW);
             step--;
             show();
           },
@@ -235,8 +335,25 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
   function prepareGame(tableFile: string, gameIni: string): AnaglyphGame | undefined {
     setting = readAnaglyph(dataDir);
     if (setting.mode !== 'on') return undefined;
+    if (setting.kind === 'nvidia') {
+      // Un manque que le front-end voit : VPX montrerait les deux vues côte à côte, la partie se joue à plat.
+      // Vérifié sur les réglages que cette partie lira : le fichier de la table, puis son VPinballX.ini.
+      const facts = ctx.nvidia(true, [findTableIni(tableFile).path, gameIni]);
+      const issues = nvidia3dVisionIssues(facts);
+      if (issues.length) {
+        console.log(`Lunettes 3D : NVIDIA 3D Vision choisie, mais ${issues.map((i) => i.id).join(', ')} ; partie à plat.`); // i18n-ignore : journal
+        return undefined;
+      }
+      const unchecked = nvidia3dVisionUnchecked(facts);
+      if (unchecked.length) console.log(`Lunettes 3D : NVIDIA 3D Vision, pas vérifié : ${unchecked.join(', ')} ; partie tentée quand même.`); // i18n-ignore : journal
+      nvidiaLogStart = markVpxLog(ctx.vpxLog());
+    }
     try {
       const game = prepareAnaglyphGame(dataDir, setting, tableFile, gameIni);
+      if (setting.kind === 'nvidia') {
+        console.log(`Lunettes 3D : partie en relief, NVIDIA 3D Vision en mode direct (profondeur ${depthLabel(setting.depth)}) ; copie de ${path.basename(game.original)}${game.existed ? '' : ' (absent)'} passée par -TableIni.`); // i18n-ignore : journal
+        return game;
+      }
       const fxaa = game.settings.some((s) => s.key === 'FXAA') ? ', anticrénelage SMAA remplacé par FXAA qualité (VPX n’applique pas SMAA en stéréo)' : ''; // i18n-ignore : journal
       console.log(`Lunettes 3D : partie en relief (lunettes ${setting.glasses}${setting.calibration ? ', calibrées' : ''}, profondeur ${depthLabel(setting.depth)}, couleurs ${setting.colors}${fxaa}) ; copie de ${path.basename(game.original)}${game.existed ? '' : ' (absent)'} passée par -TableIni.`); // i18n-ignore : journal
       return game;
@@ -248,12 +365,32 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
 
   /** Après une partie en relief : les réglages de la table enregistrés en jeu reviennent dans son fichier. */
   function restoreGame(game: AnaglyphGame): void {
+    if (game.settings.some((s) => s.key === 'Stereo3DNvidiaDirect')) noteNvidiaOutcome();
     try {
       const n = restoreAnaglyphGame(game);
       if (n) console.log(`Lunettes 3D : ${n} réglage(s) de la table changé(s) pendant la partie, reporté(s) dans ${path.basename(game.original)}.`); // i18n-ignore : journal
     } catch (error) {
       console.log(`Lunettes 3D : réglages de la table changés en jeu pas reportés (${(error as Error).message}).`); // i18n-ignore : journal
     }
+  }
+
+  /**
+   * Après une partie en 3D Vision : ce que VPX en a écrit dans son journal depuis son lancement (jamais
+   * le bilan d'une partie précédente). Rien d'écrit : le bilan devient « inconnu ».
+   */
+  function noteNvidiaOutcome(): void {
+    const start = nvidiaLogStart;
+    nvidiaLogStart = undefined;
+    let outcome: Nvidia3dVisionOutcome = { state: 'unknown', line: '' };
+    try {
+      const text = readVpxLogSince(ctx.vpxLog(), start);
+      outcome = (text !== undefined && nvidia3dVisionOutcome(text)) || outcome;
+    } catch (error) {
+      console.log(`Lunettes 3D : journal de VPX illisible pour le bilan 3D Vision (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    nvidiaOutcome = outcome;
+    writeNvidiaOutcome(dataDir, outcome);
+    console.log(outcome.state === 'unknown' ? 'Lunettes 3D : NVIDIA 3D Vision, rien au journal de VPX pour cette partie.' : `Lunettes 3D : NVIDIA 3D Vision, bilan de la partie : ${outcome.state} (${outcome.line}).`); // i18n-ignore : journal
   }
 
   return {

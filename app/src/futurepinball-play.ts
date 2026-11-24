@@ -180,6 +180,17 @@ export function placePupWindows(pids: readonly number[], roleRect: (role: 'toppe
 }
 
 /**
+ * PinUP Player lancé par la table pendant la partie (objet COM de PinEvent) : ses processus absents au lancement
+ * (`before`) et encore là à la fin (`now`) sont fermés, par leur numéro ; ceux qui tournaient déjà restent. Sans
+ * cela, PinUpDisplay.exe pouvait rester ouvert après la partie (appui long sur Exit, 24/11/2026). Rend les numéros fermés.
+ */
+export function closePupStartedDuringGame(before: readonly number[], now: readonly number[], kill: (pid: number) => void = realDmdMirrorSystem.kill): number[] {
+  const started = now.filter((pid) => !before.includes(pid));
+  for (const pid of started) kill(pid);
+  return started;
+}
+
+/**
  * Boutons de joystick de la borne et les touches que Future Pinball attend pour leur rôle, d'après ses
  * préférences (registre de l'utilisateur ; ses réglages d'origine si elles manquent). Pour le relais
  * des boutons (zen-keys.ts) : sans lui, une borne au Pinscape ne pouvait rien faire en partie.

@@ -7,7 +7,9 @@ import {
   FORBIDDEN_WINDOWS_CALLS,
   frontendNames,
   installedFrontends,
+  OTHER_FRONTENDS,
   parseTaskbarMarker,
+  PINUP_PLAYER_PROCESSES,
   restoresTaskbarsAt,
   runningFrontends,
   simulatedInstalledFrontends,
@@ -80,8 +82,16 @@ function callers(call: string): string[] {
 
 test('autres menus ouverts : reconnus par leur exécutable, sans casse ; le lecteur des PuP-Packs seul ne compte pas', () => {
   assert.deepEqual(runningFrontends(['explorer.exe', 'pinupmenu.EXE']).map((f) => f.id), ['popper']);
-  assert.deepEqual(runningFrontends(['PinUpDisplay.exe', 'PinballX.exe', 'PinballY.exe']).map((f) => f.id), ['popper', 'pinballx', 'pinbally']);
+  assert.deepEqual(runningFrontends(['PinUpMenu.exe', 'PinballX.exe', 'PinballY.exe']).map((f) => f.id), ['popper', 'pinballx', 'pinbally']);
   assert.deepEqual(runningFrontends(['PinUpPlayer.exe', 'VPinballX64.exe']), []);
+  // 24/11/2026 : PinUpDisplay.exe resté ouvert après une table PinEvent de Future Pinball faisait dire « PinUP Popper est ouvert ».
+  assert.deepEqual(runningFrontends(['PinUpPlayer.exe', 'PinUpDisplay.exe']), []);
+});
+
+test('le lecteur des PuP-Packs (PinUP Player) ne fait jamais reconnaître un menu de borne', () => {
+  for (const frontend of OTHER_FRONTENDS) {
+    for (const exe of PINUP_PLAYER_PROCESSES) assert.ok(!frontend.processes.some((p) => p.toLowerCase() === exe.toLowerCase()), `${frontend.name} reconnu à ${exe}`);
+  }
   assert.equal(frontendNames(runningFrontends(['PinUpMenu.exe'])), 'PinUP Popper');
   assert.equal(frontendNames(runningFrontends(['PinUpMenu.exe', 'PinballX.exe', 'PinballY.exe'])), 'PinUP Popper, PinballX et PinballY');
 });

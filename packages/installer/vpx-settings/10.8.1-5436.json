@@ -4,7 +4,7 @@
   "platform": "windows-x64",
   "sourceCommit": "af26b2d93",
   "source": "https://github.com/vpinball/vpinball/blob/af26b2d93/src/core/Settings_properties.inl",
-  "count": 1250,
+  "count": 1251,
   "settings": [
     {"section":"Version","key":"VPinball","type":"string","label":"VPX Version","description":"VPX version that saved this file","default":"10815436"},
     {"section":"Editor","key":"EnableLog","type":"bool","label":"Enable Log","description":"Enable general logging to the vinball.log file","default":true},
@@ -1147,6 +1147,7 @@
     {"section":"CVEdit","key":"ShowVPcore_FontStrike","type":"bool","label":"ShowVPcore","description":"","default":false},
     {"section":"Player","key":"CabinetAutofitKeepTop","type":"bool","label":"Cabinet Autofit Keep Top","description":"With 'Fit Table': never hide the top of the table. The table is zoomed only until its top reaches the top of the screen with the lower flipper bats at the selected position (hiding the apron), the remaining width is filled by a limited horizontal stretch","default":false},
     {"section":"Player","key":"CabinetAutofitMaxStretch","type":"float","label":"Cabinet Autofit Max Stretch","description":"With 'Fit Table' and 'Keep Top': maximum horizontal stretch used to fill the screen width (0% keeps the table proportions, leaving side bands)","default":0,"min":0,"max":0.5},
+    {"section":"Player","key":"Stereo3DNvidiaDirect","type":"bool","label":"NVIDIA 3D Vision","description":"With 'Side by Side': present each view at the full screen width to NVIDIA 3D Vision shutter glasses (Direct3D 11, exclusive fullscreen, NVIDIA driver 452.06 or older with stereo enabled)","default":false},
     {"section":"Plugin.vpx","key":"Enable","type":"bool","label":"Enable","description":"Enable/Disable plugin 'VPX'","default":false,"contextual":true,"plugin":"vpx"},
     {"section":"Plugin.AlphaDMD","key":"Enable","type":"bool","label":"Enable","description":"Enable/Disable plugin 'AlphaDMD'","default":false,"contextual":true,"plugin":"AlphaDMD"},
     {"section":"Plugin.AltSound","key":"Folder","type":"string","label":"AltSound Folder","description":"","default":"","plugin":"AltSound"},

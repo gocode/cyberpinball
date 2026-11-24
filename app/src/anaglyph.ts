@@ -9,7 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anaglyphGameSettings, applyVpxSettings, findTableIni, IniDocument, isAnaglyphKey, parseAnaglyphSetting, readTextIfExists, writeFileAtomic, type AnaglyphSetting, type VpxSetting } from '@cyberpinball/core';
+import { anaglyphGameSettings, applyVpxSettings, findTableIni, IniDocument, isAnaglyphKey, NVIDIA_3DVISION_OUTCOME_STATES, parseAnaglyphSetting, readTextIfExists, writeFileAtomic, type AnaglyphSetting, type Nvidia3dVisionOutcome, type VpxSetting } from '@cyberpinball/core';
 import { writeIniSettings } from './vr';
 
 const folder = (dataDir: string) => path.join(dataDir, 'anaglyphe');
@@ -26,6 +26,77 @@ export function readAnaglyph(dataDir: string): AnaglyphSetting {
 export function writeAnaglyph(dataDir: string, setting: AnaglyphSetting): void {
   fs.mkdirSync(folder(dataDir), { recursive: true });
   writeFileAtomic(settingFile(dataDir), JSON.stringify(setting, null, 2) + '\n');
+}
+
+const outcomeFile = (dataDir: string) => path.join(folder(dataDir), 'nvidia-derniere-partie.json');
+
+/** Bilan de la dernière partie en NVIDIA 3D Vision (journal de VPX) ; undefined : aucune encore, ou fichier illisible. */
+export function readNvidiaOutcome(dataDir: string): Nvidia3dVisionOutcome | undefined {
+  try {
+    const raw = JSON.parse(fs.readFileSync(outcomeFile(dataDir), 'utf8')) as Partial<Nvidia3dVisionOutcome>;
+    return typeof raw.line === 'string' && (NVIDIA_3DVISION_OUTCOME_STATES as readonly string[]).includes(raw.state as string) ? { state: raw.state!, line: raw.line } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function writeNvidiaOutcome(dataDir: string, outcome: Nvidia3dVisionOutcome): void {
+  fs.mkdirSync(folder(dataDir), { recursive: true });
+  writeFileAtomic(outcomeFile(dataDir), JSON.stringify(outcome, null, 2) + '\n');
+}
+
+/** Le journal de VPX au lancement d'une partie : son chemin et sa taille (0 : pas encore écrit). */
+export interface VpxLogMark {
+  file: string;
+  size: number;
+}
+
+export function markVpxLog(file: string | undefined): VpxLogMark | undefined {
+  if (!file) return undefined;
+  try {
+    return { file, size: fs.statSync(file).size };
+  } catch {
+    return { file, size: 0 };
+  }
+}
+
+/** Plus que ce qu'une partie écrit au journal (quelques Mo au pire) : le début de la partie suffit au bilan. */
+const LOG_READ_MAX = 8 * 1024 * 1024;
+
+function readFrom(file: string, from: number): string {
+  let fd: number | undefined;
+  try {
+    const size = fs.statSync(file).size;
+    const length = Math.min(size - from, LOG_READ_MAX);
+    if (length <= 0) return '';
+    const buffer = Buffer.alloc(length);
+    fd = fs.openSync(file, 'r');
+    fs.readSync(fd, buffer, 0, length, from);
+    return buffer.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+/**
+ * Ce que VPX a écrit dans `file` depuis `since` (le lancement de la partie) ; undefined : pas de journal.
+ * VPX ajoute à son journal et le fait tourner à 5 Mo (vpinball.log devient vpinball.1.log) : plus court
+ * qu'au lancement, il a tourné pendant la partie, dont le début est alors à la fin de l'ancien.
+ */
+export function readVpxLogSince(file: string | undefined, since: VpxLogMark | undefined): string | undefined {
+  if (!file) return undefined;
+  let size: number;
+  try {
+    size = fs.statSync(file).size;
+  } catch {
+    return undefined;
+  }
+  if (!since || since.file !== file) return readFrom(file, 0);
+  if (since.size <= size) return readFrom(file, since.size);
+  const rolled = path.join(path.dirname(file), `${path.basename(file, path.extname(file))}.1${path.extname(file)}`);
+  return readFrom(rolled, since.size) + '\n' + readFrom(file, 0);
 }
 
 /** La copie du fichier de la table passée à VPX pour une partie en relief. */

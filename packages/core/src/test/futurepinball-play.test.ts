@@ -51,7 +51,17 @@ const play = require(path.join(REPO_ROOT, 'app', 'dist', 'futurepinball-play.js'
   ): { pid(): number | undefined; stop(): void };
   placeDmdMirror(pid: number | undefined, dmdScreen: FakeWindow['rect'] | undefined, windows: () => FakeWindow[], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
   placeFuturePinballWindow(w: FakeWindow, playfield: FakeWindow['rect'] | undefined, displays: FakeWindow['rect'][], set: (w: FakeWindow, r: FakeWindow['rect']) => boolean): FakeWindow['rect'] | undefined;
+  closePupStartedDuringGame(before: readonly number[], now: readonly number[], kill: (pid: number) => void): number[];
 };
+
+test('PinUP Player lancé par une table PinEvent : fermé avec la partie, par son numéro ; celui qui tournait avant reste', () => {
+  const killed: number[] = [];
+  // 500 tournait avant la partie ; 610 (PinUpPlayer.exe) et 611 (PinUpDisplay.exe) sont venus avec la table.
+  assert.deepEqual(play.closePupStartedDuringGame([500], [500, 610, 611], (pid) => killed.push(pid)), [610, 611]);
+  assert.deepEqual(killed, [610, 611]);
+  assert.deepEqual(play.closePupStartedDuringGame([500], [500], () => assert.fail('rien à fermer')), []);
+  assert.deepEqual(play.closePupStartedDuringGame([], [], () => assert.fail('rien à fermer')), []);
+});
 
 const INSTALL = { exe: 'C:\\Games\\Future Pinball\\Future Pinball.exe', gameDir: 'C:\\Games\\Future Pinball', tablesDir: 'C:\\Games\\Future Pinball\\Tables', source: 'found' };
 const TABLE = 'D:\\Cyber Pinball\\Tables\\Alien (Original 2008)\\Alien.fpt';

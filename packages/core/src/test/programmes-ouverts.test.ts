@@ -19,6 +19,8 @@ const SLOW = 'Cadence end: frames=2152 duration=55.2s fps=39.0 p50=17ms p95=70ms
 test('programmes relevés : menus, lecteur de PuP, dmdext, serveur B2S ; Cyber Pinball et VPX jamais', () => {
   assert.deepEqual(programsDuringGame(['explorer.exe', 'PINUPMENU.EXE', 'PinUpDisplay.exe', 'PinUpPlayer.exe', 'dmdext.exe', 'VPinballX_BGFX64.exe', 'CyberPinball.exe']), ['PinUP Popper', 'PinUP Player', 'dmdext']);
   assert.deepEqual(programsDuringGame(['B2SBackglassServerEXE.exe', 'PinballY.exe']), ['PinballY', 'B2S Server']);
+  // Le lecteur seul (resté ouvert après une table PinEvent de Future Pinball) : PinUP Player, jamais PinUP Popper.
+  assert.deepEqual(programsDuringGame(['PinUpDisplay.exe']), ['PinUP Player']);
   assert.deepEqual(programsDuringGame(['explorer.exe', 'CyberPinball.exe', 'VPinballX_BGFX64.exe']), []);
 });
 

@@ -119,6 +119,7 @@ import {
   isZenEmulator,
   futurePinballCommandLine,
   PINUP_DISPLAY_EXE,
+  PINUP_PLAYER_PROCESSES,
   ZEN_GAMES,
   type ZenGameKey,
   readInfo,
@@ -335,7 +336,7 @@ import {
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
-import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
+import { closePupStartedDuringGame, detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
@@ -375,7 +376,7 @@ import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine 
 import { createFramingMenu } from './cadrage-menu';
 import { createFramingPreviews } from './framing-preview';
 import { loadPlugins } from './plugins';
-import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
+import { activeVpxIni, audioOutputs, syncConfiguration, usbDevices } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
@@ -457,6 +458,8 @@ import { prepareVpxClr } from './vpx-clr';
 import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { createAnaglyphMenu } from './anaglyph-menu';
+import { readAnaglyph } from './anaglyph';
+import { nvidia3dVisionFacts } from './nvidia-3dvision';
 import { createDebug } from './debogage';
 import { createDebugMenu } from './debogage-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
@@ -1279,6 +1282,7 @@ const library = createLibrary({
   feedbackWho: () => feedbackWho(),
   romMusic: () => romMusic,
   vrNetwork: () => vrFront.vrNetworkFacts(),
+  glasses3d: () => nvidia3dVisionChosen(),
   root: loc.root,
   dataDir: loc.dataDir,
   // Essais : le Bureau du sélecteur de fichiers est un dossier du bac à sable (CYBERPINBALL_BUREAU),
@@ -3990,7 +3994,24 @@ const anaglyphMenu = createAnaglyphMenu({
   keys: () => KEYS,
   vision3dOn: () => vision3dMenu.setting().mode === 'on',
   vrOn: () => vrFront.vrMode === 'auto',
+  nvidia: (fresh, inis) => nvidia3dVision(fresh, inis),
+  vpxLog: () => {
+    const install = vpxInstall(loc);
+    return lastLaunchLogPath() ?? (install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined);
+  },
 });
+/**
+ * Lunettes actives NVIDIA 3D Vision (nvidia-3dvision.ts) : pilote, émetteur, écran du playfield, VPX en place.
+ * `inis` : les réglages qu'une partie lira (table d'abord) ; sinon le VPinballX.ini en vigueur.
+ */
+function nvidia3dVision(fresh = false, inis?: string[]) {
+  return nvidia3dVisionFacts({ usb: () => usbDevices(), inis: () => inis ?? [activeVpxIni(loc)], vpx: () => vpxInstall(loc) }, fresh);
+}
+/** Pour la santé de la borne : relevé seulement quand les lunettes NVIDIA sont choisies et activées (lu sur disque). */
+function nvidia3dVisionChosen() {
+  const s = readAnaglyph(loc.dataDir);
+  return s.mode === 'on' && s.kind === 'nvidia' ? nvidia3dVision() : undefined;
+}
 
 
 /** Une partie se prépare ou se joue : les relevés au journal attendent. */
@@ -5617,6 +5638,9 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Les fenêtres de PinUP Player (PuP-Pack joué par une table « PinEvent ») aussi, chacune sur l'écran de son
   // rôle : son PinUpPlayer.ini les place d'après une autre disposition des écrans (PinCab, 20/11/2026).
   const pupPids = (): number[] => (fp && simulated === undefined ? processIdsByName(PINUP_DISPLAY_EXE) : []);
+  // PinUP Player lancé par la table (PinEvent) : fermé à la fin s'il n'était pas là avant (closePupStartedDuringGame).
+  const pupPlayerPids = (): number[] => (fp && simulated === undefined ? PINUP_PLAYER_PROCESSES.flatMap((exe) => processIdsByName(exe)) : []);
+  const pupBefore = pupPlayerPids();
   const dmdMirrorWatch =
     simulated === undefined && command && fp
       ? setInterval(() => {
@@ -5664,6 +5688,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   if (dmdMirrorWatch) clearInterval(dmdMirrorWatch);
   if (virtualDmdWatch) clearInterval(virtualDmdWatch);
   dmdMirror?.stop();
+  const pupClosed = fp && simulated === undefined ? closePupStartedDuringGame(pupBefore, pupPlayerPids()) : [];
+  if (pupClosed.length) console.log(`${zenName} (${table.id}) : PinUP Player lancé par la table, fermé avec la partie (processus ${pupClosed.join(', ')}).`); // i18n-ignore : journal
   if (windowsOrientation) orientationAfterGame(zenName);
   // FX3 montre aussi les images d'autres tables pendant ses transitions (essai du 20/11/2026 : un chemin
   // affiché en un éclair) : celles de toutes ses tables installées, en arrière-plan, une fois par

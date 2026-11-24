@@ -22,11 +22,17 @@ export interface OtherFrontend {
 }
 
 /**
- * Menus de borne connus. PinUpPlayer.exe n'y est pas : c'est le lecteur des PuP-Packs,
- * lancé par les tables en mode classique, pas le menu.
+ * Lecteur des PuP-Packs de l'ensemble PinUPSystem (PinUP Player) : PinUpPlayer.exe (son objet COM
+ * PinUpPlayer.PinDisplay) et PinUpDisplay.exe (ses fenêtres). Une table le lance elle-même (VPX en mode
+ * classique, Future Pinball « PinEvent ») et il peut rester ouvert après la partie : ce n'est jamais un
+ * menu. 24/11/2026 : PinUpDisplay.exe, resté ouvert après une table PinEvent, comptait pour PinUP Popper
+ * et faisait dire « PinUP Popper est ouvert » à une borne où personne ne l'avait lancé.
  */
+export const PINUP_PLAYER_PROCESSES = ['PinUpPlayer.exe', 'PinUpDisplay.exe'];
+
+/** Menus de borne connus, chacun reconnu à son seul menu (jamais au lecteur des PuP-Packs, PINUP_PLAYER_PROCESSES). */
 export const OTHER_FRONTENDS: OtherFrontend[] = [
-  { id: 'popper', name: 'PinUP Popper', processes: ['PinUpMenu.exe', 'PinUpDisplay.exe'] },
+  { id: 'popper', name: 'PinUP Popper', processes: ['PinUpMenu.exe'] },
   { id: 'pinballx', name: 'PinballX', processes: ['PinballX.exe'] },
   { id: 'pinbally', name: 'PinballY', processes: ['PinballY.exe'] },
 ];
@@ -39,7 +45,7 @@ export const OTHER_FRONTENDS: OtherFrontend[] = [
  */
 export const GAME_INTRUDERS: { name: string; processes: string[] }[] = [
   ...OTHER_FRONTENDS.map((f) => ({ name: f.name, processes: f.processes })),
-  { name: 'PinUP Player', processes: ['PinUpPlayer.exe'] },
+  { name: 'PinUP Player', processes: PINUP_PLAYER_PROCESSES },
   { name: 'dmdext', processes: ['dmdext.exe'] },
   { name: 'B2S Server', processes: ['B2SBackglassServerEXE.exe'] },
 ];

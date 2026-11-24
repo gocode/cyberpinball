@@ -275,6 +275,20 @@ test('correctif 05 : import POV sans éditeur et champs anciens vides protégés
   assert.match(bench, /assert\.equal\(number\(key\), expected/, 'le banc natif vérifie aussi les réglages numériques valides');
 });
 
+test('correctif 06 : NVIDIA 3D Vision en mode direct, Direct3D 11 et plein écran exclusif, repli côte à côte', () => {
+  const diff = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '06-nvidia-3d-vision.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 7\)/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
+  assert.match(diff, /\+PropBool\(Player, Stereo3DNvidiaDirect,[^\n]*, false\);/, 'désactivé par défaut : sans la clé, VPX rend comme la 5436');
+  assert.match(diff, /NvAPI_Stereo_SetDriverMode/, 'mode direct demandé avant la création du device');
+  assert.match(diff, /NvAPI_Stereo_SetActiveEye/, 'chaque œil présenté au pilote');
+  assert.match(diff, /falling back to plain side by side rendering/, 'un échec garde une partie jouable');
+  // Le front-end lit le bilan de la partie dans ces lignes (nvidia3dVisionOutcome).
+  for (const line of ['direct mode requested', 'direct mode ready', 'stereo " << (activated ? "activated" : "not activated', 'stereo is disabled in the NVIDIA control panel']) assert.ok(diff.includes(line), line);
+  const schema = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'installer', 'vpx-settings', '10.8.1-5436.json'), 'utf8')) as { settings: { section: string; key: string }[] };
+  assert.ok(schema.settings.some((s) => s.section === 'Player' && s.key === 'Stereo3DNvidiaDirect'), 'le schéma de la 5436 connaît le réglage');
+});
+
 test('construction : un dossier de sources par série de correctifs, une construction à la fois', () => {
   // 21/11/2026 : une publication groupée (série 1) et une branche (série 2) construisaient dans le même dossier de
   // sources ; chacune effaçait les sources de l'autre au milieu de sa compilation.
