@@ -1,7 +1,8 @@
-// Lecture seule du registre de Windows par l'API Unicode (advapi32), sans passer
+// Lecture du registre de Windows par l'API Unicode (advapi32), sans passer
 // par reg.exe : sa sortie suit la page de code de la console et abîme les
 // accents (« Haut-parleurs/écouteurs »), alors que VPX compare les noms de
-// sortie audio à l'octet près. Rien ici n'écrit dans le registre.
+// sortie audio à l'octet près. Seule écriture : hkcuSetValue (réglages d'un jeu
+// de l'utilisateur, HKCU, jamais HKLM), voir plus bas.
 
 import * as koffi from 'koffi';
 
@@ -27,11 +28,14 @@ const REG_QWORD = 11;
 
 export type RegistryValue = string | number | bigint | Uint8Array;
 
+const KEY_SET_VALUE = 0x0002;
+
 interface Api {
   RegOpenKeyExW: NativeFn;
   RegEnumKeyExW: NativeFn;
   RegCloseKey: NativeFn;
   RegGetValueW: NativeFn;
+  RegSetValueExW: NativeFn;
 }
 
 let api: Api | undefined;
@@ -50,6 +54,7 @@ function loadApi(): Api {
     RegGetValueW: advapi32.func(
       'long __stdcall RegGetValueW(intptr_t key, const char16_t *subKey, const char16_t *value, uint32_t flags, _Out_ uint32_t *type, void *data, _Inout_ uint32_t *size)',
     ),
+    RegSetValueExW: advapi32.func('long __stdcall RegSetValueExW(intptr_t key, const char16_t *name, uint32_t reserved, uint32_t type, const void *data, uint32_t size)'),
   };
   return api;
 }
@@ -86,6 +91,34 @@ export function hklmValue(path: string, name: string): RegistryValue | undefined
 /** Valeur HKCU\<path>\<name>, lue comme hklmValue. */
 export function hkcuValue(path: string, name: string): RegistryValue | undefined {
   return valueAt(HKEY_CURRENT_USER, path, name);
+}
+
+/**
+ * Écrit HKCU\<path>\<name> : REG_DWORD pour un nombre, REG_SZ pour un texte. La clé doit déjà exister
+ * (un jeu qui n'a jamais tourné n'a pas de réglages à corriger : on ne les invente pas). Lève une
+ * erreur si l'écriture échoue.
+ */
+export function hkcuSetValue(path: string, name: string, value: string | number): void {
+  const w = loadApi();
+  const handle = [0];
+  const opened = w.RegOpenKeyExW(HKEY_CURRENT_USER, path, 0, KEY_SET_VALUE, handle);
+  if (opened !== ERROR_SUCCESS) throw new Error(`clé HKCU\\${path} introuvable (code Win32 ${opened}).`); // i18n-ignore : erreur technique d'un appel Win32
+  try {
+    let data: Buffer;
+    let type: number;
+    if (typeof value === 'number') {
+      data = Buffer.alloc(4);
+      data.writeUInt32LE(value >>> 0, 0);
+      type = REG_DWORD;
+    } else {
+      data = Buffer.from(`${value}\0`, 'utf16le');
+      type = REG_SZ;
+    }
+    const rc = w.RegSetValueExW(handle[0], name, 0, type, data, data.length);
+    if (rc !== ERROR_SUCCESS) throw new Error(`RegSetValueExW a échoué pour ${name} (code Win32 ${rc}).`); // i18n-ignore : erreur technique d'un appel Win32
+  } finally {
+    w.RegCloseKey(handle[0]);
+  }
 }
 
 function valueAt(root: number, path: string, name: string): RegistryValue | undefined {

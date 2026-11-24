@@ -8,25 +8,37 @@
 import * as path from 'node:path';
 import {
   addFuturePinballTable,
+  findFuturePinball,
   formatList,
+  formatSize,
   FUTURE_PINBALL_NAME,
   futurePinballAt,
   futurePinballInstalledTables,
   futurePinballTableInMenu,
   installFuturePinballArchive,
+  managedFuturePinballDir,
+  migrateFuturePinball,
+  planFuturePinballMigration,
   t,
   tn,
   writeFuturePinballConfig,
+  type DownloadManager,
   type FuturePinballInstall,
+  type FuturePinballMigrationPlan,
   type TableEntry,
   type VpsDb,
 } from '@cyberpinball/core';
 import type { Action, Built, Row } from './library-types';
 import { onGesture } from './gesture-flash';
 import { detectFuturePinball } from './futurepinball-play';
+import { futurePinballComponent, installManagedFuturePinball } from './futurepinball-install';
+import { askElevation } from './uac-confirm';
 
 export interface FuturePinballUiHost {
   dataDir(): string;
+  /** Racine de Cyber Pinball (dossier géré <racine>\emulators\futurepinball) ; absente sans installation. */
+  root(): string | undefined;
+  downloads(): DownloadManager | undefined;
   /** Dossier des tables de Cyber Pinball ; vide sans installation. */
   tablesDir(): string;
   tables(): TableEntry[];
@@ -58,9 +70,30 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
 
   /** Relit le jeu sur ce PC : à l'ouverture de « Ajouter une table » et de cet écran. */
   function refresh(): FuturePinballInstall | undefined {
-    install = detectFuturePinball(host.dataDir());
+    install = detectFuturePinball(host.dataDir(), host.root());
     read = true;
     return install;
+  }
+
+  /**
+   * Une installation existante (emplacements habituels : l'ancien front-end, un paquet de la communauté)
+   * autre que celle utilisée, dont les tables peuvent être reprises dans le dossier géré. Lu à l'ouverture.
+   */
+  let legacy: FuturePinballMigrationPlan | undefined;
+  function readLegacy(): void {
+    legacy = undefined;
+    const root = host.root();
+    if (!root || install?.source !== 'managed') return;
+    const other = findFuturePinball({});
+    if (!other) return;
+    const plan = planFuturePinballMigration(other.gameDir, install.gameDir);
+    if (plan.files) legacy = plan;
+  }
+
+  /** « Quel dossier est utilisé », dit en clair : à l'écran, dans les notices des tables et des téléchargements. */
+  function usedFolder(game: FuturePinballInstall): string {
+    const how = game.source === 'managed' ? t('installé par Cyber Pinball') : game.source === 'chosen' ? t('dossier choisi à la main') : t('installation existante trouvée sur ce PC');
+    return t('{game} utilisé : {dir} ({how})', { game: FUTURE_PINBALL_NAME, dir: game.gameDir, how });
   }
 
   /** Entrée de « Ajouter une table ». */
@@ -73,7 +106,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       icon: 'playfield',
       badge: 'beta',
       detail: !install
-        ? t('Introuvable aux emplacements habituels : choisir son dossier, ou des fichiers .fpt')
+        ? t('Pas installé : Cyber Pinball peut le télécharger avec BAM, ou choisis son dossier ou des fichiers .fpt')
         : inMenu
           ? tn(inMenu, '{n} table dans le front-end · ajouter celles de son dossier Tables', '{n} tables dans le front-end · ajouter celles de son dossier Tables')
           : t('Ajouter les tables de son dossier Tables, ou des fichiers .fpt'),
@@ -86,6 +119,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
 
   function open(at?: number): void {
     refresh();
+    readLegacy();
     list = install ? futurePinballInstalledTables(install) : [];
     const tables = host.tables();
     present = new Map(list.map((file) => [file, futurePinballTableInMenu(tables, file)]));
@@ -129,6 +163,25 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       key: 'fpt:pick',
       run: () => void pickTables(),
     });
+    // Pas de jeu, ou un jeu qui n'est pas celui de Cyber Pinball : le télécharger chez son auteur (avec BAM), dans le dossier géré.
+    if (host.root() && install?.source !== 'managed')
+      actions.push({
+        label: install ? t('Installer celui de Cyber Pinball…') : t('Installer {game} et BAM…', { game: FUTURE_PINBALL_NAME }),
+        detail: install
+          ? t('Téléchargé chez son auteur ({size}) dans le dossier de Cyber Pinball ; ton installation actuelle reste intacte', { size: formatSize(futurePinballComponent().size) })
+          : t('Téléchargé chez l’auteur de BAM ({size}), installé dans le dossier de Cyber Pinball', { size: formatSize(futurePinballComponent().size) }),
+        icon: 'download',
+        key: 'fpt:install',
+        run: () => askInstall(),
+      });
+    if (legacy)
+      actions.push({
+        label: t('Reprendre les tables de l’ancienne installation…'),
+        detail: t('{files} fichiers ({size}) de {from} copiés dans {to} ; l’ancienne installation n’est pas modifiée', { files: legacy.files, size: formatSize(legacy.bytes), from: legacy.from, to: legacy.to }),
+        icon: 'folder-download',
+        key: 'fpt:migrate',
+        run: () => void migrate(legacy!),
+      });
     actions.push({
       label: install ? t('Changer le dossier de {game}…', { game: FUTURE_PINBALL_NAME }) : t('Choisir le dossier de {game}…', { game: FUTURE_PINBALL_NAME }),
       detail: t('Celui de « Future Pinball.exe », ou son dossier Tables'),
@@ -151,10 +204,17 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: () => host.back() });
 
     const game: Row = install
-      ? { text: install.gameDir, detail: install.source === 'chosen' ? t('Dossier choisi à la main') : t('Trouvé sur ce PC'), tone: 'ok' }
+      ? {
+          text: install.gameDir,
+          detail: [
+            install.source === 'managed' ? t('Installé par Cyber Pinball') : install.source === 'chosen' ? t('Dossier choisi à la main') : t('Installation existante, trouvée sur ce PC : utilisée telle quelle'),
+            install.loader ? t('BAM présent') : t('BAM absent : les tables récentes en ont besoin'),
+          ].join(' · '),
+          tone: 'ok',
+        }
       : {
-          text: t('Introuvable'),
-          detail: t('Ni dans C:\\Games, ni à la racine de C:, D: ou E:, ni dans Program Files. « Choisir le dossier de {game}… » : celui de son exécutable.', { game: FUTURE_PINBALL_NAME }),
+          text: t('Pas installé'),
+          detail: t('Introuvable dans C:\\Games, à la racine de C:, D: ou E:, ni dans Program Files. « Installer {game} et BAM… » le télécharge ; « Choisir le dossier de {game}… » désigne celui de son exécutable.', { game: FUTURE_PINBALL_NAME }),
           tone: 'warning',
         };
     const inMenu = tables.filter((x) => x.emulator === 'futurepinball').length;
@@ -183,6 +243,80 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       actions,
       back: () => host.back(),
     };
+  }
+
+  /**
+   * Demande d'accord avant tout téléchargement : ce qui vient, d'où, où cela va, et ce que Cyber Pinball
+   * sait de la licence (gratuit, sans clause de redistribution : il ne le livre pas, c'est le joueur qui le
+   * télécharge chez l'auteur de BAM). Puis l'avertissement de la demande de Windows (uac-confirm.ts).
+   */
+  function askInstall(): void {
+    const root = host.root();
+    if (!root) return;
+    const component = futurePinballComponent();
+    const dir = managedFuturePinballDir(root);
+    host.openCustom(
+      () => ({
+        heading: t('Installer {game} et BAM', { game: FUTURE_PINBALL_NAME }),
+        icon: 'download',
+        lead: t('Cyber Pinball ne livre pas {game} : il le télécharge chez l’auteur de BAM, avec ton accord.', { game: FUTURE_PINBALL_NAME }),
+        sections: [
+          {
+            rows: [
+              { text: t('Ce qui est téléchargé'), detail: t('{game} {version} et BAM, l’installateur « 2-en-1 » ({size})', { game: FUTURE_PINBALL_NAME, version: component.version, size: formatSize(component.size) }), icon: 'download' },
+              { text: t('D’où'), detail: t('{host} : le site de l’auteur de BAM. Son empreinte SHA-256 est vérifiée ; un fichier différent est refusé.', { host: new URL(component.url).hostname }), icon: 'globe' },
+              { text: t('Où'), detail: t('{dir} : le dossier de Cyber Pinball ; rien ailleurs, ton installation actuelle n’est pas touchée.', { dir }), icon: 'folder' },
+              { text: t('Licence'), detail: t('Gratuits à télécharger et à utiliser d’après leurs auteurs, qui ne parlent pas de redistribution : c’est pourquoi tu le télécharges toi-même chez eux.'), icon: 'info', tone: 'quiet' },
+            ],
+          },
+        ],
+        actions: [
+          { label: t('Plus tard'), icon: 'back', key: 'later', run: () => open() },
+          { label: t('Télécharger et installer'), detail: t('Windows demande ensuite ton autorisation'), icon: 'download', key: 'go', run: () => confirmInstall() },
+        ],
+        back: () => open(),
+      }),
+      0,
+    );
+  }
+
+  function confirmInstall(): void {
+    askElevation((build, at) => host.openCustom(build, at), {
+      title: t('Installer {game} et BAM', { game: FUTURE_PINBALL_NAME }),
+      what: t('Installer {game} et BAM dans le dossier de Cyber Pinball (sans fenêtre).', { game: FUTURE_PINBALL_NAME }),
+      go: () => void install_(),
+      later: () => open(),
+    });
+  }
+
+  async function install_(): Promise<void> {
+    const root = host.root();
+    if (!root) return;
+    let result: Awaited<ReturnType<typeof installManagedFuturePinball>> | undefined;
+    await host.task(t('Téléchargement et installation de {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
+      result = await installManagedFuturePinball(root, { ...(host.downloads() ? { downloads: host.downloads()! } : {}) });
+    });
+    if (result?.ok) {
+      // Le joueur a voulu celui de Cyber Pinball : le dossier choisi autrefois à la main ne passe plus devant.
+      writeFuturePinballConfig(host.dataDir(), undefined);
+      notice = result.bam
+        ? t('{game} et BAM sont installés dans {dir}. Les tables que tu ajoutes y sont rangées.', { game: FUTURE_PINBALL_NAME, dir: result.dir })
+        : t('{game} est installé dans {dir}, mais BAM n’y est pas : les tables récentes en ont besoin.', { game: FUTURE_PINBALL_NAME, dir: result.dir });
+    } else {
+      notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result?.reason ?? '?' }) + (result && !result.ok && result.log ? ' ' + t('Journal de l’installateur : {log}.', { log: result.log }) : '');
+    }
+    open();
+  }
+
+  /** Copie les tables, bibliothèques, musiques et scripts de l'ancienne installation dans le dossier géré (rien d'écrasé, source intacte). */
+  async function migrate(plan: FuturePinballMigrationPlan): Promise<void> {
+    let copied = 0;
+    await host.task(t('Copie des tables de {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
+      copied = await migrateFuturePinball(plan);
+    });
+    console.log(`${FUTURE_PINBALL_NAME} : ${copied} fichier(s) repris de ${plan.from} dans ${plan.to}.`); // i18n-ignore : journal
+    notice = tn(copied, '{n} fichier repris dans {dir} ; l’ancienne installation est intacte.', '{n} fichiers repris dans {dir} ; l’ancienne installation est intacte.', { dir: plan.to });
+    open();
   }
 
   async function pickTables(): Promise<void> {
@@ -254,7 +388,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
   async function addArchives(dirs: string[], opts: { show?: boolean; vpsGameId?: string } = {}): Promise<TableEntry[]> {
     const game = refresh();
     if (!game) {
-      notice = t('{game} est introuvable sur ce PC : choisis son dossier, puis installe de nouveau la table (le fichier reçu est gardé).', { game: FUTURE_PINBALL_NAME });
+      notice = t('{game} n’est pas installé sur ce PC : installe-le (Tables de {game}, « Installer… ») ou choisis son dossier, puis ajoute de nouveau la table (le fichier reçu est gardé).', { game: FUTURE_PINBALL_NAME });
       console.log(`${FUTURE_PINBALL_NAME} : archive pas rangée, jeu introuvable (${dirs.join(', ')}).`); // i18n-ignore : journal
       if (opts.show !== false) open(host.cursor());
       return [];
@@ -273,6 +407,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       }
     });
     const lead = [
+      usedFolder(game),
       copied ? tn(copied, '{n} fichier rangé dans {game} (bibliothèques, musique…).', '{n} fichiers rangés dans {game} (bibliothèques, musique…).', { game: FUTURE_PINBALL_NAME }) : undefined,
       kept ? tn(kept, '{n} déjà dans le jeu, gardé tel quel.', '{n} déjà dans le jeu, gardés tels quels.') : undefined,
     ].filter((x): x is string => Boolean(x));

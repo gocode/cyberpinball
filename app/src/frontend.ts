@@ -334,6 +334,7 @@ import {
   formatDateTime,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
+import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
 import { detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -5407,7 +5408,7 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
 async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined, firstRunSeen = false): Promise<PlayReport | undefined> {
   // Pinball FX ou Pinball FX3 (17/11/2026) : même partie, chacun sa détection et sa commande.
   // Future Pinball (19/11/2026) aussi : sa détection, sa commande et ses messages dans futurepinball-play.ts.
-  const fp = table.emulator === 'futurepinball' ? futurePinballPlan(table, { simulated, mode, install: simulated === undefined ? detectFuturePinball(loc.dataDir) : undefined }) : undefined;
+  const fp = table.emulator === 'futurepinball' ? futurePinballPlan(table, { simulated, mode, install: simulated === undefined ? detectFuturePinball(loc.dataDir, loc.root) : undefined }) : undefined;
   const zenKey = (fp ? undefined : table.emulator) as ZenGameKey | undefined;
   const zenName = fp ? fp.name : ZEN_GAMES[zenKey!].name;
   const launchGame = fp ? fp.launchGame : ZEN_LAUNCH_GAMES[zenKey!];
@@ -5511,6 +5512,23 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
       if (written) console.log(`${zenName} (${table.id}) : mode borne écrit dans ${written} (DMD ${JSON.stringify(layout.dmd ?? null)}, fronton ${JSON.stringify(layout.backglass ?? null)}).`); // i18n-ignore : journal
     } catch (error) {
       console.log(`${zenName} (${table.id}) : mode borne pas écrit (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
+    }
+  }
+  // Future Pinball : son playfield et son fronton visent le NOM GDI d'un écran que Windows renumérote ; sur un
+  // PinCab, le playfield 4K s'ouvrait sur l'écran du DMD (futurepinball-screens.ts). Réglé d'après les rôles.
+  if (simulated === undefined && fp && !simulatedDisplays() && process.platform === 'win32') {
+    const screenOf = (role: RoleId) => {
+      const d = menuAssignments[role];
+      return d?.gdiName ? { gdiName: d.gdiName, width: d.bounds.width, height: d.bounds.height } : undefined;
+    };
+    const playfield = screenOf('playfield');
+    const backglass = screenOf('backglass');
+    try {
+      const done = applyFuturePinballScreens({ ...(playfield ? { playfield } : {}), ...(backglass ? { backglass } : {}) });
+      if (done.written.length) console.log(`${zenName} (${table.id}) : écrans du jeu réglés d'après la borne, ${describeFuturePinballScreenChanges(done.written)}.`); // i18n-ignore : journal
+      for (const f of done.failed) console.log(`${zenName} (${table.id}) : écran du jeu pas réglé, ${f.change.name} (${f.reason}) ; la partie se lance quand même.`); // i18n-ignore : journal
+    } catch (error) {
+      console.log(`${zenName} (${table.id}) : écrans du jeu pas réglés (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
     }
   }
   // Pinball FX : pas d'image de fronton déposée pour le jeu. Sa fenêtre du fronton est fermée dans son mode borne

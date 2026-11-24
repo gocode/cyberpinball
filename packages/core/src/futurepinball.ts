@@ -46,8 +46,8 @@ export interface FuturePinballInstall {
   gameDir: string;
   /** Son dossier Tables (peut manquer : le jeu ne le crée qu'à l'installation). */
   tablesDir: string;
-  /** Trouvé aux emplacements habituels, ou choisi à la main (configuration). */
-  source: 'found' | 'chosen';
+  /** Installé par Cyber Pinball (dossier géré), trouvé aux emplacements habituels, ou choisi à la main (configuration). */
+  source: 'managed' | 'found' | 'chosen';
   /** BAM installé : chemin de son FPLoader.exe (dossier BAM du jeu). */
   loader?: string;
 }
@@ -93,19 +93,27 @@ export function writeFuturePinballConfig(dataDir: string, exe: string | undefine
 export interface FindFuturePinballOptions {
   /** Dossier des données : le jeu choisi à la main y est gardé, et passe avant les emplacements habituels. */
   dataDir?: string;
+  /** Dossier géré par Cyber Pinball (managedFuturePinballDir) : il passe avant les emplacements habituels. */
+  managedDir?: string;
   candidates?: readonly string[];
   exists?: (p: string) => boolean;
 }
 
 /**
- * Future Pinball sur ce PC : celui choisi à la main s'il est toujours là, sinon le premier des
- * emplacements habituels. Rien n'est mémorisé de ce qui est trouvé : un jeu installé ensuite est vu aussitôt.
+ * Future Pinball sur ce PC : celui choisi à la main s'il est toujours là (le joueur l'a voulu), sinon
+ * celui que Cyber Pinball a installé dans son dossier géré, sinon le premier des emplacements habituels
+ * (une installation existante reste utilisée). Rien n'est mémorisé de ce qui est trouvé : un jeu installé
+ * ensuite est vu aussitôt.
  */
 export function findFuturePinball(opts: FindFuturePinballOptions = {}): FuturePinballInstall | undefined {
   const exists = opts.exists ?? fs.existsSync;
   const chosen = opts.dataDir ? readFuturePinballConfig(opts.dataDir).exe : undefined;
   if (chosen) {
     const install = futurePinballAt(chosen, exists, 'chosen');
+    if (install) return install;
+  }
+  if (opts.managedDir) {
+    const install = futurePinballAt(opts.managedDir, exists, 'managed');
     if (install) return install;
   }
   for (const dir of opts.candidates ?? futurePinballCandidates()) {

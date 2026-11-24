@@ -592,6 +592,8 @@ export function createLibrary(host: LibraryHost) {
   // « Tables de Future Pinball » (19/11/2026) : écran à part (futurepinball-ui.ts), branché ici.
   const futurePinballUi = createFuturePinballUi({
     dataDir: () => host.dataDir,
+    root: () => host.root,
+    downloads: () => downloads,
     tablesDir: () => tablesDir(),
     tables: () => host.tables(),
     pickFolder: async () => (await pickPaths({ title: t('Dossier de {game}', { game: FUTURE_PINBALL_NAME }), icon: 'folder', purpose: tLater('Dossier de Future Pinball'), mode: 'folder', start: 'desktop' }))?.[0],
@@ -2610,7 +2612,7 @@ export function createLibrary(host: LibraryHost) {
     const zenKey = isZenEmulator(table.emulator) ? zenEntryKey(table) : undefined;
     const zen = isZenEmulator(table.emulator) ? zenTableOfEntry(table) : undefined;
     // Lu à l'ouverture de la fiche (openSheet), pas à chaque dessin.
-    const fpInstall = fp ? kept('future-pinball', () => detectFuturePinball(host.dataDir)) : undefined;
+    const fpInstall = fp ? kept('future-pinball', () => detectFuturePinball(host.dataDir, host.root)) : undefined;
     const fpFiles: Row[] = [
       { text: t('Table'), detail: path.basename(table.file), tone: 'ok' },
       fpInstall

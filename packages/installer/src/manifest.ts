@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { t } from '@cyberpinball/core';
 
 /**
- * emulator : un moteur de tables (VPX, plus tard Future Pinball…), branché à un adaptateur du même id.
+ * emulator : un moteur de tables (VPX, Future Pinball avec BAM…), branché à un adaptateur du même id.
  * tool : un outil annexe (configuration DOF, DMD…).
  * driver : le pilote d'un matériel (Kinect pour la Vision 3D), installé par son propre installateur
  * signé, en silence et avec l'accord de Windows (élévation), jamais extrait.

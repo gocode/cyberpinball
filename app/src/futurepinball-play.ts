@@ -6,7 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { dmdMirrorPlacement, pupScreenRole, pupWindowPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import { dmdMirrorPlacement, pupScreenRole, pupWindowPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, managedFuturePinballDir, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
@@ -15,11 +15,12 @@ export const FUTURE_PINBALL_SIMULATED_ENV = 'CYBERPINBALL_FUTURE_PINBALL_SIMULE'
 
 /**
  * Future Pinball sur ce PC : le faux des démonstrations, celui choisi à la main (gardé dans le dossier
- * des données), sinon le premier des emplacements habituels. Relu à chaque appel.
+ * des données), celui que Cyber Pinball a installé dans son dossier géré (`root`), sinon le premier des
+ * emplacements habituels (une installation existante reste utilisée). Relu à chaque appel.
  */
-export function detectFuturePinball(dataDir: string): FuturePinballInstall | undefined {
+export function detectFuturePinball(dataDir: string, root?: string): FuturePinballInstall | undefined {
   const simulated = process.env[FUTURE_PINBALL_SIMULATED_ENV];
-  return findFuturePinball({ dataDir, ...(simulated ? { candidates: [simulated] } : {}) });
+  return findFuturePinball({ dataDir, ...(simulated ? { candidates: [simulated] } : root ? { managedDir: managedFuturePinballDir(root) } : {}) });
 }
 
 /** Ce que la partie demande au lanceur, ou pourquoi elle est impossible. */

@@ -277,4 +277,6 @@ export * from './vpx-format';
 export * from './futurepinball';
 export * from './futurepinball-archive';
 export * from './futurepinball-keys';
+export * from './futurepinball-managed';
+export * from './futurepinball-screens';
 export * from './nudge-keys';

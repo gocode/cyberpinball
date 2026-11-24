@@ -132,6 +132,25 @@
       "sourceCommit": "28919b5df"
     },
     {
+      "id": "future-pinball",
+      "kind": "emulator",
+      "distribution": "on-demand",
+      "name": "Future Pinball + BAM",
+      "homepage": "https://ravarcade.pl/download",
+      "version": "1.9.1.20101231",
+      "channel": "stable",
+      "platform": "windows-x64",
+      "installDir": "emulators/futurepinball",
+      "url": "https://ravarcade.pl/files/FP-BAM-setup.exe",
+      "sha256": "7490e5cb649e4b0fe34b934539b1c83694d05819e1ec837c049c5210af3ef736",
+      "size": 47346211,
+      "executablePattern": "^Future Pinball\\.exe$",
+      "executable": "Future Pinball.exe",
+      "installArguments": ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/NOICONS"],
+      "license": "Future Pinball (Chris Leathley, version 1.9.1.20101231, 2010) : gratuit à télécharger et à utiliser d'après son site, sans clause de redistribution. BAM (Ravarcade) : « Freeware » d'après son site, sans clause de redistribution. Cyber Pinball ne les livre ni ne les héberge : l'installateur « 2-en-1 » est téléchargé chez l'auteur de BAM à la demande du joueur, son empreinte vérifiée, puis installé sans fenêtre dans emulators/futurepinball. Le lien officiel de Future Pinball (members.iinet.net.au) ne résout plus (constaté le 24/11/2026) : cet installateur est la seule source en ligne.",
+      "source": "https://ravarcade.pl/download"
+    },
+    {
       "id": "kinect-sdk-1.8",
       "kind": "driver",
       "distribution": "on-demand",

@@ -317,4 +317,4 @@ export * from './openxr';
 export * from './handles';
 export * from './file-holders';
 export * from './device-guard';
-export { hkcuValue, hklmValue } from './registry';
+export { hkcuSetValue, hkcuValue, hklmValue } from './registry';
