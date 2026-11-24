@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { closeCornersHolds, CLOSE_CORNERS_EYE, IniDocument, stripCloseCorners, withCloseCorners, withCustomView, withTableFramingStyle } from '../index';
+import { closeCornersHolds, closeCornersVariant, CLOSE_CORNERS_INCLINATION, CLOSE_CORNERS_EYE, IniDocument, stripCloseCorners, withCloseCorners, withCustomView, withTableFramingStyle } from '../index';
 
 const own = '[Player]\r\nScreenPlayerX = 3\r\n[TableOverride]\r\nViewCabFOV = 25\r\n';
 
@@ -39,3 +39,39 @@ function stripped(ini: string): string {
   stripCloseCorners(doc);
   return doc.toString();
 }
+
+test('au plus près des coins : deux variantes, écran incliné ou à plat, relues telles quelles et sans confusion', () => {
+  const incline = IniDocument.parse(withCloseCorners(own, 'incline'));
+  const plat = IniDocument.parse(withCloseCorners(own, 'plat'));
+  assert.equal(closeCornersVariant(incline), 'incline');
+  assert.equal(closeCornersVariant(plat), 'plat');
+  assert.equal(incline.get('Player', 'ScreenInclination'), CLOSE_CORNERS_INCLINATION.incline);
+  assert.equal(plat.get('Player', 'ScreenInclination'), CLOSE_CORNERS_INCLINATION.plat);
+  assert.notEqual(CLOSE_CORNERS_INCLINATION.incline, CLOSE_CORNERS_INCLINATION.plat);
+  // Même œil, même étirement : seule l'inclinaison les distingue.
+  for (const k of ['ScreenPlayerY', 'ScreenPlayerZ', 'CabinetAutofitMaxStretch', 'CabinetAutofitPos']) assert.equal(incline.get('Player', k), plat.get('Player', k));
+  // Passer d'une variante à l'autre ne laisse rien de la précédente.
+  assert.equal(closeCornersVariant(IniDocument.parse(withCloseCorners(withCloseCorners(own, 'incline'), 'plat'))), 'plat');
+});
+
+test('au plus près des coins : l’œil reste dans la plage réglable de VPX (Y -70..30, Z 30..100)', () => {
+  assert.ok(Number(CLOSE_CORNERS_EYE.ScreenPlayerZ) <= 100 && Number(CLOSE_CORNERS_EYE.ScreenPlayerZ) >= 30);
+  assert.ok(Number(CLOSE_CORNERS_EYE.ScreenPlayerY) <= 30 && Number(CLOSE_CORNERS_EYE.ScreenPlayerY) >= -70);
+});
+
+test('au plus près des coins : un style ou une vue reprenant la table retire aussi l’inclinaison de l’essai, jamais celle du joueur', () => {
+  for (const variant of ['incline', 'plat'] as const) {
+    const back = IniDocument.parse(stripped(withCloseCorners(own, variant)));
+    assert.equal(back.get('Player', 'ScreenInclination'), undefined);
+    assert.equal(back.get('Player', 'ScreenPlayerZ'), undefined);
+  }
+  // Une inclinaison propre au joueur, sans l'œil de l'essai : intacte.
+  const mine = IniDocument.parse('[Player]\r\nScreenInclination = 6\r\n');
+  stripCloseCorners(mine);
+  assert.equal(mine.get('Player', 'ScreenInclination'), '6');
+  // L'œil de la première version (Y -20 / Z 150) est encore retiré, sans être tenu pour un essai en place.
+  const legacy = IniDocument.parse('[Player]\r\nScreenPlayerY = -20\r\nScreenPlayerZ = 150\r\nCabinetAutofitMode = 1\r\nCabinetAutofitKeepTop = 1\r\nCabinetAutofitMaxStretch = 0.5\r\n');
+  assert.equal(closeCornersHolds(legacy), false);
+  stripCloseCorners(legacy);
+  assert.equal(legacy.get('Player', 'ScreenPlayerZ'), undefined);
+});

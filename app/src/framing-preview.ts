@@ -161,13 +161,13 @@ export function createFramingPreviews(deps: {
   return { cached, render };
 }
 
-/** Nom de l'image en cache : la table et son état, le VPX, le .ini de la table, le cadrage de la borne, la taille. */
+/** Nom de l'image en cache : la table et son état, le VPX, le cadrage effectif (empreinte), la taille. */
 export function previewKey(req: FramingPreviewRequest, exe: string): string {
   const stat = fs.statSync(req.table);
   const exeStat = fs.statSync(exe);
   return crypto
     .createHash('sha256')
-    .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, req.tableIni, framingKeys(req.globalIni), renderSize(req.window)]))
+    .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, framingFingerprint(req.tableIni, req.globalIni), renderSize(req.window)]))
     .digest('hex')
     .slice(0, 32);
 }
@@ -178,12 +178,31 @@ export function renderSize(window: { width: number; height: number }): { width: 
   return { width: Math.max(2, Math.round((RENDER_HEIGHT * ratio) / 2) * 2), height: RENDER_HEIGHT };
 }
 
-/** Les clés de VPinballX.ini qui changent le cadrage : la clé du cache n'en dépend que d'elles. */
-function framingKeys(globalIni: string): string {
-  const doc = IniDocument.parse(globalIni);
-  return ['BGSet', 'CabinetAutofitMode', 'CabinetAutofitKeepTop', 'CabinetAutofitMaxStretch', 'CabinetAutofitPos', 'ScreenWidth', 'ScreenHeight', 'ScreenInclination', 'ScreenPlayerX', 'ScreenPlayerY', 'ScreenPlayerZ']
-    .map((k) => `${k}=${doc.get('Player', k)?.trim() ?? ''}`)
-    .join(';');
+/** Les clés [Player] qui changent le cadrage : celles du .ini de la table l'emportent sur celles de VPinballX.ini. */
+const FRAMING_KEYS = ['CabinetAutofitMode', 'CabinetAutofitKeepTop', 'CabinetAutofitMaxStretch', 'CabinetAutofitPos', 'ScreenWidth', 'ScreenHeight', 'ScreenInclination', 'LockbarWidth', 'ScreenPlayerX', 'ScreenPlayerY', 'ScreenPlayerZ'];
+
+/**
+ * Le cadrage que VPX appliquerait, tel quel pour la clé du cache : les clés de cadrage effectives (table sinon borne,
+ * une valeur vide valant « absent »), la vue réglée de la table ([TableOverride]) et ses autres réglages [Player].
+ * Le reste du .ini (ScoreView, plugins…) n'y est pas : changer de cadrage ne refait plus les aperçus des autres
+ * (0.2.4, 24/11/2026 : choisir un point de vue relançait VPX pour des images identiques, parce que le texte du .ini des
+ * autres propositions avait changé sans que leur rendu change).
+ */
+export function framingFingerprint(tableIni: string, globalIni: string): string {
+  const table = IniDocument.parse(tableIni);
+  const global = IniDocument.parse(globalIni);
+  const value = (section: string, key: string) => {
+    const own = table.get(section, key)?.trim();
+    return own ? own : (global.get(section, key)?.trim() ?? '');
+  };
+  const lines = new Map<string, string>();
+  lines.set('player.bgset', global.get('Player', 'BGSet')?.trim() ?? '');
+  for (const k of FRAMING_KEYS) lines.set(`Player.${k}`.toLowerCase(), value('Player', k));
+  for (const e of table.entries()) {
+    const section = e.section.toLowerCase();
+    if ((section === 'player' || section === 'tableoverride') && e.value.trim() !== '' && !lines.has(`${section}.${e.key}`.toLowerCase())) lines.set(`${section}.${e.key}`.toLowerCase(), e.value.trim());
+  }
+  return [...lines].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(';');
 }
 
 /** VPinballX.ini d'un aperçu : celui de la borne, fenêtré à la forme du playfield, sans son ni toys ni fenêtres annexes. */

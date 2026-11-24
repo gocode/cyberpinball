@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Point de vue d'une table : le cadrage "au plus près des coins" existe maintenant en deux variantes, "écran incliné" (le fond du plateau est un peu tronqué pour garder les coins de la table dans ceux de l'écran) et "écran à plat", chacune avec son aperçu rendu par VPX ; l'œil est celui réglé à la main sur Monster Bash (maximum du curseur de VPX), l'ancien réglage dépassait la plage que VPX sait régler.
+- Les aperçus du Point de vue ne sont plus rendus de nouveau quand on choisit une configuration : leur clé de cache suit le cadrage réellement appliqué, pas le texte du .ini.
+- Les aperçus du Point de vue ont un liseré clair autour de l'image, pour voir où commencent les bords de la table dans un rendu très sombre.
 - Menu de VPX en partie : les boutons suivent enfin la navigation de Cyber Pinball. Les flippers changent de ligne (gauche : précédente, droit : suivante) ; les MagnaSave règlent, valident ou annulent (gauche : diminuer ou annuler, droit : augmenter ou valider). Avant, c'était l'inverse : les flippers validaient et sortaient, les MagnaSave changeaient de ligne.
 - Sur une borne sans MagnaSave, les flippers gardent le réglage (VPX n'a alors aucun autre bouton pour augmenter ou valider).
 - Le rappel du réglage de l'affichage en partie (« Changer de ligne », « Régler, valider ou annuler ») montre les bons boutons ; les touches de VPX se réécrivent d'elles-mêmes au prochain lancement.

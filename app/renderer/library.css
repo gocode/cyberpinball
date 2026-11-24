@@ -1366,6 +1366,14 @@ body.mouse .media-card[data-act]:hover {
 }
 
 /*
+ * Table rendue par VPX (aperçus du cadrage, 24/11/2026) : le fond est presque noir, le bord de la table s'y perdait.
+ * Un trait clair marque la limite de l'écran, pour juger d'un coup d'œil si les coins de la table y arrivent.
+ */
+.media-thumb.outlined::after {
+  box-shadow: inset 0 0 0 0.35vmin var(--ink-muted);
+}
+
+/*
  * Contenu animé (vidéo, GIF, APNG, son) : l'icône de lecture, à la façon de YouTube (rectangle
  * arrondi, triangle ; une note pour le son). Le contenu déjà là s'anime de lui-même : l'icône
  * reste petite, au coin. Le contenu à lire à la demande (lourd, ou pas encore récupéré,

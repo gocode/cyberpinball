@@ -801,9 +801,12 @@ export const messages: Record<string, string> = {
   'Rétablir le cadrage précédent': 'Restore the previous framing',
   'Ce qui cadre cette table sur l’écran du plateau, chaque choix montré sur la table rendue par VPX. Le sens de la table est toujours vérifié : un point de vue qui la mettrait de travers sur cette borne est refusé.': 'What frames this table on the playfield screen, each choice shown on the table rendered by VPX. The direction of the table is always checked: a point of view that would turn it the wrong way on this cabinet is refused.',
   'Cadrage de cette table (menu de VPX › Point of View)': 'Framing of this table (VPX menu › Point of View)',
-  'Plein cadre, au plus près des coins': 'Full frame, corners as close as possible',
-  'Essai pour cette table seule : étire davantage et relève l’œil pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.':
-    'A trial for this table only: stretches further and raises the eye to bring the playfield corners closer to the screen corners. The result depends on the table: compare the previews.',
+  'Au plus près des coins, écran incliné': 'Corners as close as possible, tilted screen',
+  'Au plus près des coins, écran à plat': 'Corners as close as possible, flat screen',
+  'Essai pour cette table seule : le fond du plateau est un peu tronqué pour que ses coins restent dans ceux de l’écran incliné. Le résultat dépend de la table : compare les aperçus.':
+    'A trial for this table only: the back of the playfield is slightly cut so its corners stay in the corners of the tilted screen. The result depends on the table: compare the previews.',
+  'Essai pour cette table seule : pour un écran posé à plat, sans inclinaison ; étire davantage pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.':
+    'A trial for this table only: for a screen laid flat, with no tilt; stretches further to bring the playfield corners closer to the screen corners. The result depends on the table: compare the previews.',
   'Plein cadre, bas rogné': 'Full frame, bottom cropped',
   'Table entière, bandes': 'Whole table, side bands',
   'Plein cadre, table élargie': 'Full frame, table widened',

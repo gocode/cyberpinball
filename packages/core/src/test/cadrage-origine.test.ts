@@ -170,7 +170,7 @@ const FRAMING_WRITERS: Record<string, string> = {
   'packages/core/src/tableview.ts': 'importedView : seulement sans mode choisi',
   'app/src/vpx-launch-compat.ts': 'copie à part pour VPX 10.8.0, le .ini de la table intact',
   'app/src/table-pov.ts': 'Point de vue : seulement le choix du joueur, l’état d’avant gardé (framing-history.ts)',
-  'packages/core/src/framing-close-corners.ts': 'l’essai « au plus près des coins », pour une table seule : étirement 50 % et œil relevé dans son .ini, retirés avec lui',
+  'packages/core/src/framing-close-corners.ts': 'l’essai « au plus près des coins », pour une table seule : deux variantes (écran incliné ou à plat) : étirement 50 %, œil relevé et inclinaison dans son .ini, retirés avec lui',
   'packages/core/src/framing-custom.ts': 'la vue personnalisée du joueur, gardée puis remise par Point de vue seulement ; le cadrage d’origine est retiré avec elle',
   'packages/core/src/framing-styles.ts':'le style choisi pour une table, écrit par Point de vue',
   'app/src/cadrage-menu.ts': 'aperçus seulement : le .ini d’une copie de travail, jamais celui de la table',

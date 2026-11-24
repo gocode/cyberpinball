@@ -134,6 +134,8 @@ export interface MediaThumb {
   icon?: string;
   /** Rotation horaire vue du joueur (plateau et chargement), demi-tour compris. */
   rotation: Rotation;
+  /** Aperçu d'un rendu sombre (table rendue par VPX) : cadre en trait clair, pour voir où finit l'écran et où commence la table. */
+  outlined?: boolean;
   text?: string;
   /** Travail en cours derrière l'aperçu (rendu par VPX…) : le texte s'affiche avec un loader animé. */
   pending?: boolean;

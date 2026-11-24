@@ -8,7 +8,7 @@
 // - le cadrage de l'installation d'origine d'une table reprise (packages/core/src/origin-framing.ts), y compris pour une
 //   table reprise avant qu'il soit figé à l'ajout, quand cette installation est encore sur le disque ;
 // - « Importer un POV… » : un POV trouvé ailleurs (Téléchargements, clé USB…), rangé avec la table puis appliqué ;
-// - « Plein cadre, au plus près des coins » (essai, bêta) : pour cette table seule, jamais pour la borne
+// - « Au plus près des coins » en deux variantes, écran incliné ou à plat (essais, bêta) : pour cette table seule, jamais pour la borne
 //   (framing-close-corners.ts) ;
 // - « Rétablir le cadrage précédent » : chaque choix garde le .ini d'avant (framing-history.ts) ;
 // - « Ma vue personnalisée » : la dernière vue réglée par le joueur dans le menu de VPX, gardée quand un autre cadrage la
@@ -18,7 +18,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  closeCornersHolds,
+  CLOSE_CORNERS_VARIANTS,
+  closeCornersVariant,
   customViewHolds,
   customViewOf,
   DEFAULT_FRAMING_STYLE,
@@ -215,16 +216,16 @@ export function createTablePov(ctx: TablePovContext) {
     const global = IniDocument.parse(orientation?.globalIni ?? '');
     const own = IniDocument.parse(text);
     // Un style choisi pour cette table seule : le mode écrit dans son .ini, sans vue manuelle ni cadrage d'origine.
-    const closeCorners = s.framing === 'cabinet' && closeCornersHolds(own);
+    const closeCorners = s.framing === 'cabinet' ? closeCornersVariant(own) : undefined;
     const tableStyle =
-      s.framing === 'cabinet' && !closeCorners && (own.get('Player', 'CabinetAutofitMode')?.trim() ?? '') !== ''
+      s.framing === 'cabinet' && closeCorners === undefined && (own.get('Player', 'CabinetAutofitMode')?.trim() ?? '') !== ''
         ? framingStyleOf((sec, key) => {
             const v = own.get(sec, key);
             return v !== undefined && v.trim() !== '' ? v : global.get(sec, key);
           }, keepTop)
         : undefined;
     const list: Option[] = [];
-    const onBorne = s.framing === 'cabinet' && !closeCorners && (tableStyle === undefined || tableStyle === borneStyle);
+    const onBorne = s.framing === 'cabinet' && closeCorners === undefined && (tableStyle === undefined || tableStyle === borneStyle);
     list.push({
       key: 'borne',
       label: t('Cadrage de la borne'),
@@ -246,18 +247,25 @@ export function createTablePov(ctx: TablePovContext) {
           ...(current ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
         });
       }
-      // Essai : les coins du plateau au plus près de ceux de l'écran (framing-close-corners.ts), pour cette table seule.
+      // Essais : les coins du plateau au plus près de ceux de l'écran (framing-close-corners.ts), pour cette table seule,
+      // selon que l'écran de la borne est incliné ou à plat.
       if (keepTop) {
-        const next = withCloseCorners(base);
-        list.push({
-          key: 'coins',
-          label: t('Plein cadre, au plus près des coins'),
-          detail: t('Essai pour cette table seule : étire davantage et relève l’œil pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.'),
-          current: closeCorners,
-          ini: closeCorners ? text : next,
-          badge: 'beta',
-          ...(closeCorners ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
-        });
+        for (const variant of CLOSE_CORNERS_VARIANTS) {
+          const next = withCloseCorners(base, variant);
+          const current = closeCorners === variant;
+          list.push({
+            key: `coins:${variant}`,
+            label: variant === 'incline' ? t('Au plus près des coins, écran incliné') : t('Au plus près des coins, écran à plat'),
+            detail:
+              variant === 'incline'
+                ? t('Essai pour cette table seule : le fond du plateau est un peu tronqué pour que ses coins restent dans ceux de l’écran incliné. Le résultat dépend de la table : compare les aperçus.')
+                : t('Essai pour cette table seule : pour un écran posé à plat, sans inclinaison ; étire davantage pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.'),
+            current,
+            ini: current ? text : next,
+            badge: 'beta',
+            ...(current ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
+          });
+        }
       }
     }
     if (s.framing === 'origin' && note) {

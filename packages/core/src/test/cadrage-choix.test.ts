@@ -168,6 +168,27 @@ test('aperçus : chaque image donnée est autorisée à l’affichage (cache hor
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
+test('aperçus : la clé du cache suit le cadrage effectif, pas le texte du .ini (choisir un point de vue ne refait pas les autres images)', () => {
+  // 24/11/2026 : après un choix dans « Point de vue », les aperçus étaient tous rendus de nouveau, parce que le .ini de
+  // chaque proposition (écrit à partir de celui de la table, qui venait de changer) différait par son texte seulement.
+  const mod = require(path.resolve(__dirname, '../../../../app/dist/framing-preview.js')) as { framingFingerprint(tableIni: string, globalIni: string): string };
+  const globalIni = '[Player]\nBGSet = 2\nCabinetAutofitMode = 1\nCabinetAutofitKeepTop = 1\nCabinetAutofitMaxStretch = 0.15\nScreenWidth = 94.1\n';
+  const same = (a: string, b: string) => assert.equal(mod.framingFingerprint(a, globalIni), mod.framingFingerprint(b, globalIni));
+  // Le mode de la borne écrit dans la table, ou laissé à VPinballX.ini : même rendu.
+  same('', '[Player]\nCabinetAutofitMode = 1\n');
+  same('', '[Player]\nCabinetAutofitMode =\n');
+  // Ordre, casse, espaces, sections sans effet sur le rendu (ScoreView, plugins).
+  same('[Player]\nscreenplayerz = 150\nCabinetAutofitMaxStretch = 0.5\n', '[ScoreView]\nScoreViewWndX = 68\n\n[Player]\nCabinetAutofitMaxStretch=0.5\nScreenPlayerZ = 150\n');
+  // Ce qui change l'image change la clé : mode, étirement, œil, vue réglée de la table.
+  const differs = (a: string, b: string) => assert.notEqual(mod.framingFingerprint(a, globalIni), mod.framingFingerprint(b, globalIni));
+  differs('', '[Player]\nCabinetAutofitMode = 2\n');
+  differs('', '[Player]\nCabinetAutofitMaxStretch = 0.5\n');
+  differs('[Player]\nScreenPlayerZ = 100\n', '[Player]\nScreenPlayerZ = 70\n');
+  differs('', '[TableOverride]\nViewCabMode = 2\nViewCabScaleX = 1.27\n');
+  // Le cadrage de la borne (VPinballX.ini) compte aussi.
+  assert.notEqual(mod.framingFingerprint('', globalIni), mod.framingFingerprint('', globalIni.replace('= 0.15', '= 0.5')));
+});
+
 test('aperçus : une image QOI de VPX lue en RGBA opaque', () => {
   // 2 × 1 : un pixel rouge (QOI_OP_RGB), puis le même (QOI_OP_RUN), marqueur de fin.
   const header = Buffer.alloc(14);

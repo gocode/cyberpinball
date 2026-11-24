@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Table point of view: the "corners as close as possible" framing now comes in two variants, "tilted screen" (the back of the playfield is slightly cut to keep the table corners in the screen corners) and "flat screen", each with its own VPX-rendered preview; the eye is the one tuned by hand on Monster Bash (the maximum of VPX's slider), the old setting went beyond the range VPX can set.
+- Point of view previews are no longer rendered again when a configuration is chosen: their cache key follows the framing actually applied, not the text of the .ini.
+- Point of view previews have a clear outline around the image, to show where the table edges begin in a very dark render.
 - VPX menu during a game: the buttons now follow Cyber Pinball's own navigation. The flippers change line (left: previous, right: next); the MagnaSave buttons adjust, confirm or cancel (left: decrease or cancel, right: increase or confirm). It used to be the other way round: the flippers confirmed and went back, the MagnaSave buttons changed line.
 - On a cabinet without MagnaSave buttons, the flippers keep adjusting (VPX then has no other button to increase or confirm).
 - The in-game display adjustment reminder ("Changer de ligne", "Régler, valider ou annuler") shows the right buttons; VPX's keys are rewritten by themselves at the next launch.

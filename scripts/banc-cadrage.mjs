@@ -53,6 +53,19 @@ const ETUDE = [
   { nom: 'haut-150', titre: 'Œil à 150 cm, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '150' } },
   { nom: 'haut-400', titre: 'Œil à 400 cm, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '400' } },
   { nom: 'etire-50', titre: 'Garder le haut, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05' } },
+  // Coins ajustés, écran incliné ou à plat (24/11/2026) : la vue réglée à la main par le joueur sur Monster Bash (mode Window,
+  // œil Y 2,49 / Z 100, fenêtre abaissée), puis l'autofit à œil identique, avec et sans inclinaison de l'écran.
+  {
+    nom: 'main-incline',
+    titre: 'Vue réglée à la main (écran incliné)',
+    reglages: { CabinetAutofitMode: '0', ScreenPlayerY: '2.485651', ScreenPlayerZ: '99.976471', CabinetAutofitMaxStretch: '0.5' },
+    vue: { ViewCabMode: '2', ViewCabScaleX: '1.267907', ViewCabScaleY: '1.080779', ViewCabHOfs: '0', ViewCabVOfs: '5.197504', ViewCabWindowTop: '261.648926', ViewCabWindowBot: '60.455444', ViewCabRotation: '0' },
+  },
+  ...[['plat', '0'], ['i6', '6'], ['i12', '12'], ['n6', '-6']].map(([n, inc]) => ({
+    nom: `oeil100-${n}`,
+    titre: `Œil Y 2,5 / Z 100, étirement 0,5, inclinaison ${inc}°`,
+    reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '2.5', ScreenPlayerZ: '100', ScreenInclination: inc },
+  })),
 ];
 
 /**

@@ -1343,7 +1343,7 @@ function forgetMediaNodes() {
 }
 
 function renderThumb(t, selected = false) {
-  const box = libEl('div', `media-thumb kind-${t.kind} rot-${t.rotation}`);
+  const box = libEl('div', `media-thumb kind-${t.kind} rot-${t.rotation}${t.outlined ? ' outlined' : ''}`);
   const file = (t.kind === 'image' || t.kind === 'video') && t.url ? mediaNode(t.kind, t.url) : undefined;
   if (file) box.append(file);
   // Un son peut montrer une image pendant qu'il s'écoute : sa forme d'onde (recherche libre, découpe).
