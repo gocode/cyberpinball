@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Community: on the suggested-player cards, the name is no longer squeezed out and its level no longer overlaps the buttons; "View profile" and "Add friend" now sit on their own row below the text.
+- The "+25 XP" on buttons stays readable on the cabinet (same size as the button).
 - Table point of view: the "corners as close as possible" framing now comes in two variants, "tilted screen" (the back of the playfield is slightly cut to keep the table corners in the screen corners) and "flat screen", each with its own VPX-rendered preview; the eye is the one tuned by hand on Monster Bash (the maximum of VPX's slider), the old setting went beyond the range VPX can set.
 - Point of view previews are no longer rendered again when a configuration is chosen: their cache key follows the framing actually applied, not the text of the .ini.
 - Point of view previews have a clear outline around the image, to show where the table edges begin in a very dark render.

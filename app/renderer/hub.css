@@ -512,7 +512,8 @@
 }
 
 .hub-button-xp {
-  font-size: 0.9em;
+  /* Pas plus petit que le bouton : 0.9em passait sous les 20 px lisibles à la borne. */
+  font-size: 1em;
   font-weight: 800;
   color: var(--signal);
 }
@@ -1041,6 +1042,17 @@
   grid-column: 3;
   grid-row: 1;
   padding-top: 0;
+}
+
+/*
+ * Deux boutons ou plus (« Voir le profil » puis « Ajouter en ami +25 XP », 23/11/2026) ne tiennent pas à
+ * droite du pseudo : la colonne de droite prenait toute la largeur, celle du texte tombait à zéro, le pseudo
+ * disparaissait et son niveau passait sur les boutons. Ils prennent leur propre rangée sous le texte.
+ */
+.hub-card.hub-layout-people .hub-buttons:has(> .hub-button + .hub-button) {
+  grid-column: 2 / -1;
+  grid-row: auto;
+  padding-top: calc(6 * var(--u));
 }
 
 .hub-card.hub-layout-people .hub-button {

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Communauté : sur les cartes des joueurs à découvrir, le pseudo n'est plus écrasé et son niveau ne passe plus sur les boutons ; "Voir le profil" et "Ajouter en ami" ont leur propre rangée sous le texte.
+- Le "+25 XP" des boutons reste lisible à la borne (taille du bouton).
 - Point de vue d'une table : le cadrage "au plus près des coins" existe maintenant en deux variantes, "écran incliné" (le fond du plateau est un peu tronqué pour garder les coins de la table dans ceux de l'écran) et "écran à plat", chacune avec son aperçu rendu par VPX ; l'œil est celui réglé à la main sur Monster Bash (maximum du curseur de VPX), l'ancien réglage dépassait la plage que VPX sait régler.
 - Les aperçus du Point de vue ne sont plus rendus de nouveau quand on choisit une configuration : leur clé de cache suit le cadrage réellement appliqué, pas le texte du .ini.
 - Les aperçus du Point de vue ont un liseré clair autour de l'image, pour voir où commencent les bords de la table dans un rendu très sombre.
