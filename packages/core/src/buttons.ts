@@ -39,16 +39,18 @@ export interface ButtonInfo {
 
 /** Ordre de l'assistant : les boutons qui pilotent l'interface d'abord, Exit avant les facultatifs. */
 export const BUTTONS: readonly ButtonInfo[] = [
-  // Les flippers déplacent aussi le curseur du menu de VPX (UILeft, UIRight) et
-  // tiennent les flippers « en deux temps » des tables qui en ont.
-  { id: 'leftFlipper', get label() { return t('Flipper gauche'); }, required: true, default: 'ShiftLeft', vpx: ['LeftFlipper', 'LeftStagedFlipper', 'UILeft'] },
-  { id: 'rightFlipper', get label() { return t('Flipper droit'); }, required: true, default: 'ShiftRight', vpx: ['RightFlipper', 'RightStagedFlipper', 'UIRight'] },
+  // Menu de VPX en partie, comme partout dans Cyber Pinball : les flippers changent de ligne
+  // (UIUp : précédente, UIDown : suivante), les MagnaSave règlent et valident ou annulent
+  // (UILeft : diminuer, annuler ; UIRight : augmenter, valider), voir vpxActionsOf pour une borne sans
+  // MagnaSave. Les flippers tiennent aussi les flippers « en deux temps » des tables qui en ont.
+  { id: 'leftFlipper', get label() { return t('Flipper gauche'); }, required: true, default: 'ShiftLeft', vpx: ['LeftFlipper', 'LeftStagedFlipper', 'UIUp'] },
+  { id: 'rightFlipper', get label() { return t('Flipper droit'); }, required: true, default: 'ShiftRight', vpx: ['RightFlipper', 'RightStagedFlipper', 'UIDown'] },
   { id: 'start', label: 'Start', required: true, default: 'Digit1', vpx: ['Start'] },
   { id: 'exit', label: 'Exit', required: true, default: 'Escape', vpx: ['ExitGame'] },
   { id: 'credit', get label() { return t('Crédit'); }, required: true, default: 'Digit5', vpx: ['Credit1'] },
   { id: 'plunger', get label() { return t('Lanceur'); }, required: true, default: 'Enter', vpx: ['LaunchBall'] },
-  { id: 'leftMagna', get label() { return t('MagnaSave gauche'); }, required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UIUp'] },
-  { id: 'rightMagna', get label() { return t('MagnaSave droit'); }, required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIDown'] },
+  { id: 'leftMagna', get label() { return t('MagnaSave gauche'); }, required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UILeft'] },
+  { id: 'rightMagna', get label() { return t('MagnaSave droit'); }, required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIRight'] },
   { id: 'extraBall', label: 'Extra Ball', required: false, default: 'KeyB', vpx: ['ExtraBall'] },
   // Pause de VPX : la partie s'arrête, le même bouton la reprend.
   { id: 'pause', label: 'Pause', required: false, default: 'KeyP', vpx: ['Pause'] },
@@ -924,6 +926,25 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
 }
 
 /**
+ * Les deux MagnaSave sont sur la borne : le menu de VPX suit alors la navigation de Cyber Pinball
+ * (flippers : changer de ligne ; MagnaSave : régler, valider, annuler). Sans eux, les flippers
+ * gardent le réglage (UILeft, UIRight) : il n'y a pas d'autre bouton pour augmenter ou valider, et
+ * la ligne ne change pas.
+ */
+export function menuByFlippers(buttons: CabinetButtons | undefined): boolean {
+  return Boolean(buttons?.leftMagna && buttons.rightMagna);
+}
+
+/** Actions de VPX d'un bouton : `vpx`, sauf les quatre du menu de VPX sur une borne sans MagnaSave. */
+export function vpxActionsOf(button: ButtonInfo, buttons: CabinetButtons | undefined): readonly string[] {
+  if (menuByFlippers(buttons)) return button.vpx;
+  const bare: Partial<Record<ButtonId, string>> = { leftFlipper: 'UILeft', rightFlipper: 'UIRight', leftMagna: 'UIUp', rightMagna: 'UIDown' };
+  const own = bare[button.id];
+  if (!own) return button.vpx;
+  return [...button.vpx.filter((a) => !a.startsWith('UI')), own];
+}
+
+/**
  * Aide-mémoire du réglage de l'affichage en partie (fiche > « Régler l'affichage en
  * partie ») : les boutons du menu de VPX, d'après InputManager.cpp (actions UIUp, UIDown,
  * UILeft, UIRight, puis Start, Credit1 et LaunchBall quand le menu est ouvert).
@@ -931,9 +952,14 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
 export function displayKeys(buttons: CabinetButtons | undefined): [string, string][] {
   const keys = buttonKeys(buttons);
   const label = (id: ButtonId) => keyLabel(keys[id]);
+  const head: [string, string][] = menuByFlippers(keys)
+    ? [
+        [t('Changer de ligne'), `${label('leftFlipper')} / ${label('rightFlipper')}`],
+        [t('Régler, valider ou annuler'), `${label('leftMagna')} / ${label('rightMagna')}`],
+      ]
+    : [[t('Régler'), `${label('leftFlipper')} / ${label('rightFlipper')}`]];
   return [
-    [t('Changer de ligne'), `${label('leftMagna')} / ${label('rightMagna')}`],
-    [t('Régler'), `${label('leftFlipper')} / ${label('rightFlipper')}`],
+    ...head,
     [t('Enregistrer : cette table ou toutes'), label('start')],
     // VPX n'allume « Enregistrer » qu'après un changement (InGameUIPage::IsModified) : après Annuler, il reste gris, et
     // Lancer (valeur par défaut) suffit à le rallumer (geste trouvé par un joueur, 17/11/2026).
@@ -1021,10 +1047,10 @@ export const VPX_INPUT_DEFAULTS: Readonly<Record<string, number>> = {
 const VPX_ACTION_LABELS: Record<string, string> = {
   get LeftStagedFlipper() { return t('Flipper gauche en deux temps'); },
   get RightStagedFlipper() { return t('Flipper droit en deux temps'); },
-  get UIUp() { return t('Menu de VPX : élément suivant'); },
-  get UIDown() { return t('Menu de VPX : élément précédent'); },
-  get UILeft() { return t('Menu de VPX : diminuer'); },
-  get UIRight() { return t('Menu de VPX : augmenter'); },
+  get UIUp() { return t('Menu de VPX : ligne précédente'); },
+  get UIDown() { return t('Menu de VPX : ligne suivante'); },
+  get UILeft() { return t('Menu de VPX : diminuer ou annuler'); },
+  get UIRight() { return t('Menu de VPX : augmenter ou valider'); },
   get Credit2() { return t('Crédit 2'); },
   get Credit3() { return t('Crédit 3'); },
   get Credit4() { return t('Crédit 4'); },
@@ -1208,9 +1234,12 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
     const scancode = code === undefined ? undefined : sdlScancode(code);
     // Bouton de joystick : la touche du clavier de VPX reste aussi, sauf si un autre bouton l'a prise.
     const joystick = code !== undefined && joystickButton(code) ? code : undefined;
-    for (const action of b.vpx) {
+    for (const action of vpxActionsOf(b, buttons)) {
       driven.add(action);
-      put(action, scancode !== undefined ? [scancode] : free(action, [VPX_INPUT_DEFAULTS[action]!]), joystick);
+      // Touche de secours au clavier : celle du bouton par défaut (le flipper reste sur Maj, même pour
+      // UIUp), pas celle de VPX pour l'action, qui croise flippers et MagnaSave dans son menu.
+      const fallback = (b.default ? sdlScancode(b.default) : undefined) ?? VPX_INPUT_DEFAULTS[action]!;
+      put(action, scancode !== undefined ? [scancode] : free(action, [fallback]), joystick);
     }
   }
 

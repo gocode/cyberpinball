@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Menu de VPX en partie : les boutons suivent enfin la navigation de Cyber Pinball. Les flippers changent de ligne (gauche : précédente, droit : suivante) ; les MagnaSave règlent, valident ou annulent (gauche : diminuer ou annuler, droit : augmenter ou valider). Avant, c'était l'inverse : les flippers validaient et sortaient, les MagnaSave changeaient de ligne.
+- Sur une borne sans MagnaSave, les flippers gardent le réglage (VPX n'a alors aucun autre bouton pour augmenter ou valider).
+- Le rappel du réglage de l'affichage en partie (« Changer de ligne », « Régler, valider ou annuler ») montre les bons boutons ; les touches de VPX se réécrivent d'elles-mêmes au prochain lancement.
 - Mise à jour légère corrigée : quand Cyber Pinball avait été relancé par un appui long sur Start, la mise à jour fermait l'application sans rien installer ni la relancer, et laissait les écrans à l'envers. L'arrêt du veilleur de la relance par Start ne touche plus à l'application qui le demande, ni à l'installeur et au déploiement.
 - Au démarrage, une mise à jour interrompue de cette façon est signalée dans le journal (« Mise à jour interrompue »), et les écrans retrouvent leur orientation d'origine.
 - Future Pinball : avant de télécharger, Cyber Pinball vérifie qu'il reste 300 Mo sur son disque et le dit clairement sinon. Si l'extraction échoue sur ton PC (antivirus, droits, disque), un écran "Installer à la main" te guide : ouvrir l'installateur de l'auteur déjà téléchargé et vérifié, lire et accepter son contrat, puis "J'ai fini : vérifier" retrouve Future Pinball où que tu l'aies installé.

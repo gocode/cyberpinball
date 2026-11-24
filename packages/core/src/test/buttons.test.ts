@@ -86,6 +86,8 @@ const input = (ini: string, action: string) => IniDocument.parse(ini).get('Input
 test('les touches par défaut des boutons sont celles de VPX', () => {
   for (const b of BUTTONS) {
     for (const action of b.vpx) {
+      // Menu de VPX : flippers et MagnaSave y sont croisés à dessein (UIUp et UIDown aux flippers).
+      if (action.startsWith('UI')) continue;
       assert.equal(VPX_INPUT_DEFAULTS[action], sdlScancode(b.default!), `${b.label} -> ${action}`);
     }
   }
@@ -176,8 +178,10 @@ test('aide-mémoire de la partie : les boutons affectés seulement', () => {
 
 test('aide-mémoire du réglage de l’affichage : les boutons du menu de VPX', () => {
   const rows = Object.fromEntries(displayKeys(undefined));
-  assert.equal(rows['Changer de ligne'], 'Ctrl gauche / Ctrl droit');
-  assert.equal(rows['Régler'], 'Maj gauche / Maj droite');
+  // Comme la navigation de Cyber Pinball : flippers pour changer de ligne, MagnaSave pour régler, valider, annuler.
+  assert.equal(rows['Changer de ligne'], 'Maj gauche / Maj droite');
+  assert.equal(rows['Régler, valider ou annuler'], 'Ctrl gauche / Ctrl droit');
+  assert.equal(rows['Régler'], undefined);
   assert.equal(rows['Enregistrer : cette table ou toutes'], '1');
   assert.equal(rows['Réglages en partie, menu de VPX'], 'Ctrl gauche + Ctrl droit');
 });
@@ -213,7 +217,11 @@ test('touches par défaut des encodeurs : écrites telles que VPX les écrit, ri
   const plan = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), VPX_FIRST_RUN);
   assert.equal(input(plan.nextIni!, 'LeftFlipper'), 'Key;225');
   assert.equal(input(plan.nextIni!, 'LeftStagedFlipper'), 'Key;225');
-  assert.equal(input(plan.nextIni!, 'UIRight'), 'Key;229');
+  // Menu de VPX : flippers pour changer de ligne, MagnaSave pour régler et valider.
+  assert.equal(input(plan.nextIni!, 'UIUp'), 'Key;225');
+  assert.equal(input(plan.nextIni!, 'UIDown'), 'Key;229');
+  assert.equal(input(plan.nextIni!, 'UILeft'), 'Key;224');
+  assert.equal(input(plan.nextIni!, 'UIRight'), 'Key;228');
   assert.equal(input(plan.nextIni!, 'Start'), 'Key;30');
   assert.equal(input(plan.nextIni!, 'ExitGame'), 'Key;41');
   assert.equal(input(plan.nextIni!, 'Credit1'), 'Key;34');
@@ -255,6 +263,42 @@ test('encodeur sur d’autres touches : chaque action suit son bouton', () => {
   // MagnaSave passés : touches de VPX par défaut.
   assert.equal(input(ini, 'LeftMagna'), 'Key;224');
   assert.equal(input(ini, 'UIUp'), 'Key;224');
+});
+
+test('menu de VPX en partie : flippers pour changer de ligne, MagnaSave pour régler, valider, annuler', () => {
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: 'KeyA', rightFlipper: 'KeyS', leftMagna: 'KeyQ', rightMagna: 'KeyW' };
+  const ini = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  // UIUp = ligne précédente, UIDown = ligne suivante (InGameUI.cpp : SelectPrevItem, SelectNextItem).
+  assert.equal(input(ini, 'UIUp'), 'Key;4');
+  assert.equal(input(ini, 'UIDown'), 'Key;22');
+  // UILeft = diminuer ou annuler, UIRight = augmenter ou valider.
+  assert.equal(input(ini, 'UILeft'), 'Key;20');
+  assert.equal(input(ini, 'UIRight'), 'Key;26');
+  assert.equal(input(ini, 'LeftMagna'), 'Key;20');
+  assert.equal(input(ini, 'LeftFlipper'), 'Key;4');
+  // Une même touche ne porte jamais deux actions du menu de VPX (sinon une pression changerait de ligne et réglerait).
+  const ui = ['UIUp', 'UIDown', 'UILeft', 'UIRight'].map((a) => input(ini, a));
+  assert.equal(new Set(ui).size, 4);
+  assert.deepEqual(displayKeys(buttons).slice(0, 2), [
+    ['Changer de ligne', 'A / S'],
+    ['Régler, valider ou annuler', 'Q / W'],
+  ]);
+  // Réécrit sur un VPinballX.ini déjà écrit à l'ancienne mode (flippers sur UILeft/UIRight) : les touches suivent.
+  const old = IniDocument.parse(['[Input]', 'Mapping.UIUp = Key;20', 'Mapping.UIDown = Key;26', 'Mapping.UILeft = Key;4', 'Mapping.UIRight = Key;22', ''].join('\n'));
+  const redone = vpxInputSettings(buttons, old, {});
+  const value = (key: string) => redone.settings.find((s) => s.key === key)!.value;
+  assert.equal(value('Mapping.UIUp'), 'Key;4');
+  assert.equal(value('Mapping.UILeft'), 'Key;20');
+});
+
+test('menu de VPX en partie sans MagnaSave : les flippers gardent le réglage', () => {
+  const buttons: CabinetButtons = { leftFlipper: 'KeyA', rightFlipper: 'KeyS', start: 'Digit2', exit: 'KeyQ', credit: 'Digit3', plunger: 'KeyW' };
+  const ini = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  assert.equal(input(ini, 'UILeft'), 'Key;4');
+  assert.equal(input(ini, 'UIRight'), 'Key;22');
+  assert.equal(input(ini, 'UIUp'), 'Key;224');
+  assert.equal(input(ini, 'UIDown'), 'Key;228');
+  assert.equal(Object.fromEntries(displayKeys(buttons))['Changer de ligne'], undefined);
 });
 
 test('menu de VPX pendant la partie : la combinaison des boutons n’y est plus, ajouts de VPX gardés', () => {
@@ -399,7 +443,7 @@ test('plan des touches seul : l’ordre des actions est celui des boutons', () =
   const plan = vpxInputSettings({ ...DEFAULT_BUTTONS }, IniDocument.parse(''));
   assert.deepEqual(
     plan.settings.slice(0, 4).map((s) => `${s.key}=${s.value}`),
-    ['Mapping.LeftFlipper=Key;225', 'Mapping.LeftStagedFlipper=Key;225', 'Mapping.UILeft=Key;225', 'Mapping.RightFlipper=Key;229'],
+    ['Mapping.LeftFlipper=Key;225', 'Mapping.LeftStagedFlipper=Key;225', 'Mapping.UIUp=Key;225', 'Mapping.RightFlipper=Key;229'],
   );
   assert.deepEqual(plan.released, []);
 });
@@ -474,7 +518,9 @@ test('joysticks : [Input] reçoit le bouton, garde la touche du clavier de VPX, 
   const first = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN);
   const ini = first.nextIni!;
   assert.equal(input(ini, 'LeftFlipper'), `${joy(0)} | Key;225`);
-  assert.equal(input(ini, 'UILeft'), `${joy(0)} | Key;225`);
+  // Menu de VPX : le flipper change de ligne (UIUp), le MagnaSave annule (UILeft) ; touches de secours : celles des boutons.
+  assert.equal(input(ini, 'UIUp'), `${joy(0)} | Key;225`);
+  assert.equal(input(ini, 'UILeft'), `${joy(6)} | Key;224`);
   assert.equal(input(ini, 'Start'), `${joy(2)} | Key;30`);
   assert.equal(input(ini, 'ExitGame'), `${joy(3)} | Key;41`);
   // Le menu de VPX en partie : F12 ; les deux MagnaSave du joystick sont lus par Cyber Pinball.

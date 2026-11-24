@@ -43,7 +43,7 @@ function loadingState(opts: { video?: boolean; display?: boolean; title?: string
     menuKeys: [],
     gameKeys: GAME_ROWS,
     loadingKeys: opts.display
-      ? { title: 'Réglage de l’affichage', rows: [['Changer de ligne', 'Ctrl gauche / Ctrl droit'], ['Régler', 'Maj gauche / Maj droite']], display: true }
+      ? { title: 'Réglage de l’affichage', rows: [['Changer de ligne', 'Maj gauche / Maj droite'], ['Régler, valider ou annuler', 'Ctrl gauche / Ctrl droit']], display: true }
       : { title: 'Commandes de la partie', rows: GAME_ROWS, display: false },
     nav: {},
   };
