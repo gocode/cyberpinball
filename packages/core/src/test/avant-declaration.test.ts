@@ -26,6 +26,8 @@ import { fakeMenuTarget } from './doublures';
  */
 const REVIEWED = new Set([
   // Mode débogage (23/11/2026) : lu par le rapport technique (debugReport), seulement quand le joueur en envoie un.
+  // Ses propres rappels (vr, windows, table…) lisent des blocs déclarés plus bas : sa première mesure est donc
+  // différée (setImmediate dans createDebug) et isolée (une erreur est journalisée, jamais lancée) ; garde plus bas.
   'debug',
   'activityMenu',
   'chatMenu',
@@ -76,7 +78,8 @@ const REVIEWED = new Set([
   // Fiche d'une table côté joueurs (table-social.ts) : lue par la fiche, à son ouverture ; jamais pendant l'initialisation.
   'tableSocial',
   // Réalité virtuelle (vr-frontend.ts) : le réseau du casque, lu par le relevé de santé de la borne (minuterie
-  // après le démarrage, ou écran ouvert) ; jamais pendant l'initialisation.
+  // après le démarrage, ou écran ouvert) ; jamais pendant l'initialisation. Corrigé le 24/11/2026 : le mode
+  // débogage lisait `vrFront.vrGameStop` dans sa première mesure, faite à sa création (incident du PinCab).
   'vrFront',
   'tableScores',
 ]);

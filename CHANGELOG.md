@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Mode débogage allumé : Cyber Pinball ne s'arrête plus au démarrage sur "A JavaScript error occurred in the main process" ; sa première mesure attend la fin du démarrage, et une mesure en échec est notée au journal sans interrompre le front-end.
 - Défis : l'onglet de l'Arène a enfin son bouton "Lancer un défi" : il ouvre le choix de la table, puis du joueur, au lieu d'expliquer un chemin dans les fiches ; sans partie jouée, il est grisé avec sa raison.
 - Partage coupé : "Régler le partage" s'ouvre sur place depuis l'onglet Défis, la Communauté et mon profil, plus de long chemin à suivre dans les réglages.
 - Joueurs à découvrir : chaque suggestion propose "Voir le profil" avant "Ajouter en ami" ; le bouton du profil s'appelle aussi "Ajouter en ami".

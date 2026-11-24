@@ -336,3 +336,58 @@ test('sources : la fenêtre est celle des notifications de partie (sans focus, c
   assert.match(own, /if \(enabled\(\)\) start\(\);/);
   assert.match(own, /if \(!enabled\(\)\) return stop\(\);/);
 });
+
+// Incident du PinCab (24/11/2026) : le mode débogage, allumé, faisait sa première mesure dans createDebug, c'est-à-dire
+// pendant l'initialisation de frontend.ts, avant `vrFront` (déclaré plus bas ; `undefined` dans l'application assemblée) :
+// « A JavaScript error occurred in the main process », et la borne restait sur cette boîte d'erreur au démarrage.
+// Invariant : rien n'est lu de l'hôte pendant createDebug, et une mesure en échec est dite au journal, jamais lancée.
+test('mode débogage : première mesure après l’initialisation de l’appelant, mesure en échec sans erreur lancée', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'debogage-init-'));
+  writeDebugSettings(dir, { ...readDebugSettings(dir), mode: 'compact' });
+  const Module = require('node:module') as { _load: (request: string, ...rest: unknown[]) => unknown };
+  const realLoad = Module._load;
+  const electron = { app: { getAppMetrics: () => [] }, ipcMain: { on: () => undefined }, BrowserWindow: class {} };
+  Module._load = function (this: unknown, request: string, ...rest: unknown[]) {
+    return request === 'electron' ? electron : realLoad.call(this, request, ...rest);
+  };
+  // Le module de l'application (app/dist), pas celui du cœur : il appelle Electron, ici remplacé par une doublure.
+  const id = path.join(REPO_ROOT, 'app', 'dist', 'debogage.js');
+  const cached = require.cache[id];
+  delete require.cache[id];
+  let debug: { close(): void } | undefined;
+  try {
+    const { createDebug } = require(id) as { createDebug(host: Record<string, unknown>): { close(): void } };
+    const lines: string[] = [];
+    let hostCalls = 0;
+    debug = createDebug({
+      dataDir: dir,
+      version: '0.0.0',
+      place: () => undefined,
+      displays: () => [],
+      phase: () => {
+        hostCalls++;
+        return 'menu';
+      },
+      // Comme `vrFront.vrGameStop` avant que `vrFront` existe.
+      vr: () => {
+        hostCalls++;
+        throw new TypeError("Cannot read properties of undefined (reading 'vrGameStop')");
+      },
+      windows: () => new Map(),
+      table: () => undefined,
+      gpu: () => undefined,
+      log: (line: string) => lines.push(line),
+    });
+    assert.equal(hostCalls, 0, 'createDebug ne lit rien de l’hôte : la première mesure attend la fin de l’initialisation');
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(hostCalls > 0, 'la première mesure suit, au tour d’après');
+    assert.ok(lines.some((l) => l.includes('mesure en échec') && l.includes('vrGameStop')), `l’échec est dit au journal : ${JSON.stringify(lines)}`);
+  } finally {
+    debug?.close();
+    Module._load = realLoad;
+    delete require.cache[id];
+    if (cached) require.cache[id] = cached;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

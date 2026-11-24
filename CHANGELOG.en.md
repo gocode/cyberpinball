@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- With debug mode on, Cyber Pinball no longer stops at startup on "A JavaScript error occurred in the main process": its first measurement waits for startup to finish, and a failed measurement is logged without interrupting the front-end.
 - Challenges: the Arena tab finally has its "Lancer un défi" (Start a challenge) button: it opens the choice of the table, then of the player, instead of explaining a path through the table sheets; with no game played yet it is greyed out with its reason.
 - Sharing off: "Régler le partage" (Set up sharing) opens on the spot from the Challenges tab, the Community and my profile, no long path through the settings to follow.
 - Players to discover: each suggestion offers "Voir le profil" (View profile) before "Ajouter en ami" (Add as friend); the profile button is also called "Ajouter en ami".

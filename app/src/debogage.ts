@@ -501,11 +501,29 @@ export function createDebug(host: DebugHost): DebugController {
     present(view, role, phase);
   }
 
+  // Une mesure du mode débogage ne fait jamais tomber le front-end : une erreur (un état pas encore prêt, une
+  // fenêtre fermée entre-temps) est dite une fois au journal, la mesure suivante réessaie. Sans cela, elle
+  // devenait « A JavaScript error occurred in the main process » et bloquait le démarrage de la borne (24/11/2026).
+  let lastFailure = '';
+  function safeTick(): void {
+    try {
+      tick();
+      lastFailure = '';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== lastFailure) host.log(`Mode débogage : mesure en échec (${message}), nouvel essai à la seconde suivante.`); // i18n-ignore : journal
+      lastFailure = message;
+    }
+  }
+
   function start(): void {
     if (timer) return;
-    timer = setInterval(tick, TICK_MS);
+    timer = setInterval(safeTick, TICK_MS);
     timer.unref?.();
-    tick();
+    // Pas de mesure pendant l'initialisation de l'appelant : frontend.ts crée le mode débogage avant d'autres
+    // blocs (la réalité virtuelle, entre autres) dont les rappels de l'hôte dépendent ; dans l'application
+    // assemblée (esbuild : const devenu var) ils lisaient `undefined`. La première mesure suit tout de suite, au tour d'après.
+    setImmediate(safeTick);
   }
 
   function stop(): void {
