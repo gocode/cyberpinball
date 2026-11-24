@@ -70,8 +70,8 @@ export function rememberCustomView(dataDir: string, tableFile: string, iniText: 
  */
 export function withCustomView(iniText: string, view: CustomView, extraKeys: readonly string[] = []): string {
   const doc = IniDocument.parse(iniText);
-  for (const e of doc.entries()) if (isViewKey(e.section, e.key)) doc.remove(e.section, e.key);
   stripCloseCorners(doc);
+  for (const e of doc.entries()) if (isViewKey(e.section, e.key)) doc.remove(e.section, e.key);
   for (const key of [...FRAMING_STYLE_KEYS, ...extraKeys]) doc.remove('Player', key);
   for (const v of view.values) doc.set('TableOverride', v.key, v.value);
   doc.set('Player', 'CabinetAutofitMode', '0');

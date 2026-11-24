@@ -59,8 +59,62 @@ export function closeCornersHolds(doc: IniDocument): boolean {
   return closeCornersVariant(doc) !== undefined;
 }
 
-/** Retire l'œil et l'inclinaison de l'essai quand un autre cadrage reprend la table ; sans la signature de l'essai, rien n'est touché. */
+/**
+ * Préréglage « œil bas, table élargie » (24/11/2026) : les caractéristiques générales de la vue qu'un joueur a réglée à la main
+ * sur Monster Bash (VPX en mode fenêtre : œil plus bas, vitre abaissée, table agrandie de 27 % en largeur et 8 % en hauteur,
+ * un peu remontée). Ce sont les hauteurs de vitre abaissées qui donnent la vue basse, avec le fond de la caisse : avec celles
+ * de la table, la vue reste haute (retour du joueur, 24/11/2026). Banc du même jour : la table remplit 100 % de l'image sur
+ * Monster Bash, 95 % sur Attack from Mars, 92 % sur Addams Family (le haut reste un peu vide). C'est un point de départ à
+ * ajuster dans le menu de VPX, pas un réglage exact : en cadrage manuel, donc sans le correctif de VPX.
+ */
+export const LOW_EYE = { ScreenPlayerY: '2.485651', ScreenPlayerZ: '99.976471' } as const;
+
+/** Sa vue : [TableOverride] ViewCab… (mode fenêtre). */
+export const LOW_EYE_VIEW = [
+  { key: 'ViewCabMode', value: '2' },
+  { key: 'ViewCabScaleX', value: '1.267907' },
+  { key: 'ViewCabScaleY', value: '1.080779' },
+  { key: 'ViewCabHOfs', value: '0' },
+  { key: 'ViewCabVOfs', value: '5.197504' },
+  { key: 'ViewCabWindowTop', value: '261.648926' },
+  { key: 'ViewCabWindowBot', value: '60.455444' },
+  { key: 'ViewCabRotation', value: '0' },
+] as const;
+
+const near = (a: string | undefined, b: string) => a !== undefined && a.trim() !== '' && Math.abs(Number(a) - Number(b)) < 1e-3;
+
+/** Le .ini de la table porte ce préréglage : cadrage manuel, son œil et sa vue (une autre valeur est celle du joueur). */
+export function lowEyeHolds(doc: IniDocument): boolean {
+  if ((doc.get('Player', 'CabinetAutofitMode')?.trim() ?? '') !== '0') return false;
+  return (
+    near(doc.get('Player', 'ScreenPlayerY'), LOW_EYE.ScreenPlayerY) &&
+    near(doc.get('Player', 'ScreenPlayerZ'), LOW_EYE.ScreenPlayerZ) &&
+    LOW_EYE_VIEW.every((v) => near(doc.get('TableOverride', v.key), v.value))
+  );
+}
+
+/** Le .ini de la table avec le préréglage, en cadrage manuel ; ses autres vues et styles automatiques sont retirés. */
+export function withLowEye(tableIni: string): string {
+  const doc = IniDocument.parse(tableIni);
+  stripCloseCorners(doc);
+  for (const e of doc.entries()) if (e.section.toLowerCase() === 'tableoverride' && /^ViewCab/i.test(e.key)) doc.remove(e.section, e.key);
+  for (const key of FRAMING_STYLE_KEYS) doc.remove('Player', key);
+  doc.set('Player', 'CabinetAutofitMode', '0');
+  for (const k of Object.keys(LOW_EYE) as (keyof typeof LOW_EYE)[]) doc.set('Player', k, LOW_EYE[k]);
+  for (const v of LOW_EYE_VIEW) doc.set('TableOverride', v.key, v.value);
+  return doc.toString();
+}
+
+/**
+ * Retire l'œil et l'inclinaison de l'essai quand un autre cadrage reprend la table ; sans la signature de l'essai, rien n'est touché.
+ * Le préréglage « œil bas » part entier (œil et vue) : il ne devient pas « ma vue personnalisée ». À appeler avant de retirer les ViewCab.
+ */
 export function stripCloseCorners(doc: IniDocument): void {
+  if (lowEyeHolds(doc)) {
+    for (const k of Object.keys(LOW_EYE)) doc.remove('Player', k);
+    for (const v of LOW_EYE_VIEW) doc.remove('TableOverride', v.key);
+    return;
+  }
   if (!hasCloseCornersEye(doc)) return;
   for (const k of EYE_KEYS) doc.remove('Player', k);
   const inclination = doc.get('Player', 'ScreenInclination')?.trim();

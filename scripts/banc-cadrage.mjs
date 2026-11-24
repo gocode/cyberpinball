@@ -61,6 +61,26 @@ const ETUDE = [
     reglages: { CabinetAutofitMode: '0', ScreenPlayerY: '2.485651', ScreenPlayerZ: '99.976471', CabinetAutofitMaxStretch: '0.5' },
     vue: { ViewCabMode: '2', ViewCabScaleX: '1.267907', ViewCabScaleY: '1.080779', ViewCabHOfs: '0', ViewCabVOfs: '5.197504', ViewCabWindowTop: '261.648926', ViewCabWindowBot: '60.455444', ViewCabRotation: '0' },
   },
+  // Préréglage « œil bas, table élargie » (24/11/2026) : les caractéristiques de la vue réglée à la main (œil bas, échelles, décalage),
+  // sans les hauteurs de verre propres à une table : vaut-il sur d'autres tables ?
+  {
+    nom: 'bas-nat',
+    titre: 'Œil bas, échelles de l’auteur, verre de la table',
+    reglages: { CabinetAutofitMode: '0', ScreenPlayerY: '2.485651', ScreenPlayerZ: '99.976471' },
+    vue: { ViewCabMode: '2', ViewCabScaleX: '1.267907', ViewCabScaleY: '1.080779', ViewCabHOfs: '0', ViewCabVOfs: '5.197504', ViewCabRotation: '0' },
+  },
+  {
+    nom: 'bas-nat-1',
+    titre: 'Œil bas, échelles 1 / 1, verre de la table',
+    reglages: { CabinetAutofitMode: '0', ScreenPlayerY: '2.485651', ScreenPlayerZ: '99.976471' },
+    vue: { ViewCabMode: '2', ViewCabScaleX: '1', ViewCabScaleY: '1', ViewCabHOfs: '0', ViewCabVOfs: '0', ViewCabRotation: '0' },
+  },
+  ...[['fen-plat', '0', '261.648926', '60.455444'], ['fen-i6', '6', '261.648926', '60.455444'], ['fen-haut', '0', '261.648926', '170.05'], ['fen-bas', '0', '350', '60.455444']].map(([n, inc, top, bot]) => ({
+    nom: `coins-${n}`,
+    titre: `Autofit, œil Y 2,5 / Z 100, inclinaison ${inc}°, fenêtre ${top} / ${bot}`,
+    reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '2.5', ScreenPlayerZ: '100', ScreenInclination: inc },
+    vue: { ViewCabMode: '2', ViewCabWindowTop: top, ViewCabWindowBot: bot },
+  })),
   ...[['plat', '0'], ['i6', '6'], ['i12', '12'], ['n6', '-6']].map(([n, inc]) => ({
     nom: `oeil100-${n}`,
     titre: `Œil Y 2,5 / Z 100, étirement 0,5, inclinaison ${inc}°`,

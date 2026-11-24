@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import {
   CLOSE_CORNERS_VARIANTS,
   closeCornersVariant,
+  lowEyeHolds,
   customViewHolds,
   customViewOf,
   DEFAULT_FRAMING_STYLE,
@@ -43,6 +44,7 @@ import {
   tablePovState,
   tLater,
   withCloseCorners,
+  withLowEye,
   withCustomView,
   withOriginFraming,
   withTableFramingStyle,
@@ -138,7 +140,7 @@ export function createTablePov(ctx: TablePovContext) {
 
   /** La vue réglée par le joueur pour cette table, gardée avant qu'un autre cadrage la remplace (ou un retour arrière). */
   function keepCustomView(table: TableEntry, iniText: string | undefined): void {
-    if (iniText !== undefined && state(table).framing === 'own') rememberCustomView(ctx.dataDir(), table.file, iniText);
+    if (iniText !== undefined && state(table).framing === 'own' && !lowEyeHolds(IniDocument.parse(iniText))) rememberCustomView(ctx.dataDir(), table.file, iniText);
   }
 
   /** Applique un choix : l'état d'avant est gardé pour « Rétablir le cadrage précédent ». */
@@ -224,6 +226,8 @@ export function createTablePov(ctx: TablePovContext) {
             return v !== undefined && v.trim() !== '' ? v : global.get(sec, key);
           }, keepTop)
         : undefined;
+    // Préréglage « œil bas » en place : cadrage manuel, mais pas la vue du joueur.
+    const lowEye = s.framing === 'own' && lowEyeHolds(own);
     const list: Option[] = [];
     const onBorne = s.framing === 'cabinet' && closeCorners === undefined && (tableStyle === undefined || tableStyle === borneStyle);
     list.push({
@@ -249,6 +253,18 @@ export function createTablePov(ctx: TablePovContext) {
       }
       // Essais : les coins du plateau au plus près de ceux de l'écran (framing-close-corners.ts), pour cette table seule,
       // selon que l'écran de la borne est incliné ou à plat.
+      {
+        const next = withLowEye(base);
+        list.push({
+          key: 'oeil-bas',
+          label: t('Œil bas, table élargie'),
+          detail: t('Essai pour cette table seule : l’œil un peu plus bas et la table redimensionnée, d’après une vue réglée à la main sur une borne. Un point de départ à ajuster dans le menu de VPX ; le résultat dépend de la table : compare les aperçus.'),
+          current: lowEye,
+          ini: lowEye ? text : next,
+          badge: 'beta',
+          ...(lowEye ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
+        });
+      }
       if (keepTop) {
         for (const variant of CLOSE_CORNERS_VARIANTS) {
           const next = withCloseCorners(base, variant);
@@ -301,7 +317,7 @@ export function createTablePov(ctx: TablePovContext) {
         badge: 'beta',
       });
     }
-    if (s.framing === 'own') list.push({ key: 'own', label: t('Vue réglée pour cette table'), detail: t('Enregistrée pour elle dans le menu de VPX, ou reprise d’une autre installation'), current: true, ini: text });
+    if (s.framing === 'own' && !lowEye) list.push({ key: 'own', label: t('Vue réglée pour cette table'), detail: t('Enregistrée pour elle dans le menu de VPX, ou reprise d’une autre installation'), current: true, ini: text });
     else {
       // Une vue réglée par le joueur, remplacée depuis : gardée à part, sinon encore dans le .ini sous un style automatique.
       const left = s.framing === 'cabinet' ? customViewOf(text) : [];

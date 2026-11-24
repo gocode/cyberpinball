@@ -53,6 +53,7 @@ export * from './framing-history';
 export * from './framing-custom';
 export * from './framing-close-corners';
 export * from './qoi';
+export * from './preview-outside';
 export { hasOwnCabinetView } from './tableview';
 export * from './tablecontents';
 export * from './doctor';

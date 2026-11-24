@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Point of view previews: what VPX renders as pure black around the table (bands, margins) is painted with a bluish striped pattern, to show where the table edges really begin; the clear outline around the card is kept. Previews are rendered once more with this background.
+- Point of view previews: choosing a framing no longer restarts VPX for the other cards. Under an automatic framing, the view left in the .ini (saved custom view, imported POV) no longer counts in the cache key, since VPX recomputes it.
+- Point of view: new trial preset (beta), "Low eye, wider table", for one table only: the characteristics of a view tuned by hand on a cabinet (lower eye, lowered glass to see the back of the cabinet, table enlarged in width and a little in height, raised). It is a starting point to adjust in the VPX menu; the preview shows the result on the table.
 - Community: on the suggested-player cards, the name is no longer squeezed out and its level no longer overlaps the buttons; "View profile" and "Add friend" now sit on their own row below the text.
 - The "+25 XP" on buttons stays readable on the cabinet (same size as the button).
 - Table point of view: the "corners as close as possible" framing now comes in two variants, "tilted screen" (the back of the playfield is slightly cut to keep the table corners in the screen corners) and "flat screen", each with its own VPX-rendered preview; the eye is the one tuned by hand on Monster Bash (the maximum of VPX's slider), the old setting went beyond the range VPX can set.

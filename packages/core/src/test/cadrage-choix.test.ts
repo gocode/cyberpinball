@@ -184,7 +184,12 @@ test('aperçus : la clé du cache suit le cadrage effectif, pas le texte du .ini
   differs('', '[Player]\nCabinetAutofitMode = 2\n');
   differs('', '[Player]\nCabinetAutofitMaxStretch = 0.5\n');
   differs('[Player]\nScreenPlayerZ = 100\n', '[Player]\nScreenPlayerZ = 70\n');
-  differs('', '[TableOverride]\nViewCabMode = 2\nViewCabScaleX = 1.27\n');
+  // Sous un cadrage automatique, VPX recalcule la vue : des ViewCab… restés dans le .ini ne changent pas l'image,
+  // sauf la rotation. En cadrage manuel, ils comptent.
+  same('', '[TableOverride]\nViewCabMode = 2\nViewCabScaleX = 1.27\n');
+  differs('', '[TableOverride]\nViewCabRotation = 90\n');
+  const manual = '[Player]\nCabinetAutofitMode = 0\n';
+  differs(manual, manual + '[TableOverride]\nViewCabMode = 2\nViewCabScaleX = 1.27\n');
   // Le cadrage de la borne (VPinballX.ini) compte aussi.
   assert.notEqual(mod.framingFingerprint('', globalIni), mod.framingFingerprint('', globalIni.replace('= 0.15', '= 0.5')));
 });

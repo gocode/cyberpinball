@@ -117,10 +117,10 @@ function applied(doc: IniDocument, view: PovView): boolean {
 /** Le .ini de la table avec la vue du POV : ses autres ViewCab… retirés (comme « Save as Table Override »), cadrage manuel. */
 function withPov(doc: IniDocument, view: PovView): IniDocument {
   const next = IniDocument.parse(doc.toString());
+  stripCloseCorners(next);
   for (const e of next.entries()) if (e.section.toLowerCase() === 'tableoverride' && /^ViewCab/i.test(e.key)) next.remove(e.section, e.key);
   for (const v of view.values) next.set('TableOverride', v.key, v.value);
   next.set('Player', 'CabinetAutofitMode', '0');
-  stripCloseCorners(next);
   return next;
 }
 

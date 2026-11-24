@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Aperçus du Point de vue : ce que VPX rend en noir pur autour de la table (bandes, marges) est peint d'un motif rayé bleuté, pour voir où commencent réellement les bords de la table ; le liseré clair autour de la carte est gardé. Les aperçus sont rendus une fois de plus avec ce fond.
+- Aperçus du Point de vue : choisir un cadrage ne relance plus VPX pour les autres cartes. Sous un cadrage automatique, la vue laissée dans le .ini (vue personnalisée gardée, POV repris) ne compte plus dans la clé du cache, puisque VPX la recalcule.
+- Point de vue : nouveau préréglage d'essai (bêta), "Œil bas, table élargie", pour une table seule : les caractéristiques d'une vue réglée à la main sur une borne (œil plus bas, vitre abaissée pour voir le fond de la caisse, table agrandie en largeur et un peu en hauteur, remontée). C'est un point de départ à ajuster dans le menu de VPX ; l'aperçu montre le résultat sur la table.
 - Communauté : sur les cartes des joueurs à découvrir, le pseudo n'est plus écrasé et son niveau ne passe plus sur les boutons ; "Voir le profil" et "Ajouter en ami" ont leur propre rangée sous le texte.
 - Le "+25 XP" des boutons reste lisible à la borne (taille du bouton).
 - Point de vue d'une table : le cadrage "au plus près des coins" existe maintenant en deux variantes, "écran incliné" (le fond du plateau est un peu tronqué pour garder les coins de la table dans ceux de l'écran) et "écran à plat", chacune avec son aperçu rendu par VPX ; l'œil est celui réglé à la main sur Monster Bash (maximum du curseur de VPX), l'ancien réglage dépassait la plage que VPX sait régler.

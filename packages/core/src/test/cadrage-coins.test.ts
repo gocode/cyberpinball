@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { closeCornersHolds, closeCornersVariant, CLOSE_CORNERS_INCLINATION, CLOSE_CORNERS_EYE, IniDocument, stripCloseCorners, withCloseCorners, withCustomView, withTableFramingStyle } from '../index';
+import { closeCornersHolds, closeCornersVariant, lowEyeHolds, withLowEye, CLOSE_CORNERS_INCLINATION, CLOSE_CORNERS_EYE, IniDocument, stripCloseCorners, withCloseCorners, withCustomView, withTableFramingStyle } from '../index';
 
 const own = '[Player]\r\nScreenPlayerX = 3\r\n[TableOverride]\r\nViewCabFOV = 25\r\n';
 
@@ -74,4 +74,35 @@ test('au plus près des coins : un style ou une vue reprenant la table retire au
   assert.equal(closeCornersHolds(legacy), false);
   stripCloseCorners(legacy);
   assert.equal(legacy.get('Player', 'ScreenPlayerZ'), undefined);
+});
+
+test('œil bas, table élargie : écrit en cadrage manuel, relu tel quel, retiré entier par un autre cadrage, jamais pris pour la vue du joueur', () => {
+  const next = withLowEye(own);
+  const doc = IniDocument.parse(next);
+  assert.equal(lowEyeHolds(doc), true);
+  assert.equal(doc.get('Player', 'CabinetAutofitMode'), '0');
+  assert.equal(doc.get('Player', 'ScreenPlayerX'), '3', 'la place du joueur en X est la sienne');
+  assert.equal(doc.get('TableOverride', 'ViewCabFOV'), undefined, 'ses autres vues sont retirées');
+  assert.equal(lowEyeHolds(IniDocument.parse(own)), false);
+  // Rien de la vue ni de l'œil ne reste quand un autre cadrage reprend la table, et ce n'est pas « ma vue personnalisée ».
+  const back = IniDocument.parse(stripped(next));
+  assert.equal(back.get('Player', 'ScreenPlayerZ'), undefined);
+  assert.equal(back.get('TableOverride', 'ViewCabScaleX'), undefined);
+  const custom = IniDocument.parse(withCustomView(next, { at: '', values: [{ key: 'ViewCabFOV', value: '30' }] }));
+  assert.equal(custom.get('Player', 'ScreenPlayerZ'), undefined);
+  assert.equal(custom.get('TableOverride', 'ViewCabScaleX'), undefined);
+  assert.equal(custom.get('TableOverride', 'ViewCabFOV'), '30');
+  // Passer par les coins ajustés retire aussi le préréglage.
+  const corners = IniDocument.parse(withCloseCorners(next, 'plat'));
+  assert.equal(corners.get('TableOverride', 'ViewCabScaleX'), undefined);
+  assert.equal(corners.get('Player', 'CabinetAutofitMode'), '1');
+});
+
+test('œil bas, table élargie : une vue du joueur, même proche, n’est jamais retirée', () => {
+  const mine = IniDocument.parse(withLowEye(own));
+  mine.set('TableOverride', 'ViewCabScaleX', '1.4');
+  assert.equal(lowEyeHolds(mine), false);
+  stripCloseCorners(mine);
+  assert.equal(mine.get('TableOverride', 'ViewCabScaleX'), '1.4');
+  assert.equal(mine.get('Player', 'ScreenPlayerZ'), '99.976471');
 });

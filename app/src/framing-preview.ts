@@ -9,7 +9,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { applyVpxSettings, decodeQoi, encodePng, IniDocument, linkOrCopy, PINMAME_FAST_BOOT, VPX_PLAY_SETTINGS, writeFileAtomic, type VpxSetting } from '@cyberpinball/core';
+import { applyVpxSettings, decodeQoi, encodePng, IniDocument, linkOrCopy, paintOutside, PINMAME_FAST_BOOT, VPX_PLAY_SETTINGS, vpxAutofitMode, writeFileAtomic, type VpxSetting } from '@cyberpinball/core';
 import { startOnHiddenDesktop } from '@cyberpinball/win-displays';
 
 export interface FramingPreviewRequest {
@@ -29,6 +29,8 @@ export interface FramingPreviewRequest {
 
 /** Hauteur de l'image rendue : assez pour juger le cadrage, sans rendre en 4K. */
 const RENDER_HEIGHT = 960;
+/** Version de l'aspect des images (fond rayé hors de la table) : change quand le traitement de l'image change. */
+const RENDER_LOOK = 3;
 /** Au-delà, VPX est arrêté : une table qui ne démarre pas ne bloque pas le choix. */
 const RENDER_TIMEOUT_MS = 150_000;
 /** Plugins coupés pendant un aperçu : toys, vrai DMD, plugins de Cyber Pinball (et PUP, repris si le script l'exige). */
@@ -96,7 +98,9 @@ export function createFramingPreviews(deps: {
     fs.mkdirSync(cacheDir, { recursive: true });
     try {
       // lecture entière : une image QOI de VPX, à RENDER_HEIGHT de haut (quelques Mo au plus).
-      writeFileAtomic(out, encodePng(decodeQoi(fs.readFileSync(image))));
+      const picture = decodeQoi(fs.readFileSync(image));
+      paintOutside(picture);
+      writeFileAtomic(out, encodePng(picture));
     } finally {
       // La capture gardée le temps de la conversion : jamais laissée dans le cache.
       fs.rmSync(image, { force: true });
@@ -167,7 +171,7 @@ export function previewKey(req: FramingPreviewRequest, exe: string): string {
   const exeStat = fs.statSync(exe);
   return crypto
     .createHash('sha256')
-    .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, framingFingerprint(req.tableIni, req.globalIni), renderSize(req.window)]))
+    .update(JSON.stringify([path.resolve(req.table).toLowerCase(), stat.size, stat.mtimeMs, exe.toLowerCase(), exeStat.mtimeMs, framingFingerprint(req.tableIni, req.globalIni), renderSize(req.window), RENDER_LOOK]))
     .digest('hex')
     .slice(0, 32);
 }
@@ -198,9 +202,15 @@ export function framingFingerprint(tableIni: string, globalIni: string): string 
   const lines = new Map<string, string>();
   lines.set('player.bgset', global.get('Player', 'BGSet')?.trim() ?? '');
   for (const k of FRAMING_KEYS) lines.set(`Player.${k}`.toLowerCase(), value('Player', k));
+  // Sous un cadrage automatique, VPX recalcule échelles, décalages et fenêtre : les ViewCab… laissés dans le .ini (vue
+  // personnalisée gardée, POV repris) ne changent pas l'image (banc du 24/11/2026 : fenêtre abaissée sans effet en autofit).
+  // Seule la rotation reste comptée. Sans cadrage automatique, toute la vue du .ini compte.
+  const automatic = vpxAutofitMode(value('Player', 'CabinetAutofitMode')) !== 0;
   for (const e of table.entries()) {
     const section = e.section.toLowerCase();
-    if ((section === 'player' || section === 'tableoverride') && e.value.trim() !== '' && !lines.has(`${section}.${e.key}`.toLowerCase())) lines.set(`${section}.${e.key}`.toLowerCase(), e.value.trim());
+    const name = `${section}.${e.key}`.toLowerCase();
+    if (automatic && name !== 'tableoverride.viewcabrotation') continue;
+    if ((section === 'player' || section === 'tableoverride') && e.value.trim() !== '' && !lines.has(name)) lines.set(name, e.value.trim());
   }
   return [...lines].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(';');
 }

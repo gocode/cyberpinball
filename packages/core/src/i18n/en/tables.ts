@@ -803,6 +803,9 @@ export const messages: Record<string, string> = {
   'Cadrage de cette table (menu de VPX › Point of View)': 'Framing of this table (VPX menu › Point of View)',
   'Au plus près des coins, écran incliné': 'Corners as close as possible, tilted screen',
   'Au plus près des coins, écran à plat': 'Corners as close as possible, flat screen',
+  'Œil bas, table élargie': 'Low eye, wider table',
+  'Essai pour cette table seule : l’œil un peu plus bas et la table redimensionnée, d’après une vue réglée à la main sur une borne. Un point de départ à ajuster dans le menu de VPX ; le résultat dépend de la table : compare les aperçus.':
+    'A trial for this table only: the eye a little lower and the table resized, from a view tuned by hand on a cabinet. A starting point to adjust in the VPX menu; the result depends on the table: compare the previews.',
   'Essai pour cette table seule : le fond du plateau est un peu tronqué pour que ses coins restent dans ceux de l’écran incliné. Le résultat dépend de la table : compare les aperçus.':
     'A trial for this table only: the back of the playfield is slightly cut so its corners stay in the corners of the tilted screen. The result depends on the table: compare the previews.',
   'Essai pour cette table seule : pour un écran posé à plat, sans inclinaison ; étire davantage pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.':
