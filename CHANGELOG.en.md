@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Light update fixed: when Cyber Pinball had been relaunched by a long press on Start, the update closed the application without installing anything or relaunching it, and left the screens upside down. Stopping the Start relaunch watcher no longer touches the application that asks for it, nor the installer and the deployment.
+- At startup, an update interrupted this way is flagged in the log ("Mise à jour interrompue"), and the screens get their original orientation back.
 - Future Pinball: before downloading, Cyber Pinball checks that 300 MB are free on its disk and says so clearly if not. If extraction fails on your PC (antivirus, permissions, disk), an "Install by hand" screen guides you: open the author's installer, already downloaded and verified, read and accept its agreement, then "I'm done: check" finds Future Pinball wherever you installed it.
 - Search the System menu: type a letter (on-screen keyboard, real keyboard or phone), and the matching settings, sections and keywords show up with each letter; a result opens its screen with the cursor on the setting. Also in Help and info › Search.
 - The back button of a screen opened after typing on the on-screen keyboard leads to the screen before the typing, no longer to the keyboard.

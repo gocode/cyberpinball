@@ -30,6 +30,7 @@ import {
   signManifest,
   stagedAppDir,
   swapAppDir,
+  lightUpdateInterrupted,
   takeUpdateOutcome,
   unpackAppPackage,
   updateFeedUrl,
@@ -246,11 +247,33 @@ test('suivi de l’installation : réussite, échec, puis effacé', () => {
   recordPendingUpdate(dir, { from: '0.1.0', to: '0.2.0', started: new Date().toISOString(), installer: 'x.exe' });
   assert.deepEqual(takeUpdateOutcome(dir, '0.2.0'), { kind: 'installed', from: '0.1.0', to: '0.2.0' });
   assert.equal(takeUpdateOutcome(dir, '0.2.0'), undefined);
-  recordPendingUpdate(dir, { from: '0.1.0', to: '0.2.0', started: new Date().toISOString(), installer: 'x.exe' });
-  assert.deepEqual(takeUpdateOutcome(dir, '0.1.0'), { kind: 'failed', from: '0.1.0', to: '0.2.0', current: '0.1.0' });
+  const started = '2026-11-24T10:39:10.000Z';
+  recordPendingUpdate(dir, { from: '0.1.0', to: '0.2.0', started, installer: 'x.exe' });
+  assert.deepEqual(takeUpdateOutcome(dir, '0.1.0'), { kind: 'failed', from: '0.1.0', to: '0.2.0', current: '0.1.0', started, log: undefined });
   fs.writeFileSync(path.join(dir, 'mise-a-jour.json'), '{');
   assert.equal(takeUpdateOutcome(dir, '0.1.0'), undefined);
   assert.ok(!fs.existsSync(path.join(dir, 'mise-a-jour.json')));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('mise à jour légère interrompue : aucune ligne du journal de l’outil pour cette tentative', () => {
+  const dir = temp();
+  const log = path.join(dir, 'maj-legere.txt');
+  const started = '2026-11-24T10:39:10.000Z';
+  // Pas de journal : l'outil n'a jamais tourné.
+  recordPendingUpdate(dir, { from: '0.2.4-essai.17', to: '0.2.4-essai.22', started, installer: 'staged', log });
+  const missing = takeUpdateOutcome(dir, '0.2.4-essai.17');
+  assert.equal(missing?.kind, 'failed');
+  assert.equal(lightUpdateInterrupted(missing as { started?: string; log?: string }), true);
+  // Seules des lignes d'une tentative plus ancienne : interrompue aussi.
+  fs.writeFileSync(log, '2026-11-20T08:00:00.000Z Mise à jour légère vers 0.2.4-essai.15 : attente.\n2026-11-20T08:00:05.000Z Relance : x\n');
+  assert.equal(lightUpdateInterrupted({ started, log }), true);
+  // Une ligne de cette tentative : l'outil a démarré (l'échec vient d'ailleurs).
+  fs.appendFileSync(log, '2026-11-24T10:39:12.345Z Mise à jour légère vers 0.2.4-essai.22 : attente de la fermeture.\n');
+  assert.equal(lightUpdateInterrupted({ started, log }), false);
+  // Installeur complet (pas de journal noté) ou date illisible : inconnu, pas d'alerte.
+  assert.equal(lightUpdateInterrupted({ started }), false);
+  assert.equal(lightUpdateInterrupted({ started: 'pas une date', log }), false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

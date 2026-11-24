@@ -348,7 +348,8 @@ if (process.argv.includes('--deployer')) {
   const watcherPidFile = path.join(root, 'data', 'relance-start', 'veilleur.pid');
   const watcherPid = fs.existsSync(watcherPidFile) ? Number.parseInt(fs.readFileSync(watcherPidFile, 'utf8'), 10) : NaN;
   if (watcherPid > 0) {
-    spawnSync('taskkill', ['/T', '/F', '/FI', `PID eq ${watcherPid}`, '/FI', 'IMAGENAME eq CyberPinball.exe'], { stdio: 'ignore' });
+    // Sans /T : le veilleur seul (Cyber Pinball, lancé par lui, en est l'enfant).
+    spawnSync('taskkill', ['/F', '/FI', `PID eq ${watcherPid}`, '/FI', 'IMAGENAME eq CyberPinball.exe'], { stdio: 'ignore' });
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   }
   const running = spawnSync('tasklist', ['/FI', 'IMAGENAME eq CyberPinball.exe', '/NH'], { encoding: 'utf8' }).stdout;

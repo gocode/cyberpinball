@@ -34,6 +34,7 @@ import {
   effectiveUpdateSource,
   layoutOf,
   loadPrivateChannel,
+  lightUpdateInterrupted,
   loadUpdateSource,
   recordPendingUpdate,
   relaunchArguments,
@@ -468,7 +469,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
       };
       const jobFile = path.join(dir, 'maj-legere.json');
       fs.writeFileSync(jobFile, `${JSON.stringify(job, null, 2)}\n`, 'utf8');
-      recordPendingUpdate(host.loc.dataDir, { from: host.version, to: latest.version, started: new Date().toISOString(), installer: staged });
+      recordPendingUpdate(host.loc.dataDir, { from: host.version, to: latest.version, started: new Date().toISOString(), installer: staged, log: job.log });
       console.log(`Mise à jour légère : ${helper} ${jobFile}`);
       // Le veilleur de la relance par Start tient le dossier de l'application : arrêté, relancé par la nouvelle version.
       stopRelaunchWatcher(host.loc.dataDir);
@@ -661,6 +662,10 @@ export function createUpdatesMenu(host: UpdatesHost) {
         ? t('Cyber Pinball {to} est installé (avant : {from}).', { to: outcome.to, from: outcome.from })
         : t('La mise à jour vers {to} n’a pas abouti : la version {current} est restée en place.', { to: outcome.to, current: outcome.current });
     console.log(`Mise à jour : ${text}`);
+    // Aucune ligne de maj-legere.txt pour cette tentative : l'application a été fermée avant de lancer la mise en place.
+    if (outcome.kind === 'failed' && lightUpdateInterrupted(outcome)) {
+      console.warn(`Mise à jour interrompue : la mise à jour légère vers ${outcome.to} n’a jamais démarré (aucune ligne dans ${outcome.log}) ; Cyber Pinball a été fermé avant de lancer la mise en place (les écrans sont rendus au démarrage d’après orientation-ecrans.json).`); // i18n-ignore : journal
+    }
     return text;
   }
 

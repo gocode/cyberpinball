@@ -802,6 +802,8 @@ export interface PendingUpdate {
   started: string;
   /** Installer launched, or light package put in place. */
   installer: string;
+  /** Light update only: the helper's log (maj-legere.txt), one ISO date at the start of each line. */
+  log?: string;
 }
 
 export function recordPendingUpdate(dataDir: string, pending: PendingUpdate): void {
@@ -812,7 +814,29 @@ export function recordPendingUpdate(dataDir: string, pending: PendingUpdate): vo
 export type UpdateOutcome =
   | { kind: 'installed'; from: string; to: string }
   /** The installer did not succeed: the old version is still there. */
-  | { kind: 'failed'; from: string; to: string; current: string };
+  | { kind: 'failed'; from: string; to: string; current: string; started?: string; log?: string };
+
+/**
+ * A light update that never reached its helper: `log` is the helper's log, `started` the date the
+ * update was launched. The helper writes a line (dated at least `started`) as soon as it runs, so no
+ * such line means the application was closed before launching it (24/11/2026: killed by the stop of
+ * the Start watcher, which it was a child of). Without a `log` (full installer), unknown: false.
+ */
+export function lightUpdateInterrupted(outcome: { started?: string; log?: string }): boolean {
+  if (!outcome.log || !outcome.started) return false;
+  const since = Date.parse(outcome.started);
+  if (!Number.isFinite(since)) return false;
+  let text = '';
+  try {
+    text = fs.readFileSync(outcome.log, 'utf8');
+  } catch {
+    return true;
+  }
+  return !text.split(/\r?\n/).some((line) => {
+    const at = Date.parse(line.slice(0, 24));
+    return Number.isFinite(at) && at >= since;
+  });
+}
 
 /**
  * At startup: had an update been launched? Reads and erases the tracking, and says whether
@@ -834,7 +858,9 @@ export function takeUpdateOutcome(dataDir: string, current: string): UpdateOutco
   if (!pending || typeof pending.to !== 'string' || typeof pending.from !== 'string') return undefined;
   if (current === pending.to) return { kind: 'installed', from: pending.from, to: pending.to };
   const newer = isVersion(current) && isVersion(pending.from) && compareAppVersions(current, pending.from) > 0;
-  return newer ? { kind: 'installed', from: pending.from, to: current } : { kind: 'failed', from: pending.from, to: pending.to, current };
+  return newer
+    ? { kind: 'installed', from: pending.from, to: current }
+    : { kind: 'failed', from: pending.from, to: pending.to, current, started: pending.started, log: pending.log };
 }
 
 /** 111 Mio, 2,4 Mio (111 MiB, 2.4 MiB). */

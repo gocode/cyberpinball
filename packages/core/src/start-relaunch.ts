@@ -10,6 +10,7 @@
 // Un bouton du clavier n'est pas concerné : sur le bureau, la touche irait aussi au programme
 // au premier plan.
 
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
@@ -112,6 +113,43 @@ export function readPidFile(file: string): number | undefined {
 
 export function writePidFile(file: string, pid: number): void {
   writeFileAtomic(file, `${pid}\n`);
+}
+
+/**
+ * Arrête le processus `pid` SEUL, jamais ses descendants (pas de `taskkill /T`).
+ *
+ * Le veilleur lance Cyber Pinball (appui long sur Start) : l'application est alors son enfant. Une
+ * mise à jour qui arrêtait le veilleur avec `/T` tuait donc l'application elle-même, avant qu'elle
+ * lance la mise en place et rende les écrans (24/11/2026, essai.17 vers essai.22 sur un PinCab).
+ * Le veilleur n'a pas d'enfant à lui : l'arrêter seul suffit. Refuse son propre pid.
+ */
+export function stopProcessAlone(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  if (process.platform === 'win32') {
+    const r = spawnSync('taskkill.exe', ['/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
+    return r.status === 0;
+  }
+  try {
+    process.kill(pid, 'SIGKILL');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Arrête le veilleur noté dans veilleur.pid (avant une mise à jour : il tient CyberPinball.exe
+ * ouvert) et retire le fichier. `isWatcher(pid)` dit si ce pid est bien le veilleur (un pid repris
+ * par un autre programme ne compte pas). Rend le pid arrêté, ou undefined s'il n'y en avait pas.
+ * Appelé par l'application, qui peut être l'enfant de ce veilleur : voir stopProcessAlone.
+ */
+export function stopRelaunchWatcherAt(dataDir: string, isWatcher: (pid: number) => boolean): number | undefined {
+  const file = relaunchWatcherPidFile(dataDir);
+  const pid = readPidFile(file);
+  if (!pid || !isWatcher(pid)) return undefined;
+  stopProcessAlone(pid);
+  fs.rmSync(file, { force: true });
+  return pid;
 }
 
 /** Ce que fait le veilleur quand l'appui long est reconnu. */

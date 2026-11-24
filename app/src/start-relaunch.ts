@@ -9,10 +9,10 @@
 //   jour l'arrête d'abord (stopRelaunchWatcher ici, l'installeur, le déploiement) ;
 // - dans Cyber Pinball ouvert, au bureau (« Bureau Windows ») : watchStartHold ramène le menu.
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { HoldDetector, readPidFile, RELAUNCH_SHORTCUT, RELAUNCH_WATCHER_FLAG, relaunchAppPidFile, relaunchWatcherPidFile, writePidFile } from '@cyberpinball/core';
+import { HoldDetector, readPidFile, RELAUNCH_SHORTCUT, RELAUNCH_WATCHER_FLAG, relaunchAppPidFile, relaunchWatcherPidFile, stopRelaunchWatcherAt, writePidFile } from '@cyberpinball/core';
 import { app, shell } from 'electron';
 import { joystickButtonsHeld, watchJoystickButtons } from './joystick-input';
 import { cyberPinballAlive, vpxPlaying, watcherScript } from './start-relaunch-process';
@@ -59,10 +59,10 @@ export function noteAppRunning(dataDir: string): void {
 
 /** Arrête le veilleur (avant une mise à jour : il tient CyberPinball.exe ouvert). Vrai s'il tournait. */
 export function stopRelaunchWatcher(dataDir: string): boolean {
-  const pid = readPidFile(relaunchWatcherPidFile(dataDir));
-  if (!cyberPinballAlive(pid)) return false;
-  spawnSync('taskkill.exe', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
-  fs.rmSync(relaunchWatcherPidFile(dataDir), { force: true });
+  // Le veilleur seul, jamais son arbre : Cyber Pinball lancé par le veilleur (appui long sur Start)
+  // en est l'enfant, et l'arbre l'emporterait avant la mise en place (24/11/2026).
+  const pid = stopRelaunchWatcherAt(dataDir, (candidate) => cyberPinballAlive(candidate));
+  if (!pid) return false;
   console.log(`Relance par Start : veilleur arrêté (pid ${pid}).`); // i18n-ignore : journal
   return true;
 }

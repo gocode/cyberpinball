@@ -246,7 +246,8 @@ Function ${un}ArreterVeilleur
   FileClose $1
   IntOp $2 $2 + 0
   ${If} $2 > 0
-    nsExec::Exec '"$SYSDIR\taskkill.exe" /T /F /FI "PID eq $2" /FI "IMAGENAME eq ${EXE}"'
+    ; Sans /T : le veilleur seul. Cyber Pinball, lancé par lui, en est l'enfant : /T le tuerait aussi.
+    nsExec::Exec '"$SYSDIR\taskkill.exe" /F /FI "PID eq $2" /FI "IMAGENAME eq ${EXE}"'
     Pop $1
     Sleep 500
   ${EndIf}
