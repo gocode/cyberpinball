@@ -553,7 +553,7 @@ export function createProposals(ctx: ProposalsContext) {
     const account = st.sites[hit.site]?.account;
     // Sans vignette dans les résultats, la capture de la fiche (lue à part, elle redessine l'écran en arrivant).
     const { file, pending } = ctx.sites?.hitThumb(hit) ?? { pending: false };
-    let thumb: MediaThumb = { kind: 'fallback', rotation: 0, text: pending ? t('Aperçu en route…') : t('Pas d’aperçu') };
+    let thumb: MediaThumb = pending ? { kind: 'fallback', rotation: 0, text: t('Aperçu en route…'), pending: true } : { kind: 'fallback', rotation: 0, text: t('Pas d’aperçu') };
     if (file && fs.existsSync(file)) {
       allowPreview(file);
       thumb = { kind: 'image', url: mediaUrl(file), rotation: 0 };

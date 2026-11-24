@@ -8,12 +8,19 @@
 // - le cadrage de l'installation d'origine d'une table reprise (packages/core/src/origin-framing.ts), y compris pour une
 //   table reprise avant qu'il soit figé à l'ajout, quand cette installation est encore sur le disque ;
 // - « Importer un POV… » : un POV trouvé ailleurs (Téléchargements, clé USB…), rangé avec la table puis appliqué ;
-// - « Rétablir le cadrage précédent » : chaque choix garde le .ini d'avant (framing-history.ts).
+// - « Plein cadre, au plus près des coins » (essai, bêta) : pour cette table seule, jamais pour la borne
+//   (framing-close-corners.ts) ;
+// - « Rétablir le cadrage précédent » : chaque choix garde le .ini d'avant (framing-history.ts) ;
+// - « Ma vue personnalisée » : la dernière vue réglée par le joueur dans le menu de VPX, gardée quand un autre cadrage la
+//   remplace (framing-custom.ts), pour y revenir sans la perdre.
 // Une vue enregistrée pour la table dans le menu de VPX (« Régler l'affichage en partie ») est dite comme telle.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  closeCornersHolds,
+  customViewHolds,
+  customViewOf,
   DEFAULT_FRAMING_STYLE,
   findTableIni,
   FRAMING_STYLE_KEYS,
@@ -26,13 +33,19 @@ import {
   IniDocument,
   isVpxCabinetView,
   originFramingOf,
+  rememberCustomView,
   rememberFraming,
   restoreFramingOps,
+  savedCustomView,
+  stripCloseCorners,
   t,
   tablePovState,
   tLater,
+  withCloseCorners,
+  withCustomView,
   withOriginFraming,
   withTableFramingStyle,
+  type CustomView,
   type FileOp,
   type FramingStyle,
   type OriginFramingNote,
@@ -93,6 +106,7 @@ interface Option {
 /** Le .ini de la table sans cadrage propre : le mode de la borne écrit (sans lui, un POV ou une vue reprise reviendrait). */
 export function borneIni(tableIni: string, borneStyle: FramingStyle, keepTop: boolean, note?: OriginFramingNote): string {
   const doc = IniDocument.parse(tableIni);
+  stripCloseCorners(doc);
   for (const key of [...FRAMING_STYLE_KEYS, ...(note?.keys ?? [])]) doc.remove('Player', key);
   doc.set('Player', 'CabinetAutofitMode', framingStyleSettings(borneStyle, keepTop)[0]!.value);
   return doc.toString();
@@ -116,11 +130,17 @@ export function createTablePov(ctx: TablePovContext) {
     return { path: ini.path, text: ini.exists ? fs.readFileSync(ini.path, 'utf8') : undefined };
   };
 
+  /** La vue réglée par le joueur pour cette table, gardée avant qu'un autre cadrage la remplace (ou un retour arrière). */
+  function keepCustomView(table: TableEntry, iniText: string | undefined): void {
+    if (iniText !== undefined && state(table).framing === 'own') rememberCustomView(ctx.dataDir(), table.file, iniText);
+  }
+
   /** Applique un choix : l'état d'avant est gardé pour « Rétablir le cadrage précédent ». */
   function choose(table: TableEntry, ops: FileOp[] | undefined, done: string, label: string, at: number): void {
     try {
       if (ops?.length) {
         const ini = readIni(table);
+        keepCustomView(table, ini.text);
         const note = originFramingOf(table.info);
         rememberFraming(ctx.dataDir(), table.file, { at: new Date().toISOString(), label, ini: ini.text ?? null, ...(note ? { note } : {}) });
         ctx.apply(ops);
@@ -136,6 +156,7 @@ export function createTablePov(ctx: TablePovContext) {
     const ini = readIni(table);
     const plan = restoreFramingOps(ctx.dataDir(), table.file, ini.path);
     if (!plan) return open(table, at);
+    keepCustomView(table, ini.text);
     try {
       const info: FileOp = { op: 'write', path: table.infoFile, content: JSON.stringify(withOriginFraming(table.info, plan.snapshot.note), null, 2) + '\n' };
       ctx.apply([...plan.ops, info]);
@@ -189,15 +210,16 @@ export function createTablePov(ctx: TablePovContext) {
     const global = IniDocument.parse(orientation?.globalIni ?? '');
     const own = IniDocument.parse(text);
     // Un style choisi pour cette table seule : le mode écrit dans son .ini, sans vue manuelle ni cadrage d'origine.
+    const closeCorners = s.framing === 'cabinet' && closeCornersHolds(own);
     const tableStyle =
-      s.framing === 'cabinet' && (own.get('Player', 'CabinetAutofitMode')?.trim() ?? '') !== ''
+      s.framing === 'cabinet' && !closeCorners && (own.get('Player', 'CabinetAutofitMode')?.trim() ?? '') !== ''
         ? framingStyleOf((sec, key) => {
             const v = own.get(sec, key);
             return v !== undefined && v.trim() !== '' ? v : global.get(sec, key);
           }, keepTop)
         : undefined;
     const list: Option[] = [];
-    const onBorne = s.framing === 'cabinet' && (tableStyle === undefined || tableStyle === borneStyle);
+    const onBorne = s.framing === 'cabinet' && !closeCorners && (tableStyle === undefined || tableStyle === borneStyle);
     list.push({
       key: 'borne',
       label: t('Cadrage de la borne'),
@@ -217,6 +239,19 @@ export function createTablePov(ctx: TablePovContext) {
           current,
           ini: current ? text : next,
           ...(current ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
+        });
+      }
+      // Essai : les coins du plateau au plus près de ceux de l'écran (framing-close-corners.ts), pour cette table seule.
+      if (keepTop) {
+        const next = withCloseCorners(base);
+        list.push({
+          key: 'coins',
+          label: t('Plein cadre, au plus près des coins'),
+          detail: t('Essai pour cette table seule : étire davantage et relève l’œil pour rapprocher les coins du plateau de ceux de l’écran. Le résultat dépend de la table : compare les aperçus.'),
+          current: closeCorners,
+          ini: closeCorners ? text : next,
+          badge: 'beta',
+          ...(closeCorners ? {} : { ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget] }),
         });
       }
     }
@@ -254,6 +289,22 @@ export function createTablePov(ctx: TablePovContext) {
       });
     }
     if (s.framing === 'own') list.push({ key: 'own', label: t('Vue réglée pour cette table'), detail: t('Enregistrée pour elle dans le menu de VPX, ou reprise d’une autre installation'), current: true, ini: text });
+    else {
+      // Une vue réglée par le joueur, remplacée depuis : gardée à part, sinon encore dans le .ini sous un style automatique.
+      const left = s.framing === 'cabinet' ? customViewOf(text) : [];
+      const custom: CustomView | undefined = left.length ? { at: '', values: left } : savedCustomView(ctx.dataDir(), table.file);
+      if (custom && !customViewHolds(text, custom)) {
+        const next = withCustomView(text, custom, note?.keys ?? []);
+        list.push({
+          key: 'custom',
+          label: t('Ma vue personnalisée'),
+          detail: t('La dernière vue que tu as réglée pour cette table dans le menu de VPX'),
+          current: false,
+          ini: next,
+          ops: [{ op: 'write' as const, path: ini.path, content: next }, ...forget],
+        });
+      }
+    }
     return list;
   }
 

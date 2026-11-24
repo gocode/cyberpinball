@@ -15,6 +15,7 @@ import type { FileOp } from './fileops';
 import { EDGE_LABELS } from './layout';
 import { t } from './i18n';
 import { IniDocument } from './ini';
+import { stripCloseCorners } from './framing-close-corners';
 import type { PlayfieldOrientation } from './sync';
 import { isPovIniName } from './tablefiles';
 import { hasOwnCabinetView } from './tableview';
@@ -119,6 +120,7 @@ function withPov(doc: IniDocument, view: PovView): IniDocument {
   for (const e of next.entries()) if (e.section.toLowerCase() === 'tableoverride' && /^ViewCab/i.test(e.key)) next.remove(e.section, e.key);
   for (const v of view.values) next.set('TableOverride', v.key, v.value);
   next.set('Player', 'CabinetAutofitMode', '0');
+  stripCloseCorners(next);
   return next;
 }
 

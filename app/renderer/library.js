@@ -1351,7 +1351,12 @@ function renderThumb(t, selected = false) {
   else if (t.kind === 'drawn' && t.drawn) box.append(drawnNode(t.drawn));
   // Une tuile qui n'est pas un fichier (« Chercher plus », la dernière des propositions) : son icône.
   else if (t.icon) box.append(cyberIcon(t.icon, 'media-thumb-icon'));
-  else box.append(libEl('span', 'media-placeholder', t.text ?? ''));
+  else if (t.pending) {
+    // Un travail est en cours (rendu par VPX) : le texte dit lequel, le loader montre qu'il avance.
+    const wait = libEl('span', 'media-placeholder media-waiting');
+    wait.append(libEl('span', 'media-loader'), libEl('span', 'media-waiting-text', t.text ?? ''));
+    box.append(wait);
+  } else box.append(libEl('span', 'media-placeholder', t.text ?? ''));
   /*
    * Contenu animé (vidéo, GIF, APNG, son) : l'icône de lecture au coin. Déjà là et léger, il
    * s'anime de lui-même ; lourd ou pas encore récupéré (onDemand), l'aperçu reste une image fixe

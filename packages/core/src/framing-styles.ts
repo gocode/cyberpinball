@@ -2,10 +2,13 @@
 // table est 17 à 29 % trop étroite : aucun cadrage ne remplit l'écran sans compromis (banc de rendu réel,
 // scripts/banc-cadrage.ps1). Trois choix, montrés au joueur sur une image rendue de sa propre table
 // (app/src/framing-preview.ts), jamais à l'aveugle :
-// - « Plein écran, apron rogné » (défaut) : « Ajuster » qui garde le haut (correctif 02 du VPX corrigé) ; le fond du
+// - « Plein cadre, bas rogné » (défaut) : « Ajuster » qui garde le haut (correctif 02 du VPX corrigé) ; le fond du
 //   plateau reste visible, l'apron sort de l'écran, étirement plafonné à 15 % ;
-// - « Table entière » : la table en entier, à ses proportions, des bandes sur les côtés ;
-// - « Plein écran, table élargie » : « Remplir » de VPX, toute la table étirée en largeur.
+// - « Table entière, bandes » : la table en entier, à ses proportions, des bandes sur les côtés ;
+// - « Plein cadre, table élargie » : « Remplir » de VPX, toute la table étirée en largeur.
+// Noms validés le 24/11/2026. Un 4e format « coins calés » (coins du plateau sur ceux de l'écran) n'est pas livré : le
+// banc montre que seule une hauteur d'œil plus grande (ScreenPlayerZ, la calibration de la borne) s'en approche, et
+// pas sur toutes les tables (mieux : Monster Bash, Space Cadet ; sans effet : Attack from Mars ; moins bien : Addams).
 // Le style de la borne est écrit dans VPinballX.ini (sync.ts) ; celui d'une table seule, dans son .ini.
 
 import { t } from './i18n';
@@ -47,11 +50,11 @@ export function framingStyles(keepTop: boolean): FramingStyle[] {
 export function framingStyleLabel(style: FramingStyle): string {
   switch (style) {
     case 'garde-le-haut':
-      return t('Plein écran, apron rogné');
+      return t('Plein cadre, bas rogné');
     case 'entiere':
-      return t('Table entière');
+      return t('Table entière, bandes');
     case 'remplir':
-      return t('Plein écran, table élargie');
+      return t('Plein cadre, table élargie');
   }
 }
 

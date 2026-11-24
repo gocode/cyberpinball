@@ -533,7 +533,7 @@ export function createGameParts(ctx: GamePartsContext) {
   function siteThumb(hit: SiteHit | undefined, text: string, also?: string): MediaThumb {
     const got = hit ? ctx.sites?.hitThumb(hit) : undefined;
     const local = [got?.file, ctx.sites?.thumb(also)].find((f): f is string => Boolean(f) && ctx.kept(`existe:${f}`, () => fs.existsSync(f!)));
-    if (!local) return { kind: 'fallback', rotation: 0, text: got?.pending ? t('Aperçu en route…') : text };
+    if (!local) return got?.pending ? { kind: 'fallback', rotation: 0, text: t('Aperçu en route…'), pending: true } : { kind: 'fallback', rotation: 0, text };
     const shown = ctx.kept(`adresse:${local}`, () => {
       allowPreview(local);
       return mediaUrl(local);

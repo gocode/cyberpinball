@@ -1436,6 +1436,30 @@ body.mouse .media-card[data-act]:hover {
   word-break: break-word;
 }
 
+/* Aperçu en cours de rendu : un loader au-dessus du texte qui dit ce qui travaille. */
+.media-waiting {
+  flex-direction: column;
+  gap: 1.6vmin;
+  color: var(--meta);
+}
+
+.media-loader {
+  flex: none;
+  width: 4.6vmin;
+  height: 4.6vmin;
+  box-sizing: border-box;
+  border: 0.5vmin solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-loader {
+    animation-duration: 2.4s;
+  }
+}
+
 .kind-fallback {
   background: repeating-linear-gradient(135deg, var(--surface) 0 1.2vmin, var(--surface-raised) 1.2vmin 2.4vmin);
 }

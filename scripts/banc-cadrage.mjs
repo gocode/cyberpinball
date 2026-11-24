@@ -40,6 +40,19 @@ const ETUDE = [
   CADRAGES[3],
   { nom: 'relief', titre: 'Relief (œil à 20 cm, 50 cm au-dessus)', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.15', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '50' } },
   { nom: 'relief-incline', titre: 'Relief, écran incliné de 6°', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.15', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '50', ScreenInclination: '6' } },
+  // Coins calés (24/11/2026) : œil très haut au-dessus de l'écran pour effacer le trapèze de la perspective, puis
+  // étirement large pour toucher les bords.
+  // Vue d'une autre table copiée telle quelle : la section fullscreen d'un .pov communautaire (test.legacy.pov du dépôt
+  // vpxtool, vue de borne tournée de 270°, mode legacy). Étude du 24/11/2026 : une vue réglée sur une table vaut-elle pour les autres ?
+  {
+    nom: 'vue-copiee',
+    titre: 'Vue d’une autre table copiée (POV communautaire)',
+    reglages: { CabinetAutofitMode: '0' },
+    vue: { ViewCabMode: '0', ViewCabLookAt: '0', ViewCabFOV: '27', ViewCabLayback: '76', ViewCabRotation: '270', ViewCabScaleX: '1', ViewCabScaleY: '1.16', ViewCabScaleZ: '1', ViewCabPlayerX: '-10', ViewCabPlayerY: '0', ViewCabPlayerZ: '-200' },
+  },
+  { nom: 'haut-150', titre: 'Œil à 150 cm, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '150' } },
+  { nom: 'haut-400', titre: 'Œil à 400 cm, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05', ScreenPlayerY: '-20', ScreenPlayerZ: '400' } },
+  { nom: 'etire-50', titre: 'Garder le haut, étirement 0,5', reglages: { CabinetAutofitMode: '1', CabinetAutofitKeepTop: '1', CabinetAutofitMaxStretch: '0.5', CabinetAutofitPos: '0.05' } },
 ];
 
 /**
@@ -130,6 +143,8 @@ async function rendu({ cadrage, vpx, table, roms, core }) {
   const ini = path.join(dir, `VPinballX-${cadrage.nom}.ini`);
   const doc = core.IniDocument.parse('');
   core.applyVpxSettings(doc, settings);
+  // Une vue copiée d'une autre table : [TableOverride] ViewCab…, avec CabinetAutofitMode = 0 dans les réglages.
+  for (const [key, value] of Object.entries(cadrage.vue ?? {})) doc.set('TableOverride', key, value);
   fs.writeFileSync(ini, doc.toString());
   const child = spawn(path.join(copie, EXE), ['-PrefPath', appdata, '-Ini', ini, '-CaptureAttract', '1', '1', jouee, 'noloop'], { cwd: copie, windowsHide: true, stdio: 'ignore' });
   const fini = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
@@ -157,7 +172,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const roms = a.roms ?? path.join(path.dirname(a.table), 'pinmame', 'roms');
   const images = [];
-  const liste = a.etude ? ETUDE : CADRAGES;
+  const noms = process.env.BANC_NOMS ? process.env.BANC_NOMS.split(',') : null;
+  const liste = (a.etude ? ETUDE : CADRAGES).filter((c) => !noms || noms.includes(c.nom));
   const releves = [];
   for (const cadrage of liste) {
     let img;

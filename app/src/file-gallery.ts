@@ -66,8 +66,8 @@ export function createFileGallery(ctx: FileGalleryContext) {
         return { kind: 'image', url: mediaUrl(local), rotation: 0 };
       }
     }
-    const text = tile.previews.length || loading ? t('Aperçu en route…') : t('Pas d’aperçu sur son site');
-    return { kind: 'fallback', rotation: 0, text };
+    if (tile.previews.length || loading) return { kind: 'fallback', rotation: 0, text: t('Aperçu en route…'), pending: true };
+    return { kind: 'fallback', rotation: 0, text: t('Pas d’aperçu sur son site') };
   }
 
   function build(c: FileChoice): Built {

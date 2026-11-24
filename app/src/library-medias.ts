@@ -135,6 +135,8 @@ export interface MediaThumb {
   /** Rotation horaire vue du joueur (plateau et chargement), demi-tour compris. */
   rotation: Rotation;
   text?: string;
+  /** Travail en cours derrière l'aperçu (rendu par VPX…) : le texte s'affiche avec un loader animé. */
+  pending?: boolean;
   /** Son : image montrée pendant qu'il s'écoute (sa forme d'onde), à la place du texte. */
   poster?: string;
   /** Habillage dessiné : la partie (composant de fallback.js) et le jeu dont il porte le nom. */

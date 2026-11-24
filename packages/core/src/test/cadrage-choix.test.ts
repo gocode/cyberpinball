@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { toPhysicalScreen } from '../fingerprint';
 import { DEFAULT_FRAMING_STYLE, framingStyleOf, framingStyles, framingStyleSettings, withTableFramingStyle, type FramingStyle } from '../framing-styles';
+import { customViewHolds, customViewOf, rememberCustomView, savedCustomView, withCustomView } from '../framing-custom';
 import { framingHistory, rememberFraming, restoreFramingOps } from '../framing-history';
 import { IniDocument } from '../ini';
 import { planJourney, type JourneyInput } from '../journey';
@@ -80,6 +81,35 @@ test('retour arrière : chaque état gardé se rétablit, du plus récent au plu
   assert.equal(restoreFramingOps(dataDir, table, ini), undefined);
   for (let i = 0; i < 15; i++) rememberFraming(dataDir, table, { at: '', label: String(i), ini: null });
   assert.equal(framingHistory(dataDir, table).length, 10, 'dix états au plus');
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
+test('vue personnalisée : gardée quand un style ou un POV la remplace, remise telle quelle, sans toucher aux autres réglages', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-cadrage-perso-'));
+  const table = path.join(dataDir, 'Monster Bash.vpx');
+  const mine = '[Player]\r\nCabinetAutofitMode = 0\r\n[TableOverride]\r\nViewCabScaleX = 1.31\r\nViewCabScaleY = 1.07\r\nViewCabPlayerZ = 640\r\n[Autre]\r\nA = 1\r\n';
+  assert.equal(rememberCustomView(dataDir, table, mine), true);
+  assert.deepEqual(savedCustomView(dataDir, table)?.values, [
+    { key: 'ViewCabScaleX', value: '1.31' },
+    { key: 'ViewCabScaleY', value: '1.07' },
+    { key: 'ViewCabPlayerZ', value: '640' },
+  ]);
+  // Un .ini sans vue propre (style automatique, ou POV sans réglage) ne remplace pas la vue gardée.
+  assert.equal(rememberCustomView(dataDir, table, '[Player]\r\nCabinetAutofitMode = 1\r\n'), false);
+  assert.equal(savedCustomView(dataDir, table)?.values.length, 3);
+  // Un autre style est passé par-dessus : la vue du joueur est encore dans le .ini, et customViewOf la retrouve.
+  const style = withTableFramingStyle(mine, 'entiere', true);
+  assert.equal(customViewOf(style).length, 3);
+  // Un POV importé retire ses ViewCab… : la vue gardée les remet, en cadrage manuel, sans clés de style.
+  const pov = '[Player]\r\nCabinetAutofitMode = 0\r\n[TableOverride]\r\nViewCabScaleX = 0.9\r\nViewCabLookAt = 20\r\n[Autre]\r\nA = 1\r\n';
+  const back = IniDocument.parse(withCustomView(withTableFramingStyle(pov, 'remplir', true), savedCustomView(dataDir, table)!));
+  assert.equal(back.get('Player', 'CabinetAutofitMode'), '0');
+  assert.equal(back.get('Player', 'CabinetAutofitKeepTop'), undefined);
+  assert.equal(back.get('TableOverride', 'ViewCabScaleX'), '1.31');
+  assert.equal(back.get('TableOverride', 'ViewCabLookAt'), undefined, 'les ViewCab… du POV sont retirés');
+  assert.equal(back.get('Autre', 'A'), '1', 'les autres réglages de la table restent');
+  assert.equal(customViewHolds(back.toString(), savedCustomView(dataDir, table)!), true);
+  assert.equal(customViewHolds(style, savedCustomView(dataDir, table)!), false, 'sous un style automatique, ce n’est pas la vue du joueur');
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 

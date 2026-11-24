@@ -60,7 +60,8 @@ export function playerRotation(edge: FlipperEdge): 0 | 90 | 180 | 270 {
 /** Une carte d'aperçu : l'image rendue, sinon l'attente ou la raison de son absence. */
 export function previewThumb(file: string | undefined, rotation: 0 | 90 | 180 | 270, failed: string | undefined): MediaThumb {
   if (file) return { kind: 'image', url: mediaUrl(file), rotation };
-  return { kind: 'fallback', rotation: 0, text: failed ?? t('Rendu par VPX…') };
+  if (failed) return { kind: 'fallback', rotation: 0, text: failed };
+  return { kind: 'fallback', rotation: 0, text: t('VPX génère le rendu…'), pending: true };
 }
 
 /** La demande d'aperçu d'une table, avec le .ini que ce cadrage lui donnerait. */

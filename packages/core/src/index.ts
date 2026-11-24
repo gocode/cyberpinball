@@ -50,6 +50,8 @@ export * from './povview';
 export * from './origin-framing';
 export * from './framing-styles';
 export * from './framing-history';
+export * from './framing-custom';
+export * from './framing-close-corners';
 export * from './qoi';
 export { hasOwnCabinetView } from './tableview';
 export * from './tablecontents';

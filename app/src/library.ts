@@ -4311,7 +4311,7 @@ export function createLibrary(host: LibraryHost) {
       allowPreview(shot.file);
       return { kind: 'image', url: mediaUrl(shot.file), rotation: 0 };
     }
-    return { kind: 'fallback', rotation: 0, text: shot.pending ? t('Aperçu en route…') : label };
+    return shot.pending ? { kind: 'fallback', rotation: 0, text: t('Aperçu en route…'), pending: true } : { kind: 'fallback', rotation: 0, text: label };
   }
 
   /** Jeux de la base VPS qui renvoient à la fiche de ce résultat (logos, toppers, frontons, packs). */

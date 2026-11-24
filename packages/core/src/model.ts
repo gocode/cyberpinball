@@ -184,7 +184,7 @@ export interface Cabinet {
   vpxManual?: string[];
   /**
    * Cadrage des tables en vue borne, choisi par le joueur sur une image de sa table (framing-styles.ts). Absent :
-   * le cadrage par défaut (« Plein écran, apron rogné »), proposé sans être imposé.
+   * le cadrage par défaut (« Plein cadre, bas rogné »), proposé sans être imposé.
    */
   framing?: FramingStyle;
   /** Absent until the "Son" (Sound) step of the setup wizard has been done: no audio key is written. */
