@@ -79,6 +79,11 @@ export interface TablePovContext {
    * absent : pas de recherche (essais).
    */
   findOrigin?(tableFile: string): { vpx: string; exe: string } | undefined;
+  /**
+   * « Chercher un POV en ligne… » : la partie « Point de vue » de « Parties du jeu » (propositions de la base des tables,
+   * de VPUniverse, de VPForums, de Téléchargements, et la recherche sur le web) ; `back` revient à cet écran.
+   */
+  findOnline?(table: TableEntry, back: () => void): void;
 }
 
 /** Le cadrage actuel de la table, en quelques mots (détail de l'entrée de la fiche). */
@@ -334,6 +339,10 @@ export function createTablePov(ctx: TablePovContext) {
     }));
     const importAt = actions.length;
     actions.push({ label: t('Importer un POV…'), detail: t('Un fichier .pov, ou le .ini d’un POV pour VPX 10.8 : Téléchargements, clé USB, disques'), icon: 'download', badge: 'beta', run: () => void importPov(table, importAt) });
+    if (ctx.findOnline) {
+      const at = actions.length;
+      actions.push({ label: t('Chercher un POV en ligne…'), detail: t('Base des tables, VPUniverse, VPForums, Téléchargements et le web : le POV choisi est rangé avec la table'), icon: 'link', badge: 'beta', run: () => ctx.findOnline!(table, () => open(ctx.fresh(table), at)) });
+    }
     if (history.length) {
       const at = actions.length;
       actions.push({ label: t('Rétablir le cadrage précédent'), detail: history.at(-1)!.label, icon: 'restore', run: () => restore(table, at) });

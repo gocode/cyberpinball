@@ -155,6 +155,7 @@ export * from './recordingini';
 export * from './tablesounds';
 export * from './acquisition';
 export * from './gameparts';
+export * from './partsources';
 export * from './tablerules';
 export * from './tableguide';
 export * from './addscreens';

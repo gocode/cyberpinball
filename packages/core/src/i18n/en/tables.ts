@@ -191,6 +191,8 @@ export const messages: Record<string, string> = {
   'Point de vue « {file} » importé et appliqué à cette table.': 'Point of view “{file}” imported and applied to this table.',
   'Préparé pour cette table, appliqué à elle seule': 'Prepared for this table, applied to it only',
   'Importer un POV…': 'Import a POV…',
+  'Chercher un POV en ligne…': 'Find a POV online…',
+  'Base des tables, VPUniverse, VPForums, Téléchargements et le web : le POV choisi est rangé avec la table': 'Table database, VPUniverse, VPForums, Downloads and the web: the POV you pick is filed with the table',
   'Un fichier .pov, ou le .ini d’un POV pour VPX 10.8 : Téléchargements, clé USB, disques': 'A .pov file, or the .ini of a POV for VPX 10.8: Downloads, USB stick, drives',
   'Point de vue fourni pour un autre écran (bêta)': 'Point of view made for another screen (beta)',
   '{file} est le point de vue préparé pour cette table, mais VPX la dessinerait flippers {played}, alors que tu es {edge} de l’écran : il n’est pas appliqué, la table garde le cadrage de la borne.':

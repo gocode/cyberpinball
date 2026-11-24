@@ -517,6 +517,8 @@ export const messages: Record<string, string> = {
   '{site} : recherche…': '{site}: searching…',
   '{site} : nouvelle recherche dans {n} s': '{site}: new search in {n} s',
   '{site} n’a pas répondu ({reason})': '{site} did not answer ({reason})',
+  'Base des tables : aucun fichier connu pour {part}': 'Table database: no known file for {part}',
+  '{site} : rien trouvé pour {part}': '{site}: nothing found for {part}',
   'Petite vignette': 'Small thumbnail',
   'Musique (Dropbox)': 'Music (Dropbox)',
   'Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver toi-même.': 'No suggestions yet: “Search the web…” to find it yourself.',

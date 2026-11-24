@@ -17,6 +17,7 @@ import {
   applyOps,
   CONTENT_LABELS,
   contentSummaryText,
+  emptySources,
   expectedPackNames,
   formatDay,
   formatSize,
@@ -157,8 +158,10 @@ export function createGameParts(ctx: GamePartsContext) {
   let proposals: Proposals | undefined;
   /** Écran de la partie affiché : la pré-recherche ne redessine que lui, jamais un autre écran ouvert depuis. */
   let showing: { key: string; build: () => Built } | undefined;
+  /** Écran d'où une partie a été ouverte hors de « Parties du jeu » (Point de vue : chercher un POV) ; son retour y mène. */
+  let elsewhere: (() => void) | undefined;
 
-  const game = (): VpsGame | undefined => identified.game;
+  const game =(): VpsGame | undefined => identified.game;
   const ownFolder = (table: TableEntry) => !samePathText(table.folder, ctx.tablesDir());
   // Le dossier de la table, parcouru à l'ouverture de l'écran (des milliers de fichiers pour un PuP-Pack), gardé pour les touches qui suivent.
   const partsOf = (table: TableEntry) => ctx.kept(`parties:${table.file}`, () => installedParts(tableContents(table.file, { ownFolder: ownFolder(table), romLibrary: ctx.layout()?.roms })));
@@ -184,6 +187,7 @@ export function createGameParts(ctx: GamePartsContext) {
   /** Parties du jeu ; `at` : la partie sur laquelle revenir. */
   function open(table: TableEntry, at = 0, notice?: Flash): void {
     if (notice) flash = notice;
+    elsewhere = undefined;
     void ctx.task(t('Parties du jeu…'), async () => {
       vpsDb = await ctx.vps();
       identified = await ctx.identify(table);
@@ -322,6 +326,28 @@ export function createGameParts(ctx: GamePartsContext) {
     ctx.show(build, at, table.file);
   }
 
+  /** Retour d'une partie ouverte d'ailleurs (Point de vue) : à l'écran d'où l'on est venu. */
+  function leaveElsewhere(): void {
+    const to = elsewhere;
+    elsewhere = undefined;
+    ctx.catalog.setRefresh(undefined);
+    to?.();
+  }
+
+  /**
+   * Une partie ouverte depuis un autre écran que « Parties du jeu » (Point de vue : « Chercher un POV en ligne… ») :
+   * le jeu est reconnu d'abord, comme à l'ouverture de « Parties du jeu », puis les propositions de toutes les sources ;
+   * « Retour » revient à `back`.
+   */
+  function openPartFrom(table: TableEntry, part: GamePart, back: () => void): void {
+    void ctx.task(t('Parties du jeu…'), async () => {
+      vpsDb = await ctx.vps();
+      identified = await ctx.identify(table);
+      elsewhere = back;
+      openPart(table, part, GAME_PARTS.indexOf(part));
+    });
+  }
+
   /** Redessine la partie si elle est toujours l'écran affiché (le curseur reste où il est). */
   function redraw(table: TableEntry, part: GamePart, from: number): void {
     if (showing?.key === `${table.file}|${part}` && ctx.isShowing(showing.build)) ctx.show(showing.build, ctx.cursor(), table.file);
@@ -373,7 +399,7 @@ export function createGameParts(ctx: GamePartsContext) {
   function buildPart(file: string, part: GamePart, from: number): Built {
     const table = ctx.find(file);
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au front-end'), run: ctx.leave }], back: ctx.leave };
-    const back = () => open(table, from);
+    const back = elsewhere ? leaveElsewhere : () => open(table, from);
     const here = partsOf(table).get(part);
     const item = itemsOf(table).find((i) => i.kind === part);
     const p = proposals?.key === `${table.file}|${part}` ? proposals : undefined;
@@ -468,7 +494,7 @@ export function createGameParts(ctx: GamePartsContext) {
     if (part === 'media') actions.push({ label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le front-end montre'), run: () => ctx.medias(table) });
     if (here && part !== 'table' && part !== 'media') actions.push({ label: t('Réaffecter à une autre table'), detail: t('Elle quitte cette table pour une autre'), run: () => openMove(table, part, from) });
     if (here && part !== 'table') actions.push({ label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, part, from) });
-    actions.push({ label: t('Retour : parties du jeu'), run: back });
+    actions.push({ label: elsewhere ? t('Retour') : t('Retour : parties du jeu'), run: back });
 
     // Avant les tuiles : ce qui concerne cette partie de la table (présente, reçue, attendue), puis
     // une source seulement quand il y a quelque chose à en dire (17/11/2026 : avant, une ligne par
@@ -520,6 +546,16 @@ export function createGameParts(ctx: GamePartsContext) {
       if (!s || s.state === 'searching') rows.push({ text: t('{site} : recherche…', { site: site.name }), tone: 'info' });
       else if (s.state === 'waiting') rows.push({ text: t('{site} : nouvelle recherche dans {n} s', { site: site.name, n: s.seconds }), tone: 'info' });
       else if (s.state === 'failed') rows.push({ text: t('{site} n’a pas répondu ({reason})', { site: site.name, reason: s.reason }), tone: 'warning' });
+    }
+    // Une source qui a répondu « rien » le dit : elle a été interrogée, ce n'est pas un oubli.
+    const sites: Partial<Record<MediaSiteId, number>> = {};
+    for (const site of MEDIA_SITES) {
+      const s = p?.sites[site.id];
+      if (s?.state === 'done') sites[site.id] = s.offers.filter((o) => !o.other).length;
+    }
+    const none = emptySources(part, { game: Boolean(game()), vpsFiles: webFiles(part).length, sites });
+    for (const source of none) {
+      rows.push({ text: source === 'vps' ? t('Base des tables : aucun fichier connu pour {part}', { part: partLabel(part) }) : t('{site} : rien trouvé pour {part}', { site: mediaSite(source).name, part: partLabel(part) }), tone: 'quiet' });
     }
     return rows;
   }
@@ -828,6 +864,8 @@ export function createGameParts(ctx: GamePartsContext) {
     open,
     /** Une partie de la table, ouverte directement (la fiche, pour le PuP-Pack). */
     openPart: (table: TableEntry, part: GamePart) => openPart(table, part, GAME_PARTS.indexOf(part)),
+    /** Une partie ouverte depuis un autre écran, dont « Retour » revient à `back` (le Point de vue, pour un POV). */
+    openPartFrom,
   };
 }
 

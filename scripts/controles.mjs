@@ -64,7 +64,11 @@ export function run(cmd, args, { cwd, log, shell = false, timeoutMs } = {}) {
     child.on('error', (error) => (out += `\n${error.message}`));
     child.on('close', (code) => {
       if (timer) clearTimeout(timer);
-      if (log) fs.writeFileSync(log, out);
+      if (log) {
+        // Un worktree neuf n'a pas encore de tmp/ : le créer plutôt que planter (fusionner, npm ci).
+        fs.mkdirSync(path.dirname(log), { recursive: true });
+        fs.writeFileSync(log, out);
+      }
       resolve({ code: timedOut ? 1 : code ?? 1, out, timedOut, hung });
     });
   });

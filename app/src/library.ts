@@ -1843,6 +1843,7 @@ export function createLibrary(host: LibraryHost) {
     dataDir: () => host.dataDir,
     framing: () => host.framing?.(),
     findOrigin: (file) => findOriginTable(file, host.root ? [host.root] : []),
+    findOnline: (table, back) => gameParts.openPartFrom(table, 'pov', back),
   });
 
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
