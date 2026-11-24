@@ -175,6 +175,8 @@ export * from './ytdlp';
 export * from './wizardsteps';
 export * from './systemmenu';
 export * from './systemmemory';
+export * from './systemsearch';
+export * from './systemsearch-places';
 export * from './guestmode';
 export * from './health';
 export * from './techsheet';

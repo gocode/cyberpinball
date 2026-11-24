@@ -52,6 +52,8 @@ export interface FuturePinballUiHost {
   openCustom(build: () => Built, at?: number): void;
   cursor(): number;
   task(message: string, work: () => Promise<void> | void): Promise<void>;
+  /** Ouvre un fichier ou un dossier avec Windows ; renvoie ce qui l'en a empêché. */
+  openPath(target: string, what: string): Promise<string | undefined>;
   vps(): Promise<VpsDb | undefined>;
   /** Tables ajoutées : la roue relue, la dernière choisie. */
   added(file: string): void;
@@ -303,8 +305,82 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       refusing = false;
       return showContract();
     }
-    notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result && !result.ok ? result.reason : '?' });
+    const failure = result && !result.ok ? result : undefined;
+    // L'installateur est là et vérifié, mais l'outil qui l'ouvre manque : le joueur peut l'installer à la main.
+    if (failure?.installer) return showManual(failure.installer, failure.reason);
+    notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: failure?.reason ?? '?' });
     open();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Repli : installer à la main (24/11/2026). L'extraction peut échouer sur un poste que nous ne voyons pas
+  // (antivirus, droits, disque, variante de Windows) : le joueur lance alors l'installateur de l'auteur,
+  // déjà téléchargé et vérifié, qui montre lui-même son contrat ; Cyber Pinball retrouve ensuite le jeu.
+
+  /** L'installateur à ouvrir à la main, et pourquoi l'installation automatique n'a pas abouti. */
+  let manual: { installer: string; reason: string } | undefined;
+  /** Ce que le joueur a lu au dernier essai de vérification ou d'ouverture. */
+  let manualNote: { text: string; tone: 'ok' | 'error' } | undefined;
+
+  function showManual(installer: string, reason: string): void {
+    manual = { installer, reason };
+    manualNote = undefined;
+    host.openCustom(buildManual, 0);
+  }
+
+  function leaveManual(message?: string): void {
+    manual = undefined;
+    manualNote = undefined;
+    downloaded = undefined;
+    if (message) notice = message;
+    open();
+  }
+
+  function buildManual(): Built {
+    const root = host.root();
+    const dir = root ? managedFuturePinballDir(root) : '';
+    const file = manual?.installer ?? '';
+    const note = (text: string, tone: 'ok' | 'error') => {
+      manualNote = { text, tone };
+      host.openCustom(buildManual, 0);
+    };
+    const rows: Row[] = [
+      { text: t('1. Ouvre l’installateur'), detail: t('{file} : celui de l’auteur de BAM, déjà téléchargé ; son empreinte SHA-256 a été vérifiée. Selon le dossier choisi, Windows peut demander l’accord d’administrateur : c’est normal pour lui.', { file }), icon: 'download' },
+      { text: t('2. Lis son contrat, accepte-le, puis laisse-le faire'), detail: t('Quand il demande le dossier d’installation, tape celui de Cyber Pinball ({dir}) ou garde celui qu’il propose : Cyber Pinball cherche aussi {game} aux emplacements habituels.', { dir, game: FUTURE_PINBALL_NAME }), icon: 'rules' },
+      { text: t('3. Reviens ici : Cyber Pinball vérifie'), detail: t('« J’ai fini » contrôle que {game} est là ; rien d’autre n’est lu ni changé.', { game: FUTURE_PINBALL_NAME }), icon: 'check' },
+    ];
+    if (manualNote) rows.push({ text: manualNote.text, icon: manualNote.tone === 'ok' ? 'check' : 'info', tone: manualNote.tone });
+    return {
+      heading: t('Installer {game} à la main', { game: FUTURE_PINBALL_NAME }),
+      icon: 'download',
+      lead: t('L’installation automatique n’a pas abouti ({reason}). Tu peux installer {game} et BAM toi-même avec l’installateur de leur auteur.', { reason: manual?.reason ?? '?', game: FUTURE_PINBALL_NAME }),
+      sections: [{ rows }],
+      actions: [
+        {
+          label: t('Ouvrir l’installateur'),
+          detail: t('Le lance comme n’importe quel programme'),
+          icon: 'download',
+          key: 'manual:open',
+          run: () => void host.openPath(file, t('L’installateur de {game}', { game: FUTURE_PINBALL_NAME })).then((problem) => note(problem ?? t('L’installateur est ouvert : suis ses pages, puis reviens ici.'), problem ? 'error' : 'ok')),
+        },
+        {
+          label: t('J’ai fini : vérifier'),
+          detail: t('Cherche {game} installé', { game: FUTURE_PINBALL_NAME }),
+          icon: 'check',
+          tone: 'ok',
+          key: 'manual:check',
+          run: () => {
+            const found = refresh();
+            if (!found) return note(t('{game} est encore introuvable. Termine l’installateur, ou choisis son dossier à la main dans « Tables de {game} ».', { game: FUTURE_PINBALL_NAME }), 'error');
+            // Une installation de Cyber Pinball remplace un dossier choisi autrefois à la main.
+            if (found.source === 'managed') writeFuturePinballConfig(host.dataDir(), undefined);
+            leaveManual(t('{game} est installé. {used}.', { game: FUTURE_PINBALL_NAME, used: usedFolder(found) }));
+          },
+        },
+        { label: t('Abandonner'), detail: t('Le fichier téléchargé reste dans le dossier des téléchargements de Cyber Pinball'), icon: 'close', key: 'manual:leave', run: () => leaveManual(t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: manual?.reason ?? '?' })) },
+      ],
+      back: () => leaveManual(),
+    };
   }
 
   /** Les pages des deux contrats, l'un après l'autre : chacun est montré en entier, dans sa langue d'origine. */
@@ -393,6 +469,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     await host.task(t('Installation de {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
       result = await extractManagedFuturePinball(root, files);
     });
+    if (result && !result.ok) return showManual(files.installer, result.reason);
     downloaded = undefined;
     if (result?.ok) {
       // Le joueur a voulu celui de Cyber Pinball : le dossier choisi autrefois à la main ne passe plus devant.
@@ -401,7 +478,8 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
         ? t('{game} et BAM sont installés dans {dir}. Les tables que tu ajoutes y sont rangées.', { game: FUTURE_PINBALL_NAME, dir: result.dir })
         : t('{game} est installé dans {dir}, mais BAM n’y est pas : les tables récentes en ont besoin.', { game: FUTURE_PINBALL_NAME, dir: result.dir });
     } else {
-      notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result && !result.ok ? result.reason : '?' });
+      // Pas de réponse de la tâche (annulée) : rien n'a été posé.
+      notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: '?' });
     }
     open();
   }

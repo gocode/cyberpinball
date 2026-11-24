@@ -20,6 +20,9 @@ export interface BackSurprise {
   landed: string;
 }
 
+/** Sortes d'écran qu'on traverse sans y revenir : le clavier à l'écran (« prompt »), fini une fois validé. */
+export const PASSING_KINDS: ReadonlySet<string> = new Set(['prompt']);
+
 export class BackTrail<S = unknown> {
   /** Écrans traversés, le plus ancien d'abord : le dernier est celui où mène le retour. */
   private trail: BackPlace[] = [];
@@ -49,8 +52,9 @@ export class BackTrail<S = unknown> {
         const at = this.trail.findIndex((p) => p.key === place.key);
         if (at >= 0) this.trail = this.trail.slice(0, at);
         // Arrivé par un retour sur un écran jamais traversé (le parcours d'une table ramène à sa
-        // fiche) : l'écran quitté ne s'empile pas, on en est revenu.
-        else if (!check) this.trail.push({ key: this.shown.key, kind: this.shown.kind, heading: this.shown.heading });
+        // fiche) : l'écran quitté ne s'empile pas, on en est revenu. Une saisie (le clavier à l'écran)
+        // ne s'empile jamais : validée, elle est finie, et l'écran qu'elle ouvre revient d'où elle venait.
+        else if (!check && !PASSING_KINDS.has(this.shown.kind)) this.trail.push({ key: this.shown.key, kind: this.shown.kind, heading: this.shown.heading });
       }
       this.shown = { ...place, screen: screen as S };
     }

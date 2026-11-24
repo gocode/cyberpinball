@@ -70,7 +70,7 @@ export const messages: Record<string, string> = {
   'Jouer ensemble': 'Play together',
   'Avec un ami, partie en direct, défier un joueur': 'With a friend, live game, challenge a player',
   'Jouer avec un ami…': 'Play with a friend…',
-  'Ouvrir une partie en direct…': 'Open an live game…',
+  'Ouvrir une partie en direct…': 'Open a live game…',
   'Défier un joueur…': 'Challenge a player…',
   'Bientôt : 48 h pour battre ton score, chacun quand il veut': 'Coming soon: 48 h to beat your score, each player when they like',
   'Amis en ligne': 'Friends online',

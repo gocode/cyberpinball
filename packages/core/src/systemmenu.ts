@@ -91,6 +91,7 @@ export const SYSTEM_ITEM_IDS = [
   'startup',
   'start-relaunch',
   'guest-mode',
+  'search',
   'updates',
   'news',
   'feedback',
@@ -314,8 +315,10 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'aide',
     icon: 'info',
     get label() { return t('Aide et infos'); },
-    get detail() { return t('Commandes, nouveautés, mise à jour, retours et propositions, nous suivre, conditions, crédits'); },
-    entries: ['controls', 'news', 'updates', 'feedback', 'follow', 'terms', 'community'],
+    get detail() { return t('Rechercher un réglage, commandes, nouveautés, mise à jour, retours et propositions, nous suivre, conditions, crédits'); },
+    // « Rechercher » en tête (22/11/2026, systemsearch.ts) : la racine est pleine, et chercher où se trouve
+    // un réglage est une aide ; le Menu système se rouvre sur « Aide et infos » quand on y est passé.
+    entries: ['search', 'controls', 'news', 'updates', 'feedback', 'follow', 'terms', 'community'],
   },
   // Toutes les sorties, de la plus légère à la plus lourde : le bureau, quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
   quitter: {
@@ -427,6 +430,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   wheel: { icon: 'wheel', get label() { return t('Roue'); } },
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
   // Les grandes nouveautés, choisies à la main (news.ts, app/src/news-menu.ts) : une chronologie.
+  // Recherche dans tout le Menu système, réglages des sous-écrans compris (systemsearch.ts, app/src/system-search-menu.ts).
+  search: { icon: 'search', get label() { return t('Rechercher'); } },
   news: { icon: 'sparkle', get label() { return t('Nouveautés'); } },
   // Le tableau public des propositions et le formulaire des retours (app/src/feedback-menu.ts).
   feedback: { icon: 'inbox', get label() { return t('Retours et propositions'); } },

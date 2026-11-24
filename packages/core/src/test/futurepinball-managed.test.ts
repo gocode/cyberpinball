@@ -10,8 +10,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import {
+  checkFuturePinballSpace,
   checkManagedFuturePinball,
   findFuturePinball,
+  freeBytesAt,
+  FUTURE_PINBALL_NEEDED_BYTES,
   FUTURE_PINBALL_DEFAULT_PREFERENCES,
   FUTURE_PINBALL_EXE,
   FUTURE_PINBALL_LICENSE_RECORD,
@@ -202,6 +205,40 @@ test('le téléchargement ne lance jamais l’installateur : extraction, jamais 
   assert.equal((ui.match(/extractManagedFuturePinball\(/g) ?? []).length, 1);
   assert.equal((ui.match(/extract_\(\)/g) ?? []).length, 2, 'définition et unique appel : le bouton « J’accepte les deux contrats »');
   assert.match(ui, /contract:accept[\s\S]{0,60}run: \(\) => void extract_\(\)/);
+});
+
+test('place sur le disque : mesurée au plus proche dossier existant, refusée sous 300 Mo, jamais bloquante si elle est inconnue', () => {
+  const seen: string[] = [];
+  // Le dossier du jeu n'existe pas encore : la mesure remonte jusqu'au premier dossier qui existe.
+  const free = freeBytesAt(path.join('C:\\', 'CyberPinball', 'emulators', 'futurepinball'), (p) => {
+    seen.push(p);
+    if (seen.length < 3) throw new Error('ENOENT');
+    return { bavail: 1000n, bsize: 4096 };
+  });
+  assert.equal(free, 4_096_000);
+  assert.equal(seen.length, 3);
+  assert.equal(freeBytesAt(path.join('C:\\', 'x'), () => { throw new Error('EPERM'); }), undefined, 'aucune mesure possible : inconnu');
+
+  assert.deepEqual(checkFuturePinballSpace('d', () => 100 * 1024 * 1024), { ok: false, free: 100 * 1024 * 1024, needed: FUTURE_PINBALL_NEEDED_BYTES });
+  assert.equal(checkFuturePinballSpace('d', () => FUTURE_PINBALL_NEEDED_BYTES).ok, true);
+  assert.equal(checkFuturePinballSpace('d', () => undefined).ok, true, 'mesure impossible : on essaie, l’échec sera expliqué');
+  assert.ok(FUTURE_PINBALL_NEEDED_BYTES >= 47_346_211 + 118_013_413, 'installateur + fichiers posés tiennent dans la place demandée');
+  // Le vrai disque répond sur ce poste.
+  assert.ok((freeBytesAt(os.tmpdir()) ?? 0) > 0);
+});
+
+test('repli « Installer à la main » : l’installateur n’est ouvert que par le joueur, la place est contrôlée avant tout octet', () => {
+  const install = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'futurepinball-install.ts'), 'utf8').replace(/\/\/.*$/gm, '');
+  const download = install.slice(install.indexOf('export async function downloadFuturePinball'));
+  assert.ok(download.indexOf('futurePinballSpaceRefusal(') > 0 && download.indexOf('futurePinballSpaceRefusal(') < download.indexOf('.track('), 'la place avant le premier suivi de téléchargement');
+  const ui = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'futurepinball-ui.ts'), 'utf8');
+  // Un échec d'extraction mène au repli, avec l'installateur gardé (pas de downloaded = undefined avant).
+  assert.match(ui, /if \(result && !result\.ok\) return showManual\(files\.installer, result\.reason\);\s*downloaded = undefined;/);
+  assert.match(ui, /failure\?\.installer\) return showManual/);
+  assert.equal((ui.match(/host\.openPath\(/g) ?? []).length, 1, 'un seul lancement de l’installateur : le bouton « Ouvrir l’installateur »');
+  assert.match(ui, /manual:open[\s\S]{0,300}host\.openPath\(file,/);
+  assert.doesNotMatch(ui, /execFile|spawn\(|startElevated/, 'l’écran ne lance rien lui-même');
+  assert.match(ui, /manual:check[\s\S]{0,200}refresh\(\)/, '« J’ai fini » relit le disque, il ne suppose rien');
 });
 
 test('reprise d’une installation existante : plan chiffré, copie sans écrasement, source intacte', async () => {

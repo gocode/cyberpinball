@@ -273,6 +273,8 @@ export type UiAction =
   | { type: 'editor'; index: number }
   /** Texte arrivé sans touche dans la page (panneau des emojis de Windows, méthode de saisie) : au point d'insertion. */
   | { type: 'editor-text'; text: string }
+  /** Un résultat montré sous le texte d'une saisie (PromptLive), cliqué. */
+  | { type: 'editor-result'; index: number }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
   /** Bouton « ‹ Retour » de l'en-tête : comme Exit, sans redescendre au bas de la liste. */
@@ -680,6 +682,24 @@ export interface PromptOptions {
   onInput?: (active: boolean) => void;
   /** Mot de passe (Mon compte) : le texte s'affiche en points, ni emoji ni préfixe. */
   secret?: boolean;
+  /** Résultats montrés sous le texte, recalculés à chaque lettre (recherche du Menu système). */
+  live?: PromptLive;
+}
+
+/** Une ligne de résultat sous le texte d'une saisie : son nom, et où elle se trouve. */
+export interface LiveRow {
+  label: string;
+  detail?: string;
+}
+
+/**
+ * Résultats d'une saisie, à chaque lettre (system-search-menu.ts) : dans le panneau du clavier, entre le
+ * texte et les touches ; un clic en ouvre un, OK les montre tous dans une liste qu'on parcourt aux flippers.
+ */
+export interface PromptLive {
+  /** Les lignes ; `empty` : ce que dit la zone sans résultat ; `footer` : sous les lignes (OK pour tout voir). */
+  rows: (text: string) => { rows: LiveRow[]; empty?: string; footer?: string };
+  pick: (text: string, index: number) => void;
 }
 
 /**
@@ -777,7 +797,7 @@ export type Screen =
   /** Écran décrit hors de la gestion des tables (configurations de la borne), recalculé à chaque affichage. */
   | { kind: 'custom'; build: () => Built; table?: string }
   /** Saisie d'un texte au clavier à l'écran ; `done` reçoit undefined à l'annulation. */
-  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string; onInput?: (active: boolean) => void };
+  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string; onInput?: (active: boolean) => void; live?: PromptLive };
 
 export type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 

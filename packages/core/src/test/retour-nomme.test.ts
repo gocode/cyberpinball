@@ -54,6 +54,20 @@ test('retour nommé : un écran d’en haut rouvert par une action (enregistrer,
   assert.equal(trail.destination().heading, 'Menu système');
 });
 
+test('retour nommé : un écran ouvert par le clavier à l’écran ne mène jamais au clavier', () => {
+  // Recherche : Menu système > clavier (« Rechercher dans le Menu système ») > OK > liste des résultats ;
+  // la liste annonçait « ‹ Rechercher dans le Menu système » et menait au Menu système.
+  const trail = new BackTrail<object>(() => HOME);
+  open(trail, SYSTEM);
+  open(trail, place('Rechercher dans le Menu système', 'prompt'));
+  assert.equal(trail.destination().heading, 'Menu système');
+  open(trail, place('Rechercher'));
+  assert.equal(trail.destination().heading, 'Menu système');
+  // Le résultat ouvert revient à la liste, la liste au Menu système.
+  open(trail, MEDIAS);
+  assert.equal(trail.destination().heading, 'Rechercher');
+});
+
 test('retour nommé : un retour qui arrive ailleurs que là où il l’annonçait est appris et signalé', () => {
   const trail = new BackTrail<object>(() => HOME);
   // Parcours ouvert depuis un message de fin de partie (rien dans le parcours) : son retour mène à la fiche.

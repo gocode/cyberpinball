@@ -18,7 +18,7 @@ export const messages: Record<string, string> = {
   '{n} places': '{n} seats',
   'Ta partie : {title}': 'Your game: {title}',
   '{n} sur {max} joueurs · départ dès qu’elle est complète': '{n} of {max} players · starts as soon as it is full',
-  'Ouvrir une partie en direct': 'Open an live game',
+  'Ouvrir une partie en direct': 'Open a live game',
   'Choisis la table et le nombre de joueurs : elle s’affiche chez tous les joueurs en ligne': 'Choose the table and the number of players: it shows up for every player online',
   'Ouvertes en ce moment ({n})': 'Open right now ({n})',
   'Aucune partie ouverte pour l’instant': 'No open game right now',

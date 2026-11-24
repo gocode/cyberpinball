@@ -60,6 +60,23 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Recherche dans le Menu système (24/11/2026) ; « La Communauté » (0.1.11) sort de la liste pour
+    // la garder à 24. Date à poser au jour de la version finale.
+    id: 'recherche-menu',
+    date: '2026-11-24',
+    version: '0.2.4',
+    get title() { return t('Rechercher dans le Menu système'); },
+    get detail() { return t('Tape une lettre dans le Menu système : les réglages qui correspondent s’affichent aussitôt.'); },
+    get more() {
+      return [
+        t('Le nom d’un réglage, d’une rubrique ou un mot-clé (« logo », « volume », « kinect ») : les résultats suivent chaque lettre, au clavier à l’écran, sur un vrai clavier ou au téléphone.'),
+        t('Un résultat ouvre son écran, le curseur posé sur le réglage ; Retour revient à la liste.'),
+      ];
+    },
+    get where() { return t('Menu système › Aide et infos › Rechercher'); },
+    reach: { kind: 'system', id: 'search' },
+  },
+  {
     // Mode débogage (23/11/2026) : les mesures de tous les écrans en direct, par-dessus l'un d'eux. « Les crédits de vos tables » (0.1.11)
     // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'mode-debogage',
@@ -439,21 +456,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Aide et infos › Retours et propositions'); },
     reach: { kind: 'system', id: 'feedback' },
-  },
-  {
-    id: 'communaute',
-    date: '2026-11-13',
-    version: '0.1.11',
-    get title() { return t('La Communauté'); },
-    get detail() { return t('Les joueurs en ligne du monde entier, et un salon de discussion par pays.'); },
-    get more() {
-      return [
-        t('Un médaillon de la roue ouvre la Communauté : les joueurs en ligne, amis ou non, avec leur drapeau ; tes messages ; les classements de toutes tes tables.'),
-        t('Chaque pays a son salon, plus « Monde » : une ligne par message, avec l’heure, le drapeau et le pseudo de chacun. On écrit avec des phrases d’un appui, le clavier à l’écran ou le téléphone.'),
-      ];
-    },
-    get where() { return t('Roue › Communauté'); },
-    reach: { kind: 'community', door: 'home' },
   },
 ];
 

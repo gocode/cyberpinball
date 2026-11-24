@@ -18,7 +18,10 @@ import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  checkFuturePinballSpace,
   checkManagedFuturePinball,
+  formatSize,
+  type FuturePinballSpaceCheck,
   FUTURE_PINBALL_EXTRACTED_APP,
   FUTURE_PINBALL_LICENSES,
   futurePinballExtractArgs,
@@ -50,9 +53,17 @@ export interface FuturePinballDownload {
   tool: string;
 }
 
-export type FuturePinballDownloaded = ({ ok: true } & FuturePinballDownload) | { ok: false; reason: string };
+/** `installer` : présent quand l'installateur est déjà téléchargé et vérifié, de quoi proposer de l'installer à la main. */
+export type FuturePinballDownloaded = ({ ok: true } & FuturePinballDownload) | { ok: false; reason: string; installer?: string };
 
 export type FuturePinballSetup = { ok: true; dir: string; bam: boolean } | { ok: false; reason: string };
+
+/** La place libre pour le téléchargement et la pose (300 Mo), dite en clair quand elle manque ; undefined si elle suffit. */
+export function futurePinballSpaceRefusal(root: string, check: (dir: string) => FuturePinballSpaceCheck = (dir) => checkFuturePinballSpace(dir)): string | undefined {
+  const space = check(layoutOf(root).downloads);
+  if (space.ok) return undefined;
+  return t('pas assez de place sur le disque de Cyber Pinball : {free} libres, {needed} nécessaires (libère de la place, puis réessaie)', { free: formatSize(space.free), needed: formatSize(space.needed) });
+}
 
 /** Dossier de travail de l'extraction, vidé avant et après : jamais rien dedans entre deux installations. */
 export function futurePinballStagingDir(root: string): string {
@@ -70,11 +81,14 @@ function refusedInAutopilot(): boolean {
  * Télécharge l'installateur (suivi dans le gestionnaire de téléchargements, repris après une coupure,
  * empreinte vérifiée) et innoextract. Rien n'est extrait ni installé : le joueur lit d'abord les contrats.
  */
-export async function downloadFuturePinball(root: string, opts: { downloads?: DownloadManager; onStep?: (line: string) => void } = {}): Promise<FuturePinballDownloaded> {
+export async function downloadFuturePinball(root: string, opts: { downloads?: DownloadManager; onStep?: (line: string) => void; space?: (dir: string) => FuturePinballSpaceCheck } = {}): Promise<FuturePinballDownloaded> {
   if (refusedInAutopilot()) return { ok: false, reason: t('essai sans opérateur : pas de téléchargement') };
   const component = futurePinballComponent();
   const layout = layoutOf(root);
-  const file = path.join(layout.downloads, path.basename(new URL(component.url).pathname));
+  // Avant tout octet reçu : un disque presque plein ferait échouer le téléchargement ou l'extraction à mi-chemin.
+  const noSpace = futurePinballSpaceRefusal(root, opts.space);
+  if (noSpace) return { ok: false, reason: noSpace };
+  const file =path.join(layout.downloads, path.basename(new URL(component.url).pathname));
   const job = opts.downloads?.track({
     id: `future-pinball-${component.version}`,
     kind: 'component',
@@ -119,7 +133,8 @@ export async function downloadFuturePinball(root: string, opts: { downloads?: Do
     return { ok: true, installer: file, tool: tool.executable };
   } catch (error) {
     toolJob?.fail('http', (error as Error).message);
-    return { ok: false, reason: t('innoextract n’a pas pu être préparé : {reason}', { reason: (error as Error).message }) };
+    // L'installateur, lui, est là et vérifié : l'installer à la main reste possible.
+    return { ok: false, reason: t('innoextract n’a pas pu être préparé : {reason}', { reason: (error as Error).message }), installer: file };
   }
 }
 

@@ -1699,6 +1699,8 @@ function renderEditor(e) {
     panel.append(value);
     if (e.warning !== undefined) panel.append(libEl('div', 'editor-warning', e.warning));
   }
+  // Résultats à chaque lettre (recherche du Menu système) : entre le texte et les touches, jamais dessus.
+  if (e.live) panel.append(renderLiveResults(e.live));
   const keys = libEl('div', 'keys-grid');
   e.keys.forEach((k, i) => {
     const wide = k.length > 1 ? ' wide' : '';
@@ -1726,6 +1728,29 @@ function renderEditor(e) {
   // Taper au téléphone : une vraie rangée sous les touches, jamais par-dessus.
   if (e.remote) panel.append(renderRemote(e.remote, true));
   box.append(panel);
+  return box;
+}
+
+/**
+ * Résultats d'une saisie, à chaque lettre : leur zone garde sa hauteur (le clavier ne bouge pas quand
+ * leur nombre change). Chaque ligne : le nom à gauche, où il se trouve à droite ; un clic l'ouvre.
+ */
+function renderLiveResults(live) {
+  const box = libEl('div', 'editor-live');
+  if (!live.rows.length) {
+    box.append(libEl('p', 'editor-live-empty', live.empty ?? ''));
+    return box;
+  }
+  const list = libEl('ol', 'editor-live-rows');
+  live.rows.forEach((row, i) => {
+    const li = actOn(libEl('li', 'editor-live-row'), { type: 'editor-result', index: i });
+    li.dataset.label = row.label;
+    li.append(libEl('span', 'editor-live-label', row.label));
+    if (row.detail) li.append(libEl('span', 'editor-live-path', row.detail));
+    list.append(li);
+  });
+  box.append(list);
+  if (live.footer) box.append(libEl('p', 'editor-live-footer', live.footer));
   return box;
 }
 

@@ -1104,6 +1104,66 @@ body.mouse .lib-row.pick:not(.selected):hover {
   gap: 0.8cqmin;
 }
 
+/*
+ * Résultats à chaque lettre (recherche du Menu système), entre le texte et les touches. La zone garde
+ * la hauteur de cinq lignes et de leur pied : le clavier ne bouge pas quand leur nombre change.
+ */
+.editor-live {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(5 * 4.4cqmin + 4cqmin);
+  margin: -1cqmin 0 2.4cqmin;
+}
+
+.editor-live-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-live-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2cqmin;
+  min-height: 4.4cqmin;
+  padding: 0.6cqmin 1.2cqmin;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+
+.editor-live-label {
+  font-size: 2.4cqmin;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Où se trouve le résultat : à droite, discret ; un chemin trop long perd son début, jamais le nom. */
+.editor-live-path {
+  font-size: 2cqmin;
+  color: var(--ink-faint);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.editor-live-empty,
+.editor-live-footer {
+  margin: 0;
+  padding: 1cqmin 1.2cqmin 0;
+  font-size: 2cqmin;
+  color: var(--ink-faint);
+}
+
+.editor-live-footer {
+  margin-top: auto;
+  color: var(--accent);
+}
+
 .editor-number .keys-grid {
   grid-template-columns: repeat(5, 1fr);
 }

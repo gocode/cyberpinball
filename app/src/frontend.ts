@@ -475,6 +475,7 @@ import { headsetWanted, language as uiLanguage, loadFeedbackState as loadFeedbac
 import { createInboxMenu, type InboxLink, type InboxThread } from './inbox-menu';
 import { createLocalPlayItem } from './local-play';
 import { createNewsMenu } from './news-menu';
+import { createSystemSearch } from './system-search-menu';
 import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
@@ -2910,6 +2911,9 @@ const newsMenu = createNewsMenu({
   log: (line) => console.log(line),
 });
 library.provideSystemItem('news', newsMenu.item);
+
+// Aide et infos > Rechercher, et une lettre tapée dans le Menu système (system-search-menu.ts).
+createSystemSearch({ library });
 
 /** Où « Essayer » mène depuis une nouveauté, ou pourquoi pas maintenant. */
 function newsReach(target: NewsReach, back: () => void): { run?: () => void; gone?: string } {

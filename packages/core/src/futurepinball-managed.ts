@@ -23,6 +23,38 @@ import { layoutOf } from './locations';
 /** Dossier du jeu dans <racine>\emulators. */
 export const FUTURE_PINBALL_MANAGED_FOLDER = 'futurepinball';
 
+/**
+ * Place à avoir sur le disque de Cyber Pinball avant de télécharger (24/11/2026) : l'installateur (47 Mo),
+ * innoextract (moins d'1 Mo), le jeu et BAM extraits (113 Mo, déplacés sur le même disque) et de la marge
+ * pour les tables et les médias qui suivent. Mesuré sur la borne : 118 Mo de fichiers posés.
+ */
+export const FUTURE_PINBALL_NEEDED_BYTES = 300 * 1024 * 1024;
+
+/** Octets libres du disque qui porte `dir` (ou son plus proche dossier existant) ; undefined si Windows ne le dit pas. */
+export function freeBytesAt(dir: string, statfs: (p: string) => { bavail: number | bigint; bsize: number | bigint } = (p) => fs.statfsSync(p)): number | undefined {
+  let at = path.resolve(dir);
+  for (let i = 0; i < 64; i++) {
+    try {
+      const stat = statfs(at);
+      return Number(stat.bavail) * Number(stat.bsize);
+    } catch {
+      const parent = path.dirname(at);
+      if (parent === at) return undefined;
+      at = parent;
+    }
+  }
+  return undefined;
+}
+
+export type FuturePinballSpaceCheck = { ok: true; free: number | undefined } | { ok: false; free: number; needed: number };
+
+/** La place libre suffit-elle ? Une mesure impossible ne bloque pas : l'installation s'essaie, son échec est expliqué. */
+export function checkFuturePinballSpace(dir: string, free: (dir: string) => number | undefined = freeBytesAt, needed = FUTURE_PINBALL_NEEDED_BYTES): FuturePinballSpaceCheck {
+  const bytes = free(dir);
+  if (bytes === undefined || bytes >= needed) return { ok: true, free: bytes };
+  return { ok: false, free: bytes, needed };
+}
+
 /** Dossier géré par Cyber Pinball (le jeu y est installé, ou le sera). */
 export function managedFuturePinballDir(root: string): string {
   return path.join(layoutOf(root).emulators, FUTURE_PINBALL_MANAGED_FOLDER);

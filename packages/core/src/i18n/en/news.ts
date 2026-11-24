@@ -118,13 +118,11 @@ export const messages: Record<string, string> = {
     'A problem can also be reported from the screen of a game that could not run, with a technical report read by the team only.',
   'Menu système › Aide et infos › Retours et propositions': 'System menu › Help and info › Feedback and ideas',
 
-  'La Communauté': 'The Community',
-  'Les joueurs en ligne du monde entier, et un salon de discussion par pays.': 'Players online from all over the world, and a chat room for each country.',
-  'Un médaillon de la roue ouvre la Communauté : les joueurs en ligne, amis ou non, avec leur drapeau ; tes messages ; les classements de toutes tes tables.':
-    'A medallion on the wheel opens the Community: players online, friends or not, with their flag; your messages; the leaderboards of all your tables.',
-  'Chaque pays a son salon, plus « Monde » : une ligne par message, avec l’heure, le drapeau et le pseudo de chacun. On écrit avec des phrases d’un appui, le clavier à l’écran ou le téléphone.':
-    'Each country has its room, plus “World”: one line per message, with each player’s time, flag and nickname. You write with one-press phrases, the on-screen keyboard or your phone.',
-  'Roue › Communauté': 'Wheel › Community',
+  'Tape une lettre dans le Menu système : les réglages qui correspondent s’affichent aussitôt.': 'Type a letter in the System menu: the matching settings show up at once.',
+  'Le nom d’un réglage, d’une rubrique ou un mot-clé (« logo », « volume », « kinect ») : les résultats suivent chaque lettre, au clavier à l’écran, sur un vrai clavier ou au téléphone.':
+    'The name of a setting, of a section, or a keyword (“logo”, “volume”, “kinect”): the results follow each letter, on the on-screen keyboard, a real keyboard or the phone.',
+  'Un résultat ouvre son écran, le curseur posé sur le réglage ; Retour revient à la liste.': 'A result opens its screen with the cursor on the setting; Back returns to the list.',
+  'Menu système › Aide et infos › Rechercher': 'System menu › Help and info › Search',
 
 
   'Le cadrage des tables, choisi sur ta table': 'Table framing, chosen on your own table',

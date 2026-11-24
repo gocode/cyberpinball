@@ -331,6 +331,7 @@ import { createMediaSites, jobKey } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
 import { createFuturePinballUi } from './futurepinball-ui';
+import { openPathForUser } from './open-path';
 import { createPinballFx3FolderUi } from './pinballfx3-folder-ui';
 import { fetchBackglassCatalog } from './pinballfx3-backglass';
 import { detectFuturePinball } from './futurepinball-play';
@@ -603,6 +604,7 @@ export function createLibrary(host: LibraryHost) {
     openCustom: (build, at) => openCustom(build, at),
     cursor: () => cursor,
     task: (message, work) => task(message, work),
+    openPath: (target, what) => openPathForUser(target, what),
     vps: () => vpsForImport(),
     added: (file) => reloadTables(file),
     // VPinMediaDB, puis l'image du fronton et du plateau de la base VPS pour ce qu'il n'a pas.
@@ -828,6 +830,78 @@ export function createLibrary(host: LibraryHost) {
     runAction(item.run, back);
   }
 
+  /** Une rubrique ou une entrée que le Menu système montre sur cette borne (fournie, pas retirée par le jeu local). */
+  function systemShown(id: SystemEntryId): boolean {
+    return isSystemGroup(id) ? systemEntries(id).length > 0 : systemItems.has(id) && !hiddenInLocalPlay(id, localPlay());
+  }
+
+  /** Le Menu système sur une rubrique (undefined : la racine), la sélection sur `at` : le « Retour » d'une recherche. */
+  function openSystemAt(group: SystemGroupId | undefined, at?: SystemEntryId): void {
+    systemReturn = undefined;
+    systemExit = undefined;
+    systemChosen = at;
+    openSystemGroup(group, at);
+  }
+
+  /** Où l'on est dans le Menu système : la rubrique affichée et l'entrée sous le curseur (la recherche y ramène). */
+  function systemHere(): { group: SystemGroupId | undefined; at: SystemEntryId | undefined } | undefined {
+    if (screen?.kind !== 'system') return undefined;
+    return { group: systemGroup, at: systemEntries(systemGroup)[cursor] };
+  }
+
+  /**
+   * Un réglage rangé dans l'écran d'une entrée (recherche du Menu système) : l'entrée s'ouvre, son
+   * « Retour » ramenant à `back` ; puis chaque ligne de `steps`, qui ouvre l'écran suivant ; le curseur se
+   * pose enfin sur la ligne du réglage. Chaque ligne est donnée par ses noms possibles (une ligne change de
+   * nom selon l'état : « Activer… », « Désactiver… ») et retrouvée par le début de son libellé, en
+   * français comme dans la langue affichée (actionIndex). Une ligne absente sur cette borne ou dans cet
+   * état : on reste sur l'écran atteint, et false le dit (journal).
+   */
+  async function reachSystemPlace(parent: SystemItemId, steps: readonly (readonly string[])[], targets: readonly string[], back: () => void): Promise<boolean> {
+    const indexOf = (actions: readonly Action[], names: readonly string[]) => names.map((n) => actionIndex(actions, n)).find((i) => i >= 0) ?? -1;
+    runSystemItem(parent, back);
+    for (const names of steps) {
+      if (!screen) return false;
+      const built = build();
+      const index = indexOf(built.actions, names);
+      if (index < 0) {
+        console.log(`Recherche : « ${names.join(' » ou « ')} » introuvable dans l'écran de « ${parent} » (${built.actions.map((a) => a.label).join(' · ')}).`); // i18n-ignore : journal
+        return false;
+      }
+      const result = runAction(built.actions[index]!.run, built.back);
+      if (result instanceof Promise) await result;
+    }
+    if (!screen) return false;
+    const index = indexOf(build().actions, targets);
+    if (index < 0) {
+      console.log(`Recherche : « ${targets.join(' » ou « ')} » introuvable dans l'écran atteint depuis « ${parent} ».`); // i18n-ignore : journal
+      return false;
+    }
+    cursor = index;
+    anchor = undefined;
+    host.broadcast();
+    return true;
+  }
+
+  /**
+   * La lettre ou le chiffre tapé sur un vrai clavier, sinon undefined. Jamais une touche relevée comme
+   * bouton de la borne (un encodeur clavier envoie Start sur 1, les flippers sur Maj…), ni un raccourci.
+   */
+  function typedChar(input: Input): string | undefined {
+    if (input.type !== 'keyDown' || input.control || input.alt || input.meta) return undefined;
+    const char = input.key && input.key.length === 1 && /[\p{L}\p{N}]/u.test(input.key) ? input.key : undefined;
+    if (!char) return undefined;
+    const buttons = Object.values(host.keys()).flatMap((v) => (Array.isArray(v) ? v : []));
+    if (buttons.includes(input.code) || input.code === CONFIG_KEY || (host.zoneKeys?.() ?? []).includes(input.code)) return undefined;
+    return char;
+  }
+
+  /** Lettre tapée sur un écran du Menu système : la recherche s'ouvre avec elle (system-search-menu.ts). */
+  let typeToSearch: ((char: string) => void) | undefined;
+  function provideTypeToSearch(open: (char: string) => void): void {
+    typeToSearch = open;
+  }
+
   /**
    * Entrées d'une rubrique (de la racine : ses rubriques et ses entrées) que l'application fournit. Une
    * rubrique dont il ne reste rien (jeu local, entrées absentes de cette borne) n'est pas montrée.
@@ -931,7 +1005,8 @@ export function createLibrary(host: LibraryHost) {
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
   function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions): void {
     const prefix = options?.prefixes?.length ? { prefixes: options.prefixes, prefixAt: Math.min(options.prefix ?? 0, options.prefixes.length - 1) } : {};
-    const next: Screen = { kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix, ...(options?.secret ? { secret: true } : {}) }, done, table: tableOf(screen), ...(options?.onInput ? { onInput: options.onInput } : {}) };
+    // Un texte donné à l'ouverture (la lettre tapée qui a ouvert la recherche) : on continue à la suite.
+    const next: Screen = { kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: Boolean(options?.live && value), ...prefix, ...(options?.secret ? { secret: true } : {}) }, done, table: tableOf(screen), ...(options?.onInput ? { onInput: options.onInput } : {}), ...(options?.live ? { live: options.live } : {}) };
     promptSeen.set(next, value);
     go(next);
   }
@@ -5515,6 +5590,15 @@ export function createLibrary(host: LibraryHost) {
       return true;
     }
     if (screen.kind === 'pages') return pagesKey(screen, input);
+    // Une lettre tapée sur un vrai clavier, dans le Menu système : la recherche s'ouvre avec elle.
+    if (screen.kind === 'system' && typeToSearch && host.guest.allows('menu.system')) {
+      const char = typedChar(input);
+      if (char) {
+        userGesture();
+        typeToSearch(char);
+        return true;
+      }
+    }
     const built = build();
     // Déplacer la sélection ou faire défiler n'est pas un geste : le message de l'écran reste (gesture-flash.ts).
     const navigation = is(KEYS.previous) || is(KEYS.next) || input.code === CONFIG_KEY || (host.zoneKeys?.() ?? []).includes(input.code) || PAGE_KEYS[input.code] !== undefined;
@@ -5955,6 +6039,13 @@ export function createLibrary(host: LibraryHost) {
       insertText(screen, action.text);
       notePromptInput();
       host.broadcast();
+    } else if (action.type === 'editor-result' && screen.kind === 'prompt' && screen.live && screen.editor?.kind === 'text' && Number.isInteger(action.index)) {
+      // Un résultat cliqué sous le texte : la saisie se ferme d'elle-même, il s'ouvre.
+      userGesture();
+      const s = screen;
+      endPromptInput(s);
+      s.live!.pick((s.editor as { value: string }).value, action.index);
+      host.broadcast();
     } else if (action.type === 'crop') {
       // Glisser ou molette sur l'image d'un recadrage : l'écran décrit s'en charge, puis se redessine.
       build().crop?.input({ ...(action.dx !== undefined ? { dx: action.dx } : {}), ...(action.dy !== undefined ? { dy: action.dy } : {}), ...(action.zoom !== undefined ? { zoom: action.zoom } : {}) });
@@ -6038,7 +6129,9 @@ export function createLibrary(host: LibraryHost) {
     const read = readable(built, zones) ? readingState() : undefined;
     soundPreview = playsSoundPreview(built.media);
     const remoteBar = screen.kind === 'edit' || screen.kind === 'prompt' ? (screen.editor && screen.editor.kind !== 'choice' ? host.phoneRemote?.bar() : undefined) : undefined;
-    const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? { ...viewEditor(screen.editor), remoteBar, remote: remoteBar ? remoteBlock(remoteBar, 'keyboard') : undefined } : undefined;
+    // Résultats à chaque lettre (recherche du Menu système) : entre le texte et les touches.
+    const live = screen.kind === 'prompt' && screen.live && screen.editor?.kind === 'text' ? screen.live.rows(screen.editor.value) : undefined;
+    const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? { ...viewEditor(screen.editor), remoteBar, remote: remoteBar ? remoteBlock(remoteBar, 'keyboard') : undefined, ...(live ? { live } : {}) } : undefined;
     // « Chercher sur le web… » n'a son icône que dans un menu à icônes : seule, elle décalerait tous les libellés.
     const iconMenu = built.actions.some((a) => a.icon && !a.web);
     return {
@@ -6718,6 +6811,13 @@ export function createLibrary(host: LibraryHost) {
     hasSystemItem: (id: SystemItemId) => systemItems.has(id),
     /** Ce que dit une entrée du menu système sous son nom (une porte qui la reprend ailleurs, Communauté). */
     systemItemDetail: (id: SystemItemId) => systemItems.get(id)?.detail ?? '',
+    /** Recherche du Menu système (system-search-menu.ts) : ce qui s'affiche, où l'on est, y revenir, atteindre un réglage. */
+    systemShown,
+    systemHere,
+    openSystemAt,
+    reachSystemPlace,
+    typedChar,
+    provideTypeToSearch,
     openPrompt,
     remoteField,
     remoteSet,
