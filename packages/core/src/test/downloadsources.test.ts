@@ -49,7 +49,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
 const CALLERS: Record<string, { count: number; how: string }> = {
   'app/src/download-sources.ts': { count: 2, how: 'transports de la file : ami (fetchFile) et adresse directe (fetchResumable)' },
   'app/src/friend-content.ts': { count: 2, how: 'fetchFile lui-même (sa déclaration et sa définition)' },
-  'app/src/futurepinball-install.ts': { count: 1, how: 'installateur de Future Pinball et BAM, chez l’auteur de BAM, avec l’accord du joueur : manager.track' },
+  'app/src/futurepinball-install.ts': { count: 2, how: 'installateur de Future Pinball et BAM, chez l’auteur de BAM, avec l’accord du joueur (manager.track), et innoextract, l’outil qui en extrait les fichiers (manager.track aussi)' },
   'app/src/install-vpx.ts': { count: 1, how: 'archive de VPX : manager.track' },
   'app/src/media-download.ts': { count: 3, how: 'plans de VPinMediaDB (une table, toutes les tables, après l’ajout) : trackInstall' },
   'app/src/media-search.ts': { count: 2, how: 'stage : un média demandé, suivi (track) ; stagePreviews : aperçus du plan, pas un téléchargement demandé' },

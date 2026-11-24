@@ -11,11 +11,13 @@ import {
   findFuturePinball,
   formatList,
   formatSize,
+  FUTURE_PINBALL_LICENSES,
   FUTURE_PINBALL_NAME,
   futurePinballAt,
   futurePinballInstalledTables,
   futurePinballTableInMenu,
   installFuturePinballArchive,
+  licensePages,
   managedFuturePinballDir,
   migrateFuturePinball,
   planFuturePinballMigration,
@@ -24,6 +26,7 @@ import {
   writeFuturePinballConfig,
   type DownloadManager,
   type FuturePinballInstall,
+  type FuturePinballLicense,
   type FuturePinballMigrationPlan,
   type TableEntry,
   type VpsDb,
@@ -31,8 +34,7 @@ import {
 import type { Action, Built, Row } from './library-types';
 import { onGesture } from './gesture-flash';
 import { detectFuturePinball } from './futurepinball-play';
-import { futurePinballComponent, installManagedFuturePinball } from './futurepinball-install';
-import { askElevation } from './uac-confirm';
+import { downloadFuturePinball, extractManagedFuturePinball, futurePinballComponent, type FuturePinballDownload, type FuturePinballDownloaded, type FuturePinballSetup } from './futurepinball-install';
 
 export interface FuturePinballUiHost {
   dataDir(): string;
@@ -246,9 +248,10 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
   }
 
   /**
-   * Demande d'accord avant tout téléchargement : ce qui vient, d'où, où cela va, et ce que Cyber Pinball
-   * sait de la licence (gratuit, sans clause de redistribution : il ne le livre pas, c'est le joueur qui le
-   * télécharge chez l'auteur de BAM). Puis l'avertissement de la demande de Windows (uac-confirm.ts).
+   * Demande d'accord avant tout téléchargement : ce qui vient, d'où, où cela va, et ce qui suit (les deux
+   * contrats à lire et à accepter : Cyber Pinball ne livre pas le jeu, c'est le joueur qui le télécharge
+   * chez l'auteur de BAM). Puis le téléchargement, les contrats (showContract), et seulement après l'accord
+   * l'extraction (futurepinball-install.ts) : pas de demande de Windows, rien n'est écrit hors du dossier géré.
    */
   function askInstall(): void {
     const root = host.root();
@@ -263,16 +266,17 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
         sections: [
           {
             rows: [
-              { text: t('Ce qui est téléchargé'), detail: t('{game} {version} et BAM, l’installateur « 2-en-1 » ({size})', { game: FUTURE_PINBALL_NAME, version: component.version, size: formatSize(component.size) }), icon: 'download' },
+              { text: t('Ce qui est téléchargé'), detail: t('{game} {version} et BAM, l’installateur « 2-en-1 » ({size}), et innoextract, l’outil libre qui en sort les fichiers (moins d’1 Mo)', { game: FUTURE_PINBALL_NAME, version: component.version, size: formatSize(component.size) }), icon: 'download' },
               { text: t('D’où'), detail: t('{host} : le site de l’auteur de BAM. Son empreinte SHA-256 est vérifiée ; un fichier différent est refusé.', { host: new URL(component.url).hostname }), icon: 'globe' },
-              { text: t('Où'), detail: t('{dir} : le dossier de Cyber Pinball ; rien ailleurs, ton installation actuelle n’est pas touchée.', { dir }), icon: 'folder' },
-              { text: t('Licence'), detail: t('Gratuits à télécharger et à utiliser d’après leurs auteurs, qui ne parlent pas de redistribution : c’est pourquoi tu le télécharges toi-même chez eux.'), icon: 'info', tone: 'quiet' },
+              { text: t('Où'), detail: t('{dir} : le dossier de Cyber Pinball ; rien ailleurs, ton installation actuelle n’est pas touchée. Aucune demande d’administrateur.', { dir }), icon: 'folder' },
+              { text: t('Licences'), detail: t('Deux contrats, celui de Future Pinball et celui de BAM : tu les lis en entier après le téléchargement, et rien n’est installé tant que tu ne les as pas acceptés. Les fichiers sont posés sans aucune modification.'), icon: 'rules', tone: 'quiet' },
+              { text: t('Ce que fait cette installation en moins'), detail: t('L’installateur n’est pas lancé : pas de désinstalleur, pas de raccourcis, pas d’association des fichiers .fpt (Cyber Pinball lance lui-même les tables). Supprimer le dossier ci-dessus suffit à tout retirer.'), icon: 'info', tone: 'quiet' },
             ],
           },
         ],
         actions: [
           { label: t('Plus tard'), icon: 'back', key: 'later', run: () => open() },
-          { label: t('Télécharger et installer'), detail: t('Windows demande ensuite ton autorisation'), icon: 'download', key: 'go', run: () => confirmInstall() },
+          { label: t('Télécharger'), detail: t('Puis les deux contrats à lire et à accepter'), icon: 'download', key: 'go', run: () => void download_() },
         ],
         back: () => open(),
       }),
@@ -280,22 +284,116 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     );
   }
 
-  function confirmInstall(): void {
-    askElevation((build, at) => host.openCustom(build, at), {
-      title: t('Installer {game} et BAM', { game: FUTURE_PINBALL_NAME }),
-      what: t('Installer {game} et BAM dans le dossier de Cyber Pinball (sans fenêtre).', { game: FUTURE_PINBALL_NAME }),
-      go: () => void install_(),
-      later: () => open(),
-    });
-  }
+  /** Ce que le téléchargement a rapporté, en attente de l'accord du joueur aux contrats. */
+  let downloaded: FuturePinballDownload | undefined;
+  /** Page du contrat affichée : les pages de chacun des deux contrats, bout à bout. */
+  let contractPage = 0;
+  let refusing = false;
 
-  async function install_(): Promise<void> {
+  async function download_(): Promise<void> {
     const root = host.root();
     if (!root) return;
-    let result: Awaited<ReturnType<typeof installManagedFuturePinball>> | undefined;
-    await host.task(t('Téléchargement et installation de {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
-      result = await installManagedFuturePinball(root, { ...(host.downloads() ? { downloads: host.downloads()! } : {}) });
+    let result: FuturePinballDownloaded | undefined;
+    await host.task(t('Téléchargement de {game} et de BAM…', { game: FUTURE_PINBALL_NAME }), async () => {
+      result = await downloadFuturePinball(root, { ...(host.downloads() ? { downloads: host.downloads()! } : {}) });
     });
+    if (result?.ok) {
+      downloaded = result;
+      contractPage = 0;
+      refusing = false;
+      return showContract();
+    }
+    notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result && !result.ok ? result.reason : '?' });
+    open();
+  }
+
+  /** Les pages des deux contrats, l'un après l'autre : chacun est montré en entier, dans sa langue d'origine. */
+  function contractPages(): { license: FuturePinballLicense; number: number; paragraphs: string[]; page: number; of: number }[] {
+    const out: { license: FuturePinballLicense; number: number; paragraphs: string[]; page: number; of: number }[] = [];
+    FUTURE_PINBALL_LICENSES.forEach((license, index) => {
+      const pages = licensePages(license.paragraphs);
+      pages.forEach((paragraphs, page) => out.push({ license, number: index + 1, paragraphs, page: page + 1, of: pages.length }));
+    });
+    return out;
+  }
+
+  function contractName(license: FuturePinballLicense): string {
+    return license.id === 'bam' ? t('Contrat de BAM') : t('Contrat de {game}', { game: FUTURE_PINBALL_NAME });
+  }
+
+  function showContract(): void {
+    host.openCustom(buildContract, 0);
+  }
+
+  function buildContract(): Built {
+    if (refusing) return buildRefusal();
+    const pages = contractPages();
+    const current = pages[Math.min(contractPage, pages.length - 1)]!;
+    const last = contractPage >= pages.length - 1;
+    const go = (to: number) => {
+      contractPage = to;
+      showContract();
+    };
+    const actions: Action[] = [];
+    if (!last) actions.push({ label: t('Page suivante'), detail: t('Lire la suite du contrat'), icon: 'chevron-right', key: 'contract:next', run: () => go(contractPage + 1) });
+    if (contractPage > 0) actions.push({ label: t('Page précédente'), icon: 'chevron-left', key: 'contract:previous', run: () => go(contractPage - 1) });
+    if (last)
+      actions.push({
+        label: t('J’accepte les deux contrats'),
+        detail: t('Extraire {game} et BAM dans le dossier de Cyber Pinball', { game: FUTURE_PINBALL_NAME }),
+        icon: 'check',
+        tone: 'ok',
+        key: 'contract:accept',
+        run: () => void extract_(),
+      });
+    actions.push({ label: t('Je refuse'), detail: t('Rien n’est installé'), icon: 'close', key: 'contract:refuse', run: () => ((refusing = true), showContract()) });
+    const rows: Row[] = current.paragraphs.flatMap((paragraph) => paragraph.split('\n').map((line) => ({ text: line.replace(/\t/g, ' ') })));
+    return {
+      heading: t('{contract} ({n} sur {count})', { contract: contractName(current.license), n: current.number, count: FUTURE_PINBALL_LICENSES.length }),
+      icon: 'rules',
+      subheading: [t('Page {n} sur {count}', { n: contractPage + 1, count: pages.length }), t('Texte d’origine, en anglais : {author}', { author: current.license.author })].join(' · '),
+      ...(contractPage === 0 ? { lead: t('Lis ces deux contrats en entier : {game} et BAM ne s’installent qu’avec ton accord à l’un et à l’autre.', { game: FUTURE_PINBALL_NAME }) } : {}),
+      sections: [{ rows }],
+      actions,
+      back: () => (contractPage > 0 ? go(contractPage - 1) : ((refusing = true), showContract())),
+    };
+  }
+
+  function buildRefusal(): Built {
+    return {
+      heading: t('Refuser les contrats ?'),
+      icon: 'rules',
+      lead: t('Sans ton accord aux deux contrats, {game} et BAM ne sont pas installés. Le fichier téléchargé reste dans le dossier des téléchargements de Cyber Pinball.', { game: FUTURE_PINBALL_NAME }),
+      sections: [],
+      actions: [
+        { label: t('Revoir les contrats'), icon: 'back', key: 'contract:review', run: () => ((refusing = false), showContract()) },
+        {
+          label: t('Ne pas installer'),
+          icon: 'close',
+          tone: 'error',
+          key: 'contract:decline',
+          run: () => {
+            downloaded = undefined;
+            refusing = false;
+            notice = t('{game} n’est pas installé : tu n’as pas accepté les contrats.', { game: FUTURE_PINBALL_NAME });
+            open();
+          },
+        },
+      ],
+      back: () => ((refusing = false), showContract()),
+    };
+  }
+
+  /** Après l'accord aux deux contrats : l'accord est gardé, puis les fichiers sont extraits et posés. */
+  async function extract_(): Promise<void> {
+    const root = host.root();
+    if (!root || !downloaded) return;
+    const files = downloaded;
+    let result: FuturePinballSetup | undefined;
+    await host.task(t('Installation de {game}…', { game: FUTURE_PINBALL_NAME }), async () => {
+      result = await extractManagedFuturePinball(root, files);
+    });
+    downloaded = undefined;
     if (result?.ok) {
       // Le joueur a voulu celui de Cyber Pinball : le dossier choisi autrefois à la main ne passe plus devant.
       writeFuturePinballConfig(host.dataDir(), undefined);
@@ -303,7 +401,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
         ? t('{game} et BAM sont installés dans {dir}. Les tables que tu ajoutes y sont rangées.', { game: FUTURE_PINBALL_NAME, dir: result.dir })
         : t('{game} est installé dans {dir}, mais BAM n’y est pas : les tables récentes en ont besoin.', { game: FUTURE_PINBALL_NAME, dir: result.dir });
     } else {
-      notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result?.reason ?? '?' }) + (result && !result.ok && result.log ? ' ' + t('Journal de l’installateur : {log}.', { log: result.log }) : '');
+      notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: result && !result.ok ? result.reason : '?' });
     }
     open();
   }

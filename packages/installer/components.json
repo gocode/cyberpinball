@@ -146,9 +146,26 @@
       "size": 47346211,
       "executablePattern": "^Future Pinball\\.exe$",
       "executable": "Future Pinball.exe",
-      "installArguments": ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/NOICONS"],
-      "license": "Future Pinball (Chris Leathley, version 1.9.1.20101231, 2010) : gratuit à télécharger et à utiliser d'après son site, sans clause de redistribution. BAM (Ravarcade) : « Freeware » d'après son site, sans clause de redistribution. Cyber Pinball ne les livre ni ne les héberge : l'installateur « 2-en-1 » est téléchargé chez l'auteur de BAM à la demande du joueur, son empreinte vérifiée, puis installé sans fenêtre dans emulators/futurepinball. Le lien officiel de Future Pinball (members.iinet.net.au) ne résout plus (constaté le 24/11/2026) : cet installateur est la seule source en ligne.",
+      "license": "Future Pinball (Chris Leathley, version 1.9.1.20101231, 2010) : contrat (EULA) propre, gratuit, copies fidèles et complètes avec le contrat, sans usage commercial, sans rétro-ingénierie. BAM (Rafal Janicki, Ravarcade) : freeware, usage personnel et commercial, fichiers inchangés et complets (BAM\\License.txt compris), jamais groupé avec le produit d'un autre auteur. Cyber Pinball ne les livre ni ne les héberge : l'installateur « 2-en-1 » est téléchargé chez l'auteur de BAM à la demande du joueur, son empreinte vérifiée, puis ses fichiers sont extraits sans modification dans emulators/futurepinball (innoextract : le mode silencieux de cet installateur ne passe pas sa page de licence), après que le joueur a lu et accepté les deux contrats en entier. Le lien officiel de Future Pinball (members.iinet.net.au) ne résout plus (constaté le 24/11/2026) : cet installateur est la seule source en ligne.",
       "source": "https://ravarcade.pl/download"
+    },
+    {
+      "id": "innoextract",
+      "kind": "tool",
+      "distribution": "on-demand",
+      "name": "innoextract",
+      "homepage": "https://constexpr.org/innoextract/",
+      "version": "1.9",
+      "channel": "stable",
+      "platform": "windows-x64",
+      "installDir": "tools/innoextract",
+      "url": "https://constexpr.org/innoextract/files/innoextract-1.9/innoextract-1.9-windows.zip",
+      "sha256": "6989342c9b026a00a72a38f23b62a8e6a22cc5de69805cf47d68ac2fec993065",
+      "size": 520705,
+      "executablePattern": "^innoextract\\.exe$",
+      "executable": "innoextract.exe",
+      "license": "zlib (innoextract, Daniel Scharrer) : redistribuable, avec ses licences jointes dans l'archive (Boost, liblzma, libstdc++). Téléchargé chez l'auteur à la demande du joueur, uniquement pour extraire l'installateur de Future Pinball et BAM : l'outil ne modifie pas ce qu'il lit.",
+      "source": "https://constexpr.org/innoextract/"
     },
     {
       "id": "kinect-sdk-1.8",

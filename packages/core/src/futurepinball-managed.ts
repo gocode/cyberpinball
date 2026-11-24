@@ -4,15 +4,20 @@
 // Cyber Pinball ne livre pas Future Pinball et ne l'héberge pas : le site de son auteur le dit gratuit à
 // télécharger et à utiliser, sans rien dire de sa redistribution, et BAM (« Freeware » chez son auteur)
 // pas davantage. Le jeu est donc téléchargé à la demande du joueur, chez l'auteur de BAM (installateur
-// « 2-en-1 » : Future Pinball et BAM), puis installé sans fenêtre dans le dossier géré (composant
-// « future-pinball » du manifeste de l'installateur, app/src/futurepinball-install.ts).
+// « 2-en-1 » : Future Pinball et BAM), puis ses fichiers en sont extraits sans modification dans le dossier
+// géré (composants « future-pinball » et « innoextract » du manifeste de l'installateur,
+// app/src/futurepinball-install.ts). L'installateur n'est pas exécuté : son mode silencieux ne passe pas sa
+// page de licence ; ses deux contrats (futurepinball-licenses.ts) sont montrés en entier au joueur, qui les
+// accepte avant l'extraction, et son accord est gardé à côté du jeu.
 //
-// Ici, ce qui ne touche ni au réseau ni à l'écran : l'emplacement, la ligne de commande de l'installateur,
-// le contrôle du résultat, et le plan de reprise des tables d'une installation existante (copie, jamais un
-// déplacement : l'ancienne installation n'est pas modifiée).
+// Ici, ce qui ne touche ni au réseau ni à l'écran : l'emplacement, la ligne de commande de l'extraction,
+// la pose des fichiers extraits, le contrôle du résultat, l'accord gardé, et le plan de reprise des tables
+// d'une installation existante (copie, jamais un déplacement : l'ancienne installation n'est pas modifiée).
 
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetryAsync } from './atomicwrite';
 import { layoutOf } from './locations';
 
 /** Dossier du jeu dans <racine>\emulators. */
@@ -24,11 +29,146 @@ export function managedFuturePinballDir(root: string): string {
 }
 
 /**
- * Ligne de commande de l'installateur (Inno Setup) : sans fenêtre, sans redémarrage, sans raccourcis,
- * dans le dossier géré, avec un journal à lire si le résultat n'est pas celui attendu.
+ * Ligne de commande d'innoextract (composant « innoextract ») : extrait tout l'installateur dans
+ * `staging` (le jeu sous app\, deux images de l'assistant sous tmp\), sans avertissement sur les
+ * fichiers inutilisés, sans barre de progression. Le mode silencieux de l'installateur lui-même
+ * ne passe pas sa page de licence (une page Pascal Script dont « Suivant » reste grisé tant que la
+ * case n'est pas cochée) : on n'exécute donc pas l'installateur, on en lit les fichiers.
  */
-export function futurePinballInstallerArgs(base: readonly string[], dir: string, log: string): string[] {
-  return [...base, `/DIR=${dir}`, `/LOG=${log}`];
+export function futurePinballExtractArgs(installer: string, staging: string): string[] {
+  return ['--extract', '--silent', '--no-warn-unused', '--output-dir', staging, installer];
+}
+
+/** Dossier du jeu dans ce que l'extraction écrit : <extraction>\app. */
+export const FUTURE_PINBALL_EXTRACTED_APP = 'app';
+
+/**
+ * Préférences que l'installateur de l'auteur écrit dans le registre (HKCU), relevées sur la borne le
+ * 24/11/2026 en l'observant : ce sont les valeurs d'une installation neuve. Écrites seulement si
+ * elles sont absentes, jamais par-dessus un réglage du joueur (futurepinball-registry.ts, app).
+ */
+export const FUTURE_PINBALL_DEFAULT_PREFERENCES: readonly { key: string; name: string; value: number }[] = [
+  { key: 'Software\\Future Pinball\\Editor', name: 'LoadImagesIntoEditor', value: 0 },
+  { key: 'Software\\Future Pinball\\Editor', name: 'NumberShapePoints', value: 0 },
+  { key: 'Software\\Future Pinball\\Editor', name: 'PolygonInfo', value: 0 },
+  { key: 'Software\\Future Pinball\\GamePlayer', name: 'BallDirt', value: 1 },
+  { key: 'Software\\Future Pinball\\GamePlayer', name: 'CpuAffinity', value: 0 },
+  { key: 'Software\\Future Pinball\\GamePlayer', name: 'ModelRenderQuality', value: 2 },
+];
+
+/**
+ * Dossiers de l'installation où un fichier déjà là est celui du joueur (ses tables, ses musiques, les
+ * réglages de BAM par table, la mémoire des tables) : l'extraction n'y écrase rien. Tout le reste est du
+ * programme, remplacé par la version de l'installateur (une réparation remet les fichiers d'origine).
+ */
+export const FUTURE_PINBALL_KEPT_FOLDERS: readonly string[] = ['Tables', 'Libraries', 'Music', 'Scripts', 'BAM/cfg', 'fpRAM'];
+
+export interface MovedFuturePinball {
+  /** Fichiers posés dans le dossier géré (nouveaux ou remplacés). */
+  placed: number;
+  /** Fichiers du joueur laissés tels quels (déjà là, dans un dossier à lui). */
+  kept: number;
+}
+
+function isKept(relative: string): boolean {
+  const normal = relative.split(path.sep).join('/').toLowerCase();
+  return FUTURE_PINBALL_KEPT_FOLDERS.some((folder) => normal.startsWith(`${folder.toLowerCase()}/`));
+}
+
+/**
+ * Pose le contenu extrait (`from`, le dossier app\ de l'extraction) dans le dossier géré (`to`) : un
+ * déplacement quand c'est possible (même volume), sinon une copie. Les fichiers du joueur ne sont pas
+ * écrasés (FUTURE_PINBALL_KEPT_FOLDERS). Lève une erreur au premier fichier impossible à poser (un
+ * exécutable que le jeu tient ouvert) : l'installation est alors à refaire, jamais à moitié annoncée réussie.
+ */
+export async function moveExtractedFuturePinball(from: string, to: string): Promise<MovedFuturePinball> {
+  const result: MovedFuturePinball = { placed: 0, kept: 0 };
+  for (const file of walk(from)) {
+    const relative = path.relative(from, file);
+    const target = path.join(to, relative);
+    if (isKept(relative) && fs.existsSync(target)) {
+      result.kept++;
+      continue;
+    }
+    await fs.promises.mkdir(path.dirname(target), { recursive: true });
+    try {
+      await fs.promises.rm(target, { force: true });
+      await renameWithRetryAsync(file, target);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+      await fs.promises.copyFile(file, target);
+      await fs.promises.rm(file, { force: true });
+    }
+    result.placed++;
+  }
+  return result;
+}
+
+/**
+ * Pages d'un contrat pour l'écran : les paragraphes dans l'ordre, jamais coupés, regroupés tant que la
+ * page ne dépasse pas `maxChars` (un paragraphe plus long que la limite a sa page à lui).
+ */
+export function licensePages(paragraphs: readonly string[], maxChars = 1500): string[][] {
+  const pages: string[][] = [];
+  let page: string[] = [];
+  let size = 0;
+  for (const paragraph of paragraphs) {
+    if (page.length && size + paragraph.length > maxChars) {
+      pages.push(page);
+      page = [];
+      size = 0;
+    }
+    page.push(paragraph);
+    size += paragraph.length;
+  }
+  if (page.length) pages.push(page);
+  return pages;
+}
+
+/** Fichier où l'accord du joueur est gardé, à côté du jeu. */
+export const FUTURE_PINBALL_LICENSE_RECORD = 'cyberpinball-licences.json';
+
+export interface FuturePinballLicenseAcceptance {
+  version: 1;
+  /** ISO 8601 : quand le joueur a dit oui. */
+  acceptedAt: string;
+  /** Installateur dont les contrats ont été montrés (SHA-256 et version du composant). */
+  installer: { sha256: string; version: string };
+  /** Les contrats montrés en entier et acceptés, avec l'empreinte de leur texte. */
+  licenses: { id: string; author: string; sha256: string }[];
+}
+
+/** Empreinte du texte d'un contrat (ses paragraphes joints par des sauts de ligne). */
+export function licenseTextHash(paragraphs: readonly string[]): string {
+  return crypto.createHash('sha256').update(paragraphs.join('\n'), 'utf8').digest('hex');
+}
+
+/** Garde l'accord du joueur dans le dossier géré (créé au besoin). Rend ce qui a été écrit. */
+export function recordFuturePinballLicensesAccepted(
+  dir: string,
+  installer: { sha256: string; version: string },
+  licenses: readonly { id: string; author: string; paragraphs: readonly string[] }[],
+  now: Date = new Date(),
+): FuturePinballLicenseAcceptance {
+  const record: FuturePinballLicenseAcceptance = {
+    version: 1,
+    acceptedAt: now.toISOString(),
+    installer,
+    licenses: licenses.map((l) => ({ id: l.id, author: l.author, sha256: licenseTextHash(l.paragraphs) })),
+  };
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, FUTURE_PINBALL_LICENSE_RECORD), JSON.stringify(record, null, 2) + '\n');
+  return record;
+}
+
+/** L'accord gardé, ou rien (absent, illisible). */
+export function readFuturePinballLicenseAcceptance(dir: string): FuturePinballLicenseAcceptance | undefined {
+  try {
+    const record = JSON.parse(fs.readFileSync(path.join(dir, FUTURE_PINBALL_LICENSE_RECORD), 'utf8').replace(/^﻿/, '')) as FuturePinballLicenseAcceptance;
+    return record?.version === 1 && typeof record.acceptedAt === 'string' ? record : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface ManagedFuturePinballCheck {

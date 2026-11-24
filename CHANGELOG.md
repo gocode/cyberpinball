@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Future Pinball : l'installation depuis Cyber Pinball ne passait pas (l'installateur de l'auteur s'arrête sur sa page de licence, même en mode silencieux). Il n'est plus lancé : Cyber Pinball télécharge le fichier chez l'auteur de BAM, vérifie son empreinte, te montre en entier les deux contrats (celui de Future Pinball et celui de BAM) et n'extrait les fichiers qu'après ton accord, gardé à côté du jeu. L'extraction se fait par innoextract, un petit outil libre téléchargé lui aussi à la demande, sans demande d'administrateur ; les fichiers sont posés sans modification, et tes tables, bibliothèques, musiques et scripts déjà présents ne sont jamais écrasés.
+- Future Pinball : cette installation n'a ni désinstalleur, ni raccourcis, ni association des fichiers .fpt : Cyber Pinball lance lui-même les tables, et supprimer le dossier de Future Pinball dans Cyber Pinball suffit à tout retirer. L'écran de demande le dit avant le téléchargement.
 - Choix du cadrage d'une table : pendant que VPX prépare l'aperçu, la vignette affiche "VPX génère le rendu…" avec un loader animé, au lieu d'un simple "Rendu par VPX…" qu'on prenait pour un titre. Les autres "Aperçu en route…" (images de jeu, propositions de médias) ont le même loader.
 - Point de vue d'une table : la vue que tu as réglée dans le menu de VPX est gardée quand un style, un POV importé ou le cadrage d'origine la remplace, et reste proposée sous "Ma vue personnalisée" pour y revenir sans la perdre.
 - Cadrage des tables : les trois formats sont renommés pour dire ce qu'ils font : "Plein cadre, bas rogné", "Table entière, bandes" et "Plein cadre, table élargie".

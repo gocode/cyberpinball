@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Future Pinball: installing it from Cyber Pinball did not work (the author's installer stops at its licence page, even in silent mode). It is no longer run: Cyber Pinball downloads the file from the author of BAM, checks its fingerprint, shows you both licences in full (Future Pinball's and BAM's) and only extracts the files once you accept, your acceptance being kept next to the game. Extraction uses innoextract, a small free tool also downloaded on demand, with no administrator prompt; files are placed unmodified, and the tables, libraries, music and scripts you already have are never overwritten.
+- Future Pinball: this installation has no uninstaller, no shortcuts and no .fpt file association: Cyber Pinball launches the tables itself, and deleting the Future Pinball folder inside Cyber Pinball removes everything. The prompt screen says so before the download.
 - Choosing a table's framing: while VPX prepares the preview, the thumbnail shows "VPX is rendering…" with an animated loader, instead of a plain "Rendered by VPX…" that looked like a title. The other "Preview on its way…" tiles (game images, media proposals) get the same loader.
 - A table's point of view: the view you set in the VPX menu is kept when a style, an imported POV or the original framing replaces it, and stays offered as "My custom view" so you can go back to it without losing it.
 - Table framing: the three formats are renamed to say what they do: "Full frame, bottom cropped", "Whole table, side bands" and "Full frame, table widened".
