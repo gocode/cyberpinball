@@ -20,7 +20,12 @@ import {
   correctTint,
   hexToRgb,
   hueDistance,
+  LED_PALETTE_CHROMA_MIN,
+  LED_PALETTE_MAX,
+  LED_PALETTE_SEPARATION,
+  measureLedPalette,
   measureTint,
+  recordLeds,
   NEUTRAL_TINT,
   oklchToHex,
   rgbToOklch,
@@ -33,6 +38,7 @@ import {
   TINT_LIGHTNESS,
   TINT_MAX_ALPHA_UNDER_TEXT,
   tintCacheFile,
+  tintRecord,
   type TableTint,
 } from '../tabletint';
 
@@ -361,6 +367,87 @@ test('menu : les points du DMD prennent d’abord la couleur du média de l’é
     await wait(60);
     assert.equal(tints.current()!.color, undefined);
     assert.equal(tints.current()!.dmd, tintOf(images.orange!).dmd);
+    tints.dispose();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 25/11/2026 : les LED de la roue prennent les couleurs du visuel de la table, pas une seule teinte.
+test('LED : les couleurs dominantes du visuel, de la plus présente à la moins présente, distinctes et franches', () => {
+  // Fronton à trois couleurs : moitié bleu, un tiers rouge, le reste jaune ; plus un peu de gris.
+  const img = image([
+    [[...hexToRgb('#1f4fe0'), 255], 0.45],
+    [[...hexToRgb('#d82020'), 255], 0.3],
+    [[...hexToRgb('#f0c020'), 255], 0.15],
+    [[128, 128, 128, 255], 0.1],
+  ]);
+  const leds = measureLedPalette([img]);
+  assert.equal(leds.length, 3, leds.join());
+  const hues = leds.map((h) => lch(h)[2]);
+  assert.ok(hueDistance(hues[0]!, lch('#1f4fe0')[2]) < 6, 'le bleu, le plus présent, d’abord');
+  assert.ok(hueDistance(hues[1]!, lch('#d82020')[2]) < 6, 'puis le rouge');
+  assert.ok(hueDistance(hues[2]!, lch('#f0c020')[2]) < 6, 'puis le jaune');
+  for (const hex of leds) assert.ok(lch(hex)[1] >= LED_PALETTE_CHROMA_MIN - 0.02, `${hex} franche`);
+  for (let i = 0; i < hues.length; i++) for (let j = i + 1; j < hues.length; j++) assert.ok(hueDistance(hues[i]!, hues[j]!) >= LED_PALETTE_SEPARATION / 2);
+  // Les nuances d'une même couleur ne font qu'une ; une trace infime ne compte pas ; jamais plus de LED_PALETTE_MAX.
+  assert.equal(measureLedPalette([image([[[...hexToRgb('#2050e0'), 255], 0.5], [[...hexToRgb('#3060f0'), 255], 0.49], [[...hexToRgb('#e02020'), 255], 0.01]])]).length, 1);
+  assert.ok(measureLedPalette([image(Array.from({ length: 8 }, (_, i) => [[...hexToRgb(oklchToHex(0.65, 0.18, i * 45)), 255] as Rgba, 1 / 8]))]).length <= LED_PALETTE_MAX);
+  // Gris, vide : aucune couleur (les LED gardent la couleur réglée).
+  assert.deepEqual(measureLedPalette([solid('#7a7f80')]), []);
+  assert.deepEqual(measureLedPalette([solid('#ff0000', 0)]), []);
+  // La teinte d'interface porte la palette ; la première couleur est de la même famille.
+  const tint = tintOf(img);
+  assert.deepEqual(tint.leds, leds);
+  assert.ok(hueDistance(lch(tint.leds![0]!)[2], tint.measured) < 10);
+});
+
+test('LED : une table toute verte n’a pas de teinte d’interface (vert signal), mais ses LED restent vertes', () => {
+  const green = [solid('#8be23a')];
+  assert.equal(tableTint(green), 'signal');
+  const record = tintRecord(green);
+  assert.equal('refused' in record && record.refused, 'signal');
+  assert.ok(hueDistance(lch(recordLeds(record)![0]!)[2], lch('#8be23a')[2]) < 8, 'vert gardé pour les LED');
+  assert.deepEqual(tintRecord([solid('#7a7f80')]), { refused: 'terne' }, 'un gris ne donne rien');
+});
+
+test('LED : la roue transmet les couleurs de la table, même refusée pour l’interface', async () => {
+  interface Tints {
+    follow(subject: { key: string; files: readonly string[] } | undefined): void;
+    current(): (Partial<TableTint> & { leds?: string[] }) | undefined;
+    dispose(): void;
+  }
+  type Converter = { mediaFrames(file: string): Promise<{ width: number; height: number; images: RgbaImage[] }> };
+  const { TableTints } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-tint.js')) as {
+    TableTints: new (opts: { dataDir: string; settleMs?: number; onChange(): void; converter(): Converter }) => Tints;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teintes-led-'));
+  try {
+    const at = (name: string) => {
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, name);
+      return file;
+    };
+    const images: Record<string, RgbaImage> = {
+      duo: image([[[...hexToRgb('#1f4fe0'), 255], 0.6], [[...hexToRgb('#d82020'), 255], 0.4]]),
+      vert: solid('#8be23a'),
+    };
+    const duo = at('duo-backglass.png');
+    const vert = at('vert-backglass.png');
+    const tints = new TableTints({
+      dataDir: dir,
+      settleMs: 10,
+      onChange() {},
+      converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
+    });
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    tints.follow({ key: 'duo', files: [duo] });
+    await wait(60);
+    assert.deepEqual(tints.current()!.leds, measureLedPalette([images.duo!]));
+    tints.follow({ key: 'vert', files: [vert] });
+    await wait(60);
+    assert.equal(tints.current()!.color, undefined, 'pas de teinte d’interface');
+    assert.deepEqual(tints.current()!.leds, measureLedPalette([images.vert!]), 'les LED gardent le vert');
     tints.dispose();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

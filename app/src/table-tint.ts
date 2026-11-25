@@ -17,7 +17,7 @@
 // attendre SETTLE_MS la décalait en plein atterrissage de la roue, et coûtait un envoi de plus).
 
 import * as path from 'node:path';
-import { cachedTint, mediaKind, storeTint, tableTint, tintCacheEntries, tintCacheFile, tintCacheKey, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
+import { cachedTint, mediaKind, recordLeds, storeTint, tintCacheEntries, tintCacheFile, tintCacheKey, tintRecord, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
 import type { Converter } from './media-convert';
 
 /** Attente après le dernier changement de table avant de chercher sa teinte. */
@@ -46,8 +46,14 @@ export interface TintSubject {
   dmdFiles?: readonly string[];
 }
 
-/** Teinte montrée : celle de l'ambiance (color absente : la sarcelle de la marque), et les points du DMD. */
+/** Teinte montrée : celle de l'ambiance (color absente : la sarcelle de la marque), les points du DMD, les couleurs des LED. */
 export type ShownTint = Partial<TableTint>;
+
+function shownTint(ambient: TableTint | undefined, dmd: string | undefined, leds: string[] | undefined): ShownTint | undefined {
+  if (!ambient && !dmd && !leds?.length) return undefined;
+  const { leds: _own, ...rest } = ambient ?? ({} as Partial<TableTint>);
+  return { ...rest, ...(dmd && { dmd }), ...(leds?.length && { leds }) };
+}
 
 export class TableTints {
   private readonly cacheFile: string;
@@ -135,12 +141,28 @@ export class TableTints {
   private async resolveSubject(subject: TintSubject, run: number): Promise<ShownTint | undefined> {
     const ambient = await this.resolve(subject.files, run);
     const dmd = (subject.dmdFiles?.length ? await this.resolve(subject.dmdFiles, run) : undefined)?.dmd ?? ambient?.dmd;
-    if (!ambient && !dmd) return undefined;
-    return { ...ambient, ...(dmd && { dmd }) };
+    return shownTint(ambient, dmd, this.ledsOf(subject.files));
+  }
+
+  /**
+   * Couleurs des LED des fichiers d'ambiance, d'après les mesures déjà faites (en mémoire) : celles du
+   * premier qui en a, jusqu'à celui qui donne la teinte. Un refus (table toute verte) garde les siennes.
+   */
+  private ledsOf(files: readonly string[]): string[] | undefined {
+    for (const file of files) {
+      const id = tintCacheKey(file);
+      if (!id) continue;
+      const record = this.memo.get(id);
+      if (!record) return undefined;
+      const leds = recordLeds(record);
+      if (leds?.length) return leds;
+      if ('tint' in record) return undefined;
+    }
+    return undefined;
   }
 
   private settle(tint: ShownTint | undefined): void {
-    const changed = this.shown?.color !== tint?.color || this.shown?.dmd !== tint?.dmd;
+    const changed = this.shown?.color !== tint?.color || this.shown?.dmd !== tint?.dmd || this.shown?.leds?.join() !== tint?.leds?.join();
     this.shown = tint;
     if (changed) this.opts.onChange();
   }
@@ -167,9 +189,7 @@ export class TableTints {
     if (ambient === UNKNOWN) return UNKNOWN;
     const dmdOwn = subject.dmdFiles?.length ? first(subject.dmdFiles) : undefined;
     if (dmdOwn === UNKNOWN) return UNKNOWN;
-    const dmd = dmdOwn?.dmd ?? ambient?.dmd;
-    if (!ambient && !dmd) return undefined;
-    return { ...ambient, ...(dmd && { dmd }) };
+    return shownTint(ambient, dmdOwn?.dmd ?? ambient?.dmd, this.ledsOf(subject.files));
   }
 
   /** Teinte du premier fichier qui en a une. */
@@ -197,8 +217,7 @@ export class TableTints {
     if (kind !== 'image' && kind !== 'video') return undefined;
     try {
       const got = await this.opts.converter().mediaFrames(file, kind === 'video' ? VIDEO_FRAME_TIMES : [0], SAMPLE_WIDTH);
-      const result = tableTint(got.images);
-      const record: TintRecord = typeof result === 'string' ? { refused: result } : { tint: result };
+      const record = tintRecord(got.images);
       this.memo.set(id, record);
       storeTint(this.cacheFile, file, record);
       return record;

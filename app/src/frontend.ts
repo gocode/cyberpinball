@@ -7912,6 +7912,8 @@ function ledContext() {
     ...(shown ? { tableKey: shown.file, index: state.index } : {}),
     ...(state.phase === 'library' && library.table() ? { ficheKey: library.table()! } : {}),
     ...(tints?.current()?.color ? { tint: tints.current()!.color! } : {}),
+    // Couleurs dominantes du visuel de la table (measureLedPalette) : les LED prennent celles du jeu.
+    ...(tints?.current()?.leds?.length ? { palette: tints.current()!.leds! } : {}),
   };
 }
 

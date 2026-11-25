@@ -85,6 +85,8 @@ export interface TableTint {
   hue: number;
   /** Teinte mesurée avant correction : différente quand elle a été écartée du vert signal. */
   measured: number;
+  /** Couleurs dominantes du visuel pour les LED (measureLedPalette), la plus présente d'abord. */
+  leds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -161,9 +163,31 @@ export const SIGNAL_HUE = rgbToOklch(...hexToRgb(SIGNAL_COLOR))[2];
  * de n'en voir aucune. Les pixels transparents (un logo détouré) ne comptent pas.
  */
 export function measureTint(images: readonly RgbaImage[]): TintMeasure | TintRefusal {
+  const votes = hueVotes(images);
+  if (!votes.visible) return 'vide';
+  const share = votes.voters.length / votes.visible;
+  if (share < MIN_COLOR_SHARE) return 'terne';
+  const smoothed = smoothBins(votes.bins);
+  let peak = 0;
+  for (let i = 1; i < smoothed.length; i++) if (smoothed[i]! > smoothed[peak]!) peak = i;
+  const around = peakMean(votes.voters, (peak + 0.5) * BIN_DEGREES);
+  if (!around) return 'terne';
+  const measure: TintMeasure = { hue: around.hue, chroma: around.chroma, share, dominance: around.weight / votes.total };
+  return measure.chroma < MIN_MEAN_CHROMA ? 'terne' : measure;
+}
+
+interface HueVoter {
+  h: number;
+  c: number;
+  w: number;
+}
+
+/** Votes des pixels colorés : histogramme des teintes pesé, et chaque votant (pour les moyennes). */
+function hueVotes(images: readonly RgbaImage[]): { bins: Float64Array; voters: HueVoter[]; visible: number; total: number } {
   const bins = new Float64Array(360 / BIN_DEGREES);
-  const voters: { h: number; c: number; w: number }[] = [];
+  const voters: HueVoter[] = [];
   let visible = 0;
+  let total = 0;
   for (const img of images) {
     const d = img.data;
     for (let i = 0; i + 3 < d.length; i += 4) {
@@ -174,32 +198,28 @@ export function measureTint(images: readonly RgbaImage[]): TintMeasure | TintRef
       // Une couleur franche pèse plus qu'une couleur passée ; un ton moyen plus qu'un ton extrême.
       const w = C * (1 - Math.abs(L - 0.62));
       voters.push({ h, c: C, w });
+      total += w;
       bins[Math.floor(h / BIN_DEGREES) % bins.length]! += w;
     }
   }
-  if (!visible) return 'vide';
-  const share = voters.length / visible;
-  if (share < MIN_COLOR_SHARE) return 'terne';
-  // Pic de l'histogramme lissé (chaque case avec ses deux voisines, en boucle).
+  return { bins, voters, visible, total };
+}
+
+/** Histogramme lissé : chaque case avec ses deux voisines, en boucle. */
+function smoothBins(bins: Float64Array): Float64Array {
   const n = bins.length;
-  let peak = 0;
-  let best = -1;
-  for (let i = 0; i < n; i++) {
-    const v = bins[(i + n - 1) % n]! + 2 * bins[i]! + bins[(i + 1) % n]!;
-    if (v > best) {
-      best = v;
-      peak = i;
-    }
-  }
-  const center = (peak + 0.5) * BIN_DEGREES;
-  // Moyenne circulaire des teintes autour du pic, pesée ; chroma moyenne des mêmes pixels.
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) out[i] = bins[(i + n - 1) % n]! + 2 * bins[i]! + bins[(i + 1) % n]!;
+  return out;
+}
+
+/** Moyenne circulaire des teintes à moins de PEAK_HALF_WIDTH du centre, pesée ; chroma moyenne des mêmes pixels. */
+function peakMean(voters: readonly HueVoter[], center: number): { hue: number; chroma: number; weight: number } | undefined {
   let x = 0;
   let y = 0;
   let weight = 0;
   let chroma = 0;
-  let total = 0;
   for (const v of voters) {
-    total += v.w;
     if (hueDistance(v.h, center) > PEAK_HALF_WIDTH) continue;
     const rad = (v.h * Math.PI) / 180;
     x += v.w * Math.cos(rad);
@@ -207,10 +227,51 @@ export function measureTint(images: readonly RgbaImage[]): TintMeasure | TintRef
     weight += v.w;
     chroma += v.w * v.c;
   }
-  if (!weight) return 'terne';
+  if (!weight) return undefined;
   const mean = (Math.atan2(y, x) * 180) / Math.PI;
-  const measure: TintMeasure = { hue: mean < 0 ? mean + 360 : mean, chroma: chroma / weight, share, dominance: weight / total };
-  return measure.chroma < MIN_MEAN_CHROMA ? 'terne' : measure;
+  return { hue: mean < 0 ? mean + 360 : mean, chroma: chroma / weight, weight };
+}
+
+/** Couleurs des LED d'une table : au plus quatre. */
+export const LED_PALETTE_MAX = 4;
+/** Écart minimal (degrés OKLCH) entre deux couleurs de la palette des LED. */
+export const LED_PALETTE_SEPARATION = 40;
+/** Une couleur secondaire n'entre dans la palette que si elle pèse au moins cette part de la principale. */
+export const LED_PALETTE_MIN_RATIO = 0.12;
+/** Clarté et chroma OKLCH des couleurs des LED : franches, une LED délavée paraît blanche. */
+export const LED_PALETTE_LIGHTNESS = 0.72;
+export const LED_PALETTE_CHROMA_MIN = 0.12;
+export const LED_PALETTE_CHROMA_MAX = 0.26;
+
+/**
+ * Couleurs dominantes d'un visuel pour les LED (#rrggbb), de la plus présente à la moins présente :
+ * les pics distincts de l'histogramme des teintes (au moins LED_PALETTE_SEPARATION degrés entre eux).
+ * Rien n'est écarté du vert signal (il ne concerne que l'interface) ; une image grise ou vide n'en donne
+ * aucune. Mêmes votes que measureTint : la première couleur a la teinte de la table.
+ */
+export function measureLedPalette(images: readonly RgbaImage[], max = LED_PALETTE_MAX): string[] {
+  const votes = hueVotes(images);
+  if (!votes.visible || votes.voters.length / votes.visible < MIN_COLOR_SHARE) return [];
+  const smoothed = smoothBins(votes.bins);
+  const reach = Math.ceil(LED_PALETTE_SEPARATION / BIN_DEGREES);
+  const colors: { hue: number; chroma: number; weight: number }[] = [];
+  let top = 0;
+  while (colors.length < max) {
+    let peak = -1;
+    for (let i = 0; i < smoothed.length; i++) if (smoothed[i]! > 0 && (peak < 0 || smoothed[i]! > smoothed[peak]!)) peak = i;
+    if (peak < 0) break;
+    const value = smoothed[peak]!;
+    if (!top) top = value;
+    if (value < top * LED_PALETTE_MIN_RATIO) break;
+    // Les cases voisines appartiennent à ce pic : elles ne font pas une autre couleur.
+    for (let k = -reach + 1; k < reach; k++) smoothed[(peak + k + smoothed.length) % smoothed.length] = 0;
+    const around = peakMean(votes.voters, (peak + 0.5) * BIN_DEGREES);
+    if (!around || around.chroma < MIN_PIXEL_CHROMA) continue;
+    if (colors.some((c) => hueDistance(c.hue, around.hue) < LED_PALETTE_SEPARATION / 2)) continue;
+    colors.push(around);
+  }
+  if (!colors.length || colors[0]!.chroma < MIN_MEAN_CHROMA) return [];
+  return colors.map((c) => oklchToHex(LED_PALETTE_LIGHTNESS, clamp(c.chroma * 1.4, LED_PALETTE_CHROMA_MIN, LED_PALETTE_CHROMA_MAX), c.hue));
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +303,27 @@ export function correctTint(measure: TintMeasure): TableTint | 'signal' {
 /** Teinte de la table d'après les images d'un média, ou la raison de n'en donner aucune. */
 export function tableTint(images: readonly RgbaImage[]): TableTint | TintRefusal {
   const measure = measureTint(images);
-  return typeof measure === 'string' ? measure : correctTint(measure);
+  if (typeof measure === 'string') return measure;
+  const tint = correctTint(measure);
+  if (tint === 'signal') return tint;
+  const leds = measureLedPalette(images);
+  return leds.length ? { ...tint, leds } : tint;
+}
+
+/**
+ * Mesure gardée d'un média : sa teinte, ou la raison d'en refuser une. Un refus peut garder les couleurs
+ * des LED : une table toute verte n'a pas de teinte d'interface (vert signal), mais ses LED restent vertes.
+ */
+export function tintRecord(images: readonly RgbaImage[]): TintRecord {
+  const result = tableTint(images);
+  if (typeof result !== 'string') return { tint: result };
+  const leds = result === 'vide' ? [] : measureLedPalette(images);
+  return leds.length ? { refused: result, leds } : { refused: result };
+}
+
+/** Couleurs des LED portées par une mesure gardée (teinte ou refus). */
+export function recordLeds(record: TintRecord): string[] | undefined {
+  return 'tint' in record ? record.tint.leds : record.leds;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +357,8 @@ export const TINT_MAX_ALPHA_UNDER_TEXT = 0.25;
 // Cache sur disque : une mesure par fichier de média
 
 /** Change quand la mesure ou les corrections changent : les teintes plus anciennes sont refaites. */
-export const TINT_CACHE_VERSION = 1;
+/** 2 : les couleurs des LED (leds) s'ajoutent à chaque mesure ; les anciennes sont refaites. */
+export const TINT_CACHE_VERSION = 2;
 
 /** <données>\cache\teintes-tables.json */
 export function tintCacheFile(dataDir: string): string {
@@ -284,7 +366,7 @@ export function tintCacheFile(dataDir: string): string {
 }
 
 /** Ce que le cache garde d'un média : sa teinte, ou la raison de n'en avoir aucune. */
-export type TintRecord = { tint: TableTint } | { refused: TintRefusal };
+export type TintRecord = { tint: TableTint } | { refused: TintRefusal; leds?: string[] };
 
 interface TintCacheFile {
   version: number;

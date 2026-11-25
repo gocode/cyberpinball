@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs: a much richer effect library prepares the next animations (33 looping effects in 12 families: breathing, waves, gradients, comets with trails, beams rising or falling, light packets crossing each other, twinkling, sparks, slow rainbows, fire, aurora, chasers; and 11 one-shot effects for game events).
+- LEDs: each table's colour is now measured as several dominant colours of its artwork (up to four), and an all-green table keeps green LEDs; each table's first measure is redone once.
 - NVIDIA 3D Vision glasses: a game launched in 3D that plays flat now says so on screen, over the game, with the reason ("3D Fix Manager is blocking 3D: close it" when it is open). Cyber Pinball tries to turn 3D on again for each game: closing 3D Fix Manager is enough, no need to restart Cyber Pinball.
 - DOF now works on original tables (without a ROM) that your DOF config knows, such as Space Cadet, Stranger Things, Matrix or City Hunter. VPX 10.8's DOF plugin only starts with a ROM, so these tables stayed dark even though the config had their line. Cyber Pinball now runs VPX's libdof separately during the game, with the table's B2S name, and passes it the script's events: every configtool effect, on all your hardware (Pinscape, LedWiz, LED strips…). On by default; the "DOF for original tables" switch in "LEDs and feedback (DOF)" turns it off. Tables with a ROM are unchanged.
 - Future Pinball: when a game starts, the log now says which sound output the game plays on (Future Pinball has no output choice: it follows the Windows default output), its level, and whether it is muted or at 0%. When the cabinet's "Sound" step targets another output, the log says so too.

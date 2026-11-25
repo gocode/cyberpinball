@@ -40,6 +40,8 @@ export interface LedAnimationContext {
   ficheKey?: string;
   /** Teinte de la table montrée (#rrggbb), mesurée et gardée par table-tint.ts. */
   tint?: string;
+  /** Couleurs dominantes du visuel de cette table pour les LED (#rrggbb, la plus présente d'abord). */
+  palette?: readonly string[];
 }
 
 export interface LedAnimationsOptions {

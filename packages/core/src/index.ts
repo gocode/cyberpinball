@@ -78,6 +78,7 @@ export * from './dof';
 export * from './dof-evenements';
 export * from './led-live';
 export * from './led-animations';
+export * from './led-effets';
 export * from './vpx-plugin-settings';
 export * from './puppack';
 export { emptyPlayedPlaylists, missingPackFiles } from './pupfiles';

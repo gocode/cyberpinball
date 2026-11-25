@@ -214,10 +214,12 @@ const ARRIVE_MS = 1200;
 const SPEED_FACTOR: Record<LedSpeed, number> = { slow: 0.55, normal: 1, fast: 1.8 };
 
 const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
-const smooth = (v: number) => {
+/** Lissage (smoothstep) : 0 sous 0, 1 au-delà de 1, une courbe en S entre les deux. Partagé avec led-effets.ts. */
+export function ledSmooth(v: number): number {
   const x = clamp01(v);
   return x * x * (3 - 2 * x);
-};
+}
+const smooth = ledSmooth;
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
 const mixRgb = (a: Rgb, b: Rgb, f: number): Rgb => [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f)];
 
@@ -230,8 +232,8 @@ export function ledHash(n: number): number {
   return (x >>> 0) / 4294967296;
 }
 
-/** Bruit doux : interpolation entre deux valeurs aléatoires voisines. */
-function softNoise(seed: number, x: number): number {
+/** Bruit doux : interpolation entre deux valeurs aléatoires voisines (0 à 1, continu en `x`). Partagé avec led-effets.ts. */
+export function ledSoftNoise(seed: number, x: number): number {
   const i = Math.floor(x);
   return lerp(ledHash(seed * 7919 + i), ledHash(seed * 7919 + i + 1), smooth(x - i));
 }
@@ -381,7 +383,7 @@ export class LedAmbientEngine {
         return [mixRgb(p.primary, p.secondary, 0.5 + 0.5 * Math.sin(2 * Math.PI * (x * 0.6 + s / 23))), 0.12 + 0.88 * smooth(wave)];
       }
       case 'embers': {
-        const heat = softNoise(k + 1, s * 0.9) * 0.6 + softNoise(k + 977, s * 2.3) * 0.4;
+        const heat = ledSoftNoise(k + 1, s * 0.9) * 0.6 + ledSoftNoise(k + 977, s * 2.3) * 0.4;
         return [mixRgb(p.primary, p.accent, smooth((heat - 0.35) * 2.2)), 0.1 + 0.9 * heat * heat];
       }
     }
