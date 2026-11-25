@@ -53,16 +53,23 @@ export function slowTestsFor(all, { complete, changed = [] }) {
   return complete ? slow : touchedTests(changed, slow, all);
 }
 
+/** Chemin d'une suite du train dont l'arbre est déjà certifié vert par une branche (scripts/publication-groupee.mjs). */
+export const SANS_TESTS_RAPIDES = 'sans-tests-rapides';
+
 /**
  * La vérification. Rend { ok, flaky: [...], failures: [...], problems?: [...] }.
  * `complete` : tous les tests lents (le train, ou avant une version finale) ; sinon ceux de la branche.
  * `train` : lancée par le train sur proto/ecrans : ni annonce dans la file, ni certificat.
+ * `testsRapides: false` : contrôles express sans les tests rapides (compilation, traductions, audit
+ * gardés), pour un arbre qu'une branche a déjà passé aux contrôles express complets (le train).
  */
-export async function runAvantFusion({ cwd = REPO, say = console.log, complete = false, train = false } = {}) {
+export async function runAvantFusion({ cwd = REPO, say = console.log, complete = false, train = false, testsRapides = true } = {}) {
   const dir = coordinationDir(cwd);
   const branche = currentBranch(cwd);
   const durations = complete ? 'durees.json' : 'durees-branche.json';
-  const expected = expectedSuiteMs(readDurations(dir, durations), complete ? undefined : DUREE_BRANCHE_DEFAUT_MS);
+  // Durées rangées par chemin : une suite sans tests rapides dure moitié moins (estimation à part).
+  const chemin = testsRapides ? undefined : { chemin: SANS_TESTS_RAPIDES };
+  const expected = expectedSuiteMs(readDurations(dir, durations), complete ? undefined : DUREE_BRANCHE_DEFAUT_MS, chemin);
   const note = (entry) => {
     if (!train) announce({ branche, ...entry }, dir);
   };
@@ -72,7 +79,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
   const tmp = path.join(cwd, 'tmp');
   fs.mkdirSync(tmp, { recursive: true });
 
-  say(complete ? `Suite complète de ${branche}.` : `Vérification de la branche ${branche} : contrôles express, puis les tests lents qu'elle touche.`);
+  say(complete ? `Suite complète de ${branche}${testsRapides ? '' : ' sans tests rapides (compilation, traductions, audit, puis tous les tests lents)'}.` : `Vérification de la branche ${branche} : contrôles express, puis les tests lents qu'elle touche.`);
   // Au plus SUITES_SIMULTANEES vérifications à la fois sur la machine, contrôles express compris :
   // trois ou quatre suites menées ensemble mettaient le processeur à 100 % (21/11/2026).
   const slots = suiteSlots(dir);
@@ -94,7 +101,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
   const started = Date.now();
   note({ etape: 'tests', finPrevue: iso(started + expected + DUREE_FUSION_MS) });
   try {
-    const controles = await runControles({ cwd, say });
+    const controles = await runControles({ cwd, say, tests: testsRapides });
     printControles(controles, say);
     if (!controles.ok) {
       leave();
@@ -106,7 +113,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
     let unreadable = [];
     if (!chosen.length) {
       say('Aucun test lent ne touche cette branche : le train passera la suite complète sur proto/ecrans avant la préversion.');
-      recordDuration(Date.now() - started, dir, durations);
+      recordDuration(Date.now() - started, dir, durations, chemin);
     } else {
       ensureElectron(cwd, say);
       say(`Tests lents : ${chosen.length} fichier(s)${complete ? '' : ` touché(s) par la branche (${chosen.map((c) => c.name.replace(/\.test\.m?js$/, '')).join(', ')})`}…`);
@@ -114,7 +121,7 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
       // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond.
       const first = await run(process.execPath, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...chosen.map((c) => path.relative(cwd, c.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
       if (first.timedOut) say(`Tests lents arrêtés au plafond${first.hung.length ? ` ; figés : ${first.hung.map((f) => path.basename(f)).join(', ')}` : ''}.`);
-      else recordDuration(Date.now() - started, dir, durations);
+      else recordDuration(Date.now() - started, dir, durations, chemin);
       t = totals(first.out);
       failing = first.code === 0 ? [] : [...new Set([...failedFiles(first.out), ...first.hung])];
       if (first.code !== 0 && !failing.length) failing = ['(sortie illisible : voir tmp/avant-fusion.txt)'];

@@ -52,11 +52,15 @@ export function publicTree(source) {
  * Prépare l'instantané de `source` au-dessus du dernier publié (sans parent avec
  * `newHistory`) et, sauf essai, l'envoie sur main. Renvoie son identifiant (celui du
  * dernier publié s'il n'y a rien de nouveau).
+ * `audited` : `source` a déjà passé le contrôle de publication sur un dossier propre (publier.mjs,
+ * qui a rendu le dossier principal au train avant l'envoi : il peut y avoir une fusion en cours).
  */
-export function snapshotAndPush({ message, source = 'HEAD', dryRun = false, newHistory = false } = {}) {
-  if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('des modifications ne sont pas enregistrées (git status) : l’instantané doit être celui d’un commit.');
-  const audit = auditRepository();
-  if (audit.problems.length) throw new Error(`le dépôt est public, à retirer d'abord :\n  ${audit.problems.join('\n  ')}`);
+export function snapshotAndPush({ message, source = 'HEAD', dryRun = false, newHistory = false, audited = false } = {}) {
+  if (!audited) {
+    if (git(['status', '--porcelain', '--untracked-files=no'])) throw new Error('des modifications ne sont pas enregistrées (git status) : l’instantané doit être celui d’un commit.');
+    const audit = auditRepository();
+    if (audit.problems.length) throw new Error(`le dépôt est public, à retirer d'abord :\n  ${audit.problems.join('\n  ')}`);
+  }
 
   const url = remoteUrl();
   console.log(`Dernier instantané publié : ${url} main`);

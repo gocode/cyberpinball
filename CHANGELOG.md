@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Les préversions sortent plus vite : un code déjà vérifié n'est plus testé deux fois, il n'est compilé qu'une fois par publication, et les changements suivants sont préparés pendant l'envoi de la préversion en cours. Tu reçois donc les correctifs plus tôt, avec les mêmes contrôles qu'avant.
 - LED (tables à ROM) : une table jamais lue passait pour une table sans ROM ; la partie prenait alors le port des LED pour les effets sans ROM, et DOF ne pouvait plus l'ouvrir (aucun effet de la ROM, bumpers non détectés). Le script de la table est maintenant lu une fois dans le fichier de la table, sans lancer VPX ; une table PinMAME reste une table à ROM même quand le nom de sa ROM n'est pas trouvé.
 - LED (tables sans ROM) : les bandes sont éteintes entre deux événements ; plus de lueur de fond permanente, et un flipper tenu ne garde plus le bas allumé.
 - LED (tables sans ROM) : la luminosité des effets en partie ne dépasse plus la luminosité maximale réglée pour les animations LED.

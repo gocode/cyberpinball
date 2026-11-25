@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Prereleases come out faster: code that was already checked is no longer tested twice, it is compiled only once per release, and the next changes are prepared while the current prerelease is being uploaded. You get fixes sooner, with the same checks as before.
 - LEDs (ROM tables): a table that had never been read was treated as a table without a ROM; the game then took the LED port for the no-ROM effects, and DOF could not open it (no ROM effects, bumpers not detected). The table's script is now read once from the table file, without launching VPX; a PinMAME table stays a ROM table even when its ROM name is not found.
 - LEDs (tables without a ROM): the strips are off between events; no more permanent background glow, and a held flipper no longer keeps the bottom lit.
 - LEDs (tables without a ROM): in-game effect brightness no longer goes above the maximum brightness set for LED animations.

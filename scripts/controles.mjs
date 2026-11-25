@@ -17,6 +17,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { forgetCompilation, recordCompilation } from './compilation-faite.mjs';
 import { coordinationDir, currentBranch, recordFlaky } from './coordination.mjs';
 import { failedFiles, failureDetails, shortReport, totals } from './sortie-tests.mjs';
 import { collectTests } from './verifier.mjs';
@@ -130,6 +131,8 @@ export async function runControles({ cwd = here, tests = true, say = console.log
   // La compilation dans l'ordre de npm run build (liens des espaces, puis sorties orphelines retirées
   // de dist\, puis tsc), tout du long ; traductions et audit, qui ne font que lire, pendant ce temps.
   const problems = [];
+  // Compilation notée une fois réussie : publier.mjs et fabriquer.mjs ne la refont pas (compilation-faite.mjs).
+  forgetCompilation(cwd);
   const compile = (async () => {
     const chain = [
       ['liens-espaces', [s('liens-espaces.mjs')], 'controles-liens.txt'],
@@ -157,6 +160,7 @@ export async function runControles({ cwd = here, tests = true, say = console.log
     if (code !== 0) problems.push({ etape, lignes: problemLines(out) });
   }
   const compiled = !problems.some((p) => p.etape === 'compilation');
+  if (!problems.some((p) => ['liens-espaces', 'sorties-orphelines', 'compilation'].includes(p.etape))) recordCompilation(cwd);
   if (tests && compiled) {
     const fast = collectTests(cwd).filter((t) => !t.slow);
     say(`Contrôles : ${fast.length} fichiers de tests rapides…`);

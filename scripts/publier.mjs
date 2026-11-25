@@ -5,6 +5,9 @@
 //                                            GitHub (dépôt public et dépôt du canal d'essai), nouveautés
 //                                            de changements/ rassemblées dans les CHANGELOG, commit
 //                                            « Version … » fait ici, puis publication
+//   ... --liberer (lancé par le train, avec un canal IPC) -> une fois le flux signé, le dossier principal
+//                                            est rendu au train, qui accepte d'abord le commit figé ;
+//                                            l'envoi sur GitHub part de copies des fichiers
 //   npm run publier -- --suivante <correctif|mineure|majeure|essai> -> de même, pour une autre sorte de version
 //                                            (version finale : manuels révisés d'abord, scripts/manuels-a-reviser.mjs)
 //   npm run publier                       -> release GitHub v<version> de package.json
@@ -49,6 +52,7 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +63,7 @@ import { lockBuild, zipProblems } from './paquet-application.mjs';
 import { describeRepository } from './decrire-github.mjs';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
+import { compileOnce } from './compilation-faite.mjs';
 import { frozenProblem } from './publication-figee.mjs';
 import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { toReview } from './manuels-a-reviser.mjs';
@@ -106,14 +111,20 @@ if (bump && bump !== 'essai' && !argv.includes('--manuels-non-revises')) {
 // (le 17/11/2026, deux publications simultanées ont fait chacune un commit « Version 0.1.14-essai.35 »,
 // la seconde n'étant arrêtée qu'à la fabrication). Il protège aussi release\ entre la fabrication et
 // l'envoi. Un verrou laissé par un processus disparu est repris.
+let releaseBuild;
 try {
-  lockBuild(release);
+  releaseBuild = lockBuild(release);
 } catch (error) {
   fail(error.message);
 }
 
 step('Compilation TypeScript');
-execFileSync(process.execPath, [path.join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '-b'], { cwd: repo, stdio: 'inherit' });
+// Déjà faite sur ces sources par les contrôles du train : pas refaite (compilation-faite.mjs).
+try {
+  compileOnce(repo);
+} catch (error) {
+  fail(error.message);
+}
 const update = require(path.join(repo, 'packages', 'core', 'dist', 'update.js'));
 const repository = /github\.com\/([^/]+\/[^/.]+)/.exec(pkg.repository?.url ?? '')?.[1];
 if (repository !== update.UPDATE_REPOSITORY) fail(`le dépôt de package.json (${repository}) n'est pas celui que lisent les bornes (${update.UPDATE_REPOSITORY}).`);
@@ -391,22 +402,61 @@ if (local) {
   process.exit(0);
 }
 
+// Le VPX corrigé (packages/vpx-corrige) est un binaire de VPX modifié : ses sources complètes doivent être publiées
+// (licences de VPX). Une release à part, faite une fois par version du correctif ; sans elle, rien ne part.
+// Avant de rendre le dossier principal : elle lit packages/core/dist et écrit build\vpx-corrige.
+if (!privateRepo) {
+  step('Sources du VPX corrigé (licences de VPX)');
+  const { ensureVpxCorrigeSources } = await import('./vpx-corrige-sources.mjs');
+  const sources = await ensureVpxCorrigeSources({ repository, token }).catch((error) => fail(`sources du VPX corrigé : ${error.message}`));
+  console.log(`Sources : ${sources}`);
+}
+
+// Description et sujets du dépôt, d'après package.json (lu avant de rendre le dossier principal).
+// Sans la permission « Administration », la release est faite quand même : seul ce point reste à
+// refaire (npm run decrire).
+if (!privateRepo) {
+  step('Description et sujets du dépôt');
+  await describeRepository().catch((error) => console.log(`Non appliqués : ${error.message}`));
+}
+
+// Fichiers envoyés dans la release.
+let files = reference ? [appPackage, feed] : [installer, ...(fs.existsSync(complete) ? [complete] : []), appPackage, feed];
+
+// --liberer (le train, scripts/publication-groupee.mjs) : le dossier principal lui est rendu avant
+// l'envoi, qui part de copies des fichiers et du commit figé ; le train fusionne et vérifie le lot
+// suivant pendant ce temps. Il contrôle d'abord que le commit figé est bien celui qu'il a vérifié
+// (plus le seul numéro de version) : sinon, rien ne part.
+let liberated = false;
+if (argv.includes('--liberer') && process.send) {
+  step('Dossier principal rendu au train (envoi depuis une copie)');
+  const staged = fs.mkdtempSync(path.join(os.tmpdir(), `cyberpinball-envoi-${version}-`));
+  process.once('exit', () => fs.rmSync(staged, { recursive: true, force: true }));
+  files = files.map((file) => {
+    const copy = path.join(staged, path.basename(file));
+    fs.copyFileSync(file, copy);
+    return copy;
+  });
+  const reply = await new Promise((resolve) => {
+    process.once('message', resolve);
+    process.once('disconnect', () => resolve(undefined));
+    process.send({ libere: true, frozen, version });
+  });
+  process.disconnect?.();
+  if (!reply?.continuer) fail(`le train refuse l'envoi : ${reply?.raison ?? 'pas de réponse'}.`);
+  releaseBuild?.();
+  liberated = true;
+  console.log(`Envoi de ${files.map((f) => path.basename(f)).join(', ')} depuis ${staged}.`);
+}
+
 let commit;
 if (privateRepo) {
   // Le code ne part pas sur le dépôt public : la release est posée sur la branche du dépôt privé.
   commit = (await api('GET', '')).json.default_branch;
 } else {
   step('Code sur GitHub (instantané, sans l’historique)');
-  commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}`, source: frozen });
-}
-
-// Le VPX corrigé (packages/vpx-corrige) est un binaire de VPX modifié : ses sources complètes doivent être publiées
-// (licences de VPX). Une release à part, faite une fois par version du correctif ; sans elle, rien ne part.
-if (!privateRepo) {
-  step('Sources du VPX corrigé (licences de VPX)');
-  const { ensureVpxCorrigeSources } = await import('./vpx-corrige-sources.mjs');
-  const sources = await ensureVpxCorrigeSources({ repository, token }).catch((error) => fail(`sources du VPX corrigé : ${error.message}`));
-  console.log(`Sources : ${sources}`);
+  // Rendu au train : il peut y avoir une fusion en cours ; le commit figé a passé le contrôle de publication.
+  commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}`, source: frozen, audited: liberated });
 }
 
 step(`Release v${version} sur github.com/${target}${privateRepo ? ' (essai privé)' : ''}`);
@@ -443,7 +493,6 @@ const created = await api('POST', '/releases', {
 });
 if (created.status !== 201) fail(`création de la release refusée (HTTP ${created.status}) : ${JSON.stringify(created.json)}`);
 const uploadBase = created.json.upload_url.replace(/\{.*\}$/, '');
-const files = reference ? [appPackage, feed] : [installer, ...(fs.existsSync(complete) ? [complete] : []), appPackage, feed];
 if (!prerelease) {
   const missing = DIRECT_DOWNLOADS.filter((name) => !files.some((file) => path.basename(file) === name));
   if (missing.length) fail(`la version finale ${version} n'aurait pas ${missing.join(', ')} : les liens de téléchargement direct des README mèneraient à une erreur. La release reste en brouillon.`);
@@ -491,11 +540,4 @@ if (argv.includes('--brouillon')) {
     if (problems.length) console.log(`Attention : téléchargement direct des README pas encore sur ${version} :\n  ${problems.join('\n  ')}`);
     else console.log(`Téléchargement direct des README : ${DIRECT_DOWNLOADS.join(' et ')} de la version ${version}.`);
   }
-}
-
-// Description et sujets du dépôt, d'après package.json. Sans la permission « Administration »,
-// la release est faite quand même : seul ce point reste à refaire (npm run decrire).
-if (!privateRepo) {
-  step('Description et sujets du dépôt');
-  await describeRepository().catch((error) => console.log(`Non appliqués : ${error.message}`));
 }

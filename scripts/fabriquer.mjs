@@ -27,6 +27,7 @@ import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compileOnce } from './compilation-faite.mjs';
 import { builtApart, lockBuild, stageProblems } from './paquet-application.mjs';
 import { sign, signAll, signatureConfigured } from './signature.mjs';
 
@@ -54,7 +55,13 @@ try {
 }
 
 step('Compilation TypeScript');
-execFileSync(process.execPath, [path.join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '-b'], { cwd: repo, stdio: 'inherit' });
+// Déjà faite sur ces sources (contrôles du train, puis publier.mjs) : pas refaite (compilation-faite.mjs).
+try {
+  compileOnce(repo);
+} catch (error) {
+  console.error(`Fabrication arrêtée : ${error.message}`);
+  process.exit(1);
+}
 // Copie de dossiers sûre avec les chemins accentués (packages/core/src/copytree.ts) : ce script
 // tourne sous Node 22, dont fs.cpSync les abîme sous Windows.
 const { copyTree } = require(path.join(repo, 'packages', 'core', 'dist', 'copytree.js'));

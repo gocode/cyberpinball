@@ -83,7 +83,10 @@ test('verifier : la suite rapide et test:electron se partagent tous les tests, l
   // Train de fusion (23/11/2026) : la suite lente complète une fois par préversion, sur proto/ecrans,
   // avant la publication ; jamais une préversion sans elle.
   const train = read('publication-groupee.mjs');
-  assert.match(train, /runAvantFusion\(\{ cwd: main, say, complete: true, train: true \}\)[\s\S]*publish\(main, args/, 'la suite complète avant la publication');
+  // Arbre déjà certifié (25/11/2026) : sans tests rapides, mais toujours compilation et tests lents.
+  // Le comportement est fixé dans scripts/train.test.mjs (jamais de publication d'un commit non vérifié).
+  assert.match(train, /deps\.verify \?\? \(async \(options\) => \(await import\('\.\/avant-fusion\.mjs'\)\)\.runAvantFusion\(options\)\)/, 'la vérification du train est runAvantFusion');
+  assert.match(train, /await verify\(\{ cwd: main, say, complete: true, train: true, testsRapides: !certified \}\)[\s\S]*publish\(main, args/, 'la suite complète avant la publication');
   assert.match(train, /if \(!result\.ok\) \{[\s\S]*return 1;/, 'suite rouge : pas de préversion');
 });
 

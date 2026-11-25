@@ -161,11 +161,36 @@ export function withdraw(branche, dir = coordinationDir()) {
 
 // ---------------------------------------------------------------- durées des suites complètes
 
-/** Médiane des dernières durées mesurées (ms), sinon la valeur par défaut. */
-export function expectedSuiteMs(durations, fallback = DUREE_SUITE_DEFAUT_MS) {
-  const last = durations.slice(-10).map((d) => d.ms).filter((ms) => ms > 0).sort((a, b) => a - b);
-  if (!last.length) return fallback;
-  return last[Math.floor(last.length / 2)];
+/** Part d'une suite complète que prend une suite sans tests rapides, tant qu'aucune n'a été mesurée. */
+export const PART_SANS_TESTS_RAPIDES = 0.45;
+/** Durée prévue d'une publication (fabrication et envoi) tant qu'aucune n'a été mesurée. */
+export const DUREE_PUBLICATION_DEFAUT_MS = 10 * 60_000;
+
+const median = (values) => {
+  const sorted = values.filter((v) => v > 0).sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.floor(sorted.length / 2)] : undefined;
+};
+
+/**
+ * Médiane des dernières durées de suite mesurées (ms), sinon la valeur par défaut.
+ * `chemin` : la suite sans tests rapides du train (arbre déjà certifié) a ses propres mesures ; sans
+ * mesure, une part de la suite complète. Les mesures de publication (`type`) sont ignorées ici.
+ */
+export function expectedSuiteMs(durations, fallback = DUREE_SUITE_DEFAUT_MS, { chemin } = {}) {
+  const suites = durations.filter((d) => !d.type && (d.chemin ?? undefined) === (chemin ?? undefined));
+  const found = median(suites.slice(-10).map((d) => d.ms));
+  if (found) return found;
+  return chemin ? Math.round(PART_SANS_TESTS_RAPIDES * expectedSuiteMs(durations, fallback)) : fallback;
+}
+
+/**
+ * Durées prévues d'une publication, d'après les dernières mesurées (scripts/publication-groupee.mjs) :
+ * `libereMs` jusqu'à la libération du dossier principal, `totalMs` jusqu'à la préversion en ligne.
+ */
+export function expectedPublicationMs(durations) {
+  const last = durations.filter((d) => d.type === 'publication').slice(-10);
+  const totalMs = median(last.map((d) => d.totalMs)) ?? DUREE_PUBLICATION_DEFAUT_MS;
+  return { totalMs, libereMs: Math.min(totalMs, median(last.map((d) => d.libereMs)) ?? totalMs) };
 }
 
 /** `name` : durees.json (suites complètes, celles du train) ou durees-branche.json (vérifications de branche). */
@@ -173,10 +198,36 @@ export function readDurations(dir = coordinationDir(), name = 'durees.json') {
   return readJson(path.join(dir, name), []);
 }
 
-export function recordDuration(ms, dir = coordinationDir(), name = 'durees.json') {
+/** Les 30 dernières mesures de chaque sorte (suite complète, suite sans tests rapides, publication). */
+function keepRecent(list, per = 30) {
+  const kind = (d) => d.type ?? d.chemin ?? 'suite';
+  const counts = new Map();
+  const kept = [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const k = kind(list[i]);
+    const n = counts.get(k) ?? 0;
+    if (n >= per) continue;
+    counts.set(k, n + 1);
+    kept.unshift(list[i]);
+  }
+  return kept;
+}
+
+/** `extra` : précisions rangées avec la mesure (chemin de la suite…). */
+export function recordDuration(ms, dir = coordinationDir(), name = 'durees.json', extra = {}) {
   const list = readDurations(dir, name);
-  list.push({ ms, date: new Date().toISOString() });
-  writeJson(path.join(dir, name), list.slice(-30));
+  list.push({ ms, ...extra, date: new Date().toISOString() });
+  writeJson(path.join(dir, name), keepRecent(list));
+}
+
+/**
+ * Mesure d'une publication : durée totale, durée jusqu'à la libération du dossier principal, et celle
+ * de chaque étape. Sans champ `ms` : les lecteurs des suites (même anciens) ne la comptent pas.
+ */
+export function recordPublication(entry, dir = coordinationDir(), name = 'durees.json') {
+  const list = readDurations(dir, name);
+  list.push({ type: 'publication', ...entry, date: new Date().toISOString() });
+  writeJson(path.join(dir, name), keepRecent(list));
 }
 
 // ---------------------------------------------------------------- dossier principal

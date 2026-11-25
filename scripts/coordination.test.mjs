@@ -5,8 +5,13 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, expectedSuiteMs, imminent, liveEntries, readJson, tryLock, writeJson } from './coordination.mjs';
-import { ATTENTE_MAX_MS, dropMerge, enqueueMerge, pickSuspects, publicationPlan, publicationRetry, readMergeQueue, trainStatus, worthWaiting } from './publication-groupee.mjs';
+import {
+  DUREE_PUBLICATION_DEFAUT_MS, DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, PART_SANS_TESTS_RAPIDES, expectedPublicationMs, expectedSuiteMs, imminent, liveEntries, readDurations, readJson,
+  recordDuration, recordPublication, tryLock, writeJson,
+} from './coordination.mjs';
+import {
+  ATTENTE_MAX_MS, dropMerge, enqueueMerge, pickSuspects, publicationPlan, publicationRetry, publicationSteps, readMergeQueue, stepsSummary, trainStatus, worthWaiting,
+} from './publication-groupee.mjs';
 import { failedFiles, failureDetails, totals } from './sortie-tests.mjs';
 import { problemLines } from './controles.mjs';
 
@@ -61,6 +66,40 @@ test('reprise : seulement une préversion effectivement préparée, jamais une f
 test('durée prévue d’une suite : médiane des dernières mesures, sinon la valeur par défaut', () => {
   assert.equal(expectedSuiteMs([]), DUREE_SUITE_DEFAUT_MS);
   assert.equal(expectedSuiteMs([{ ms: 300_000 }, { ms: 900_000 }, { ms: 400_000 }]), 400_000);
+});
+
+test('durées prévues selon le chemin du train : sans tests rapides à part, publications à part', () => {
+  const sans = { chemin: 'sans-tests-rapides' };
+  const suites = [{ ms: 600_000 }, { ms: 800_000 }, { ms: 700_000 }];
+  // Pas encore de mesure sans tests rapides : une part de la suite complète.
+  assert.equal(expectedSuiteMs(suites, undefined, sans), Math.round(PART_SANS_TESTS_RAPIDES * 700_000));
+  const all = [...suites, { ms: 200_000, chemin: 'sans-tests-rapides' }, { ms: 300_000, chemin: 'sans-tests-rapides' }, { type: 'publication', totalMs: 400_000, libereMs: 250_000 }];
+  assert.equal(expectedSuiteMs(all), 700_000, 'la suite complète ne compte ni les suites sans tests rapides ni les publications');
+  assert.equal(expectedSuiteMs(all, undefined, sans), 300_000);
+  assert.deepEqual(expectedPublicationMs(all), { totalMs: 400_000, libereMs: 250_000 });
+  assert.deepEqual(expectedPublicationMs([]), { totalMs: DUREE_PUBLICATION_DEFAUT_MS, libereMs: DUREE_PUBLICATION_DEFAUT_MS });
+  // Chaque sorte garde ses 30 dernières mesures : les publications ne chassent pas les suites.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-durees-'));
+  try {
+    for (let i = 0; i < 5; i++) recordDuration(100_000 + i, dir);
+    for (let i = 0; i < 40; i++) recordPublication({ version: `0.0.${i}`, totalMs: 1000, libereMs: 500, etapes: [] }, dir);
+    const kept = readDurations(dir);
+    assert.equal(kept.filter((d) => d.type === 'publication').length, 30);
+    assert.deepEqual(kept.filter((d) => !d.type).map((d) => d.ms), [100_000, 100_001, 100_002, 100_003, 100_004]);
+    assert.ok(kept.every((d) => d.type !== 'publication' || d.ms === undefined), 'une publication n’a pas de champ ms (anciens lecteurs)');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('étapes de publication horodatées, et leur durée', () => {
+  const steps = publicationSteps();
+  assert.equal(steps.line('texte ordinaire', 0), 'texte ordinaire');
+  assert.match(steps.line('> Compilation TypeScript', 1_000), /^\[\d{2}:\d{2}:\d{2}\] > Compilation TypeScript$/);
+  steps.line('> Fabrication de l’application seule (sans electron-builder ni installeurs)', 3_000);
+  steps.line('> Flux signé', 93_000);
+  assert.deepEqual(steps.end(95_000), [{ etape: 'Compilation TypeScript', ms: 2_000 }, { etape: 'Fabrication de l’application seule (sans electron-builder ni installeurs)', ms: 90_000 }, { etape: 'Flux signé', ms: 2_000 }]);
+  assert.equal(stepsSummary({ etapes: steps.end(95_000), totalMs: 200_000, libereMs: 95_000 }), 'Compilation TypeScript 2 s, Fabrication de l’application seule 1 min 30 s, Flux signé 2 s ; total 3 min 20 s, dossier principal rendu après 1 min 35 s');
 });
 
 test('verrou : exclusif tant que son processus vit, repris quand il a disparu', () => {
