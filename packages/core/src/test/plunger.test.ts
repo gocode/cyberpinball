@@ -216,6 +216,28 @@ test('position vue par VPX : zone morte, inversion, et tir', () => {
   assert.equal(busy.last?.strength, 0.8);
 });
 
+test('tir : le rebond du ressort ne remplace pas le lâcher', () => {
+  const play = (w: ShotWatch, readings: readonly (readonly [number, number])[]) => {
+    for (const [at, p] of readings) w = watchShot(w, p, at);
+    return w;
+  };
+  // Tiré à fond, lâché (retour au repos), rebond à 30 % puis un second à 12 % : le tir reste à 100 %.
+  const release = [[0, 0], [400, 0.6], [450, 1], [800, 1], [808, 0.5], [816, 0.02]] as const;
+  const bounces = [[824, 0.05], [832, 0.25], [840, 0.3], [848, 0.15], [856, 0.02], [920, 0.12], [940, 0.02], [1000, 0]] as const;
+  let w = play({ recent: [] }, release);
+  assert.equal(w.last?.strength, 1);
+  w = play(w, bounces);
+  assert.equal(w.last?.strength, 1);
+  // Un nouveau tir, plus tard : il compte, même plus faible.
+  w = play(w, [[2000, 0], [2400, 0.5], [2800, 0.5], [2810, 0.02]]);
+  assert.equal(w.last?.strength, 0.5);
+  // Un second lâcher plus fort juste après le premier n'est pas un rebond (un rebond ne dépasse pas son tir).
+  const again = play(play({ recent: [] }, [[0, 0.5], [10, 0.02]]), [[100, 0.9], [110, 0.02]]);
+  assert.equal(again.last?.strength, 0.9);
+  // Un lâcher sans rebond, puis plus rien : inchangé.
+  assert.equal(play({ recent: [] }, [[0, 0.7], [20, 0.01], [500, 0]]).last?.strength, 0.7);
+});
+
 test('repos loin de 0 : signalé, VPX n’a pas de décalage', () => {
   assert.equal(restProblem(0.05), undefined);
   assert.match(restProblem(-0.98)!, /-98 %/);

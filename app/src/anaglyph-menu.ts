@@ -62,6 +62,8 @@ export interface AnaglyphMenuContext {
   stereo(wanted: boolean): Promise<StereoChange>;
   /** Le journal de VPX de la version jouée (vpinball.log), pour le bilan d'une partie en 3D Vision. */
   vpxLog(): string | undefined;
+  /** Une partie en relief NVIDIA qui se jouera à plat : sa raison dite au joueur, par-dessus VPX (annonce stereo-flat). */
+  flatNotice(issue: { id: string; title: string }): void;
 }
 
 /** Place de « Calibrer les lunettes » dans les réglages (après Activer, le type et les couleurs des verres). */
@@ -347,8 +349,9 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
       await ctx.refreshNvidia();
       let facts = ctx.nvidia(false, inis);
       // Rien d'autre ne manque et la stéréo globale est coupée (au démarrage du PC, ou par Cyber Pinball après
-      // la partie précédente) : activée pour cette partie, coupée après (restoreGame).
-      if (facts.nvapi && facts.stereo === false && !nvidia3dVisionIssues(facts).length) {
+      // la partie précédente) : activée pour cette partie, coupée après (restoreGame). Un refus à la partie
+      // précédente n'empêche pas d'essayer encore : 3D Fix Manager a pu être fermé depuis (PinCab, 25/11/2026).
+      if (facts.nvapi && facts.stereo === false && !nvidia3dVisionIssues({ ...facts, stereoRefused: false }).length) {
         const change = await ctx.stereo(true);
         console.log(
           change.after
@@ -360,6 +363,8 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
       const issues = nvidia3dVisionIssues(facts);
       if (issues.length) {
         console.log(`Lunettes 3D : NVIDIA 3D Vision choisie, mais ${issues.map((i) => i.id).join(', ')} ; partie à plat.`); // i18n-ignore : journal
+        // Sans cela, le joueur ne voit qu'une table sans relief, et la raison n'est que dans le journal.
+        ctx.flatNotice(issues[0]!);
         return undefined;
       }
       const unchecked = nvidia3dVisionUnchecked(facts);

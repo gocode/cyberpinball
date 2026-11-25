@@ -296,6 +296,7 @@ import { cleanupImportStaging } from './import-cleanup';
 import { importLinksRows } from './import-links-menu';
 import { importSpaceSection, importSpaceShort } from './import-space-menu';
 import { createDofMenu } from './dof-menu';
+import { loadEventSettings, saveEventSettings } from './dof-evenements-jeu';
 import { buildVpxChoice, createOtherVpxMenu, createPlanVpx, otherVpxLimitsText, playedWithText, vpxChoiceCursor } from './autres-vpx-menu';
 import { createHardwareDmdMenu } from './hardware-dmd-menu';
 import { applyMenuDmdServer, dmdServerProblem, dmdServerReady, onDmdServerState } from './dmd-server';
@@ -1757,6 +1758,7 @@ export function createLibrary(host: LibraryHost) {
     usb: () => usbDevices(),
     hidNames: () => cabinetJoystickHids(loadCabinet(host.dataDir)),
     backupDir: () => backupDir(host.dataDir),
+    events: { get: () => loadEventSettings(host.dataDir), set: (s) => saveEventSettings(host.dataDir, s) },
     stagingDir: dofStaging,
     unpack: (file, dest) => unpackArchive(file, dest),
     browse: (url, received) =>
@@ -1774,6 +1776,8 @@ export function createLibrary(host: LibraryHost) {
           },
         },
       }),
+    leds: host.leds,
+    ...(host.ledAnimations ? { ledAnimations: host.ledAnimations } : {}),
     changed: () => void health.refresh(),
   });
   provideSystemItem('dof', dofMenu.item);

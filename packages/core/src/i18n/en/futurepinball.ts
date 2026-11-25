@@ -115,6 +115,8 @@ export const messages: Record<string, string> = {
     'Downloaded from its author ({size}) into the Cyber Pinball folder; your current installation stays untouched',
   'Téléchargé chez l’auteur de BAM ({size}), installé dans le dossier de Cyber Pinball': 'Downloaded from the author of BAM ({size}), installed in the Cyber Pinball folder',
   'Reprendre les tables de l’ancienne installation…': 'Take over the tables of the old installation…',
+  'Reprendre les tables et les vues de BAM de l’ancienne installation…': 'Take over the tables and BAM views of the old installation…',
+  ' · les vues par défaut que BAM a créées sont remplacées (gardées à côté, en « .avant-reprise »)': ' · the default views BAM created are replaced (kept beside them, as ".avant-reprise")',
   '{files} fichiers ({size}) de {from} copiés dans {to} ; l’ancienne installation n’est pas modifiée':
     '{files} files ({size}) from {from} copied into {to}; the old installation isn’t modified',
   'Installé par Cyber Pinball': 'Installed by Cyber Pinball',

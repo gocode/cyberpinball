@@ -266,7 +266,17 @@ export interface ShotWatch {
   recent: [number, number][];
   /** Dernier tir : force de 0 à 1 (le recul au moment du lâcher), et son instant. */
   last?: { strength: number; at: number };
+  /**
+   * Jusqu'à cet instant (ms), un retour au repos après un recul plus faible que le dernier tir est
+   * le rebond du ressort, pas un nouveau tir. Prolongé à chaque rebond écarté.
+   */
+  bounceUntil?: number;
 }
+
+/** Durée pendant laquelle le lanceur rebondit après un lâcher (VPX : le second aller-retour vient environ 100 ms après le premier). */
+export const SHOT_REBOUND_MS = 400;
+/** Recul de plus que le dernier tir à partir duquel un retour au repos, même tout de suite après, est un nouveau tir. */
+const SHOT_REBOUND_MARGIN = 0.1;
 
 export function watchShot(watch: ShotWatch, position: number, now: number): ShotWatch {
   // La lecture précédente compte toujours : un processus occupé peut espacer deux lectures de
@@ -275,8 +285,15 @@ export function watchShot(watch: ShotWatch, position: number, now: number): Shot
   const recent = [...watch.recent.filter(([at]) => now - at <= 100), [now, position] as [number, number]];
   if (previous && !recent.includes(previous)) recent.unshift(previous);
   const apex = Math.max(...recent.map(([, p]) => p));
-  if (apex >= 0.2 && position <= 0.05) return { recent: [], last: { strength: Math.min(1, apex), at: now } };
-  return { recent, last: watch.last };
+  if (apex >= 0.2 && position <= 0.05) {
+    // Un lanceur à ressort rebondit après le lâcher (de 20 à 30 % de sa course) : ce rebond remonte
+    // puis retombe au repos comme un tir, et ne doit pas remplacer le vrai lâcher (novembre 2026,
+    // rapports de joueurs : « tiré à 100 %, force de 20 à 30 % »).
+    const rebound = watch.last && watch.bounceUntil !== undefined && now <= watch.bounceUntil && apex < watch.last.strength + SHOT_REBOUND_MARGIN;
+    if (rebound) return { recent: [], last: watch.last, bounceUntil: now + SHOT_REBOUND_MS };
+    return { recent: [], last: { strength: Math.min(1, apex), at: now }, bounceUntil: now + SHOT_REBOUND_MS };
+  }
+  return { recent, last: watch.last, ...(watch.bounceUntil !== undefined && { bounceUntil: watch.bounceUntil }) };
 }
 
 // ---------------------------------------------------------------------------

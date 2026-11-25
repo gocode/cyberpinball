@@ -60,6 +60,24 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Animations des LED hors partie (25/11/2026) : « Groupes » (0.1.14) sort de la liste pour la garder
+    // à 24. Date à poser au jour de la version finale.
+    id: 'animations-led',
+    date: '2026-11-25',
+    version: '0.2.4',
+    get title() { return t('Animations des LED'); },
+    get detail() { return t('Tes LED adressables s’animent aux couleurs de la table choisie, et se taisent quand une partie démarre.'); },
+    get more() {
+      return [
+        t('Dans les écrans de la borne et à la roue, tes bandes de LED adressables montrent une ambiance douce, aux couleurs de la table choisie. Chaque changement de table lance un balayage dans le sens du défilement, et l’ouverture d’une fiche une pulsation.'),
+        t('Style, luminosité maximale, vitesse, couleurs, extinction après inactivité : tout se règle. Dès qu’une partie se prépare, les LED sont rendues à DOF.'),
+      ];
+    },
+    get where() { return t('Menu système › Ma borne › DMD et LED › LED et retours (DOF) › Animations des LED'); },
+    reach: { kind: 'system', id: 'dof' },
+    noPreview: 'Une animation de LED se voit sur les bandes de la borne, pas à l’écran : aucune capture ne la montre sans matériel réel.', // i18n-ignore : raison interne, jamais affichée
+  },
+  {
     // Recherche dans le Menu système (24/11/2026) ; « La Communauté » (0.1.11) sort de la liste pour
     // la garder à 24. Date à poser au jour de la version finale.
     id: 'recherche-menu',
@@ -410,21 +428,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Parties en direct'); },
     reach: { kind: 'community', door: 'instant' },
-  },
-  {
-    id: 'groupes',
-    date: '2026-11-17',
-    version: '0.1.14',
-    get title() { return t('Groupes'); },
-    get detail() { return t('Tes cercles, publics ou privés : une discussion et une table de la semaine, avec son classement.'); },
-    get more() {
-      return [
-        t('Crée un groupe avec tes amis : privé, il ne paraît nulle part et l’on y entre sur invitation ; public, n’importe quel joueur le rejoint d’un appui. Chaque semaine, une table choisie pour tous : Start la lance, et le classement du groupe se remplit tout seul.'),
-        t('Chaque membre peut inviter ses amis. Tout passe d’une borne à l’autre, sans serveur : un membre absent reçoit les messages à son retour.'),
-      ];
-    },
-    get where() { return t('Communauté › Groupes'); },
-    reach: { kind: 'community', door: 'groups' },
   },
   {
     id: 'pinball-fx',

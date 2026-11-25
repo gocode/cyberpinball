@@ -2,6 +2,11 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties en direct, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  'Animations des LED': 'LED animations',
+  'Tes LED adressables s’animent aux couleurs de la table choisie, et se taisent quand une partie démarre.': 'Your addressable LEDs come alive in the colours of the chosen table, and go quiet when a game starts.',
+  'Dans les écrans de la borne et à la roue, tes bandes de LED adressables montrent une ambiance douce, aux couleurs de la table choisie. Chaque changement de table lance un balayage dans le sens du défilement, et l’ouverture d’une fiche une pulsation.': 'In the menus and at the wheel, your addressable LED strips show a soft mood, in the colours of the chosen table. Each change of table starts a sweep in the direction of the scroll, and opening a table sheet a pulse.',
+  'Style, luminosité maximale, vitesse, couleurs, extinction après inactivité : tout se règle. Dès qu’une partie se prépare, les LED sont rendues à DOF.': 'Style, maximum brightness, speed, colours, turn-off after inactivity: everything can be set. As soon as a game is being prepared, the LEDs are handed back to DOF.',
+  'Menu système › Ma borne › DMD et LED › LED et retours (DOF) › Animations des LED': 'System menu › My cabinet › DMD and LED › LED and feedback (DOF) › LED animations',
   'Indisponible : choisis une table VPX sur la roue': 'Unavailable: choose a VPX table on the wheel',
   // Mode débogage (packages/core/src/news.ts)
   'Le mode débogage': 'Debug mode',
@@ -96,12 +101,7 @@ export const messages: Record<string, string> = {
     'Friends or not, all it takes is the same version of the table. You are told whenever someone joins, and a game can also be opened from a table’s page.',
   'Communauté › Parties en direct': 'Community › Live games',
 
-  'Tes cercles, publics ou privés : une discussion et une table de la semaine, avec son classement.': 'Your circles, public or private: a chat and a table of the week, with its leaderboard.',
-  'Crée un groupe avec tes amis : privé, il ne paraît nulle part et l’on y entre sur invitation ; public, n’importe quel joueur le rejoint d’un appui. Chaque semaine, une table choisie pour tous : Start la lance, et le classement du groupe se remplit tout seul.':
-    'Create a group with your friends: private, it appears nowhere and you get in by invitation; public, any player joins it in one press. Every week, a table chosen for everyone: Start launches it, and the group’s leaderboard fills itself.',
   'Communauté › Groupes': 'Community › Groups',
-  'Chaque membre peut inviter ses amis. Tout passe d’une borne à l’autre, sans serveur : un membre absent reçoit les messages à son retour.':
-    'Every member can invite their friends. Everything goes from cabinet to cabinet, with no server: a member who is away gets the messages when they are back.',
 
   'Pinball FX sur la roue': 'Pinball FX on the wheel',
   'Tes tables Pinball FX, achetées sur Steam ou Epic, à côté de tes tables VPX.': 'Your Pinball FX tables, bought on Steam or Epic, next to your VPX tables.',

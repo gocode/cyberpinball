@@ -202,8 +202,10 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       });
     if (legacy)
       actions.push({
-        label: t('Reprendre les tables de l’ancienne installation…'),
-        detail: t('{files} fichiers ({size}) de {from} copiés dans {to} ; l’ancienne installation n’est pas modifiée', { files: legacy.files, size: formatSize(legacy.bytes), from: legacy.from, to: legacy.to }),
+        label: legacy.views.length ? t('Reprendre les tables et les vues de BAM de l’ancienne installation…') : t('Reprendre les tables de l’ancienne installation…'),
+        detail:
+          t('{files} fichiers ({size}) de {from} copiés dans {to} ; l’ancienne installation n’est pas modifiée', { files: legacy.files, size: formatSize(legacy.bytes), from: legacy.from, to: legacy.to }) +
+          (legacy.views.some((v) => v.replaces) ? t(' · les vues par défaut que BAM a créées sont remplacées (gardées à côté, en « .avant-reprise »)') : ''),
         icon: 'folder-download',
         key: 'fpt:migrate',
         run: () => void migrate(legacy!),
@@ -522,6 +524,10 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       copied = await migrateFuturePinball(plan);
     });
     console.log(`${FUTURE_PINBALL_NAME} : ${copied} fichier(s) repris de ${plan.from} dans ${plan.to}.`); // i18n-ignore : journal
+    if (plan.views.length) {
+      const replaced = plan.views.filter((v) => v.replaces).map((v) => v.rel);
+      console.log(`${FUTURE_PINBALL_NAME} : ${plan.views.length} réglage(s) de vue de BAM repris (${plan.views.map((v) => v.rel).join(', ')})${replaced.length ? `, dont ${replaced.length} qui remplace(nt) la vue par défaut créée par BAM (gardée en .avant-reprise)` : ''}.`); // i18n-ignore : journal
+    }
     notice = tn(copied, '{n} fichier repris dans {dir} ; l’ancienne installation est intacte.', '{n} fichiers repris dans {dir} ; l’ancienne installation est intacte.', { dir: plan.to });
     open();
   }

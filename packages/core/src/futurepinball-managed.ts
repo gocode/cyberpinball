@@ -18,6 +18,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetryAsync } from './atomicwrite';
+import { readWholeFile } from './boundedread';
 import { layoutOf } from './locations';
 
 /** Dossier du jeu dans <racine>\emulators. */
@@ -94,6 +95,7 @@ export const FUTURE_PINBALL_DEFAULT_PREFERENCES: readonly { key: string; name: s
  * programme, remplacé par la version de l'installateur (une réparation remet les fichiers d'origine).
  */
 export const FUTURE_PINBALL_KEPT_FOLDERS: readonly string[] = ['Tables', 'Libraries', 'Music', 'Scripts', 'BAM/cfg', 'fpRAM'];
+
 
 export interface MovedFuturePinball {
   /** Fichiers posés dans le dossier géré (nouveaux ou remplacés). */
@@ -232,12 +234,88 @@ export interface FuturePinballMigrationFolder {
   present: number;
 }
 
+/**
+ * Un réglage de vue de BAM du joueur (`BAM\default.cfg`, `BAM\cfg\<table>.cfg`). Sans lui, BAM crée pour
+ * chaque table une vue par défaut : la caméra, le cadrage et l'inclinaison réglés sur la borne sont perdus.
+ */
+export interface FuturePinballViewFile {
+  /** Fichier de l'ancienne installation. */
+  file: string;
+  /** Chemin sous BAM\, avec des « / » : « default.cfg » ou « cfg/<table>.cfg ». */
+  rel: string;
+  bytes: number;
+  /** Il y a déjà là une vue qui n'est pas la sienne (celle que BAM a créée par défaut) : elle est gardée à côté, en « .avant-reprise ». */
+  replaces: boolean;
+}
+
 export interface FuturePinballMigrationPlan {
   from: string;
   to: string;
   folders: FuturePinballMigrationFolder[];
+  /** Réglages de vue de BAM à reprendre. */
+  views: FuturePinballViewFile[];
+  /** Fichiers à copier : ceux des dossiers, et les réglages de vue. */
   files: number;
   bytes: number;
+}
+
+/**
+ * Écart maximal entre la création et la dernière écriture d'une vue que BAM vient de créer : il l'écrit
+ * deux fois de suite à son premier lancement de la table (relevé : 1,6 s). Au-delà, quelqu'un l'a
+ * enregistrée depuis (réglage de la vue dans BAM) : elle est au joueur.
+ */
+export const FUTURE_PINBALL_VIEW_UNTOUCHED_MS = 10_000;
+
+/** Vue créée par BAM et jamais enregistrée depuis : rien du joueur à y perdre. Dates illisibles : on la tient pour sienne. */
+function viewNeverSaved(file: string): boolean {
+  try {
+    const st = fs.statSync(file);
+    return st.birthtimeMs > 0 && st.mtimeMs >= st.birthtimeMs && st.mtimeMs - st.birthtimeMs <= FUTURE_PINBALL_VIEW_UNTOUCHED_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Les réglages de vue de `from` à reprendre dans `to` : ceux qui manquent, et ceux que BAM a créés par
+ * défaut à leur place au premier lancement (jamais une vue que le joueur a enregistrée dans `to`).
+ */
+/** Un réglage de vue de BAM fait quelques ko : au-delà, ce n'en est pas un, il n'est pas repris. */
+const FUTURE_PINBALL_VIEW_MAX_BYTES = 1024 * 1024;
+
+export function planFuturePinballViews(from: string, to: string): FuturePinballViewFile[] {
+  const src = path.join(path.resolve(from), 'BAM');
+  const dest = path.join(path.resolve(to), 'BAM');
+  const candidates: { file: string; rel: string }[] = [];
+  const base = path.join(src, 'default.cfg');
+  if (fs.existsSync(base)) candidates.push({ file: base, rel: 'default.cfg' });
+  const cfgDir = path.join(src, 'cfg');
+  for (const file of walk(cfgDir)) {
+    if (path.extname(file).toLowerCase() === '.cfg') candidates.push({ file, rel: `cfg/${path.relative(cfgDir, file).split(path.sep).join('/')}` });
+  }
+  const views: FuturePinballViewFile[] = [];
+  for (const { file, rel } of candidates) {
+    const target = path.join(dest, ...rel.split('/'));
+    let bytes: number;
+    let content: Buffer;
+    try {
+      content = readWholeFile(file, FUTURE_PINBALL_VIEW_MAX_BYTES);
+      bytes = content.length;
+    } catch {
+      continue;
+    }
+    if (!fs.existsSync(target)) {
+      views.push({ file, rel, bytes, replaces: false });
+      continue;
+    }
+    try {
+      if (readWholeFile(target, FUTURE_PINBALL_VIEW_MAX_BYTES).equals(content)) continue;
+    } catch {
+      continue;
+    }
+    if (viewNeverSaved(target)) views.push({ file, rel, bytes, replaces: true });
+  }
+  return views;
 }
 
 function walk(dir: string): string[] {
@@ -286,7 +364,15 @@ export function planFuturePinballMigration(from: string, to: string): FuturePinb
       if (files.length || present) folders.push({ folder, files, bytes, present });
     }
   }
-  return { from: src, to: dest, folders, files: folders.reduce((n, f) => n + f.files.length, 0), bytes: folders.reduce((n, f) => n + f.bytes, 0) };
+  const views = src.toLowerCase() !== dest.toLowerCase() ? planFuturePinballViews(src, dest) : [];
+  return {
+    from: src,
+    to: dest,
+    folders,
+    views,
+    files: folders.reduce((n, f) => n + f.files.length, 0) + views.length,
+    bytes: folders.reduce((n, f) => n + f.bytes, 0) + views.reduce((n, v) => n + v.bytes, 0),
+  };
 }
 
 /** Copie le plan : jamais d'écrasement, jamais de suppression ni de déplacement à la source. Rend le nombre de fichiers copiés. */
@@ -302,6 +388,21 @@ export async function migrateFuturePinball(plan: FuturePinballMigrationPlan, onF
       await fs.promises.mkdir(path.dirname(target), { recursive: true });
       await fs.promises.copyFile(file, target, fs.constants.COPYFILE_EXCL);
     }
+  }
+  for (const view of plan.views) {
+    const target = path.join(plan.to, 'BAM', ...view.rel.split('/'));
+    done++;
+    onFile?.(done, plan.files);
+    await fs.promises.mkdir(path.dirname(target), { recursive: true });
+    if (fs.existsSync(target)) {
+      // La vue par défaut de BAM est gardée à côté (première fois seulement), jamais perdue.
+      await fs.promises.copyFile(target, `${target}.avant-reprise`, fs.constants.COPYFILE_EXCL).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EEXIST') throw error;
+      });
+    }
+    const partial = `${target}.reprise`;
+    await fs.promises.copyFile(view.file, partial);
+    await renameWithRetryAsync(partial, target);
   }
   return done;
 }

@@ -273,8 +273,12 @@ export function plungerTick(step: PlungerStep, readings: AxisReading[], now: num
     if (p && raw !== undefined) {
       const position = plungerPosition(raw, p);
       const last = step.shot.last;
+      const until = step.shot.bounceUntil;
       step.shot = watchShot(step.shot, position, now);
       step.peak = step.shot.last !== last ? 0 : Math.max(step.peak, position);
+      // Journal (joint aux rapports) : de quoi voir ce que le lanceur a envoyé quand un joueur se plaint de sa force.
+      if (step.shot.last !== last) console.log(`Lanceur : tir à ${Math.round(step.shot.last!.strength * 100)} % (axe lu ${Math.round(raw * 100)} %)`); // i18n-ignore : journal
+      else if (step.shot.bounceUntil !== until && until !== undefined) console.log(`Lanceur : rebond écarté, le tir reste à ${Math.round(step.shot.last!.strength * 100)} %`); // i18n-ignore : journal
     }
   }
   return JSON.stringify(gauge(step)) !== before;

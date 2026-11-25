@@ -103,6 +103,8 @@ import {
   liveReadyOverdue,
   type LiveBoardScreens,
   loadCabinet,
+  ledsFromCabinet,
+  dofRomNumbers,
   joystickButtonsUnrecorded,
   playfieldOrientation,
   FRAMING_STYLE_KEYS,
@@ -337,6 +339,7 @@ import {
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
+import { logFuturePinballLaunch, logFuturePinballLibraries, logFuturePinballView } from './futurepinball-diagnostics';
 import { closePupStartedDuringGame, detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -488,6 +491,11 @@ import { handOverOnQuit, shellSession } from './dedicated-session';
 import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start-relaunch';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
+import { createLedService } from './led-live';
+import { startTap, tapMode, tapPlanned, type DofTapDeps } from './dof-evenements-jeu';
+import { createLedAnimations } from './led-animations';
+import { readDof } from './dof-files';
+import { type CabinetLeds } from '@cyberpinball/core';
 import { createPhoneRelay } from './phone-relay';
 import { createPhoneRemote, phoneRemoteMode, type MenuEntries, type MenuEntry, type RemoteCommunity, type RemoteJukebox } from './phone-remote';
 
@@ -1277,7 +1285,50 @@ const framingHost = {
   log: (line: string) => console.log(line),
   current: () => loadCabinet(loc.dataDir)?.framing,
 };
+// LED adressables hors partie : le port série est rendu à DOF dès qu'une partie se prépare (broadcast).
+const ledService = createLedService({ log: (line) => console.warn(line) });
+// Partie sur une table sans ROM (dof-evenements-jeu.ts) : relais vers libdof pour une table originale que la
+// config DOF connaît, sinon profil générique (le port reste alors à Cyber Pinball pour elle seule).
+// La config DOF se relit au plus toutes les 5 s (lue à chaque état envoyé pendant une partie).
+let dofSetupMemo: { at: number; setup: ReturnType<typeof readDof> } | undefined;
+const dofSetupNow = () => {
+  if (!dofSetupMemo || Date.now() - dofSetupMemo.at > 5000) dofSetupMemo = { at: Date.now(), setup: readDof(loc) };
+  return dofSetupMemo.setup;
+};
+const dofTapDeps: DofTapDeps = {
+  dataDir: loc.dataDir,
+  leds: () => {
+    const cabinet = dofSetupNow()?.cabinet;
+    return cabinet ? ledsFromCabinet(cabinet) : undefined;
+  },
+  service: ledService,
+  log: (line) => console.log(line),
+  dof: () => {
+    const setup = dofSetupNow();
+    return setup ? { base: path.dirname(setup.dir) + path.sep, has: (rom) => dofRomNumbers(setup.ini, rom).length > 0 } : undefined;
+  },
+};
+const b2sNameOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.b2sName;
+// Animations des LED hors partie (led-animations.ts) : ambiance de la roue et des écrans, jamais pendant une partie.
+// Les bandes décrites se relisent au plus toutes les 5 s (la lecture touche le disque).
+let savedLedsMemo: { at: number; leds: CabinetLeds | undefined } | undefined;
+const ledAnimations = createLedAnimations({
+  service: ledService,
+  dataDir: loc.dataDir,
+  idleFor: () => attract.idleFor(),
+  leds: () => {
+    if (!savedLedsMemo || Date.now() - savedLedsMemo.at > 5000) {
+      const setup = readDof(loc);
+      savedLedsMemo = { at: Date.now(), leds: setup?.cabinet ? ledsFromCabinet(setup.cabinet) : undefined };
+    }
+    return savedLedsMemo.leds;
+  },
+  log: (line) => console.warn(line),
+});
+
 const library = createLibrary({
+  leds: ledService,
+  ledAnimations,
   feedbackService,
   teamThreads,
   feedbackWho: () => feedbackWho(),
@@ -4000,6 +4051,7 @@ const anaglyphMenu = createAnaglyphMenu({
   nvidia: (fresh, inis) => nvidia3dVision(fresh, inis),
   refreshNvidia: () => refreshNvidiaDriver(),
   stereo: (wanted) => stereoFor(wanted),
+  flatNotice: (issue) => menuNotices.push([{ kind: 'stereo-flat' as const, key: `stereo-flat|${issue.id}|${issue.title}`, at: Date.now(), subject: issue.title }]),
   vpxLog: () => {
     const install = vpxInstall(loc);
     return lastLaunchLogPath() ?? (install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined);
@@ -4575,6 +4627,8 @@ export function startFrontend(): void {
   }
   app.on('before-quit', () => {
     closing = true;
+    ledAnimations.dispose();
+    void ledService.stop();
     // dmdserver ne survit pas au menu : VPX lancé ailleurs retrouverait le DMD en direct.
     menuDmdServer().stop();
     vrFront.headset?.dispose();
@@ -5564,6 +5618,20 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     } catch (error) {
       console.log(`${zenName} (${table.id}) : écrans du jeu pas réglés (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
     }
+    // Son et vue : ce que la partie va trouver (sortie par défaut de Windows, vue de BAM de la table), dit avant qu'elle ne parte.
+    const fpInstall = detectFuturePinball(loc.dataDir, loc.root);
+    logFuturePinballLaunch({ tableId: table.id, tableFile: table.file, install: fpInstall, audio: loadCabinet(loc.dataDir)?.audio, outputs: audioOutputs() ?? [], log: (line) => console.log(line) });
+    // Cadrage : résolution, mode, rotation de la table, mode arcade et caméra que le jeu va trouver, face à l'écran du playfield.
+    const fpScreen = menuAssignments.playfield;
+    const fpEdge = loadCabinet(loc.dataDir)?.playfield?.flipperEdge;
+    logFuturePinballView({
+      tableId: table.id,
+      ...(fpScreen ? { screen: { width: fpScreen.bounds.width, height: fpScreen.bounds.height, rotation: fpScreen.rotation } } : {}),
+      ...(fpEdge ? { flipperEdge: fpEdge } : {}),
+      log: (line) => console.log(line),
+    });
+    // Bibliothèques (.fpl) de la table absentes du jeu : remises si une autre installation les a, sinon dites ici.
+    await logFuturePinballLibraries({ tableId: table.id, tableFile: table.file, install: fpInstall, ...(loc.root ? { downloadsDir: layoutOf(loc.root).downloads } : {}), log: (line) => console.log(line) });
   }
   // Pinball FX : pas d'image de fronton déposée pour le jeu. Sa fenêtre du fronton est fermée dans son mode borne
   // (décision du 20/11/2026) : le fronton de la borne reste celui de Cyber Pinball, le média de la table.
@@ -6178,12 +6246,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const anaglyphGame = simulated === undefined && !displayMode && !otherVpx && !vrGame ? await anaglyphMenu.prepareGame(played.file, double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)) : undefined;
   // Toute autre partie (à plat, dans le casque, un autre VPX) : la 3D stéréoscopique globale du pilote NVIDIA coupée.
   if (simulated === undefined && !anaglyphMenu.nvidiaGame(anaglyphGame)) await anaglyphMenu.flatGame();
+  // Table sans ROM : l'écoute des « DOF n, état » du script (dof-evenements-jeu.ts), relayés à libdof pour une
+  // table originale que la config DOF connaît, sinon profil générique s'il est voulu.
+  // Jamais dans le casque : ses variables (roomEnv) et celles de l'écoute ne se croisent donc pas.
+  const dofMode = simulated === undefined && !displayMode && !otherVpx && !vrGame ? tapMode(dofTapDeps, { hasRom: romsOf(table).length > 0, b2sName: b2sNameOf(table) }) : undefined;
+  const dofTap = dofMode ? startTap(dofTapDeps, install.exe, dofMode, played.file) : undefined;
+  const dofTapEnv = dofTap ? { env: dofTap.env } : {};
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
-      : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, ...dofTapEnv, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
   // Mode débogage : le journal de VPX est suivi pour la cadence en direct (debogage.ts).
   debug.gameBegin({ pid: game.pid, vpxLog });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
@@ -6275,6 +6349,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (load) console.log(load);
   stopWaitExit?.();
   stopOtherExit?.();
+  dofTap?.stop();
   vrFront.vrGameStop = undefined;
   // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
   if (result.ok) rememberLaunch(result, table.title);
@@ -7829,11 +7904,29 @@ function followTint(): void {
   tints.follow({ key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]) });
 }
 
+/** Ce que les animations des LED ont besoin de savoir de l'écran : la table choisie, la fiche ouverte, sa teinte. */
+function ledContext() {
+  const shown = attractTable() ?? (onMedallion() ? undefined : tables[state.index]);
+  return {
+    phase: state.phase,
+    ...(shown ? { tableKey: shown.file, index: state.index } : {}),
+    ...(state.phase === 'library' && library.table() ? { ficheKey: library.table()! } : {}),
+    ...(tints?.current()?.color ? { tint: tints.current()!.color! } : {}),
+  };
+}
+
 function broadcast(): void {
   // Retour d'une partie, de quelque jeu que ce soit : une recherche de mise à jour, pour que la
   // pastille soit là quand on revient à la roue (updates-menu.ts, au plus une toutes les 5 min).
   if (broadcastPhase === 'playing' && state.phase !== 'playing') updates.checkSoon();
   broadcastPhase = state.phase;
+  // Partie en préparation ou en cours, de quelque jeu que ce soit : les LED sont à DOF, le port est rendu.
+  // Sauf une table sans ROM aux effets LED voulus (dof-evenements-jeu.ts) : le port reste à Cyber Pinball.
+  const gameOn = state.phase === 'loading' || state.phase === 'playing';
+  const tapTable = gameOn ? (playing ?? tables[state.index]) : undefined;
+  if (gameOn && !(tapTable && tapPlanned(dofTapDeps, romsOf(tapTable).length > 0, b2sNameOf(tapTable)))) void ledService.gameStarted();
+  else if (!gameOn) ledService.gameEnded();
+  ledAnimations.update(ledContext());
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
   // (Exit, partie lancée du téléphone, extinction…) ; sauf vers sa gestion : au bureau la musique y
   // continue, en fond ; en borne elle s'y met en pause et reprend au retour au lecteur.

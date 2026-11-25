@@ -64,8 +64,14 @@ import { type ReportFriend } from './tech-sheet';
 import type { FeedbackService } from './feedback-service';
 import type { TeamThreads } from './team-threads';
 import type { FeedbackPerson } from '@cyberpinball/core';
+import type { LedService } from './led-live';
+import type { LedAnimations } from './led-animations';
 
 export interface LibraryHost {
+  /** Pilote des LED hors partie (led-live.ts) : l'essai des bandes de « LED et retours (DOF) ». */
+  leds?: LedService;
+  /** Animations des LED hors partie (led-animations.ts) : l'écran de réglage de « LED et retours (DOF) ». */
+  ledAnimations?: LedAnimations;
   /** Musique tirée des ROM (rom-music.ts) : repli de la musique du jeu, et source « Musique de la ROM ». */
   romMusic?(): RomMusic | undefined;
   /** Le réseau du casque pour la santé de la borne (vr-reseau.ts) ; undefined sans casque relevé. */

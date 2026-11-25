@@ -13,6 +13,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   cabinetXml,
+  colorOrderFromSeen,
   detectDofControllers,
   DOF_ADDRESSABLE_NUMBER,
   DOF_CONTROLLERS,
@@ -42,6 +43,8 @@ import {
   ledsOnBoard,
   ledsOnSerial,
   ledProblems,
+  ledTestEffect,
+  ledTestExpectation,
   ledsFromCabinet,
   ledsPerOutput,
   nextDofOutput,
@@ -57,6 +60,7 @@ import {
   tn,
   writeFileAtomic,
   type CabinetLeds,
+  type LedTestKind,
   type DofSetup,
   type HidName,
   type IconName,
@@ -67,6 +71,11 @@ import {
   type ObservedUsbDevice,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
+import type { LedService } from './led-live';
+import { DOF_EVENT_LEVELS } from './dof-evenements-jeu';
+import type { DofEventSettings } from '@cyberpinball/core';
+import type { LedAnimations } from './led-animations';
+import { createLedAnimationsMenu } from './led-animations-menu';
 
 /** Adresse du configtool : la configuration DOF de la borne s'y fait, avec un compte VPUniverse. */
 export const CONFIGTOOL_URL = 'https://configtool.vpuniverse.com/';
@@ -99,6 +108,12 @@ export interface DofMenuHost {
   unpack(file: string, dest: string): Promise<boolean>;
   /** Ouvre une page dans « Récupérer » ; le fichier téléchargé revient à `received`. Absent : pas de navigateur intégré. */
   browse?(url: string, received: (file: string) => void): void;
+  /** Pilote des LED hors partie (led-live.ts) : absent, pas d'essai des bandes. */
+  leds?: LedService;
+  /** Effets LED des tables sans ROM (dof-evenements-jeu.ts) : réglage lu et écrit. */
+  events?: { get(): DofEventSettings; set(settings: DofEventSettings): void };
+  /** Animations des LED hors partie (led-animations.ts) : l'écran de réglage ; absent, pas d'entrée. */
+  ledAnimations?: LedAnimations;
   /** Après un changement : VPinballX.ini resynchronisé ([Plugin.DOF] Enable), santé relevée de nouveau. */
   changed(): void;
 }
@@ -122,6 +137,7 @@ const BRIGHTNESS_CHOICES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 export function createDofMenu(host: DofMenuHost) {
   const { library } = host;
+  const ledAnimationsMenu = host.ledAnimations ? createLedAnimationsMenu({ library, animations: host.ledAnimations }) : undefined;
   let flash: { text: string; tone: 'ok' | 'warning' | 'error' } | undefined;
   /** Bandes en cours de description ; reprises du Cabinet.xml à chaque ouverture de l'éditeur. */
   let draft: CabinetLeds | undefined;
@@ -272,6 +288,10 @@ export function createDofMenu(host: DofMenuHost) {
         ...(s ? (findings.some((f) => f.code === 'addressableIniUndeclared') ? { tone: 'warning' as const } : {}) : { tone: 'quiet' as const }),
         run: () => (s ? openEditor() : library.openNotice(t('LED adressables indisponibles'), [t('Installe d’abord VPX : DOF fait partie de VPX.')], () => open())),
       },
+      ...eventActions(),
+      ...(ledAnimationsMenu
+        ? [{ label: t('Animations des LED…'), detail: ledAnimationsMenu.summary(), icon: 'sparkle' as const, run: () => ledAnimationsMenu.open(() => open()) } satisfies Action]
+        : []),
       { label: t('Vérifier de nouveau'), detail: t('Relit les périphériques USB et le dossier de DOF'), icon: 'refresh', run: () => refresh() },
       { label: t('Retour'), icon: 'back', run: back },
     ];
@@ -463,6 +483,49 @@ export function createDofMenu(host: DofMenuHost) {
     if (ok) host.changed();
     flash = { text: message[0] ?? '', tone: ok ? 'ok' : 'error' };
     library.openNotice(ok ? t('Configuration DOF importée') : t('Import impossible'), message, () => open());
+  }
+
+  // ---------- Effets des tables sans ROM ----------
+
+  /** Tables sans ROM (DOF ne tourne pas) : flippers et slingshots allument les bandes décrites. */
+  function eventActions(): Action[] {
+    const ev = host.events;
+    if (!ev) return [];
+    const s = ev.get();
+    const originals = s.originals !== false;
+    const relay: Action = {
+      label: originals ? t('DOF des tables originales : activé') : t('DOF des tables originales : coupé'),
+      detail: t('Tables sans ROM dont ta config DOF a la ligne : leurs effets passent par Cyber Pinball'),
+      icon: 'bulb',
+      run: () => {
+        ev.set({ ...s, originals: !originals });
+        open();
+      },
+    };
+    const toggle: Action = {
+      label: s.enabled ? t('Effets LED des tables sans ROM : activés') : t('Effets LED des tables sans ROM : coupés'),
+      detail: t('Flippers et slingshots allument tes bandes pendant une partie que DOF ne prend pas en charge'),
+      icon: 'bulb',
+      run: () => {
+        ev.set({ ...s, enabled: !s.enabled });
+        open();
+      },
+    };
+    if (!s.enabled) return [relay, toggle];
+    const next = DOF_EVENT_LEVELS.find((l) => l > s.intensity) ?? DOF_EVENT_LEVELS[0];
+    return [
+      relay,
+      toggle,
+      {
+        label: t('Intensité des effets : {n} %', { n: s.intensity }),
+        detail: t('Start : passer à {n} %', { n: next }),
+        icon: 'bulb',
+        run: () => {
+          ev.set({ ...s, intensity: next });
+          open();
+        },
+      },
+    ];
   }
 
   // ---------- LED adressables ----------
@@ -799,6 +862,194 @@ export function createDofMenu(host: DofMenuHost) {
     }));
   }
 
+  // --- Essai des LED -----------------------------------------------------------
+  // Allume la bande telle que décrite ici, enregistrée ou non : rien n'est écrit sur la carte.
+  let testNote: string | undefined;
+  let chaseTail = 3;
+  let chaseReverse = false;
+  const CHASE_TAILS = [0, 3, 8, 16];
+
+  function testSummary(): string {
+    const s = host.leds?.status();
+    if (!s) return '';
+    if (s.error) return s.error.message;
+    if (s.state === 'running') return s.simulated ? t('Liaison simulée : aucune LED réelle.') : t('Liaison ouverte avec {port}.', { port: s.target ?? '' });
+    return '';
+  }
+
+  /** Ouvre la liaison (une fois) avec la description du brouillon. Les erreurs restent dans l'état du pilote, lues par l'écran. */
+  async function ensureTestLink(): Promise<boolean> {
+    const leds = host.leds;
+    if (!leds || !draft) return false;
+    leds.configure(draft);
+    try {
+      await leds.start();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function applyTest(i: number, kind: LedTestKind | 'chase'): void {
+    const leds = host.leds;
+    void (async () => {
+      if (kind !== 'off' && !(await ensureTestLink())) {
+        testNote = undefined;
+        return openStripTest(i);
+      }
+      if (!leds) return;
+      if (kind === 'off') {
+        leds.blackout();
+        testNote = ledTestExpectation('off');
+      } else if (kind === 'chase') {
+        leds.setEffect('#' + i, { kind: 'chase', color: [255, 0, 0], tail: chaseTail, reverse: chaseReverse }, 'test');
+        testNote = t('Une LED rouge avance {sens}, avec une queue de {n} LED.', {
+          sens: chaseReverse ? t('de la dernière à la première') : t('de la première à la dernière'),
+          n: chaseTail,
+        });
+      } else {
+        const effect = ledTestEffect(kind);
+        if (effect) leds.setEffect('#' + i, effect, 'test');
+        testNote = ledTestExpectation(kind, draft?.strips[i]);
+      }
+      openStripTest(i);
+    })();
+  }
+
+  function openStripTest(i: number): void {
+    library.openCustom(() => {
+      const leds = host.leds;
+      const s = draft?.strips[i];
+      const back = () => {
+        void leds?.stop();
+        testNote = undefined;
+        openStrip(i, 0);
+      };
+      if (!leds || !s) return buildEditor();
+      if (ledsOnBoard(draft!.controller)) {
+        return {
+          heading: t('Essai de la bande'),
+          icon: 'bulb',
+          lead: t('{controller} : les bandes se décrivent dans l’outil de la carte, et seul DOF les pilote. L’essai se fait en jouant une table configurée.', { controller: controllerLabel(draft!.controller) }),
+          sections: [],
+          actions: [{ label: t('Retour'), icon: 'back', run: back }],
+          back,
+        };
+      }
+      const pick = (label: string, kind: LedTestKind | 'chase', detail?: string): Action => ({ label, detail, icon: 'bulb', run: () => applyTest(i, kind) });
+      const actions: Action[] = [
+        pick(t('Rouge'), 'red'),
+        pick(t('Vert'), 'green'),
+        pick(t('Bleu'), 'blue'),
+        pick(t('Blanc'), 'white'),
+        pick(t('Chenillard'), 'chase', t('Sens : {sens} · queue : {n}', { sens: chaseReverse ? t('inverse') : t('aller'), n: chaseTail })),
+        {
+          label: t('Chenillard : changer le sens'),
+          icon: 'shuffle',
+          run: () => {
+            chaseReverse = !chaseReverse;
+            applyTest(i, 'chase');
+          },
+        },
+        {
+          label: t('Chenillard : changer la longueur'),
+          detail: t('Queue de {n} LED', { n: chaseTail }),
+          icon: 'list',
+          run: () => {
+            chaseTail = CHASE_TAILS[(CHASE_TAILS.indexOf(chaseTail) + 1) % CHASE_TAILS.length]!;
+            applyTest(i, 'chase');
+          },
+        },
+        pick(t('Début, fin et sens'), 'direction', t('Première LED verte, dernière bleue')),
+        pick(t('Ordre des couleurs'), 'colors', t('Rouge, vert, bleu : à comparer à ce que tu vois')),
+        {
+          label: t('Si tu vois… (ordre des couleurs)'),
+          detail: t('Dis les couleurs vues : je trouve l’ordre'),
+          icon: 'palette',
+          run: () => openColorsSeen(i),
+        },
+        pick(t('Câblage de la matrice'), 'layout'),
+        pick(t('Luminosité'), 'brightness'),
+        pick(t('Règle (compter les LED)'), 'ruler'),
+        pick(t('Arc-en-ciel'), 'rainbow'),
+        { label: t('Tout éteindre'), icon: 'power', run: () => applyTest(i, 'off') },
+        { label: t('Retour'), icon: 'back', run: back },
+      ];
+      return {
+        heading: t('Essai : {name}', { name: s.name || t('Bande sans nom') }),
+        icon: 'bulb',
+        lead: testNote || testSummary() || t('Choisis un essai : les LED s’allument tout de suite. Au lancement d’une partie, elles repassent à DOF.'),
+        sections: [],
+        actions,
+        back,
+      };
+    });
+  }
+
+  /** « Si tu vois… » : trois questions (la couleur vue au début, au milieu, à la fin), puis l'ordre à choisir. */
+  function openColorsSeen(i: number): void {
+    const seen: string[] = [];
+    const names: Record<string, string> = { R: t('Rouge'), G: t('Vert'), B: t('Bleu') };
+    const done = (): void => {
+      const s = draft?.strips[i];
+      const found = s ? colorOrderFromSeen(s.colorOrder, seen as [string, string, string]) : undefined;
+      library.openCustom(() => ({
+        heading: t('Ordre des couleurs'),
+        icon: 'palette',
+        lead: found
+          ? t('L’ordre qui convient est {order}.', { order: found })
+          : t('Cette suite de couleurs ne correspond à aucun ordre : recommence en regardant bien le début, le milieu et la fin de la bande.'),
+        sections: [],
+        actions: [
+          ...(found
+            ? [
+                {
+                  label: t('Appliquer {order}', { order: found }),
+                  icon: 'check' as const,
+                  run: () => {
+                    if (draft?.strips[i]) draft.strips[i]!.colorOrder = found;
+                    if (host.leds && draft) host.leds.configure(draft);
+                    testNote = t('Ordre {order} appliqué : relance l’essai des couleurs, tu dois voir rouge, vert, bleu.', { order: found });
+                    openStripTest(i);
+                  },
+                },
+              ]
+            : []),
+          { label: t('Retour'), icon: 'back' as const, run: () => openStripTest(i) },
+        ],
+        back: () => openStripTest(i),
+      }));
+    };
+    const ask = (step: number): void => {
+      if (step === 3) return done();
+      const where = [t('au début de la bande'), t('au milieu'), t('à la fin')][step]!;
+      library.openCustom(() => ({
+        heading: t('Quelle couleur vois-tu {where} ?', { where }),
+        icon: 'palette',
+        sections: [],
+        actions: [
+          ...(['R', 'G', 'B'] as const).map(
+            (c): Action => ({
+              label: names[c]!,
+              icon: 'bulb',
+              run: () => {
+                seen[step] = c;
+                ask(step + 1);
+              },
+            }),
+          ),
+          { label: t('Retour'), icon: 'back', run: () => openStripTest(i) },
+        ],
+        back: () => openStripTest(i),
+      }));
+    };
+    // L'essai des couleurs tourne pendant qu'on répond.
+    void ensureTestLink().then((ok) => {
+      if (ok) host.leds?.setEffect('#' + i, ledTestEffect('colors')!, 'test');
+      ask(0);
+    });
+  }
+
   function openStrip(i: number, at = 0): void {
     library.openCustom(() => {
       const s = (draft ??= initialDraft()).strips[i];
@@ -902,6 +1153,12 @@ export function createDofMenu(host: DofMenuHost) {
             detail: t('Celle du toy dans le configtool'),
             icon: 'chip',
             run: () => choose(7, t('Sortie DOF'), dofChoices, String, s.dofOutput, (v) => (s.dofOutput = v)),
+          },
+          {
+            label: t('Tester cette bande'),
+            detail: t('Allume les LED pour vérifier couleurs, sens et longueur'),
+            icon: 'bulb',
+            run: () => openStripTest(i),
           },
           {
             label: t('Supprimer cette bande'),

@@ -89,6 +89,8 @@ export interface Nvidia3dVisionFacts {
    * la borne, 24 et 25/11/2026).
    */
   stereoRefused?: boolean;
+  /** 3D Fix Manager tourne (3DFixManager.exe) : son bouton « Enable 3D » l'emporte sur Cyber Pinball ; absent : pas relevé. */
+  fixManagerOpen?: boolean;
   /** L'émetteur USB est branché ; absent : USB illisible. */
   emitter?: boolean;
   /** Émetteur branché mais son pilote (NvStUSB) ne démarre pas : code du Gestionnaire de périphériques (28 : aucun pilote). */
@@ -134,6 +136,11 @@ export interface Nvidia3dVisionIssue {
   steps: string[];
 }
 
+/** 3D Fix Manager est parmi les processus (noms d'exécutables, casse indifférente). */
+export function fixManagerRunning(names: readonly string[]): boolean {
+  return names.some((n) => n.toLowerCase().replace(/\.exe$/, '') === '3dfixmanager');
+}
+
 /** Les manques, dans l'ordre où les régler : sans pilote NVIDIA, rien d'autre ne se lit. */
 export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = process.platform): Nvidia3dVisionIssue[] {
   if (platform !== 'win32') return [{ id: 'not-windows', title: t('3D Vision ne marche que sous Windows'), steps: [t('Les lunettes à filtres colorés, elles, marchent partout')] }];
@@ -165,6 +172,16 @@ export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = 
         t('Dans 3D Fix Manager : « Install 3D Driver », puis « Enable Driver Hack »'),
         t('Redémarre le PC'),
         t('Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : lance l’assistant de configuration une fois, lunettes allumées'),
+      ],
+    });
+  else if (f.stereo === false && f.stereoRefused && f.fixManagerOpen)
+    // PinCab, 25/11/2026 : 3D Fix Manager laissé ouvert, réduit, après le blocage de l'ouverture ; toutes les parties à plat.
+    issues.push({
+      id: 'stereo-disabled',
+      title: t('3D Fix Manager bloque la 3D : ferme-le'),
+      steps: [
+        t('Ouvert, 3D Fix Manager remet la 3D dans l’état de son bouton « Enable 3D » : ferme-le, y compris s’il est réduit près de l’horloge'),
+        t('Cyber Pinball active la 3D pour chaque partie en relief et la coupe après'),
       ],
     });
   else if (f.stereo === false && f.stereoRefused)

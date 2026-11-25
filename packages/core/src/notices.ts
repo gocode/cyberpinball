@@ -48,6 +48,7 @@ export type NoticeKind =
   | 'idea-shipped'
   | 'team-reply'
   | 'program-open'
+  | 'stereo-flat'
   | 'room-mention'
   | 'room-line'
   | 'room-report'
@@ -201,6 +202,9 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // même accepté au démarrage : il peut prendre le processeur, le disque ou le DMD réel par moments (17/11/2026, joueur venu
   // de PinUP Popper : arrêts de 1 à 2 s sur presque toutes les tables). Par-dessus VPX, une fois par jour et par programme.
   'program-open': { priority: 6, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'alert', tone: 'warning', act: { type: 'activity' }, away: true, journal: false },
+  // Une partie lancée en relief NVIDIA qui se joue à plat (anaglyph-menu.ts, prepareGame) : la raison par-dessus VPX,
+  // sinon le joueur ne voit qu'une table sans relief (PinCab, 25/11/2026 : 3D Fix Manager resté ouvert). Une fois par raison et par heure.
+  'stereo-flat': { priority: 5, ttlMs: 10 * MIN, quietMs: 60 * MIN, icon: 'alert', tone: 'warning', act: { type: 'activity' }, away: true, journal: false },
   'idea-shipped': { priority: 12, ttlMs: 24 * 60 * MIN, quietMs: MIN, icon: 'sparkle', tone: 'ok', act: { type: 'my-profile' }, sound: 'news' },
   // L'équipe répond à un rapport ou à une proposition du joueur (feedback-threads.ts) : partout, comme
   // un message d'ami ; un clic ouvre l'échange (team-threads-menu.ts).
@@ -507,6 +511,9 @@ export function noticeText(kind: NoticeKind, stored: readonly NoticeEvent[], opt
     case 'program-open':
       // `subject` : les programmes ouverts (« PinUP Popper et dmdext »).
       return fit({ title: t('Ouvert pendant la partie : {names}', { names: events[events.length - 1]!.subject ?? '' }), detail: t('Il peut ralentir la partie : ferme-le') });
+    case 'stereo-flat':
+      // `subject` : la raison (titre du manque, nvidia3dVisionIssues).
+      return fit({ title: t('Partie à plat, sans relief'), detail: events[events.length - 1]!.subject ?? '' });
     case 'idea-shipped':
       // `subject` : le titre de la proposition.
       return fit(one ? { title: t('Ton idée est arrivée dans Cyber Pinball'), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} de tes idées est arrivée dans Cyber Pinball', '{n} de tes idées sont arrivées dans Cyber Pinball'), detail: subjectList(events.map(subject)) });
@@ -564,6 +571,8 @@ function digestPart(kind: NoticeKind, n: number): string {
       return tn(n, '{n} personne invitée', '{n} personnes invitées');
     case 'program-open':
       return tn(n, '{n} programme ouvert', '{n} programmes ouverts');
+    case 'stereo-flat':
+      return tn(n, '{n} partie à plat', '{n} parties à plat');
     case 'idea-shipped':
       return tn(n, '{n} idée arrivée', '{n} idées arrivées');
     case 'team-reply':

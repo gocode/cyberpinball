@@ -92,6 +92,13 @@ export const messages: Record<string, string> = {
   'Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : lance l’assistant de configuration une fois, lunettes allumées':
     'NVIDIA Control Panel, "Set up stereoscopic 3D": run the setup wizard once, with the glasses on',
   'Cyber Pinball n’a pas pu activer la 3D stéréoscopique': 'Cyber Pinball could not turn stereoscopic 3D on',
+  '3D Fix Manager bloque la 3D : ferme-le': '3D Fix Manager is blocking 3D: close it',
+  'Ouvert, 3D Fix Manager remet la 3D dans l’état de son bouton « Enable 3D » : ferme-le, y compris s’il est réduit près de l’horloge':
+    'While open, 3D Fix Manager puts 3D back in the state of its "Enable 3D" button: close it, even when it is minimized near the clock',
+  'Cyber Pinball active la 3D pour chaque partie en relief et la coupe après': 'Cyber Pinball turns 3D on for each 3D game and off afterwards',
+  'Partie à plat, sans relief': 'Flat game, no 3D',
+  '{n} partie à plat': '{n} flat game',
+  '{n} parties à plat': '{n} flat games',
   '3D Fix Manager ouvert garde la 3D dans l’état de son bouton « Enable 3D » : ferme-le, Cyber Pinball active la 3D pour chaque partie en relief et la coupe après':
     '3D Fix Manager, while open, keeps 3D in the state of its "Enable 3D" button: close it, Cyber Pinball turns 3D on for each 3D game and off afterwards',
   'Sinon, Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : vérifie que la page s’ouvre et que l’assistant de configuration passe, lunettes allumées':

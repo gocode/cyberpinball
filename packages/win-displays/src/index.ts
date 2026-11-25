@@ -318,3 +318,4 @@ export * from './handles';
 export * from './file-holders';
 export * from './device-guard';
 export { hkcuSetValue, hkcuValue, hklmValue } from './registry';
+export { openSerial, serialDevicePath, SerialOpenError, type SerialLink, type SerialOptions, type SerialOpenFailure } from './serial-port';

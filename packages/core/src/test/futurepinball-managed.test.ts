@@ -28,6 +28,7 @@ import {
   migrateFuturePinball,
   moveExtractedFuturePinball,
   planFuturePinballMigration,
+  planFuturePinballViews,
   readFuturePinballLicenseAcceptance,
   recordFuturePinballLicensesAccepted,
   writeFuturePinballConfig,
@@ -275,6 +276,45 @@ test('reprise d’une installation existante : plan chiffré, copie sans écrase
   assert.equal(planFuturePinballMigration(from, to).files, 0);
   // Source et destination identiques : rien.
   assert.equal(planFuturePinballMigration(from, from).files, 0);
+});
+
+test('reprise des vues de BAM : celles qui manquent, celles que BAM a créées par défaut, jamais une vue enregistrée', async () => {
+  const root = tmp();
+  const from = fakeGame(path.join(root, 'ancien'));
+  const to = fakeGame(path.join(root, 'gere'));
+  put(path.join(from, 'BAM', 'default.cfg'), 'vue-defaut-reglee');
+  put(path.join(from, 'BAM', 'cfg', 'Absente.cfg'), 'vue-absente');
+  put(path.join(from, 'BAM', 'cfg', 'ParDefaut.cfg'), 'vue-reglee');
+  put(path.join(from, 'BAM', 'cfg', 'Enregistree.cfg'), 'vue-du-joueur-ancienne');
+  put(path.join(from, 'BAM', 'cfg', 'Identique.cfg'), 'meme');
+  put(path.join(from, 'BAM', 'config.ini'), 'ini'); // pas une vue
+  // Dans le dossier géré : BAM a créé ParDefaut.cfg (jamais enregistrée), le joueur a réglé Enregistree.cfg depuis.
+  put(path.join(to, 'BAM', 'cfg', 'ParDefaut.cfg'), 'vue-bam');
+  put(path.join(to, 'BAM', 'cfg', 'Enregistree.cfg'), 'vue-du-joueur-nouvelle');
+  put(path.join(to, 'BAM', 'cfg', 'Identique.cfg'), 'meme');
+  const now = Date.now();
+  fs.utimesSync(path.join(to, 'BAM', 'cfg', 'ParDefaut.cfg'), new Date(now), new Date(now));
+  // Enregistrée : dernière écriture bien après la création (au-delà de FUTURE_PINBALL_VIEW_UNTOUCHED_MS).
+  const created = fs.statSync(path.join(to, 'BAM', 'cfg', 'Enregistree.cfg')).birthtimeMs;
+  fs.utimesSync(path.join(to, 'BAM', 'cfg', 'Enregistree.cfg'), new Date(created + 60_000), new Date(created + 60_000));
+
+  const views = planFuturePinballViews(from, to);
+  assert.deepEqual(views.map((v) => [v.rel, v.replaces]).sort(), [['cfg/Absente.cfg', false], ['cfg/ParDefaut.cfg', true], ['default.cfg', false]]);
+
+  const plan = planFuturePinballMigration(from, to);
+  assert.equal(plan.files, 3, 'les vues comptent dans le plan');
+  assert.equal(plan.bytes, 'vue-defaut-reglee'.length + 'vue-absente'.length + 'vue-reglee'.length);
+  assert.equal(await migrateFuturePinball(plan), 3);
+  assert.equal(fs.readFileSync(path.join(to, 'BAM', 'default.cfg'), 'utf8'), 'vue-defaut-reglee');
+  assert.equal(fs.readFileSync(path.join(to, 'BAM', 'cfg', 'Absente.cfg'), 'utf8'), 'vue-absente');
+  assert.equal(fs.readFileSync(path.join(to, 'BAM', 'cfg', 'ParDefaut.cfg'), 'utf8'), 'vue-reglee');
+  assert.equal(fs.readFileSync(path.join(to, 'BAM', 'cfg', 'ParDefaut.cfg.avant-reprise'), 'utf8'), 'vue-bam', 'la vue par défaut remplacée est gardée à côté');
+  assert.equal(fs.readFileSync(path.join(to, 'BAM', 'cfg', 'Enregistree.cfg'), 'utf8'), 'vue-du-joueur-nouvelle', 'une vue enregistrée n’est jamais écrasée');
+  assert.equal(fs.existsSync(path.join(to, 'BAM', 'config.ini')), false);
+  // Source intacte, et plus rien à reprendre : la copie est idempotente.
+  assert.equal(fs.readFileSync(path.join(from, 'BAM', 'cfg', 'ParDefaut.cfg'), 'utf8'), 'vue-reglee');
+  assert.deepEqual(planFuturePinballViews(from, to), []);
+  assert.equal(planFuturePinballViews(from, from).length, 0, 'une installation n’est pas sa propre source');
 });
 
 test('manifeste : Future Pinball et BAM ne sont ni livrés ni installés d’office, empreinte fixée', () => {

@@ -20,6 +20,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   cutStereoAtStart,
+  fixManagerRunning,
   IniDocument,
   isNvidia3dVisionEmitter,
   playfieldOnPrimary,
@@ -30,6 +31,7 @@ import {
   type ObservedUsbDevice,
   type VpxDisplayCandidate,
 } from '@cyberpinball/core';
+import { runningProcessNames } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
 import { desktopPrimaryDisplay, OFFSCREEN } from './offscreen';
 import { journalIncident } from './uncaught';
@@ -72,6 +74,20 @@ function fixtureFacts(): DriverFacts | undefined {
   if (fixture) return readJsonFile(fixture) as DriverFacts;
   if (process.platform !== 'win32') return { nvapi: false };
   return undefined;
+}
+
+/** 3D Fix Manager ouvert (essais : le champ fixManagerOpen du relevé) ; rien hors Windows ni hors écran. */
+function fixManagerFact(): { fixManagerOpen?: boolean } {
+  if (process.env.CYBERPINBALL_NVIDIA_3DVISION) {
+    const open = (fixtureFacts() as { fixManagerOpen?: unknown }).fixManagerOpen;
+    return typeof open === 'boolean' ? { fixManagerOpen: open } : {};
+  }
+  if (process.platform !== 'win32' || OFFSCREEN) return {};
+  try {
+    return { fixManagerOpen: fixManagerRunning(runningProcessNames()) };
+  } catch {
+    return {};
+  }
 }
 
 /** Le pilote NVIDIA : présent, sa version, la stéréo activée, lu par un processus neuf. Jamais d'exception. */
@@ -254,7 +270,7 @@ export function nvidia3dVisionFacts(src: Nvidia3dVisionSources, fresh = false): 
   const emitterProblem = emitters.length && emitters.every((d) => d.problem) ? emitters[0]!.problem : undefined;
   return {
     ...kept.facts,
-    ...(refused && kept.facts.stereo === false ? { stereoRefused: true } : {}),
+    ...(refused && kept.facts.stereo === false ? { stereoRefused: true, ...fixManagerFact() } : {}),
     ...(usb ? { emitter: emitters.length > 0 } : {}),
     ...(emitterProblem ? { emitterProblem } : {}),
     ...(primary !== undefined ? { playfieldPrimary: primary } : {}),

@@ -11,6 +11,7 @@ import { REPO_ROOT } from './i18n-scan';
 import { anaglyphGameSettings, anaglyphWheelRelief, DEFAULT_ANAGLYPH, isAnaglyphKey, parseAnaglyphSetting, type AnaglyphSetting } from '../anaglyph';
 import {
   cutStereoAtStart,
+  fixManagerRunning,
   isNvidia3dVisionEmitter,
   STARTUP_STEREO_SETTLE_MS,
   NVIDIA_3DVISION_LAST_DRIVER,
@@ -27,6 +28,7 @@ import {
   type Nvidia3dVisionFacts,
 } from '../nvidia3dvision';
 import { VR_REFUSED_FXAA, VR_STEREO_FXAA } from '../vr';
+import { NOTICE_DETAIL_MAX, NOTICE_RULES, noticeText } from '../notices';
 
 const NV: AnaglyphSetting = { ...DEFAULT_ANAGLYPH, mode: 'on', kind: 'nvidia' };
 const READY: Nvidia3dVisionFacts = { nvapi: true, driver: 45206, stereo: true, emitter: true, playfieldPrimary: true, vpxSupported: true };
@@ -65,6 +67,35 @@ test('stéréo coupée : pas un manque, Cyber Pinball l’active ; muette ou ref
   assert.ok(refused.steps.some((s) => s.includes('3D Fix Manager') && s.includes('Enable 3D')));
   assert.deepEqual(ids({ ...READY, stereo: true, stereoRefused: true }), [], 'activée malgré tout : rien à dire');
   assert.match(nvidia3dVisionReadyText({ ...READY, stereo: false }).detail, /activée pour chaque partie en relief/);
+});
+
+// PinCab, 25/11/2026 : 3D Fix Manager resté ouvert (réduit), chaque partie lancée en relief s'est jouée à plat,
+// la raison seulement dans le journal ; et après un refus, Cyber Pinball ne retentait plus jusqu'à sa relance.
+// Désormais : 3D Fix Manager nommé quand il tourne, la raison dite par-dessus VPX, un nouvel essai à chaque partie.
+test('partie en relief jouée à plat : la raison à l’écran, 3D Fix Manager nommé, un nouvel essai à chaque partie', () => {
+  assert.ok(fixManagerRunning(['explorer.exe', '3DFixManager.exe']));
+  assert.ok(fixManagerRunning(['3dfixmanager']));
+  assert.ok(!fixManagerRunning(['VPinballX_BGFX64.exe', 'FixManager.exe']));
+  const [named] = nvidia3dVisionIssues({ ...READY, stereo: false, stereoRefused: true, fixManagerOpen: true }, 'win32');
+  assert.equal(named?.id, 'stereo-disabled');
+  assert.match(named.title, /3D Fix Manager bloque la 3D : ferme-le/);
+  assert.ok(named.title.length <= NOTICE_DETAIL_MAX, 'tient dans le détail d’une annonce');
+  const [generic] = nvidia3dVisionIssues({ ...READY, stereo: false, stereoRefused: true, fixManagerOpen: false }, 'win32');
+  assert.match(generic!.title, /n’a pas pu activer/);
+  // L'annonce : par-dessus VPX, hors de l'Activité récente.
+  const rule = NOTICE_RULES['stereo-flat'];
+  assert.equal(rule.away, true);
+  assert.equal(rule.journal, false);
+  const view = noticeText('stereo-flat', [{ kind: 'stereo-flat', key: 'stereo-flat|x', at: 0, subject: named.title }]);
+  assert.match(view.title, /Partie à plat/);
+  assert.match(view.detail ?? '', /3D Fix Manager/);
+  // Le front-end : la raison annoncée, et le refus précédent ignoré pour décider d'essayer encore.
+  const app = path.join(REPO_ROOT, 'app', 'src');
+  const menu = fs.readFileSync(path.join(app, 'anaglyph-menu.ts'), 'utf8');
+  assert.match(menu, /nvidia3dVisionIssues\(\{ \.\.\.facts, stereoRefused: false \}\)/);
+  assert.match(menu, /ctx\.flatNotice\(issues\[0\]!\)/);
+  assert.match(fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8'), /flatNotice: \(issue\) => menuNotices\.push\(\[\{ kind: 'stereo-flat'/);
+  assert.match(fs.readFileSync(path.join(app, 'nvidia-3dvision.ts'), 'utf8'), /stereoRefused: true, \.\.\.fixManagerFact\(\)/);
 });
 
 // NVAPI garde dans un même processus l'état de la stéréo lu la première fois : Cyber Pinball le lisait
