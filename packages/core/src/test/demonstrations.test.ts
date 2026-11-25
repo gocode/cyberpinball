@@ -22,7 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import ts from 'typescript';
-import { DEMOS, internalFiles } from './interne';
+import { DEMOS, internalFiles, withoutInternal } from './interne';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const DOCS = DEMOS;
@@ -145,13 +145,13 @@ function callProblems(call: ts.CallExpression | ts.NewExpression, sigs: readonly
   return best ?? [];
 }
 
-test('les modules que chargent les démonstrations existent encore', () => {
+test('les modules que chargent les démonstrations existent encore', { skip: withoutInternal() }, () => {
   const gone = uses.flatMap((u) => [...new Set([...u.bindings.values()].filter((b) => !fs.existsSync(b.file)).map((b) => b.spec))].map((spec) => `${u.script} : ${spec}`));
   assert.ok(files.length > 5, `modules trouvés : ${files.length}`);
   assert.deepEqual(gone, []);
 });
 
-test('les noms que prennent les démonstrations sont encore exportés', () => {
+test('les noms que prennent les démonstrations sont encore exportés', { skip: withoutInternal() }, () => {
   const problems: string[] = [];
   for (const u of uses) {
     for (const b of u.bindings.values()) {
@@ -200,14 +200,14 @@ function callIssues(u: Use): { problems: string[]; checked: number } {
   return { problems, checked };
 }
 
-test('les appels des démonstrations donnent tout ce qu’attend l’application (hôtes simulés compris)', () => {
+test('les appels des démonstrations donnent tout ce qu’attend l’application (hôtes simulés compris)', { skip: withoutInternal() }, () => {
   const all = uses.map(callIssues);
   const checked = all.reduce((n, r) => n + r.checked, 0);
   assert.ok(checked > 50, `appels vérifiés : ${checked}`);
   assert.deepEqual(all.flatMap((r) => r.problems), []);
 });
 
-test('un hôte simulé à qui manque un membre obligatoire est relevé (le menu d’un ami sans downloads, 29/10/2026)', () => {
+test('un hôte simulé à qui manque un membre obligatoire est relevé (le menu d’un ami sans downloads, 29/10/2026)', { skip: withoutInternal() }, () => {
   const script = [
     "const { createFriendLibraryMenu } = require(path.join(WT, 'app', 'dist', 'friend-library-menu.js'));",
     'createFriendLibraryMenu({',
@@ -276,7 +276,7 @@ function unknownTexts(u: Use): { problems: string[]; named: number } {
   return { problems: [...new Set(problems)], named };
 }
 
-test('les textes traduits que nomment les démonstrations existent encore dans l’application', () => {
+test('les textes traduits que nomment les démonstrations existent encore dans l’application', { skip: withoutInternal() }, () => {
   const all = uses.map(unknownTexts);
   const named = all.reduce((n, r) => n + r.named, 0);
   assert.ok(named > 20, `textes nommés : ${named}`);
@@ -297,7 +297,7 @@ test('un libellé que l’application n’a plus est relevé', () => {
 // Incident du 29/10/2026 : demo-sante.cjs échouait (« ÉCHEC » dans son relevé) et
 // demo-sante.ps1 finissait comme une réussite. Electron rend 0 après app.quit(), quel que soit
 // process.exitCode : le script PowerShell, qui juge sur $LASTEXITCODE, ne voyait rien.
-test('une démonstration qui note son échec (process.exitCode) le rend au script : app.exit, pas app.quit', () => {
+test('une démonstration qui note son échec (process.exitCode) le rend au script : app.exit, pas app.quit', { skip: withoutInternal() }, () => {
   const lost = SCRIPTS.filter((script) => {
     const text = fs.readFileSync(path.join(DOCS, script), 'utf8');
     return /process\.exitCode\s*=/.test(text) && /\bapp\.quit\(\)/.test(text.replace(/\/\/.*$/gm, ''));
@@ -310,7 +310,7 @@ test('une démonstration qui note son échec (process.exitCode) le rend au scrip
 // dans la barre des tâches), et la page du passage en anglais avortait (ERR_FAILED). Une
 // démonstration qui détruit ou ferme une fenêtre née de createWindow garde l'application par une
 // fenêtre gardienne (`keeper`, créée hors de createWindow), détruite juste avant app.exit.
-test('une démonstration qui ferme ses fenêtres garde l’application par une fenêtre gardienne', () => {
+test('une démonstration qui ferme ses fenêtres garde l’application par une fenêtre gardienne', { skip: withoutInternal() }, () => {
   const unkept = SCRIPTS.filter((script) => {
     const text = fs.readFileSync(path.join(DOCS, script), 'utf8').replace(/\/\/.*$/gm, '');
     if (!/\bcreateWindow\(/.test(text)) return false;
@@ -324,7 +324,7 @@ test('une démonstration qui ferme ses fenêtres garde l’application par une f
 // leurs tables factices (data\cache\scripts.json) en version 3 de la lecture, l'application en était
 // à la 7 : une entrée plus ancienne est relue, le médecin relançait VPX (« spawn EFTYPE » sur la
 // fausse installation de New-FauxVpx) et ne savait plus quel PuP-Pack la table charge.
-test('le script pré-enregistré par les démonstrations est dans la version de lecture de l’application', () => {
+test('le script pré-enregistré par les démonstrations est dans la version de lecture de l’application', { skip: withoutInternal() }, () => {
   const vbs = fs.readFileSync(path.join(REPO, 'app', 'src', 'vbs.ts'), 'utf8');
   const current = Number(/const FACTS_VERSION = (\d+);/.exec(vbs)?.[1]);
   assert.ok(current > 0, 'FACTS_VERSION introuvable dans app\\src\\vbs.ts');
