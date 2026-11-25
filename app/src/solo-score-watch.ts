@@ -26,6 +26,8 @@ export interface SoloScoreWatchOptions {
   log?(line: string): void;
   /** Une partie vient de finir ou d'être quittée. */
   onGame?(game: TrackedGame, finished: boolean): void;
+  /** La table passe en partie (une partie commence, ou reprend après un instant d'attente). */
+  onPlay?(): void;
   now?(): number;
   fetch?: typeof fetch;
 }
@@ -40,6 +42,7 @@ export function watchSoloScores(opts: SoloScoreWatchOptions): SoloScoreWatch {
   let stopped = false;
   let busy = false;
   let lastIn: boolean | undefined;
+  let playing = false;
 
   const json = async (page: string): Promise<unknown> => (await get(`http://127.0.0.1:${opts.port}${page}`, { signal: AbortSignal.timeout(800) })).json();
 
@@ -68,6 +71,9 @@ export function watchSoloScores(opts: SoloScoreWatchOptions): SoloScoreWatch {
       const warm = at - firstRead < SOLO_WARMUP_MS;
       const ended = tracker.feed({ ...sample, at, inGame: sample.inGame && !warm });
       if (ended) opts.onGame?.(ended, ended.finished);
+      const nowPlaying = sample.inGame && !warm;
+      if (nowPlaying && !playing) opts.onPlay?.();
+      playing = nowPlaying;
       const line = `${sample.inGame ? 'en partie' : 'attente'} bille ${sample.ball} scores ${sample.scores.join('/')}`; // i18n-ignore : journal
       if (sample.inGame !== lastIn) opts.log?.(`Relevé en direct : ${line}.`); // i18n-ignore : journal
       lastIn = sample.inGame;

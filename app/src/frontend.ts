@@ -326,6 +326,8 @@ import {
   type RemoteJukeboxOp,
   countryName,
   locale,
+  endCardView,
+  type EndCardView,
   mentions,
   maskWords,
   jukeboxRoutes,
@@ -445,6 +447,7 @@ import { createMdnsResponder } from './mdns-responder';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
+import { createEndCard } from './carte-fin-partie';
 import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
 import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createNightMode, type NightMode } from './modenuit';
@@ -3386,6 +3389,10 @@ const gameNotices = createGameNotices({
   captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
 });
+// Fin d'une partie solo lue en direct : le score et les classements, par-dessus VPX (carte-fin-partie.ts).
+const endCard = createEndCard({ place: playfieldPlace, captureDir: process.env.CYBERPINBALL_CAPTURE, log: (line) => console.log(line) });
+/** Flip gauche sur la carte : VPX se ferme, puis le choix du joueur à défier s'ouvre sur cette table. */
+let challengeAfterGame: TableEntry | undefined;
 // Mode débogage (debogage.ts) : les mesures de tous les écrans en direct, par-dessus un seul d'entre eux ; éteint, rien ne tourne.
 let debugGpu: { at: number; gpu: { name: string; vramMb?: number } | undefined } | undefined;
 const debug = createDebug({
@@ -6380,7 +6387,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
       : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, ...dofTapEnv, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
-  if (soloSetup && soloPlan && soloPort) soloWatch = watchSoloScores({ port: soloPort, plan: soloPlan.plan, log: (line) => console.log(line), onGame: (g, finished) => console.log(`Relevé en direct (${table.id}) : partie ${finished ? 'finie' : 'quittée en cours'}, ${g.scores.join(' / ')} points, bille ${g.ball}.`) }); // i18n-ignore : journal
+  if (soloSetup && soloPlan && soloPort) soloWatch = watchSoloScores({ port: soloPort, plan: soloPlan.plan, log: (line) => console.log(line), onGame: (g, finished) => {
+        console.log(`Relevé en direct (${table.id}) : partie ${finished ? 'finie' : 'quittée en cours'}, ${g.scores.join(' / ')} points, bille ${g.ball}.`); // i18n-ignore : journal
+        if (finished) endCardAfterGame(table, g.scores, configuration?.buttons, () => game.stop());
+      }, onPlay: () => endCard.close() });
   // Mode débogage : le journal de VPX est suivi pour la cadence en direct (debogage.ts).
   debug.gameBegin({ pid: game.pid, vpxLog });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
@@ -6471,6 +6481,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   stopWaitExit?.();
+  endCard.close();
   // VPX parti : le dernier score connu est gardé ; le VPinballX.ini et memmaps reviennent comme avant.
   const trackedGames = soloWatch?.stop();
   soloSetup?.restore();
@@ -6611,12 +6622,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           await publishScores(table, kept, Boolean(double && live?.multi));
           await noteChallengeScores(table, kept, Boolean(double && live?.multi));
           levelAfterGame(kept.filter((p) => !p.of).map((p) => p.score));
+          challengeFromEndCard(table);
         })
         .catch((error: Error) => {
           console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`); // i18n-ignore : journal
           levelAfterGame();
+          challengeFromEndCard(table);
         });
-    }
+    } else challengeFromEndCard(table);
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
     // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
     // Une erreur ici (écriture refusée de social.json, essai réel du 01/11/2026) ne perd jamais la
@@ -6684,6 +6697,68 @@ async function publishScores(table: TableEntry, kept: readonly PlayedScore[], mu
     const sent = socialNet.publishScore({ board, ...(balls ? { balls } : {}), table: presenceTable(table), score: p.score, at: p.at, how: p.how });
     if (sent) console.log(`Classements (${table.id}) : ${p.score} publié (${balls ? `${balls} billes` : 'billes inconnues'}).`); // i18n-ignore : journal
   }
+}
+
+/**
+ * Partie solo finie, lue en direct : la carte de fin de partie, par-dessus VPX (carte-fin-partie.ts).
+ * Flip gauche : VPX s'arrête, puis le défi s'ouvre une fois le front-end revenu (challengeFromEndCard).
+ */
+function endCardAfterGame(table: TableEntry, scores: readonly number[], buttons: Parameters<typeof endCard.gameOver>[1], stopGame: () => void): void {
+  const score = scores[0];
+  if (scores.length !== 1 || !score) return;
+  endCard.gameOver(() => endCardFor(table, score), buttons, () => {
+    challengeAfterGame = table;
+    stopGame();
+  });
+}
+
+/**
+ * La carte de fin de partie (carte-fin-partie.ts) : ce score sur la version exacte de la table, le top 3
+ * de mon pays avec ma ligne, ma place au monde. Le score compte tout de suite, avant d'être publié.
+ */
+function endCardFor(table: TableEntry, score: number): EndCardView {
+  const net = socialNet.state();
+  const version = tableRankings.version(table);
+  const unavailable = guest.active
+    ? t('Mode invité : pas de classement')
+    : vpxInstall(loc)?.trial
+      ? t('VPX d’essai : les scores restent sur la borne')
+      : !net.enabled
+        ? t('Partage désactivé : Communauté > Partage et réseau')
+        : version.state === 'pending'
+          ? t('Empreinte de la table en calcul…')
+          : version.state === 'none'
+            ? t('Version de la table illisible : pas de classement')
+            : undefined;
+  const country = socialNet.country();
+  const challengeOff = challengesMenu.unavailableAfterGame(table);
+  return endCardView({
+    table: presenceTable(table),
+    score,
+    at: new Date().toISOString(),
+    locale: locale(),
+    ...(net.shareScores === false ? { note: t('tes scores ne sont pas publiés') } : {}),
+    ...(challengeOff ? { challengeOff } : {}),
+    ranking:
+      unavailable || version.state !== 'ok'
+        ? { unavailable: unavailable ?? '' }
+        : { store: socialNet.rankings(), board: version.board, ...(version.balls ? { balls: version.balls } : {}), me: { key: net.key.publicKey, name: net.name, ...(country ? { country } : {}) } },
+  });
+}
+
+/** Défi demandé sur la carte de fin de partie : le choix du joueur, une fois le front-end revenu et le score publié. */
+function challengeFromEndCard(table: TableEntry): void {
+  if (challengeAfterGame?.id !== table.id) return;
+  challengeAfterGame = undefined;
+  let tries = 0;
+  const open = () => {
+    if (state.phase === 'menu' && !playing && !library.isActive()) {
+      challengesMenu.sheetAction(table, () => library.leave()).run();
+      broadcast();
+    } else if (++tries < 50) setTimeout(open, 200);
+    else console.log(`Carte de fin de partie (${table.id}) : choix du défi pas ouvert, le front-end est occupé.`); // i18n-ignore : journal
+  };
+  open();
 }
 
 /**

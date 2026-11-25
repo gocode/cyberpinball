@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- End-of-game card: when a solo game ends on a table whose score is read live, a card appears over the playfield, without leaving VPX or taking focus from it. It shows your score (and "Your best!" when you beat your record), your country's top 3, your own place on a 4th line if you are not in it, then your world rank.
+- Left flipper: challenge a player on this table. Right flipper: continue, the card closes and you are back in the game. The card waits until you have finished entering your initials, and closes by itself if you start a new game.
+- Without a ranking (guest mode, sharing turned off, trial VPX…), the card shows your score and says why the ranking is missing.
 - LEDs (ROM tables): a ROM whose DOF configuration animates almost nothing on the strips gets fallback effects that react to the game (the ROM's coils, switches and lamps: flippers, slingshots, bumpers, flashers…), written separately into the DOF configuration. Only reacting effects count: a configuration that only lights the strips steadily (general illumination) is completed; a rich configuration is never touched.
 - LEDs (tables without a ROM): each event's role is read from the table's script (flipper, slingshot, bumper, plunger, ball drain, target, ramp, spinner, jackpot, multiball, extra ball, tilt, game start and end…), and each has its own effect: on every flip, a sweep rising from the bottom on the flipper's side; on ball launch, a comet climbing the shooter lane; ball drain in red; big moments with the new effect library.
 - LEDs (tables without a ROM): what happens often (flips, slingshots, bumpers, launch, targets) stays in the table's colours, the same as the wheel and the DMD; contrasting colours are kept for rare moments (jackpot, extra ball, multiball, tilt, game start and end).

@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Carte de fin de partie : à la fin d'une partie solo sur une table dont le score se lit en direct, une carte s'affiche par-dessus le plateau, sans quitter VPX ni lui prendre la main. Elle montre ton score (et "Ton record !" quand tu bats ton meilleur), le top 3 de ton pays, ta place en 4e ligne si tu n'y es pas, puis ta place au monde.
+- Flip gauche : défier un joueur sur cette table. Flip droit : continuer, la carte se ferme et tu reviens au jeu. La carte attend que tu aies fini d'entrer tes initiales, et elle se ferme d'elle-même si tu relances une partie.
+- Sans classement (mode invité, partage désactivé, VPX d'essai…), la carte donne ton score et dit pourquoi le classement manque.
 - LED (tables à ROM) : une ROM dont la configuration DOF n'anime presque rien sur les bandes reçoit des effets de repli qui réagissent au jeu (bobines, contacts, lampes de la ROM : flippers, slingshots, bumpers, flashers…), écrits à part dans la configuration DOF. Seuls les effets qui réagissent comptent : une configuration qui n'allume les bandes qu'en continu (éclairage général) est complétée ; une configuration riche n'est jamais touchée.
 - LED (tables sans ROM) : le rôle de chaque événement est lu dans le script de la table (flipper, slingshot, bumper, lanceur, bille perdue, cible, rampe, spinner, jackpot, multibille, extra-ball, tilt, début et fin de partie…), et chacun a son effet : à chaque flip, un balayage qui part du bas vers le haut du côté du flipper ; au lancer de la bille, une comète qui monte le couloir ; bille perdue en rouge ; grands moments avec les effets de la nouvelle bibliothèque.
 - LED (tables sans ROM) : ce qui arrive souvent (flips, slingshots, bumpers, lancer, cibles) reste dans les couleurs de la table, les mêmes que la roue et le DMD ; les couleurs contrastées sont réservées aux moments rares (jackpot, extra-ball, multibille, tilt, début et fin de partie).

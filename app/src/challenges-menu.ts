@@ -82,6 +82,11 @@ export interface ChallengesMenu {
   button(p: ChallengePlayer, table: ChallengeTable | undefined, score: number | undefined, source: ChallengeOffer['source'], key: string, after: () => void): HubButtonSpec;
   /** Fiche d'une table : « Défier un joueur… ». */
   sheetAction(table: TableEntry, back: () => void): Action;
+  /**
+   * Carte de fin de partie : pourquoi on ne pourra pas défier sur cette table (défis fermés, version
+   * illisible) ; la partie qui vient de finir donne le score à battre. undefined : on pourra.
+   */
+  unavailableAfterGame(table: TableEntry): string | undefined;
   /** L'écran d'un défi. */
   openChallenge(id: string, back: () => void): void;
   /** Défier ce joueur (son profil) : le choix de la table. */
@@ -486,6 +491,11 @@ export function createChallengesMenu(host: ChallengesMenuHost): ChallengesMenu {
     boardPage,
     button,
     sheetAction,
+    unavailableAfterGame(entry) {
+      const off = svc.unavailable();
+      if (off) return off;
+      return host.versionOf(entry).state === 'none' ? t('Version de la table illisible : pas de défi possible') : undefined;
+    },
     openChallenge,
     openPlayer: (p, back) => host.library.openCustom(() => buildPlayer(p, back)),
   };

@@ -251,6 +251,7 @@ export * from './typing';
 export * from './moderation';
 export * from './livechoice';
 export * from './livestart';
+export * from './cartefinpartie';
 export * from './notices';
 export * from './activity';
 export * from './news';

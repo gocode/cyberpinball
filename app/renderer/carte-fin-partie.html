@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'" />
+    <title data-i18n>Cyber Pinball — Fin de partie</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="carte-fin-partie.css" />
+  </head>
+  <body>
+    <div id="frame" class="frame">
+      <div id="card" class="card" hidden>
+        <div class="head"><span class="icon" id="icon"></span><span class="title" id="title"></span></div>
+        <div class="table" id="table"></div>
+        <div class="score" id="score"></div>
+        <div class="rows" id="rows"></div>
+        <div class="foot">
+          <div class="key key-left" id="left">
+            <span class="key-hint"><span class="key-chevron" id="left-chevron"></span><span id="left-hint"></span></span>
+            <span class="key-label"><span class="key-icon" id="left-icon"></span><span id="left-label"></span></span>
+            <span class="key-off" id="left-off"></span>
+          </div>
+          <div class="key key-right" id="right">
+            <span class="key-hint"><span id="right-hint"></span><span class="key-chevron" id="right-chevron"></span></span>
+            <span class="key-label"><span id="right-label"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="icons.js"></script>
+    <script src="carte-fin-partie.js"></script>
+  </body>
+</html>

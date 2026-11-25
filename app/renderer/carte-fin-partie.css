@@ -1,0 +1,240 @@
+/* Carte de fin de partie (carte-fin-partie.ts) : par-dessus VPX, au centre du tiers haut du plateau. */
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Cadre vu du joueur, tourné comme le plateau ; la carte le remplit. */
+.frame {
+  --a: calc(var(--w, 640px) / 640);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--w, 640px);
+  height: var(--h, 600px);
+  transform: translate(-50%, -50%) rotate(var(--turn, 0deg));
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-ui);
+  color: var(--ink);
+}
+
+.card {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: calc(22 * var(--a)) calc(28 * var(--a)) calc(20 * var(--a));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(20 * var(--a));
+  background: var(--scrim-strong);
+  font-variant-numeric: tabular-nums;
+  /* Halo dedans : la fenêtre s'arrête au bord de la carte. */
+  box-shadow: inset 0 0 calc(24 * var(--a)) rgb(0 0 0 / 0.35);
+}
+.card[hidden] {
+  display: none;
+}
+.card.record {
+  border-color: var(--signal);
+  box-shadow: inset 0 0 calc(28 * var(--a)) color-mix(in srgb, var(--signal) 22%, transparent);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--a));
+}
+.icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--signal);
+}
+/* Le conteneur prend la taille du trophée : sinon une règle générale des icônes le réduit à 1em. */
+.head > .icon,
+.icon svg {
+  width: calc(32 * var(--a));
+  height: calc(32 * var(--a));
+}
+.title {
+  font-size: calc(24 * var(--a));
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.table {
+  margin-top: calc(4 * var(--a));
+  font-size: calc(24 * var(--a));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.score {
+  margin: calc(2 * var(--a)) 0 calc(8 * var(--a));
+  font-size: calc(64 * var(--a));
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+.record .score {
+  color: var(--signal);
+}
+
+/* Lignes : place, drapeau, nom, score ; les blocs pleine largeur s'étendent sur les quatre colonnes. */
+.rows {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+  column-gap: calc(14 * var(--a));
+}
+.row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: calc(50 * var(--a));
+  box-sizing: border-box;
+  border-top: 1px solid var(--line-soft);
+  font-size: calc(24 * var(--a));
+}
+.row .rank {
+  font-weight: 700;
+  justify-self: end;
+  min-width: calc(48 * var(--a));
+  text-align: right;
+}
+.row .flag {
+  width: calc(36 * var(--a));
+  height: calc(24 * var(--a));
+  object-fit: cover;
+  border-radius: calc(3 * var(--a));
+  display: block;
+}
+.row .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row .points {
+  justify-self: end;
+  color: var(--ink-muted);
+}
+.row.mine .rank,
+.row.mine .name,
+.row.mine .points {
+  color: var(--signal);
+}
+.row.mine .name {
+  font-weight: 600;
+}
+.row.block {
+  font-size: calc(22 * var(--a));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.row.block .label {
+  grid-column: 3 / -1;
+}
+.row.world .label {
+  grid-column: 1 / 4;
+  color: var(--ink-muted);
+}
+.row.world .value {
+  justify-self: end;
+  font-weight: 700;
+}
+/* Raison et note : deux lignes au plus, la place comptée par endCardRows. */
+.row.wide {
+  min-height: calc(100 * var(--a));
+}
+.row.wide .label {
+  grid-column: 1 / -1;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.row.off .label {
+  color: var(--ink-faint);
+}
+.row.note {
+  font-size: calc(20 * var(--a));
+}
+.row.note .label {
+  color: var(--ink-muted);
+}
+
+/* Pied : un flipper de chaque côté, comme sur la borne. */
+.foot {
+  margin-top: auto;
+  padding-top: calc(12 * var(--a));
+  border-top: 1px solid var(--line-soft);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: calc(16 * var(--a));
+}
+.key {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--a));
+}
+.key-right {
+  align-items: flex-end;
+  text-align: right;
+}
+.key-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(4 * var(--a));
+  font-size: calc(20 * var(--a));
+  color: var(--ink-muted);
+}
+.key-chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--signal);
+}
+.key-chevron svg {
+  width: calc(20 * var(--a));
+  height: calc(20 * var(--a));
+}
+.key-label {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--a));
+  font-size: calc(26 * var(--a));
+  font-weight: 600;
+}
+.key-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--signal);
+}
+.key-icon svg {
+  width: calc(26 * var(--a));
+  height: calc(26 * var(--a));
+}
+.key-off {
+  font-size: calc(20 * var(--a));
+  color: var(--ink-faint);
+  max-width: calc(300 * var(--a));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.key-off:empty {
+  display: none;
+}
+.key.off .key-label,
+.key.off .key-icon,
+.key.off .key-chevron {
+  color: var(--ink-faint);
+}

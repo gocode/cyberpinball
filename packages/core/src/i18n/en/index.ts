@@ -39,6 +39,7 @@ import { messages as feedback } from './feedback';
 import { messages as history } from './history';
 import { messages as intro } from './intro';
 import { messages as ingame } from './ingame';
+import { messages as cartefinpartie } from './cartefinpartie';
 import { messages as backups } from './backups';
 import { messages as installation } from './installation';
 import { messages as avatar } from './avatar';
@@ -82,6 +83,6 @@ import { messages as challenges } from './challenges';
 import { messages as debogage } from './debogage';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, ledtest, ledanimations, hardwaredmd, dedicated, power, hours, modenuit, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads, dailytables, arena, communityhub, overtakes, anaglyph, qualitevpx, challenges, profile, debogage, systemsearch };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, ledtest, ledanimations, hardwaredmd, dedicated, power, hours, modenuit, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, cartefinpartie, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads, dailytables, arena, communityhub, overtakes, anaglyph, qualitevpx, challenges, profile, debogage, systemsearch };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));
