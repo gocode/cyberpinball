@@ -5077,8 +5077,9 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     // Relâchements compris (combinaison du mode invité) : onKeyInput les fait arriver (key-input.ts).
     // Ctrl et Maj d'un raccourci (Ctrl+Maj+D…) n'y agissent pas en MagnaSave ni en flipper (keyboardChords).
     onKeyInput(win, keyboardChords.down, keyboardChords.up);
-    // Boutons d'un joystick (Pinscape…) : comme des touches.
-    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)));
+    // Le menu ne reprend pas le premier plan pendant une partie, même si Electron le croit
+    // encore actif. Les observateurs globaux (Exit, réglages en partie) restent à l'écoute.
+    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)), () => state.phase !== 'playing');
     // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
     if (role.id === 'playfield') {
       win.on('blur', () => surpriseGesture.reset());

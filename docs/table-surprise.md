@@ -32,10 +32,12 @@ Les empreintes incluent taille et date du fichier de table, du script externe é
 
 `frontend.ts` raccorde les boutons configurés, la collection exacte, le mode invité et le lanceur existant. Une réservation commune est acquise avant `backups.yieldToGame()`, revérifiée après cette attente et libérée à chaque sortie. Exit peut invalider une préparation encore en attente. Les continuations Zen repassent par cette même porte.
 
+La navigation joystick du menu est suspendue pendant la phase de jeu, avant toute reprise de focus : Electron peut encore croire le menu actif alors que Windows a donné le clavier à VPX. Les observateurs globaux des boutons et le menu des réglages en partie restent disponibles. Exit pendant un chargement lent conserve son comportement habituel.
+
 `app/renderer/table-surprise.js` et sa feuille de style affichent uniquement le playfield, utilisent les médias locaux existants, respectent les rotations et réduisent le mouvement lorsque cette préférence est active. La minuterie du processus principal reste l'autorité, même si le rendu perd une image.
 
 ## Validation
 
-`npm run verifier -- table-surprise guestmode collections cinema i18n` contrôle la politique, les temporisations, les annulations, les commandes concurrentes, les fichiers et l'intégration. Le test Electron utilise des fichiers fictifs et une fenêtre rendue en mémoire, muette, jamais montrée. Il couvre les quatre rotations en 4K, le FHD, le titre de secours et l'annulation.
+`npm run verifier -- table-surprise joystick-menu-game guestmode collections cinema i18n` contrôle la politique, les temporisations, les annulations, les commandes concurrentes, les fichiers, le focus et l'intégration. Le test Electron utilise des fichiers fictifs et une fenêtre rendue en mémoire, muette, jamais montrée. Il couvre les quatre rotations en 4K, le FHD, le titre de secours et l'annulation.
 
 Exécuter également `npm run build`, `npm run test:electron` et `npm test` avant une contribution. Les essais réels de boutons, de lisibilité sur un pincab et du lancement de chaque moteur restent des tests humains séparés. Aucun jeu réel ni contrôleur DOF ne doit être démarré par les tests de Table surprise.

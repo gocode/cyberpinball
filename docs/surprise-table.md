@@ -32,10 +32,12 @@ Fingerprints include sizes and modification times of the table file, any externa
 
 `frontend.ts` connects configured buttons, the exact collection, guest mode and the existing launcher. A shared reservation is acquired before `backups.yieldToGame()`, rechecked after that wait and released on every exit. Exit can invalidate preparation still waiting. Zen continuations reenter the same gate.
 
+Menu joystick navigation is suspended during the playing phase before attempting to reclaim keyboard focus: Electron can still consider the menu active after Windows has handed the keyboard to VPX. Global button observers and the in-game settings menu remain available. Exit during a slow loading phase retains its usual behavior.
+
 `app/renderer/table-surprise.js` and its stylesheet affect only the playfield, use existing local media, respect rotations and reduce motion when requested. The main process timer remains authoritative even if the renderer drops a frame.
 
 ## Validation
 
-`npm run verifier -- table-surprise guestmode collections cinema i18n` checks policy, timing, cancellation, concurrent commands, files and integration. The Electron test uses fictional files and an in-memory, muted window that is never shown. It covers all four rotations in 4K, FHD, title fallback and cancellation.
+`npm run verifier -- table-surprise joystick-menu-game guestmode collections cinema i18n` checks policy, timing, cancellation, concurrent commands, files, focus and integration. The Electron test uses fictional files and an in-memory, muted window that is never shown. It covers all four rotations in 4K, FHD, title fallback and cancellation.
 
 Also run `npm run build`, `npm run test:electron` and `npm test` before contributing. Real cabinet button, readability and engine launch checks remain separate human tests. Surprise table tests must never start a real game or DOF controller.
