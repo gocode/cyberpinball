@@ -114,20 +114,16 @@ export type Nvidia3dVisionIssueId =
 
 /**
  * L'émetteur ne synchronise les lunettes que sur un mode décrit dans sa table (registre de NvStUSB,
- * que NvTimingsEd complète) : la fréquence pixel y tient sur 16 bits, en 10 kHz, soit 655,35 MHz au
- * plus (NvTimingsEd plafonne à 650). Les lunettes alternent aussi à 100 Hz au moins (50 images par œil).
- * Relevé sur la borne, 25/11/2026 : iiyama PL4380UH en 3840x2160 à 119,91 Hz, 1 075 MHz, hors table ;
- * les plus grands modes connus du pilote sont en 2560x1440 à 120 Hz.
+ * que NvTimingsEd complète). La fréquence pixel y tient sur 32 bits, en 10 kHz (relevé sur la borne,
+ * 25/11/2026) : aucune définition n'est exclue par la table elle-même, seul NvTimingsEd plafonne sa
+ * saisie à 650 MHz. Une entrée 3840x2160 à 119,91 Hz (1 075 MHz) a été ajoutée à la main pour l'iiyama
+ * PL4380UH : la 4K reste à prouver sur l'émetteur. Les lunettes alternent à 100 Hz au moins (50 images par œil).
  */
-export const NVIDIA_3DVISION_MAX_PIXEL_MHZ = 655.35;
 export const NVIDIA_3DVISION_MIN_HZ = 99;
-/** Les blancs d'un mode réduit (CVT-RB) : environ 5 % de pixels en plus de la partie visible. */
-const BLANKING = 1.05;
 
-/** Le mode de l'écran ne peut pas être synchronisé par l'émetteur (trop de pixels, ou trop lent). */
-export function nvidia3dVisionModeUnsupported(mode: { width: number; height: number; hz: number }): 'pixels' | 'hz' | undefined {
-  if (mode.hz < NVIDIA_3DVISION_MIN_HZ) return 'hz';
-  return (mode.width * mode.height * mode.hz * BLANKING) / 1e6 > NVIDIA_3DVISION_MAX_PIXEL_MHZ ? 'pixels' : undefined;
+/** Le mode de l'écran est trop lent pour les lunettes (moins de 100 Hz). */
+export function nvidia3dVisionModeUnsupported(mode: { width: number; height: number; hz: number }): 'hz' | undefined {
+  return mode.hz < NVIDIA_3DVISION_MIN_HZ ? 'hz' : undefined;
 }
 
 /** Un manque : ce qui ne va pas, et la marche à suivre. */
@@ -201,18 +197,15 @@ export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = 
       title: t('Le playfield n’est pas l’écran principal de Windows'),
       steps: [t('Le pilote NVIDIA ne montre la 3D que sur l’écran principal'), t('Paramètres de Windows, Système, Affichage : choisis l’écran du playfield et coche « En faire mon écran principal »'), t('Puis Configuration de la borne, pour que Cyber Pinball retrouve ses écrans')],
     });
-  const tooMuch = f.playfieldPrimary !== false && f.primaryMode ? nvidia3dVisionModeUnsupported(f.primaryMode) : undefined;
-  if (tooMuch && f.primaryMode) {
+  const tooSlow = f.playfieldPrimary !== false && f.primaryMode ? nvidia3dVisionModeUnsupported(f.primaryMode) : undefined;
+  if (tooSlow && f.primaryMode) {
     const mode = { width: f.primaryMode.width, height: f.primaryMode.height, hz: Math.round(f.primaryMode.hz) };
     issues.push({
       id: 'mode-unsupported',
-      title:
-        tooMuch === 'hz'
-          ? t('Playfield en {width}x{height} à {hz} Hz : les lunettes 3D Vision demandent 100 Hz au moins', mode)
-          : t('Playfield en {width}x{height} à {hz} Hz : trop de pixels pour l’émetteur 3D Vision', mode),
+      title: t('Playfield en {width}x{height} à {hz} Hz : les lunettes 3D Vision demandent 100 Hz au moins', mode),
       steps: [
-        t('L’émetteur ne synchronise les lunettes que jusqu’à 2560x1440 à 120 Hz environ, et à 100 Hz au moins'),
-        t('Pour jouer avec ces lunettes, il faut un mode de playfield dans ces limites ; sinon, prends les lunettes à filtres colorés, qui marchent à toute définition'),
+        t('Les lunettes alternent les images des deux yeux : à moins de 100 Hz, chaque œil verrait l’image clignoter'),
+        t('Passe le playfield à 100 Hz au moins (120 Hz par exemple) dans le Panneau de configuration NVIDIA ; sinon, prends les lunettes à filtres colorés, qui marchent à toute fréquence'),
       ],
     });
   }

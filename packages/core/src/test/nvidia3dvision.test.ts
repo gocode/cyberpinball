@@ -77,19 +77,20 @@ test('le pilote NVIDIA se lit par un processus neuf, jamais dans le front-end', 
   for (const id of ['0x239c4545', '0x2ec50c2b', '0x348ff8e1']) assert.ok(sonde.includes(id), id);
 });
 
-// La borne, 25/11/2026 : playfield iiyama PL4380UH en 3840x2160 à 119,91 Hz (1 075 MHz), que la table de
-// l'émetteur ne peut pas décrire (fréquence pixel sur 16 bits, 655,35 MHz au plus) : pas de 3D, même au
-// test de NVIDIA. Le dire, au lieu de laisser croire que tout est prêt.
-test('un mode de playfield hors de la table de l’émetteur est dit', () => {
-  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 119.91 }), 'pixels');
-  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 99.9 }), 'pixels');
+// La table de l'émetteur stocke la fréquence pixel sur 32 bits (relevé sur une borne réelle, 25/11/2026) :
+// la 4K à 120 Hz (1 075 MHz) y entre, seul NvTimingsEd plafonne sa saisie à 650 MHz. La définition n'exclut
+// donc rien ; seule une fréquence sous 100 Hz rend les lunettes inutilisables, et se dit.
+test('seul un playfield sous 100 Hz est dit hors de portée des lunettes', () => {
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 119.91 }), undefined, 'la 4K à 120 Hz n’est pas exclue');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 99.9 }), undefined);
   assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 60 }), 'hz');
-  assert.equal(nvidia3dVisionModeUnsupported({ width: 2560, height: 1440, hz: 120 }), undefined, 'le plus grand mode connu du pilote');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 2560, height: 1440, hz: 120 }), undefined);
   assert.equal(nvidia3dVisionModeUnsupported({ width: 1920, height: 1080, hz: 119.98 }), undefined);
-  assert.equal(nvidia3dVisionModeUnsupported({ width: 1920, height: 1080, hz: 99.93 }), undefined);
-  const [issue] = nvidia3dVisionIssues({ ...READY, primaryMode: { width: 3840, height: 2160, hz: 119.91 } }, 'win32');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 1920, height: 1080, hz: 59.94 }), 'hz');
+  assert.deepEqual(ids({ ...READY, primaryMode: { width: 3840, height: 2160, hz: 119.91 } }), []);
+  const [issue] = nvidia3dVisionIssues({ ...READY, primaryMode: { width: 3840, height: 2160, hz: 60 } }, 'win32');
   assert.equal(issue?.id, 'mode-unsupported');
-  assert.match(issue.title, /3840x2160 à 120 Hz/);
+  assert.match(issue.title, /3840x2160 à 60 Hz/);
   assert.deepEqual(ids({ ...READY, playfieldPrimary: false, primaryMode: { width: 3840, height: 2160, hz: 60 } }), ['playfield-not-primary'], 'l’écran principal n’est pas le playfield : son mode ne dit rien');
 });
 

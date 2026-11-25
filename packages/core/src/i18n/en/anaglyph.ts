@@ -109,11 +109,10 @@ export const messages: Record<string, string> = {
     'Windows Settings, System, Display: pick the playfield display and tick "Make this my main display"',
   'Puis Configuration de la borne, pour que Cyber Pinball retrouve ses écrans': 'Then Cabinet setup, so Cyber Pinball finds its displays again',
   'Playfield en {width}x{height} à {hz} Hz : les lunettes 3D Vision demandent 100 Hz au moins': 'Playfield at {width}x{height}, {hz} Hz: 3D Vision glasses need 100 Hz or more',
-  'Playfield en {width}x{height} à {hz} Hz : trop de pixels pour l’émetteur 3D Vision': 'Playfield at {width}x{height}, {hz} Hz: too many pixels for the 3D Vision emitter',
-  'L’émetteur ne synchronise les lunettes que jusqu’à 2560x1440 à 120 Hz environ, et à 100 Hz au moins':
-    'The emitter only syncs the glasses up to about 2560x1440 at 120 Hz, and at 100 Hz or more',
-  'Pour jouer avec ces lunettes, il faut un mode de playfield dans ces limites ; sinon, prends les lunettes à filtres colorés, qui marchent à toute définition':
-    'To play with these glasses, the playfield needs a mode within these limits; otherwise, use colour filter glasses, which work at any resolution',
+  'Les lunettes alternent les images des deux yeux : à moins de 100 Hz, chaque œil verrait l’image clignoter':
+    'The glasses alternate the images for each eye: below 100 Hz, each eye would see the picture flicker',
+  'Passe le playfield à 100 Hz au moins (120 Hz par exemple) dans le Panneau de configuration NVIDIA ; sinon, prends les lunettes à filtres colorés, qui marchent à toute fréquence':
+    'Set the playfield to 100 Hz or more (120 Hz for example) in the NVIDIA Control Panel; otherwise, use colour filter glasses, which work at any refresh rate',
   'Le VPX en place n’a pas le mode 3D Vision': 'The installed VPX has no 3D Vision mode',
   'Le mode 3D Vision est dans le VPX 10.8.1-5436 que Cyber Pinball installe et corrige': 'The 3D Vision mode is in the VPX 10.8.1-5436 that Cyber Pinball installs and patches',
   'Choisis cette version dans les réglages de VPX': 'Pick this version in the VPX settings',
