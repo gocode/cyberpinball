@@ -32,6 +32,7 @@ export const PAIRS = [
   { fr: 'CHANGELOG.md', en: 'CHANGELOG.en.md' },
   { fr: 'docs/fonctionnalites.md', en: 'docs/features.md' },
   { fr: 'docs/manuel.md', en: 'docs/manual.md' },
+  { fr: 'docs/table-surprise.md', en: 'docs/surprise-table.md' },
   // Document interne (non publié) : vérifié quand il est là.
   { fr: 'interne/tests-manuels/tests-manuels.md', en: 'interne/tests-manuels/manual-tests.md' },
   { fr: 'docs/design-system/README.md', en: 'docs/design-system/README.en.md' },

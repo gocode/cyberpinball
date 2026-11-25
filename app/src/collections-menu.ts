@@ -315,6 +315,8 @@ export interface CollectionsMenu {
   list(): Collection<TableEntry>[];
   /** La collection montrée : celle du mode invité s'il en impose une, sinon l'active. */
   current(): Collection<TableEntry>;
+  /** Sans repli sur Toutes : un tirage ne contourne jamais une collection vide ou supprimée. */
+  exact(): Collection<TableEntry> | undefined;
   /**
    * Ses tables, et la place de la table choisie ; `adjust` (au menu des tables) : une table choisie
    * hors de la collection (retirée des favoris, lancée depuis « Toutes les tables ») y est ramenée.
@@ -437,6 +439,7 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
   return {
     list,
     current,
+    exact: () => list().find((c) => c.id === (host.guestCollection() ?? active)),
     shelf,
     move(offset) {
       const s = shelf();

@@ -130,6 +130,8 @@ export interface LibraryHost {
   favorite?(table: TableEntry, on: boolean): void;
   /** « Ajouter à une collection… » : les collections personnelles de la table (collections-menu.ts) ; `back` rouvre la fiche. */
   tableCollections?(table: TableEntry, back: () => void): Action;
+  /** Autorisation locale explicite pour le tirage, seulement dans la gestion administrative. */
+  tableSurprise?(table: TableEntry, back: () => void): Action;
   /** « DMD sur la roue » (menu-dmd.ts) : le DMD du menu affiché ou masqué pour cette table, et sa place ; `back` : l'écran d'où on l'a ouvert. */
   menuDmd?: { detail(table: TableEntry): string; open(table: TableEntry, back: () => void): void };
   /**

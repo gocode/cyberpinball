@@ -1,0 +1,22 @@
+/** Catalogue anglais : tirage dans la collection courante. */
+export const messages: Record<string, string> = {
+  'Table surprise': 'Surprise table',
+  'Autorisée dans le tirage': 'Allowed in the draw',
+  'Exclue du tirage': 'Excluded from the draw',
+  'Confirme le contenu et les prérequis de cette entrée sur ce PC. Pour Pinball FX, confirme aussi que cette table est possédée et accessible avec le compte actuel. Une fiche ou un jeu installé ne prouve pas ces droits.': 'Confirm the content and prerequisites of this entry on this PC. For Pinball FX, also confirm that this table is owned and accessible with the current account. An entry or an installed game does not prove ownership.',
+  'Fichier et moteur trouvés': 'Table file and engine found',
+  'Prérequis inconnus ou manquants': 'Unknown or missing prerequisites',
+  'Vérifie auparavant les dépendances, les médias du pack et le fonctionnement de cette version. Toute modification de fichier ou de moteur impose une nouvelle confirmation.': 'First check the dependencies, pack media and operation of this version. Changes to checked files or the engine require a new confirmation.',
+  'Confirmer : adaptée à la famille et jouable': 'Confirm: family-friendly and playable',
+  'Confirmer : mode normal seulement et jouable': 'Confirm: normal mode only and playable',
+  'Exclure : adulte, masquée ou à vérifier': 'Exclude: adult, hidden or unverified',
+  'Retirer l’autorisation locale': 'Remove local permission',
+  'Aucune autorisation locale': 'No local permission',
+  'Aucune table éligible': 'No eligible table',
+  'Cette collection ne contient aucune table autorisée dont les prérequis sont confirmés. Un administrateur peut les vérifier dans Gérer la table > Table surprise.': 'This collection contains no permitted table with confirmed prerequisites. An administrator can check them in Manage table > Surprise table.',
+  'Table surprise interrompue': 'Surprise table interrupted',
+  'Le tirage a été interrompu. Vérifie les prérequis de la table avant de réessayer.': 'The draw was interrupted. Check the table prerequisites before trying again.',
+  'Relâche les deux flippers pour jouer · Exit : annuler': 'Release both flippers to play · Exit: cancel',
+  'Tirage en cours · Exit : annuler': 'Drawing a table · Exit: cancel',
+  'Vérification des tables autorisées…': 'Checking permitted tables…',
+};
