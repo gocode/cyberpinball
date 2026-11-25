@@ -35,6 +35,11 @@ export interface ButtonInfo {
   prompt?: string;
   /** Ce qu'est ce bouton sur une borne, rappelé pendant son relevé. */
   how?: string;
+  /**
+   * Bouton avancé : facultatif, sans touche tant qu'on n'en donne pas, rangé dans la section repliée
+   * « Boutons avancés ». Le relevé pas à pas ne le demande pas ; on le relève depuis le récapitulatif.
+   */
+  advanced?: boolean;
 }
 
 /** Ordre de l'assistant : les boutons qui pilotent l'interface d'abord, Exit avant les facultatifs. */
@@ -118,7 +123,20 @@ export const BUTTONS: readonly ButtonInfo[] = [
   },
   { id: 'volumeUp', label: 'Volume +', get how() { return t('Le son de toute la borne monte de 5 %'); }, required: false, default: 'Equal', vpx: [] },
   { id: 'volumeMute', get label() { return t('Muet'); }, get how() { return t('Coupe ou rétablit le son de toute la borne'); }, required: false, vpx: [] },
+  // Boutons avancés (section repliée « Boutons avancés ») : des actions de VPX 10.8.1 qu'aucun encodeur
+  // n'envoie d'office. Sans touche, l'action garde celle de VPX (ou aucune) : rien n'est écrit.
+  { id: 'credit2', get label() { return t('Crédit 2'); }, get how() { return t('Un deuxième monnayeur : pour insérer une deuxième pièce (ou un autre prix) sur une table qui en compte plusieurs'); }, required: false, vpx: ['Credit2'], advanced: true },
+  { id: 'credit3', get label() { return t('Crédit 3'); }, get how() { return t('Un troisième monnayeur, pour les tables qui en ont trois'); }, required: false, vpx: ['Credit3'], advanced: true },
+  { id: 'credit4', get label() { return t('Crédit 4'); }, get how() { return t('Un quatrième monnayeur, pour les tables qui en ont quatre'); }, required: false, vpx: ['Credit4'], advanced: true },
+  // Lockbar de VPX : le bouton « Fire » des flippers à barre de verrouillage (Alt gauche d'office).
+  { id: 'lockbar', get label() { return t('Fire (barre de verrouillage)'); }, get how() { return t('Le bouton de la barre de verrouillage, en bas de la façade : « Fire » sur les tables qui s’en servent (multibille, tir spécial)'); }, required: false, vpx: ['Lockbar'], advanced: true },
+  { id: 'showRules', get label() { return t('Afficher les règles'); }, get how() { return t('Affiche les règles de la table, quand elle en a'); }, required: false, vpx: ['ShowRules'], advanced: true },
+  // Le mode debug : les statistiques d'affichage de VPX en partie (PerfOverlay, F11 d'office).
+  { id: 'debug', get label() { return t('Mode debug'); }, get how() { return t('Affiche ou masque les statistiques d’affichage de VPX pendant la partie (images par seconde, temps de calcul)'); }, required: false, vpx: ['PerfOverlay'], advanced: true },
 ];
+
+/** Boutons avancés, dans l'ordre de leur section. */
+export const ADVANCED_BUTTONS: readonly ButtonInfo[] = BUTTONS.filter((b) => b.advanced);
 
 export function buttonInfo(id: ButtonId): ButtonInfo {
   return BUTTONS.find((b) => b.id === id)!;
@@ -190,7 +208,7 @@ export type SetKeys = Partial<Record<string, string>>;
 
 export interface KeySet {
   kind: 'game' | 'interface';
-  items: readonly { id: string; label: string; required: boolean }[];
+  items: readonly { id: string; label: string; required: boolean; advanced?: boolean }[];
   /** Bouton qui, une fois relevé, passe un bouton facultatif : Exit, ou Retour. */
   skip: string;
   /** Au récapitulatif : choisir (précédent, suivant), lancer le choix, sortir. */
@@ -658,6 +676,8 @@ export interface NavigationInfo {
   label: string;
   /** Obligatoire : l'assistant attend ce bouton. Facultatif : Retour le passe. */
   required: boolean;
+  /** Ce qu'est ce bouton, rappelé pendant son relevé. */
+  how?: string;
   /** Bouton de jeu qui tient ce rôle par défaut (borne d'avant les boutons de l'interface, touches par défaut). */
   game?: ButtonId;
   /** Touches de secours du clavier, toujours actives pour ce rôle et pour lui seul. */
@@ -673,7 +693,15 @@ export const NAVIGATION: readonly NavigationInfo[] = [
   { id: 'help', get label() { return t('Aide-mémoire'); }, required: false, fallback: [] },
   { id: 'settings', get label() { return t('Réglages de VPX'); }, required: false, fallback: [] },
   // Bureau Windows d'un appui, de n'importe quel écran du menu ; au bureau, le même bouton (de joystick) ramène le menu.
-  { id: 'desktop', get label() { return t('Bureau Windows'); }, required: false, fallback: [] },
+  // Un seul bouton : il quitte vers Windows, et un bouton de joystick ramène aussi le front-end (watchDesktopButton).
+  // Une touche du clavier ne le ramène pas (un raccourci global sans Ctrl la prendrait à tout Windows) : Ctrl+Maj+D, Start maintenu ou la barre des tâches.
+  {
+    id: 'desktop',
+    get label() { return t('Bureau Windows'); },
+    get how() { return t('Ouvre le bureau de Windows. Un bouton de joystick ramène aussi le front-end ; une touche du clavier non : Ctrl+Maj+D ou la barre des tâches'); },
+    required: false,
+    fallback: [],
+  },
   // Configuration de la borne (assistant, étapes seules) : en sortir sans rien écrire, d'un appui (wizardsteps.ts, quitButtonActs).
   { id: 'quit', get label() { return t('Quitter sans enregistrer'); }, required: false, fallback: [] },
 ];
@@ -1043,6 +1071,12 @@ export const VPX_INPUT_DEFAULTS: Readonly<Record<string, number>> = {
   ToggleStereo: 67,
 };
 
+/**
+ * Actions de VPX sans touche par défaut qu'un bouton avancé peut recevoir (ShowRules) : rendues à VPX,
+ * c'est-à-dire vidées, quand le bouton n'a plus de touche (vpxInputSettings, `released`).
+ */
+export const VPX_ACTIONS_WITHOUT_KEY: readonly string[] = ['ShowRules'];
+
 /** Libellés de VPX des actions qu'une touche de bouton peut faire taire. */
 const VPX_ACTION_LABELS: Record<string, string> = {
   get LeftStagedFlipper() { return t('Flipper gauche en deux temps'); },
@@ -1234,12 +1268,14 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
     const scancode = code === undefined ? undefined : sdlScancode(code);
     // Bouton de joystick : la touche du clavier de VPX reste aussi, sauf si un autre bouton l'a prise.
     const joystick = code !== undefined && joystickButton(code) ? code : undefined;
+    // Bouton avancé sans touche : son action reste telle quelle (la touche de VPX, ou aucune), traitée plus bas.
+    if (b.advanced && code === undefined) continue;
     for (const action of vpxActionsOf(b, buttons)) {
       driven.add(action);
       // Touche de secours au clavier : celle du bouton par défaut (le flipper reste sur Maj, même pour
       // UIUp), pas celle de VPX pour l'action, qui croise flippers et MagnaSave dans son menu.
-      const fallback = (b.default ? sdlScancode(b.default) : undefined) ?? VPX_INPUT_DEFAULTS[action]!;
-      put(action, scancode !== undefined ? [scancode] : free(action, [fallback]), joystick);
+      const fallback = (b.default ? sdlScancode(b.default) : undefined) ?? VPX_INPUT_DEFAULTS[action];
+      put(action, scancode !== undefined ? [scancode] : fallback === undefined ? [] : free(action, [fallback]), joystick);
     }
   }
 
@@ -1247,7 +1283,7 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
   settings.push(...vpxVolumeSettings(doc, written));
   for (const action of VPX_VOLUME_ACTIONS) driven.add(action);
 
-  for (const action of Object.keys(VPX_INPUT_DEFAULTS)) {
+  for (const action of [...Object.keys(VPX_INPUT_DEFAULTS), ...VPX_ACTIONS_WITHOUT_KEY]) {
     if (driven.has(action)) continue;
     const key = mappingKey(action);
     const current = doc.get(VPX_INPUT_SECTION, key);

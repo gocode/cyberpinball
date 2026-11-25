@@ -198,6 +198,16 @@ body {
   color: var(--warning);
 }
 
+/* Section « Boutons avancés » : son entête sur toute la largeur, repliée ou dépliée ; ses boutons en retrait de couleur. */
+.buttons-list li.advanced-head {
+  grid-column: 1 / -1;
+  cursor: pointer;
+}
+
+.buttons-list li.indent {
+  border-style: dashed;
+}
+
 .buttons-list li.tried b::after {
   content: ' ✓';
   color: var(--signal);

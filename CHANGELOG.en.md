@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Advanced buttons: in the "Buttons" step (wizard and the cabinet buttons settings), a collapsed section at the bottom of the list lets you assign Credit 2, 3 and 4 (other coin slots), Fire (the lockbar), Show rules and Debug mode (VPX display statistics). All are optional and empty by default; the wizard does not ask for them one by one.
+- Windows desktop: the button screen now says that the same joystick button brings Cyber Pinball back, and that with a keyboard key you need Ctrl+Shift+D or the taskbar.
+- Scores: each game's score is now read while you play, not only when VPX closes. A table session with several games keeps every one of them on the scoreboard, each with its time.
+- Scores: a game left midway (on ball 2, for instance) keeps its last score and counts like any other: the cabinet scoreboard, rankings, challenges and level. It is no longer set aside because it was not finished.
+- The reading goes through VPX's inspector, as for games with friends, without copying or changing your table; it needs the VPX firewall rule (System menu > Community > Community settings > Sharing and network). Without it, the score is read as before, when VPX closes.
 - LEDs: a much richer effect library prepares the next animations (33 looping effects in 12 families: breathing, waves, gradients, comets with trails, beams rising or falling, light packets crossing each other, twinkling, sparks, slow rainbows, fire, aurora, chasers; and 11 one-shot effects for game events).
 - LEDs: each table's colour is now measured as several dominant colours of its artwork (up to four), and an all-green table keeps green LEDs; each table's first measure is redone once.
 - NVIDIA 3D Vision glasses: a game launched in 3D that plays flat now says so on screen, over the game, with the reason ("3D Fix Manager is blocking 3D: close it" when it is open). Cyber Pinball tries to turn 3D on again for each game: closing 3D Fix Manager is enough, no need to restart Cyber Pinball.

@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { toPhysicalScreen } from '../fingerprint';
 import {
+  ADVANCED_BUTTONS,
+  VPX_ACTIONS_WITHOUT_KEY,
+  VPX_VOLUME_ACTIONS,
   BUTTONS,
   buttonInfo,
   buttonKeys,
@@ -88,6 +91,11 @@ test('les touches par défaut des boutons sont celles de VPX', () => {
     for (const action of b.vpx) {
       // Menu de VPX : flippers et MagnaSave y sont croisés à dessein (UIUp et UIDown aux flippers).
       if (action.startsWith('UI')) continue;
+      // Bouton avancé : sans touche d'encodeur ; son action a la touche de VPX, ou aucune (ShowRules).
+      if (b.advanced) {
+        assert.ok(action in VPX_INPUT_DEFAULTS || VPX_ACTIONS_WITHOUT_KEY.includes(action), `${b.label} -> ${action} : action de VPX connue`);
+        continue;
+      }
       assert.equal(VPX_INPUT_DEFAULTS[action], sdlScancode(b.default!), `${b.label} -> ${action}`);
     }
   }
@@ -592,7 +600,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
     serviceUp: 'Escape',
   };
   let keys: CabinetButtons = {};
-  for (const b of BUTTONS) {
+  for (const b of BUTTONS.filter((b) => !b.advanced)) {
     const record = recordButton(keys, b.id, pressed[b.id]!);
     assert.equal(record.refused, undefined, `${b.id} : ${record.refused}`);
     keys = record.keys;
@@ -667,7 +675,7 @@ test('chaque bouton, du jeu et de l’interface, se relève sur une touche du cl
   for (const set of [GAME_KEYS, INTERFACE_KEYS]) {
     for (const [i, item] of set.items.entries()) {
       // Une touche libre, que VPX connaît et qu'aucun autre bouton ne tient : F1, F2…
-      const key = `F${i + 1}`;
+      const key = `F${(i % 24) + 1}`;
       assert.equal(sdlScancode(key) !== undefined, true, key);
       const byKey = recordKey(set, {}, item.id, key);
       assert.equal(byKey.refused, undefined, `${set.kind} ${item.id} : ${byKey.refused}`);

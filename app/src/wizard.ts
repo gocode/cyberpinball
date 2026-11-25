@@ -160,6 +160,7 @@ import {
   type SyncFinding,
   type VpxChange,
 } from '@cyberpinball/core';
+import { advancedSummary, buttonRows } from './advanced-buttons';
 import { orientation } from './display-orientation';
 import { observedDisplays, orientationSimulated } from './displays';
 import { qrRows } from './remote-qr';
@@ -317,6 +318,8 @@ interface ButtonCapture {
   action: number;
   tried: Set<string>;
   notice?: string;
+  /** Section « Boutons avancés » dépliée (repliée par défaut : advanced-buttons.ts). */
+  advancedOpen?: boolean;
 }
 
 interface SoundStep {
@@ -1116,9 +1119,11 @@ const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
  * Au relevé, chaque appui est relevé : rien ne s'y choisit aux boutons.
  */
 const CAPTURE_ACTIONS = ['previous', 'skip', 'finish', 'defaults', 'restart'] as const;
+/** Plie ou déplie la section « Boutons avancés » (la ligne qui l'ouvre, au récapitulatif). */
+const ADVANCED_ACTION = 'advanced';
 /** Premier écran d'une borne sans boutons enregistrés : garder les touches actuelles, ou les modifier. */
 const CHOICE_ACTIONS = ['keep', 'modify'] as const;
-type ButtonsAction = (typeof SUMMARY_ACTIONS)[number] | (typeof CAPTURE_ACTIONS)[number] | (typeof CHOICE_ACTIONS)[number];
+type ButtonsAction = (typeof SUMMARY_ACTIONS)[number] | (typeof CAPTURE_ACTIONS)[number] | (typeof CHOICE_ACTIONS)[number] | typeof ADVANCED_ACTION;
 
 /** Marque de « Relevé : … » après « Touches par défaut » (le texte affiché est lastLabel). */
 const DEFAULTS_LAST = 'defaults';
@@ -1363,9 +1368,12 @@ const BOUNCE_MS = 1000;
 function nextButton(capture: ButtonCapture): void {
   const items = capture.set.items;
   const order = [...items.keys()].map((i) => (capture.index + 1 + i) % items.length);
-  const next = order.find((i) => !capture.answered.has(items[i]!.id));
-  if (next === undefined) enterButtonsSummary(capture);
-  else capture.index = next;
+  // Les boutons avancés ne se demandent pas pas à pas : ils se relèvent depuis le récapitulatif.
+  const next = order.find((i) => !items[i]!.advanced && !capture.answered.has(items[i]!.id));
+  if (next === undefined) {
+    for (const b of items) if (b.advanced) capture.answered.add(b.id);
+    enterButtonsSummary(capture);
+  } else capture.index = next;
 }
 
 /** Récapitulatif, curseur sur « Valider » ; les essais des touches inchangées restent acquis. */
@@ -1383,6 +1391,7 @@ function redoingOne(capture: ButtonCapture): boolean {
 function redoButton(capture: ButtonCapture, index: number): void {
   if (!capture.set.items[index]) return;
   capture.index = index;
+  if (capture.set.items[index]!.advanced) capture.advancedOpen = true;
   wizard.phase = capturePhase(capture.set);
 }
 
@@ -1408,10 +1417,15 @@ function handleButtonsSummaryKey(input: Input): void {
   touched(capture);
   const code = input.code;
   const { keys, set } = capture;
-  const choices = SUMMARY_ACTIONS.length + set.items.length;
+  const rows = buttonRows(set.items, Boolean(capture.advancedOpen));
+  const choices = SUMMARY_ACTIONS.length + rows.length;
   const move = (step: number) => (capture.action = (capture.action + step + choices) % choices);
-  const run = () =>
-    capture.action < SUMMARY_ACTIONS.length ? runButtonsAction(SUMMARY_ACTIONS[capture.action]!) : redoButton(capture, capture.action - SUMMARY_ACTIONS.length);
+  const run = () => {
+    if (capture.action < SUMMARY_ACTIONS.length) return runButtonsAction(SUMMARY_ACTIONS[capture.action]!);
+    const row = rows[capture.action - SUMMARY_ACTIONS.length]!;
+    if (row.kind === 'advanced') runButtonsAction(ADVANCED_ACTION);
+    else redoButton(capture, row.index);
+  };
   const tried = set.tried.find((id) => keys[id] === code);
   if (tried) capture.tried.add(tried);
   const own = (role: keyof KeySet['move']) => keys[set.move[role]] === code;
@@ -1482,6 +1496,11 @@ function runButtonsAction(action: ButtonsAction): void {
       return startCapture(INTERFACE_KEYS);
     case 'previous':
       return previousButton();
+    case 'advanced':
+      // Plier ou déplier la section : au récapitulatif seulement ; la ligne garde le curseur.
+      if (!isSummaryPhase(wizard.phase)) return;
+      capture.advancedOpen = !capture.advancedOpen;
+      return;
     case 'skip':
       if (wizard.phase !== capturePhase(set)) return;
       return skipButton(capture);
@@ -1826,6 +1845,7 @@ const ACTION_LABELS: Record<ButtonsAction, string> = {
   get restart() { return t('Tout modifier'); },
   get keep() { return t('Garder ces touches'); },
   get modify() { return t('Modifier mes boutons'); },
+  get advanced() { return t('Boutons avancés'); },
 };
 
 /**
@@ -1842,7 +1862,22 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const inForceSet = inForceKeys(set);
   // Touche en vigueur d'un bouton, si un autre bouton du relevé ne l'a pas reprise (recordKey, `taken`).
   const holderOf = (id: string) => set.items.find((o) => o.id !== id && inForceSet[id] && capture.keys[o.id] === inForceSet[id]);
-  const list = set.items.map((b, i) => {
+  // La section « Boutons avancés » : repliée, sauf au relevé de l'un d'eux ou si on l'a dépliée.
+  const open = Boolean(capture.advancedOpen) || (!summary && Boolean(set.items[capture.index]?.advanced));
+  const rows = buttonRows(set.items, open, !summary && Boolean(set.items[capture.index]?.advanced));
+  const list = rows.map((row, position) => {
+    if (row.kind === 'advanced') {
+      return {
+        label: t('Boutons avancés'),
+        key: advancedSummary(set.items, capture.keys, open),
+        state: 'done advanced-head',
+        selected: summary && capture.action === SUMMARY_ACTIONS.length + position,
+        tried: false,
+        act: { type: 'buttons', action: ADVANCED_ACTION },
+      };
+    }
+    const i = row.index;
+    const b = set.items[i]!;
     const code = capture.keys[b.id];
     const answered = capture.answered.has(b.id);
     // Sans touche parce qu'un autre bouton l'a reprise (relevé, ou touche en vigueur pas encore
@@ -1863,8 +1898,10 @@ function buttonsView(index: number, base: Record<string, unknown>) {
                 ? t('à relever')
                 : t('facultatif'),
       state: lostTo ? `${state} lost` : state,
-      selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
+      selected: summary && capture.action === SUMMARY_ACTIONS.length + position,
       tried: summary && capture.tried.has(b.id),
+      act: { type: 'button', index: i },
+      ...(b.advanced && { indent: true }),
     };
   });
   // « Valider » indisponible tant qu'un bouton changé reste à essayer : grisé, sa raison dessous dès l'arrivée.
@@ -2040,7 +2077,7 @@ function choiceView(common: Record<string, unknown>, inForceSet: SetKeys) {
     // Le nom de l'étape est dans la frise du haut (wizard-progress.ts).
     name: '',
     details: t('Ceux qui font circuler dans le front-end et dans l’assistant. Touches par défaut des encodeurs : la plupart des bornes les envoient déjà.'),
-    buttons: capture.set.items.map((b) => ({ label: b.label, key: inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? t('aucune') : t('facultatif'), state: 'done' })),
+    buttons: capture.set.items.filter((b) => !b.advanced).map((b) => ({ label: b.label, key: inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? t('aucune') : t('facultatif'), state: 'done' })),
     actions: CHOICE_ACTIONS.map((id, i) => ({ id, label: ACTION_LABELS[id], selected: i === capture.action })),
     notice: seconds === undefined ? undefined : t('Sans réponse dans {n} s : ces touches sont gardées, l’assistant passe aux écrans.', { n: seconds }),
     // VPX en cours d'installation : le clavier marche tout de suite, les joysticks seront lus à la fin.
@@ -3840,10 +3877,11 @@ function progressCount(): string | undefined {
   if (capture && wizard.phase === capturePhase(capture.set)) {
     const items = capture.set.items;
     const button = items[capture.index]!;
+    if (button.advanced) return t('Bouton avancé');
     const required = items.filter((b) => b.required).length;
     return button.required
       ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
-      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: items.length - required });
+      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: items.filter((b) => !b.advanced).length - required });
   }
   if (wizard.phase === 'assign' && ROLES[wizard.roleIndex]) return t('Rôle {n} sur {total}', { n: wizard.roleIndex + 1, total: ROLES.length });
   const sound = wizard.sound;

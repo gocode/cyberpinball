@@ -149,7 +149,7 @@ test('la règle suit VPX quand sa version change : jonction déplacée, règle �
     // L'application relit la règle avant chaque partie entre amis.
     const front = frontendSource();
     assert.match(front, /vpx: \(\) => vpxFirewallTargets\(vpxInstall\(loc\)\?\.exe\)/);
-    assert.match(front, /const inspectorReady = hooks\.double && !displayMode && simulated === undefined \? inspectorFor\(socialFirewall, /);
+    assert.match(front, /const inspectorReady = \(hooks\.double \|\| \(!hooks\.record && !autoStopAfterMs\)\) && !displayMode && simulated === undefined \? inspectorFor\(socialFirewall, /);
     assert.match(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'vpx-inspector.ts'), 'utf8'), /const state = await firewall\.checkVpx\(\)/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

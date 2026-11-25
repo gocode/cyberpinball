@@ -451,6 +451,8 @@ import { createTableRankings, playerStatus } from './table-rankings';
 import { createRemoteRanks } from './remote-ranks';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
+import { prepareSoloInspector, restoreSoloInspector, type SoloInspectorSetup } from './solo-inspector-setup';
+import { watchSoloScores, type SoloScoreWatch } from './solo-score-watch';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
@@ -3107,6 +3109,8 @@ const tableDoubles = createTableDoubles({
   log: (line) => console.log(line),
 });
 tableDoubles.sweep();
+// Un arrêt brutal pendant une partie seul : le VPinballX.ini et memmaps remis comme avant (solo-inspector-setup.ts).
+restoreSoloInspector(loc.dataDir, (line) => console.log(line));
 const liveGames = createLiveGames({
   net: socialNet,
   dataDir: loc.dataDir,
@@ -3253,7 +3257,7 @@ function playFromNotice(table: TableEntry): void {
 /** Mon record sur une table : le meilleur relevé par le niveau, ou une partie de cette borne au tableau des scores. */
 function myTableBest(table: TableEntry): number | undefined {
   const best = levelTracker.state().bests[tableKey(presenceTable(table))] ?? 0;
-  const played = tableScores.board(table, 'all').lines.find((l) => l.at && !l.partial)?.score ?? 0;
+  const played = tableScores.board(table, 'all').lines.find((l) => l.at)?.score ?? 0;
   return Math.max(best, played) || undefined;
 }
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
@@ -5936,7 +5940,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
   displayMode = mode === 'display';
   // Partie entre amis : la règle du pare-feu de VPX relue pendant le chargement, pour l'inspector de VPX (vpx-inspector.ts).
-  const inspectorReady = hooks.double && !displayMode && simulated === undefined ? inspectorFor(socialFirewall, (line) => console.log(line)) : Promise.resolve(undefined);
+  // Partie seul : la même règle, pour le relevé du score en direct (solo-score-watch.ts).
+  const inspectorReady = (hooks.double || (!hooks.record && !autoStopAfterMs)) && !displayMode && simulated === undefined ? inspectorFor(socialFirewall, (line) => console.log(line)) : Promise.resolve(undefined);
   guest.releaseAll();
   state = { ...state, phase: 'loading', help: false };
   // La musique d'une ROM qui s'enregistre cède la place à la partie, tout de suite.
@@ -6254,10 +6259,17 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const dofTapEnv = dofTap ? { env: dofTap.env } : {};
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
+  // Partie seul : le score relevé pendant toute la session, par l'inspector de VPX (solo-score-watch.ts) ; table jamais copiée ni modifiée.
+  let soloSetup: SoloInspectorSetup | undefined;
+  let soloWatch: SoloScoreWatch | undefined;
+  const soloPlan = simulated === undefined && !double && !vrGame && !recordIni && !otherVpx && !displayMode && mode !== 'display' && !autoStopAfterMs && scoresBefore ? tableScores.solo(table) : undefined;
+  const soloPort = soloPlan ? inspector?.port : undefined;
+  if (soloPlan && soloPort) soloSetup = prepareSoloInspector({ dataDir: loc.dataDir, ini: activeVpxIni(loc), tableFolder: table.folder, games: soloPlan.games, states: soloPlan.plan.states, port: soloPort, log: (line) => console.log(line) });
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}), ...(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE ? { crashCode: Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_PLANTAGE) } : {}) })
       : launchVpx({ exe: install.exe, ini: otherVpx ? undefined : (vrGame?.ini ?? double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)), table: played.file, display: displayMode, version: install.version, tableIni: classicTableIni, ...dofTapEnv, vpxPrefDir: vpxPrefDir(install.version), ...vpxEnv, onVr, onPlaying, onForeground, onWindows });
+  if (soloSetup && soloPlan && soloPort) soloWatch = watchSoloScores({ port: soloPort, plan: soloPlan.plan, log: (line) => console.log(line), onGame: (g, finished) => console.log(`Relevé en direct (${table.id}) : partie ${finished ? 'finie' : 'quittée en cours'}, ${g.scores.join(' / ')} points, bille ${g.ball}.`) }); // i18n-ignore : journal
   // Mode débogage : le journal de VPX est suivi pour la cadence en direct (debogage.ts).
   debug.gameBegin({ pid: game.pid, vpxLog });
   // Arrêt demandé par Cyber Pinball (Exit, casque perdu, partie entre amis…) : une fin voulue, pas un plantage.
@@ -6348,6 +6360,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   stopWaitExit?.();
+  // VPX parti : le dernier score connu est gardé ; le VPinballX.ini et memmaps reviennent comme avant.
+  const trackedGames = soloWatch?.stop();
+  soloSetup?.restore();
   stopOtherExit?.();
   dofTap?.stop();
   vrFront.vrGameStop = undefined;
@@ -6479,13 +6494,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Les scores de la partie, datés, au tableau des scores de la table ; sans retarder le retour au menu.
     if (!autoStopAfterMs && scoresBefore) {
       tableScores
-        .finish(table, scoresBefore, double ? { live: { ...(live?.score ? { score: live.score } : {}) } } : { recordsBefore, recordsAfter })
+        .finish(table, scoresBefore, double ? { live: { ...(live?.score ? { score: live.score } : {}) } } : { recordsBefore, recordsAfter, ...(trackedGames?.length ? { tracked: trackedGames } : {}) })
         .then(async (kept) => {
           if (kept.length) broadcast();
           await publishScores(table, kept, Boolean(double && live?.multi));
           await noteChallengeScores(table, kept, Boolean(double && live?.multi));
-          // Une partie quittée en cours (partial) reste au tableau de la borne : ni classement, ni défi, ni record du niveau.
-          levelAfterGame(kept.filter((p) => !p.of && !p.partial).map((p) => p.score));
+          levelAfterGame(kept.filter((p) => !p.of).map((p) => p.score));
         })
         .catch((error: Error) => {
           console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`); // i18n-ignore : journal
@@ -6548,7 +6562,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
  * ni une partie à plusieurs (on ne sait pas qui joue après le joueur 1).
  */
 async function publishScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
-  const solo = kept.filter((p) => !p.of && !p.partial);
+  const solo = kept.filter((p) => !p.of);
   if (guest.active || multi || !solo.length) return;
   // VPX d'essai (vpx-essai.ts) : autre physique (secousses, lanceur), les scores restent sur la borne.
   if (vpxInstall(loc)?.trial) return void console.log(`Classements (${table.id}) : non publiés, partie jouée avec le VPX d'essai.`); // i18n-ignore : journal
@@ -6567,7 +6581,7 @@ async function publishScores(table: TableEntry, kept: readonly PlayedScore[], mu
  * Mêmes règles que les classements : ni invité, ni partie à plusieurs, ni VPX d'essai.
  */
 async function noteChallengeScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
-  const solo = kept.filter((p) => !p.of && !p.partial);
+  const solo = kept.filter((p) => !p.of);
   if (guest.active || multi || !solo.length || vpxInstall(loc)?.trial) return;
   try {
     const board = boardKey(await liveGames.versionOf(table));

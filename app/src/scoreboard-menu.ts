@@ -103,7 +103,7 @@ function lineView(line: BoardLine, now: Date): ScoreboardLineView {
     name,
     ...(line.initials ? {} : { anonymous: true }),
     score: formatNumber(line.score),
-    when: line.partial ? t('{when} · partie quittée', { when: whenLabel(line, now) }) : whenLabel(line, now),
+    when: whenLabel(line, now),
     ...(line.rank === 1 ? { first: true } : {}),
   };
 }

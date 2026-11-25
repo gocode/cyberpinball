@@ -253,7 +253,13 @@ export type ButtonId =
   | 'nudgeCenter'
   | 'volumeDown'
   | 'volumeUp'
-  | 'volumeMute';
+  | 'volumeMute'
+  | 'credit2'
+  | 'credit3'
+  | 'credit4'
+  | 'lockbar'
+  | 'showRules'
+  | 'debug';
 
 /**
  * Button -> key it sends (KeyboardEvent.code: "ShiftLeft", "Digit1"...).

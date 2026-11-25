@@ -156,6 +156,7 @@ const TOTAL_TIMEOUT_ALLOWED: Record<string, { count: number; how: string }> = {
   'app/src/account-service.ts': { count: 1, how: 'POST au service du compte : réponse de quelques octets, jamais réessayé (non idempotent)' },
   'app/src/feedback-service.ts': { count: 1, how: 'POST d’un retour : réponse de quelques octets, jamais réessayé (non idempotent)' },
   'app/src/dmd-watch.ts': { count: 1, how: 'serveur local du DMD, sur la machine même' },
+  'app/src/solo-score-watch.ts': { count: 1, how: 'inspector de VPX, sur la machine même : relevé de 800 ms répété chaque seconde' },
   'app/src/table-rules.ts': { count: 1, how: 'vignette YouTube : quelques Ko, abandonnée sans dommage' },
   'app/src/jukebox-library.ts': { count: 1, how: 'vignette YouTube : quelques Ko, abandonnée sans dommage' },
 };

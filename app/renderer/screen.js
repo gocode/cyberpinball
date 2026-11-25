@@ -36,8 +36,8 @@ function renderButtons(state) {
   actions.replaceChildren();
   for (const [index, b] of (state.buttons ?? []).entries()) {
     const li = document.createElement('li');
-    li.className = `${b.state}${b.selected ? ' selected' : ''}${b.tried ? ' tried' : ''}`;
-    li.dataset.act = JSON.stringify({ type: 'button', index });
+    li.className = `${b.state}${b.selected ? ' selected' : ''}${b.tried ? ' tried' : ''}${b.indent ? ' indent' : ''}`;
+    li.dataset.act = JSON.stringify(b.act ?? { type: 'button', index });
     const label = document.createElement('span');
     label.textContent = b.label;
     const key = document.createElement('b');

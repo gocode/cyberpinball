@@ -17,7 +17,6 @@ import {
   inPeriod,
   loadScoreJournal,
   periodStart,
-  readRomGameOver,
   readRomLastGame,
   romPlayedScores,
   saveScoreJournal,
@@ -226,7 +225,7 @@ const { scoreboardView, scoresSummary } = require(path.join(REPO_ROOT, 'app', 'd
   scoresSummary(all: Board, today: Board): string;
 };
 
-function cabinet(memory: RomMemory = WPC): { dir: string; table: TableEntry; nv: string } {
+function cabinet(): { dir: string; table: TableEntry; nv: string } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tableau-scores-'));
   const folder = path.join(dir, 'tables', 'Terminator 2');
   fs.mkdirSync(path.join(folder, 'pinmame', 'nvram'), { recursive: true });
@@ -234,8 +233,8 @@ function cabinet(memory: RomMemory = WPC): { dir: string; table: TableEntry; nv:
   const cache = path.join(dir, 'data', 'cache', 'cartes-memoire');
   fs.mkdirSync(cache, { recursive: true });
   fs.writeFileSync(path.join(cache, 'index.json'), JSON.stringify({ t2_l8: 'maps/williams/wpc/t2_l8.map.json' }));
-  fs.writeFileSync(path.join(cache, 'maps_williams_wpc_t2_l8.map.json'), JSON.stringify(memory.map));
-  fs.writeFileSync(path.join(cache, 'platform_williams-wpc-8K.json'), JSON.stringify(memory.platform));
+  fs.writeFileSync(path.join(cache, 'maps_williams_wpc_t2_l8.map.json'), JSON.stringify(WPC.map));
+  fs.writeFileSync(path.join(cache, 'platform_williams-wpc-8K.json'), JSON.stringify(WPC.platform));
   const nv = path.join(folder, 'pinmame', 'nvram', 't2_l8.nv');
   fs.writeFileSync(nv, wpc([78_320_570]));
   const table: TableEntry = { id: 'Terminator 2/Terminator 2.vpx', emulator: 'vpx', file: path.join(folder, 'Terminator 2.vpx'), folder, title: 'Terminator 2', infoFile: path.join(folder, 'Terminator 2.info'), info: {} };
@@ -311,94 +310,5 @@ test('table originale : seuls les scores entrés au tableau d’honneur sont gar
   // Une période vide le dit.
   const empty = scoreboardView(() => ({ lines: [], games: 0, tableBoard: false, everyGame: true, romWithoutMap: false }), 'today', NOW);
   assert.deepEqual(empty.empty, { title: 'Aucun score aujourd’hui', detail: 'Les parties jouées aujourd’hui s’inscrivent ici.' });
-  fs.rmSync(dir, { recursive: true, force: true });
-});
-
-// ---------------------------------------------------------------------------
-// Table quittée en cours de partie (correctif du 23/11/2026, rapport DfHR84t6Fg) : la ROM n'écrit
-// sa mémoire qu'à l'arrêt de PinMAME ; si « game_over » y est faux, la partie n'était pas finie.
-// Le score est gardé, marqué « partial », et jamais publié.
-
-const withGameOver = (game_over: object): RomMemory => ({ ...WPC, map: { ...WPC.map, game_state: { ...(WPC.map as { game_state: object }).game_state, game_over } } as unknown as RomMemory['map'] });
-/** WPC avec « game_over » en 6040 (booléen : 1 = partie finie). */
-const WPC_OVER = withGameOver({ label: 'Game Over', start: 6040, encoding: 'bool' });
-
-function wpcOver(last: number[], over: number, board?: [string, number][]): Buffer {
-  const nv = wpc(last, board);
-  nv[6040] = over;
-  return nv;
-}
-
-test('ROM : « partie finie » lue dans la mémoire, avec son masque et son inversion ; inconnue quand la carte ne la situe pas', () => {
-  assert.equal(readRomGameOver(WPC_OVER, wpcOver([10], 1)), true);
-  assert.equal(readRomGameOver(WPC_OVER, wpcOver([10], 0)), false);
-  // Inversion (Retour vers le futur) : l'octet à zéro, c'est la partie finie.
-  const inverted = withGameOver({ start: 6040, encoding: 'bool', invert: true });
-  assert.equal(readRomGameOver(inverted, wpcOver([10], 0)), true);
-  assert.equal(readRomGameOver(inverted, wpcOver([10], 1)), false);
-  // Masque (Stern SAM) : seuls les bits du masque comptent.
-  const masked = withGameOver({ start: 6040, encoding: 'bool', mask: '0xFE', invert: true });
-  assert.equal(readRomGameOver(masked, wpcOver([10], 0x01)), true, 'le bit 0 est hors du masque');
-  assert.equal(readRomGameOver(masked, wpcOver([10], 0x04)), false);
-  // Inconnu : carte sans game_over, hors de la NVRAM (Stern SAM : parfois en RAM), mémoire trop courte, autre encodage.
-  assert.equal(readRomGameOver(WPC, wpcOver([10], 0)), undefined, 'carte sans game_over');
-  assert.equal(readRomGameOver(withGameOver({ start: '0x02000100', encoding: 'bool' }), wpcOver([10], 0)), undefined, 'hors de la NVRAM');
-  assert.equal(readRomGameOver(WPC_OVER, Buffer.alloc(100)), undefined, 'mémoire trop courte');
-  assert.equal(readRomGameOver(withGameOver({ start: 6040, encoding: 'int' }), wpcOver([10], 0)), undefined, 'pas un booléen');
-});
-
-test('partie quittée : les scores sont marqués, passent le journal et l’écran, et ne sont jamais des scores finals', () => {
-  const when = NOW.toISOString();
-  assert.deepEqual(romPlayedScores([1], [5_000], [], when, true), [{ at: when, score: 5_000, partial: true, how: 'rom' }]);
-  assert.deepEqual(romPlayedScores([1], [5_000], [], when), [{ at: when, score: 5_000, how: 'rom' }], 'sans la marque : finie, comme avant');
-  // Le journal garde la marque d'une écriture à l'autre.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scores-'));
-  const file = path.join(dir, 'scores.json');
-  const journal = emptyScoreJournal();
-  addPlayed(journal, 'T2/t2.vpx', [{ at: when, score: 5_000, partial: true, how: 'rom' }, { at: when, score: 7_000, how: 'rom' }], NOW);
-  saveScoreJournal(file, journal);
-  const back = loadScoreJournal(file, NOW).journal.tables['T2/t2.vpx']!;
-  assert.deepEqual(back.map((p) => [p.score, p.partial]).sort(), [[5_000, true], [7_000, undefined]]);
-  // Une valeur autre que « true » dans le fichier n'est pas une marque.
-  fs.writeFileSync(file, JSON.stringify({ v: journal.v, tables: { x: [{ at: when, score: 3, partial: 'oui', how: 'rom' }] } }));
-  assert.equal(loadScoreJournal(file, NOW).journal.tables.x![0]!.partial, undefined);
-  fs.rmSync(dir, { recursive: true, force: true });
-  // Le tableau la porte ; l'écran la dit.
-  setLanguage('fr');
-  const lines = scoreBoard(back, undefined, 'today', NOW);
-  assert.equal(lines.find((l) => l.score === 5_000)!.partial, true);
-  assert.equal(lines.find((l) => l.score === 7_000)!.partial, undefined);
-  const board = { lines, games: 1, tableBoard: false, everyGame: true, romWithoutMap: false };
-  const view = scoreboardView(() => board, 'today', NOW);
-  assert.match(view.lines.find((l) => l.score === (5_000).toLocaleString('fr-FR'))!.when, /· partie quittée$/);
-  assert.doesNotMatch(view.lines.find((l) => l.score === (7_000).toLocaleString('fr-FR'))!.when, /quittée/);
-});
-
-test('de la partie à la fiche : quittée en cours, la partie est gardée, marquée ; finie ou inconnue, elle compte comme avant', async () => {
-  setLanguage('fr');
-  const { dir, table, nv } = cabinet(WPC_OVER);
-  let now = NOW;
-  const scores = createTableScores(fakeTableScoresOptions({ dataDir: path.join(dir, 'data'), romsOf: () => ['t2_l8'], now: () => now }));
-  const played = async (memory: Buffer) => {
-    const snap = scores.snapshot(table);
-    fs.writeFileSync(nv, memory);
-    return scores.finish(table, snap, {});
-  };
-  const board = [['AJA', 152_431_870], ['XAQ', 90_000_000]] as [string, number][];
-
-  // Quittée à la 2e bille : game_over faux, aucun score entré au tableau → gardée, marquée.
-  now = new Date(2026, 10, 9, 20);
-  assert.deepEqual(await played(wpcOver([4_200_000], 0, board)), [{ at: now.toISOString(), score: 4_200_000, partial: true, how: 'rom' }]);
-  // Finie : game_over vrai → comme avant, sans marque.
-  now = new Date(2026, 10, 9, 20, 30);
-  assert.deepEqual(await played(wpcOver([9_000_000], 1, board)), [{ at: now.toISOString(), score: 9_000_000, how: 'rom' }]);
-  // Un score entré à son tableau d'honneur prouve la partie finie, même si game_over se lit faux (carte douteuse).
-  now = new Date(2026, 10, 9, 21);
-  assert.deepEqual(await played(wpcOver([95_000_000], 0, [['JUL', 95_000_000], ['AJA', 152_431_870]])), [{ at: now.toISOString(), score: 95_000_000, initials: 'JUL', how: 'rom' }]);
-
-  // Au tableau de la borne : les trois parties, la quittée marquée.
-  const today = scores.board(table, 'today');
-  assert.equal(today.games, 3);
-  assert.deepEqual(today.lines.map((l) => [l.score, l.partial]), [[95_000_000, undefined], [9_000_000, undefined], [4_200_000, true]]);
   fs.rmSync(dir, { recursive: true, force: true });
 });

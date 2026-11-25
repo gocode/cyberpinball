@@ -133,7 +133,7 @@ export function liveStateSupport(script: string | undefined, elements: readonly 
 // La mémoire d'une ROM
 
 /** Une valeur de la mémoire de la ROM : sa place dans Controller.NVRAM (le .nv) et son codage. */
-interface NvField {
+export interface NvField {
   at: number;
   length: number;
   bcd: boolean;
@@ -180,7 +180,7 @@ const num = (v: unknown): number | undefined => (typeof v === 'number' && Number
  * valeurs de « game_state » absentes, hors de la NVRAM, ou d'un codage inconnu). `inspector` : une
  * valeur hors de la NVRAM se lit par l'inspector de VPX (sinon, pas de relevé).
  */
-export function romLivePlan(memory: RomMemory, opts: { inspector?: boolean } = {}): { ok: true; plan: RomLivePlan } | { ok: false; reason: string } {
+export function romLivePlan(memory: RomMemory, opts: { inspector?: boolean; /** Toutes les valeurs par l'inspector, aucune par la NVRAM (relevé d'une partie seul, sans script : soloinspect.ts). */ all?: boolean } = {}): { ok: true; plan: RomLivePlan } | { ok: false; reason: string } {
   const map = memory.map as RomMemory['map'] & { game_state?: Record<string, unknown>; high_scores?: { score?: Descriptor }[] };
   const state = map.game_state;
   if (!state || typeof state !== 'object') return { ok: false, reason: 'carte sans état de jeu (game_state)' }; // i18n-ignore : journal
@@ -210,7 +210,7 @@ export function romLivePlan(memory: RomMemory, opts: { inspector?: boolean } = {
       ...(kind === 'bool' ? { bool: { invert: e.invert === true } } : {}),
     };
     const at = start - region.base!;
-    if (at >= 0 && at + length <= region.size!) {
+    if (!opts.all && at >= 0 && at + length <= region.size!) {
       size = Math.max(size, at + length);
       return { at, ...value };
     }
@@ -228,7 +228,7 @@ export function romLivePlan(memory: RomMemory, opts: { inspector?: boolean } = {
   if (missing.length) return { ok: false, reason: `état de jeu hors de la NVRAM ou illisible (${missing.join(', ')})` }; // i18n-ignore : journal
   const players = field(state.player_count, 'number', 'joueurs');
   const ballsEntry = romBallsEntry(memory);
-  const balls = field(ballsEntry, 'number');
+  const balls = field(ballsEntry, 'number', opts.all ? 'billes' : undefined);
   // Le tableau des records, dans la NVRAM seulement (il y est sur WPC comme sur SAM).
   const board = (Array.isArray(map.high_scores) ? map.high_scores : []).map((h) => field(h?.score, 'number')).filter((f): f is NvField => !!f);
   return { ok: true, plan: { scores: scores as NvField[], player: player!, ball: ball!, over: over!, ...(players ? { players } : {}), ...(balls ? { balls } : {}), board, size, states } };

@@ -136,6 +136,8 @@ export * from './romvolume';
 export * from './journal';
 export * from './livestate';
 export * from './vpxinspector';
+export * from './gametracker';
+export * from './soloinspect';
 export * from './vpxfailure';
 export * from './vpxgamelog';
 export * from './fileerror';

@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Boutons avancés : dans l'étape "Boutons" (assistant et réglages des boutons de la borne), une section repliée en bas de la liste te laisse affecter Crédit 2, 3 et 4 (autres monnayeurs), Fire (la barre de verrouillage), Afficher les règles et le Mode debug (statistiques d'affichage de VPX). Tous sont facultatifs et vides par défaut ; l'assistant ne te les demande pas un par un.
+- Bureau Windows : l'écran du relevé dit maintenant que le même bouton de joystick ramène Cyber Pinball, et qu'au clavier il faut Ctrl+Maj+D ou la barre des tâches.
+- Scores : le score de chaque partie est relevé pendant que tu joues, plus seulement à la fermeture de VPX. Une session de table à plusieurs parties garde chacune d'elles au tableau des scores, avec son heure.
+- Scores : une partie quittée en cours (à la 2e bille, par exemple) garde son dernier score et compte comme les autres : tableau des scores de la borne, classements, défis et niveau. Elle n'est plus écartée parce qu'elle n'est pas finie.
+- Le relevé passe par l'inspector de VPX, comme les parties entre amis, sans copier ni modifier ta table ; il demande la règle du pare-feu de VPX (Menu système > Communauté > Réglages de la communauté > Partage et réseau). Sans elle, le score se relève comme avant, à la fermeture de VPX.
 - LED : une bibliothèque d'effets bien plus riche prépare les prochaines animations (33 effets en boucle dans 12 familles : respiration, vagues, dégradés, comètes à traîne, faisceaux qui montent ou descendent, paquets de lumière qui se croisent, scintillement, étincelles, arcs-en-ciel lents, feu, aurore, chenillards ; et 11 effets ponctuels pour les événements de jeu).
 - LED : la couleur de chaque table est maintenant mesurée en plusieurs couleurs dominantes de son visuel (jusqu'à quatre), et une table toute verte garde ses LED vertes ; la première mesure de chaque table est refaite une fois.
 - Lunettes NVIDIA 3D Vision : une partie lancée en relief qui se joue à plat le dit à l'écran, par-dessus la partie, avec la raison ("3D Fix Manager bloque la 3D : ferme-le" quand il est ouvert). Cyber Pinball retente d'activer la 3D à chaque partie : fermer 3D Fix Manager suffit, sans relancer Cyber Pinball.

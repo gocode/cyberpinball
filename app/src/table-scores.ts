@@ -21,12 +21,13 @@ import {
   loadRomMemory,
   loadScoreJournal,
   newRecords,
-  readRomGameOver,
   readRomLastGame,
   readRomRecords,
   readTableRecords,
   romPlayedScores,
   saveScoreJournal,
+  soloInspectPlan,
+  type SoloInspectPlan,
   scoreBoard,
   scoreJournalFile,
   vpRegFile,
@@ -39,6 +40,7 @@ import {
   type ScorePeriod,
   type TableEntry,
   type TableRecords,
+  type TrackedGame,
 } from '@cyberpinball/core';
 
 export interface TableScoresOptions {
@@ -65,6 +67,28 @@ export interface GameScores {
   recordsAfter?: TableRecords;
   /** Partie entre amis : le score de cette borne, relevé en direct. */
   live?: { score?: number };
+  /** Les parties relevées en direct pendant la session (gametracker.ts), horloge Date.now. */
+  tracked?: readonly TrackedGame[];
+}
+
+/**
+ * Les parties relevées en direct, un score par joueur ; `fromRom` (la dernière partie lue dans la
+ * mémoire de la ROM à la fermeture) leur donne leurs initiales, et ajoute ce que le relevé a manqué.
+ */
+export function mergeTracked(tracked: readonly TrackedGame[], fromRom: readonly PlayedScore[], fallbackAt: string): PlayedScore[] {
+  const out: PlayedScore[] = [];
+  for (const g of tracked) {
+    const at = new Date(g.endedAt ?? g.startedAt).toISOString();
+    const playing = g.scores.filter((s) => s > 0).length;
+    g.scores.forEach((score, i) => {
+      if (score <= 0) return;
+      const rom = fromRom.find((p) => p.score === score && p.initials);
+      out.push({ at, score, ...(rom?.initials ? { initials: rom.initials } : {}), ...(playing > 1 ? { player: i + 1, of: playing } : {}), how: 'rom' });
+    });
+  }
+  // Une partie que le relevé n'a pas vue (VPX chargé sans inspector un instant…) : la mémoire de la ROM la donne.
+  for (const p of fromRom) if (!out.some((o) => o.score === p.score)) out.push({ ...p, at: fallbackAt });
+  return out;
 }
 
 export interface TableBoard {
@@ -82,10 +106,12 @@ export interface TableBoard {
 export interface TableScores {
   /** Au Start : la mémoire des ROM, pour savoir au retour si une partie a été jouée. */
   snapshot(table: TableEntry): ScoresSnapshot;
-  /** Au retour : les scores de la partie, gardés ; ce qui a été gardé (`partial` : table quittée en cours de partie, à ne pas publier). */
+  /** Au retour : les scores de la partie, gardés ; ce qui a été gardé. */
   finish(table: TableEntry, snapshot: ScoresSnapshot, game: GameScores): Promise<PlayedScore[]>;
   /** Le tableau d'une période. */
   board(table: TableEntry, period: ScorePeriod): TableBoard;
+  /** Le relevé en direct de cette table (solo-score-watch.ts) : jeux qu'elle charge et valeurs à lire ; undefined sans carte lisible. */
+  solo(table: TableEntry): { games: string[]; plan: SoloInspectPlan } | undefined;
 }
 
 export function createTableScores(opts: TableScoresOptions): TableScores {
@@ -219,20 +245,31 @@ export function createTableScores(opts: TableScoresOptions): TableScores {
             r.bytes ? { file: '', storage: r.rom, scores: readRomRecords(memory, r.bytes) ?? [] } : undefined,
             { file: '', storage: r.rom, scores: readRomRecords(memory, after) ?? [] },
           );
-          // Quittée en cours de partie : la ROM laisse « partie en cours » dans sa mémoire. Gardée, mais
-          // marquée (jamais publiée). Un score entré à son tableau d'honneur prouve la partie finie ; une
-          // carte qui ne dit pas game_over : finie, comme avant.
-          const quit = readRomGameOver(memory, after) === false && !entered.length;
-          played = romPlayedScores(before, last, entered, at, quit);
+          played = romPlayedScores(before, last, entered, at);
           break;
         }
         // Table originale : les scores entrés à son tableau d'honneur, avec leurs initiales.
         if (!played.length && !snapshot.roms.length) played = newRecords(game.recordsBefore, game.recordsAfter).map((s) => ({ at, score: s.score, ...(s.initials ? { initials: s.initials } : {}), how: 'record' as const }));
       }
+      // Relevé en direct (solo-score-watch.ts) : chaque partie de la session, la partie quittée en cours
+      // comprise. Les initiales viennent de la mémoire de la ROM quand son score y est entré.
+      if (game.tracked?.length) played = mergeTracked(game.tracked, played, at);
       if (!played.length) return [];
       if (addPlayed(load(), table.id, played, now())) save();
       log(`Tableau des scores (${table.id}) : ${played.map((p) => `${p.score}${p.initials ? ` ${p.initials}` : ''}`).join(', ')} (${played[0]!.how}).`); // i18n-ignore : journal
       return played;
+    },
+
+    solo(table) {
+      const list = roms(table);
+      for (const rom of list) {
+        const memory = memoryOf(rom);
+        if (!memory) continue;
+        const plan = soloInspectPlan(memory);
+        if (plan.ok) return { games: [...new Set([...opts.romsOf(table), ...list])], plan: plan.plan };
+        log(`Relevé en direct (${table.id}) : ${rom} pas relevable (${plan.reason}), mémoire de la ROM à la fermeture seulement.`); // i18n-ignore : journal
+      }
+      return undefined;
     },
 
     board(table, period) {

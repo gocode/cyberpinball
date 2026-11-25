@@ -21,7 +21,7 @@ import { removeTempDir } from './temp-dir';
 // clavier-premier-ecran-*.test.ts, répartis pour tourner en parallèle.
 
 test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise reprise, Retour arrière et Échap', { skip, timeout: 290_000 }, () => {
-  assert.deepEqual(Object.keys(GAME_BY_KEYBOARD), BUTTONS.map((b) => b.id), 'un relevé pour chaque bouton du jeu');
+  assert.deepEqual(Object.keys(GAME_BY_KEYBOARD), BUTTONS.filter((b) => !b.advanced).map((b) => b.id), 'un relevé pour chaque bouton du jeu (les avancés ne se demandent pas pas à pas)');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-clavier-'));
   try {
     const home = path.join(dir, 'home');
@@ -141,7 +141,7 @@ test('boutons du jeu au joystick (Pinscape, croix d’une manette) et au clavier
         'Joy0', 'Joy1', 'Joy2', 'Joy3', // flippers, Start, Exit au joystick
         'Clavier:Digit5', // crédit au clavier
         'JoyCroix:up', // lanceur à la croix (manette en XInput)
-        ...repeat('Joy3', BUTTONS.length - 6), // Exit passe les boutons facultatifs
+        ...repeat('Joy3', BUTTONS.filter((b) => !b.advanced).length - 6), // Exit passe les boutons facultatifs
         'Joy0', 'Joy1', 'Joy3', 'Joy2', // essai, Start enregistre
       ],
       ['--boutons'],

@@ -42,6 +42,36 @@ export function inspectorMemMapFiles(states: readonly InspectorState[], games: r
   ];
 }
 
+/** Les lignes de [Plugin.Inspector] (titre compris) dans ce VPinballX.ini ; undefined s'il n'y en a pas. */
+export function iniInspectorSection(text: string): string[] | undefined {
+  const lines = text.split(/\r?\n/);
+  const at = lines.findIndex((l) => new RegExp(`^\\s*\\[Plugin\\.${INSPECTOR_PLUGIN}\\]\\s*$`, 'i').test(l));
+  if (at < 0) return undefined;
+  let end = at + 1;
+  while (end < lines.length && !/^\s*\[.*\]\s*$/.test(lines[end]!)) end++;
+  return lines.slice(at, end);
+}
+
+/**
+ * Le VPinballX.ini tel que VPX l'a laissé après une partie seul, [Plugin.Inspector] remis comme il
+ * était avant (`saved` : ses lignes d'avant, undefined s'il n'y en avait pas). Rien d'autre n'est
+ * touché : ce que VPX a changé pendant la partie (réglages, place des fenêtres) est gardé.
+ */
+export function iniInspectorRestored(current: string, saved: readonly string[] | undefined): string {
+  const eol = /\r\n/.test(current) ? '\r\n' : '\n';
+  const lines = current.split(/\r?\n/);
+  const at = lines.findIndex((l) => new RegExp(`^\\s*\\[Plugin\\.${INSPECTOR_PLUGIN}\\]\\s*$`, 'i').test(l));
+  if (at >= 0) {
+    let end = at + 1;
+    while (end < lines.length && !/^\s*\[.*\]\s*$/.test(lines[end]!)) end++;
+    lines.splice(at, end - at, ...(saved ?? []));
+  } else if (saved) {
+    while (lines.length && lines.at(-1)!.trim() === '') lines.pop();
+    lines.push('', ...saved);
+  }
+  return lines.join(eol);
+}
+
 /** Le VPinballX.ini de la partie : celui de la borne, [Plugin.Inspector] activé sur ce port. */
 export function iniWithInspector(text: string, port: number): string {
   const eol = /\r\n/.test(text) ? '\r\n' : '\n';

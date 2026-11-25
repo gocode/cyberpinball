@@ -29,7 +29,7 @@ test('boutons du jeu d’une PinOne en mode clavier : Maj, Ctrl, Échap et Alt r
         'click:#actions button:nth-child(4)', // « Tout modifier »
         ...PINONE,
         // Extra Ball sur Alt gauche, puis Exit (Échap) passe les boutons facultatifs suivants.
-        ...keyboard('AltLeft', ...repeat('Escape', BUTTONS.length - PINONE.length - 1)),
+        ...keyboard('AltLeft', ...repeat('Escape', BUTTONS.filter((b) => !b.advanced).length - PINONE.length - 1)),
         // Essai des flippers et d'Exit, puis Start enregistre.
         'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Escape', 'Clavier:Digit1',
       ],
