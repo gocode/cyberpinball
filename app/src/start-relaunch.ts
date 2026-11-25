@@ -12,7 +12,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { HoldDetector, readPidFile, RELAUNCH_SHORTCUT, RELAUNCH_WATCHER_FLAG, relaunchAppPidFile, relaunchWatcherPidFile, stopRelaunchWatcherAt, writePidFile } from '@cyberpinball/core';
+import { HoldDetector, readPidFile, RELAUNCH_SHORTCUT, RELAUNCH_WATCHER_FLAG, relaunchAppPidFile, relaunchWatcherPidFile, stopRelaunchWatcherAt, updatePending, writePidFile } from '@cyberpinball/core';
 import { app, shell } from 'electron';
 import { joystickButtonsHeld, watchJoystickButtons } from './joystick-input';
 import { cyberPinballAlive, vpxPlaying, watcherScript } from './start-relaunch-process';
@@ -102,7 +102,11 @@ export function syncRelaunchWatcher(opts: { dataDir: string; startupDir: string;
       });
       console.log(`Relance par Start : raccourci du dossier Démarrage posé (${shortcut}).`); // i18n-ignore : journal
     }
-    if (!cyberPinballAlive(readPidFile(relaunchWatcherPidFile(opts.dataDir)))) startWatcher();
+    if (cyberPinballAlive(readPidFile(relaunchWatcherPidFile(opts.dataDir)))) return;
+    // Une mise à jour en cours vient d'arrêter le veilleur : relancé ici, il tiendrait le dossier
+    // qu'elle remplace (25/11/2026). La nouvelle version le relance à son démarrage.
+    if (updatePending(opts.dataDir)) return void console.log('Relance par Start : mise à jour en cours, veilleur relancé par la nouvelle version.'); // i18n-ignore : journal
+    startWatcher();
   } catch (error) {
     console.warn(`Relance par Start : ${(error as Error).message}`); // i18n-ignore : journal
   }

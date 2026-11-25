@@ -12,6 +12,10 @@
 
 import { format } from 'node:util';
 import './veille-tests.mjs';
+import { isolerTemp } from './temp-tests.mjs';
+
+// Le dossier temporaire du processus, à lui et vidé à la sortie (scripts/temp-tests.mjs).
+isolerTemp();
 
 for (const name of ['log', 'info', 'debug']) {
   console[name] = (...args) => {

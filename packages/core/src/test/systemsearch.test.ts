@@ -66,11 +66,16 @@ test('recherche : chaque libellé déclaré existe dans le code (début d’une 
   const code = sources(path.join(REPO, 'app', 'src')) + sources(path.join(REPO, 'packages', 'core', 'src'));
   const literals = [...code.matchAll(/(['"`])((?:\\.|(?!\1).)*?)\1/g)].map((m) => m[2]!.replace(/\\(.)/g, '$1'));
   const declaration = fs.readFileSync(path.join(REPO, 'packages', 'core', 'src', 'systemsearch-places.ts'), 'utf8');
+  // Les chaînes en minuscules, une fois : les passer en minuscules à chaque libellé (centaines de libellés
+  // × dizaines de milliers de chaînes) faisait durer ce test 25 s le 25/11/2026.
+  const lowered = literals.map((l) => l.toLocaleLowerCase('fr'));
   const missing: string[] = [];
   for (const place of SEARCH_PLACES) {
     for (const name of allNames(place)) {
       // Le libellé lui-même compte, pas sa déclaration ici.
-      const uses = literals.filter((l) => sameStart(l, name.key)).length;
+      const start = name.key.toLocaleLowerCase('fr');
+      let uses = 0;
+      for (const l of lowered) if (l.startsWith(start)) uses++;
       const declared = [...declaration.matchAll(new RegExp(`tLater\\('${name.key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`, 'g'))].length;
       if (uses <= declared) missing.push(`${describe(place)} : « ${name.key} »`);
     }

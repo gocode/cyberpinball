@@ -3,12 +3,22 @@
 // Le banc se construit avec le compagnon (npm run casque-vr) ; sans lui, ces essais sont sautés et le disent.
 
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { describe, it } from 'node:test';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { BANC_RUNTIME, BANC_SONDE, bancPerime, bancPret, jouer, sonder } from './banc-casque.mjs';
+
+// Chaque essai joue un scénario en temps réel (8 à 18 s d'attente : le runtime factice et le compagnon tiennent leurs
+// délais d'horloge, ceux du produit) : en série, les 29 faisaient 242 s à eux seuls, le goulet de toute la suite
+// rapide (25/11/2026). Chacun a son dossier, son scénario, sa trace et ses processus, arrêtés par PID (voir « deux
+// bancs en même temps ») : ils tournent ensemble, LOT_PARALLELE à la fois, en une trentaine de secondes.
+// Garde-fou de durée : scripts/durees-tests.mjs.
+const LOT_PARALLELE = 12;
+const essais = [];
+/** Enregistre un essai ; le lot en fin de fichier les lance ensemble. */
+const test = (nom, options, corps) => essais.push(typeof options === 'function' ? [nom, {}, options] : [nom, options, corps]);
 
 const pret = bancPret();
 const sauf = pret ? {} : { skip: 'banc pas construit : npm run casque-vr' };
@@ -371,7 +381,7 @@ test('banc : place sans contour, contour lu, rien à ancrer ; après le calage, 
   const reste = core.placeGap(ancre.place, run.vraie);
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
 });
-
+
 // Le lecteur des sauts de l'application vérifie aussi la signature (13 novembre 2026) : des lignes réelles du journal
 // d'essai.13, les remises (arrivée à l'origine) gardées, les rafales du casque tenu en main (acceptées par la sonde
 // d'alors) écartées, même si une sonde plus ancienne les annonçait encore.
@@ -543,4 +553,8 @@ test('banc : deux bancs en même temps, chacun son scénario, aucun ne gêne l�
     const text = fs.readFileSync(new URL(f, import.meta.url), 'utf8');
     assert.doesNotMatch(text, /taskkill[^\n]*\/IM|Stop-Process[^\n]*-Name|killall/i, f);
   }
+});
+
+describe('banc du casque', { concurrency: LOT_PARALLELE }, () => {
+  for (const [nom, options, corps] of essais) it(nom, options, corps);
 });

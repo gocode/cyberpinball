@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Après une mise à jour légère, Cyber Pinball restait figé environ une minute à chaque lancement : l'ancienne version, encore tenue par le veilleur de la relance par Start, était retirée en bloquant tout le front-end. Elle se retire maintenant sans rien bloquer, le veilleur resté sur l'ancienne version est arrêté puis relancé depuis la nouvelle, et il n'est plus relancé pendant une mise à jour.
+- Un lancement retardé ne provoque plus l'erreur « app.getSystemLocale() can only be called after app is ready » dans le journal.
+- Les contrôles avant publication sont plus rapides : le banc du casque (26 essais) tourne en parallèle, en une trentaine de secondes au lieu de quatre minutes, et deux tests de la bibliothèque du menu système ne relisent plus tout le code pour chaque libellé.
+- Les tests d'installation ne souffrent plus d'un dossier temporaire encombré : chaque processus de test a son dossier à lui, vidé à la sortie, au lieu de laisser des centaines de milliers de dossiers dans le dossier temporaire de Windows.
+- Les contrôles mesurent la durée de chaque fichier de tests rapides (`tmp/durees-tests-rapides.json`) et avertissent, avec son nom et sa durée, de tout fichier de plus de 60 s, qui fixerait à lui seul la durée de la suite.
 - Les préversions sortent plus vite : un code déjà vérifié n'est plus testé deux fois, il n'est compilé qu'une fois par publication, et les changements suivants sont préparés pendant l'envoi de la préversion en cours. Tu reçois donc les correctifs plus tôt, avec les mêmes contrôles qu'avant.
 - LED (tables à ROM) : une table jamais lue passait pour une table sans ROM ; la partie prenait alors le port des LED pour les effets sans ROM, et DOF ne pouvait plus l'ouvrir (aucun effet de la ROM, bumpers non détectés). Le script de la table est maintenant lu une fois dans le fichier de la table, sans lancer VPX ; une table PinMAME reste une table à ROM même quand le nom de sa ROM n'est pas trouvé.
 - LED (tables sans ROM) : les bandes sont éteintes entre deux événements ; plus de lueur de fond permanente, et un flipper tenu ne garde plus le bas allumé.

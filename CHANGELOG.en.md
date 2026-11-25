@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- After a light update, Cyber Pinball froze for about a minute at every launch: the old version, still held by the Start relaunch watcher, was removed while blocking the whole front-end. It is now removed without blocking anything, the watcher left on the old version is stopped and restarted from the new one, and it is no longer restarted during an update.
+- A delayed launch no longer logs the error "app.getSystemLocale() can only be called after app is ready".
+- Pre-release checks are faster: the headset bench (26 tests) now runs in parallel, in about thirty seconds instead of four minutes, and two tests of the system menu library no longer re-read all the code for every label.
+- Installation tests no longer suffer from a cluttered temporary folder: each test process now has its own folder, emptied on exit, instead of leaving hundreds of thousands of folders in the Windows temporary folder.
+- The checks now time each fast test file (`tmp/durees-tests-rapides.json`) and warn, with its name and duration, about any file over 60 s, which would on its own set the length of the whole suite.
 - Prereleases come out faster: code that was already checked is no longer tested twice, it is compiled only once per release, and the next changes are prepared while the current prerelease is being uploaded. You get fixes sooner, with the same checks as before.
 - LEDs (ROM tables): a table that had never been read was treated as a table without a ROM; the game then took the LED port for the no-ROM effects, and DOF could not open it (no ROM effects, bumpers not detected). The table's script is now read once from the table file, without launching VPX; a PinMAME table stays a ROM table even when its ROM name is not found.
 - LEDs (tables without a ROM): the strips are off between events; no more permanent background glow, and a held flipper no longer keeps the bottom lit.

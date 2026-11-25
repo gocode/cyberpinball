@@ -23,6 +23,7 @@ import { failedFiles, failureDetails, shortReport, totals } from './sortie-tests
 import { collectTests } from './verifier.mjs';
 import { NODE_TEST_ARGS } from './tests-node.mjs';
 import { TEST_FIGE_MS } from './veille-tests.mjs';
+import { avertissementsLents, lireDurees, reporterArgs } from './durees-tests.mjs';
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -164,7 +165,9 @@ export async function runControles({ cwd = here, tests = true, say = console.log
   if (tests && compiled) {
     const fast = collectTests(cwd).filter((t) => !t.slow);
     say(`Contrôles : ${fast.length} fichiers de tests rapides…`);
-    const { code, out, hung } = await run(node, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
+    const { code, out, hung } = await run(node, [...NODE_TEST_ARGS, ...reporterArgs(cwd), `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
+    // Un fichier rapide de plus de 60 s fixe la durée de toute la suite : signalé, jamais un échec.
+    for (const l of avertissementsLents(lireDurees(cwd)?.fichiers ?? {})) say(l);
     if (code !== 0) {
       const files = [...new Set([...failedFiles(out), ...hung])];
       if (!files.length) {

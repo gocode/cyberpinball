@@ -764,7 +764,7 @@ export async function waitForExit(pid: number, timeoutMs: number): Promise<boole
 export async function swapAppDir(appDir: string, staged: string, opts: { retryMs?: number } = {}): Promise<boolean> {
   if (!fs.existsSync(path.join(staged, 'package.json'))) throw new Error(t('Paquet de l’application introuvable : {dir}', { dir: staged }));
   const previous = `${appDir}.precedente`;
-  removePreviousApp(appDir);
+  await removePreviousAppSoon(appDir, { retryMs: 5_000 });
   const end = Date.now() + (opts.retryMs ?? 10_000);
   for (;;) {
     try {
@@ -788,21 +788,47 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
     renameWithRetry(previous, appDir);
     throw error;
   }
-  return removePreviousApp(appDir);
+  return removePreviousAppSoon(appDir, { retryMs: 5_000 });
 }
 
 /**
- * Removes <appDir>.precedente, a leftover of a light update (new attempts for 5 s if
- * a file is still held). True if nothing is left of it; never an error.
+ * Removes <appDir>.precedente, a leftover of a light update, in one attempt: never blocks.
+ * (fs.rmSync's maxRetries waits retryDelay × attempt number, synchronously: 20 × 250 ms made
+ * 52 s, the front-end frozen at every startup while the folder stayed held, 25/11/2026.)
+ * True if nothing is left of it; never an error.
  */
 export function removePreviousApp(appDir: string): boolean {
   const previous = `${appDir}.precedente`;
   try {
-    fs.rmSync(previous, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    fs.rmSync(previous, { recursive: true, force: true });
   } catch {
     // Removed at the next startup, or at the next update.
   }
   return !fs.existsSync(previous);
+}
+
+/**
+ * Removes <appDir>.precedente without blocking the process: new attempts every `delayMs`
+ * for `retryMs` while a file stays held. True if nothing is left of it; never an error.
+ */
+export async function removePreviousAppSoon(appDir: string, opts: { retryMs?: number; delayMs?: number } = {}): Promise<boolean> {
+  const previous = `${appDir}.precedente`;
+  const end = Date.now() + (opts.retryMs ?? 5_000);
+  for (;;) {
+    try {
+      await fs.promises.rm(previous, { recursive: true, force: true });
+    } catch {
+      // Still held: new attempt below.
+    }
+    if (!fs.existsSync(previous)) return true;
+    if (Date.now() >= end) return false;
+    await new Promise((r) => setTimeout(r, opts.delayMs ?? 250));
+  }
+}
+
+/** An update was launched and its outcome not yet read at startup (takeUpdateOutcome). */
+export function updatePending(dataDir: string): boolean {
+  return fs.existsSync(path.join(dataDir, UPDATE_PENDING_FILE));
 }
 
 // ---------- Installation ----------

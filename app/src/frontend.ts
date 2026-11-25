@@ -2870,7 +2870,8 @@ const socialNet = createSocialNet({
     groupService.forget(keys);
   },
   // Le pays par défaut des classements : la région de Windows (format régional, sinon langues préférées).
-  systemLocale: () => [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)),
+  // Avant « ready », Electron lève une exception (minuterie du réseau partie pendant un lancement retardé, 25/11/2026).
+  systemLocale: () => (app.isReady() ? [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)) : undefined),
   // Personnes invitées (invitations.ts) : l'empreinte de cette machine, et la notification quand une
   // personne que j'ai invitée finit sa première partie.
   machine: machineTagOf,

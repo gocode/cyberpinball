@@ -162,7 +162,12 @@ test('menu système : l’application fournit chaque entrée de l’arbre', () =
 const norm = (s: string) => s.replace(/[’']/g, "'").replace(/\s*\/\s*/g, ' / ').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** Noms d'une entrée, en français et en anglais (« Langue / Language » s'écrit dans les deux sens). */
+const namesCache = new Map<SystemEntryId, string[]>();
 function namesOf(id: SystemEntryId): string[] {
+  // Calculé une fois par entrée : les noms ne changent pas, et la relecture du manuel les redemandait
+  // à chaque phrase (setLanguage deux fois par appel : ce test durait 44 s le 25/11/2026).
+  const known = namesCache.get(id);
+  if (known) return known;
   const names: string[] = [];
   for (const lang of ['fr', 'en'] as const) {
     setLanguage(lang);
@@ -170,6 +175,7 @@ function namesOf(id: SystemEntryId): string[] {
     names.push(norm(label), norm(label.split('/').reverse().join('/')));
   }
   setLanguage('fr');
+  namesCache.set(id, names);
   return names;
 }
 
@@ -296,17 +302,21 @@ function groupAtEnd(parts: string[]): SystemGroupId | undefined {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Une expression par rubrique et par nom, construites une fois (et non à chaque phrase du manuel). */
+let groupPatterns: Array<{ group: SystemGroupId; named: RegExp }> | undefined;
+const patternsOfGroups = () =>
+  (groupPatterns ??= SYSTEM_GROUP_IDS.flatMap((group) =>
+    [...new Set(namesOf(group))].map((name) => {
+      const n = escape(name);
+      return { group, named: new RegExp(`rubriques?\\s+(?:«\\s*)?${n}(?![\\p{L}])|(?<![\\p{L}])"?${n}"?(?:\\s*\\([^)]*\\))?\\s+section|section\\s+"?${n}(?![\\p{L}])`, 'u') };
+    }),
+  ));
+
 /** Rubriques qu'une phrase désigne comme lieu : « rubrique Borne », « Borne (Cabinet) section », « Menu système > Borne : ». */
 function placesIn(sentence: string): SystemGroupId[] {
   const text = norm(sentence);
   const places = new Set<SystemGroupId>();
-  for (const group of SYSTEM_GROUP_IDS) {
-    for (const name of new Set(namesOf(group))) {
-      const n = escape(name);
-      const named = new RegExp(`rubriques?\\s+(?:«\\s*)?${n}(?![\\p{L}])|(?<![\\p{L}])"?${n}"?(?:\\s*\\([^)]*\\))?\\s+section|section\\s+"?${n}(?![\\p{L}])`, 'u');
-      if (named.test(text)) places.add(group);
-    }
-  }
+  for (const { group, named } of patternsOfGroups()) if (named.test(text)) places.add(group);
   for (const m of sentence.matchAll(/(?:menu système|system menu)\s*(?:\*{0,2}\s*\([^)]*\))?\s*\*{0,2}\s*>\s*(.*)/gi)) {
     const group = groupAtEnd(segments(m[1]!));
     if (group) places.add(group);

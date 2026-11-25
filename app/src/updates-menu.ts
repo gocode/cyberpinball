@@ -44,6 +44,7 @@ import {
   recordPendingUpdate,
   relaunchArguments,
   removePreviousApp,
+  removePreviousAppSoon,
   saveUpdateSource,
   stagedAppDir,
   t,
@@ -711,12 +712,26 @@ export function createUpdatesMenu(host: UpdatesHost) {
   let installed: { from: string; to: string } | undefined;
 
   /**
+   * Retire <app>.precedente sans jamais bloquer le démarrage. S'il reste tenu, c'est d'ordinaire
+   * le veilleur de la relance par Start lancé par l'ancienne version depuis ce dossier (il y garde
+   * koffi.node chargé, 25/11/2026) : il est arrêté, puis relancé depuis la nouvelle version par la
+   * synchronisation du veilleur, quelques secondes après l'ouverture.
+   */
+  function removeLeftover(): void {
+    if (removePreviousApp(host.appDir)) return void console.log('Mise à jour légère : ancienne version retirée.'); // i18n-ignore : journal
+    if (stopRelaunchWatcher(host.loc.dataDir)) console.log('Mise à jour légère : veilleur de l’ancienne version arrêté, il tenait l’ancienne version.'); // i18n-ignore : journal
+    void removePreviousAppSoon(host.appDir, { retryMs: 30_000, delayMs: 1_000 }).then((removed) =>
+      console.log(`Mise à jour légère : ancienne version ${removed ? 'retirée' : 'toujours tenue (retirée au prochain démarrage)'}.`), // i18n-ignore : journal
+    );
+  }
+
+  /**
    * Au démarrage : constat de la mise à jour lancée avant la fermeture (version attendue
    * là, ou ancienne version restée en place). Undefined s'il n'y en avait pas.
    */
   function startupNotice(): string | undefined {
     // Reste d'une mise à jour légère dont l'ancienne version était encore tenue à la mise en place.
-    if (swappable() && fs.existsSync(`${host.appDir}.precedente`)) console.log(`Mise à jour légère : ancienne version ${removePreviousApp(host.appDir) ? 'retirée' : 'toujours tenue'}.`); // i18n-ignore : journal
+    if (swappable() && fs.existsSync(`${host.appDir}.precedente`)) removeLeftover();
     const outcome = takeUpdateOutcome(host.loc.dataDir, host.version);
     if (!outcome) return undefined;
     if (outcome.kind === 'installed') installed = { from: outcome.from, to: outcome.to };
