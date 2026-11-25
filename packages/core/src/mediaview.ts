@@ -12,6 +12,7 @@ import { writeFileAtomic } from './atomicwrite';
 import { b2sCacheDir, b2sImages } from './b2simage';
 import { romAudioDir } from './romaudio';
 import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } from './arcadehours';
+import { DEFAULT_NIGHT_MODE, normalizeNightMode, type NightModeSettings } from './modenuit';
 import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
 import { DEFAULT_INTRO_SETTINGS, normalizeIntroSettings, type IntroSettings } from './intro';
@@ -624,6 +625,8 @@ export interface MenuMediaSettings {
   jukeboxAudio: JukeboxAudioSettings;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
+  /** Mode nuit (modenuit.ts) : ce qu'il change, et qui l'active. */
+  nightMode: NightModeSettings;
   /**
    * Menu des tables (notices.ts) : la pastille des amis en ligne et les notifications (tout, par
    * défaut), la pastille seule, ou rien. La pastille des téléchargements reste dans tous les cas.
@@ -665,6 +668,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   jukeboxAudio: DEFAULT_JUKEBOX_AUDIO,
   hours: DEFAULT_ARCADE_HOURS,
+  nightMode: DEFAULT_NIGHT_MODE,
   notices: 'all',
   intro: DEFAULT_INTRO_SETTINGS,
 };
@@ -712,6 +716,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     jukeboxAudio: normalizeJukeboxAudio(r.jukeboxAudio),
     hours: normalizeArcadeHours(r.hours),
+    nightMode: normalizeNightMode(r.nightMode),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
     intro: normalizeIntroSettings(r.intro),
   };

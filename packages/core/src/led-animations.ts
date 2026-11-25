@@ -1,32 +1,42 @@
 // Animations des LED hors partie : la partie pure (aucune entrée-sortie, l'horloge est donnée).
 //
 // Quand rien ne se passe, dans les écrans et dans la roue des tables, les bandes de LED adressables
-// montrent une ambiance douce (respiration, dégradé lent, scintillement, vague, braises) aux couleurs
-// de la table choisie ou à une couleur fixe. Chaque changement de table lance un balayage dans le
-// sens du défilement, et l'ouverture de la fiche une pulsation. Ce module décrit :
+// montrent une ambiance aux couleurs de la table choisie (les couleurs dominantes de son visuel) ou à
+// une couleur fixe : le Florilège (par défaut : les effets de led-effets.ts s'enchaînent, un autre à
+// chaque changement d'écran), ou un style unique et doux (respiration, dégradé lent, scintillement,
+// vague, braises). Chaque changement de table lance un balayage dans le sens du défilement, et
+// l'ouverture de la fiche une pulsation. À l'ouverture de Cyber Pinball, les bandes jouent l'animation
+// d'ouverture (led-ouverture.ts), puis se fondent dans l'ambiance des menus. Ce module décrit :
 // - les réglages (activer, style, luminosité maximale, vitesse, couleurs, extinction après inactivité),
 //   leur lecture sûre et leur écriture (writeFileAtomic) ;
-// - la palette tirée de la teinte de la table (tabletint.ts, déjà mesurée et gardée par table) ;
+// - la palette tirée des couleurs de la table (tabletint.ts, déjà mesurées et gardées par table) ;
 // - le moteur (`LedAmbientEngine`) : image d'une bande à un instant, fondu entre palettes, transitions.
 // Le service des LED, les minuteries et le branchement au front-end sont dans app/src/led-animations.ts.
 //
 // Invariants (fixés par led-animations.test.ts) : aucune LED ne dépasse la luminosité maximale réglée ;
 // l'ambiance seule reste sous 70 % de ce maximum, la marge est celle des transitions ; une image ne
-// dépend que de l'instant donné (aucun hasard) ; tout réglage illisible retombe sur une valeur sûre.
+// dépend que de l'instant donné (aucun hasard), sauf le Florilège, dont la suite d'effets dépend aussi
+// de sa graine (tirée au lancement, fixée par les essais) ; tout réglage illisible retombe sur une
+// valeur sûre ; animations éteintes : tout est noir.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { hsvToRgb, rgbToHsv, type Rgb } from './jukebox-visualizer';
+// led-effets.ts et led-ouverture.ts importent ce module en retour : ils ne s'en servent qu'à l'appel,
+// jamais au chargement, et ce module ne se sert d'eux que dans le moteur (import circulaire sans risque).
+import { LedFxSequencer, ledLightToBytes, type LedFxId } from './led-effets';
 import { ledXY, type LedGrid } from './led-live';
+import { ledIntroLight } from './led-ouverture';
 import { hexToRgb, NEUTRAL_TINT } from './tabletint';
 
 // ---------------------------------------------------------------------------
 // Réglages
 // ---------------------------------------------------------------------------
 
-export const LED_AMBIENT_STYLES = ['breath', 'drift', 'twinkle', 'wave', 'embers'] as const;
+/** Styles de l'ambiance ; le Florilège (`medley`) enchaîne les effets de led-effets.ts, c'est le défaut. */
+export const LED_AMBIENT_STYLES = ['medley', 'breath', 'drift', 'twinkle', 'wave', 'embers'] as const;
 export type LedAmbientStyle = (typeof LED_AMBIENT_STYLES)[number];
 
 export const LED_SPEEDS = ['slow', 'normal', 'fast'] as const;
@@ -66,10 +76,13 @@ export interface LedAnimationSettings {
   idleMinutes: number;
 }
 
-/** Valeurs sûres : allumées, douces (40 %), qui suivent la table, éteintes après 30 minutes. */
+/**
+ * Valeurs sûres : allumées, douces (40 %), le Florilège (de la variété aux menus et au repos), qui
+ * suivent la table, éteintes après 30 minutes. Un style déjà enregistré reste celui du joueur.
+ */
 export const DEFAULT_LED_ANIMATIONS: Readonly<LedAnimationSettings> = {
   enabled: true,
-  style: 'breath',
+  style: 'medley',
   brightness: 40,
   speed: 'normal',
   followTable: true,
@@ -115,6 +128,8 @@ export function writeLedAnimations(dataDir: string, settings: LedAnimationSettin
 
 export function ledStyleLabel(style: LedAmbientStyle): string {
   switch (style) {
+    case 'medley':
+      return t('Florilège');
     case 'breath':
       return t('Respiration');
     case 'drift':
@@ -130,6 +145,8 @@ export function ledStyleLabel(style: LedAmbientStyle): string {
 
 export function ledStyleDetail(style: LedAmbientStyle): string {
   switch (style) {
+    case 'medley':
+      return t('Les effets s’enchaînent : comètes, faisceaux, vagues, étincelles, arcs-en-ciel… aux couleurs de la table');
     case 'breath':
       return t('Les LED montent et descendent doucement, comme un souffle');
     case 'drift':
@@ -202,15 +219,41 @@ export function ledPalette(hex: string | undefined): LedPalette {
   };
 }
 
+/** Couleur d'une LED d'après un #rrggbb : sa teinte, saturée comme `ledPalette` (sauf un blanc), à pleine valeur. */
+function vivid(hex: string): Rgb {
+  const [h, s] = rgbToHsv(hexToRgb(hex));
+  return hsvToRgb(h, s < 0.12 ? s : Math.max(s, 0.85), 1);
+}
+
+/**
+ * Palette des LED d'après les couleurs dominantes du visuel d'une table (#rrggbb, la plus présente
+ * d'abord) : primary = la première, secondary et accent = la deuxième et la troisième, chacune saturée
+ * comme `ledPalette` ; une couleur qui manque est la voisine de teinte de la première (`ledPalette`).
+ * Sans couleur lisible : `ledPalette(undefined)`, la sarcelle de la marque.
+ */
+export function ledPaletteFrom(colors: readonly string[] | undefined): LedPalette {
+  const list = (colors ?? []).map((c) => (typeof c === 'string' ? c.trim() : '')).filter((c) => HEX.test(c));
+  const base = ledPalette(list[0]);
+  return {
+    primary: base.primary,
+    secondary: list[1] ? vivid(list[1]) : base.secondary,
+    accent: list[2] ? vivid(list[2]) : base.accent,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Moteur
 // ---------------------------------------------------------------------------
 
 /** Part de la luminosité maximale que l'ambiance seule ne dépasse pas : le reste est pour les transitions. */
 export const LED_AMBIENT_CEILING = 0.7;
+/** Florilège : écart minimal entre deux changements d'effet provoqués par un changement d'écran. */
+export const LED_SHUFFLE_MIN_MS = 8000;
 const FADE_MS = 900;
 const SWEEP_MS = 800;
 const ARRIVE_MS = 1200;
+/** Fin de l'ouverture : fondu de son image vers l'ambiance des menus. */
+const HANDOFF_MS = 1500;
 const SPEED_FACTOR: Record<LedSpeed, number> = { slow: 0.55, normal: 1, fast: 1.8 };
 
 const clamp01 = (v: number) => (v <= 0 ? 0 : v >= 1 ? 1 : v);
@@ -258,19 +301,43 @@ interface Transition {
   dir: 1 | -1;
 }
 
+export interface LedAmbientEngineOptions {
+  /**
+   * Graine du Florilège (l'ordre des effets) : tirée au hasard à chaque lancement par défaut, pour que
+   * la borne ne rejoue pas toujours la même suite ; fixée par les essais.
+   */
+  seed?: number;
+}
+
 export class LedAmbientEngine {
   private from: LedPalette;
   private to: LedPalette;
   private fadeStart = -Infinity;
   private transitions: Transition[] = [];
   private positions?: { key: string; u: Float32Array };
+  /** Couleurs visées (#rrggbb, la dominante d'abord) : celles que reçoit le Florilège. */
+  private colors: readonly string[];
+  private readonly seed: number;
+  private seq?: LedFxSequencer;
+  private lastNow = 0;
+  /** Ouverture en cours : instant de son départ (horloge de l'appelant). */
+  private introStart?: number;
+  /** Sortie de l'ouverture : fondu de son image vers l'ambiance. */
+  private handoff?: { start: number; introStart: number };
+  private introLight: Float32Array = new Float32Array(0);
 
-  constructor(public settings: LedAnimationSettings = { ...DEFAULT_LED_ANIMATIONS }) {
+  constructor(
+    public settings: LedAnimationSettings = { ...DEFAULT_LED_ANIMATIONS },
+    options: LedAmbientEngineOptions = {},
+  ) {
     this.from = this.to = ledPalette(settings.color);
+    this.colors = [settings.color];
+    this.seed = options.seed !== undefined && Number.isFinite(options.seed) ? Math.floor(options.seed) : 1 + Math.floor(Math.random() * 0x7ffffffe);
   }
 
   configure(settings: LedAnimationSettings): void {
     this.settings = settings;
+    this.seq?.configure({ speed: SPEED_FACTOR[settings.speed] }, this.lastNow);
   }
 
   /** Couleur visée : celle de la table si on la suit et qu'elle en a une, sinon la couleur fixe. */
@@ -278,18 +345,86 @@ export class LedAmbientEngine {
     return this.settings.followTable && tint && HEX.test(tint) ? tint : this.settings.color;
   }
 
+  /**
+   * Couleurs visées : sans suivre la table, la couleur fixe ; sinon les couleurs dominantes du visuel
+   * de la table (jusqu'à 5), à défaut sa teinte, à défaut la couleur fixe.
+   */
+  targetColors(tint: string | undefined, palette?: readonly string[]): string[] {
+    if (!this.settings.followTable) return [this.settings.color];
+    const list = (palette ?? []).filter((c): c is string => typeof c === 'string' && HEX.test(c.trim())).map((c) => c.trim().toLowerCase());
+    return list.length ? list.slice(0, 5) : [this.targetColor(tint)];
+  }
+
   /** Palette montrée à l'instant `now` (fondu en cours compris). */
   palette(now: number): LedPalette {
     return mixPalette(this.from, this.to, smooth((now - this.fadeStart) / FADE_MS));
   }
 
-  /** Nouvelle teinte de table (ou aucune) : fondu depuis la palette montrée ; `instant` : sans fondu. */
-  setTint(tint: string | undefined, now: number, instant = false): void {
-    const target = ledPalette(this.targetColor(tint));
+  /**
+   * Nouvelle table (ou aucune) : sa teinte et, s'il y en a, les couleurs dominantes de son visuel
+   * (`palette`, la plus présente d'abord). Fondu depuis la palette montrée ; `instant` : sans fondu.
+   */
+  setTint(tint: string | undefined, now: number, instant = false, palette?: readonly string[]): void {
+    const colors = this.targetColors(tint, palette);
+    const target = ledPaletteFrom(colors);
+    this.colors = colors;
+    this.seq?.setPalette(colors, now, instant);
     if (JSON.stringify(target) === JSON.stringify(this.to)) return;
     this.from = instant ? target : this.palette(now);
     this.to = target;
     this.fadeStart = instant ? -Infinity : now;
+  }
+
+  /** Effet en boucle que montre le Florilège (undefined tant qu'il n'a pas servi). */
+  get medleyEffect(): LedFxId | undefined {
+    return this.seq?.current;
+  }
+
+  /**
+   * Florilège : passe à l'effet suivant (changement d'écran), par un fondu enchaîné. Sans effet pour un
+   * autre style. Au plus un changement par LED_SHUFFLE_MIN_MS : des écrans passés vite (un message, une
+   * confirmation) ne font pas défiler les effets en fondus avortés.
+   */
+  shuffle(now: number): void {
+    if (this.settings.style !== 'medley' || now - this.shuffledAt < LED_SHUFFLE_MIN_MS) return;
+    this.shuffledAt = now;
+    this.sequencer(now).next(now);
+  }
+  private shuffledAt = -Infinity;
+
+  /**
+   * Ouverture de Cyber Pinball : l'image suit l'animation d'ouverture des LED (led-ouverture.ts), calée
+   * sur `startedAt`, l'instant de départ des animations des écrans (même horloge que `render`). Une
+   * liaison ouverte en retard prend l'animation où elle en est.
+   */
+  playIntro(startedAt: number): void {
+    if (!Number.isFinite(startedAt)) return;
+    this.introStart = startedAt;
+    this.handoff = undefined;
+  }
+
+  /** Fin de l'ouverture : son image se fond dans l'ambiance (1,5 s), sans passer par le noir. */
+  endIntro(now: number): void {
+    if (this.introStart === undefined) return;
+    this.handoff = { start: now, introStart: this.introStart };
+    this.introStart = undefined;
+  }
+
+  /** L'ouverture est en cours (pas sa sortie). */
+  get introPlaying(): boolean {
+    return this.introStart !== undefined;
+  }
+
+  /** Le séquenceur du Florilège, créé au premier besoin, déjà installé (pas de montée depuis le noir). */
+  private sequencer(now: number): LedFxSequencer {
+    if (!this.seq) {
+      const fadeMs = 3000;
+      this.seq = new LedFxSequencer(
+        { colors: this.colors, brightness: 1, ambientLevel: LED_AMBIENT_CEILING, seed: this.seed, speed: SPEED_FACTOR[this.settings.speed], fadeMs },
+        now - fadeMs,
+      );
+    }
+    return this.seq;
   }
 
   /** Changement de table : une bande de lumière traverse, dans le sens du défilement (1 : vers la fin). */
@@ -304,7 +439,12 @@ export class LedAmbientEngine {
 
   /** Une transition ou un fondu est en cours : l'image bouge même pour un style immobile. */
   busy(now: number): boolean {
-    return now - this.fadeStart < FADE_MS || this.transitions.some((x) => now - x.start < (x.kind === 'sweep' ? SWEEP_MS : ARRIVE_MS));
+    return (
+      this.introStart !== undefined ||
+      (this.handoff !== undefined && now - this.handoff.start < HANDOFF_MS) ||
+      now - this.fadeStart < FADE_MS ||
+      this.transitions.some((x) => now - x.start < (x.kind === 'sweep' ? SWEEP_MS : ARRIVE_MS))
+    );
   }
 
   /** Position (0 à 1) de chaque LED le long de la bande ; pour une matrice, selon la colonne. */
@@ -319,21 +459,56 @@ export class LedAmbientEngine {
     return u;
   }
 
-  /** Image de la bande à l'instant `now` (ms) : 3 octets par LED, jamais au-delà de la luminosité réglée. */
+  /**
+   * Image de la bande à l'instant `now` (ms) : 3 octets par LED, jamais au-delà de la luminosité réglée.
+   * Tout se compose en lumière AVANT gamma (0 à 255 par canal) : l'ambiance (un style, ou la lumière du
+   * séquenceur du Florilège, prise avant son gamma), l'ouverture et son fondu de sortie, puis les
+   * transitions ajoutées par-dessus ; le gamma 2 et le plafond ne s'appliquent qu'une fois, à la fin.
+   */
   render(grid: LedGrid, now: number): Uint8Array {
+    if (Number.isFinite(now)) this.lastNow = now;
     const u = this.along(grid);
     const n = u.length;
     const out = new Uint8Array(n * 3);
+    if (!this.settings.enabled || !n) return out;
+    const cap = clamp01(this.settings.brightness / 100);
+    if (this.handoff && now - this.handoff.start >= HANDOFF_MS) this.handoff = undefined;
+    // Ouverture : son image seule, sans ambiance ni transitions.
+    if (this.introStart !== undefined) {
+      this.introLight = ledIntroLight(grid, now - this.introStart, this.introLight);
+      return ledLightToBytes(this.introLight, cap, out);
+    }
     const speed = SPEED_FACTOR[this.settings.speed];
     const s = (now / 1000) * speed;
     const p = this.palette(now);
-    const cap = clamp01(this.settings.brightness / 100);
     const style = this.settings.style;
+    const medley = style === 'medley' ? this.sequencer(now).light(grid, now) : undefined;
+    // Sortie de l'ouverture : son image (qui continue) cède la place à l'ambiance.
+    let fromIntro = 0;
+    if (this.handoff) {
+      fromIntro = 1 - smooth((now - this.handoff.start) / HANDOFF_MS);
+      this.introLight = ledIntroLight(grid, now - this.handoff.introStart, this.introLight);
+    }
+    const intro = this.introLight;
     for (let k = 0; k < n; k++) {
-      const [color, level] = this.ambient(style, p, k, u[k]!, s);
-      let r = color[0] * level * LED_AMBIENT_CEILING;
-      let g = color[1] * level * LED_AMBIENT_CEILING;
-      let b = color[2] * level * LED_AMBIENT_CEILING;
+      let r: number;
+      let g: number;
+      let b: number;
+      if (medley) {
+        r = 255 * Math.min(1, medley[k * 3]!);
+        g = 255 * Math.min(1, medley[k * 3 + 1]!);
+        b = 255 * Math.min(1, medley[k * 3 + 2]!);
+      } else {
+        const [color, level] = this.ambient(style, p, k, u[k]!, s);
+        r = color[0] * level * LED_AMBIENT_CEILING;
+        g = color[1] * level * LED_AMBIENT_CEILING;
+        b = color[2] * level * LED_AMBIENT_CEILING;
+      }
+      if (fromIntro > 0) {
+        r = lerp(r, 255 * intro[k * 3]!, fromIntro);
+        g = lerp(g, 255 * intro[k * 3 + 1]!, fromIntro);
+        b = lerp(b, 255 * intro[k * 3 + 2]!, fromIntro);
+      }
       for (const tr of this.transitions) {
         const e = (now - tr.start) / (tr.kind === 'sweep' ? SWEEP_MS : ARRIVE_MS);
         if (e < 0 || e >= 1) continue;
@@ -362,6 +537,7 @@ export class LedAmbientEngine {
   /** Couleur et niveau (0 à 1) de la LED `k`, à la position `x` de la bande, au temps `s` (en périodes de base). */
   private ambient(style: LedAmbientStyle, p: LedPalette, k: number, x: number, s: number): [Rgb, number] {
     switch (style) {
+      case 'medley': // rendu par le séquenceur (render) ; ici, la respiration en repli
       case 'breath': {
         // 7 s par souffle, la fin de la bande un peu en retard : la respiration se propage.
         const breath = 0.5 - 0.5 * Math.cos(2 * Math.PI * (s / 7 - x * 0.12));

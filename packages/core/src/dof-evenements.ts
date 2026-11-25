@@ -107,6 +107,8 @@ export interface DofEventSettings {
   intensity: number;
   /** false : les tables originales n'ont pas leurs effets DOF par le relais (app/src/dof-relais.ts). Absent : allumé. */
   originals?: boolean;
+  /** false : pas d'effets de repli écrits pour les ROM dont la config DOF n'a presque rien sur les bandes (dof-repli.ts). Absent : allumé. */
+  romFallback?: boolean;
 }
 
 export const DOF_EVENT_DEFAULTS: DofEventSettings = { enabled: false, intensity: 70 };

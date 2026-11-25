@@ -5,8 +5,9 @@
 //   processus à part (relais-dof.ts, dof-relais.ts) initialise la libdof de VPX avec ce nom et lui passe
 //   les événements : tous les effets du configtool, sur tout le matériel. Le port des LED est rendu à
 //   libdof avant qu'elle s'initialise. Allumé par défaut, coupé par le réglage « originals ».
-// - générique : sinon, et si le joueur l'a voulu, le pilote des LED (led-live.ts) joue un profil simple
-//   sur les bandes décrites. Le port série des LED reste alors à Cyber Pinball pour cette partie.
+// - générique : sinon, et si le joueur l'a voulu, le pilote des LED (led-live.ts) joue les effets de
+//   dof-scene.ts sur les bandes décrites : événements du script (rôle lu dans le script), boutons de la
+//   borne et lanceur analogique. Le port série des LED reste alors à Cyber Pinball pour cette partie.
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -15,13 +16,15 @@ import {
   DOF_EVENT_DEFAULTS,
   DOF_TAP_ENV,
   LED_ALL,
-  LED_BLACK,
   addDofTap,
-  effectFor,
-  hexToRgb,
+  classifyDofScript,
+  createDofScene,
+  createLaunchDetector,
+  dofEventClass,
+  dofScenePalette,
   parseTapChunk,
-  releaseFor,
   type CabinetLeds,
+  type DofEventClass,
   type DofEventSettings,
   type DofZone,
 } from '@cyberpinball/core';
@@ -37,7 +40,7 @@ export function loadEventSettings(dataDir: string): DofEventSettings {
   try {
     const raw = JSON.parse(fs.readFileSync(path.join(dataDir, SETTINGS_FILE), 'utf8')) as Partial<DofEventSettings>;
     const intensity = typeof raw.intensity === 'number' ? Math.max(0, Math.min(100, raw.intensity)) : DOF_EVENT_DEFAULTS.intensity;
-    return { enabled: raw.enabled === true, intensity, ...(raw.originals === false ? { originals: false } : {}) };
+    return { enabled: raw.enabled === true, intensity, ...(raw.originals === false ? { originals: false } : {}), ...(raw.romFallback === false ? { romFallback: false } : {}) };
   } catch {
     return { ...DOF_EVENT_DEFAULTS };
   }
@@ -48,11 +51,18 @@ export function saveEventSettings(dataDir: string, settings: DofEventSettings): 
   fs.writeFileSync(path.join(dataDir, SETTINGS_FILE), JSON.stringify(settings));
 }
 
+/** Boutons de la borne qui ont un effet même quand le script de la table n'appelle pas DOF. */
+export type DofButton = 'leftFlipper' | 'rightFlipper' | 'plunger' | 'start';
+
 export interface DofTapDeps {
   dataDir: string;
   /** Bandes décrites dans Cabinet.xml ; undefined : pas de LED adressables. */
   leds(): CabinetLeds | undefined;
-  service: Pick<LedService, 'configure' | 'start' | 'setColor' | 'blackout' | 'stop' | 'gameStarted'>;
+  service: Pick<LedService, 'configure' | 'start' | 'setFrame' | 'blackout' | 'stop' | 'gameStarted'>;
+  /** Boutons de la borne pendant la partie (VPX au premier plan) : `on(bouton, appuyé)` ; rend de quoi arrêter. */
+  watchButtons?(on: (button: DofButton, down: boolean) => void): () => void;
+  /** Tirette du lanceur analogique : 0 au repos, 1 tirée à fond ; undefined sans lanceur analogique. */
+  plungerPull?(): number | undefined;
   log(line: string): void;
   /** Config DOF de la borne : base de libdof (préférences de VPX, séparateur final) et ROM qui y ont une ligne. */
   dof?(): { base: string; has(rom: string): boolean } | undefined;
@@ -134,57 +144,90 @@ function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: st
   };
 }
 
+/** Ce que la partie sait de la table pour ses effets : son script (rôle des événements) et sa couleur. */
+export interface DofTapTable {
+  script?: string;
+  /** Couleur de la table (#rrggbb), d'où la palette des effets quand ses couleurs mesurées manquent. */
+  color?: string;
+  /** Couleurs dominantes mesurées de la table (TableTints, jusqu'à quatre) : celles de la roue et du DMD. */
+  colors?: string[];
+}
+
+const BUTTON_EVENTS: Readonly<Record<DofButton, DofEventClass>> = {
+  leftFlipper: { kind: 'flipper', side: 'left' },
+  rightFlipper: { kind: 'flipper', side: 'right' },
+  // Le couloir du lanceur est à droite sur presque toutes les tables.
+  plunger: { kind: 'launch', side: 'right' },
+  start: { kind: 'game-start', side: 'center' },
+};
+
 /**
  * Au lancement d'une partie dont `tapMode` a dit le mode : pose l'écoute, puis lance le relais, ou ouvre
  * les LED du profil générique (sans attendre : le lancement de VPX ne patiente jamais). undefined : rien à faire.
+ *
+ * Profil générique : chaque événement DOF du script prend le rôle que lui donne le script de la table
+ * (classifyDofScript), les boutons de la borne (flippers, lanceur, Start) et la tirette du lanceur
+ * analogique ont leur effet même si le script n'appelle pas DOF, et les bandes reçoivent une image par
+ * 1/30 s (dof-scene.ts) aux couleurs de la table.
  */
-export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { kind: 'generique' }, table = ''): DofTapGame | undefined {
+export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { kind: 'generique' }, table = '', about: DofTapTable = {}): DofTapGame | undefined {
   if (mode.kind === 'relais') return startRelayGame(deps, vpxExe, mode.rom, table);
   const leds = deps.leds();
   if (!leds || !installTap(vpxExe)) return undefined;
   const file = tapFile();
   deps.service.configure(leds);
   deps.service.start().catch((e: Error) => deps.log(`Effets LED sans DOF : ${e.message}`)); // i18n-ignore : journal
+  const settings = loadEventSettings(deps.dataDir);
+  const scene = createDofScene(dofScenePalette(about.color, about.colors), settings.intensity / 100);
+  let classes: Map<number, DofEventClass> | undefined;
+  try {
+    classes = about.script ? classifyDofScript(about.script) : undefined;
+  } catch {
+    classes = undefined;
+  }
+  const strips = leds.strips.map((s) => ({ name: s.name, width: s.width, height: s.height, arrangement: s.arrangement }));
+  const play = (c: DofEventClass, on: boolean) => (on ? scene.trigger(c.kind, c.side, Date.now()) : scene.release(c.kind, c.side, Date.now()));
+  const stopButtons = deps.watchButtons?.((button, down) => {
+    // Lanceur : la bille part quand le bouton est relâché.
+    if (button === 'plunger') return void (down ? undefined : play(BUTTON_EVENTS.plunger, true));
+    play(BUTTON_EVENTS[button], down);
+  });
+  const launched = createLaunchDetector();
   let offset = 0;
   let rest = '';
-  const timers = new Map<string, NodeJS.Timeout>();
-  const black = (zone: DofZone) => deps.service.setColor(zoneTarget(leds, zone), LED_BLACK, 'ambient');
+  let lastFrame = 0;
   const poll = setInterval(() => {
+    const now = Date.now();
+    const pull = deps.plungerPull?.();
+    if (pull !== undefined && launched(pull, now)) play(BUTTON_EVENTS.plunger, true);
     try {
       const size = fs.statSync(file).size;
-      if (size <= offset) return;
-      const fd = fs.openSync(file, 'r');
-      const buf = Buffer.alloc(size - offset);
-      fs.readSync(fd, buf, 0, buf.length, offset);
-      fs.closeSync(fd);
-      offset = size;
-      const { events, rest: tail } = parseTapChunk(rest + buf.toString('latin1'));
-      rest = tail;
-      const settings = loadEventSettings(deps.dataDir);
-      for (const ev of events) {
-        const effect = effectFor(ev, settings);
-        if (effect) {
-          const target = zoneTarget(leds, effect.zone);
-          deps.service.setColor(target, hexToRgb(effect.color), 'ambient');
-          if (effect.mode === 'pulse') {
-            clearTimeout(timers.get(target));
-            timers.set(target, setTimeout(() => black(effect.zone), effect.durationMs));
-          }
-        } else {
-          const zone = releaseFor(ev, settings);
-          if (zone) black(zone);
-        }
+      if (size > offset) {
+        const fd = fs.openSync(file, 'r');
+        const buf = Buffer.alloc(size - offset);
+        fs.readSync(fd, buf, 0, buf.length, offset);
+        fs.closeSync(fd);
+        offset = size;
+        const { events, rest: tail } = parseTapChunk(rest + buf.toString('latin1'));
+        rest = tail;
+        for (const ev of events) play(dofEventClass(classes, ev.number), ev.state >= 1);
       }
     } catch {
       // Fichier pas encore là ou en cours d'écriture : au prochain tour.
     }
-  }, 25);
-  deps.log('Effets LED sans DOF : écoute des événements de la table.'); // i18n-ignore : journal
+    // Une image par 1/30 s au plus (le pilote n'en envoie pas plus).
+    if (now - lastFrame >= 33) {
+      lastFrame = now;
+      for (const s of strips) deps.service.setFrame(s.name, scene.render(s, now), 'ambient');
+    }
+  }, 15);
+  const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
+  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}).`); // i18n-ignore : journal
   return {
     env: { [DOF_TAP_ENV]: file },
     stop() {
       clearInterval(poll);
-      for (const t of timers.values()) clearTimeout(t);
+      stopButtons?.();
       deps.service.blackout();
       void deps.service.stop();
       fs.rmSync(file, { force: true });

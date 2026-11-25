@@ -13,6 +13,7 @@ const REPO = path.join(__dirname, '..', '..', '..', '..');
 const VRAIS_MENUS = [
   /[Mm]enu système/g, // écran nommé « Menu système »
   /[Mm]enu de VPX/g,
+  /[Mm]enu de BAM/g, // le menu de réglage de Future Pinball, ouvert aux deux MagnaSave
   /menu Démarrer/g, // Windows
   /menu de service/g, // menu de la ROM, porte ouverte
   /menu du navigateur/g, // téléphone

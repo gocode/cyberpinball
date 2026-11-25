@@ -12,23 +12,31 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import {
   DEFAULT_LED_ANIMATIONS,
+  INTRO_TIMELINE,
   LED_AMBIENT_CEILING,
   LED_AMBIENT_STYLES,
+  LED_SHUFFLE_MIN_MS,
   LED_BRIGHTNESS_CHOICES,
   LED_FIXED_COLORS,
   LED_SPEEDS,
   LedAmbientEngine,
   ledAnimationsFile,
   ledFixedColorId,
+  ledFxInfo,
   ledPalette,
+  ledPaletteFrom,
+  ledStyleDetail,
+  ledStyleLabel,
   normalizeLedAnimations,
   readLedAnimations,
+  renderLedIntro,
   rgbToHsv,
   writeLedAnimations,
   type CabinetLeds,
   type LedAnimationSettings,
   type LedGrid,
   type LedStripSpec,
+  type Rgb,
 } from '../index';
 
 const strip = (over: Partial<LedStripSpec> = {}): LedStripSpec => ({
@@ -52,7 +60,18 @@ const withDir = (run: (dir: string) => void | Promise<void>) => async () => {
   }
 };
 const settings = (over: Partial<LedAnimationSettings> = {}): LedAnimationSettings => normalizeLedAnimations({ ...DEFAULT_LED_ANIMATIONS, ...over });
+/** Moteur à graine fixe : le Florilège rejoue la même suite d'effets d'un essai à l'autre. */
+const engineOf = (over: Partial<LedAnimationSettings> = {}, seed = 7) => new LedAmbientEngine(settings(over), { seed });
 const grid: LedGrid = { width: 1, height: 20, arrangement: 'TopDownLeftRight' };
+const hueOf = (c: Rgb) => rgbToHsv(c)[0];
+const hueGap = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
+const hexHue = (hex: string) => hueOf([parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]);
+/** Somme des canaux rouge, vert et bleu d'une image. */
+const channels = (rgb: Uint8Array): [number, number, number] => {
+  const s: [number, number, number] = [0, 0, 0];
+  for (let i = 0; i < rgb.length; i++) s[i % 3]! += rgb[i]!;
+  return s;
+};
 const peak = (rgb: Uint8Array) => rgb.reduce((m, v) => Math.max(m, v), 0);
 const sum = (rgb: Uint8Array) => rgb.reduce((a, v) => a + v, 0);
 
@@ -69,6 +88,18 @@ test('Animations LED : des valeurs sûres par défaut, et tout réglage illisibl
   assert.equal(normalizeLedAnimations({ idleMinutes: -9 }).idleMinutes, 0);
   assert.equal(normalizeLedAnimations({ color: ' #FF7A1A ' }).color, '#ff7a1a');
   for (const style of LED_AMBIENT_STYLES) assert.equal(normalizeLedAnimations({ style }).style, style);
+});
+
+test('Animations LED : le Florilège est le premier style, celui par défaut, et un style enregistré reste respecté', () => {
+  assert.equal(LED_AMBIENT_STYLES[0], 'medley');
+  assert.equal(DEFAULT_LED_ANIMATIONS.style, 'medley');
+  assert.equal(normalizeLedAnimations({ style: 'medley' }).style, 'medley');
+  assert.equal(normalizeLedAnimations({ style: 'breath' }).style, 'breath', 'un joueur qui avait choisi la respiration la garde');
+  assert.equal(normalizeLedAnimations({}).style, 'medley');
+  for (const style of LED_AMBIENT_STYLES) {
+    assert.ok(ledStyleLabel(style).length > 0 && ledStyleDetail(style).length > 0, `${style} : libellé et détail`);
+  }
+  assert.equal(ledStyleLabel('medley'), 'Florilège');
 });
 
 test(
@@ -122,6 +153,70 @@ test('Animations LED : un blanc chaud reste un blanc, il n’est pas teinté de 
   assert.ok(s < 0.15);
 });
 
+test('Animations LED : la palette des couleurs de la table prend la première, la deuxième et la troisième, saturées', () => {
+  const colors = ['#4a7fd0', '#d06aa8', '#d0a040'];
+  const p = ledPaletteFrom(colors);
+  assert.deepEqual(p.primary, ledPalette(colors[0]).primary, 'la dominante comme ledPalette');
+  for (const [c, hex] of [
+    [p.secondary, colors[1]!],
+    [p.accent, colors[2]!],
+  ] as const) {
+    const [h, s, v] = rgbToHsv(c);
+    assert.ok(hueGap(h, hexHue(hex)) < 3, `${hex} : même teinte`);
+    assert.ok(s >= 0.84 && v >= 0.99, `${hex} : saturée et pleine`);
+  }
+  // Une seule couleur : les voisines de ledPalette ; aucune (ou illisible) : la marque.
+  assert.deepEqual(ledPaletteFrom(['#4a7fd0']), ledPalette('#4a7fd0'));
+  assert.deepEqual(ledPaletteFrom(undefined), ledPalette(undefined));
+  assert.deepEqual(ledPaletteFrom(['bleu', '#4a7fd0']), ledPalette('#4a7fd0'), 'une couleur illisible est ignorée');
+});
+
+test('Animations LED : couleurs visées — la table (ses couleurs, sinon sa teinte, sinon la couleur fixe), ou la couleur fixe sans la suivre', () => {
+  const follow = engineOf({ followTable: true, color: '#2f6bff' });
+  assert.deepEqual(follow.targetColors('#ffb36b', ['#ff0000', '#00ff00']), ['#ff0000', '#00ff00']);
+  assert.deepEqual(follow.targetColors('#ffb36b', []), ['#ffb36b']);
+  assert.deepEqual(follow.targetColors(undefined, undefined), ['#2f6bff']);
+  const fixed = engineOf({ followTable: false, color: '#2f6bff' });
+  assert.deepEqual(fixed.targetColors('#ffb36b', ['#ff0000', '#00ff00']), ['#2f6bff']);
+});
+
+test('Animations LED : un style classique prend les couleurs de la table ; sans suivre la table, la couleur fixe', () => {
+  const colors = ['#2f6bff', '#ff3d9a', '#ffb000'];
+  const follow = engineOf({ style: 'drift', followTable: true, color: '#2bdc5a' });
+  follow.setTint('#ff2a2a', 0, true, colors);
+  assert.deepEqual(follow.palette(0), ledPaletteFrom(colors));
+  // Sans palette mesurée : la teinte, comme avant.
+  follow.setTint('#ff2a2a', 0, true);
+  assert.deepEqual(follow.palette(0), ledPalette('#ff2a2a'));
+  const fixed = engineOf({ style: 'drift', followTable: false, color: '#2bdc5a' });
+  fixed.setTint('#ff2a2a', 0, true, colors);
+  assert.deepEqual(fixed.palette(0), ledPalette('#2bdc5a'), 'couleur fixe, palette de la table ignorée');
+  // Le fondu vers les couleurs de la table reste le même.
+  const fade = engineOf({ style: 'drift' });
+  fade.setTint('#ff2a2a', 0, true);
+  fade.setTint(undefined, 10_000, false, colors);
+  assert.notDeepEqual(fade.palette(10_450), ledPaletteFrom(colors), 'en cours de fondu');
+  assert.deepEqual(fade.palette(11_000), ledPaletteFrom(colors));
+});
+
+test('Animations LED : le Florilège prend les couleurs de la table, ou la couleur fixe sans la suivre', () => {
+  // Bleu de la table contre rouge fixe : sur cinq minutes, la couleur visée domine (les arcs-en-ciel s'équilibrent).
+  const total = (over: Partial<LedAnimationSettings>, colors: string[]) => {
+    const engine = engineOf({ style: 'medley', brightness: 100, ...over });
+    engine.setTint(undefined, 0, true, colors);
+    const s: [number, number, number] = [0, 0, 0];
+    for (let t = 0; t < 300_000; t += 500) {
+      const c = channels(engine.render(grid, t));
+      for (let i = 0; i < 3; i++) s[i]! += c[i]!;
+    }
+    return s;
+  };
+  const blue = total({ followTable: true, color: '#ff2a2a' }, ['#2f6bff', '#3d5cff']);
+  assert.ok(blue[2] > 1.5 * blue[0], `table bleue : du bleu (${blue.join(' / ')})`);
+  const red = total({ followTable: false, color: '#ff2a2a' }, ['#2f6bff', '#3d5cff']);
+  assert.ok(red[0] > 1.5 * red[2], `couleur fixe rouge : du rouge (${red.join(' / ')})`);
+});
+
 // --- Moteur -----------------------------------------------------------------------------------
 
 test('Animations LED : aucune LED ne dépasse la luminosité maximale, quel que soit le style, la vitesse ou la transition', () => {
@@ -129,8 +224,8 @@ test('Animations LED : aucune LED ne dépasse la luminosité maximale, quel que 
     const cap = Math.round((255 * brightness) / 100);
     for (const style of LED_AMBIENT_STYLES) {
       for (const speed of LED_SPEEDS) {
-        const engine = new LedAmbientEngine(settings({ brightness, style, speed }));
-        engine.setTint('#ff8f8f', 0, true);
+        const engine = engineOf({ brightness, style, speed });
+        engine.setTint('#ff8f8f', 0, true, ['#ff8f8f', '#ffffff', '#30ff60']);
         engine.sweep(1000, 1);
         engine.sweep(1100, -1);
         engine.arrive(1500);
@@ -139,6 +234,13 @@ test('Animations LED : aucune LED ne dépasse la luminosité maximale, quel que 
           assert.equal(out.length, 60);
           assert.ok(peak(out) <= cap, `${style}/${speed}/${brightness} % à ${t} ms : ${peak(out)} > ${cap}`);
         }
+        // L'ouverture, puis sa sortie avec un balayage par-dessus : toujours sous le plafond.
+        engine.playIntro(20_000);
+        for (let t = 20_000; t < 26_000; t += 61) assert.ok(peak(engine.render(grid, t)) <= cap, `ouverture ${style}/${brightness} % à ${t - 20_000} ms`);
+        engine.endIntro(26_000);
+        engine.sweep(26_100, 1);
+        engine.arrive(26_300);
+        for (let t = 26_000; t < 29_000; t += 61) assert.ok(peak(engine.render(grid, t)) <= cap, `sortie ${style}/${brightness} % à ${t - 26_000} ms`);
       }
     }
   }
@@ -147,7 +249,7 @@ test('Animations LED : aucune LED ne dépasse la luminosité maximale, quel que 
 test('Animations LED : l’ambiance seule laisse de la marge aux transitions', () => {
   const brightness = 100;
   for (const style of LED_AMBIENT_STYLES) {
-    const engine = new LedAmbientEngine(settings({ brightness, style }));
+    const engine = engineOf({ brightness, style });
     let high = 0;
     for (let t = 0; t < 60_000; t += 97) high = Math.max(high, peak(engine.render(grid, t)));
     // Gamma 2 : le plafond de 70 % donne au plus 49 % de la valeur maximale.
@@ -158,7 +260,7 @@ test('Animations LED : l’ambiance seule laisse de la marge aux transitions', (
 
 test('Animations LED : chaque style allume la bande et change avec le temps', () => {
   for (const style of LED_AMBIENT_STYLES) {
-    const engine = new LedAmbientEngine(settings({ style, brightness: 100 }));
+    const engine = engineOf({ style, brightness: 100 });
     const frames = [0, 2500, 5000, 9000, 14_000].map((t) => engine.render(grid, t));
     assert.ok(frames.every((f) => sum(f) > 0), `${style} : allumée en permanence`);
     assert.ok(new Set(frames.map((f) => f.join(','))).size > 1, `${style} : l’image évolue`);
@@ -166,12 +268,56 @@ test('Animations LED : chaque style allume la bande et change avec le temps', ()
 });
 
 test('Animations LED : une image ne dépend que de l’instant (aucun hasard), même d’un moteur à l’autre', () => {
-  for (const style of LED_AMBIENT_STYLES) {
+  for (const style of LED_AMBIENT_STYLES.filter((s) => s !== 'medley')) {
     const a = new LedAmbientEngine(settings({ style }));
     const b = new LedAmbientEngine(settings({ style }));
     for (const t of [0, 333, 4242, 99_999]) assert.deepEqual(a.render(grid, t), b.render(grid, t), `${style} à ${t} ms`);
     assert.deepEqual(a.render(grid, 4242), a.render(grid, 4242));
   }
+  // Florilège : à graine égale, la même suite d'images ; la graine seule change l'ordre des effets.
+  const a = engineOf({ style: 'medley' }, 42);
+  const b = engineOf({ style: 'medley' }, 42);
+  for (const t of [0, 333, 4242, 45_000, 99_999]) assert.deepEqual(a.render(grid, t), b.render(grid, t), `medley à ${t} ms`);
+});
+
+test('Animations LED : le Florilège varie — plusieurs effets et familles en quelques minutes, une graine différente à chaque lancement', () => {
+  const engine = engineOf({ style: 'medley', brightness: 100 });
+  const effects = new Set<string>();
+  const images = new Set<string>();
+  for (let t = 0; t < 6 * 60_000; t += 1000) {
+    images.add(engine.render(grid, t).join(','));
+    effects.add(engine.medleyEffect!);
+  }
+  const families = new Set([...effects].map((id) => ledFxInfo(id)!.family));
+  assert.ok(effects.size >= 6, `effets distincts en 6 min : ${[...effects].join(', ')}`);
+  assert.ok(families.size >= 5, `familles distinctes : ${[...families].join(', ')}`);
+  assert.ok(images.size > 120, `l’image change (${images.size} images distinctes sur 360)`);
+  // Un changement d'écran passe à un autre effet.
+  const before = engine.medleyEffect;
+  engine.shuffle(400_000);
+  assert.notEqual(engine.medleyEffect, before);
+  // Écrans passés vite : un seul changement par LED_SHUFFLE_MIN_MS, pas une rafale de fondus.
+  const shuffled = engine.medleyEffect;
+  engine.shuffle(400_000 + LED_SHUFFLE_MIN_MS / 2);
+  assert.equal(engine.medleyEffect, shuffled);
+  engine.shuffle(400_000 + LED_SHUFFLE_MIN_MS);
+  assert.notEqual(engine.medleyEffect, shuffled);
+  // Un style classique n'a pas de séquenceur : shuffle n'y fait rien.
+  const calm = engineOf({ style: 'breath' });
+  calm.shuffle(1000);
+  assert.equal(calm.medleyEffect, undefined);
+  // Graine tirée au lancement : deux moteurs sans graine donnée ne la partagent pas (presque jamais).
+  const firsts = new Set<string>();
+  for (let i = 0; i < 6; i++) {
+    const e = new LedAmbientEngine(settings({ style: 'medley' }));
+    const seq: string[] = [];
+    for (let t = 0; t < 200_000; t += 5000) {
+      e.render(grid, t);
+      seq.push(e.medleyEffect!);
+    }
+    firsts.add(seq.join(','));
+  }
+  assert.ok(firsts.size > 1, 'des suites différentes d’un lancement à l’autre');
 });
 
 test('Animations LED : la matrice est rendue en entier, les bandes d’une LED aussi', () => {
@@ -267,6 +413,99 @@ test('Animations LED : l’arrivée sur la fiche pulse puis s’éteint', () => 
   assert.deepEqual(engine.render(grid, 205_000), new LedAmbientEngine(settings({ style: 'drift', brightness: 100 })).render(grid, 205_000));
 });
 
+test('Animations LED : animations éteintes, tout est noir, ambiance comme ouverture', () => {
+  const engine = engineOf({ enabled: false, brightness: 100 });
+  for (const t of [0, 3000, 60_000]) assert.equal(sum(engine.render(grid, t)), 0);
+  engine.playIntro(100_000);
+  for (let t = 100_000; t < 106_000; t += 100) assert.equal(sum(engine.render(grid, t)), 0, `ouverture à ${t - 100_000} ms`);
+});
+
+// --- Ouverture ---------------------------------------------------------------------------------
+
+/** Rang de la LED la plus vive. */
+const brightest = (rgb: Uint8Array) => {
+  let best = -1;
+  let where = 0;
+  for (let k = 0; k < rgb.length / 3; k++) {
+    const v = rgb[k * 3]! + rgb[k * 3 + 1]! + rgb[k * 3 + 2]!;
+    if (v > best) {
+      best = v;
+      where = k;
+    }
+  }
+  return where;
+};
+
+test('Ouverture des LED : noire avant la mise sous tension, puis une lueur discrète', () => {
+  for (const ms of [-500, 0, 100, INTRO_TIMELINE.dmdPower - 1]) assert.equal(sum(renderLedIntro(grid, ms, 1)), 0, `${ms} ms`);
+  assert.equal(sum(renderLedIntro(grid, NaN, 1)), 0);
+  const glow = renderLedIntro(grid, 1100, 1);
+  assert.ok(sum(glow) > 0, 'la mise sous tension se voit');
+  assert.ok(peak(glow) < 255 * 0.4, `discrète (${peak(glow)})`);
+});
+
+test('Ouverture des LED : la bille monte jusqu’à l’ignition, le pic est à l’ignition', () => {
+  const T = INTRO_TIMELINE;
+  // La bille monte vers la fin de la bande.
+  const low = brightest(renderLedIntro(grid, 1800, 1));
+  const high = brightest(renderLedIntro(grid, 2300, 1));
+  assert.ok(high > low, `la bille monte (${low} → ${high})`);
+  // Le pic : l'éclair de l'ignition.
+  const atIgnition = renderLedIntro(grid, T.ignition + 30, 1);
+  assert.ok(peak(atIgnition) >= 240, `éclair (${peak(atIgnition)})`);
+  for (const ms of [800, 1800, T.topperSweep + 300, T.sheen + 300, T.end + 1000, 20_000]) {
+    assert.ok(sum(atIgnition) > sum(renderLedIntro(grid, ms, 1)), `l’ignition (${sum(atIgnition)}) l’emporte sur ${ms} ms`);
+  }
+  // Plafond et aucun hasard.
+  for (let ms = 0; ms < 8000; ms += 37) {
+    assert.ok(peak(renderLedIntro(grid, ms, 0.4)) <= Math.round(255 * 0.4), `${ms} ms sous le plafond`);
+  }
+  assert.deepEqual(renderLedIntro(grid, 2777, 1), renderLedIntro(grid, 2777, 1));
+  assert.equal(renderLedIntro({ width: 8, height: 4, arrangement: 'TopDownLeftRight' }, 2500, 1).length, 8 * 4 * 3);
+});
+
+test('Ouverture des LED : après la fin, l’ambiance posée, allumée et sous la marge de l’ambiance', () => {
+  const settled: Uint8Array[] = [];
+  for (let ms = INTRO_TIMELINE.end + 100; ms < 60_000; ms += 499) settled.push(renderLedIntro(grid, ms, 1));
+  assert.ok(settled.every((f) => sum(f) > 0), 'jamais noire');
+  assert.ok(new Set(settled.map((f) => f.join(','))).size > 10, 'elle vit');
+  const high = Math.max(...settled.map(peak));
+  assert.ok(high <= Math.ceil(255 * LED_AMBIENT_CEILING ** 2) + 1, `sous la marge (${high})`);
+  // Aux couleurs de la marque : sarcelle et vert, ni rouge ni violet.
+  const [r, g, b] = settled.map(channels).reduce((a, c) => [a[0] + c[0], a[1] + c[1], a[2] + c[2]], [0, 0, 0]);
+  assert.ok(g > r && g > b * 0.8, `sarcelle et vert (${r} / ${g} / ${b})`);
+});
+
+test('Ouverture des LED : le moteur la cale sur l’instant de départ, même rejointe en retard, puis passe au menu sans noir', () => {
+  const start = 50_000;
+  const engine = engineOf({ style: 'medley', brightness: 100 });
+  engine.setTint('#ff3d9a', 0, true);
+  engine.playIntro(start);
+  assert.equal(engine.introPlaying, true);
+  assert.equal(engine.busy(start + 60_000), true);
+  // Rejointe en retard (port ouvert après le départ) : la même image que l'ouverture à cet instant.
+  assert.deepEqual(engine.render(grid, start + INTRO_TIMELINE.ignition + 30), renderLedIntro(grid, INTRO_TIMELINE.ignition + 30, 1));
+  assert.deepEqual(engine.render(grid, start + 7000), renderLedIntro(grid, 7000, 1));
+  // Sortie : fondu de l'image d'ouverture vers l'ambiance, jamais noir.
+  const leave = start + 9000;
+  const introSum = sum(engine.render(grid, leave));
+  engine.endIntro(leave);
+  assert.equal(engine.introPlaying, false);
+  const sums: number[] = [];
+  for (let t = leave; t <= leave + 2000; t += 40) sums.push(sum(engine.render(grid, t)));
+  const ambientSum = sums[sums.length - 1]!;
+  const floor = 0.2 * Math.min(introSum, ambientSum);
+  assert.ok(ambientSum > 0 && introSum > 0);
+  assert.ok(Math.min(...sums) >= floor, `aucun creux noir (min ${Math.min(...sums)}, seuil ${floor.toFixed(0)})`);
+  assert.ok(Math.abs(sums[0]! - introSum) <= 60, 'le fondu part de l’image montrée (aux arrondis près)');
+  assert.equal(engine.busy(leave + 1600), false, 'fondu fini');
+  // Une sortie sans ouverture en cours ne change rien.
+  const plain = engineOf({ style: 'drift' });
+  const before = plain.render(grid, 3000);
+  plain.endIntro(3000);
+  assert.deepEqual(plain.render(grid, 3000), before);
+});
+
 // --- Contrôleur de l'application ---------------------------------------------------------------
 
 interface Service {
@@ -283,7 +522,7 @@ interface Service {
   simulation: { device: { shownOutput(output: number, count: number): Uint8Array } } | undefined;
 }
 interface Controller {
-  update(c: { phase: string; tableKey?: string; index?: number; ficheKey?: string; tint?: string }): void;
+  update(c: { phase: string; tableKey?: string; index?: number; ficheKey?: string; tint?: string; palette?: readonly string[]; introStartedAt?: number }): void;
   settings(): LedAnimationSettings;
   change(patch: Partial<LedAnimationSettings>): void;
   available(): boolean;
@@ -295,6 +534,7 @@ const driver = require(path.resolve(__dirname, '../../../../app/dist/led-live.js
 const animationsModule = require(path.resolve(__dirname, '../../../../app/dist/led-animations.js')) as {
   createLedAnimations(o: Record<string, unknown>): Controller;
   LED_AMBIENT_PHASES: readonly string[];
+  LED_INTRO_PHASE: string;
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -334,6 +574,7 @@ function bench(dir: string, leds: CabinetLeds | undefined = teensy([strip()]), i
     leds: () => config.leds,
     idleFor: () => idle.ms,
     now: () => clock.now,
+    seed: 7,
     setInterval: (run: () => void) => {
       beat = run;
       return 1;
@@ -414,7 +655,62 @@ test(
 test('Animations LED : seuls la roue, les menus, les messages et le Juke-box sont des écrans d’ambiance', () => {
   assert.deepEqual([...animationsModule.LED_AMBIENT_PHASES].sort(), ['confirmQuit', 'jukebox', 'library', 'menu', 'message']);
   for (const phase of ['intro', 'loading', 'playing']) assert.ok(!animationsModule.LED_AMBIENT_PHASES.includes(phase), phase);
+  assert.equal(animationsModule.LED_INTRO_PHASE, 'intro', 'l’ouverture a son animation à elle');
 });
+
+test(
+  'Animations LED : l’ouverture joue à l’horloge des écrans, même port ouvert en retard, puis la roue sans noir',
+  withDir(async (dir) => {
+    const b = bench(dir);
+    // Fenêtres pas encore prêtes : pas d'instant de départ, rien ne s'allume.
+    b.controller.update({ phase: 'intro' });
+    await settle();
+    assert.equal(b.controller.running, false);
+    assert.equal(b.service.status().state, 'closed', 'aucun port ouvert avant le départ');
+    // Les animations partent ; le port s'ouvre (en retard : l'ignition est déjà là).
+    b.controller.update({ phase: 'intro', introStartedAt: b.clock.now - INTRO_TIMELINE.ignition - 30, tint: '#ff3d9a', palette: ['#ff3d9a'] });
+    await settle();
+    assert.equal(b.controller.running, true);
+    await b.timer.beat();
+    const cap = Math.round((255 * DEFAULT_LED_ANIMATIONS.brightness) / 100);
+    assert.ok(peak(shown(b)) >= cap - 15, `l’éclair de l’ignition (${peak(shown(b))} / ${cap})`);
+    assert.ok(peak(shown(b)) <= cap);
+    // Ambiance posée de l'ouverture, puis le premier bouton : la roue, sans passer par le noir.
+    b.clock.now += 8000;
+    await b.timer.beat();
+    const settled = sum(shown(b));
+    assert.ok(settled > 0);
+    b.controller.update({ phase: 'menu', tableKey: 'a.vpx', index: 0, tint: '#ff3d9a', palette: ['#ff3d9a'] });
+    for (let i = 0; i < 40; i++) {
+      b.clock.now += 40;
+      await b.timer.beat();
+      assert.ok(sum(shown(b)) > 0, `aucun noir à ${i * 40} ms de la sortie`);
+    }
+    assert.equal(b.controller.running, true, 'l’ambiance des menus continue');
+    b.controller.dispose();
+    await b.service.stop();
+  }),
+);
+
+test(
+  'Animations LED : animations éteintes ou sans bande, l’ouverture n’allume rien et n’ouvre aucun port',
+  withDir(async (dir) => {
+    for (const c of [
+      { leds: teensy([strip()]), initial: { enabled: false } as Partial<LedAnimationSettings> },
+      { leds: undefined, initial: undefined },
+    ]) {
+      const sub = fs.mkdtempSync(path.join(dir, 'o-'));
+      const b = bench(sub, c.leds, c.initial);
+      b.config.leds = c.leds;
+      b.controller.update({ phase: 'intro', introStartedAt: b.clock.now - 2400 });
+      await settle();
+      assert.equal(b.controller.running, false);
+      assert.equal(b.timer.active, false);
+      assert.equal(b.service.status().state, 'closed');
+      b.controller.dispose();
+    }
+  }),
+);
 
 test(
   'Animations LED : rien ne tourne sans bande, avec les animations éteintes, ou sur une carte qui porte ses bandes',

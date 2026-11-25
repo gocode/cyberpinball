@@ -6,7 +6,8 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
-import { dmdMirrorPlacement, pupScreenRole, pupWindowPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, managedFuturePinballDir, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
+import * as path from 'node:path';
+import { bamMenuButtons, bamMenuVk, type BamMenuButtons, dmdMirrorPlacement, pupScreenRole, pupWindowPlacement, findFuturePinball, FUTURE_PINBALL_NAME, FUTURE_PINBALL_PLAYER_KEY, futurePinballCommand, futurePinballDmdMirror, futurePinballGameKeys, futurePinballJoystickKeys, managedFuturePinballDir, type NudgeSide, futurePinballPlacement, t, type ButtonsSource, type FuturePinballCommand, type FuturePinballInstall, type Rect, type TableEntry } from '@cyberpinball/core';
 import { hkcuValue, type WindowInfo } from '@cyberpinball/win-displays';
 import { FUTURE_PINBALL_BAM_LAUNCH_GAME, FUTURE_PINBALL_LAUNCH_GAME, type ZenLaunchGame } from './pinballfx-launcher';
 
@@ -197,6 +198,28 @@ export function closePupStartedDuringGame(before: readonly number[], now: readon
  */
 export function futurePinballButtonKeys(source: ButtonsSource, read: (value: string) => unknown = (value) => hkcuValue(FUTURE_PINBALL_PLAYER_KEY, value)): Map<string, string[]> {
   return futurePinballJoystickKeys(source, read);
+}
+
+/**
+ * Le menu de BAM réglé depuis les boutons de la borne (futurepinball-bam-menu.ts) : les boutons de joystick de
+ * chaque rôle et la touche d'ouverture lue dans BAM\bam.cfg (le dossier de la commande). undefined : jeu lancé
+ * sans BAM (pas de menu), ou borne dont les deux MagnaSave ne sont pas des boutons de joystick.
+ */
+export function futurePinballBamMenu(
+  source: ButtonsSource,
+  command: { bam?: true; cwd?: string },
+  readText: (file: string) => string | undefined = (file) => {
+    try {
+      return fs.readFileSync(file, 'utf8');
+    } catch {
+      return undefined;
+    }
+  },
+): { buttons: BamMenuButtons; vk: number } | undefined {
+  if (!command.bam) return undefined;
+  const buttons = bamMenuButtons(source);
+  if (!buttons.leftMagna || !buttons.rightMagna) return undefined;
+  return { buttons, vk: bamMenuVk(command.cwd ? readText(path.join(command.cwd, 'bam.cfg')) : undefined) };
 }
 
 /** Touches de secousse de Future Pinball (gauche, droite, vers l'avant), d'après ses préférences. */

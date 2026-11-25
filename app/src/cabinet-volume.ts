@@ -73,12 +73,12 @@ export interface CabinetVolume {
 /** Volume simulé des essais : une sortie, 50 %. */
 const simulated: OutputVolume[] = [{ id: 'essai', level: 0.5, muted: false }];
 
-function readVolumes(ids: string[]): OutputVolume[] {
+export function readVolumes(ids: string[]): OutputVolume[] {
   if (OFFSCREEN) return simulated.map((o) => ({ ...o }));
   return readEndpointVolumes(ids);
 }
 
-function writeVolumes(outputs: OutputVolume[]): void {
+export function writeVolumes(outputs: OutputVolume[]): void {
   if (OFFSCREEN) {
     simulated.splice(0, simulated.length, ...outputs.map((o) => ({ ...o })));
     return;

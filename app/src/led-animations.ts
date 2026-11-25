@@ -8,6 +8,9 @@
 // - Le front-end ne donne que des faits (`update`) : l'écran, la table choisie, la fiche ouverte, la
 //   teinte de la table. Le pilote rend le port à DOF dès qu'une partie se prépare (led-live.ts) ; ici,
 //   `update` n'allume plus rien dans ces phases et vide la couche d'ambiance.
+// - À l'ouverture, les bandes jouent l'animation d'ouverture, calée sur l'horloge des écrans
+//   (`introStartedAt`) : une liaison ouverte en retard la prend où elle en est. À la sortie, le moteur
+//   fond son image dans l'ambiance des menus. Mêmes garde-fous que l'ambiance (`wanted`).
 // - Les images partent au rythme de 25 par seconde au plus, uniquement tant que quelque chose bouge.
 // - L'essai des bandes de l'écran de configuration (couche « test », ou une description en cours
 //   d'essai) garde la main : tant que le pilote porte une autre description que celle enregistrée,
@@ -28,6 +31,11 @@ import type { LedService } from './led-live';
 
 /** Écrans où l'ambiance a sa place : la roue, les menus, les messages, le Juke-box. Jamais l'intro ni une partie. */
 export const LED_AMBIENT_PHASES: readonly string[] = ['menu', 'library', 'message', 'confirmQuit', 'jukebox'];
+/**
+ * Écran de l'ouverture : les bandes y jouent l'animation d'ouverture des LED (led-ouverture.ts), calée
+ * sur l'instant de départ des animations des écrans (`introStartedAt`) ; rien tant qu'elles n'ont pas démarré.
+ */
+export const LED_INTRO_PHASE = 'intro';
 
 /** Ce que le front-end sait, à chaque état envoyé. */
 export interface LedAnimationContext {
@@ -42,6 +50,11 @@ export interface LedAnimationContext {
   tint?: string;
   /** Couleurs dominantes du visuel de cette table pour les LED (#rrggbb, la plus présente d'abord). */
   palette?: readonly string[];
+  /**
+   * Ouverture : instant de départ de ses animations (IntroRun.startedAt, Date.now() : la même horloge
+   * que `now`) ; absent tant que les fenêtres ne sont pas toutes prêtes.
+   */
+  introStartedAt?: number;
 }
 
 export interface LedAnimationsOptions {
@@ -53,6 +66,8 @@ export interface LedAnimationsOptions {
   idleFor: () => number;
   now?: () => number;
   /** Remplaçables par les essais. */
+  /** Graine du Florilège (par défaut : tirée au lancement). */
+  seed?: number;
   setInterval?: (run: () => void, ms: number) => unknown;
   clearInterval?: (id: unknown) => void;
   log?: (line: string) => void;
@@ -81,7 +96,7 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
   const setTimer = options.setInterval ?? ((run, ms) => setInterval(run, ms));
   const clearTimer = options.clearInterval ?? ((id) => clearInterval(id as ReturnType<typeof setInterval>));
   let settings = readLedAnimations(options.dataDir);
-  const engine = new LedAmbientEngine(settings);
+  const engine = new LedAmbientEngine(settings, { seed: options.seed });
   let context: LedAnimationContext = { phase: 'menu' };
   let seen: LedAnimationContext | undefined;
   let timer: unknown;
@@ -96,7 +111,9 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
     return leds && leds.strips.length && !ledsOnBoard(leds.controller) && !ledProblems(leds).length ? leds : undefined;
   };
 
-  const wanted = (): boolean => settings.enabled && LED_AMBIENT_PHASES.includes(context.phase) && !idle && Boolean(usable());
+  /** L'ouverture a démarré : ses animations LED ont leur instant de départ. */
+  const introOn = (): boolean => context.phase === LED_INTRO_PHASE && context.introStartedAt !== undefined && Number.isFinite(context.introStartedAt);
+  const wanted = (): boolean => settings.enabled && (LED_AMBIENT_PHASES.includes(context.phase) || introOn()) && !idle && Boolean(usable());
 
   function stopTimer(): void {
     if (timer !== undefined) clearTimer(timer);
@@ -165,11 +182,22 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
     const t = now();
     // Activité : un changement de ce que montre l'écran réveille les LED éteintes pour inactivité.
     if (idle && (settings.idleMinutes === 0 || options.idleFor() < settings.idleMinutes * 60_000)) idle = false;
+    // Sortie de l'ouverture : son image se fond dans l'ambiance, sans passer par le noir (rien si elle ne jouait pas).
+    if (next.phase !== LED_INTRO_PHASE) engine.endIntro(t);
     if (!wanted()) return clear();
     engine.configure(settings);
+    if (introOn()) {
+      engine.playIntro(next.introStartedAt!);
+      // Les couleurs de la table sont prêtes pour l'ambiance qui suivra.
+      engine.setTint(next.tint, t, true, next.palette);
+      engage();
+      return;
+    }
     const first = !previous || !LED_AMBIENT_PHASES.includes(previous.phase);
-    engine.setTint(next.tint, t, first);
+    engine.setTint(next.tint, t, first, next.palette);
     if (!first) {
+      // Florilège : un autre écran, un autre effet (de la variété sans attendre la fin de l'effet montré).
+      if (next.phase !== previous.phase) engine.shuffle(t);
       if (next.phase === 'menu' && next.tableKey !== previous.tableKey && next.tableKey !== undefined) {
         engine.sweep(t, next.index !== undefined && previous.index !== undefined && next.index < previous.index ? -1 : 1);
       } else if (next.ficheKey !== previous.ficheKey && next.ficheKey !== undefined) {
@@ -209,7 +237,7 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
       }
       engine.configure(settings);
       // Réglage changé : le style, la couleur ou la luminosité se voient tout de suite.
-      engine.setTint(context.tint, now());
+      engine.setTint(context.tint, now(), false, context.palette);
       idle = false;
       if (!settings.enabled) {
         clear();

@@ -5,6 +5,8 @@ tmp/
 # Journaux et sorties qu'un essai laisse à la racine (tmp-npmci-retours.log, 17/11/2026 : l'audit de
 # publication y a trouvé une adresse et arrêté l'envoi) : sur ce poste seulement, comme tmp/.
 /tmp-*
+# Journal de libdof, écrit dans le dossier courant d'un essai du relais DOF lancé à la main (25/11/2026).
+DirectOutput.log
 build/
 release/
 cache/

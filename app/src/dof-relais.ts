@@ -29,7 +29,7 @@ export function vpxDofDll(vpxExe: string): string | undefined {
 }
 
 /** Lignes d'information de libdof gardées au journal : ce qui dit quelle config a été lue et ce qui a été ouvert. */
-const USEFUL = /romname|table ?config|config loading|toys?\b|cabinet|globalconfig|output controller|no (?:config|table)/i;
+const USEFUL = /romname|table ?config|config loading|toys?\b|cabinet|globalconfig|output controller|no (?:config|table)|ledcontrol file|ledcontrol\.ini files loaded/i;
 const MAX_LINES = 40;
 
 export function startDofRelay(job: DofRelayJob, log: (line: string) => void, script = path.join(__dirname, 'relais-dof.js')): DofRelay {

@@ -8,6 +8,7 @@
 import * as path from 'node:path';
 import {
   addFuturePinballTable,
+  bamMenuHelp,
   findFuturePinball,
   formatList,
   formatSize,
@@ -252,7 +253,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       subheading: [t('Bêta : {game} est en phase de test dans Cyber Pinball', { game: FUTURE_PINBALL_NAME }), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
       lead:
         notice ??
-        t('Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, par BAM s’il est installé ; ses écrans se règlent dans ses préférences (Vidéo).'),
+        t('Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, par BAM s’il est installé ; ses écrans se règlent dans ses préférences (Vidéo).') + ' ' + bamMenuHelp(),
       sections: [
         { title: FUTURE_PINBALL_NAME, rows: [game, pupRow()] },
         {

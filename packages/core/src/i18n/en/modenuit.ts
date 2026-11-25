@@ -1,0 +1,53 @@
+// Catalogue anglais : mode nuit (packages/core/src/modenuit.ts, app/src/modenuit-menu.ts).
+// Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  'Mode nuit': 'Night mode',
+  'Mode nuit : actif': 'Night mode: on',
+  'Mode nuit : inactif': 'Night mode: off',
+  'Mode nuit : {summary}': 'Night mode: {summary}',
+  'Baisse les écrans, le son, les LED et les toys pour jouer sans déranger (Start : régler)': 'Lowers the screens, sound, LEDs and toys so you can play without disturbing anyone (Start: adjust)',
+  'Écrans, son, LED et toys suivent tes réglages ci-dessous (Start : désactiver)': 'Screens, sound, LEDs and toys follow your settings below (Start: turn off)',
+  'Rien ne change tant qu’il est inactif (Start : activer)': 'Nothing changes while it is off (Start: turn on)',
+  'Lié à l’horaire de la borne : oui': 'Linked to the cabinet hours: yes',
+  'Lié à l’horaire de la borne : non': 'Linked to the cabinet hours: no',
+  'Le mode s’active de lui-même la nuit de l’horaire, et s’arrête à la fin de la nuit (Start : délier)': 'The mode turns itself on during the scheduled night and off when the night ends (Start: unlink)',
+  'Sans lien : seul le bouton ou ce réglage l’active (Start : l’activer la nuit de l’horaire)': 'Not linked: only the button or this setting turns it on (Start: turn it on during the scheduled night)',
+  'Écrans : {dim}': 'Screens: {dim}',
+  'Voile noir sur les écrans du front-end ; pendant une partie, VPX garde la main sur ses écrans': 'Black veil over the front-end screens; during a game, VPX keeps control of its own screens',
+  'Son : {volume}': 'Sound: {volume}',
+  'Volume de Windows sur les sorties de la borne, remis à la fin du mode nuit ; 0 % : muet': 'Windows volume on the cabinet outputs, restored when night mode ends; 0%: muted',
+  'LED : {leds}': 'LEDs: {leds}',
+  'LED éteintes : la luminosité ne compte pas': 'LEDs off: the brightness does not matter',
+  'Luminosité des LED du front-end et des parties': 'Brightness of the front-end and in-game LEDs',
+  'LED éteintes : oui': 'LEDs off: yes',
+  'LED éteintes : non': 'LEDs off: no',
+  'Sans effet en partie : {reason}': 'No effect during a game: {reason}',
+  'Éteint toutes les LED pendant le mode nuit (Start : changer)': 'Turns all the LEDs off during night mode (Start: change)',
+  'Toys coupés : oui': 'Toys off: yes',
+  'Toys coupés : non': 'Toys off: no',
+  'Solénoïdes, shaker et autres toys de la borne se taisent pendant les parties (Start : changer)': 'Solenoids, shaker and the cabinet’s other toys stay quiet during games (Start: change)',
+  'Pour jouer sans déranger : tu choisis ce que le mode change, ligne par ligne. Il s’active aux boutons (si la borne en a un), ici, ou la nuit de l’horaire. Tout est remis en le désactivant.':
+    'Play without disturbing anyone: you choose what the mode changes, line by line. It turns on with the cabinet button (if it has one), here, or during the scheduled night. Everything is put back when you turn it off.',
+  'Écrans en mode nuit': 'Screens in night mode',
+  'Voile noir posé sur chaque écran du front-end. Il disparaît pendant une partie : VPX affiche ses propres écrans.': 'Black veil over each front-end screen. It goes away during a game: VPX shows its own screens.',
+  'Son en mode nuit': 'Sound in night mode',
+  'Part du volume de Windows gardée la nuit, sur les sorties de la borne. Le volume d’avant revient à la fin du mode nuit, sauf une sortie que tu as réglée aux boutons entre-temps.':
+    'Share of the Windows volume kept at night, on the cabinet outputs. The previous volume comes back when night mode ends, except for an output you adjusted with the buttons in the meantime.',
+  'LED en mode nuit': 'LEDs in night mode',
+  'Luminosité des LED : celles du front-end tout de suite, celles des parties au lancement suivant (si la config DOF est celle de Cyber Pinball).':
+    'LED brightness: the front-end LEDs right away, the in-game LEDs at the next launch (if the DOF config is Cyber Pinball’s).',
+  inchangé: 'unchanged',
+  muet: 'muted',
+  '{percent} % du volume': '{percent}% of the volume',
+  'LED éteintes': 'LEDs off',
+  inchangées: 'unchanged',
+  '{percent} % de la luminosité': '{percent}% of the brightness',
+  inchangés: 'unchanged',
+  actif: 'on',
+  inactif: 'off',
+  'selon l’horaire': 'follows the hours',
+  'Ta configuration DOF (GlobalConfig) est écrite à la main : Cyber Pinball n’y touche pas. Le son et les écrans suivent le mode nuit, pas les toys ni les LED en partie.':
+    'Your DOF configuration (GlobalConfig) is hand-written: Cyber Pinball does not touch it. Sound and screens follow night mode, but not the toys or LEDs during a game.',
+  'Ta configuration DOF (Cabinet.xml) est écrite à la main : Cyber Pinball n’y touche pas. Le son et les écrans suivent le mode nuit, pas les toys ni les LED en partie.':
+    'Your DOF configuration (Cabinet.xml) is hand-written: Cyber Pinball does not touch it. Sound and screens follow night mode, but not the toys or LEDs during a game.',
+};

@@ -114,7 +114,9 @@ export const messages: Record<string, string> = {
   'Téléchargé chez son auteur ({size}) dans le dossier de Cyber Pinball ; ton installation actuelle reste intacte':
     'Downloaded from its author ({size}) into the Cyber Pinball folder; your current installation stays untouched',
   'Téléchargé chez l’auteur de BAM ({size}), installé dans le dossier de Cyber Pinball': 'Downloaded from the author of BAM ({size}), installed in the Cyber Pinball folder',
-  'Reprendre les tables de l’ancienne installation…': 'Take over the tables of the old installation…',
+  'En partie, les deux MagnaSave ensemble ouvrent le menu de BAM pour régler la vue : les flippers changent la valeur, les MagnaSave choisissent la ligne, Start valide et Exit le ferme. BAM enregistre lui-même la vue de la table.':
+    'During a game, both MagnaSave buttons together open the BAM menu to adjust the view: the flippers change the value, the MagnaSave buttons pick the line, Start confirms and Exit closes the menu. BAM saves the table’s view by itself.',
+  'Reprendre les tables de l’ancienne installation…':'Take over the tables of the old installation…',
   'Reprendre les tables et les vues de BAM de l’ancienne installation…': 'Take over the tables and BAM views of the old installation…',
   ' · les vues par défaut que BAM a créées sont remplacées (gardées à côté, en « .avant-reprise »)': ' · the default views BAM created are replaced (kept beside them, as ".avant-reprise")',
   '{files} fichiers ({size}) de {from} copiés dans {to} ; l’ancienne installation n’est pas modifiée':

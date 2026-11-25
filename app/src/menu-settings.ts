@@ -75,6 +75,8 @@ export interface MenuSettingsHost {
   sleepAllowed(): boolean;
   /** Ouverture au démarrage (intro-menu.ts) : son écran, et ce qu'en dit la ligne. */
   intro: { open(back: () => void): void; summary(): string };
+  /** Mode nuit (modenuit-menu.ts) : son écran, et ce qu'en dit la ligne. */
+  nightMode: { open(back: () => void): void; summary(): string };
   /** Définition des parties enregistrées (« Jouer et enregistrer »), gardée dans <données>\enregistrement.json. */
   recording: { quality(): RecordingQuality; setQuality(quality: RecordingQuality): void };
 }
@@ -102,6 +104,7 @@ export const MENU_SETTINGS_ROWS = [
   'uiSoundsVolume',
   'notices',
   'attract',
+  'nightMode',
   'game',
   'downloadQuality',
   'recordQuality',
@@ -215,6 +218,12 @@ export function createMenuSettings(host: MenuSettingsHost): MenuSettingsItems {
         detail: t('{summary} (Start : régler)', { summary: attractSummary() }),
         icon: 'attract',
         run: () => openAttract(),
+      },
+      nightMode: {
+        label: t('Mode nuit : {summary}', { summary: host.nightMode.summary() }),
+        detail: t('Baisse les écrans, le son, les LED et les toys pour jouer sans déranger (Start : régler)'),
+        icon: 'moon',
+        run: () => host.nightMode.open(() => open(row('nightMode'))),
       },
       game: { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
       downloadQuality: {

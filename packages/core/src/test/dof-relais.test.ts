@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { DOF_TAP_ENV, DOF_TAP_MARK } from '../index';
+import { DOF_TAP_ENV, DOF_TAP_MARK, cabinetXml, readDofSetup, refreshDofFallback } from '../index';
 
 type Mode = { kind: 'relais'; rom: string } | { kind: 'generique' } | undefined;
 interface Relay {
@@ -131,5 +131,35 @@ test('DOF des tables originales : le relais charge la vraie libdof, lit la confi
   await wait(100);
   relay.stop();
   assert.equal(await relay.done, 0, `sortie propre :\n${lines.join('\n')}`);
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
+test('Repli DOF des tables à ROM : la vraie libdof lit directoutputconfig99.ini et son LedWizEquivalent sans erreur', { skip: !fs.existsSync(REAL_DLL) && 'pas de VPX sur ce poste' }, async () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-libdof-')) + path.sep;
+  const config = path.join(base, 'directoutputconfig');
+  fs.mkdirSync(config);
+  const strip = { output: 1, width: 1, height: 60, arrangement: 'TopDownLeftRight', colorOrder: 'GRB', brightness: 80 } as const;
+  const xml = cabinetXml({ controller: 'TeensyStripController', port: 'COM250', strips: [{ ...strip, name: 'PF Left', dofOutput: 1 }, { ...strip, name: 'PF Right', output: 2, dofOutput: 4 }] });
+  // Bandes déclarées sans contrôleur : aucun port n'est ouvert.
+  fs.writeFileSync(path.join(config, 'Cabinet.xml'), xml.replace(/<OutputControllers>[\s\S]*<\/OutputControllers>/, '<OutputControllers></OutputControllers>').replace('<AutoConfigEnabled>true', '<AutoConfigEnabled>false'));
+  fs.writeFileSync(path.join(config, 'GlobalConfig_B2SServer.xml'), `<?xml version="1.0"?>\r\n<GlobalConfig>\r\n<IniFilesPath>${config}</IniFilesPath>\r\n<CabinetConfigFilePattern>${path.join(config, 'Cabinet.xml')}</CabinetConfigFilePattern>\r\n</GlobalConfig>\r\n`);
+  fs.writeFileSync(path.join(config, 'directoutputconfig30.ini'), '[Colors DOF]\r\nRed=#ff0000ff\r\n[Config DOF]\r\nmm,S9 Red AL0 AT0 AW100 AH100 300,0\r\n');
+  fs.writeFileSync(path.join(config, 'directoutputconfig51.ini'), '[Colors DOF]\r\nRed=#ff0000ff\r\n[Config DOF]\r\nmm,S9,S10,W15,S47|S48,G1\r\n');
+  const result = refreshDofFallback(readDofSetup(config), ['mm_109b'], { enabled: true });
+  assert.deepEqual(result.plan?.added.map((a) => a.key), ['mm']);
+  const tapFile = path.join(base, 'evenements.txt');
+  fs.writeFileSync(tapFile, '');
+  const lines: string[] = [];
+  const relay = relayModule.startDofRelay({ dll: REAL_DLL, base, table: path.join(base, 'Essai.vpx'), rom: 'mm_109b', tap: tapFile }, (l) => lines.push(l), path.join(APP, 'dist', 'relais-dof.js'));
+  relay.begin();
+  for (let i = 0; i < 100 && !lines.some((l) => / prêt\.$/.test(l)); i++) await wait(50);
+  relay.stop();
+  assert.equal(await relay.done, 0, `sortie propre :\n${lines.join('\n')}`);
+  const log = lines.join('\n');
+  assert.match(log, /3 directoutputconfig\.ini or ledcontrol\.ini files loaded/);
+  assert.match(log, /directoutputconfig99\.ini/);
+  assert.match(log, /Config for RomName mm_109b exists/);
+  assert.match(log, /4 toy definitions loaded/, 'deux bandes, LedWizEquivalent 30 et 99');
+  assert.doesNotMatch(log, /could not|exception|invalid|unknown|warning/i);
   fs.rmSync(base, { recursive: true, force: true });
 });

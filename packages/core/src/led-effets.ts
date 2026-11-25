@@ -992,6 +992,33 @@ export function renderLedFx(id: LedFxId, grid: LedGrid, ms: number, opts: LedFxR
   return target;
 }
 
+/**
+ * Ajoute à `acc` la lumière de l'effet `id` à l'instant `ms` (AVANT gamma, chaque canal plafonné à 1
+ * puis multiplié par `weight`) : pour composer plusieurs effets en une image (ouverture des LED,
+ * led-ouverture.ts) avant un seul passage par `ledLightToBytes`. `opts.brightness` est ignoré.
+ * Rend false si rien n'est dessiné (ponctuel hors de sa durée, bande vide).
+ */
+export function addLedFxLight(id: LedFxId, grid: LedGrid, ms: number, opts: Omit<LedFxRenderOptions, 'brightness'>, acc: Float32Array, weight = 1): boolean {
+  if (!(weight > 0)) return false;
+  const g = geometry(grid);
+  const count = Math.min(g.n * 3, acc.length);
+  if (scratch.length < g.n * 3) scratch = new Float32Array(g.n * 3);
+  scratch.fill(0, 0, g.n * 3);
+  if (!drawFx(id, g, ms, paletteOf(opts.palette), opts.seed ?? 0, opts.speed ?? 1, opts.durationMs, scratch)) return false;
+  for (let i = 0; i < count; i++) {
+    const v = scratch[i]!;
+    acc[i]! += (v < 1 ? v : 1) * weight;
+  }
+  return true;
+}
+
+/** Octets d'après une lumière avant gamma (0 à 1 par canal, plafonnée) : gamma 2 et luminosité maximale (0 à 1). */
+export function ledLightToBytes(light: Float32Array, brightness: number, out?: Uint8Array): Uint8Array {
+  const target = out && out.length === light.length ? out : new Uint8Array(light.length);
+  toBytes(light, light.length, brightness, target);
+  return target;
+}
+
 // ---------------------------------------------------------------------------
 // Séquenceur
 // ---------------------------------------------------------------------------
@@ -1185,9 +1212,22 @@ export class LedFxSequencer {
 
   /** Image à l'instant `now` : 3 octets RVB par LED, jamais au-delà de la luminosité réglée. */
   render(grid: LedGrid, now: number, out?: Uint8Array): Uint8Array {
+    const light = this.light(grid, now);
+    const count = light.length;
+    const target = out && out.length === count ? out : new Uint8Array(count);
+    toBytes(light, count, this.s.brightness, target);
+    return target;
+  }
+
+  /**
+   * Lumière à l'instant `now`, AVANT gamma et sans la luminosité réglée : 3 réels par LED, de 0 à 1
+   * (au-delà possible quand des effets posés s'ajoutent : à plafonner). Pour composer avec d'autres
+   * calques (transitions de LedAmbientEngine) sans repasser par l'inverse du gamma. Le tampon rendu
+   * est réutilisé à l'image suivante.
+   */
+  light(grid: LedGrid, now: number): Float32Array {
     const g = geometry(grid);
     const count = g.n * 3;
-    const target = out && out.length === count ? out : new Uint8Array(count);
     if (now >= this.cur.end) this.next(now);
     if (this.acc.length < count) {
       this.acc = new Float32Array(count);
@@ -1207,8 +1247,7 @@ export class LedFxSequencer {
         this.layer(x.id, g, ms, x.P ?? P, x.seed, x.dur, x.level * env, count);
       }
     }
-    toBytes(this.acc, count, this.s.brightness, target);
-    return target;
+    return this.acc.length === count ? this.acc : this.acc.subarray(0, count);
   }
 
   /** Palette montrée à l'instant `now` (fondu compris), dans un tampon réutilisé. */

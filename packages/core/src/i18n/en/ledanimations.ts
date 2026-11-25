@@ -1,6 +1,8 @@
 // Catalogue anglais : animations des LED hors partie (packages/core/src/led-animations.ts, app/src/led-animations-menu.ts).
 // Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  'Florilège': 'Medley',
+  'Les effets s’enchaînent : comètes, faisceaux, vagues, étincelles, arcs-en-ciel… aux couleurs de la table': 'The effects follow one another: comets, beams, waves, sparkles, rainbows… in the table’s colours',
   'Respiration': 'Breathing',
   'Dégradé lent': 'Slow gradient',
   'Scintillement': 'Twinkle',

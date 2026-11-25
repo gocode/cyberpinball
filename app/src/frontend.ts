@@ -104,6 +104,8 @@ import {
   type LiveBoardScreens,
   loadCabinet,
   ledsFromCabinet,
+  dofScenePalette,
+  refreshDofFallback,
   dofRomNumbers,
   joystickButtonsUnrecorded,
   playfieldOrientation,
@@ -133,6 +135,7 @@ import {
   PINBALLFX3_BACKGLASS_PAGE,
   PINBALLFX3_BACKGLASS_TITLE,
   buttonKeys,
+  windowsVk,
   readTextIfExists,
   IniDocument,
   recordPlay,
@@ -337,10 +340,10 @@ import {
   mediaKind,
   formatDateTime,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
 import { logFuturePinballLaunch, logFuturePinballLibraries, logFuturePinballView } from './futurepinball-diagnostics';
-import { closePupStartedDuringGame, detectFuturePinball, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
+import { closePupStartedDuringGame, detectFuturePinball, futurePinballBamMenu, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
@@ -373,7 +376,7 @@ import { createConverter } from './media-convert';
 import { RomFirstBoot } from './rom-first-boot';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
-import { onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
+import { joystickAxes, onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
 import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine } from './qualite-vpx';
@@ -444,6 +447,8 @@ import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
 import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
 import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
+import { createNightMode, type NightMode } from './modenuit';
+import { createNightModeMenu } from './modenuit-menu';
 import { createBallCounts } from './ball-count';
 import { createRomVolumes } from './rom-volume';
 import { createTableScores } from './table-scores';
@@ -494,7 +499,7 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createLedService } from './led-live';
-import { startTap, tapMode, tapPlanned, type DofTapDeps } from './dof-evenements-jeu';
+import { loadEventSettings, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps } from './dof-evenements-jeu';
 import { createLedAnimations } from './led-animations';
 import { readDof } from './dof-files';
 import { type CabinetLeds } from '@cyberpinball/core';
@@ -848,6 +853,8 @@ let headsetMedias: MenuMedias | undefined;
 /** Guet des dossiers des tables et des médias : tout changement se voit aussitôt sur chaque écran. */
 let mediaWatch: MediaWatch | undefined;
 let mediaSettings: MenuMediaSettings = loadMenuMediaSettings(loc.dataDir);
+/** Mode nuit (modenuit.ts), créé plus bas, après l'horaire ; déclaré ici car des fermetures plus haut le lisent. */
+let nightMode: NightMode | undefined;
 const mediaErrorLog = mediaErrorsFile(path.join(loc.dataDir, 'logs'));
 /** Tables voisines dont les médias sont préchargés par chaque fenêtre. */
 const PRELOAD_OFFSETS = [1, -1, 2, -2];
@@ -1297,6 +1304,12 @@ const dofSetupNow = () => {
   if (!dofSetupMemo || Date.now() - dofSetupMemo.at > 5000) dofSetupMemo = { at: Date.now(), setup: readDof(loc) };
   return dofSetupMemo.setup;
 };
+/** Configuration de la borne relue au plus toutes les 5 s (la tirette du lanceur se lit 60 fois par seconde). */
+let cabinetMemo: { at: number; cabinet: ReturnType<typeof loadCabinet> } | undefined;
+const loadCabinetMemo = () => {
+  if (!cabinetMemo || Date.now() - cabinetMemo.at > 5000) cabinetMemo = { at: Date.now(), cabinet: loadCabinet(loc.dataDir) };
+  return cabinetMemo.cabinet;
+};
 const dofTapDeps: DofTapDeps = {
   dataDir: loc.dataDir,
   leds: () => {
@@ -1305,12 +1318,77 @@ const dofTapDeps: DofTapDeps = {
   },
   service: ledService,
   log: (line) => console.log(line),
+  // Profil générique : flippers, lanceur et Start de la borne (clavier par Windows, joystick par SDL), même
+  // quand VPX a le premier plan ; tirette du lanceur analogique lue sur son axe.
+  watchButtons: (on) => {
+    const keys = buttonKeys(loadCabinet(loc.dataDir)?.buttons);
+    const wanted: DofButton[] = ['leftFlipper', 'rightFlipper', 'plunger', 'start'];
+    const codes = wanted.map((b) => [b, keys[b]] as const).filter((e): e is readonly [DofButton, string] => Boolean(e[1]));
+    const joy = new Map(codes.filter(([, c]) => c.startsWith('SDLJoy_')).map(([b, c]) => [c, b]));
+    const vk = codes.flatMap(([b, c]) => (c.startsWith('SDLJoy_') || windowsVk(c) === undefined ? [] : [[b, windowsVk(c)!] as const]));
+    const down = new Set<DofButton>();
+    const timer = setInterval(() => {
+      if (!vk.length) return;
+      let held: number[];
+      try {
+        held = keysDown(vk.map(([, v]) => v));
+      } catch {
+        return; // API de Windows indisponible
+      }
+      for (const [b, v] of vk) {
+        const now = held.includes(v);
+        if (now === down.has(b)) continue;
+        if (now) down.add(b);
+        else down.delete(b);
+        on(b, now);
+      }
+    }, 15);
+    const stopJoy = joy.size ? watchJoystickButtons((code, pressed) => joy.has(code) && on(joy.get(code)!, pressed)) : undefined;
+    return () => {
+      clearInterval(timer);
+      stopJoy?.();
+    };
+  },
+  plungerPull: () => {
+    const sensor = loadCabinetMemo()?.analog?.plunger;
+    if (!sensor) return undefined;
+    const v = joystickAxes().find((a) => a.device === sensor.device)?.values[sensor.axis];
+    return v === undefined ? undefined : Math.max(0, sensor.reversed ? -v : v);
+  },
   dof: () => {
     const setup = dofSetupNow();
     return setup ? { base: path.dirname(setup.dir) + path.sep, has: (rom) => dofRomNumbers(setup.ini, rom).length > 0 } : undefined;
   },
 };
 const b2sNameOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.b2sName;
+// Table à ROM : avant que libdof ne lise sa config, le repli (dof-repli.ts) écrit directoutputconfig99.ini,
+// des effets pour les bandes de LED aux ROM dont la config n'en a presque pas (riches : laissées telles
+// quelles). Les ROM de la bibliothèque se relisent au plus toutes les 10 min ; la table lancée prend ses couleurs.
+let libraryRomsMemo: { at: number; roms: string[] } | undefined;
+function refreshRomFallback(table: TableEntry): void {
+  try {
+    const setup = readDof(loc);
+    if (!setup) return;
+    if (!libraryRomsMemo || Date.now() - libraryRomsMemo.at > 600_000) libraryRomsMemo = { at: Date.now(), roms: [...new Set(tables.flatMap((t) => romsOf(t)))] };
+    const played = [...new Set([...romsOf(table), ...loadedRoms(table.folder, romsOf(table))])];
+    const tint = tints?.current()?.color;
+    const p = dofScenePalette(tint, tints?.current()?.leds);
+    const colors = [p.primary, p.accent, p.secondary].map((c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`);
+    const playedSet = new Set(played.map((r) => r.toLowerCase()));
+    const result = refreshDofFallback(setup, [...libraryRomsMemo.roms, ...played], {
+      enabled: loadEventSettings(loc.dataDir).romFallback !== false,
+      ...(tint ? { palette: (rom: string) => (playedSet.has(rom.toLowerCase()) ? colors : undefined) } : {}),
+    });
+    if (result.refused) console.warn(`[dof] repli : ${result.refused}`);
+    if (result.wrote || result.removed || result.cabinetUpdated) {
+      const added = result.plan?.added.filter((a) => playedSet.has(a.rom.toLowerCase())) ?? [];
+      console.log(`[dof] repli ${result.removed ? 'retiré' : 'écrit'} (${result.file}) : ${result.plan?.added.length ?? 0} ROM complétée(s), ${result.plan?.rich.length ?? 0} laissée(s) ; table lancée : ${added.map((a) => `${a.rom} (${a.before} effet(s) d'origine)`).join(', ') || 'config riche'}.`);
+      dofSetupMemo = undefined;
+    }
+  } catch (error) {
+    console.warn(`[dof] repli impossible : ${(error as Error).message}`);
+  }
+}
 // Animations des LED hors partie (led-animations.ts) : ambiance de la roue et des écrans, jamais pendant une partie.
 // Les bandes décrites se relisent au plus toutes les 5 s (la lecture touche le disque).
 let savedLedsMemo: { at: number; leds: CabinetLeds | undefined } | undefined;
@@ -2469,6 +2547,7 @@ function saveMediaSettings(next: MenuMediaSettings): void {
   } catch (error) {
     console.log(`Médias : réglage non enregistré (${(error as Error).message}).`);
   }
+  nightMode?.refresh();
   broadcast();
 }
 // Ouverture au démarrage : jouée ou coupée, l'animation de Cyber Pinball ou un fichier par écran, la musique de fond.
@@ -2490,6 +2569,15 @@ const introMenu = createIntroMenu({
   },
   preview: () => beginIntro('library'),
 });
+// Mode nuit : l'écran des réglages (modenuit-menu.ts).
+const nightModeMenu = createNightModeMenu({
+  library,
+  settings: () => mediaSettings.nightMode,
+  save: (next) => saveMediaSettings({ ...mediaSettings, nightMode: next }),
+  on: () => nightMode?.on() ?? false,
+  toggle: () => nightMode?.toggle() ?? false,
+  dofRefusal: () => nightMode?.dofRefusal(),
+});
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
 const menuSettings = createMenuSettings({
   library,
@@ -2500,6 +2588,7 @@ const menuSettings = createMenuSettings({
   wakeDevices: () => wakeDevices(),
   sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
   intro: introMenu,
+  nightMode: nightModeMenu,
   recording: {
     quality: () => library.kept('recording-quality', () => loadRecordingSettings(loc.dataDir).quality),
     setQuality: (quality) => {
@@ -4189,10 +4278,25 @@ const hours = new ArcadeHours({
     stopNotice = notice;
     broadcast();
   },
-  changed: () => broadcast(),
+  changed: () => {
+    nightMode?.refresh(); // la nuit de l'horaire commence ou finit : le mode nuit lié à l'horaire suit
+    broadcast();
+  },
   done: (action, outcome) => powerFinished(action, outcome),
   log: (line) => console.log(line),
   clock: hoursClock,
+});
+/** Mode nuit (modenuit.ts) : volume, LED, voile des écrans, et toys/LED en partie (variante DOF). */
+nightMode = createNightMode({
+  settings: () => mediaSettings.nightMode,
+  scheduleNight: () => hours.night(),
+  journalFile: path.join(loc.dataDir, 'modenuit.json'),
+  outputs: () => volumeOutputIds(loadCabinet(loc.dataDir)?.audio),
+  dofSetup: () => readDof(loc),
+  ledMaster: (level) => ledService.setMaster(level),
+  changed: () => broadcast(),
+  save: (next) => saveMediaSettings({ ...mediaSettings, nightMode: next }),
+  log: (line) => console.log(line),
 });
 /** Préavis d'arrêt affiché, s'il y en a un. */
 let stopNotice: StopNotice | undefined;
@@ -4550,6 +4654,9 @@ export function startFrontend(): void {
   // Après l'ouverture : tasklist et le raccourci ne la retardent pas.
   setTimeout(applyRelaunchWatcher, RELAUNCH_SYNC_DELAY_MS).unref();
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
+  // Mode nuit : ce qu'un plantage a laissé (volume, config DOF) est remis, puis le mode se réapplique s'il est voulu.
+  nightMode?.recover();
+  nightMode?.refresh();
   // Les boutons de volume règlent le son de toute la borne (Windows), sur les sorties de l'étape « Son ».
   cabinetVolume = startCabinetVolume({
     config: () => {
@@ -4632,6 +4739,7 @@ export function startFrontend(): void {
   app.on('before-quit', () => {
     closing = true;
     ledAnimations.dispose();
+    nightMode?.stop();
     void ledService.stop();
     // dmdserver ne survit pas au menu : VPX lancé ailleurs retrouverait le DMD en direct.
     menuDmdServer().stop();
@@ -5692,7 +5800,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   };
   // Exit tenu se lit quel que soit le premier plan : le sondage des joysticks tourne pendant la partie.
   const stopJoystick = watchJoystickButtons(() => undefined);
-  const command: { file: string; args: string[]; cwd?: string } | undefined = fp
+  const command: { file: string; args: string[]; cwd?: string; bam?: true } | undefined = fp
     ? fp.command
     : fx && table.pinballFxTable !== undefined
       ? pinballFxCommand(fx, table.pinballFxTable)
@@ -5749,7 +5857,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     simulated === undefined && command && zenKey
       ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, zenKey)
       : simulated === undefined && command && fp
-        ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, undefined, { name: zenName, keys: futurePinballButtonKeys({ buttons, navigation }) })
+        ? bridgeZenKeys({ buttons, navigation }, () => game.pid, undefined, undefined, { name: zenName, keys: futurePinballButtonKeys({ buttons, navigation }), bam: futurePinballBamMenu({ buttons, navigation }, command) })
         : () => undefined;
   // Secousses de la borne (accéléromètre de l'étape « Tilt ») : Future Pinball ne le lit pas, ses touches
   // de secousse lui sont frappées à chaque à-coup (nudge-keys.ts).
@@ -6255,7 +6363,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // table originale que la config DOF connaît, sinon profil générique s'il est voulu.
   // Jamais dans le casque : ses variables (roomEnv) et celles de l'écoute ne se croisent donc pas.
   const dofMode = simulated === undefined && !displayMode && !otherVpx && !vrGame ? tapMode(dofTapDeps, { hasRom: romsOf(table).length > 0, b2sName: b2sNameOf(table) }) : undefined;
-  const dofTap = dofMode ? startTap(dofTapDeps, install.exe, dofMode, played.file) : undefined;
+  const dofTap = dofMode
+    ? startTap(dofTapDeps, install.exe, dofMode, played.file, dofMode.kind === 'generique' ? { script: tableScriptText(table), ...(tints?.current()?.color ? { color: tints.current()!.color } : {}), ...(tints?.current()?.leds?.length ? { colors: tints.current()!.leds! } : {}) } : {})
+    : undefined;
+  if (simulated === undefined && !displayMode && !otherVpx && romsOf(table).length) refreshRomFallback(table);
   const dofTapEnv = dofTap ? { env: dofTap.env } : {};
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
@@ -7453,7 +7564,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
     attract: shown ? { ...describe(shown), wheel: m?.wheel(shown), ...(mediaSettings.attractCredits ? { credits: library.credits.attractLine(shown) } : {}) } : undefined,
     // Horaire : voile noir de la nuit (0 à 1) sur chaque écran, en attente seulement.
-    night: shown && hours.night() ? mediaSettings.hours.nightDim / 100 : 0,
+    night: shown ? Math.max(hours.night() ? mediaSettings.hours.nightDim / 100 : 0, nightMode?.screenDim() ?? 0) : 0,
     // Préavis d'arrêt (dessiné par le playfield) : son heure dans l'horloge de la fenêtre.
     stop: stopNotice ? { action: stopNotice.action, endsAt: Date.now() + (stopNotice.endsAt - hoursClock.now()), ms: STOP_NOTICE_MS } : undefined,
     // Partie en cours (fenêtre de jeu de VPX à l'écran) : fond de partie de chaque rôle de
@@ -7928,6 +8039,8 @@ function ledContext() {
     ...(tints?.current()?.color ? { tint: tints.current()!.color! } : {}),
     // Couleurs dominantes du visuel de la table (measureLedPalette) : les LED prennent celles du jeu.
     ...(tints?.current()?.leds?.length ? { palette: tints.current()!.leds! } : {}),
+    // Ouverture : les LED jouent la leur, à l'horloge des animations des écrans (IntroRun, Date.now()).
+    ...(state.phase === 'intro' && introRun.current?.startedAt !== undefined ? { introStartedAt: introRun.current.startedAt } : {}),
   };
 }
 
@@ -7939,6 +8052,7 @@ function broadcast(): void {
   // Partie en préparation ou en cours, de quelque jeu que ce soit : les LED sont à DOF, le port est rendu.
   // Sauf une table sans ROM aux effets LED voulus (dof-evenements-jeu.ts) : le port reste à Cyber Pinball.
   const gameOn = state.phase === 'loading' || state.phase === 'playing';
+  nightMode?.game(gameOn); // variante DOF du mode nuit posée avant le lancement de VPX, remise à la fin
   const tapTable = gameOn ? (playing ?? tables[state.index]) : undefined;
   if (gameOn && !(tapTable && tapPlanned(dofTapDeps, romsOf(tapTable).length > 0, b2sNameOf(tapTable)))) void ledService.gameStarted();
   else if (!gameOn) ledService.gameEnded();

@@ -21,6 +21,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { zedmdLogPorts, type DmdPortHints } from './dmd';
+import { DOF_FALLBACK_NUMBER, fallbackEquivalentLines, isOwnedFallbackIni } from './dof-repli';
 import { formatDate, t, tn } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { DofFacts } from './health';
@@ -383,6 +384,8 @@ export interface DofSetup {
   /** Dossier où libdof trouvera les ini hors dossier de table ; undefined s'il n'y en a aucun. */
   iniDir?: string;
   ini: DofIniFile[];
+  /** directoutputconfig99.ini écrit par Cyber Pinball (repli des ROM à config pauvre), hors de `ini`. */
+  fallbackIni?: string;
   /** Cabinet.xml que libdof chargera (désigné par CabinetConfigFilePattern). */
   cabinet?: DofCabinetFile;
   /** Cabinet.xml présent dans le dossier mais que libdof ne lira pas (aucun GlobalConfig ne le désigne). */
@@ -581,7 +584,13 @@ export function readDofSetup(dir: string, workDir?: string, legacyInstalls: stri
     for (const file of found.files) {
       const number = dofIniNumber(file)!;
       try {
-        setup.ini.push({ number, file, roms: dofIniRoms(fs.readFileSync(file, 'latin1')) });
+        const text = fs.readFileSync(file, 'latin1');
+        // Le repli de Cyber Pinball (dof-repli.ts) n'est pas la config du joueur : ni ROM connues, ni constats.
+        if (number === DOF_FALLBACK_NUMBER && isOwnedFallbackIni(text)) {
+          setup.fallbackIni = file;
+          continue;
+        }
+        setup.ini.push({ number, file, roms: dofIniRoms(text) });
       } catch (e) {
         setup.errors.push({ file, message: (e as Error).message });
       }
@@ -954,7 +963,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
           if (!toyNames.has(o.name)) push('outputUnknownToy', 'warning', t('{equivalent}, sortie {n} : « {name} » n’est ni une bande ni un toy déclaré.', { equivalent: e.name, n: o.number, name: o.name }));
         }
       }
-      if (setup.ini.length && !numbers.has(e.number)) {
+      if (setup.ini.length && !numbers.has(e.number) && e.number !== DOF_FALLBACK_NUMBER) {
         push('equivalentWithoutIni', 'warning', t('{equivalent} : aucun directoutputconfig{n}.ini. Dans le configtool, le contrôleur de tes LED adressables doit porter le numéro {n}.', { equivalent: e.name, n: e.number }));
       }
     }
@@ -1284,6 +1293,8 @@ export function cabinetXml(leds: CabinetLeds, now = new Date()): string {
     '      </Outputs>',
     el('LedWizNumber', number, '      '),
     '    </LedWizEquivalent>',
+    // Mêmes bandes sous le numéro du repli : directoutputconfig99.ini (dof-repli.ts) les vise aussi.
+    ...fallbackEquivalentLines(leds.strips.map((s) => s.name)),
     '  </Toys>',
     '</Cabinet>',
     '',
@@ -1342,7 +1353,7 @@ export function planLedWrite(dir: string, leds: CabinetLeds, now = new Date()): 
 
 /** Bandes d'un Cabinet.xml relu, pour reprendre la description dans l'éditeur. */
 export function ledsFromCabinet(cabinet: DofCabinetFile): CabinetLeds | undefined {
-  const dofOutputs = new Map(cabinet.equivalents.flatMap((e) => e.outputs.map((o) => [o.name, o.number] as const)));
+  const dofOutputs = new Map(cabinet.equivalents.filter((e) => e.number !== DOF_FALLBACK_NUMBER).flatMap((e) => e.outputs.map((o) => [o.name, o.number] as const)));
   const spec = (s: DofCabinetStrip, output: number): LedStripSpec => ({
     name: s.name,
     output,

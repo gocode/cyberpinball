@@ -20,7 +20,7 @@
 // FOCUS_CHECK_MS, la plus grande fenêtre du jeu (la table, sur le playfield) reprend le premier plan
 // quand une autre fenêtre du jeu l'a ; le journal nomme la première fenêtre ainsi corrigée.
 
-import { windowsVk, ZenKeyPresser, zenJoystickKeys, zenKeyboardEchoes, type ButtonsSource, type ZenGameKey } from '@cyberpinball/core';
+import { BamMenuRouter, windowsVk, ZenKeyPresser, zenJoystickKeys, zenKeyboardEchoes, type BamMenuButtons, type ButtonsSource, type ZenGameKey } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, keysDown, listWindows, setKeyDown, type WindowInfo } from '@cyberpinball/win-displays';
 
 /** Contrôle de la fenêtre qui a le clavier pendant une partie de Zen : rapide, sans charge. */
@@ -31,6 +31,9 @@ export function tableWindow<W extends Pick<WindowInfo, 'visible' | 'minimized' |
   const area = (w: W) => Math.max(0, w.rect.width) * Math.max(0, w.rect.height);
   return windows.filter((w) => w.visible && !w.minimized && area(w) > 0).sort((a, b) => area(b) - area(a))[0];
 }
+
+/** Durée de la frappe qui ouvre ou ferme le menu de BAM : BAM sonde les touches à chaque image. */
+const BAM_MENU_TAP_MS = 80;
 
 /** Sondage des touches de flipper d'une borne au clavier : assez vif pour un menu, sans charge. */
 export const KEYBOARD_POLL_MS = 15;
@@ -89,13 +92,24 @@ export function bridgeZenKeys(
   system: ZenKeysSystem = realSystem,
   game?: ZenGameKey,
   /** Autre jeu qui ne lit que le clavier (Future Pinball, 20/11/2026) : son nom et ses touches par bouton de joystick. */
-  other?: { name: string; keys: Map<string, string[]> },
+  other?: { name: string; keys: Map<string, string[]>; /** Menu de BAM réglé aux boutons (futurepinball-bam-menu.ts) : ses boutons de joystick et sa touche d'ouverture. */ bam?: { buttons: BamMenuButtons; vk: number } },
 ): () => void {
   const keys = other ? other.keys : zenJoystickKeys(source, game);
   const echoes = !other && system.keysDown && system.every ? zenKeyboardEchoes(source, game) : new Map<string, string[]>();
   const label = other ? other.name : 'Jeu de Zen'; // i18n-ignore : journal
   if (keys.size === 0 && echoes.size === 0) return () => undefined;
   const presser = new ZenKeyPresser(new Map([...keys, ...echoes]));
+  const menu = other?.bam
+    ? new BamMenuRouter(
+        other.bam.buttons,
+        other.bam.vk,
+        (vk, down) => system.key(vk, down),
+        (vk) => {
+          system.key(vk, true);
+          setTimeout(() => system.key(vk, false), BAM_MENU_TAP_MS);
+        },
+      )
+    : undefined;
   let sent = 0;
   let held = 0;
   let refocused = 0;
@@ -122,6 +136,7 @@ export function bridgeZenKeys(
       keepTableFocused();
       sent++;
     }
+    if (menu?.available && menu.button(code, down)) return;
     for (const k of presser.press(code, down)) send(k.key, k.down);
   };
   const stopWatch = keys.size
@@ -146,11 +161,13 @@ export function bridgeZenKeys(
     : () => undefined;
   const stopFocus = !other && system.focusTable && system.every ? system.every(FOCUS_CHECK_MS, keepTableFocused) : () => undefined;
   if (keys.size) console.log(`${label} : ${keys.size} bouton(s) du joystick rendus au jeu comme des touches du clavier.`); // i18n-ignore : journal
+  if (menu?.available) console.log(`${label} : les deux MagnaSave ensemble ouvrent le menu de BAM (touche ${other!.bam!.vk}).`); // i18n-ignore : journal
   if (polled.length) console.log(`${label} : ${polled.length} flipper(s) au clavier (${polled.map((p) => p.code).join(', ')}) doublés des flèches des menus.`); // i18n-ignore : journal
   return () => {
     stopWatch();
     stopPoll();
     stopFocus();
+    menu?.release();
     for (const key of presser.releaseAll()) send(key, false);
     console.log(`${label} : ${sent} appui(s) de bouton envoyé(s) au jeu, ${held} gardé(s) (jeu pas au premier plan)${refocused ? `, table remise au premier plan ${refocused} fois` : ''}.`); // i18n-ignore : journal
   };

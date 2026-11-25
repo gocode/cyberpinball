@@ -203,6 +203,16 @@ test('DOF : Cabinet.xml écrit puis relu par le même lecteur que libdof', () =>
         { number: 7, name: 'PF Back' },
       ],
     },
+    // Repli des ROM à config pauvre (dof-repli.ts) : mêmes bandes, sous le numéro 99.
+    {
+      name: 'LedWizEquivalent 99',
+      number: 99,
+      outputs: [
+        { number: 1, name: 'PF Left' },
+        { number: 4, name: 'PF Right' },
+        { number: 7, name: 'PF Back' },
+      ],
+    },
   ]);
   // Relu dans l'éditeur : même description.
   const back = ledsFromCabinet(cab)!;

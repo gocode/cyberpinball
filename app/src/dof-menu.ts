@@ -502,6 +502,16 @@ export function createDofMenu(host: DofMenuHost) {
         open();
       },
     };
+    const romFallback = s.romFallback !== false;
+    const fallback: Action = {
+      label: romFallback ? t('Effets LED ajoutés aux tables à ROM : activés') : t('Effets LED ajoutés aux tables à ROM : coupés'),
+      detail: t('ROM dont ta config DOF n’a presque rien pour tes bandes : Cyber Pinball ajoute des effets (directoutputconfig99.ini)'),
+      icon: 'bulb',
+      run: () => {
+        ev.set({ ...s, romFallback: !romFallback });
+        open();
+      },
+    };
     const toggle: Action = {
       label: s.enabled ? t('Effets LED des tables sans ROM : activés') : t('Effets LED des tables sans ROM : coupés'),
       detail: t('Flippers et slingshots allument tes bandes pendant une partie que DOF ne prend pas en charge'),
@@ -511,9 +521,10 @@ export function createDofMenu(host: DofMenuHost) {
         open();
       },
     };
-    if (!s.enabled) return [relay, toggle];
+    if (!s.enabled) return [fallback, relay, toggle];
     const next = DOF_EVENT_LEVELS.find((l) => l > s.intensity) ?? DOF_EVENT_LEVELS[0];
     return [
+      fallback,
       relay,
       toggle,
       {

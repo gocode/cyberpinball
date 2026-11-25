@@ -50,6 +50,10 @@ export const messages: Record<string, string> = {
   'LED adressables indisponibles': 'Addressable LEDs unavailable',
   'Vérifier de nouveau': 'Check again',
   'Relit les périphériques USB et le dossier de DOF': 'Reads the USB devices and the DOF folder again',
+  'Effets LED ajoutés aux tables à ROM : activés': 'Added LED effects for ROM tables: on',
+  'Effets LED ajoutés aux tables à ROM : coupés': 'Added LED effects for ROM tables: off',
+  'ROM dont ta config DOF n’a presque rien pour tes bandes : Cyber Pinball ajoute des effets (directoutputconfig99.ini)':
+    'ROMs whose DOF config has almost nothing for your strips: Cyber Pinball adds effects (directoutputconfig99.ini)',
   'DOF des tables originales : activé': 'DOF for original tables: on',
   'DOF des tables originales : coupé': 'DOF for original tables: off',
   'Tables sans ROM dont ta config DOF a la ligne : leurs effets passent par Cyber Pinball': 'Tables without a ROM that have a line in your DOF config: their effects go through Cyber Pinball',
