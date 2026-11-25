@@ -8,7 +8,7 @@
 //   active pendant une partie à plat, elle fait disparaître des éléments des tables.
 // - Émetteur : les périphériques USB déjà relevés (vpx-ini.ts, usbDevices).
 // - Écran : [Player] PlayfieldDisplay que la partie lira (fichier de la table, puis VPinballX.ini),
-//   comparé à l'écran principal et aux écrans présents.
+//   cherché par son nom parmi les écrans présents (displays.ts), comme VPX le fait.
 // - VPX : le mode direct n'est que dans le VPX corrigé en place (10.8.1-5436, série 7, vpx-corrige.ts).
 //
 // Relevé à l'ouverture de l'écran Lunettes 3D et par Santé de la borne, seulement quand les lunettes
@@ -17,9 +17,19 @@
 import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { screen } from 'electron';
-import { IniDocument, isNvidia3dVisionEmitter, playfieldOnPrimary, readJsonFile, readTextIfExists, type Nvidia3dVisionFacts, type ObservedUsbDevice } from '@cyberpinball/core';
-import { desktopDisplays, desktopPrimaryDisplay } from './offscreen';
+import {
+  IniDocument,
+  isNvidia3dVisionEmitter,
+  playfieldOnPrimary,
+  readJsonFile,
+  readTextIfExists,
+  vpxDisplayId,
+  type Nvidia3dVisionFacts,
+  type ObservedUsbDevice,
+  type VpxDisplayCandidate,
+} from '@cyberpinball/core';
+import { observedDisplays } from './displays';
+import { desktopPrimaryDisplay } from './offscreen';
 import { vpxCorrigeInPlace } from './vpx-corrige';
 
 /** Première série du VPX corrigé qui a le mode direct de 3D Vision (correctif 06). */
@@ -166,16 +176,15 @@ export interface Nvidia3dVisionSources {
 }
 
 /**
- * L'origine des écrans présents, en pixels physiques comme les écrit VPX ; undefined : inconnue
- * (aucun écran relevé, essais hors écran).
+ * Les écrans présents, nommés comme VPX les nomme (nom seul en 10.8.1-5436, « Nom [x, y] » avant) ;
+ * undefined : illisibles.
  */
-function displayOrigins(): { x: number; y: number }[] | undefined {
-  const displays = desktopDisplays();
-  if (!displays.length) return undefined;
-  return displays.map((d) => {
-    const r = screen.dipToScreenRect(null, d.bounds);
-    return { x: r.x, y: r.y };
-  });
+function vpxDisplays(): VpxDisplayCandidate[] | undefined {
+  try {
+    return observedDisplays().map((d) => ({ ids: [vpxDisplayId(d, 'name'), vpxDisplayId(d, 'name-position')], primary: d.primary }));
+  } catch {
+    return undefined;
+  }
 }
 
 /** Le mode de l'écran principal (celui de la 3D), en pixels physiques ; undefined : pas relevé (essais hors écran). */
@@ -198,15 +207,19 @@ function playfieldDisplay(inis: string[]): string | undefined {
 export function nvidia3dVisionFacts(src: Nvidia3dVisionSources, fresh = false): Nvidia3dVisionFacts {
   if (fresh || !kept || Date.now() - kept.at > KEEP_MS) kept = { at: Date.now(), facts: readDriver() };
   const usb = src.usb();
-  const primary = playfieldOnPrimary(playfieldDisplay(src.inis()), displayOrigins());
+  const primary = playfieldOnPrimary(playfieldDisplay(src.inis()), vpxDisplays());
   const mode = primaryMode();
   const vpx = src.vpx();
   // Le mode direct n'est que dans le VPX corrigé, série 7 ou plus, réellement en place (pas seulement sa version).
   const patch = vpx ? vpxCorrigeInPlace(path.dirname(vpx.exe), vpx.version, path.join(__dirname, '..')) : undefined;
+  const emitters = usb?.filter(isNvidia3dVisionEmitter) ?? [];
+  // Un émetteur en panne de pilote ne compte que si aucun autre ne marche.
+  const emitterProblem = emitters.length && emitters.every((d) => d.problem) ? emitters[0]!.problem : undefined;
   return {
     ...kept.facts,
     ...(refused && kept.facts.stereo === false ? { stereoRefused: true } : {}),
-    ...(usb ? { emitter: usb.some(isNvidia3dVisionEmitter) } : {}),
+    ...(usb ? { emitter: emitters.length > 0 } : {}),
+    ...(emitterProblem ? { emitterProblem } : {}),
     ...(primary !== undefined ? { playfieldPrimary: primary } : {}),
     ...(mode ? { primaryMode: mode } : {}),
     ...(vpx ? { vpxSupported: patch !== undefined && patch >= NVIDIA_3DVISION_VPX_PATCH } : {}),

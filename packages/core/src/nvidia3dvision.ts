@@ -44,22 +44,31 @@ export function isNvidia3dVisionEmitter(d: ObservedUsbDevice): boolean {
   return d.pid === NVIDIA_3DVISION_EMITTER_PID || /3d\s*vision|stereo/i.test(d.name ?? '');
 }
 
+/** Un écran présent, vu comme VPX le nomme : ses identifiants possibles (vpxDisplayId, nom seul et « Nom [x, y] »). */
+export interface VpxDisplayCandidate {
+  ids: readonly string[];
+  primary: boolean;
+}
+
 /**
  * Le playfield est-il l'écran principal de Windows ? Le pilote NVIDIA ne montre la 3D que sur lui.
- * `playfieldDisplay` : [Player] PlayfieldDisplay de VPX (« Nom [x, y] », la position de l'écran sur le
- * bureau) ; l'écran principal est toujours en [0, 0]. Vide : VPX prend l'écran principal. Illisible : undefined.
- * `displays` : l'origine des écrans présents (pixels physiques) ; un écran nommé qui n'y est plus
- * (débranché, bureau réarrangé) fait prendre à VPX l'écran principal.
+ * `playfieldDisplay` : [Player] PlayfieldDisplay de VPX. VPX (Window::GetDisplayConfig) prend l'écran
+ * qui porte exactement ce nom (« PL4380UH » en 10.8.1-5436, « Nom [x, y] » avant), sinon l'écran
+ * principal. Vide : l'écran principal.
+ * `displays` : les écrans présents. Sans eux, seule la position d'un « Nom [x, y] » renseigne
+ * (l'écran principal est toujours en [0, 0]) ; un nom seul reste inconnu (undefined), comme deux
+ * écrans du même nom dont un seul est le principal.
  */
-export function playfieldOnPrimary(playfieldDisplay: string | undefined, displays?: { x: number; y: number }[]): boolean | undefined {
+export function playfieldOnPrimary(playfieldDisplay: string | undefined, displays?: readonly VpxDisplayCandidate[]): boolean | undefined {
   const value = playfieldDisplay?.trim();
   if (!value) return true;
+  if (displays?.length) {
+    const named = displays.filter((d) => d.ids.some((id) => id.trim() === value));
+    if (!named.length) return true; // écran débranché ou renommé : VPX prend l'écran principal
+    return named.every((d) => d.primary === named[0]!.primary) ? named[0]!.primary : undefined;
+  }
   const m = /\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]\s*$/.exec(value);
-  if (!m) return undefined;
-  const x = Number(m[1]);
-  const y = Number(m[2]);
-  if (displays && !displays.some((d) => d.x === x && d.y === y)) return true;
-  return x === 0 && y === 0;
+  return m ? Number(m[1]) === 0 && Number(m[2]) === 0 : undefined;
 }
 
 /** Ce que l'application relève (app/src/nvidia-3dvision.ts). Absent : pas relevé ou illisible. */
@@ -82,6 +91,8 @@ export interface Nvidia3dVisionFacts {
   stereoRefused?: boolean;
   /** L'émetteur USB est branché ; absent : USB illisible. */
   emitter?: boolean;
+  /** Émetteur branché mais son pilote (NvStUSB) ne démarre pas : code du Gestionnaire de périphériques (28 : aucun pilote). */
+  emitterProblem?: number;
   /** Le playfield est l'écran principal de Windows. */
   playfieldPrimary?: boolean;
   /** Le mode de l'écran principal (pixels physiques, fréquence en Hz) ; absent : pas relevé. */
@@ -90,7 +101,16 @@ export interface Nvidia3dVisionFacts {
   vpxSupported?: boolean;
 }
 
-export type Nvidia3dVisionIssueId = 'not-windows' | 'no-nvidia' | 'driver-too-new' | 'stereo-disabled' | 'no-emitter' | 'playfield-not-primary' | 'mode-unsupported' | 'vpx-unsupported';
+export type Nvidia3dVisionIssueId =
+  | 'not-windows'
+  | 'no-nvidia'
+  | 'driver-too-new'
+  | 'stereo-disabled'
+  | 'no-emitter'
+  | 'emitter-driver'
+  | 'playfield-not-primary'
+  | 'mode-unsupported'
+  | 'vpx-unsupported';
 
 /**
  * L'émetteur ne synchronise les lunettes que sur un mode décrit dans sa table (registre de NvStUSB,
@@ -165,6 +185,15 @@ export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = 
       id: 'no-emitter',
       title: t('Émetteur 3D Vision introuvable'),
       steps: [t('Branche l’émetteur (la petite pyramide) sur un port USB du PC, sans hub si possible'), t('Son voyant s’allume quand la 3D démarre ; sans voyant, réinstalle le pilote 3D avec 3D Fix Manager')],
+    });
+  else if (f.emitter && f.emitterProblem)
+    issues.push({
+      id: 'emitter-driver',
+      title: t('L’émetteur est branché, mais son pilote ne démarre pas (code {code})', { code: f.emitterProblem }),
+      steps: [
+        t('Débranche l’émetteur, puis rebranche-le sur un autre port USB du PC'),
+        t('Si le Gestionnaire de périphériques le montre encore en erreur : dans 3D Fix Manager, « Install 3D Driver », puis redémarre le PC'),
+      ],
     });
   if (f.playfieldPrimary === false)
     issues.push({

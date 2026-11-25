@@ -95,6 +95,8 @@ test('un mode de playfield hors de la table de l’émetteur est dit', () => {
 
 test('émetteur, écran principal, version de VPX : chacun son constat et sa marche à suivre', () => {
   assert.deepEqual(ids({ ...READY, emitter: false }), ['no-emitter']);
+  assert.deepEqual(ids({ ...READY, emitterProblem: 28 }), ['emitter-driver'], 'branché, pilote NvStUSB absent');
+  assert.match(nvidia3dVisionIssues({ ...READY, emitterProblem: 28 }, 'win32')[0]!.title, /code 28/);
   assert.deepEqual(ids({ ...READY, playfieldPrimary: false }), ['playfield-not-primary']);
   assert.deepEqual(ids({ ...READY, vpxSupported: false }), ['vpx-unsupported']);
   assert.deepEqual(ids({ ...READY, emitter: undefined, playfieldPrimary: undefined, vpxSupported: undefined }), [], 'ce qui n’a pas pu être lu ne bloque pas');
@@ -129,17 +131,26 @@ test('version du pilote écrite comme NVIDIA', () => {
   assert.equal(nvidiaDriverLabel(42531), '425.31');
 });
 
-test('playfield en écran principal : la position [0, 0] du PlayfieldDisplay de VPX', () => {
+test('playfield en écran principal : l’écran que VPX choisit par son nom, sinon le principal', () => {
   assert.equal(playfieldOnPrimary(undefined), true);
   assert.equal(playfieldOnPrimary('  '), true, 'vide : VPX prend l’écran principal');
+  // Sans la liste des écrans : seule la position d'un « Nom [x, y] » renseigne.
   assert.equal(playfieldOnPrimary('G4380 [0, 0]'), true);
   assert.equal(playfieldOnPrimary('G4380 [3840, 0]'), false);
   assert.equal(playfieldOnPrimary('DMD [-1920, 0]'), false);
-  assert.equal(playfieldOnPrimary('Écran sans position'), undefined);
-  const twoScreens = [{ x: 0, y: 0 }, { x: 3840, y: 0 }];
-  assert.equal(playfieldOnPrimary('G4380 [3840, 0]', twoScreens), false);
-  assert.equal(playfieldOnPrimary('G4380 [3840, 0]', [{ x: 0, y: 0 }]), true, 'écran absent : VPX prend l’écran principal');
-  assert.equal(playfieldOnPrimary('G4380 [0, 0]', twoScreens), true);
+  assert.equal(playfieldOnPrimary('PL4380UH'), undefined, 'nom seul, écrans inconnus');
+  assert.equal(playfieldOnPrimary('PL4380UH', []), undefined);
+  // Une borne réelle (VPX 10.8.1-5436 n'écrit que le nom) : playfield principal, DMD à côté.
+  const screen = (name: string, x: number, primary: boolean) => ({ ids: [name, `${name} [${x}, 0]`], primary });
+  const cab = [screen('PL4380UH', 0, true), screen('TYPEC', 3840, false)];
+  assert.equal(playfieldOnPrimary('PL4380UH', cab), true);
+  assert.equal(playfieldOnPrimary('TYPEC', cab), false);
+  assert.equal(playfieldOnPrimary('TYPEC [3840, 0]', cab), false, 'ancien format');
+  assert.equal(playfieldOnPrimary('G4380', cab), true, 'écran absent ou renommé : VPX prend l’écran principal');
+  assert.equal(playfieldOnPrimary('PL4380UH [3840, 0]', [screen('PL4380UH', 0, true)]), true, 'position périmée : écran absent');
+  const twins = [screen('PLX2283HSU', 0, true), screen('PLX2283HSU', 1920, false)];
+  assert.equal(playfieldOnPrimary('PLX2283HSU', twins), undefined, 'deux écrans du même nom : on ne sait pas lequel VPX prend');
+  assert.equal(playfieldOnPrimary('PLX2283HSU [1920, 0]', twins), false);
 });
 
 test('l’émetteur : NVIDIA 0955:0007, ou un périphérique NVIDIA qui se dit 3D Vision', () => {

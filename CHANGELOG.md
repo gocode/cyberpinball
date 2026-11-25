@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Lunettes NVIDIA 3D Vision : l'écran du playfield est retrouvé par son nom, comme VPX 10.8.1 le cherche ; un playfield réglé sur un écran nommé n'est plus marqué "Pas vérifié". Un émetteur branché dont le pilote ne démarre pas est signalé, avec la marche à suivre.
 - Lunettes NVIDIA 3D Vision (bêta) : Cyber Pinball active lui-même la 3D stéréoscopique du pilote avant chaque partie en relief et la coupe après ; il n'est plus nécessaire de la cocher dans le Panneau NVIDIA.
 - Toute autre partie (à plat, dans le casque, avec un autre VPX) se lance la 3D du pilote coupée : active, elle faisait disparaître des éléments des tables.
 - L'état de la 3D est relu à neuf à chaque vérification : Cyber Pinball ne croit plus la 3D coupée quand elle a été activée après son démarrage.

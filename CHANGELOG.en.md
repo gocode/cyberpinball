@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- NVIDIA 3D Vision glasses: the playfield display is found by its name, the way VPX 10.8.1 looks for it; a playfield set to a named display is no longer marked "Not checked". An emitter that is plugged in but whose driver does not start is reported, with the steps to fix it.
 - NVIDIA 3D Vision glasses (beta): Cyber Pinball turns the driver's stereoscopic 3D on itself before each 3D game and off afterwards; there is no need to tick it in the NVIDIA Control Panel anymore.
 - Every other game (flat, in the headset, with another VPX) starts with the driver's 3D turned off: when on, it made table elements disappear.
 - The 3D state is read afresh at each check: Cyber Pinball no longer thinks 3D is off when it was turned on after it started.

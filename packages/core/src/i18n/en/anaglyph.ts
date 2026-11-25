@@ -99,6 +99,10 @@ export const messages: Record<string, string> = {
   'Émetteur 3D Vision introuvable': '3D Vision emitter not found',
   'Branche l’émetteur (la petite pyramide) sur un port USB du PC, sans hub si possible': 'Plug the emitter (the small pyramid) into a USB port of the PC, without a hub if you can',
   'Son voyant s’allume quand la 3D démarre ; sans voyant, réinstalle le pilote 3D avec 3D Fix Manager': 'Its light comes on when 3D starts; with no light, reinstall the 3D driver with 3D Fix Manager',
+  'L’émetteur est branché, mais son pilote ne démarre pas (code {code})': 'The emitter is plugged in, but its driver does not start (code {code})',
+  'Débranche l’émetteur, puis rebranche-le sur un autre port USB du PC': 'Unplug the emitter, then plug it into another USB port of the PC',
+  'Si le Gestionnaire de périphériques le montre encore en erreur : dans 3D Fix Manager, « Install 3D Driver », puis redémarre le PC':
+    'If Device Manager still shows it with an error: in 3D Fix Manager, "Install 3D Driver", then restart the PC',
   'Le playfield n’est pas l’écran principal de Windows': 'The playfield is not the Windows main display',
   'Le pilote NVIDIA ne montre la 3D que sur l’écran principal': 'The NVIDIA driver only shows 3D on the main display',
   'Paramètres de Windows, Système, Affichage : choisis l’écran du playfield et coche « En faire mon écran principal »':
