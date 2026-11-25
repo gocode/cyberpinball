@@ -5,7 +5,8 @@
 //   stéréoscopique globale activée ou non. Dans un même processus, NVAPI garde l'état lu la première
 //   fois (essai sur la borne, 24/11/2026 : « coupée » lu par Cyber Pinball, « activée » par une sonde
 //   neuve). La sonde active aussi la stéréo avant une partie en relief et la coupe après (stereoFor) :
-//   active pendant une partie à plat, elle fait disparaître des éléments des tables.
+//   active pendant une partie à plat, elle fait disparaître des éléments des tables. Elle est aussi
+//   coupée au lancement, avant toute fenêtre (stereoOffAtStart) : active, elle fige l'ouverture.
 // - Émetteur : les périphériques USB déjà relevés (vpx-ini.ts, usbDevices).
 // - Écran : [Player] PlayfieldDisplay que la partie lira (fichier de la table, puis VPinballX.ini),
 //   cherché par son nom parmi les écrans présents (displays.ts), comme VPX le fait.
@@ -18,6 +19,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  cutStereoAtStart,
   IniDocument,
   isNvidia3dVisionEmitter,
   playfieldOnPrimary,
@@ -29,7 +31,8 @@ import {
   type VpxDisplayCandidate,
 } from '@cyberpinball/core';
 import { observedDisplays } from './displays';
-import { desktopPrimaryDisplay } from './offscreen';
+import { desktopPrimaryDisplay, OFFSCREEN } from './offscreen';
+import { journalIncident } from './uncaught';
 import { vpxCorrigeInPlace } from './vpx-corrige';
 
 /** Première série du VPX corrigé qui a le mode direct de 3D Vision (correctif 06). */
@@ -159,6 +162,40 @@ export async function refreshNvidiaDriver(): Promise<void> {
   kept = { at: Date.now(), facts: { nvapi: facts.nvapi, ...(facts.driver !== undefined ? { driver: facts.driver } : {}), ...(facts.stereo !== undefined ? { stereo: facts.stereo } : {}) } };
 }
 
+/**
+ * Le pilote 3D de 3D Vision est installé (3D Fix Manager le remet sur les pilotes 452.06 et plus
+ * anciens) : sans lui, la stéréo globale ne peut pas être active, et aucune sonde n'est lancée.
+ */
+function stereoDriverInstalled(): boolean {
+  if (process.env.CYBERPINBALL_NVIDIA_3DVISION) return true;
+  const programs = process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)';
+  return fs.existsSync(path.join(programs, 'NVIDIA Corporation', '3D Vision'));
+}
+
+/**
+ * Au lancement, avant toute fenêtre : la 3D stéréoscopique globale du pilote coupée si elle est active.
+ * Active, le pilote 452.06 prend aussi les fenêtres de Cyber Pinball et leur ouverture reste figée sur sa
+ * première image (PinCab, 25/11/2026). Cyber Pinball la rallume pour chaque partie en relief
+ * (stereoFor). Bloquant, mais seulement avec le pilote 3D installé : une sonde, trois si elle était active.
+ * Jamais pendant un essai sans opérateur (le pilote du poste), sauf avec le relevé des essais.
+ */
+export function stereoOffAtStart(): void {
+  if (OFFSCREEN && !process.env.CYBERPINBALL_NVIDIA_3DVISION) return;
+  if (!nvapiPresent() || !stereoDriverInstalled()) return;
+  const started = Date.now();
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  const result = cutStereoAtStart(
+    (op) => fixtureFacts() ?? parseProbe(spawnSync(process.execPath, [SONDE, op], { windowsHide: true, env: sondeEnv(), encoding: 'utf8', timeout: PROBE_TIMEOUT_MS }).stdout ?? '', op),
+    (ms) => Atomics.wait(sleeper, 0, 0, ms),
+  );
+  const took = `${Date.now() - started} ms`;
+  if (result.before !== true) return console.log(`Lunettes 3D : 3D stéréoscopique du pilote ${result.before === false ? 'coupée' : 'non lue'} au lancement (${took}).`); // i18n-ignore : journal
+  if (result.after === false) return console.log(`Lunettes 3D : 3D stéréoscopique du pilote active au lancement, coupée avant les fenêtres de Cyber Pinball (${took}) ; rallumée pour chaque partie en relief.`); // i18n-ignore : journal
+  // Toujours active (ou pas relue) : un programme la remet, et l'ouverture risque de rester figée.
+  const what = `3D stéréoscopique du pilote NVIDIA toujours active au lancement malgré sa coupure (${result.after === undefined ? 'pas relue' : 'remise aussitôt'}) : 3D Fix Manager ouvert avec « Enable 3D » sur On ? Les écrans de Cyber Pinball peuvent rester figés sur l'ouverture ; mettre « Enable 3D » sur Off, Cyber Pinball l'active lui-même pour chaque partie en relief`; // i18n-ignore : journal
+  console.warn(`Lunettes 3D : ${what}.`); // i18n-ignore : journal
+  journalIncident(what);
+}
 
 let kept: { at: number; facts: DriverFacts } | undefined;
 const KEEP_MS = 30_000;

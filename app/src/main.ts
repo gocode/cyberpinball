@@ -36,6 +36,7 @@ import { focusSafeLookup, noApplicationMenu } from './app-menu';
 import { journalConsole } from './journal';
 import { journalIncidents, journalNativeCrashes, journalPolicyViolations, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
 import { startWizard } from './wizard';
+import { stereoOffAtStart } from './nvidia-3dvision';
 
 // Aucun menu d'application : les raccourcis du menu par défaut d'Electron faisaient tomber la borne (app-menu.ts).
 noApplicationMenu();
@@ -72,6 +73,8 @@ if (!superviseCabinet(loc.dataDir) && !runRelaunchWatcher() && !relaunchOnHidden
   configureLifetime({ relaunching: isRelaunching });
   // Une seule instance : un second lancement ramène celle qui est ouverte (single-instance.ts).
   const single = holdSingleInstance({ relaying: isRelay(), ignore: () => isRelaunching() || isQuitting() });
+  // Avant toute fenêtre : la 3D stéréoscopique globale du pilote NVIDIA coupée, sinon l'ouverture reste figée (nvidia-3dvision.ts).
+  stereoOffAtStart();
   app.whenReady().then(async () => {
     if (!(await single)) return app.exit(0);
     // Le veilleur de la relance par Start sait que Cyber Pinball est ouvert : il ne relance rien.

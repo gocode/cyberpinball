@@ -321,6 +321,36 @@ export function nvidia3dVisionOutcomeText(o: Nvidia3dVisionOutcome): { text: str
   }
 }
 
+/**
+ * La 3D stéréoscopique globale du pilote au lancement de Cyber Pinball. Active (Panneau NVIDIA, ou
+ * « Enable 3D » de 3D Fix Manager), le pilote 452.06 prend aussi les fenêtres de Cyber Pinball : leur
+ * ouverture reste figée sur sa première image (PinCab, 25/11/2026 : chaque lancement figé dès que
+ * 3D Fix Manager l'a activée, reparti dès qu'elle a été coupée). Coupée avant toute fenêtre ; Cyber
+ * Pinball la rallume lui-même pour chaque partie en relief.
+ */
+export interface StartupStereo {
+  /** Lue avant ; undefined : inconnue (pas de pilote NVIDIA, pas de pilote 3D, sonde muette). */
+  before?: boolean;
+  /** Relue après la coupure ; seulement si elle était active. */
+  after?: boolean;
+}
+
+/** Délai avant la relecture : 3D Fix Manager ouvert remet son bouton « Enable 3D » dans la seconde. */
+export const STARTUP_STEREO_SETTLE_MS = 1500;
+
+/**
+ * Lit la stéréo et ne la coupe que si elle est active, puis la relit après STARTUP_STEREO_SETTLE_MS.
+ * `probe` : un processus neuf à chaque appel (NVAPI garde dans un processus l'état lu la première fois).
+ */
+export function cutStereoAtStart(probe: (op: 'read' | 'disable') => { nvapi: boolean; stereo?: boolean }, wait: (ms: number) => void): StartupStereo {
+  const read = probe('read');
+  if (!read.nvapi || read.stereo !== true) return read.nvapi && read.stereo === false ? { before: false } : {};
+  probe('disable');
+  wait(STARTUP_STEREO_SETTLE_MS);
+  const again = probe('read');
+  return { before: true, ...(again.nvapi && again.stereo !== undefined ? { after: again.stereo } : {}) };
+}
+
 export function stereoGlassesKindLabel(kind: StereoGlassesKind): string {
   return kind === 'nvidia' ? t('actives NVIDIA 3D Vision') : t('à filtres colorés');
 }

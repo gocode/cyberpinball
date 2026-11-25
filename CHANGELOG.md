@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Lunettes NVIDIA 3D Vision : Cyber Pinball ne reste plus figé sur la première image de l'ouverture quand la 3D du pilote NVIDIA est activée (Panneau NVIDIA ou "Enable 3D" de 3D Fix Manager). Il la coupe au lancement, avant d'ouvrir ses fenêtres, et la rallume pour chaque partie en relief. Si un programme la remet aussitôt, c'est noté dans le journal des incidents avec la marche à suivre.
 - Lunettes NVIDIA 3D Vision : un playfield en 4K n'est plus déclaré hors de portée de l'émetteur ; seul un mode sous 100 Hz est signalé, avec la marche à suivre.
 - Écran du DMD : le type choisi (DMD seul ou FullDMD) n'est plus jamais recalculé d'après la forme de la zone. Un DMD placé librement en 1280x481 sur un écran 1280x720 restait DMD jusqu'à 480 lignes puis basculait en FullDMD : il reste un DMD, quelle que soit la taille donnée à sa zone dans l'assistant ou dans Disposition des écrans.
 - Assistant : un DMD placé librement dans une partie d'écran, sans que son type soit connu, fait demander « FullDMD ou DMD seul ? » pour cette place, au lieu de le deviner au pixel près.
