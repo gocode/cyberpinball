@@ -67,6 +67,31 @@ test('scripts.json : lu une seule fois pour cent tables, relu dès qu’il chang
   }
 });
 
+// 25/11/2026, borne d'essai : 13 tables sur 18 n'avaient jamais été lues (la lecture ne se faisait qu'à l'inventaire
+// des ROM). The Addams Family passait pour une table sans ROM : effets LED sans ROM, port des LED pris, DOF muet.
+// Invariant : « pas encore lue » ne vaut jamais « sans ROM » ; le script est lu dans le .vpx, sans lancer VPX.
+test('cachedScript : une table jamais lue donne sa ROM, lue dans le .vpx et gardée', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-scripts-cache-'));
+  try {
+    const dataDir = path.join(dir, 'data');
+    const script = ['Option Explicit', 'Const cGameName = "taf_l7"', 'LoadVPM "01560000", "WPC.VBS", 3.26', 'Sub Table1_Init', '  With Controller', '    .GameName = cGameName', '    .Run', '  End With', 'End Sub', ''].join('\r\n');
+    const table = path.join(dir, 'The Addams Family.vpx');
+    fs.writeFileSync(table, vpxWithScript(script));
+    const unreadable = path.join(dir, 'Abimee.vpx');
+    fs.writeFileSync(unreadable, 'pas une table');
+    vbs.forgetScriptCache();
+
+    assert.deepEqual(vbs.cachedScript(table, dataDir)?.roms, ['taf_l7']);
+    const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'cache', 'scripts.json'), 'utf8')) as Record<string, { facts: ScriptFacts }>;
+    assert.deepEqual(saved[table.toLowerCase()]?.facts.roms, ['taf_l7'], 'gardée dans scripts.json');
+    assert.equal(vbs.cachedScript(unreadable, dataDir), undefined, 'illisible : rien d’inventé');
+    assert.equal(vbs.cachedScript(unreadable, dataDir), undefined);
+  } finally {
+    vbs.forgetScriptCache();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // 18/11/2026 : le correctif executeGlobalOnce (clignotements analysés par l'antivirus) a été publié sans changer
 // FACTS_VERSION ; sur une borne, les lectures gardées en cache dataient de la veille, ne le réclamaient pas, et le
 // médecin, qui s'y fie sans relire le script, ne l'a jamais appliqué (Daredevil, Hellboy). Invariant : une lecture

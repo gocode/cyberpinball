@@ -1,6 +1,7 @@
 // Couleur de chaque table au menu (packages/core/src/tabletint.ts) : la teinte de la table montrée,
-// tirée de ses médias dans l'ordre fronton (l'image allumée du .directb2s comprise), logo, plateau ;
-// le premier qui a assez de couleur la donne. La couleur des points du DMD (« Couleur de la table »)
+// tirée de ses médias dans l'ordre fronton (l'image allumée du .directb2s comprise), plateau, logo ;
+// le premier qui a assez de couleur la donne. Les couleurs des LED mêlent les dominantes du fronton et
+// du plateau (mergeLedPalettes). La couleur des points du DMD (« Couleur de la table »)
 // se mesure d'abord sur le média de l'écran du DMD (FullDMD, ou capture du DMD de la machine) : plus
 // proche du vrai DMD que le fronton (demande du 12/11/2026) ; sans teinte là, celle du fronton.
 // Calculée une fois par fichier, gardée dans
@@ -17,7 +18,7 @@
 // attendre SETTLE_MS la décalait en plein atterrissage de la roue, et coûtait un envoi de plus).
 
 import * as path from 'node:path';
-import { cachedTint, mediaKind, recordLeds, storeTint, tintCacheEntries, tintCacheFile, tintCacheKey, tintRecord, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
+import { cachedTint, mediaKind, mergeLedPalettes, recordLeds, storeTint, tintCacheEntries, tintCacheFile, tintCacheKey, tintRecord, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
 import type { Converter } from './media-convert';
 
 /** Attente après le dernier changement de table avant de chercher sa teinte. */
@@ -44,6 +45,11 @@ export interface TintSubject {
   files: readonly string[];
   /** Pour les points du DMD, lus avant `files` : le média de l'écran du DMD. */
   dmdFiles?: readonly string[];
+  /**
+   * Pour les couleurs des LED : les visuels dont les dominantes se mêlent (fronton, plateau), tous mesurés ;
+   * sans couleur là, celles du premier de `files` qui en a.
+   */
+  ledFiles?: readonly string[];
 }
 
 /** Teinte montrée : celle de l'ambiance (color absente : la sarcelle de la marque), les points du DMD, les couleurs des LED. */
@@ -141,7 +147,22 @@ export class TableTints {
   private async resolveSubject(subject: TintSubject, run: number): Promise<ShownTint | undefined> {
     const ambient = await this.resolve(subject.files, run);
     const dmd = (subject.dmdFiles?.length ? await this.resolve(subject.dmdFiles, run) : undefined)?.dmd ?? ambient?.dmd;
-    return shownTint(ambient, dmd, this.ledsOf(subject.files));
+    for (const file of subject.ledFiles ?? []) {
+      if (run !== this.run) return undefined;
+      await this.measure(file);
+    }
+    return shownTint(ambient, dmd, this.ledsFor(subject));
+  }
+
+  /** Couleurs des LED : les dominantes mêlées des `ledFiles` (déjà mesurés), sinon celles de `files`. */
+  private ledsFor(subject: TintSubject): string[] | undefined {
+    const lists = (subject.ledFiles ?? []).map((file) => {
+      const id = tintCacheKey(file);
+      const record = id ? this.memo.get(id) : undefined;
+      return record ? recordLeds(record) : undefined;
+    });
+    const merged = mergeLedPalettes(lists);
+    return merged.length ? merged : this.ledsOf(subject.files);
   }
 
   /**
@@ -189,7 +210,15 @@ export class TableTints {
     if (ambient === UNKNOWN) return UNKNOWN;
     const dmdOwn = subject.dmdFiles?.length ? first(subject.dmdFiles) : undefined;
     if (dmdOwn === UNKNOWN) return UNKNOWN;
-    return shownTint(ambient, dmdOwn?.dmd ?? ambient?.dmd, this.ledsOf(subject.files));
+    for (const file of subject.ledFiles ?? []) {
+      const id = tintCacheKey(file);
+      if (!id) continue;
+      this.disk ??= tintCacheEntries(this.cacheFile);
+      const record = this.memo.get(id) ?? this.disk[id];
+      if (!record) return UNKNOWN;
+      this.memo.set(id, record);
+    }
+    return shownTint(ambient, dmdOwn?.dmd ?? ambient?.dmd, this.ledsFor(subject));
   }
 
   /** Teinte du premier fichier qui en a une. */

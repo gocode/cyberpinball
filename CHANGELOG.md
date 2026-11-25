@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- LED (tables à ROM) : une table jamais lue passait pour une table sans ROM ; la partie prenait alors le port des LED pour les effets sans ROM, et DOF ne pouvait plus l'ouvrir (aucun effet de la ROM, bumpers non détectés). Le script de la table est maintenant lu une fois dans le fichier de la table, sans lancer VPX ; une table PinMAME reste une table à ROM même quand le nom de sa ROM n'est pas trouvé.
+- LED (tables sans ROM) : les bandes sont éteintes entre deux événements ; plus de lueur de fond permanente, et un flipper tenu ne garde plus le bas allumé.
+- LED (tables sans ROM) : la luminosité des effets en partie ne dépasse plus la luminosité maximale réglée pour les animations LED.
+- LED : les couleurs des bandes mêlent les couleurs dominantes du fronton et du plateau (jusqu'à quatre) ; la roue ne sert plus qu'en dernier recours. La couleur de la table au menu suit le même ordre : fronton, plateau, puis roue.
+- Journal : le mode LED de chaque partie (DOF de VPX avec sa ROM, ou effets sans ROM avec leurs couleurs et leur luminosité), et en fin de partie sans ROM, le bilan des événements reçus et la part du temps où les bandes étaient allumées.
 - Carte de fin de partie : à la fin d'une partie solo sur une table dont le score se lit en direct, une carte s'affiche par-dessus le plateau, sans quitter VPX ni lui prendre la main. Elle montre ton score (et "Ton record !" quand tu bats ton meilleur), le top 3 de ton pays, ta place en 4e ligne si tu n'y es pas, puis ta place au monde.
 - Flip gauche : défier un joueur sur cette table. Flip droit : continuer, la carte se ferme et tu reviens au jeu. La carte attend que tu aies fini d'entrer tes initiales, et elle se ferme d'elle-même si tu relances une partie.
 - Sans classement (mode invité, partage désactivé, VPX d'essai…), la carte donne ton score et dit pourquoi le classement manque.

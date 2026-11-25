@@ -113,10 +113,15 @@ const at = (frame: Uint8Array, h: number) => {
 };
 const total = (frame: Uint8Array) => frame.reduce((s, v) => s + v, 0);
 
-test('Flipper : balayage du bas vers le haut du côté du flipper, dans la couleur de la table, bas allumé tant qu’il est tenu', () => {
+// 25/11/2026, borne d'essai : « les LED restent presque constamment allumées ». Invariant : entre deux événements
+// les bandes sont noires (pas de lueur de fond), et un flipper tenu ne garde pas le bas allumé au-delà d'un instant.
+test('Flipper : balayage du bas vers le haut du côté du flipper, dans la couleur de la table, puis noir même tenu', () => {
   const scene = createDofScene(PALETTE, 1);
   const ambient = total(scene.render(LEFT, 0));
-  assert.ok(ambient > 0, 'ambiance douce');
+  assert.equal(ambient, 0, 'noir au repos');
+  scene.trigger('gi', 'center', 0);
+  assert.equal(total(scene.render(LEFT, 10)), 0, 'GI allumé : toujours noir');
+  assert.equal(scene.busy(10), false);
   scene.trigger('flipper', 'left', 1000);
   const early = scene.render(LEFT, 1060);
   assert.ok(at(early, 4) > at(early, 18) + 100, 'le bas d’abord');
@@ -124,9 +129,15 @@ test('Flipper : balayage du bas vers le haut du côté du flipper, dans la coule
   assert.ok(at(late, 17) > at(early, 17) + 100, 'puis le haut');
   assert.ok(late[(19 - 17) * 3]! > late[(19 - 17) * 3 + 2]!, 'couleur principale (rouge)');
   assert.equal(total(scene.render(RIGHT, 1050)), ambient, 'l’autre côté ne bouge pas');
-  assert.ok(at(scene.render(LEFT, 2000), 0) > 50, 'tenu : le bas reste allumé');
+  assert.ok(at(scene.render(LEFT, 1350), 0) > 50, 'tenu : le bas reste allumé un instant');
+  assert.equal(total(scene.render(LEFT, 2000)), 0, 'tenu longtemps : éteint');
+  assert.equal(scene.busy(2000), false);
   scene.release('flipper', 'left', 2000);
   assert.equal(total(scene.render(LEFT, 2600)), ambient, 'relâché : éteint');
+  // Relâché tôt : le bas s'éteint aussitôt.
+  scene.trigger('flipper', 'left', 5000);
+  scene.release('flipper', 'left', 5200);
+  assert.equal(total(scene.render(LEFT, 5700)), 0);
   // Touche et script envoient le même flip : un seul effet.
   scene.trigger('flipper', 'right', 3000);
   scene.release('flipper', 'right', 3010);
@@ -160,9 +171,7 @@ test('Chaque événement reconnu allume quelque chose ; perte de bille et tilt e
   assert.ok(at(launch.render(RIGHT, 100), 3) > at(launch.render(RIGHT, 100), 17));
   assert.ok(at(launch.render(RIGHT, 380), 17) > 200);
   assert.equal(total(launch.render(LEFT, 100)), base);
-  // GI coupé : plus d'ambiance.
-  launch.release('gi', 'center', 2000);
-  assert.equal(total(launch.render(LEFT, 3000)), 0);
+  assert.equal(total(launch.render(RIGHT, 3000)), 0, 'effet fini : noir');
   // Bande du centre, large : la moitié du côté du flipper.
   const board: DofSceneStrip = { name: 'Matrix', width: 8, height: 4, arrangement: 'LeftRightTopDown' };
   const m = createDofScene(PALETTE, 1);

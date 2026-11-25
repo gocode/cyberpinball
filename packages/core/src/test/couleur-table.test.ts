@@ -25,6 +25,7 @@ import {
   LED_PALETTE_SEPARATION,
   measureLedPalette,
   measureTint,
+  mergeLedPalettes,
   recordLeds,
   NEUTRAL_TINT,
   oklchToHex,
@@ -449,6 +450,65 @@ test('LED : la roue transmet les couleurs de la table, même refusée pour l’i
     assert.equal(tints.current()!.color, undefined, 'pas de teinte d’interface');
     assert.deepEqual(tints.current()!.leds, measureLedPalette([images.vert!]), 'les LED gardent le vert');
     tints.dispose();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 25/11/2026, borne d'essai : fronton vert refusé pour l'interface, la roue donnait seule les couleurs des LED
+// et le plateau n'était jamais lu. Invariant : les LED mêlent les dominantes du fronton et du plateau ; la
+// roue ne sert qu'en dernier.
+test('LED : les dominantes du fronton et du plateau se mêlent, la roue en dernier recours', async () => {
+  const merged = mergeLedPalettes([['#20d040', '#2060ff'], ['#2a6aff', '#e02020'], undefined]);
+  assert.deepEqual(merged, ['#20d040', '#2a6aff', '#e02020'], 'la dominante de chacun d’abord, puis les suivantes, sans doublon proche');
+  assert.equal(mergeLedPalettes([['#ff0000', '#00ff00', '#0000ff', '#ffff00'], ['#ff00ff', '#00ffff']]).length, LED_PALETTE_MAX);
+  assert.deepEqual(mergeLedPalettes([[], undefined]), []);
+
+  interface Tints {
+    follow(subject: { key: string; files: readonly string[]; ledFiles?: readonly string[] } | undefined): void;
+    current(): (Partial<TableTint> & { leds?: string[] }) | undefined;
+    dispose(): void;
+  }
+  type Converter = { mediaFrames(file: string): Promise<{ width: number; height: number; images: RgbaImage[] }> };
+  const { TableTints } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-tint.js')) as {
+    TableTints: new (opts: { dataDir: string; settleMs?: number; onChange(): void; converter(): Converter }) => Tints;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teintes-led-'));
+  try {
+    const at = (name: string) => {
+      const file = path.join(dir, name);
+      fs.writeFileSync(file, name);
+      return file;
+    };
+    const images: Record<string, RgbaImage> = { vert: solid('#8be23a'), bleu: solid('#1f4fe0'), rouge: solid('#d82020') };
+    const backglass = at('vert-backglass.png');
+    const playfield = at('bleu-playfield.png');
+    const wheel = at('rouge-wheel.png');
+    const measured: string[] = [];
+    const converter = () => ({
+      mediaFrames: async (file: string) => {
+        measured.push(path.basename(file));
+        return { width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] };
+      },
+    });
+    const tints = new TableTints({ dataDir: dir, settleMs: 10, onChange() {}, converter });
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const subject = { key: 'matrice', files: [backglass, playfield, wheel], ledFiles: [backglass, playfield] };
+    tints.follow(subject);
+    await wait(80);
+    const shown = tints.current()!;
+    const hues = shown.leds!.map((h) => lch(h)[2]);
+    assert.ok(hueDistance(hues[0]!, lch('#8be23a')[2]) < 15, `fronton d'abord : ${shown.leds!.join()}`);
+    assert.ok(hues.some((h) => hueDistance(h, lch('#1f4fe0')[2]) < 15), `plateau mêlé : ${shown.leds!.join()}`);
+    assert.ok(!hues.some((h) => hueDistance(h, lch('#d82020')[2]) < 15), 'pas la roue');
+    assert.ok(hueDistance(lch(shown.color!)[2], lch('#1f4fe0')[2]) < 25, 'interface : le plateau avant la roue');
+    assert.ok(!measured.includes('rouge-wheel.png'), 'roue pas mesurée : inutile');
+    tints.dispose();
+    // Déjà mesurée (cache) : montrée aussitôt, mêmes couleurs.
+    const again = new TableTints({ dataDir: dir, settleMs: 10, onChange() {}, converter: () => ({ mediaFrames: async () => assert.fail('mesuré deux fois') }) });
+    again.follow(subject);
+    assert.deepEqual(again.current()?.leds, shown.leds);
+    again.dispose();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

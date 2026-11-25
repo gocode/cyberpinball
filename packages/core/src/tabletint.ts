@@ -326,6 +326,28 @@ export function recordLeds(record: TintRecord): string[] | undefined {
   return 'tint' in record ? record.tint.leds : record.leds;
 }
 
+/**
+ * Couleurs des LED d'une table d'après plusieurs visuels (fronton, plateau), du plus important au moins
+ * important : la dominante de chacun d'abord, puis leurs suivantes, chacune à tour de rôle ; une couleur
+ * trop proche d'une déjà prise (moins de LED_PALETTE_SEPARATION / 2 degrés) n'entre pas. Au plus `max`.
+ * Retour d'essai du 25/11/2026 : les LED prenaient les couleurs du seul premier visuel mesuré, la roue
+ * quand le fronton était refusé, et pas celles du plateau.
+ */
+export function mergeLedPalettes(lists: readonly (readonly string[] | undefined)[], max = LED_PALETTE_MAX): string[] {
+  const out: { hex: string; hue: number }[] = [];
+  const depth = Math.max(0, ...lists.map((l) => l?.length ?? 0));
+  for (let rank = 0; rank < depth && out.length < max; rank++) {
+    for (const list of lists) {
+      const hex = list?.[rank];
+      if (!hex || out.length >= max) continue;
+      const hue = rgbToOklch(...hexToRgb(hex))[2];
+      if (out.some((c) => hueDistance(c.hue, hue) < LED_PALETTE_SEPARATION / 2)) continue;
+      out.push({ hex, hue });
+    }
+  }
+  return out.map((c) => c.hex);
+}
+
 // ---------------------------------------------------------------------------
 // Lisibilité : la teinte n'éclaire que l'ambiance, sous les voiles ; le texte reste lisible.
 

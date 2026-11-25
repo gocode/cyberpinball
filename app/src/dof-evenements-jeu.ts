@@ -23,6 +23,7 @@ import {
   dofEventClass,
   dofScenePalette,
   parseTapChunk,
+  readLedAnimations,
   type CabinetLeds,
   type DofEventClass,
   type DofEventSettings,
@@ -49,6 +50,22 @@ export function loadEventSettings(dataDir: string): DofEventSettings {
 export function saveEventSettings(dataDir: string, settings: DofEventSettings): void {
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(path.join(dataDir, SETTINGS_FILE), JSON.stringify(settings));
+}
+
+/**
+ * Force des effets en partie (0..1) : l'intensité des événements, jamais au-dessus de la luminosité maximale
+ * des animations LED (retour d'essai du 25/11/2026 : réglée basse au menu, la partie l'ignorait).
+ */
+export function gameLedGain(dataDir: string): number {
+  return Math.min(loadEventSettings(dataDir).intensity, readLedAnimations(dataDir).brightness) / 100;
+}
+
+/** Ligne de journal à la fin d'une partie en effets génériques : événements reçus et part du temps allumé. */
+export function ledGameSummary(seen: ReadonlyMap<string, number>, frames: number, litFrames: number): string {
+  const total = [...seen.values()].reduce((s, n) => s + n, 0);
+  const kinds = [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+  const share = frames ? Math.round((100 * litFrames) / frames) : 0;
+  return `Effets LED sans DOF : fin de partie, ${total} événement(s)${kinds ? ` (${kinds})` : ''}, bandes allumées ${share} % du temps.`; // i18n-ignore : journal
 }
 
 /** Boutons de la borne qui ont un effet même quand le script de la table n'appelle pas DOF. */
@@ -177,8 +194,9 @@ export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { 
   const file = tapFile();
   deps.service.configure(leds);
   deps.service.start().catch((e: Error) => deps.log(`Effets LED sans DOF : ${e.message}`)); // i18n-ignore : journal
-  const settings = loadEventSettings(deps.dataDir);
-  const scene = createDofScene(dofScenePalette(about.color, about.colors), settings.intensity / 100);
+  const gain = gameLedGain(deps.dataDir);
+  const palette = dofScenePalette(about.color, about.colors);
+  const scene = createDofScene(palette, gain);
   let classes: Map<number, DofEventClass> | undefined;
   try {
     classes = about.script ? classifyDofScript(about.script) : undefined;
@@ -186,7 +204,15 @@ export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { 
     classes = undefined;
   }
   const strips = leds.strips.map((s) => ({ name: s.name, width: s.width, height: s.height, arrangement: s.arrangement }));
-  const play = (c: DofEventClass, on: boolean) => (on ? scene.trigger(c.kind, c.side, Date.now()) : scene.release(c.kind, c.side, Date.now()));
+  // Bilan de la partie, au journal à l'arrêt : de quoi voir après coup si les bandes sont restées allumées
+  // et quels événements sont arrivés (retour d'essai du 25/11/2026 : « reste tout le temps allumé »).
+  const seen = new Map<string, number>();
+  let frames = 0;
+  let litFrames = 0;
+  const play = (c: DofEventClass, on: boolean) => {
+    if (on) seen.set(c.kind, (seen.get(c.kind) ?? 0) + 1);
+    return on ? scene.trigger(c.kind, c.side, Date.now()) : scene.release(c.kind, c.side, Date.now());
+  };
   const stopButtons = deps.watchButtons?.((button, down) => {
     // Lanceur : la bille part quand le bouton est relâché.
     if (button === 'plunger') return void (down ? undefined : play(BUTTON_EVENTS.plunger, true));
@@ -218,15 +244,24 @@ export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { 
     // Une image par 1/30 s au plus (le pilote n'en envoie pas plus).
     if (now - lastFrame >= 33) {
       lastFrame = now;
-      for (const s of strips) deps.service.setFrame(s.name, scene.render(s, now), 'ambient');
+      let lit = false;
+      for (const s of strips) {
+        const frame = scene.render(s, now);
+        lit ||= frame.some((v) => v > 0);
+        deps.service.setFrame(s.name, frame, 'ambient');
+      }
+      frames++;
+      if (lit) litFrames++;
     }
   }, 15);
   const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
-  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}).`); // i18n-ignore : journal
+  const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, luminosité ${Math.round(gain * 100)} %.`); // i18n-ignore : journal
   return {
     env: { [DOF_TAP_ENV]: file },
     stop() {
       clearInterval(poll);
+      deps.log(ledGameSummary(seen, frames, litFrames));
       stopButtons?.();
       deps.service.blackout();
       void deps.service.stop();

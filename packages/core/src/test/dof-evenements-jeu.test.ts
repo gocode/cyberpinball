@@ -21,6 +21,7 @@ interface TapModule {
   tapPlanned(deps: unknown, hasRom: boolean): boolean;
   zoneTarget(leds: CabinetLeds, zone: string): string;
   startTap(deps: unknown, exe: string, mode?: { kind: 'generique' }, table?: string, about?: { script?: string; color?: string }): { env: Record<string, string>; stop(): void } | undefined;
+  gameLedGain(dir: string): number;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const driver = require(path.resolve(__dirname, '../../../../app/dist/led-live.js')) as { createLedService(o: Record<string, unknown>): Service };
@@ -52,6 +53,19 @@ test('effets sans ROM : réglage coupé par défaut, gardé, et jamais pour une 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// 25/11/2026, borne d'essai : luminosité maximale des animations réglée basse, la partie l'ignorait.
+test('effets sans ROM : la partie ne dépasse jamais la luminosité maximale des animations LED', () => {
+  const { dir } = setup();
+  tap.saveEventSettings(dir, { enabled: true, intensity: 100 });
+  assert.equal(tap.gameLedGain(dir), 0.4, 'luminosité maximale par défaut : 40 %');
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 20 }));
+  assert.equal(tap.gameLedGain(dir), 0.2);
+  tap.saveEventSettings(dir, { enabled: true, intensity: 30 });
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100 }));
+  assert.equal(tap.gameLedGain(dir), 0.3, 'intensité des événements plus basse : elle compte');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('effets sans ROM : bandes de gauche et de droite trouvées par leur nom, sinon toutes', () => {
   assert.equal(tap.zoneTarget(LEDS, 'left'), 'Gauche');
   assert.equal(tap.zoneTarget(LEDS, 'right'), 'Droite');
@@ -66,11 +80,12 @@ test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le s
   const leds: CabinetLeds = { ...LEDS, strips: [tall('Gauche', 1), tall('Droite', 2)] };
   let press: ((button: string, down: boolean) => void) | undefined;
   let stopped = false;
+  const logs: string[] = [];
   const deps = {
     dataDir: dir,
     leds: () => leds,
     service,
-    log: () => undefined,
+    log: (line: string) => logs.push(line),
     watchButtons: (on: (button: string, down: boolean) => void) => {
       press = on;
       return () => (stopped = true);
@@ -89,7 +104,7 @@ test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le s
     return { left: sum(0), right: sum(1) };
   };
   const ambient = await shown();
-  assert.equal(ambient.left, ambient.right, 'ambiance des deux côtés');
+  assert.deepEqual(ambient, { left: 0, right: 0 }, 'noir au repos');
   fs.appendFileSync(file, 'E,101,1,1.0\r\n');
   let s = await shown(100);
   assert.ok(s.left > s.right + 100, `flipper gauche : ${JSON.stringify(s)}`);
@@ -107,6 +122,10 @@ test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le s
   s = await shown(60);
   assert.ok(s.left > ambient.left + 100 && s.right > ambient.right + 100, `bumper : ${JSON.stringify(s)}`);
   game.stop();
+  assert.match(logs[0] ?? '', /couleurs #[0-9a-f]{6} .* luminosité 40 %/, 'couleurs et luminosité au journal');
+  const summary = logs.at(-1) ?? '';
+  assert.match(summary, /fin de partie, 3 événement\(s\) \(.*flipper 1.*\), bandes allumées \d+ % du temps/, summary);
+  assert.ok(!/allumées 100 %/.test(summary), 'pas allumées tout le temps');
   assert.equal(stopped, true, 'boutons rendus');
   assert.equal(fs.existsSync(file), false);
   await wait(20);

@@ -67,8 +67,14 @@ const LIFE: Readonly<Record<DofEventKind, number>> = {
 };
 /** Effets qui suivent l'état de l'événement (allumé tant qu'il dure). */
 const HOLDS: ReadonlySet<DofEventKind> = new Set(['flipper', 'flasher']);
-/** Un effet tenu jamais relâché (événement perdu) s'éteint quand même. */
-const MAX_HOLD = 4000;
+/**
+ * Un effet tenu jamais relâché (événement perdu, flasher laissé allumé) s'éteint quand même. Retour d'essai
+ * (25/11/2026, table originale) : « les LED restent presque constamment allumées ». Entre deux événements,
+ * les bandes sont éteintes : ni lueur de fond (GI), ni flipper tenu qui reste allumé.
+ */
+const MAX_HOLD = 1200;
+/** Flipper tenu : le bas reste allumé ce temps-là après le flip, puis s'éteint même si le bouton reste enfoncé. */
+const FLIPPER_HOLD_MS = 450;
 /** Le même événement reçu deux fois de suite (touche et script) ne rejoue pas l'effet. */
 const DEBOUNCE = 90;
 /**
@@ -162,19 +168,23 @@ export interface DofScene {
 export function createDofScene(palette: DofScenePalette, intensity = 1): DofScene {
   const k = clamp01(intensity);
   let actives: Active[] = [];
-  let gi = true;
   let seed = 1;
   const last = new Map<string, number>();
   /** Côté d'une bande, gardé par nom. */
   const sides = new Map<string, DofSide>();
-  const ambient = mix([0, 0, 0], palette.primary, 0.07);
   const fxPalette = ledFxPalette([palette.primary, palette.secondary, palette.accent]);
   const opposite = complement(palette.primary);
   const contrastPalette = ledFxPalette([opposite, GOLD, WHITE, palette.primary]);
 
+  /** Fin du maintien : le relâché, ou pour un flipper au plus tard FLIPPER_HOLD_MS après le flip. */
+  function releasedAt(a: Active): number | undefined {
+    return a.kind === 'flipper' ? Math.min(a.released ?? Infinity, a.start + FLIPPER_HOLD_MS) : a.released;
+  }
+
   function alive(a: Active, now: number): boolean {
-    if (a.hold && a.released === undefined) return now - a.start < MAX_HOLD;
-    const end = a.hold ? a.released! + Math.max(150, LIFE[a.kind] - (a.released! - a.start)) : a.start + LIFE[a.kind];
+    const released = releasedAt(a);
+    if (a.hold && released === undefined) return now - a.start < MAX_HOLD;
+    const end = a.hold ? released! + Math.max(150, LIFE[a.kind] - (released! - a.start)) : a.start + LIFE[a.kind];
     return now < end;
   }
 
@@ -189,7 +199,8 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
         const d = head - p;
         const sweep = d >= 0 && d < 0.4 ? (1 - d / 0.4) ** 1.5 : 0;
         const color = d < 0.06 ? mix(palette.primary, WHITE, 0.55) : palette.primary;
-        const held = a.released === undefined ? 1 : clamp01(1 - (now - a.released) / 150);
+        const released = releasedAt(a)!;
+        const held = now <= released ? 1 : clamp01(1 - (now - released) / 150);
         const base = t > 120 && p < 0.3 ? 0.45 * (1 - p / 0.3) * held : 0;
         return [color, Math.max(sweep, base)];
       }
@@ -290,11 +301,8 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
 
   return {
     trigger(kind, side, now) {
-      if (kind === 'mech') return;
-      if (kind === 'gi') {
-        gi = true;
-        return;
-      }
+      // GI allumé tout le long de la partie, mécanismes : pas un événement à montrer.
+      if (kind === 'mech' || kind === 'gi') return;
       const key = `${kind}/${side}`;
       const prev = last.get(key);
       last.set(key, now);
@@ -305,10 +313,6 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
       if (actives.length > 48) actives.splice(0, actives.length - 48);
     },
     release(kind, side, now) {
-      if (kind === 'gi') {
-        gi = false;
-        return;
-      }
       for (const a of actives) if (a.kind === kind && a.side === side && a.hold && a.released === undefined) a.released = now;
     },
     render(strip, now) {
@@ -330,9 +334,9 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
         // Bande verticale : 0 en bas, 1 en haut ; bande à plat (une ligne) : le long de la bande.
         const p = tall ? (strip.height - 1 - y) / (strip.height - 1) : wide ? cx / (strip.width - 1) : 0.5;
         const x = wide && tall ? cx / (strip.width - 1) : 0.5;
-        let r = gi ? ambient[0] : 0;
-        let g = gi ? ambient[1] : 0;
-        let b = gi ? ambient[2] : 0;
+        let r = 0;
+        let g = 0;
+        let b = 0;
         for (const a of actives) {
           if (!applies(a, side, x, wide && tall)) continue;
           const [c, f] = shade(a, p, x, now);
@@ -353,7 +357,7 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
       return out;
     },
     busy(now) {
-      return gi || actives.some((a) => alive(a, now));
+      return actives.some((a) => alive(a, now));
     },
   };
 }

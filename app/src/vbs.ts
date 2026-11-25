@@ -240,6 +240,7 @@ function saveCache(file: string, cache: Record<string, CacheEntry>): void {
 export function forgetScriptCache(): void {
   loaded.clear();
   playedScripts.clear();
+  unreadable.clear();
 }
 
 /**
@@ -255,8 +256,8 @@ export function rememberScript(table: string, facts: ScriptFacts, dataDir: strin
 }
 
 /**
- * Script déjà lu, sans lancer VPX (undefined si inconnu ou si la table a changé).
- * Une lecture d'une version précédente sert encore : la ROM y est, seuls les appels PuP manquent.
+ * Script de la table, sans jamais lancer VPX : celui du cache, sinon lu une fois dans le .vpx et gardé
+ * (undefined : script protégé ou illisible, sans .vbs à côté).
  */
 export function cachedScript(table: string, dataDir: string): ScriptFacts | undefined {
   if (!isVpxFile(table)) return NO_SCRIPT;
@@ -279,8 +280,26 @@ export function cachedScript(table: string, dataDir: string): ScriptFacts | unde
       saveCache(cacheFile, cache);
       return withPlayedScript(table, facts);
     }
-    return undefined;
+    // Jamais lue (25/11/2026, borne d'essai : 13 tables sur 18, dont The Addams Family) : « pas encore lue »
+    // passait pour « sans ROM », la partie prenait le port des LED pour les effets sans ROM et DOF ne pouvait
+    // plus l'ouvrir. Lue ici une fois dans le .vpx, sans lancer VPX (même texte que -ExtractVBS) ; un script
+    // protégé ou un fichier illisible n'est pas relu tant qu'il ne change pas.
+    const version = `${stat.size}:${stat.mtimeMs}`;
+    if (unreadable.get(table.toLowerCase()) === version) return undefined;
+    const text = readVpxScript(table);
+    if (text === undefined) {
+      unreadable.set(table.toLowerCase(), version);
+      const played = withPlayedScript(table, NO_SCRIPT);
+      return played === NO_SCRIPT ? undefined : played;
+    }
+    const facts = scriptFacts(text);
+    cache[table.toLowerCase()] = cacheEntry(stat, facts);
+    saveCache(cacheFile, cache);
+    return withPlayedScript(table, facts);
   } catch {
     return undefined;
   }
 }
+
+/** Tables dont le script n'a pas pu être lu dans le .vpx, par version du fichier (taille:date). */
+const unreadable = new Map<string, string>();

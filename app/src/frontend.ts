@@ -2957,6 +2957,8 @@ function downloadsChanged(): void {
 }
 // Dans un écran de la gestion des tables (bibliothèque d'un ami, sa table) : lu à son ouverture, gardé pour les touches (library.kept).
 const romsOf = (table: TableEntry) => library.kept(`roms:${table.file}`, () => cachedScript(table.file, loc.dataDir)?.roms ?? []);
+/** Table à ROM pour les LED : une table PinMAME dont le nom de ROM n'a pas été trouvé en est une (DOF de VPX garde le port). */
+const hasRomOf = (table: TableEntry) => romsOf(table).length > 0 || cachedScript(table.file, loc.dataDir)?.usesPinmame === true;
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
 /** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */
 function tableInventory(table: TableEntry) {
@@ -6369,7 +6371,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Table sans ROM : l'écoute des « DOF n, état » du script (dof-evenements-jeu.ts), relayés à libdof pour une
   // table originale que la config DOF connaît, sinon profil générique s'il est voulu.
   // Jamais dans le casque : ses variables (roomEnv) et celles de l'écoute ne se croisent donc pas.
-  const dofMode = simulated === undefined && !displayMode && !otherVpx && !vrGame ? tapMode(dofTapDeps, { hasRom: romsOf(table).length > 0, b2sName: b2sNameOf(table) }) : undefined;
+  const hasRom = hasRomOf(table);
+  const ledGame = simulated === undefined && !displayMode && !otherVpx && !vrGame;
+  const dofMode = ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table) }) : undefined;
+  // Au journal, le mode LED de chaque partie (25/11/2026 : une table à ROM jouée en effets sans ROM, sans trace).
+  if (ledGame && hasRom) console.log(`LED de la partie : DOF de VPX (ROM ${romsOf(table).join(', ') || 'au nom inconnu'}).`); // i18n-ignore : journal
+  else if (ledGame && !dofMode) console.log('LED de la partie : aucun effet (table sans ROM ; effets sans ROM coupés, ou pas de bandes décrites).'); // i18n-ignore : journal
   const dofTap = dofMode
     ? startTap(dofTapDeps, install.exe, dofMode, played.file, dofMode.kind === 'generique' ? { script: tableScriptText(table), ...(tints?.current()?.color ? { color: tints.current()!.color } : {}), ...(tints?.current()?.leds?.length ? { colors: tints.current()!.leds! } : {}) } : {})
     : undefined;
@@ -8089,19 +8096,23 @@ function menuDmdColor(): string {
 
 /**
  * Teinte de la table que montrent les écrans (table-tint.ts) : ses médias, dans l'ordre fronton
- * (l'image allumée du .directb2s comprise), logo, plateau. Les points du DMD la prennent d'abord
- * du média de l'écran du DMD (FullDMD ou capture du DMD). Mesurée seulement si l'ambiance ou le
- * DMD s'en servent ; la clé change avec la table et avec ses médias (adresse datée, mediaUrl).
+ * (l'image allumée du .directb2s comprise), plateau, logo : la table d'abord, la roue en dernier
+ * (retour d'essai du 25/11/2026 : fronton refusé, la roue donnait seule la couleur). Les couleurs des
+ * LED mêlent les dominantes du fronton et du plateau. Les points du DMD la prennent d'abord du média
+ * de l'écran du DMD (FullDMD ou capture du DMD). Mesurée seulement si l'ambiance ou le DMD s'en
+ * servent ; la clé change avec la table et avec ses médias (adresse datée, mediaUrl).
  */
 function followTint(): void {
   if (!tints) return;
   const used = mediaSettings.tableColor || mediaSettings.dmdColor === DMD_TABLE_COLOR;
   const table = used && medias ? screensSubject() : undefined;
   if (!table || !medias) return tints.follow(undefined);
-  const urls = [medias.roleMedia(table, 'backglass').url, medias.wheel(table), medias.roleMedia(table, 'playfield').url];
+  const backglass = medias.roleMedia(table, 'backglass').url;
+  const playfield = medias.roleMedia(table, 'playfield').url;
+  const urls = [backglass, playfield, medias.wheel(table)];
   const dmdUrl = mediaSettings.dmdColor === DMD_TABLE_COLOR ? medias.roleMedia(table, 'dmd').url : undefined;
   const paths = (list: readonly (string | undefined)[]) => list.map((u) => (u ? mediaPathFromUrl(u) : undefined)).filter((f): f is string => Boolean(f));
-  tints.follow({ key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]) });
+  tints.follow({ key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]), ledFiles: paths([backglass, playfield]) });
 }
 
 /** Ce que les animations des LED ont besoin de savoir de l'écran : la table choisie, la fiche ouverte, sa teinte. */
@@ -8129,7 +8140,7 @@ function broadcast(): void {
   const gameOn = state.phase === 'loading' || state.phase === 'playing';
   nightMode?.game(gameOn); // variante DOF du mode nuit posée avant le lancement de VPX, remise à la fin
   const tapTable = gameOn ? (playing ?? tables[state.index]) : undefined;
-  if (gameOn && !(tapTable && tapPlanned(dofTapDeps, romsOf(tapTable).length > 0, b2sNameOf(tapTable)))) void ledService.gameStarted();
+  if (gameOn && !(tapTable && tapPlanned(dofTapDeps, hasRomOf(tapTable), b2sNameOf(tapTable)))) void ledService.gameStarted();
   else if (!gameOn) ledService.gameEnded();
   ledAnimations.update(ledContext());
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit

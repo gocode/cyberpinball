@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs (ROM tables): a table that had never been read was treated as a table without a ROM; the game then took the LED port for the no-ROM effects, and DOF could not open it (no ROM effects, bumpers not detected). The table's script is now read once from the table file, without launching VPX; a PinMAME table stays a ROM table even when its ROM name is not found.
+- LEDs (tables without a ROM): the strips are off between events; no more permanent background glow, and a held flipper no longer keeps the bottom lit.
+- LEDs (tables without a ROM): in-game effect brightness no longer goes above the maximum brightness set for LED animations.
+- LEDs: strip colours blend the dominant colours of the backglass and the playfield (up to four); the wheel is only used as a last resort. The table colour in the menu follows the same order: backglass, playfield, then wheel.
+- Log: each game's LED mode (VPX DOF with its ROM, or no-ROM effects with their colours and brightness), and at the end of a no-ROM game, a summary of the events received and the share of time the strips were lit.
 - End-of-game card: when a solo game ends on a table whose score is read live, a card appears over the playfield, without leaving VPX or taking focus from it. It shows your score (and "Your best!" when you beat your record), your country's top 3, your own place on a 4th line if you are not in it, then your world rank.
 - Left flipper: challenge a player on this table. Right flipper: continue, the card closes and you are back in the game. The card waits until you have finished entering your initials, and closes by itself if you start a new game.
 - Without a ranking (guest mode, sharing turned off, trial VPX…), the card shows your score and says why the ranking is missing.
