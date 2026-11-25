@@ -55,8 +55,8 @@ export const messages: Record<string, string> = {
   // app/src/frontend.ts : « Écran du DMD »
   'Écran du DMD': 'DMD screen',
   'FullDMD 16:9 ou DMD seul : ce que montre l’écran du DMD': '16:9 FullDMD or DMD only: what the DMD screen shows',
-  'Le DMD occupe une bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ?':
-    'The DMD fills a {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. Is it a FullDMD?',
+  'Le DMD occupe une zone {zone} de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ou un DMD seul ?':
+    'The DMD fills a {zone} area of the “{screen}” screen ({ratio}), which shows nothing else. Is it a FullDMD or a DMD only?',
   'L’écran « {screen} » est un FullDMD.': 'The “{screen}” screen is a FullDMD.',
   'L’écran du DMD est un FullDMD.': 'The DMD screen is a FullDMD.',
   'L’écran « {screen} » montre le DMD seul.': 'The “{screen}” screen shows the DMD only.',

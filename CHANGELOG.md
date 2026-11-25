@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Écran du DMD : le type choisi (DMD seul ou FullDMD) n'est plus jamais recalculé d'après la forme de la zone. Un DMD placé librement en 1280x481 sur un écran 1280x720 restait DMD jusqu'à 480 lignes puis basculait en FullDMD : il reste un DMD, quelle que soit la taille donnée à sa zone dans l'assistant ou dans Disposition des écrans.
+- Assistant : un DMD placé librement dans une partie d'écran, sans que son type soit connu, fait demander « FullDMD ou DMD seul ? » pour cette place, au lieu de le deviner au pixel près.
+- Configuration de la borne > Écran du DMD : « C'est un DMD seul » garde la zone placée à la main au lieu de la remplacer par une bande 4:1 ; une zone seule sur un écran large, sans type choisi, est signalée « À vérifier » quelle que soit sa forme.
 - Lunettes NVIDIA 3D Vision : l'écran du playfield est retrouvé par son nom, comme VPX 10.8.1 le cherche ; un playfield réglé sur un écran nommé n'est plus marqué "Pas vérifié". Un émetteur branché dont le pilote ne démarre pas est signalé, avec la marche à suivre.
 - Lunettes NVIDIA 3D Vision (bêta) : Cyber Pinball active lui-même la 3D stéréoscopique du pilote avant chaque partie en relief et la coupe après ; il n'est plus nécessaire de la cocher dans le Panneau NVIDIA.
 - Toute autre partie (à plat, dans le casque, avec un autre VPX) se lance la 3D du pilote coupée : active, elle faisait disparaître des éléments des tables.

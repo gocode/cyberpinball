@@ -27,7 +27,7 @@ import { cabinetFullDmd, describePupCabinet, parseScreens, pupCabinet, pupDmdRoo
 import { planVpxSync } from '../sync';
 import { vpxPluginDefaults, vpxSettingsFor, type VpxProfile } from '../vpx';
 import { cabinetChanges, stepCabinet, wizardStepInfo } from '../wizardsteps';
-import { cabinetZones, isFullZone, roleZone, splitBackglassDmd, zoneRatio } from '../zones';
+import { cabinetZones, embeddedDmdZone, isFullZone, roleZone, splitBackglassDmd, zoneRatio } from '../zones';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 
 const [samsung, auo, , plx] = devPcDisplays() as [ReturnType<typeof devPcDisplays>[number], ReturnType<typeof devPcDisplays>[number], unknown, ReturnType<typeof devPcDisplays>[number]];
@@ -92,7 +92,7 @@ test('Écran du DMD : la configuration ambiguë (bande seule sur un écran large
   const findings = dmdKindFindings(poste());
   assert.equal(findings.length, 1);
   assert.equal(findings[0]!.severity, 'warning');
-  assert.match(findings[0]!.message, /bande 4,78:1 .*« PLX2283HSU \(1920 × 1080\) » \(16:9\)/);
+  assert.match(findings[0]!.message, /zone 4,78:1 sur l’écran « PLX2283HSU \(1920 × 1080\) » \(16:9\)/);
   assert.ok(planVpxSync(poste(), devPcDisplays(), '', PROFILE).findings.some((f) => f.message === findings[0]!.message));
 });
 
@@ -157,18 +157,71 @@ test('Écran du DMD : un type contraire à la forme de la zone est signalé (inf
   assert.equal(dmdKindFindings(stretched)[0]?.severity, 'info');
 });
 
-test('Écran du DMD : la disposition garde le type tant que la zone ne change pas, sinon la forme décide', () => {
+test('Écran du DMD : la disposition garde le type sur le même écran, quelle que soit la zone', () => {
   const before = poste();
   // Zone inchangée et type jamais dit : la question reste posée.
   assert.equal(dmdKindAfterArrange(before, poste()), undefined);
   assert.equal(dmdKindAfterArrange({ ...before, dmdKind: 'dmd' }, poste()), 'dmd');
-  // Tirée en 16:9 : FullDMD ; en bande : DMD seul.
+  // Tirée en 16:9 ou ramenée en bande : le type dit ne bouge pas.
   const widened = poste();
   widened.zones = { dmd: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } };
-  assert.equal(dmdKindAfterArrange({ ...before, dmdKind: 'dmd' }, widened), 'fulldmd');
+  assert.equal(dmdKindAfterArrange({ ...before, dmdKind: 'dmd' }, widened), 'dmd');
   const narrowed: Cabinet = { ...poste(), zones: { dmd: centeredDmdBand(plx.bounds) } };
-  assert.equal(dmdKindAfterArrange(withDmdKind(before, 'fulldmd'), narrowed), 'dmd');
+  assert.equal(dmdKindAfterArrange(withDmdKind(before, 'fulldmd'), narrowed), 'fulldmd');
+  // Jamais dit et zone changée : rien d'inventé, la question se pose.
+  assert.equal(dmdKindAfterArrange(before, widened), undefined);
+  assert.ok(dmdKindQuestion(widened));
   assert.equal(dmdKindAfterArrange(before, { ...poste(), roles: { playfield: before.roles.playfield } }), undefined);
+  // Incrusté dans le playfield : DMD seul, quoi qu'on ait dit avant.
+  const embedded = poste();
+  embedded.roles.dmd = embedded.roles.playfield;
+  embedded.zones = { dmd: embeddedDmdZone(auo.bounds, 'bottom') };
+  assert.equal(dmdKindAfterArrange({ ...before, dmdKind: 'fulldmd' }, embedded), 'dmd');
+  // Passé sur un autre écran : le type d'avant parlait de l'autre ; sans doute possible, la forme.
+  const moved = poste();
+  moved.roles.dmd = moved.screens[2]!.fingerprint;
+  moved.zones = undefined;
+  assert.equal(dmdKindAfterArrange({ ...before, dmdKind: 'dmd' }, moved), dmdKindOf(moved));
+});
+
+test('Issue n° 3 : un DMD dit DMD le reste dans toute zone (1280 × 481 sur un écran 1280 × 720)', () => {
+  const size = { width: 1280, height: 720 };
+  const zone = (h: number) => ({ x: 0, y: (720 - h) / 2 / 720, width: 1, height: h / 720 });
+  const at = (h: number, dmdKind?: 'dmd' | 'fulldmd'): Cabinet => {
+    const c = poste();
+    c.screens[3] = { ...c.screens[3]!, widthPx: 1280, heightPx: 720 };
+    c.zones = { dmd: zone(h) };
+    if (dmdKind) c.dmdKind = dmdKind;
+    return c;
+  };
+  // Le seuil 8:3 tombe entre 480 et 481 lignes : c'est lui qui faisait basculer le type.
+  assert.equal(dmdKindForRatio(zoneRatio(zone(480), size)!), 'dmd');
+  assert.equal(dmdKindForRatio(zoneRatio(zone(481), size)!), 'fulldmd');
+
+  // Type dit : jamais réinterprété d'après la forme, ni à la lecture ni après la disposition.
+  for (const h of [320, 480, 481, 600, 720]) {
+    assert.equal(dmdKindOf(at(h, 'dmd')), 'dmd', `DMD 1280 × ${h}`);
+    assert.equal(dmdMediaType(at(h, 'dmd')), 'DMD', `DMD 1280 × ${h}`);
+    assert.equal(pupCabinet(at(h, 'dmd'))!.fullDmd, false, `PuP-Packs, DMD 1280 × ${h}`);
+    assert.equal(dmdKindQuestion(at(h, 'dmd')), undefined);
+    assert.equal(dmdKindAfterArrange(at(480, 'dmd'), at(h)), 'dmd', `redimensionné de 480 à ${h}`);
+    assert.equal(dmdKindAfterArrange(at(720, 'fulldmd'), at(h)), 'fulldmd', `FullDMD redimensionné à ${h}`);
+  }
+
+  // « C'est un DMD seul » garde la zone placée à la main, sans avertissement « bandes noires ».
+  const kept = withDmdKind(at(481), 'dmd');
+  assert.equal(kept.dmdKind, 'dmd');
+  assert.deepEqual(kept.zones?.dmd, zone(481));
+  assert.deepEqual(dmdKindFindings(kept), []);
+  // L'écran entier, lui, devient une bande 4:1 (inchangé).
+  assert.ok(Math.abs(zoneRatio(withDmdKind(at(720), 'dmd').zones!.dmd!, size)! - 4) < 1e-9);
+
+  // Sans type dit : toute zone partielle seule sur l'écran se demande au lieu de se deviner.
+  for (const h of [320, 480, 481, 600]) {
+    assert.ok(dmdKindQuestion(at(h)), `question pour 1280 × ${h}`);
+    assert.equal(dmdKindFindings(at(h))[0]?.severity, 'warning');
+  }
+  assert.equal(dmdKindAfterArrange(at(480), at(481)), undefined);
 });
 
 test('Écran du DMD : l’assistant enregistre le type avec les écrans et la disposition', () => {

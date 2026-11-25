@@ -7,14 +7,16 @@
 // - DMD seul : une bande 4:1 (vrai écran DMD, bande sous le fronton, écran 16:9 derrière
 //   la découpe du panneau des haut-parleurs, incrustation dans le playfield).
 //
-// Le choix est dit par l'utilisateur (Cabinet.dmdKind). Les modèles d'avant ce choix le
-// déduisent des proportions de la zone ; une bande DMD dessinée seule sur un écran large
-// reste ambiguë (dmdKindQuestion) : elle peut être un FullDMD mal découpé.
+// Le choix est dit par l'utilisateur (Cabinet.dmdKind) et n'est jamais réinterprété d'après
+// la forme de la zone : redimensionner la zone ne change pas le type (issue n° 3, un DMD
+// 1280 × 481 sur un écran 1280 × 720 devenait FullDMD au pixel près). Les modèles d'avant ce
+// choix le déduisent des proportions de la zone ; une zone placée seule sur un écran large
+// reste ambiguë (dmdKindQuestion) : le type se demande au lieu de se deviner.
 
 import { t } from './i18n';
 import type { Cabinet, DmdKind, PhysicalScreen, RoleId, ScreenZone } from './model';
 import type { SyncFinding } from './sync';
-import { isFullZone, ratioLabel, roleZone, sameZone, splitBackglassDmd, zoneRatio } from './zones';
+import { isFullZone, ratioLabel, roleZone, splitBackglassDmd, zoneRatio } from './zones';
 
 /**
  * Frontière entre 4:1 et 16:9 : moyenne géométrique des deux proportions
@@ -88,7 +90,7 @@ export function centeredDmdBand(size: { width: number; height: number }): Screen
   return { x: (1 - w) / 2, y: (1 - h) / 2, width: w, height: h, aspect: 4 };
 }
 
-/** La configuration ambiguë : une bande DMD seule sur un écran large, sans choix enregistré. */
+/** La configuration ambiguë : une zone DMD seule sur un écran large, sans choix enregistré. */
 export interface DmdKindQuestion {
   /** Nom de l'écran du DMD (« PLX2283HSU (1920 × 1080) »). */
   screen: string;
@@ -98,11 +100,13 @@ export interface DmdKindQuestion {
 }
 
 /**
- * Bande DMD dessinée seule sur un écran large (16:9, 16:10, 4:3), sans que l'utilisateur ait
+ * Zone DMD dessinée seule sur un écran large (16:9, 16:10, 4:3), sans que l'utilisateur ait
  * dit ce qu'est cet écran : peut-être un FullDMD réduit à une bande (Poste à 3 écrans,
  * octobre 2026 : bande 4,8:1 au milieu d'un écran 16:9 ; le menu y montrait l'image FullDMD
- * réduite, VPX y ouvrait une fenêtre en bande). Une bande sous le fronton ou une incrustation
- * dans le playfield est voulue : pas de question.
+ * réduite, VPX y ouvrait une fenêtre en bande), ou un DMD seul dans une zone plus haute
+ * qu'une bande 4:1 (1280 × 481 sur un écran 1280 × 720, issue n° 3). Quelle que soit sa forme,
+ * on demande. Une zone sous le fronton ou une incrustation dans le playfield est voulue : pas
+ * de question.
  */
 export function dmdKindQuestion(cabinet: Cabinet): DmdKindQuestion | undefined {
   if (cabinet.dmdKind || !cabinet.roles.dmd || screenMates(cabinet).length) return undefined;
@@ -112,7 +116,7 @@ export function dmdKindQuestion(cabinet: Cabinet): DmdKindQuestion | undefined {
   const zone = roleZone(cabinet, 'dmd');
   const screenRatio = zoneRatio({ x: 0, y: 0, width: 1, height: 1 }, size)!;
   const ratio = zoneRatio(zone, size);
-  if (isFullZone(zone) || ratio === undefined || screenRatio >= DMD_RATIO_THRESHOLD || ratio < DMD_RATIO_THRESHOLD) return undefined;
+  if (isFullZone(zone) || ratio === undefined || screenRatio >= DMD_RATIO_THRESHOLD) return undefined;
   return { screen: screen.label, screenRatio, zoneRatio: ratio };
 }
 
@@ -125,8 +129,10 @@ export function dmdKindChoices(cabinet: Cabinet): DmdKind[] {
 /**
  * La borne avec ce type d'écran DMD, et la zone qui va avec quand la zone enregistrée ne
  * convient pas : écran entier pour un FullDMD seul sur son écran, bande 4:1 centrée pour un
- * DMD seul ; sous le fronton partagé, la bande du bas (16:9 ou 4:1, splitBackglassDmd). Une
- * zone qui a déjà la bonne forme est gardée (place réglée dans « Disposition des écrans »).
+ * DMD seul qui occupait tout l'écran ; sous le fronton partagé, la bande du bas (16:9 ou 4:1,
+ * splitBackglassDmd). Une zone qui a déjà la bonne forme est gardée (place réglée dans
+ * « Disposition des écrans »), comme la zone d'un DMD seul placée à la main, quelle que soit
+ * sa forme : le DMD y est centré, du noir autour.
  */
 export function withDmdKind(cabinet: Cabinet, kind: DmdKind): Cabinet {
   const screen = dmdScreen(cabinet);
@@ -135,7 +141,7 @@ export function withDmdKind(cabinet: Cabinet, kind: DmdKind): Cabinet {
   const zone = roleZone(cabinet, 'dmd');
   const zones: Partial<Record<RoleId, ScreenZone>> = { ...cabinet.zones };
   const mates = screenMates(cabinet);
-  const fits = dmdKindForRatio(zoneRatio(zone, size) ?? 1) === kind;
+  const fits = dmdKindForRatio(zoneRatio(zone, size) ?? 1) === kind || (kind === 'dmd' && !mates.length && !isFullZone(zone));
   if (!fits) {
     if (!mates.length) {
       if (kind === 'fulldmd') delete zones.dmd;
@@ -153,14 +159,19 @@ export function withDmdKind(cabinet: Cabinet, kind: DmdKind): Cabinet {
 }
 
 /**
- * Type d'écran après la disposition des écrans : gardé tant que la zone du DMD n'a pas changé
- * (absent, il le reste : une configuration ambiguë reste à trancher), sinon celui de sa
- * nouvelle forme (une bande tirée à 4:1 est un DMD seul).
+ * Type d'écran après la disposition des écrans. Le DMD reste sur le même écran : son type est
+ * gardé quelle que soit sa nouvelle zone (choisi, l'utilisateur l'a dit ; absent, il le reste
+ * et la question se pose si la zone est ambiguë). Il change d'écran : le type d'avant parlait
+ * d'un autre écran, celui de la nouvelle place est déduit seulement s'il n'y a pas de doute
+ * (dmdKindQuestion). Incrusté dans le playfield : toujours un DMD seul.
  */
 export function dmdKindAfterArrange(previous: Cabinet | undefined, next: Cabinet): DmdKind | undefined {
   if (!next.roles.dmd) return undefined;
-  if (previous && previous.roles.dmd === next.roles.dmd && sameZone(roleZone(previous, 'dmd'), roleZone(next, 'dmd'))) return previous.dmdKind;
-  return dmdKindOf({ ...next, dmdKind: undefined });
+  const choices = dmdKindChoices(next);
+  if (choices.length === 1) return choices[0];
+  if (previous && previous.roles.dmd === next.roles.dmd) return previous.dmdKind;
+  const fresh: Cabinet = { ...next, dmdKind: undefined };
+  return dmdKindQuestion(fresh) ? undefined : dmdKindOf(fresh);
 }
 
 /**
@@ -176,7 +187,7 @@ export function dmdKindFindings(cabinet: Cabinet): SyncFinding[] {
       {
         severity: 'warning',
         message: t(
-          'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dis-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.',
+          'DMD : zone {zone} sur l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Dis si c’est un FullDMD ou un DMD seul dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.',
           { zone: ratioLabel(question.zoneRatio), screen: question.screen, ratio: ratioLabel(question.screenRatio) },
         ),
       },
@@ -185,8 +196,11 @@ export function dmdKindFindings(cabinet: Cabinet): SyncFinding[] {
   const kind = cabinet.dmdKind;
   const screen = dmdScreen(cabinet);
   if (!kind || !screen) return [];
-  const ratio = zoneRatio(roleZone(cabinet, 'dmd'), sizeOf(screen));
+  const zone = roleZone(cabinet, 'dmd');
+  const ratio = zoneRatio(zone, sizeOf(screen));
   if (ratio === undefined || dmdKindForRatio(ratio) === kind) return [];
+  // DMD seul dans une zone placée à la main : voulu, withDmdKind la garde.
+  if (kind === 'dmd' && !isFullZone(zone)) return [];
   return [
     {
       severity: 'info',

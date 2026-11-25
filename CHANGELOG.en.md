@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- DMD screen: the chosen type (DMD only or FullDMD) is never recomputed from the shape of its area anymore. A DMD placed freely at 1280x481 on a 1280x720 screen stayed a DMD up to 480 lines, then switched to FullDMD: it now stays a DMD, whatever size its area gets in the setup wizard or in Screen layout.
+- Setup wizard: a DMD placed freely on part of a screen, with no known type, now asks "FullDMD or DMD only?" for that spot, instead of guessing it down to the pixel.
+- Cabinet setup > DMD screen: "It's a DMD only" keeps the area placed by hand instead of replacing it with a 4:1 strip; an area alone on a wide screen with no chosen type is flagged "To check" whatever its shape.
 - NVIDIA 3D Vision glasses: the playfield display is found by its name, the way VPX 10.8.1 looks for it; a playfield set to a named display is no longer marked "Not checked". An emitter that is plugged in but whose driver does not start is reported, with the steps to fix it.
 - NVIDIA 3D Vision glasses (beta): Cyber Pinball turns the driver's stereoscopic 3D on itself before each 3D game and off afterwards; there is no need to tick it in the NVIDIA Control Panel anymore.
 - Every other game (flat, in the headset, with another VPX) starts with the driver's 3D turned off: when on, it made table elements disappear.

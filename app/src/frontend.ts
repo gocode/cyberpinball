@@ -148,6 +148,7 @@ import {
   dmdScreen,
   ratioLabel,
   roleZone,
+  sameZone,
   withDmdKind,
   type Cabinet,
   type DmdKind,
@@ -2335,7 +2336,7 @@ function openDmdScreen(back: () => void = () => openCabinetPart('screens')): voi
     const screen = dmdScreen(cabinet);
     const choices = dmdKindChoices(cabinet);
     const state = question
-      ? { text: t('Le DMD occupe une bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ?', { zone: ratioLabel(question.zoneRatio), screen: question.screen, ratio: ratioLabel(question.screenRatio) }), tone: 'warning' as const }
+      ? { text: t('Le DMD occupe une zone {zone} de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ou un DMD seul ?', { zone: ratioLabel(question.zoneRatio), screen: question.screen, ratio: ratioLabel(question.screenRatio) }), tone: 'warning' as const }
       : {
           text:
             current === 'fulldmd'
@@ -2352,9 +2353,11 @@ function openDmdScreen(back: () => void = () => openCabinetPart('screens')): voi
       saveCabinet(loc.dataDir, withDmdKind(cabinet, kind));
       relaunchMenu();
     };
+    // DMD seul : une zone placée à la main est gardée telle quelle (withDmdKind), sinon une bande 4:1.
+    const keepsZone = sameZone(roleZone(withDmdKind(cabinet, 'dmd'), 'dmd'), roleZone(cabinet, 'dmd'));
     const all: { kind: DmdKind; label: string; detail: string; icon: 'image' | 'dmd' }[] = [
       { kind: 'fulldmd', label: t('C’est un FullDMD'), detail: t('Tout l’écran 16:9 : média FullDMD, écran 5 des PuP-Packs, DMD du jeu incrusté'), icon: 'image' },
-      { kind: 'dmd', label: t('C’est un DMD seul'), detail: question ? t('Garder la bande : le DMD du jeu seul, du noir autour') : t('Une bande 4:1 : le DMD du jeu seul, du noir autour'), icon: 'dmd' },
+      { kind: 'dmd', label: t('C’est un DMD seul'), detail: keepsZone ? t('Garder la bande : le DMD du jeu seul, du noir autour') : t('Une bande 4:1 : le DMD du jeu seul, du noir autour'), icon: 'dmd' },
     ];
     const offered = all.filter((c) => choices.includes(c.kind));
     // Une réponse déjà enregistrée est « Actuel » ; une forme seulement déduite ne l'est pas encore.

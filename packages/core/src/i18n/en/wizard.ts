@@ -231,6 +231,7 @@ export const messages: Record<string, string> = {
   '{role} : {output}{where}': '{role}: {output}{where}',
   '{role} : {output}{where}, {channels}, {mode} (Sound3D {sound3D})': '{role}: {output}{where}, {channels}, {mode} (Sound3D {sound3D})',
   'placer librement…': 'place freely…',
+  'dans la zone placée': 'in the area you placed',
   'en bas, sous le Backglass (4:1)': 'at the bottom, under the Backglass (4:1)',
   'en bas, sous le Backglass (16:9)': 'at the bottom, under the Backglass (16:9)',
   'en bande 4:1 au centre': 'as a 4:1 strip in the middle',
@@ -240,8 +241,8 @@ export const messages: Record<string, string> = {
   'Quel écran affiche le DMD ou le FullDMD ?': 'Which screen shows the DMD or the FullDMD?',
   'Écran du DMD : {kind}': 'DMD screen: {kind}',
   // packages/core/src/dmdscreen.ts
-  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dis-le dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.':
-    'DMD: {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. If it’s a FullDMD, say so in Cabinet setup > DMD screen: the menu, VPX and PuP-Packs will treat it as one.',
+  'DMD : zone {zone} sur l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Dis si c’est un FullDMD ou un DMD seul dans Configuration de la borne > Écran du DMD : le front-end, VPX et les PuP-Packs le traiteront comme tel.':
+    'DMD: {zone} area on the “{screen}” screen ({ratio}), which shows nothing else. Say whether it’s a FullDMD or a DMD only in Cabinet setup > DMD screen: the menu, VPX and PuP-Packs will treat it as such.',
   'FullDMD dans une zone {ratio} : les médias 16:9 y seront réduits. Écran du DMD (Configuration de la borne) lui rend tout son écran.':
     'FullDMD in a {ratio} area: 16:9 media will be shrunk into it. DMD screen (Cabinet setup) gives it back its whole screen.',
   'DMD seul dans une zone {ratio} : le DMD y aura des bandes noires. Écran du DMD (Configuration de la borne) le remet en bande 4:1.':

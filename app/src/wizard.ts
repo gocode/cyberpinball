@@ -68,10 +68,13 @@ import {
   centeredDmdBand,
   DMD_RATIO_THRESHOLD,
   dmdKindAfterArrange,
+  dmdKindChoices,
   dmdKindLabel,
   dmdKindOf,
+  dmdKindQuestion,
   type DmdKind,
   embeddedDmdZone,
+  isFullZone,
   sameZone,
   splitBackglassDmd,
   zoneRect,
@@ -266,10 +269,13 @@ interface Wizard {
   /** Rôles auxquels on a répondu « aucun écran » dans cette session. */
   unassigned: Set<RoleId>;
   /**
-   * FullDMD ou DMD seul, répondu à l'étape des rôles, avec la zone du DMD à ce moment : une
-   * zone changée ensuite dans l'éditeur décide à sa place, par sa forme (dmdKindAfterArrange).
+   * FullDMD ou DMD seul, répondu à l'étape des rôles (ou enregistré), pour l'écran dont c'est
+   * l'empreinte : gardé quelle que soit la zone que l'éditeur donne ensuite au DMD sur cet
+   * écran, jamais redéduit de sa forme (issue n° 3).
    */
-  dmdKind?: { kind: DmdKind; zone?: ScreenZone };
+  dmdKind?: { kind: DmdKind; screen: string };
+  /** DMD placé librement sans type connu : sa place, en attendant la réponse « FullDMD ou DMD seul ? ». */
+  placedDmd?: { display: number; zone: ScreenZone };
   /** « Placer librement… » : l'éditeur de disposition ouvert sur ce rôle, et l'état d'avant pour revenir. */
   free?: { role: AncillaryRoleId; option: number; assignments: Partial<Record<RoleId, number>>; zones: Partial<Record<RoleId, ScreenZone>>; dmdKind?: Wizard['dmdKind'] };
   /** « Quitter sans enregistrer ? » ouvert : ce qui serait perdu, et la fin du délai de réponse. */
@@ -812,7 +818,10 @@ function handleKey(input: Input): boolean {
       wizard.unassigned.delete(role.id);
       if (option.zone && role.id !== 'playfield') wizard.zones[role.id] = option.zone;
       if (option.host) wizard.zones[option.host.role] = option.host.zone;
-      if (role.id === 'dmd') wizard.dmdKind = option.dmdKind && { kind: option.dmdKind, ...(option.zone && { zone: option.zone }) };
+      if (role.id === 'dmd') {
+        wizard.dmdKind = option.dmdKind && { kind: option.dmdKind, screen: fingerprintOf(displays[option.display]!).key };
+        wizard.placedDmd = undefined;
+      }
       // Écrans et rôles seuls : bord des flippers et diagonale redemandés seulement pour un autre écran.
       if (role.id === 'playfield' && !(isOnly('ecrans') && fingerprintOf(displays[option.display]!).key === previous?.roles.playfield)) startLayout();
       else nextRole();
@@ -2875,7 +2884,8 @@ function loadAssignments(): void {
     if (index >= 0) wizard.assignments[id] = index;
   }
   wizard.zones = structuredClone(previous!.zones ?? {});
-  wizard.dmdKind = previous!.dmdKind && { kind: previous!.dmdKind, ...(previous!.zones?.dmd && { zone: previous!.zones.dmd }) };
+  const dmdScreenKey = previous!.roles.dmd;
+  wizard.dmdKind = previous!.dmdKind && dmdScreenKey ? { kind: previous!.dmdKind, screen: dmdScreenKey } : undefined;
 }
 
 function restart(): void {
@@ -2963,16 +2973,22 @@ function freeTarget(role: AncillaryRoleId): number {
 function placedOptions(): RoleOption[] {
   const role = ROLES[wizard.roleIndex];
   if (role?.id !== 'dmd') return freeDisplays().map((display) => ({ display }));
+  // Placé librement sans type connu (askDmdKind) : d'abord les deux réponses pour cette place.
+  const placed = wizard.placedDmd;
+  const placedFree = placed && !Object.entries(wizard.assignments).some(([r, d]) => r !== 'dmd' && r !== 'backglass' && d === placed.display);
+  const options: RoleOption[] = placed && placedFree
+    ? (['fulldmd', 'dmd'] as const).map((dmdKind) => ({ display: placed.display, zone: placed.zone, label: t('dans la zone placée'), dmdKind }))
+    : [];
   // Un écran large libre : FullDMD sur tout l'écran, ou DMD seul en bande (découpe du panneau
   // des haut-parleurs). Un écran déjà 4:1 : DMD seul.
-  const options: RoleOption[] = freeDisplays().flatMap((display): RoleOption[] => {
+  options.push(...freeDisplays().flatMap((display): RoleOption[] => {
     const size = displays[display]!.bounds;
     if (Math.max(size.width, size.height) / Math.min(size.width, size.height) >= DMD_RATIO_THRESHOLD) return [{ display, dmdKind: 'dmd' }];
     return [
       { display, dmdKind: 'fulldmd' },
       { display, zone: centeredDmdBand(size), dmdKind: 'dmd', label: t('en bande 4:1 au centre') },
     ];
-  });
+  }));
   const backglass = wizard.assignments.backglass;
   if (backglass !== undefined && !wizard.zones.backglass) {
     const size = displays[backglass]!.bounds;
@@ -3027,14 +3043,20 @@ function defaultOption(): number {
 }
 
 /**
- * FullDMD ou DMD seul : la réponse de l'étape des rôles tant que la zone du DMD est celle de
- * cette réponse ; placée ou changée dans l'éditeur, d'après la forme de sa zone.
+ * FullDMD ou DMD seul : la réponse donnée pour l'écran du DMD, quelle que soit la zone que
+ * l'éditeur lui donne ensuite (jamais redéduite de sa forme au pixel près, issue n° 3) ;
+ * incrusté dans le playfield, un DMD seul. Sans réponse pour cet écran : d'après sa forme
+ * seulement si elle ne laisse pas de doute (dmdKindQuestion), sinon rien, et la question se
+ * pose (afterFreePlacement, Configuration de la borne > Écran du DMD).
  */
 function wizardDmdKind(roles: Cabinet['roles'], zones: Cabinet['zones']): DmdKind | undefined {
   if (!roles.dmd) return undefined;
+  const cabinet: Cabinet = { version: 1, screens: displays.map(toPhysicalScreen), roles, ...(zones && { zones }), vpx: { iniPath: '' }, updatedAt: '' };
+  const choices = dmdKindChoices(cabinet);
+  if (choices.length === 1) return choices[0];
   const chosen = wizard.dmdKind;
-  if (chosen && sameZone(chosen.zone ?? FULL_ZONE, zones?.dmd ?? FULL_ZONE)) return chosen.kind;
-  return dmdKindOf({ version: 1, screens: displays.map(toPhysicalScreen), roles, ...(zones && { zones }), vpx: { iniPath: '' }, updatedAt: '' });
+  if (chosen && chosen.screen === roles.dmd) return chosen.kind;
+  return dmdKindQuestion(cabinet) ? undefined : dmdKindOf(cabinet);
 }
 
 /** Nom d'un rôle dans l'assistant : « FullDMD » pour le DMD quand c'en est un (réponse ou forme de sa zone). */
@@ -3229,8 +3251,14 @@ function afterArrange(outcome: ArrangeOutcome): void {
  */
 function startFreePlacement(role: AncillaryRoleId, display: number): void {
   wizard.free = { role, option: wizard.option, assignments: { ...wizard.assignments }, zones: structuredClone(wizard.zones), dmdKind: wizard.dmdKind };
-  // Placé à la main : FullDMD ou DMD seul d'après la forme donnée à sa zone.
-  if (role === 'dmd') wizard.dmdKind = undefined;
+  // Placé à la main : le type déjà dit pour cet écran est gardé, quelle que soit la zone ;
+  // sinon il se demande au retour (afterFreePlacement), jamais déduit de la forme dessinée.
+  if (role === 'dmd') {
+    const screen = fingerprintOf(displays[display]!).key;
+    const known = wizard.dmdKind?.screen === screen ? wizard.dmdKind.kind : previous?.roles.dmd === screen ? previous.dmdKind : undefined;
+    wizard.dmdKind = known && { kind: known, screen };
+    wizard.placedDmd = undefined;
+  }
   wizard.assignments[role] = display;
   wizard.unassigned.delete(role);
   // Sa place enregistrée sur ce même écran, sinon l'écran entier.
@@ -3258,7 +3286,29 @@ function afterFreePlacement(outcome: ArrangeOutcome): void {
   }
   // « Aucun écran » choisi dans l'éditeur : le rôle n'a pas d'écran.
   if (wizard.assignments[free.role] === undefined) wizard.unassigned.add(free.role);
+  else if (free.role === 'dmd' && askDmdKind()) return;
   nextRole();
+}
+
+/**
+ * DMD placé librement dans une part d'écran sans que son type soit connu : au lieu de le
+ * déduire de la forme dessinée (1280 × 480 DMD, 1280 × 481 FullDMD : issue n° 3), l'assistant
+ * repose la question du DMD avec deux réponses pour cette place, « FullDMD » et « DMD seul »
+ * (placedOptions). Faux si le type est connu ou sans doute possible.
+ */
+function askDmdKind(): boolean {
+  const display = wizard.assignments.dmd;
+  const zone = wizard.zones.dmd;
+  if (display === undefined || !zone || isFullZone(zone)) return false;
+  const roles = { dmd: fingerprintOf(displays[display]!).key, ...(wizard.assignments.playfield !== undefined && { playfield: fingerprintOf(displays[wizard.assignments.playfield]!).key }) };
+  const cabinet: Cabinet = { version: 1, screens: displays.map(toPhysicalScreen), roles, zones: { dmd: zone }, vpx: { iniPath: '' }, updatedAt: '' };
+  if (dmdKindChoices(cabinet).length < 2) return false;
+  if (wizard.dmdKind?.screen === roles.dmd) return false;
+  wizard.placedDmd = { display, zone };
+  delete wizard.assignments.dmd;
+  delete wizard.zones.dmd;
+  wizard.option = 0;
+  return true;
 }
 
 /** Ce que la synchronisation dira de la disposition en cours (chevauchements, incrustation couchée…). */
