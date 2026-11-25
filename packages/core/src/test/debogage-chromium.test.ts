@@ -63,6 +63,17 @@ const pageHas = async (win, text) => {
 app.whenReady().then(async () => {
   try {
     const core = require(path.join(repo, 'packages', 'core', 'dist', 'index.js'));
+    // Offscreen windows never claim real desktop priority: keepOffscreen disables later
+    // setAlwaysOnTop calls, and Windows can report false for a never-shown HWND. Record the
+    // requested constructor policy while retaining the real offscreen window and renderer.
+    const offscreen = require(path.join(repo, 'app', 'dist', 'offscreen.js'));
+    const createWindow = offscreen.createWindow;
+    const requestedOptions = new WeakMap();
+    offscreen.createWindow = (options) => {
+      const created = createWindow(options);
+      requestedOptions.set(created, options);
+      return created;
+    };
     const { createDebug } = require(path.join(repo, 'app', 'dist', 'debogage.js'));
     core.setLanguage('fr');
     // Une borne simulée : playfield couché (1080 × 1920), backglass, DMD.
@@ -107,6 +118,7 @@ app.whenReady().then(async () => {
       facts.allume.bounds = b;
       facts.allume.focusable = win.isFocusable();
       facts.allume.onTop = win.isAlwaysOnTop();
+      facts.allume.requestedOnTop = requestedOptions.get(win)?.alwaysOnTop;
       facts.allume.title = win.getTitle();
       await wait(800);
       facts.page = await win.webContents.executeJavaScript('(' + (() => {
@@ -206,7 +218,7 @@ test('mode débogage dans un vrai Electron : éteint = rien, allumé = fenêtre 
     assert.ok(b.x >= 1100 && b.y >= 0 && b.x + b.width <= 1100 + 1920 && b.y + b.height <= 1080, `dans l’écran du backglass : ${JSON.stringify(b)}`);
     assert.ok(b.x + b.width >= 1100 + 1920 - 30, 'collée au bord droit (à sa marge près)');
     assert.equal(facts.allume.focusable, false, 'jamais le focus : VPX garde la main');
-    assert.equal(facts.allume.onTop, true, 'au-dessus de VPX');
+    assert.equal(facts.allume.requestedOnTop, true, 'overlay requests priority above VPX; hidden HWND state is not a desktop stacking test');
 
     // La page : dessinée, rien de coupé, aucun style en ligne (la politique de sécurité les refuserait), rien sous 20 px.
     const page = facts.page;
