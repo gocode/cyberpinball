@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { decodePng } from '../png';
 import { FALLBACK_RENDERER, pauseVrSettings, PAUSE_RENDERER, tableUsesPupCapture, vrNeedsVpxBackglass, WATCH_RENDERER } from '../vr-profil';
+import { nativeBench } from './banc-natif';
 import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -93,11 +94,11 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
 });
 
 test('plugin : banc de la pause (pause de VPX constatée, joystick, valider, appui tenu 1,5 s, jamais avalés), s’il est construit', (t) => {
-  const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-pause.exe');
-  if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
+  const banc = nativeBench('banc-pause.exe');
+  if ('skip' in banc) return t.skip(banc.skip);
   // Le PNG des captures, écrit par le banc, relu par le décodeur de Cyber Pinball : 3 × 2, couleurs exactes.
   const png = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'banc-pause-')), 'banc.png');
-  const run = spawnSync(banc, [png], { encoding: 'utf8', windowsHide: true });
+  const run = spawnSync(banc.exe, [png], { encoding: 'utf8', windowsHide: true });
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /tout va bien/);
   const image = decodePng(fs.readFileSync(png))!;

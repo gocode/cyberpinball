@@ -339,22 +339,28 @@ private:
          LARGE_INTEGER t;
          QueryPerformanceCounter(&t);
          if ((t.QuadPart - derniere) * 1000 < static_cast<int64_t>(SEUIL_MS) * m_frequence)
+         {
+            // Les fils à relever se cherchent ici, entre les arrêts, au plus une fois par seconde : la recherche fait
+            // un instantané de tous les fils de la machine, qui prend des centaines de ms quand elle est chargée.
+            // Faite au début d'un arrêt, elle en mangeait le relevé (banc du 25/11/2026 : à-coup de 300 ms sans un
+            // seul relevé). Le fil du rendu naît après la première image : cherché tant qu'il n'est pas trouvé.
+            if ((m_nomRendu && !m_rendu) || (m_tous && m_autres))
+            {
+               if (t.QuadPart - m_renduCherche > m_frequence)
+               {
+                  m_renduCherche = t.QuadPart;
+                  if (m_nomRendu && !m_rendu)
+                     m_rendu = ouvrirFilNomme(m_nomRendu);
+                  if (m_tous && m_autres)
+                     ouvrirAutres();
+               }
+            }
             continue;
+         }
          if (m_parArret.first == derniere && m_parArret.second >= MAX_PAR_ARRET)
             continue;
          if (m_parArret.first != derniere)
-         {
             m_parArret = { derniere, 0 };
-            // Le fil du rendu, cherché par son nom au premier arrêt (il naît après la première image), puis à chaque
-            // nouvel arrêt tant qu'il n'est pas trouvé, au plus une fois par seconde.
-            if (m_nomRendu && !m_rendu && (t.QuadPart - m_renduCherche) > m_frequence)
-            {
-               m_renduCherche = t.QuadPart;
-               m_rendu = ouvrirFilNomme(m_nomRendu);
-            }
-            if (m_tous && m_autres)
-               ouvrirAutres();
-         }
          m_parArret.second++;
          releve(derniere, m_fil, m_comptes);
          if (m_rendu)
@@ -381,7 +387,7 @@ private:
       m_nAutres = 0;
    }
 
-   /** Tous les fils du processus sauf la veille, la boucle de jeu et le rendu, avec leur nom ; refait à chaque arrêt. */
+   /** Tous les fils du processus sauf la veille, la boucle de jeu et le rendu, avec leur nom ; refait chaque seconde entre les arrêts. */
    void ouvrirAutres()
    {
       fermerAutres();
@@ -598,7 +604,7 @@ private:
    HANDLE m_fil = nullptr;
    HANDLE m_rendu = nullptr; // fil de veille seul (et arreter, une fois la veille finie)
    const wchar_t* m_nomRendu = nullptr;
-   int64_t m_renduCherche = 0; // fil de veille seul : dernière recherche du fil du rendu
+   int64_t m_renduCherche = 0; // fil de veille seul : dernière recherche des fils à relever (rendu, autres)
    Comptes m_comptesRendu; // sous m_verrou
    bool m_tous = false;
    std::unique_ptr<AutreFil[]> m_autres; // poignées : fil de veille (et arreter) ; comptes : sous m_verrou

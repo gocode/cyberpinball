@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { nativeBench } from './banc-natif';
 import { cadenceJournal, cadenceVerdict, parseVpxCadence, readVpxCadence, readVpxTargetFps, stallPlace, stallPlaceJournal, vpxMemoryGrowth } from '../vpxcadence';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -103,6 +104,12 @@ test('à-coups : chacun dit où était le fil des images (relevé pendant l’at
   assert.ok(suspended.length > 0);
   const calls = [...suspended.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
   for (const call of calls) assert.ok(['SuspendThread', 'GetThreadContext', 'static_cast', 'reinterpret_cast', 'VirtualQuery', 'sizeof', 'min', 'memcpy', 'if', 'defined'].includes(call!), `appel pendant la suspension : ${call}`);
+  // Les fils à relever se cherchent entre les arrêts, jamais pendant : l'instantané des fils de la machine prend des
+  // centaines de ms quand elle est chargée et mangeait tout le relevé d'un à-coup (banc du 25/11/2026).
+  const veiller = h.slice(h.indexOf('void veiller()'), h.indexOf('timeEndPeriodSur();', h.indexOf('void veiller()')));
+  const pendant = veiller.slice(veiller.indexOf('MAX_PAR_ARRET'));
+  assert.ok(veiller.includes('ouvrirFilNomme(') && veiller.includes('ouvrirAutres()') && pendant.length > 0);
+  assert.doesNotMatch(pendant, /ouvrirFilNomme\(|ouvrirAutres\(|CreateToolhelp32Snapshot/, 'recherche des fils pendant un arrêt');
   assert.match(read('packages', 'vpx-vision3d', 'CMakeLists.txt'), /add_executable\(banc-arrets test\/banc-arrets\.cpp\)/);
 });
 
@@ -150,17 +157,17 @@ test('à-coups : la boucle de jeu qui attend le rendu (rapport du 21/11/2026), e
 });
 
 test('à-coups : banc du relevé (comptes par module, vrai fil suspendu), s’il est construit', (t) => {
-  const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-arrets.exe');
-  if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
-  const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });
+  const banc = nativeBench('banc-arrets.exe');
+  if ('skip' in banc) return t.skip(banc.skip);
+  const run = spawnSync(banc.exe, [], { encoding: 'utf8', windowsHide: true });
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /tout va bien/);
 });
 
 test('cadence : banc de la logique (histogramme, centiles, à-coups, pire fenêtre), s’il est construit', (t) => {
-  const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-cadence.exe');
-  if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
-  const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });
+  const banc = nativeBench('banc-cadence.exe');
+  if ('skip' in banc) return t.skip(banc.skip);
+  const run = spawnSync(banc.exe, [], { encoding: 'utf8', windowsHide: true });
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /tout va bien/);
 });

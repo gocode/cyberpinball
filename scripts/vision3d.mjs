@@ -18,6 +18,7 @@ export const VISION3D_SOURCE = path.join(repo, 'packages', 'vpx-vision3d');
 const build = path.join(repo, 'build', 'vision3d');
 export const VISION3D_DLL = path.join(build, 'Release', 'plugin-vision3d64.dll');
 export const VISION3D_BANC = path.join(build, 'Release', 'banc-vision3d.exe');
+export const VISION3D_BUILT = path.join(build, 'Release', 'construit.txt');
 /**
  * Dossier de chaque jeu de DLL des plugins, par API de plugins de VPX (app/src/vpx-plugins.ts, vpxPluginSetDir) :
  * 10.8.1 dans Release, les autres dans Release\vpx-<version>. Mêmes noms de fichiers partout.
@@ -47,6 +48,9 @@ export function buildVision3d({ quiet = false } = {}) {
     if (quiet) console.log(compile.stdout, compile.stderr);
     return undefined;
   }
+  // Témoin d'une construction réussie : tout ce qui est dans Release répond aux sources de cet instant, même un banc
+  // que MSBuild n'a pas refait (à jour). Les essais écartent un banc plus ancien que ses sources (test/banc-natif.ts).
+  fs.writeFileSync(VISION3D_BUILT, `${new Date().toISOString()}\n`);
   return VISION3D_DLL;
 }
 

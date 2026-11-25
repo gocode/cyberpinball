@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { nativeBench } from './banc-natif';
 import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -63,9 +64,9 @@ test('schéma de VPX : chaque source de packages/vpx-vision3d appartient à un s
 });
 
 test('plugin du DMD : banc du suivi (diffusion tout de suite, au plus tous les 0,1 s, confirmée à 0,3 s), s’il est construit', (t) => {
-  const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-suivi-dmd.exe');
-  if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
-  const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });
+  const banc = nativeBench('banc-suivi-dmd.exe');
+  if ('skip' in banc) return t.skip(banc.skip);
+  const run = spawnSync(banc.exe, [], { encoding: 'utf8', windowsHide: true });
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /tout va bien/);
 });
