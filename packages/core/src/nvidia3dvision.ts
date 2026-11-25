@@ -68,17 +68,47 @@ export interface Nvidia3dVisionFacts {
   nvapi: boolean;
   /** Version du pilote, en centièmes (45206). */
   driver?: number;
-  /** La 3D stéréoscopique est activée dans le pilote (NvAPI_Stereo_IsEnabled). */
+  /**
+   * La 3D stéréoscopique globale est activée dans le pilote (NvAPI_Stereo_IsEnabled). Coupée n'est pas
+   * un manque : Cyber Pinball l'active avant chaque partie en relief et la coupe après (une partie à
+   * plat, stéréo active, perd des éléments de la table). Absente : pilote 3D qui ne répond pas.
+   */
   stereo?: boolean;
+  /**
+   * Cyber Pinball a demandé la stéréo pour la dernière partie en relief, et elle est restée coupée :
+   * 3D Fix Manager ouvert, son bouton « Enable 3D » sur Off, la remet aussitôt à son état (essais sur
+   * la borne, 24 et 25/11/2026).
+   */
+  stereoRefused?: boolean;
   /** L'émetteur USB est branché ; absent : USB illisible. */
   emitter?: boolean;
   /** Le playfield est l'écran principal de Windows. */
   playfieldPrimary?: boolean;
+  /** Le mode de l'écran principal (pixels physiques, fréquence en Hz) ; absent : pas relevé. */
+  primaryMode?: { width: number; height: number; hz: number };
   /** Le VPX en place est celui que Cyber Pinball corrige (10.8.1-5436) ; false : une autre version, sans le mode direct. */
   vpxSupported?: boolean;
 }
 
-export type Nvidia3dVisionIssueId = 'not-windows' | 'no-nvidia' | 'driver-too-new' | 'stereo-disabled' | 'no-emitter' | 'playfield-not-primary' | 'vpx-unsupported';
+export type Nvidia3dVisionIssueId = 'not-windows' | 'no-nvidia' | 'driver-too-new' | 'stereo-disabled' | 'no-emitter' | 'playfield-not-primary' | 'mode-unsupported' | 'vpx-unsupported';
+
+/**
+ * L'émetteur ne synchronise les lunettes que sur un mode décrit dans sa table (registre de NvStUSB,
+ * que NvTimingsEd complète) : la fréquence pixel y tient sur 16 bits, en 10 kHz, soit 655,35 MHz au
+ * plus (NvTimingsEd plafonne à 650). Les lunettes alternent aussi à 100 Hz au moins (50 images par œil).
+ * Relevé sur la borne, 25/11/2026 : iiyama PL4380UH en 3840x2160 à 119,91 Hz, 1 075 MHz, hors table ;
+ * les plus grands modes connus du pilote sont en 2560x1440 à 120 Hz.
+ */
+export const NVIDIA_3DVISION_MAX_PIXEL_MHZ = 655.35;
+export const NVIDIA_3DVISION_MIN_HZ = 99;
+/** Les blancs d'un mode réduit (CVT-RB) : environ 5 % de pixels en plus de la partie visible. */
+const BLANKING = 1.05;
+
+/** Le mode de l'écran ne peut pas être synchronisé par l'émetteur (trop de pixels, ou trop lent). */
+export function nvidia3dVisionModeUnsupported(mode: { width: number; height: number; hz: number }): 'pixels' | 'hz' | undefined {
+  if (mode.hz < NVIDIA_3DVISION_MIN_HZ) return 'hz';
+  return (mode.width * mode.height * mode.hz * BLANKING) / 1e6 > NVIDIA_3DVISION_MAX_PIXEL_MHZ ? 'pixels' : undefined;
+}
 
 /** Un manque : ce qui ne va pas, et la marche à suivre. */
 export interface Nvidia3dVisionIssue {
@@ -111,14 +141,23 @@ export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = 
         t('Redémarre le PC'),
       ],
     });
-  else if (f.stereo === false || f.stereo === undefined)
+  else if (f.stereo === undefined)
     issues.push({
       id: 'stereo-disabled',
-      title: f.stereo === false ? t('La 3D stéréoscopique est désactivée dans le pilote NVIDIA') : t('Le pilote 3D de NVIDIA ne répond pas'),
+      title: t('Le pilote 3D de NVIDIA ne répond pas'),
       steps: [
-        t('Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : coche « Activer la 3D stéréoscopique »'),
-        t('Lance l’assistant de configuration une fois, lunettes allumées'),
-        t('Si cette page manque : dans 3D Fix Manager, « Install 3D Driver », puis « Enable Driver Hack »'),
+        t('Dans 3D Fix Manager : « Install 3D Driver », puis « Enable Driver Hack »'),
+        t('Redémarre le PC'),
+        t('Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : lance l’assistant de configuration une fois, lunettes allumées'),
+      ],
+    });
+  else if (f.stereo === false && f.stereoRefused)
+    issues.push({
+      id: 'stereo-disabled',
+      title: t('Cyber Pinball n’a pas pu activer la 3D stéréoscopique'),
+      steps: [
+        t('3D Fix Manager ouvert garde la 3D dans l’état de son bouton « Enable 3D » : ferme-le, Cyber Pinball active la 3D pour chaque partie en relief et la coupe après'),
+        t('Sinon, Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : vérifie que la page s’ouvre et que l’assistant de configuration passe, lunettes allumées'),
       ],
     });
   if (f.emitter === false)
@@ -133,6 +172,21 @@ export function nvidia3dVisionIssues(f: Nvidia3dVisionFacts, platform: string = 
       title: t('Le playfield n’est pas l’écran principal de Windows'),
       steps: [t('Le pilote NVIDIA ne montre la 3D que sur l’écran principal'), t('Paramètres de Windows, Système, Affichage : choisis l’écran du playfield et coche « En faire mon écran principal »'), t('Puis Configuration de la borne, pour que Cyber Pinball retrouve ses écrans')],
     });
+  const tooMuch = f.playfieldPrimary !== false && f.primaryMode ? nvidia3dVisionModeUnsupported(f.primaryMode) : undefined;
+  if (tooMuch && f.primaryMode) {
+    const mode = { width: f.primaryMode.width, height: f.primaryMode.height, hz: Math.round(f.primaryMode.hz) };
+    issues.push({
+      id: 'mode-unsupported',
+      title:
+        tooMuch === 'hz'
+          ? t('Playfield en {width}x{height} à {hz} Hz : les lunettes 3D Vision demandent 100 Hz au moins', mode)
+          : t('Playfield en {width}x{height} à {hz} Hz : trop de pixels pour l’émetteur 3D Vision', mode),
+      steps: [
+        t('L’émetteur ne synchronise les lunettes que jusqu’à 2560x1440 à 120 Hz environ, et à 100 Hz au moins'),
+        t('Pour jouer avec ces lunettes, il faut un mode de playfield dans ces limites ; sinon, prends les lunettes à filtres colorés, qui marchent à toute définition'),
+      ],
+    });
+  }
   if (f.vpxSupported === false)
     issues.push({
       id: 'vpx-unsupported',
@@ -164,7 +218,7 @@ export function nvidia3dVisionReadyText(f: Nvidia3dVisionFacts): { complete: boo
     return {
       complete: true,
       text: t('NVIDIA 3D Vision prête'),
-      detail: t('Pilote {version}, stéréo activée, émetteur branché, playfield en écran principal', { version: nvidiaDriverLabel(f.driver!) }),
+      detail: t('Pilote {version}, émetteur branché, playfield en écran principal ; la 3D stéréoscopique est activée pour chaque partie en relief, et coupée après', { version: nvidiaDriverLabel(f.driver!) }),
     };
   return {
     complete: false,

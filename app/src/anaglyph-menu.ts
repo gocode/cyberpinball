@@ -38,6 +38,7 @@ import {
 import type { Input } from 'electron';
 import { markVpxLog, prepareAnaglyphGame, readAnaglyph, readNvidiaOutcome, readVpxLogSince, restoreAnaglyphGame, writeAnaglyph, writeNvidiaOutcome, type AnaglyphGame, type VpxLogMark } from './anaglyph';
 import type { createLibrary, Row } from './library';
+import type { StereoChange } from './nvidia-3dvision';
 
 /** Ce que le front-end prête aux Lunettes 3D. */
 export interface AnaglyphMenuContext {
@@ -55,6 +56,10 @@ export interface AnaglyphMenuContext {
    * relit le pilote ; `inis` : les réglages que la partie lira (fichier de la table d'abord).
    */
   nvidia(fresh?: boolean, inis?: string[]): Nvidia3dVisionFacts;
+  /** Relit le pilote NVIDIA sans bloquer (avant une partie) ; `nvidia()` rend ensuite ce relevé. */
+  refreshNvidia(): Promise<void>;
+  /** Met la 3D stéréoscopique globale du pilote dans l'état voulu, puis la relit (nvidia-3dvision.ts, stereoFor). */
+  stereo(wanted: boolean): Promise<StereoChange>;
   /** Le journal de VPX de la version jouée (vpinball.log), pour le bilan d'une partie en 3D Vision. */
   vpxLog(): string | undefined;
 }
@@ -229,7 +234,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     return {
       heading: SYSTEM_ITEMS.anaglyph.label,
       icon: SYSTEM_ITEMS.anaglyph.icon,
-      lead: t('Lunettes actives NVIDIA 3D Vision (bêta) : chaque œil voit la table à la pleine définition. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec la 3D activée, l’émetteur, et le playfield en écran principal. Le fronton et le DMD restent à plat.'),
+      lead: t('Lunettes actives NVIDIA 3D Vision (bêta) : chaque œil voit la table à la pleine définition. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec son pilote 3D, l’émetteur, et le playfield en écran principal. Cyber Pinball active la 3D du pilote pour chaque partie en relief et la coupe après. Le fronton et le DMD restent à plat.'),
       sections: [{ rows }],
       actions: [
         {
@@ -332,13 +337,26 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
    * Partie en relief : la copie du fichier de la table à passer par -TableIni, ou undefined
    * (désactivées). `gameIni` : le VPinballX.ini que VPX recevra. Jamais pour une partie dans le casque.
    */
-  function prepareGame(tableFile: string, gameIni: string): AnaglyphGame | undefined {
+  async function prepareGame(tableFile: string, gameIni: string): Promise<AnaglyphGame | undefined> {
     setting = readAnaglyph(dataDir);
     if (setting.mode !== 'on') return undefined;
     if (setting.kind === 'nvidia') {
       // Un manque que le front-end voit : VPX montrerait les deux vues côte à côte, la partie se joue à plat.
       // Vérifié sur les réglages que cette partie lira : le fichier de la table, puis son VPinballX.ini.
-      const facts = ctx.nvidia(true, [findTableIni(tableFile).path, gameIni]);
+      const inis = [findTableIni(tableFile).path, gameIni];
+      await ctx.refreshNvidia();
+      let facts = ctx.nvidia(false, inis);
+      // Rien d'autre ne manque et la stéréo globale est coupée (au démarrage du PC, ou par Cyber Pinball après
+      // la partie précédente) : activée pour cette partie, coupée après (restoreGame).
+      if (facts.nvapi && facts.stereo === false && !nvidia3dVisionIssues(facts).length) {
+        const change = await ctx.stereo(true);
+        console.log(
+          change.after
+            ? 'Lunettes 3D : 3D stéréoscopique du pilote activée par Cyber Pinball pour la partie.' // i18n-ignore : journal
+            : `Lunettes 3D : 3D stéréoscopique demandée au pilote (code ${change.change ?? '?'}), restée coupée : 3D Fix Manager ouvert, « Enable 3D » sur Off ?`, // i18n-ignore : journal
+        );
+        facts = ctx.nvidia(false, inis);
+      }
       const issues = nvidia3dVisionIssues(facts);
       if (issues.length) {
         console.log(`Lunettes 3D : NVIDIA 3D Vision choisie, mais ${issues.map((i) => i.id).join(', ')} ; partie à plat.`); // i18n-ignore : journal
@@ -363,9 +381,37 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     }
   }
 
+  /** La partie se joue en relief avec les lunettes NVIDIA (la stéréo globale du pilote lui sert). */
+  function nvidiaGame(game: AnaglyphGame | undefined): boolean {
+    return Boolean(game?.settings.some((s) => s.key === 'Stereo3DNvidiaDirect'));
+  }
+
+  /**
+   * Toute partie qui ne se joue pas en relief NVIDIA : la 3D stéréoscopique globale du pilote coupée avant
+   * que VPX ne crée son affichage. Active, le pilote passe la partie en 3D automatique et des éléments
+   * des tables disparaissent (essai sur la borne, 24/11/2026). Rien sans pilote 3D.
+   */
+  async function flatGame(): Promise<void> {
+    await stereoOff('avant une partie à plat'); // i18n-ignore : journal
+  }
+
+  async function stereoOff(when: string): Promise<void> {
+    const change = await ctx.stereo(false);
+    if (change.change === undefined) return;
+    console.log(
+      change.after === false
+        ? `Lunettes 3D : 3D stéréoscopique du pilote coupée ${when}.` // i18n-ignore : journal
+        : `Lunettes 3D : 3D stéréoscopique du pilote coupée ${when} (code ${change.change}), mais toujours active : 3D Fix Manager ouvert, « Enable 3D » sur On ? Une partie à plat perd des éléments de la table.`, // i18n-ignore : journal
+    );
+  }
+
   /** Après une partie en relief : les réglages de la table enregistrés en jeu reviennent dans son fichier. */
   function restoreGame(game: AnaglyphGame): void {
-    if (game.settings.some((s) => s.key === 'Stereo3DNvidiaDirect')) noteNvidiaOutcome();
+    if (nvidiaGame(game)) {
+      noteNvidiaOutcome();
+      // La stéréo globale ne reste jamais active hors d'une partie en relief.
+      void stereoOff('après la partie en relief'); // i18n-ignore : journal
+    }
     try {
       const n = restoreAnaglyphGame(game);
       if (n) console.log(`Lunettes 3D : ${n} réglage(s) de la table changé(s) pendant la partie, reporté(s) dans ${path.basename(game.original)}.`); // i18n-ignore : journal
@@ -400,5 +446,7 @@ export function createAnaglyphMenu(ctx: AnaglyphMenuContext) {
     wheelRelief: () => anaglyphWheelRelief(setting),
     prepareGame,
     restoreGame,
+    nvidiaGame,
+    flatGame,
   };
 }

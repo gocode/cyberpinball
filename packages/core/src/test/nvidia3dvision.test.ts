@@ -12,6 +12,7 @@ import { anaglyphGameSettings, anaglyphWheelRelief, DEFAULT_ANAGLYPH, isAnaglyph
 import {
   isNvidia3dVisionEmitter,
   NVIDIA_3DVISION_LAST_DRIVER,
+  nvidia3dVisionModeUnsupported,
   NVIDIA_STEREO_MODE,
   nvidia3dVisionGameSettings,
   nvidia3dVisionIssues,
@@ -50,14 +51,54 @@ test('un pilote après le 452.06 : à remplacer, sans constat sur la stéréo qu
   assert.deepEqual(ids({ ...READY, driver: 42531 }), [], 'un pilote plus ancien convient');
 });
 
-test('stéréo désactivée ou muette, émetteur, écran principal, version de VPX : chacun son constat et sa marche à suivre', () => {
-  assert.deepEqual(ids({ ...READY, stereo: false }), ['stereo-disabled']);
+// Essais sur la borne, 24 et 25/11/2026 : Cyber Pinball active lui-même la stéréo globale avant une partie
+// en relief et la coupe après (active pendant une partie à plat, des éléments des tables disparaissent).
+// Coupée n'est donc pas un manque ; seulement son pilote muet, ou une activation restée sans effet
+// (3D Fix Manager ouvert, son bouton « Enable 3D » sur Off), avec la marche à suivre qui le dit.
+test('stéréo coupée : pas un manque, Cyber Pinball l’active ; muette ou refusée : un constat', () => {
+  assert.deepEqual(ids({ ...READY, stereo: false }), []);
   assert.deepEqual(ids({ ...READY, stereo: undefined }), ['stereo-disabled']);
+  const [refused] = nvidia3dVisionIssues({ ...READY, stereo: false, stereoRefused: true }, 'win32');
+  assert.equal(refused?.id, 'stereo-disabled');
+  assert.ok(refused.steps.some((s) => s.includes('3D Fix Manager') && s.includes('Enable 3D')));
+  assert.deepEqual(ids({ ...READY, stereo: true, stereoRefused: true }), [], 'activée malgré tout : rien à dire');
+  assert.match(nvidia3dVisionReadyText({ ...READY, stereo: false }).detail, /activée pour chaque partie en relief/);
+});
+
+// NVAPI garde dans un même processus l'état de la stéréo lu la première fois : Cyber Pinball le lisait
+// « coupé » pendant qu'une sonde neuve le lisait « activé ». Le front-end ne charge jamais nvapi64.dll
+// lui-même : la sonde, un processus neuf à chaque lecture, fabriquée à part.
+test('le pilote NVIDIA se lit par un processus neuf, jamais dans le front-end', () => {
+  const app = path.join(REPO_ROOT, 'app', 'src');
+  const front = fs.readFileSync(path.join(app, 'nvidia-3dvision.ts'), 'utf8');
+  assert.doesNotMatch(front, /from 'koffi'|require\('koffi'\)/);
+  assert.match(front, /path\.join\(__dirname, 'sonde-nvidia-3dvision\.js'\)/);
+  const sonde = fs.readFileSync(path.join(app, 'sonde-nvidia-3dvision.ts'), 'utf8');
+  for (const id of ['0x239c4545', '0x2ec50c2b', '0x348ff8e1']) assert.ok(sonde.includes(id), id);
+});
+
+// La borne, 25/11/2026 : playfield iiyama PL4380UH en 3840x2160 à 119,91 Hz (1 075 MHz), que la table de
+// l'émetteur ne peut pas décrire (fréquence pixel sur 16 bits, 655,35 MHz au plus) : pas de 3D, même au
+// test de NVIDIA. Le dire, au lieu de laisser croire que tout est prêt.
+test('un mode de playfield hors de la table de l’émetteur est dit', () => {
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 119.91 }), 'pixels');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 99.9 }), 'pixels');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 3840, height: 2160, hz: 60 }), 'hz');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 2560, height: 1440, hz: 120 }), undefined, 'le plus grand mode connu du pilote');
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 1920, height: 1080, hz: 119.98 }), undefined);
+  assert.equal(nvidia3dVisionModeUnsupported({ width: 1920, height: 1080, hz: 99.93 }), undefined);
+  const [issue] = nvidia3dVisionIssues({ ...READY, primaryMode: { width: 3840, height: 2160, hz: 119.91 } }, 'win32');
+  assert.equal(issue?.id, 'mode-unsupported');
+  assert.match(issue.title, /3840x2160 à 120 Hz/);
+  assert.deepEqual(ids({ ...READY, playfieldPrimary: false, primaryMode: { width: 3840, height: 2160, hz: 60 } }), ['playfield-not-primary'], 'l’écran principal n’est pas le playfield : son mode ne dit rien');
+});
+
+test('émetteur, écran principal, version de VPX : chacun son constat et sa marche à suivre', () => {
   assert.deepEqual(ids({ ...READY, emitter: false }), ['no-emitter']);
   assert.deepEqual(ids({ ...READY, playfieldPrimary: false }), ['playfield-not-primary']);
   assert.deepEqual(ids({ ...READY, vpxSupported: false }), ['vpx-unsupported']);
   assert.deepEqual(ids({ ...READY, emitter: undefined, playfieldPrimary: undefined, vpxSupported: undefined }), [], 'ce qui n’a pas pu être lu ne bloque pas');
-  const all = nvidia3dVisionIssues({ nvapi: true, driver: 45206, stereo: false, emitter: false, playfieldPrimary: false, vpxSupported: false }, 'win32');
+  const all = nvidia3dVisionIssues({ nvapi: true, driver: 45206, stereo: false, stereoRefused: true, emitter: false, playfieldPrimary: false, vpxSupported: false }, 'win32');
   assert.deepEqual(
     all.map((i) => i.id),
     ['stereo-disabled', 'no-emitter', 'playfield-not-primary', 'vpx-unsupported'],

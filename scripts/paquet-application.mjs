@@ -19,11 +19,11 @@ export const VITAL_FILES = ['package.json', 'dist/main.js', 'dist/preload.js', '
  * Scripts de app/dist regroupés chacun dans son propre fichier (fabriquer.mjs) : ceux qu'un
  * processus charge par leur nom, path.join(__dirname, '<nom>.js'), à côté de main.js. Les préchargés
  * des fenêtres, la mise à jour légère, le veilleur de la relance par Start, l'enregistreur de la
- * musique des ROM, le runtime Visual C++, la sonde du PIN2DMD, le serveur des morceaux du Juke-box.
- * Le 19/11/2026, ce dernier manquait à la liste : il plantait dans l'application installée, et le
+ * musique des ROM, le runtime Visual C++, la sonde du PIN2DMD, le serveur des morceaux du Juke-box,
+ * la sonde du pilote NVIDIA (lunettes 3D Vision). Le 19/11/2026, ce dernier manquait à la liste : il plantait dans l'application installée, et le
  * Juke-box retombait sur la lecture qui coupe (scripts/paquet-application.test.mjs le garde).
  */
-export const SEPARATE_SCRIPTS = ['maj-legere.js', 'veilleur.js', 'enregistreur-rom.js', 'runtime-vc.js', 'sonde-pin2dmd.js', 'jukebox-media-worker.js'];
+export const SEPARATE_SCRIPTS = ['maj-legere.js', 'veilleur.js', 'enregistreur-rom.js', 'runtime-vc.js', 'sonde-pin2dmd.js', 'jukebox-media-worker.js', 'sonde-nvidia-3dvision.js'];
 
 export function builtApart(name) {
   return /preload\.js$/.test(name) || SEPARATE_SCRIPTS.includes(name);

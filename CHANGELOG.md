@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Lunettes NVIDIA 3D Vision (bêta) : Cyber Pinball active lui-même la 3D stéréoscopique du pilote avant chaque partie en relief et la coupe après ; il n'est plus nécessaire de la cocher dans le Panneau NVIDIA.
+- Toute autre partie (à plat, dans le casque, avec un autre VPX) se lance la 3D du pilote coupée : active, elle faisait disparaître des éléments des tables.
+- L'état de la 3D est relu à neuf à chaque vérification : Cyber Pinball ne croit plus la 3D coupée quand elle a été activée après son démarrage.
+- Quand 3D Fix Manager, ouvert, empêche Cyber Pinball d'activer la 3D (bouton « Enable 3D »), l'écran Lunettes 3D le dit et explique quoi faire.
+- Un playfield dont le mode dépasse ce que l'émetteur 3D Vision sait synchroniser (environ 2560x1440 à 120 Hz, et 100 Hz au moins) est signalé, au lieu d'une 3D qui ne démarre jamais.
 - Lunettes actives NVIDIA 3D Vision (bêta) : dans Menu système > Ma borne > Réalité virtuelle et vision 3D > Lunettes 3D, le choix "Lunettes" passe des lunettes à filtres colorés aux lunettes actives. Chaque œil voit la table à la pleine définition, le fronton et le DMD restent à plat. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec la 3D activée, l'émetteur, et le playfield en écran principal.
 - L'écran vérifie chacun de ces points (pilote et version, 3D activée, émetteur branché, écran principal, version de VPX) et donne la marche à suivre pour ce qui manque ; la santé de la borne le signale aussi. Tant qu'il manque quelque chose, les parties se jouent à plat ; ce qui n'a pas pu être vérifié est signalé, et la partie tente la 3D quand même. Après chaque partie, l'écran dit si la 3D s'est bien activée.
 - VPX corrigé, série 7 : le mode direct de NVIDIA 3D Vision (Direct3D 11, plein écran exclusif sur le playfield, chaque œil présenté au pilote). En cas d'échec, la partie continue avec les deux vues côte à côte, et le journal de VPX dit pourquoi.

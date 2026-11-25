@@ -69,9 +69,11 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   // vidéo, dmd-video-shrink.ts), l'habillage FullDMD, pour une partie entre amis la règle du pare-feu de VPX, lue pendant
   // le chargement (inspector), l'arrêt du serveur du DMD quand VPX ouvre le DMD lui-même (dmd-server.ts, handDmdToVpx),
   // et, une fois pour toutes, la mise en route d'une ROM qui n'a pas encore de mémoire (rom-first-boot.ts).
+  // Puis la 3D stéréoscopique du pilote NVIDIA, activée pour une partie en relief, coupée pour toute autre
+  // (anaglyph-menu.ts) : avant que VPX ne crée son affichage, sinon le pilote ne la prend pas en compte.
   // Aucune ne dépend de lui.
   const awaits = [...play.slice(start, launch).matchAll(/await ([^;]+);/g)].map((m) => m[1]!.replace(/\s+/g, ' ').slice(0, 40));
-  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'shrinkTableDmdVideos(table)', 'romFirstBoot.beforeGame(table, { startin', 'prepareDressing(table, { root: loc.root,', 'inspectorReady', 'handDmdToVpx()']);
+  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'shrinkTableDmdVideos(table)', 'romFirstBoot.beforeGame(table, { startin', 'prepareDressing(table, { root: loc.root,', 'inspectorReady', 'handDmdToVpx()', 'anaglyphMenu.prepareGame(played.file, do', 'anaglyphMenu.flatGame()']);
   assert.ok(play.indexOf('const inspectorReady = ') < start, 'la lecture part avant le chargement, sans le retarder');
   assert.match(play, /const loadingMs = Number\(process\.env\.CYBERPINBALL_LOADING_MS \?\? 2500\);/, 'délai du chargement indépendant du cinéma');
   // Nulle part dans le menu on n'attend une animation (DMD, chorégraphie) : seule la partie s'attend.

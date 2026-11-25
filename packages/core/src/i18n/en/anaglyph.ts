@@ -65,13 +65,14 @@ export const messages: Record<string, string> = {
   Abandonner: 'Give up',
   // app/src/anaglyph-menu.ts : l'écran « Lunettes 3D », lunettes actives NVIDIA 3D Vision
   'NVIDIA 3D Vision prête': 'NVIDIA 3D Vision ready',
-  'Pilote {version}, stéréo activée, émetteur branché, playfield en écran principal': 'Driver {version}, stereo on, emitter plugged in, playfield on the main display',
+  'Pilote {version}, émetteur branché, playfield en écran principal ; la 3D stéréoscopique est activée pour chaque partie en relief, et coupée après':
+    'Driver {version}, emitter plugged in, playfield on the main display; stereoscopic 3D is turned on for each 3D game, and off afterwards',
   'Écran pas reconnu pour la 3D ?': 'Display not recognised for 3D?',
   'Le pilote ne montre la 3D que sur un écran qu’il connaît : CRU et NvTimingsEd lui font accepter le tien':
     'The driver only shows 3D on a display it knows: CRU and NvTimingsEd make it accept yours',
   'Tant qu’il manque quelque chose, les parties se jouent à plat': 'While something is missing, games are played flat',
-  'Lunettes actives NVIDIA 3D Vision (bêta) : chaque œil voit la table à la pleine définition. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec la 3D activée, l’émetteur, et le playfield en écran principal. Le fronton et le DMD restent à plat.':
-    'NVIDIA 3D Vision shutter glasses (beta): each eye sees the table at full resolution. You need a GeForce card, NVIDIA driver 452.06 or older with 3D turned on, the emitter, and the playfield as the main display. The backglass and the DMD stay flat.',
+  'Lunettes actives NVIDIA 3D Vision (bêta) : chaque œil voit la table à la pleine définition. Il faut une carte GeForce, le pilote NVIDIA 452.06 au plus avec son pilote 3D, l’émetteur, et le playfield en écran principal. Cyber Pinball active la 3D du pilote pour chaque partie en relief et la coupe après. Le fronton et le DMD restent à plat.':
+    'NVIDIA 3D Vision shutter glasses (beta): each eye sees the table at full resolution. You need a GeForce card, NVIDIA driver 452.06 or older with its 3D driver, the emitter, and the playfield as the main display. Cyber Pinball turns the driver’s 3D on for each 3D game and off afterwards. The backglass and the DMD stay flat.',
   'Vérifier à nouveau': 'Check again',
   'Relit le pilote NVIDIA, l’émetteur et les écrans': 'Reads the NVIDIA driver, the emitter and the displays again',
   // packages/core/src/health.ts : santé de la borne
@@ -87,12 +88,14 @@ export const messages: Record<string, string> = {
   'Installe le pilote NVIDIA 452.06 pour ta carte': 'Install NVIDIA driver 452.06 for your card',
   'Dans 3D Fix Manager : « Install 3D Driver », puis « Enable Driver Hack »': 'In 3D Fix Manager: "Install 3D Driver", then "Enable Driver Hack"',
   'Redémarre le PC': 'Restart the PC',
-  'La 3D stéréoscopique est désactivée dans le pilote NVIDIA': 'Stereoscopic 3D is turned off in the NVIDIA driver',
   'Le pilote 3D de NVIDIA ne répond pas': 'The NVIDIA 3D driver does not answer',
-  'Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : coche « Activer la 3D stéréoscopique »':
-    'NVIDIA Control Panel, "Set up stereoscopic 3D": tick "Enable stereoscopic 3D"',
-  'Lance l’assistant de configuration une fois, lunettes allumées': 'Run the setup wizard once, with the glasses on',
-  'Si cette page manque : dans 3D Fix Manager, « Install 3D Driver », puis « Enable Driver Hack »': 'If this page is missing: in 3D Fix Manager, "Install 3D Driver", then "Enable Driver Hack"',
+  'Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : lance l’assistant de configuration une fois, lunettes allumées':
+    'NVIDIA Control Panel, "Set up stereoscopic 3D": run the setup wizard once, with the glasses on',
+  'Cyber Pinball n’a pas pu activer la 3D stéréoscopique': 'Cyber Pinball could not turn stereoscopic 3D on',
+  '3D Fix Manager ouvert garde la 3D dans l’état de son bouton « Enable 3D » : ferme-le, Cyber Pinball active la 3D pour chaque partie en relief et la coupe après':
+    '3D Fix Manager, while open, keeps 3D in the state of its "Enable 3D" button: close it, Cyber Pinball turns 3D on for each 3D game and off afterwards',
+  'Sinon, Panneau de configuration NVIDIA, « Configurer la 3D stéréoscopique » : vérifie que la page s’ouvre et que l’assistant de configuration passe, lunettes allumées':
+    'Otherwise, NVIDIA Control Panel, "Set up stereoscopic 3D": check that the page opens and that the setup wizard completes, with the glasses on',
   'Émetteur 3D Vision introuvable': '3D Vision emitter not found',
   'Branche l’émetteur (la petite pyramide) sur un port USB du PC, sans hub si possible': 'Plug the emitter (the small pyramid) into a USB port of the PC, without a hub if you can',
   'Son voyant s’allume quand la 3D démarre ; sans voyant, réinstalle le pilote 3D avec 3D Fix Manager': 'Its light comes on when 3D starts; with no light, reinstall the 3D driver with 3D Fix Manager',
@@ -101,6 +104,12 @@ export const messages: Record<string, string> = {
   'Paramètres de Windows, Système, Affichage : choisis l’écran du playfield et coche « En faire mon écran principal »':
     'Windows Settings, System, Display: pick the playfield display and tick "Make this my main display"',
   'Puis Configuration de la borne, pour que Cyber Pinball retrouve ses écrans': 'Then Cabinet setup, so Cyber Pinball finds its displays again',
+  'Playfield en {width}x{height} à {hz} Hz : les lunettes 3D Vision demandent 100 Hz au moins': 'Playfield at {width}x{height}, {hz} Hz: 3D Vision glasses need 100 Hz or more',
+  'Playfield en {width}x{height} à {hz} Hz : trop de pixels pour l’émetteur 3D Vision': 'Playfield at {width}x{height}, {hz} Hz: too many pixels for the 3D Vision emitter',
+  'L’émetteur ne synchronise les lunettes que jusqu’à 2560x1440 à 120 Hz environ, et à 100 Hz au moins':
+    'The emitter only syncs the glasses up to about 2560x1440 at 120 Hz, and at 100 Hz or more',
+  'Pour jouer avec ces lunettes, il faut un mode de playfield dans ces limites ; sinon, prends les lunettes à filtres colorés, qui marchent à toute définition':
+    'To play with these glasses, the playfield needs a mode within these limits; otherwise, use colour filter glasses, which work at any resolution',
   'Le VPX en place n’a pas le mode 3D Vision': 'The installed VPX has no 3D Vision mode',
   'Le mode 3D Vision est dans le VPX 10.8.1-5436 que Cyber Pinball installe et corrige': 'The 3D Vision mode is in the VPX 10.8.1-5436 that Cyber Pinball installs and patches',
   'Choisis cette version dans les réglages de VPX': 'Pick this version in the VPX settings',

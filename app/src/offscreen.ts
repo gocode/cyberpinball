@@ -339,6 +339,11 @@ export function primaryWorkArea(): { width: number; height: number } {
   return screen.getPrimaryDisplay().workAreaSize;
 }
 
+/** L'écran principal réel du bureau ; undefined hors écran (écrans simulés). */
+export function desktopPrimaryDisplay(): Display | undefined {
+  return OFFSCREEN ? undefined : screen.getPrimaryDisplay();
+}
+
 /** Rectangle de l'écran principal, en coordonnées Electron. */
 export function primaryRect(): Rectangle {
   if (!OFFSCREEN) return screen.getPrimaryDisplay().bounds;

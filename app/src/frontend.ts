@@ -459,7 +459,7 @@ import { askElevation } from './uac-confirm';
 import { createVision3dMenu } from './vision3d-menu';
 import { createAnaglyphMenu } from './anaglyph-menu';
 import { readAnaglyph } from './anaglyph';
-import { nvidia3dVisionFacts } from './nvidia-3dvision';
+import { nvidia3dVisionFacts, refreshNvidiaDriver, stereoFor } from './nvidia-3dvision';
 import { createDebug } from './debogage';
 import { createDebugMenu } from './debogage-menu';
 import { noteGameCadence, vpxLogSize } from './game-cadence';
@@ -3995,6 +3995,8 @@ const anaglyphMenu = createAnaglyphMenu({
   vision3dOn: () => vision3dMenu.setting().mode === 'on',
   vrOn: () => vrFront.vrMode === 'auto',
   nvidia: (fresh, inis) => nvidia3dVision(fresh, inis),
+  refreshNvidia: () => refreshNvidiaDriver(),
+  stereo: (wanted) => stereoFor(wanted),
   vpxLog: () => {
     const install = vpxInstall(loc);
     return lastLaunchLogPath() ?? (install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined);
@@ -6170,7 +6172,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const roomEnv = vrGame && simulated === undefined ? vrFront.startGameRoom() : undefined;
   // Lunettes 3D (anaglyph-menu.ts) : la stéréo posée dans une copie du fichier de la table, passée par -TableIni ;
   // jamais dans le casque, ni pour régler l'affichage, ni avec un autre VPX.
-  const anaglyphGame = simulated === undefined && !displayMode && !otherVpx && !vrGame ? anaglyphMenu.prepareGame(played.file, double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)) : undefined;
+  const anaglyphGame = simulated === undefined && !displayMode && !otherVpx && !vrGame ? await anaglyphMenu.prepareGame(played.file, double?.ini ?? recordIni?.ini ?? activeVpxIni(loc)) : undefined;
+  // Toute autre partie (à plat, dans le casque, un autre VPX) : la 3D stéréoscopique globale du pilote NVIDIA coupée.
+  if (simulated === undefined && !anaglyphMenu.nvidiaGame(anaglyphGame)) await anaglyphMenu.flatGame();
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
   const game =

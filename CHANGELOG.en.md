@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- NVIDIA 3D Vision glasses (beta): Cyber Pinball turns the driver's stereoscopic 3D on itself before each 3D game and off afterwards; there is no need to tick it in the NVIDIA Control Panel anymore.
+- Every other game (flat, in the headset, with another VPX) starts with the driver's 3D turned off: when on, it made table elements disappear.
+- The 3D state is read afresh at each check: Cyber Pinball no longer thinks 3D is off when it was turned on after it started.
+- When 3D Fix Manager, while open, keeps Cyber Pinball from turning 3D on ("Enable 3D" button), the 3D glasses screen says so and explains what to do.
+- A playfield whose mode is beyond what the 3D Vision emitter can sync (about 2560x1440 at 120 Hz, and 100 Hz or more) is reported, instead of 3D that never starts.
 - NVIDIA 3D Vision shutter glasses (beta): in System menu > My cabinet > Virtual reality and 3D vision > 3D glasses, the "Glasses" choice switches from colour filter glasses to shutter glasses. Each eye sees the table at full resolution, the backglass and the DMD stay flat. You need a GeForce card, NVIDIA driver 452.06 or older with 3D turned on, the emitter, and the playfield as the main display.
 - The screen checks each of these points (driver and version, 3D turned on, emitter plugged in, main display, VPX version) and gives the steps for what is missing; the cabinet health shows it too. While something is missing, games are played flat; what could not be checked is shown, and the game tries 3D anyway. After each game, the screen says whether 3D turned on.
 - Patched VPX, series 7: NVIDIA 3D Vision direct mode (Direct3D 11, exclusive fullscreen on the playfield, each eye presented to the driver). If it fails, the game goes on with both views side by side, and the VPX log says why.
