@@ -74,7 +74,7 @@ function unresolved(root: string): string[] {
   for (const [file, playlistCol, fileCol] of [['triggers.pup', 5, 6], ['screens.pup', 2, 3]] as const) {
     const lines = fs.readFileSync(path.join(root, file), 'latin1').split(/\r?\n/).slice(1).filter(Boolean);
     for (const line of lines) {
-      const cols = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g)!.map((c) => c.replace(/,$/, '').replace(/^"|"$/g, ''));
+      const cols = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g)!.map((c) => c.replace(/,$/, '').replace(/"/g, ''));
       if (file === 'triggers.pup' && cols[1] !== '1') continue;
       if (file === 'screens.pup' && cols[5]?.toLowerCase() === 'off') continue;
       const want = cols[fileCol];
@@ -167,6 +167,70 @@ test('un nom que le script cite reste tel quel', () => {
   assert.ok(!fixes.renames.some((r) => r.from.endsWith('Stark.mp4')));
   assert.deepEqual(fixes.kept, [path.join('Choose your House', 'Stark.mp4')]);
   assert.ok(fixes.renames.some((r) => r.from.endsWith('Backglass.mp4')));
+});
+
+// Espaces autour d'un nom dans un .pup (Game of Thrones LE : « … .mp4 » suivi d'une espace dans
+// screens.pup) : PinUP Player les retire, le plugin PUP non (parse_csv_line ne retire que les
+// guillemets). Invariant : après la réparation d'avant-partie, aucune colonne que le plugin
+// compare telle quelle (playlist, fichier, mode de l'écran, nom du déclencheur, action) n'est
+// entourée d'espaces, dans aucun .pup du pack ; les .pup de l'option restent ceux de la racine.
+test('médecin : les espaces autour des noms dans les .pup sont retirés, comme PinUP Player', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pupfiles-'));
+  const folder = path.join(tablesDir, 'Espaces (Original 2026)');
+  // Le dossier du pack porte le nom de ROM du script (cGameName), comme celui que le plugin cherche.
+  const root = path.join(folder, 'pupvideos', 'gameofthrones');
+  for (const dir of ['Backglass', 'Callouts', OPTION]) fs.mkdirSync(path.join(root, dir), { recursive: true });
+  fs.writeFileSync(path.join(root, 'Backglass', 'Fond.mp4'), MP4);
+  fs.writeFileSync(path.join(root, 'Callouts', 'Bravo.mp4'), MP4);
+  const screens = ['ScreenNum,ScreenDes,PlayList,PlayFile,Loopit,Active,Priority,CustomPos', '2,Backglass,Backglass,"Fond.mp4" ,1 ,show ,,', ''].join('\r\n');
+  const triggers = [
+    'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile,Volume,Priority,Length,Counter,RestSeconds,Loop,Defaults',
+    '1,1,Bravo, D11,2,Callouts ,Bravo.mp4 ,,5,,,, Loop,0',
+    '2,1,Hasard,D12,2," Callouts","",,5,,,,,0',
+    '',
+  ].join('\r\n');
+  const playlists = 'ScreenNum,Folder,Des,AlphaSort,RestSeconds,Volume,Priority\r\n0,Backglass ,,0,0,100,0\r\n0,Callouts,,0,0,100,0\r\n';
+  for (const dir of ['', OPTION]) {
+    fs.writeFileSync(path.join(root, dir, 'screens.pup'), screens);
+    fs.writeFileSync(path.join(root, dir, 'triggers.pup'), triggers);
+    fs.writeFileSync(path.join(root, dir, 'playlists.pup'), playlists);
+  }
+  fs.writeFileSync(path.join(folder, 'Espaces (Original 2026).vpx'), vpxWithScript(SCRIPT));
+  const ctx: DoctorContext = { tablesDir, script: scriptFacts(SCRIPT), cabinet: CABINET };
+
+  assert.deepEqual(unresolved(root).sort(), ['Backglass\\Fond.mp4 ', 'Callouts \\Bravo.mp4 '].sort());
+  const found = diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'pupFileNames');
+  assert.match(found!.detail, /noms suivis ou précédés d’une espace/);
+  assert.match(found!.fix!.label, /espaces en trop/);
+  repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir: `${tablesDir}-corbeille` });
+
+  assert.deepEqual(unresolved(root), []);
+  const padded: string[] = [];
+  for (const [file, columns] of [['screens.pup', [2, 3, 4, 5]], ['playlists.pup', [1]], ['triggers.pup', [3, 5, 6, 12]]] as const) {
+    for (const line of fs.readFileSync(path.join(root, file), 'latin1').split(/\r?\n/).slice(1).filter(Boolean)) {
+      // Lecture du plugin : les champs entre virgules, les guillemets retirés, les espaces gardés.
+      const cols = line.split(',').map((c) => c.replace(/"/g, ''));
+      for (const n of columns) if (/^[ \t]|[ \t]$/.test(cols[n] ?? '')) padded.push(`${file}:${n}:${JSON.stringify(cols[n])}`);
+    }
+  }
+  assert.deepEqual(padded, []);
+  // Rien d'autre n'a bougé : description, nombres et guillemets d'origine.
+  assert.equal(fs.readFileSync(path.join(root, 'triggers.pup'), 'latin1').split('\r\n')[1], '1,1,Bravo,D11,2,Callouts,Bravo.mp4,,5,,,,Loop,0');
+  assert.equal(fs.readFileSync(path.join(root, 'triggers.pup'), 'latin1').split('\r\n')[2], '2,1,Hasard,D12,2,"Callouts","",,5,,,,,0');
+  assert.equal(fs.readFileSync(path.join(root, 'screens.pup'), 'latin1').split('\r\n')[1], '2,Backglass,Backglass,"Fond.mp4",1,show,,');
+  for (const file of ['screens.pup', 'triggers.pup', 'playlists.pup']) assert.deepEqual(fs.readFileSync(path.join(root, OPTION, file)), fs.readFileSync(path.join(root, file)));
+  assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir: `${tablesDir}-corbeille` }).map((f) => f.code), []);
+});
+
+test('un nom entouré d’espaces qui existe tel quel sur le disque est gardé', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pupfiles-'));
+  fs.mkdirSync(path.join(root, 'Callouts'));
+  fs.writeFileSync(path.join(root, 'Callouts', ' Bravo.mp4'), MP4);
+  fs.writeFileSync(path.join(root, 'playlists.pup'), 'ScreenNum,Folder,Des,AlphaSort,RestSeconds,Volume,Priority\r\n0,Callouts,,0,0,100,0\r\n');
+  fs.writeFileSync(path.join(root, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile,Volume,Priority,Length,Counter,RestSeconds,Loop,Defaults\r\n1,1,Bravo,D11,2,Callouts, Bravo.mp4,,5,,,,,0\r\n');
+  const fixes = packFileFixes(root);
+  assert.deepEqual(fixes.trimmed, []);
+  assert.deepEqual(fixes.writes, []);
 });
 
 test('nom pris : le fichier renommé ne remplace jamais un autre', () => {

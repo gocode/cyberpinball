@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- PuP-Packs: a name with a leading or trailing space in a .pup file (playlist, video, screen mode, trigger) is now fixed before the game. PinUP Popper ignored those spaces, VPX's PUP plugin does not: the video or trigger never played.
+- The sound preview of a card on the tables screen now stops when a game starts, instead of playing on top of the table's music.
 - The secret hidden in the wheel now has its own display: the backglass and DMD no longer show the table's media, its LEDs follow the game like on a pinball table, a quiet background music plays along, and a lost ball drops back one floor instead of ending everything.
 - Applications on the playfield (TikTok in portrait): the phone touch pad now covers the whole screen instead of a strip at the top. Windows still reports the old dimensions right after turning the screen, so Edge was placed in landscape on a screen that had become portrait. The rectangle is now recomputed, and the log reports a badly placed window.
 - Behind the scenes: a fix set aside from a release because it broke a test is picked up again automatically once the rest has changed and its tests pass; after a few tries it stays flagged until someone fixes it.

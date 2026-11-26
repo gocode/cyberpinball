@@ -62,6 +62,8 @@ export interface PackFileFixes {
   writes: { file: string; content: string }[];
   /** Noms à corriger que le script cite : laissés tels quels. */
   kept: string[];
+  /** Noms des .pup entourés d'espaces (« Stark.mp4 »), que le plugin ne retrouverait pas : sans espaces. */
+  trimmed: string[];
 }
 
 /** Dossiers du pack qui ne sont pas des playlists. */
@@ -115,23 +117,48 @@ export function packFileFixes(root: string, script?: string): PackFileFixes {
     takenDirs.add(free.toLowerCase());
     folders.push({ from: dir.name, to: free, why: 'ascii' });
   }
-  const writes = renames.length || folders.length ? rewritePups(root, renames, folders) : [];
+  const { writes, trimmed } = rewritePups(root, renames, folders);
   // Les fichiers d'abord (dans leur dossier d'origine), puis les dossiers.
-  return { renames: [...renames, ...folders], writes, kept };
+  return { renames: [...renames, ...folders], writes, kept, trimmed };
 }
 
-/** Colonnes qui nomment une playlist, et un fichier, dans chaque .pup (en-têtes de PinUP Player). */
-const COLUMNS: Record<string, { playlist: number; file?: number }> = {
-  'screens.pup': { playlist: 2, file: 3 },
-  'playlists.pup': { playlist: 1 },
-  'triggers.pup': { playlist: 5, file: 6 },
+/**
+ * Colonnes qui nomment une playlist, et un fichier, dans chaque .pup (en-têtes de PinUP Player) ;
+ * `exact` : les colonnes de texte que le plugin compare telles quelles (mode de l'écran, nom du
+ * déclencheur, action), sans retirer les espaces autour.
+ */
+const COLUMNS: Record<string, { playlist: number; file?: number; exact: number[] }> = {
+  'screens.pup': { playlist: 2, file: 3, exact: [4, 5] },
+  'playlists.pup': { playlist: 1, exact: [] },
+  'triggers.pup': { playlist: 5, file: 6, exact: [3, 12] },
 };
 
-/** Les .pup du pack (racine, options, sauvegardes), réécrits avec les nouveaux noms. */
-function rewritePups(root: string, files: PackRename[], folders: PackRename[]): { file: string; content: string }[] {
+/**
+ * Valeur d'un champ comme la lit le plugin (parse_csv_line, plugins/pup/common.cpp) : les
+ * guillemets retirés où qu'ils soient, les espaces gardés. PinUP Player, lui, les retire : un
+ * « Stark.mp4 » suivi d'une espace marche avec PinUP Popper et jamais avec le plugin.
+ */
+function pluginValue(field: string): string {
+  return field.replace(/"/g, '');
+}
+
+const PADDED = /^[ \t]|[ \t]$/;
+
+/**
+ * Les .pup du pack (racine, options, sauvegardes), réécrits avec les nouveaux noms et sans les
+ * espaces autour des noms. Un nom entouré d'espaces qui existe tel quel sur le disque est gardé.
+ */
+function rewritePups(root: string, files: PackRename[], folders: PackRename[]): { writes: { file: string; content: string }[]; trimmed: string[] } {
   const byFile = new Map(files.map((r) => [`${path.dirname(r.from).toLowerCase()}|${path.basename(r.from).toLowerCase()}`, path.basename(r.to)]));
   const byFolder = new Map(folders.map((r) => [r.from.toLowerCase(), r.to]));
+  const entries = readDirents(root);
+  const folderExists = (name: string) => entries.some((d) => d.isDirectory() && d.name.toLowerCase() === name.toLowerCase());
+  const fileExists = (playlist: string, name: string) => {
+    const dir = entries.find((d) => d.isDirectory() && d.name.toLowerCase() === playlist.trim().toLowerCase());
+    return dir !== undefined && readDirents(path.join(root, dir.name)).some((e) => e.name.toLowerCase() === name.toLowerCase());
+  };
   const out: { file: string; content: string }[] = [];
+  const trimmed = new Set<string>();
   for (const rel of listPups(root)) {
     const columns = COLUMNS[path.basename(rel).toLowerCase()];
     if (!columns) continue;
@@ -150,14 +177,33 @@ function rewritePups(root: string, files: PackRename[], folders: PackRename[]): 
       if (!playlistSpan) continue;
       const playlist = decode(line.slice(playlistSpan.start, playlistSpan.end));
       const edits: { span: Span; value: string }[] = [];
+      const value = (span: Span) => pluginValue(line.slice(span.start, span.end));
       const fileSpan = columns.file !== undefined ? spans[columns.file] : undefined;
       if (fileSpan) {
-        const value = decode(line.slice(fileSpan.start, fileSpan.end));
-        const renamed = value && byFile.get(`${playlist.toLowerCase()}|${value.toLowerCase()}`);
+        const read = value(fileSpan);
+        const renamed = decode(read) && byFile.get(`${playlist.toLowerCase()}|${decode(read).toLowerCase()}`);
         if (renamed) edits.push({ span: fileSpan, value: renamed });
+        else if (PADDED.test(read) && read.trim() && !fileExists(playlist, read)) {
+          edits.push({ span: fileSpan, value: read.trim() });
+          trimmed.add(read.trim());
+        }
       }
       const folder = byFolder.get(playlist.toLowerCase());
+      const readPlaylist = value(playlistSpan);
       if (folder) edits.push({ span: playlistSpan, value: folder });
+      else if (PADDED.test(readPlaylist) && readPlaylist.trim() && !folderExists(readPlaylist)) {
+        edits.push({ span: playlistSpan, value: readPlaylist.trim() });
+        trimmed.add(readPlaylist.trim());
+      }
+      for (const n of columns.exact) {
+        const span = spans[n];
+        if (!span) continue;
+        const read = value(span);
+        if (PADDED.test(read) && read.trim()) {
+          edits.push({ span, value: read.trim() });
+          trimmed.add(read.trim());
+        }
+      }
       if (!edits.length) continue;
       let next = line;
       for (const e of edits.sort((a, b) => b.span.start - a.span.start)) next = next.slice(0, e.span.start) + quoteField(e.value, e.span.quoted) + next.slice(e.span.end);
@@ -166,7 +212,7 @@ function rewritePups(root: string, files: PackRename[], folders: PackRename[]): 
     }
     if (changed) out.push({ file: rel, content: lines.join('') });
   }
-  return out;
+  return { writes: out, trimmed: [...trimmed] };
 }
 
 interface Span {
@@ -348,6 +394,18 @@ export function describeRenames(renames: PackRename[]): string {
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/** Résumé des noms entourés d'espaces, pour un constat. */
+export function describeTrims(trimmed: string[]): string {
+  if (!trimmed.length) return '';
+  const list = formatList(trimmed.slice(0, 3).map((n) => `« ${n} »`)) + (trimmed.length > 3 ? '…' : '');
+  return tn(
+    trimmed.length,
+    'Un nom suivi ou précédé d’une espace dans un fichier .pup ({list}) : PinUP Popper l’ignore, le plugin PUP non, et ce qui le nomme ne jouerait jamais.',
+    '{n} noms suivis ou précédés d’une espace dans les fichiers .pup ({list}) : PinUP Popper les ignore, le plugin PUP non, et ce qui les nomme ne jouerait jamais.',
+    { n: trimmed.length, list },
+  );
 }
 
 function listPups(root: string, rel = '', depth = 0): string[] {

@@ -2211,6 +2211,9 @@ window.cyber.onState((s) => {
   CyberMedia.preload(s.preload, { settle: burst });
   // Sons de l'interface : muets pendant la partie, même si un ordre de jouer arrivait.
   window.CyberUiSounds?.setPhase(s.phase);
+  // Hors de l'écran des tables, son aperçu sonore se tait : une partie lancée pendant qu'il joue
+  // l'entendrait par-dessus la musique de la table ou de son PuP-Pack.
+  if (s.phase !== 'library' && typeof silenceLibraryMedia === 'function') silenceLibraryMedia();
   // Son du menu (playfield seulement) : musique, son de lancement, son de la vidéo du plateau.
   if (role === 'playfield') {
     CyberMenuAudio.update(s.sound);

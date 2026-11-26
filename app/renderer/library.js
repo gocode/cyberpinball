@@ -1391,6 +1391,12 @@ function renderThumb(t, selected = false) {
 // Son de la carte choisie : un seul à la fois, arrêté dès qu'on change de carte ou d'écran.
 let playingAudio = null;
 
+/** Hors de l'écran des tables (partie lancée, autre écran) : plus un son de ses aperçus ne joue. */
+function silenceLibraryMedia() {
+  playingAudio = null;
+  for (const node of mediaNodes.values()) if (node.tagName === 'AUDIO' && !node.paused) node.pause();
+}
+
 function syncAudio() {
   for (const [key, node] of mediaNodes) {
     if (!key.startsWith('audio ')) continue;

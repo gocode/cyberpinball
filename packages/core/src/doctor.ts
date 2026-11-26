@@ -103,7 +103,7 @@ import { scriptCode } from './vbscript';
 import { cabinetDmdIni, cabinetDmdOptions, type CabinetDmdOption } from './tableoptions';
 import { readVpxFileVersion, readVpxImageNames, readVpxScript, readVpxTableName } from './vpxinfo';
 import { tableTooNew, tooNewAdvice, tooNewReason, withVpxChoice, type OtherVpx } from './autres-vpx';
-import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
+import { describeRenames, describeTrims, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
 import { tableHasVrRoom } from './vr';
@@ -1434,9 +1434,11 @@ function packFileNamesFinding(pack: string, root: string, media: PackFileFixes):
     code: 'pupFileNames',
     severity: 'warning',
     title: t('Fichiers du PuP-Pack que le plugin PUP lirait mal'),
-    detail: describeRenames(media.renames),
+    detail: [describeRenames(media.renames), describeTrims(media.trimmed)].filter(Boolean).join(' '),
     fix: {
-      label: tn(media.renames.length, 'Renommer le fichier dans pupvideos\\{pack}', 'Renommer {n} fichiers dans pupvideos\\{pack}', { pack, n: media.renames.length }),
+      label: media.renames.length
+        ? tn(media.renames.length, 'Renommer le fichier dans pupvideos\\{pack}', 'Renommer {n} fichiers dans pupvideos\\{pack}', { pack, n: media.renames.length })
+        : t('Retirer les espaces en trop dans les fichiers .pup de pupvideos\\{pack}', { pack }),
       ops: [
         ...media.renames.map((r) => ({ op: 'move' as const, from: path.join(root, r.from), to: path.join(root, r.to) })),
         ...media.writes.map((w) => ({ op: 'write' as const, path: path.join(root, w.file), content: w.content, encoding: 'latin1' as const })),
@@ -2228,10 +2230,11 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     }
 
     // Files that the plugin reads differently from PinUP Player (image named like a video, name
-    // with accents), then files named by the pack and missing: without them, screens stay black.
+    // with accents, name padded with spaces in a .pup), then files named by the pack and missing:
+    // without them, screens stay black.
     if (!nested.has(pack)) {
       const media = packFileFixes(info.root, facts?.pup ? played : undefined);
-      if (media.renames.length) findings.push(packFileNamesFinding(pack, info.root, media));
+      if (media.renames.length || media.trimmed.length) findings.push(packFileNamesFinding(pack, info.root, media));
       else {
         const missing = missingPackFiles(info.root);
         if (missing.length) {

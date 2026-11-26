@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- PuP-Packs : un nom suivi ou précédé d'une espace dans un fichier .pup (playlist, vidéo, mode d'écran, déclencheur) est maintenant corrigé avant la partie. PinUP Popper ignorait ces espaces, le plugin PUP de VPX non : la vidéo ou le déclencheur ne jouait jamais.
+- L'aperçu sonore d'une carte de l'écran des tables s'arrête quand une partie démarre, au lieu de continuer par-dessus la musique de la table.
 - Le secret caché dans la roue a maintenant son propre affichage : le fronton et le DMD ne montrent plus les médias de la table, ses LED suivent la partie comme sur une table de flipper, une musique de fond discrète l'accompagne, et une bille perdue redescend d'un étage au lieu de tout arrêter.
 - Applications sur le playfield (TikTok en portrait) : le pavé tactile du téléphone couvre maintenant tout l'écran, et non plus une bande du haut. Windows rend encore les dimensions d'avant juste après avoir tourné l'écran : Edge était posé en paysage sur un écran devenu portrait. Le rectangle est désormais recalculé, et le journal signale une fenêtre mal placée.
 - Coulisses : une correction écartée de la livraison parce qu'elle faisait tomber un test est reprise toute seule dès que le reste a changé et que ses tests repassent ; après quelques essais, elle reste signalée jusqu'à ce qu'on la corrige.
