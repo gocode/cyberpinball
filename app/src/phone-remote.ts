@@ -92,6 +92,7 @@ import {
   parsePhoneMessage,
   pickLanAddress,
   remoteEntries,
+  remoteEntriesShape,
   readRemoteField,
   REMOTE_CHALLENGE_BYTES,
   REMOTE_FOCUS_PROBE,
@@ -616,6 +617,8 @@ const RELAY_CHECK_MS = 30_000;
 const LISTEN_RETRY_MS = [5_000, 15_000, 30_000, 60_000];
 /** Au plus, images réduites gardées en mémoire (une miniature se redemande à chaque passage dans la liste). */
 const RESIZED_MAX = 400;
+/** Versions d'écran dont la forme est gardée : un toucher arrive bien avant que tant d'écrans soient partis. */
+const ENTRIES_SHAPES_KEPT = 8;
 /** Les classements sont relus au plus à ce rythme pendant que la vue Scores est ouverte (sauf demande du téléphone). */
 const RANKS_MS = 1000;
 /** Au plus, connexions ouvertes en même temps (un téléphone, sa reconnexion, un curieux). */
@@ -734,10 +737,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let screenSent = '';
   /**
    * Écran envoyé au téléphone (message « entries ») : son contenu, sa version, ce que fait chaque
-   * entrée. Le téléphone renvoie la version et le rang (« pick ») : un rang d'un écran dépassé est ignoré.
+   * entrée. Le téléphone renvoie la version et le rang (« pick ») : un rang d'un écran dépassé est ignoré,
+   * sauf si cet écran a gardé sa forme (remoteEntriesShape : mêmes entrées, seul un détail a changé).
    */
   let entriesSent = '';
   let entriesVersion = 0;
+  /** Forme des dernières versions envoyées (ENTRIES_SHAPES_KEPT au plus). */
+  const entriesShapes = new Map<number, string>();
+  /** Un rang touché sous la version `v` vaut pour l'écran envoyé maintenant. */
+  const sameScreen = (v: number): boolean => v === entriesVersion || (entriesShapes.has(v) && entriesShapes.get(v) === entriesShapes.get(entriesVersion));
   let entriesPicks: ((() => void) | undefined)[] = [];
   let cursorSent = -2;
   /** Pendant une partie, les boutons du téléphone pilotent les réglages en partie ouverts. */
@@ -1449,6 +1457,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (force || text !== entriesSent) {
       entriesSent = text;
       entriesVersion++;
+      entriesShapes.set(entriesVersion, remoteEntriesShape(shown));
+      if (entriesShapes.size > ENTRIES_SHAPES_KEPT) entriesShapes.delete(entriesShapes.keys().next().value!);
       entriesPicks = e.items.slice(0, shown.items.length).map((i) => i.pick);
       entriesFocus = e.items.slice(0, shown.items.length).map((i) => i.focus);
       collectionPicks = e.collections?.items.map((c) => c.pick) ?? [];
@@ -1802,7 +1812,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       case 'pick': {
         // Une entrée de l'écran que le téléphone a reçu ; l'écran a changé depuis : rien (le nouveau est déjà parti).
-        if (message.v !== entriesVersion) return;
+        if (!sameScreen(message.v)) return;
         const pick = entriesPicks[message.i];
         if (!pick) return;
         releaseButtons();
@@ -1810,7 +1820,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       }
       case 'focus': {
-        if (message.v !== entriesVersion) return;
+        if (!sameScreen(message.v)) return;
         const focus = entriesFocus[message.i];
         if (!focus) return;
         releaseButtons();
@@ -1819,7 +1829,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       }
       case 'collection': {
         // Une collection de l'écran reçu ; l'écran a changé depuis : rien.
-        if (message.v !== entriesVersion) return;
+        if (!sameScreen(message.v)) return;
         const pick = collectionPicks[message.i];
         if (!pick) return;
         releaseButtons();

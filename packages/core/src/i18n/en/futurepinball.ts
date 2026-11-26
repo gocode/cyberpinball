@@ -143,23 +143,8 @@ export const messages: Record<string, string> = {
   'Ce que fait cette installation en moins': 'What this installation leaves out',
   'L’installateur n’est pas lancé : pas de désinstalleur, pas de raccourcis, pas d’association des fichiers .fpt (Cyber Pinball lance lui-même les tables). Supprimer le dossier ci-dessus suffit à tout retirer.':
     'The installer isn’t run: no uninstaller, no shortcuts, no .fpt file association (Cyber Pinball launches the tables itself). Deleting the folder above removes everything.',
-  'PuP-Packs : PinUP Player présent': 'PuP-Packs: PinUP Player present',
-  '{dir}. Les tables « PinEvent » jouent leurs vidéos (fronton, DMD, topper) ; leurs PuP-Packs se rangent dans {videos}. PinUP Popper n’a pas besoin d’être ouvert : Cyber Pinball reste le front-end.':
-    '{dir}. "PinEvent" tables play their videos (backglass, DMD, topper); their PuP-Packs go in {videos}. PinUP Popper doesn’t need to be open: Cyber Pinball stays the front-end.',
-  'PuP-Packs : PinUP Player absent': 'PuP-Packs: PinUP Player missing',
-  'Certaines tables (« PinEvent ») pilotent un PuP-Pack : les vidéos du fronton, du DMD et du topper. {game} n’a pas de lecteur intégré : il faut PinUP Player, qui s’installe avec PinUP Popper (ensemble PinUPSystem). Popper n’a pas besoin d’être ouvert : Cyber Pinball reste le front-end. Sans lui, ces tables se jouent sans leurs vidéos.':
-    'Some tables ("PinEvent") drive a PuP-Pack: the backglass, DMD and topper videos. {game} has no built-in player: it needs PinUP Player, which is installed with PinUP Popper (the PinUPSystem bundle). Popper doesn’t need to be open: Cyber Pinball stays the front-end. Without it, these tables play without their videos.',
-  'PuP-Packs': 'PuP-Packs',
-  'Pas fournis ici, mais PinUP Player est déjà sur ce PC ({dir}) : les tables « PinEvent » joueront leurs vidéos (fronton, DMD, topper).':
-    'Not included here, but PinUP Player is already on this PC ({dir}): "PinEvent" tables will play their videos (backglass, DMD, topper).',
-  'Pas fournis ici : les tables « PinEvent » pilotent leurs vidéos (fronton, DMD, topper) par PinUP Player, qui s’installe avec PinUP Popper (ensemble PinUPSystem). Popper n’a pas besoin d’être ouvert. Sans lui, ces tables se jouent sans leurs vidéos.':
-    'Not included here: "PinEvent" tables drive their videos (backglass, DMD, topper) through PinUP Player, which is installed with PinUP Popper (the PinUPSystem bundle). Popper doesn’t need to be open. Without it, these tables play without their videos.',
-  'Les tables « PinEvent » jouent leurs vidéos (PuP-Pack) par PinUP Player, qui s’installe avec PinUP Popper : voir la ligne « PuP-Packs ».':
-    '"PinEvent" tables play their videos (PuP-Pack) through PinUP Player, which is installed with PinUP Popper: see the "PuP-Packs" line.',
-  '« {title} » semble piloter un PuP-Pack : sans PinUP Player (installé avec PinUP Popper), elle se joue sans ses vidéos.':
-    '"{title}" seems to drive a PuP-Pack: without PinUP Player (installed with PinUP Popper), it plays without its videos.',
-  '{n} tables semblent piloter un PuP-Pack : sans PinUP Player (installé avec PinUP Popper), elles se jouent sans leurs vidéos.':
-    '{n} tables seem to drive a PuP-Pack: without PinUP Player (installed with PinUP Popper), they play without their videos.',
+  'Tables « PinEvent »': '"PinEvent" tables',
+  'Elles se jouent avec le DMD et les sons de {game}, sans rien à installer de plus.': 'They play with {game}’s DMD and sounds, with nothing more to install.',
   Télécharger: 'Download',
   'Puis les deux contrats à lire et à accepter': 'Then the two licences to read and accept',
   'Téléchargement de {game} et de BAM…': 'Downloading {game} and BAM…',

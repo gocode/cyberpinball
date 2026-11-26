@@ -13,10 +13,11 @@
 // appelée deux fois). Le médecin l'applique avant chaque partie (PUP_PLAY_REPAIRS) et dès
 // l'installation ; la table n'est jamais modifiée.
 
+import { addTableDofTap, dofCallLines, DOF_TAP_TABLE_SUB, ownDofSubs } from './dof-evenements';
 import { commentStart, scriptCode } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd' | 'b2sArgs';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd' | 'b2sArgs' | 'dofTapOwnSub';
 
 interface CompatRule {
   id: CompatFix;
@@ -711,7 +712,24 @@ const b2sArgs: CompatRule = {
   stop: /Failed to convert a parameter in call to B2S_Server\.|Type incompatible: '[\w.]*\.B2S\w+'|Type mismatch: '[\w.]*\.B2S\w+'/i,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd, b2sArgs];
+// ---------- Sub DOF propre au script ----------
+//
+// Les effets LED d'une table sans ROM viennent de ses appels DOF, recopiés par l'écoute posée dans la Sub DOF de
+// controller.vbs (dof-evenements.ts). Un script qui colle sa propre copie de controller.vbs (Stranger Things :
+// « Sub DOF(DOFevent, State) » dans la table, controller.vbs jamais chargé) court-circuite cette écoute : 312 appels
+// DOF, LED muettes. Le .vbs de Cyber Pinball branche la même écoute en tête de ses Sub DOF et DOFALT, sur la ligne
+// de leur déclaration. Inerte hors d'une partie aux LED (variable CYBERPINBALL_DOF_TAP absente).
+
+const dofTapOwnSub: CompatRule = {
+  id: 'dofTapOwnSub',
+  found: (code) => ownDofSubs(code).some((s) => !s.tapped) && dofCallLines(code) > 0,
+  applicable: (code) => ownDofSubs(code).length > 0,
+  applied: (text) => new RegExp(`^\\s*sub\\s+${DOF_TAP_TABLE_SUB}\\b`, 'im').test(text) && ownDofSubs(scriptCode(text)).every((s) => s.tapped),
+  apply: addTableDofTap,
+  stop: /(?!)/,
+};
+
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd, b2sArgs, dofTapOwnSub];
 
 /** Correctifs que réclament les lignes du journal de VPX d'une partie de la table (erreurs du script, refus d'un plugin). */
 export function compatFixesFromLog(lines: readonly string[], code?: string): CompatFix[] {

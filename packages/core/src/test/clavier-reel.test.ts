@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { BUTTONS, INTERFACE_KEYS } from '../buttons';
 import type { CabinetButtons } from '../model';
 import { loadCabinet } from '../store';
-import { cabinetIn, electron, GAME_BY_KEYBOARD, keyboard, recorded, repeat, runWizard, sdlLibrary, skip } from './clavier-reel-outils';
+import { cabinetIn, electron, GAME_BY_KEYBOARD, keyboard, recorded, repeat, REPO, runWizard, sdlLibrary, skip } from './clavier-reel-outils';
 import { removeTempDir } from './temp-dir';
 
 // Relevé des boutons par le vrai chemin d'une touche du clavier : l'assistant, rendu hors
@@ -19,6 +19,32 @@ import { removeTempDir } from './temp-dir';
 // virtuel de la bibliothèque SDL de VPX (autopilote « Joy<n> »), comme un Pinscape.
 // Outils communs : clavier-reel-outils.ts ; les cas du premier écran d’une borne neuve sont dans
 // clavier-premier-ecran-*.test.ts, répartis pour tourner en parallèle.
+
+test('autopilote : rien n’attend entre un appui rejoué et son relâchement, sinon une machine chargée en fait un maintien', () => {
+  // Bancs du 26/11/2026 : la pause de 50 ms entre l'appui et le relâchement a duré 6 s ; la touche
+  // était vraiment tenue pour l'assistant, qui ouvrait « Quitter sans enregistrer ? ».
+  const body = (source: string, name: string) => {
+    const at = source.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} introuvable`);
+    const rest = source.slice(at);
+    return rest.slice(0, rest.search(/\r?\n\}\r?\n/));
+  };
+  const app = path.join(REPO, 'app', 'src');
+  const wizard = fs.readFileSync(path.join(app, 'wizard.ts'), 'utf8');
+  const key = body(wizard, 'pressRealKey');
+  assert.match(key, /sendInputEvent\(\{ type: 'keyDown'[^\n]*\n\s*win\.webContents\.sendInputEvent\(\{ type: 'keyUp'/, 'relâchement aussitôt après l’appui');
+  assert.doesNotMatch(key, /await|delay\(|setTimeout/, key);
+  // Le maintien relit les joysticks avant de conclure (un relâchement pas encore lu).
+  assert.match(body(wizard, 'watchHold'), /readJoysticksNow\(\);\s*if \(held\?\.timer !== timer\) return;\s*stopHold\(\);/);
+  const joystick = fs.readFileSync(path.join(app, 'joystick-input.ts'), 'utf8');
+  for (const name of ['pressVirtualButton', 'pressVirtualHat', 'pressVirtualPinscapeButton']) {
+    const press = body(joystick, name);
+    assert.match(press, /pressAndRelease\(/, name);
+    assert.doesNotMatch(press, /setTimeout|pause\(/, name);
+  }
+  // Relâché dès que le sondage a lu l'appui.
+  assert.match(body(joystick, 'pressAndRelease'), /if \(down && !pressed\) \{\s*pressed = true;\s*release\(\);/);
+});
 
 test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise reprise, Retour arrière et Échap', { skip, timeout: 290_000 }, () => {
   assert.deepEqual(Object.keys(GAME_BY_KEYBOARD), BUTTONS.filter((b) => !b.advanced).map((b) => b.id), 'un relevé pour chaque bouton du jeu (les avancés ne se demandent pas pas à pas)');
@@ -64,7 +90,7 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
     // Le lanceur n'a pas été relevé : Retour arrière l'a laissé.
     assert.ok(!output.includes(recorded('game', 'plunger', 'Backspace')), output);
     // Enregistré : Échap n'a pas quitté, chaque bouton a sa touche du clavier.
-    assert.deepEqual(loadCabinet(home)!.buttons, GAME_BY_KEYBOARD);
+    assert.deepEqual(loadCabinet(home)!.buttons, GAME_BY_KEYBOARD, output);
     const ini = fs.readFileSync(path.join(home, 'sandbox', 'VPinballX.ini'), 'utf8');
     assert.match(ini, /^Mapping\.Credit1 = Key;32\b/m, 'crédit sur 3 dans [Input]');
     assert.match(ini, /^Mapping\.LaunchBall = Key;26\b/m, 'lanceur sur W dans [Input]');
@@ -119,7 +145,10 @@ test('premier écran d’une borne neuve : sans réponse, le délai garde les to
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-premier-delai-'));
   try {
     const home = path.join(dir, 'home');
-    const output = runWizard(home, ['Attendre21', 'CtrlQ'], []);
+    // Le vrai délai, raccourci à 2 s ; l'autopilote attend sa fin (« FinDuDelai ») au lieu de 21 s comptées à part,
+    // qui sous charge pouvaient finir avant lui (26/11/2026).
+    const output = runWizard(home, ['FinDuDelai', 'CtrlQ'], [], { CYBERPINBALL_DELAI_BOUTONS_MS: '2000' });
+    assert.doesNotMatch(output, /au bout d’une minute/, output);
     assert.doesNotMatch(output, /Assistant : relevé game/, output);
     assert.match(output, /Assistant : « Quitter sans enregistrer \? » \(assign\)/, output);
   } finally {

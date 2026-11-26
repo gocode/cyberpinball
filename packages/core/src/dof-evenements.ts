@@ -13,10 +13,34 @@
 // (elle marche donc aussi sans B2S), ne lève jamais d'erreur (On Error Resume Next) et ne fait qu'ajouter
 // une ligne à un fichier.
 
+import { scriptCode } from './vbscript';
+
 export const DOF_TAP_ENV = 'CYBERPINBALL_DOF_TAP';
 /** Repère des lignes ajoutées à controller.vbs : leur présence dit qu'il est déjà retouché. */
 export const DOF_TAP_MARK = "' CyberPinball-dof-tap";
 const TAP_SUB = 'CyberPinball_DofTap';
+/**
+ * Écoute posée dans le script d'une table qui définit sa propre `Sub DOF` (copie de controller.vbs collée dans le
+ * script, comme Stranger Things) : ses appels DOF n'atteignent jamais la Sub DOF de controller.vbs. Nom distinct de
+ * celui de controller.vbs, pour qu'une table qui charge aussi controller.vbs n'ait pas deux Sub du même nom.
+ */
+export const DOF_TAP_TABLE_SUB = 'CyberPinball_DofTapTable';
+
+/** La Sub qui écrit « E,numéro,état,secondes » (Timer : secondes depuis minuit), et ses deux variables globales. */
+function tapSubLines(name: string): string[] {
+  return [
+    `Dim ${name}File, ${name}Ready`,
+    `Sub ${name}(n, s)`,
+    '\tOn Error Resume Next',
+    `\tIf ${name}Ready = "" Then`,
+    `\t\t${name}Ready = "no"`,
+    '\t\tDim p : p = CreateObject("WScript." & "Shell").Environment("Process").Item("' + DOF_TAP_ENV + '")',
+    `\t\tIf p <> "" Then Set ${name}File = CreateObject("Scripting.FileSystemObject").OpenTextFile(p, 8, True) : If Err.Number = 0 Then ${name}Ready = "yes"`,
+    '\tEnd If',
+    `\tIf ${name}Ready = "yes" Then ${name}File.WriteLine "E," & CLng(n) & "," & CLng(s) & "," & Replace(CStr(Round(Timer, 3)), ",", ".")`,
+    'End Sub',
+  ];
+}
 
 /**
  * controller.vbs avec l'écoute : un appel en tête de `Sub DOF` et de `Sub DOFALT`, et la Sub qui écrit
@@ -34,21 +58,92 @@ export function addDofTap(text: string): string | undefined {
     return [line, ['\tOn Error Resume Next', ': ' + TAP_SUB + ' ' + head[2] + ', ' + head[3], ': On Error Goto 0', DOF_TAP_MARK].join(' ')];
   });
   if (!found || !lines.some((l) => /^\s*(?:Public\s+)?Sub\s+DOF\s*\(/i.test(l))) return undefined;
-  const body = [
-    DOF_TAP_MARK + ': copy of the DOF events for Cyber Pinball (variable ' + DOF_TAP_ENV + ')',
-    'Dim CyberPinball_DofTapFile, CyberPinball_DofTapReady',
-    `Sub ${TAP_SUB}(n, s)`,
-    '\tOn Error Resume Next',
-    '\tIf CyberPinball_DofTapReady = "" Then',
-    '\t\tCyberPinball_DofTapReady = "no"',
-    '\t\tDim p : p = CreateObject("WScript." & "Shell").Environment("Process").Item("' + DOF_TAP_ENV + '")',
-    '\t\tIf p <> "" Then Set CyberPinball_DofTapFile = CreateObject("Scripting.FileSystemObject").OpenTextFile(p, 8, True) : If Err.Number = 0 Then CyberPinball_DofTapReady = "yes"',
-    '\tEnd If',
-    '\tIf CyberPinball_DofTapReady = "yes" Then CyberPinball_DofTapFile.WriteLine "E," & CLng(n) & "," & CLng(s) & "," & Replace(CStr(Round(Timer, 3)), ",", ".")',
-    'End Sub',
-  ];
+  const body = [DOF_TAP_MARK + ': copy of the DOF events for Cyber Pinball (variable ' + DOF_TAP_ENV + ')', ...tapSubLines(TAP_SUB)];
   const out = lines.join(eol);
   return out + (/\r?\n$/.test(out) ? '' : eol) + body.join(eol) + eol;
+}
+
+/** En-tête d'une `Sub DOF(événement, état)` ou `Sub DOFALT(…)` : groupe 1 l'en-tête entier, 2 et 3 les paramètres. */
+const OWN_DOF_SUB = /^(\s*(?:(?:public|private)\s+)?sub\s+(?:DOF|DOFALT)\s*\(\s*(?:by(?:val|ref)\s+)?(\w+)\s*,\s*(?:by(?:val|ref)\s+)?(\w+)\s*\))/i;
+/** Un appel DOF du script : `DOF 101, DOFOn`, `DOF(101, 2)`, `DOFALT …`, `SoundFXDOF(…)` ; jamais la déclaration d'une Sub. */
+const DOF_CALL = /(?:^|[^\w.])(?:(?:DOF|DOFALT)(?!\w)\s*\(?\s*[\w.]+\s*,|SoundFXDOF\s*\()/i;
+const CONTROLLER_LOAD = /\(\s*"controller\.vbs"\s*\)/i;
+
+/** Les `Sub DOF` / `Sub DOFALT` que le script définit lui-même (hors classes), avec l'écoute déjà branchée ou non. */
+export function ownDofSubs(code: string): { line: number; tapped: boolean }[] {
+  const found: { line: number; tapped: boolean }[] = [];
+  let inClass = false;
+  code.split('\n').forEach((line, i) => {
+    if (/^\s*(?:(?:public|private)\s+)?class\s+\w/i.test(line)) inClass = true;
+    else if (/^\s*end\s+class\b/i.test(line)) inClass = false;
+    else if (!inClass && OWN_DOF_SUB.test(line)) found.push({ line: i, tapped: line.toLowerCase().includes(DOF_TAP_TABLE_SUB.toLowerCase()) });
+  });
+  return found;
+}
+
+/** Nombre de lignes de code qui appellent DOF (déclarations des Sub exclues). */
+export function dofCallLines(code: string): number {
+  // Seul l'en-tête « Sub DOF(e, s) » est écarté : « Sub Flipper_Hit : DOF 101, 2 : End Sub » est un appel.
+  return code.split('\n').filter((l) => DOF_CALL.test(l.replace(OWN_DOF_SUB, ''))).length;
+}
+
+const DOF_EVENT = /(?:^|[^\w.])(?:DOF|DOFALT)(?!\w)\s*\(?\s*([\w.]+)\s*,|SoundFXDOF\s*\([^,()]*(?:\([^()]*\)[^,()]*)*,\s*([\w.]+)/gi;
+const CONST_NUMBER = /\bconst\s+(\w+)\s*=\s*(\d+)\b/gi;
+
+/**
+ * Événements DOF que le script envoie (`DOF 101, …`, `DOFALT`, `SoundFXDOF(son, 101, …)`) et combien de fois
+ * chacun est appelé ; les numéros donnés par une constante (`Const dLeftFlipper = 101`) comptent aussi. Un
+ * numéro passé par une variable (la Sub DOF elle-même, une boucle) ne se lit pas : il n'est pas compté.
+ */
+export function dofScriptEvents(code: string): Map<number, number> {
+  const consts = new Map<string, number>();
+  for (const m of code.matchAll(CONST_NUMBER)) consts.set(m[1]!.toLowerCase(), Number(m[2]));
+  const events = new Map<number, number>();
+  for (const line of code.split('\n')) {
+    for (const m of line.replace(OWN_DOF_SUB, '').matchAll(DOF_EVENT)) {
+      const raw = (m[1] ?? m[2])!;
+      const n = /^\d+$/.test(raw) ? Number(raw) : consts.get(raw.toLowerCase());
+      if (n !== undefined && n > 0) events.set(n, (events.get(n) ?? 0) + 1);
+    }
+  }
+  return events;
+}
+
+/**
+ * Le script avec l'écoute branchée en tête de chacune de ses propres `Sub DOF` / `Sub DOFALT`, sur la même ligne
+ * (« Sub DOF(e, s) : CyberPinball_DofTapTable e, s ») : aucune ligne ne bouge, les erreurs de script gardent leurs
+ * numéros. La Sub d'écoute est ajoutée à la fin. Inerte sans CYBERPINBALL_DOF_TAP, comme celle de controller.vbs, et
+ * appelée avant tout test de la table (B2SOn) : elle reçoit l'état 2 (impulsion) tel que le script l'envoie.
+ * undefined si le script n'a pas de Sub DOF à lui.
+ */
+export function addTableDofTap(text: string): string | undefined {
+  const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+  const lines = text.split(/\r?\n/);
+  const subs = ownDofSubs(scriptCode(text));
+  if (!subs.length) return undefined;
+  for (const { line, tapped } of subs) {
+    if (tapped) continue;
+    const m = OWN_DOF_SUB.exec(lines[line]!);
+    if (!m) return undefined;
+    lines[line] = `${m[1]} : ${DOF_TAP_TABLE_SUB} ${m[2]}, ${m[3]}${lines[line]!.slice(m[1]!.length)}`;
+  }
+  let out = lines.join(eol);
+  if (new RegExp(`^\\s*sub\\s+${DOF_TAP_TABLE_SUB}\\b`, 'im').test(out)) return out;
+  if (out && !/\r?\n$/.test(out)) out += eol;
+  return out + [DOF_TAP_MARK + ': copy of the DOF events of the table for Cyber Pinball (variable ' + DOF_TAP_ENV + ')', ...tapSubLines(DOF_TAP_TABLE_SUB)].join(eol) + eol;
+}
+
+/**
+ * Par où passent les appels DOF du script : 'table', ses propres Sub DOF, toutes écoutées ; 'controller', la Sub DOF
+ * de controller.vbs, que le script charge (écoutée par addDofTap) ; 'missed', des appels qui n'atteignent aucune
+ * écoute (Sub DOF du script pas encore retouchée, ou Sub DOF venue d'ailleurs) ; 'none', aucun appel DOF.
+ */
+export function dofTapReach(text: string): 'table' | 'controller' | 'missed' | 'none' {
+  const code = scriptCode(text);
+  if (!dofCallLines(code)) return 'none';
+  const own = ownDofSubs(code);
+  if (own.length) return own.every((s) => s.tapped) ? 'table' : 'missed';
+  return CONTROLLER_LOAD.test(code) ? 'controller' : 'missed';
 }
 
 /** controller.vbs d'origine : les lignes de l'écoute retirées. */

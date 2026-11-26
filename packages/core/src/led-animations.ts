@@ -27,7 +27,7 @@ import { hsvToRgb, rgbToHsv, type Rgb } from './jukebox-visualizer';
 // led-effets.ts et led-ouverture.ts importent ce module en retour : ils ne s'en servent qu'à l'appel,
 // jamais au chargement, et ce module ne se sert d'eux que dans le moteur (import circulaire sans risque).
 import { LedFxSequencer, ledLightToBytes, type LedFxId } from './led-effets';
-import { ledXY, type LedGrid } from './led-live';
+import { ledStripPosition, ledXY, type LedGrid } from './led-live';
 import { LED_LEVEL_CHOICES, LED_LEVEL_SCALE, ledDitherByte, ledLevelFromLinear, ledLevelGain } from './led-luminosite';
 import { ledIntroLight } from './led-ouverture';
 import { hexToRgb, NEUTRAL_TINT } from './tabletint';
@@ -464,14 +464,14 @@ export class LedAmbientEngine {
     );
   }
 
-  /** Position (0 à 1) de chaque LED le long de la bande ; pour une matrice, selon la colonne. */
+  /** Position (0 à 1) de chaque LED le long de la bande, du bas vers le haut (ledStripPosition) ; pour une matrice, selon la colonne. */
   private along(grid: LedGrid): Float32Array {
     const key = `${grid.width}x${grid.height}:${grid.arrangement}`;
     if (this.positions?.key === key) return this.positions.u;
     const n = Math.max(0, grid.width) * Math.max(0, grid.height);
     const u = new Float32Array(n);
     const matrix = grid.width > 1 && grid.height > 1;
-    for (let k = 0; k < n; k++) u[k] = matrix ? ledXY(grid, k).x / Math.max(1, grid.width - 1) : n > 1 ? k / (n - 1) : 0;
+    for (let k = 0; k < n; k++) u[k] = matrix ? ledXY(grid, k).x / Math.max(1, grid.width - 1) : n > 1 ? ledStripPosition(grid, k) : 0;
     this.positions = { key, u };
     return u;
   }

@@ -1,12 +1,16 @@
-// Retour de partie (engagement, planche validée le 21/11/2026, `homeRetour`) : après une partie qui
-// apporte du neuf (record personnel battu, place gagnée, joueur dépassé), un écran avant la roue :
+// Retour de partie (engagement, planche validée le 21/11/2026, `homeRetour`) : après toute partie dont
+// le score est connu (finie ou quittée en cours, premier score compris, relevée en direct ou à la
+// fermeture), un écran avant la roue. Jusqu'au 26/11/2026, il ne s'ouvrait que pour du neuf (record
+// battu, joueur dépassé) : un premier score ou une partie moyenne revenaient à la roue sans rien dire.
 // - le score et le record ;
 // - « +N XP » sur la barre du niveau qui vient de monter (la part gagnée en clair) et le détail du
 //   barème de levels.ts ;
-// - le joueur dépassé, la place gagnée et le prochain à battre (packages/core/src/overtakes.ts) ;
+// - le classement : le joueur dépassé, la place gagnée et le prochain à battre ; sinon la place de la
+//   partie et le prochain à battre (packages/core/src/overtakes.ts) ; sans classement publié pour la
+//   version, le tableau des scores de la table sur la borne ;
 // - « Rejouer », « Défier … » (challenges-menu.ts, avec le score de la partie), « Un mot à … »
 //   (phrases préparées, entre amis) et « Retour aux tables ».
-// Rien de neuf : pas d'écran. Il se passe d'un appui (Exit, ou Start sur « Retour aux tables ») ; un
+// Aucun score relevé : pas d'écran. Il se passe d'un appui (Exit, ou Start sur « Retour aux tables ») ; un
 // bouton encore tenu en sortant de la partie ne compte pas (GUARD_MS). L'animation des badges et du
 // niveau garde son moment à elle : elle attend le bilan de la partie (`holding`), puis cet écran, et se
 // montre au retour sur la roue. Ni ligue ni missions : elles n'existent pas encore.
@@ -20,6 +24,7 @@ import {
   gainText,
   gameNews,
   gameOvertake,
+  gameStanding,
   levelOf,
   locale,
   rivalPhrases,
@@ -28,8 +33,10 @@ import {
   tierOf,
   tn,
   XP,
+  type BoardLine,
   type DailyHolder,
   type GameNews,
+  type GameOvertake,
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built } from './library';
@@ -46,6 +53,8 @@ export interface GameReturnHost {
   /** « Défier {nom} » (challenges-menu.ts) : le joueur dépassé, avec le score qu'on vient de faire ; absent : pas de bouton. */
   challenge?(rival: DailyHolder, f: GameReturnFacts, reopen: () => void): HubButtonSpec | undefined;
   zoneKeys(): readonly string[];
+  /** Le tableau des scores de la table sur la borne, tout temps (table-scores.ts) : sans classement publié pour la version. */
+  board?(table: TableEntry): readonly BoardLine[];
   /** L'écran peut-il s'ouvrir maintenant (la roue à l'écran, pas de partie, ni jeu local ni invité) ? */
   canOpen(): boolean;
   log(line: string): void;
@@ -79,6 +88,10 @@ export interface GameReturn {
 export const GAME_RETURN_GUARD_MS = 1500;
 /** Le bilan ne se fait jamais attendre plus que ça : le moment des badges passe quand même. */
 const EXPECT_MAX_MS = 30_000;
+/** Lignes du tableau de la table montrées au retour. */
+const BOARD_LINES = 5;
+/** Une ligne du tableau vient de cette partie : faite depuis son début. */
+const isMine = (l: BoardLine, f: GameReturnFacts) => l.at !== undefined && Date.parse(l.at) >= f.since.getTime() - 1000;
 
 export function createGameReturn(host: GameReturnHost): GameReturn {
   const now = () => host.now?.() ?? Date.now();
@@ -87,7 +100,32 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
   const fmt = (n: number) => formatNumber(n).split(thin).join(nbsp);
   let expected: number | undefined;
   /** L'écran ouvert : sa partie, son bilan, depuis quand, à qui on a déjà écrit. */
-  let shown: { f: GameReturnFacts; news: GameNews; at: number; sent?: string } | undefined;
+  let shown: { f: GameReturnFacts; news: GameNews; standing?: GameOvertake; board?: readonly BoardLine[]; at: number; sent?: string } | undefined;
+
+  /** La place de la partie au classement publié, quand personne n'est dépassé. */
+  function standing(f: GameReturnFacts): GameOvertake | undefined {
+    if (!f.version || !f.report.best || host.daily.unavailable() !== undefined) return undefined;
+    try {
+      return gameStanding(host.daily.input(), f.version, f.since, { now: new Date(now()) });
+    } catch (error) {
+      host.log(`Retour de partie : classement non lu (${(error as Error).message}).`); // i18n-ignore : journal
+      return undefined;
+    }
+  }
+
+  /** Le tableau de la table sur la borne : cinq lignes, celle de la partie comprise si elle est plus bas. */
+  function boardOf(f: GameReturnFacts): readonly BoardLine[] | undefined {
+    let lines: readonly BoardLine[] = [];
+    try {
+      lines = host.board?.(f.table) ?? [];
+    } catch (error) {
+      host.log(`Retour de partie : tableau de la table non lu (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    if (!lines.length) return undefined;
+    const top = lines.slice(0, BOARD_LINES);
+    const mine = lines.find((l) => isMine(l, f));
+    return mine && !top.includes(mine) ? [...top.slice(0, BOARD_LINES - 1), mine] : top;
+  }
 
   function news(f: GameReturnFacts): GameNews | undefined {
     let overtake;
@@ -172,6 +210,23 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
       else cards.push({ key: 'first', icon: 'trophy', title: t('Personne devant toi'), detail: t('Tu es premier : garde ta place') });
       const where = o.scope === 'country' && host.daily.input().country ? countryName(host.daily.input().country!, locale()) : o.scope === 'friends' ? t('Amis') : t('Monde');
       sections.push({ title: o.period === 'today' ? t('Classement du jour') : t('Classement de tout temps'), note: where, layout: 'list', cards });
+    } else if (s.standing) {
+      // Personne de dépassé : la place de la partie, et le prochain à battre.
+      const p = s.standing;
+      const cards: HubCardSpec[] = [{ key: 'place', icon: 'trophy', title: t('Ta place : {place}', { place: placeText(p.rank, p.period) }), aside: tn(p.players, '{n} joueur', '{n} joueurs') }];
+      if (p.next) cards.push({ key: 'next', avatar: host.daily.face(p.next), title: t('Prochain : {name}', { name: p.next.name }), ...levelChip(p.next), aside: fmt(p.next.score), detail: t('{place} · il te manque {gap}', { place: placeText(p.next.rank, p.period), gap: fmt(p.gap ?? 0) }) });
+      else cards.push({ key: 'first', icon: 'trophy', title: t('Personne devant toi'), detail: t('Tu es premier : garde ta place') });
+      const where = p.scope === 'country' && host.daily.input().country ? countryName(host.daily.input().country!, locale()) : t('Monde');
+      sections.push({ title: p.period === 'today' ? t('Classement du jour') : t('Classement de tout temps'), note: where, layout: 'list', cards });
+    } else if (s.board) {
+      // Pas de classement publié pour cette version : le tableau de la table sur la borne.
+      const cards: HubCardSpec[] = s.board.map((l, i) => ({
+        key: `board:${i}`,
+        title: `${l.rank}. ${l.initials ?? '—'}`,
+        aside: fmt(l.score),
+        ...(isMine(l, f) ? { tone: 'signal' as const, eyebrow: t('Ta partie') } : {}),
+      }));
+      sections.push({ title: t('Tableau de la table'), layout: 'list', cards });
     }
     // La suite : rejouer, un mot, retour.
     const target = o?.next;
@@ -197,7 +252,7 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
       icon: 'trophy',
       medallion: 'arene',
       title: t('PARTIE TERMINÉE'),
-      facts: [f.table.title, ...(o ? [t('Version classée')] : [])],
+      facts: [f.table.title, ...(o || s.standing ? [t('Version classée')] : [])],
       band: {
         level: v.level,
         short: t('NIV.'),
@@ -231,17 +286,20 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
     news,
     report(f) {
       expected = undefined;
-      const n = news(f);
-      if (!n) {
-        host.log(`Retour de partie : rien de neuf sur ${f.table.title}, pas d'écran.`); // i18n-ignore : journal
+      const n = news(f) ?? {};
+      if (!f.report.best) {
+        host.log(`Retour de partie : aucun score relevé sur ${f.table.title}, pas d'écran.`); // i18n-ignore : journal
         return false;
       }
       if (!host.canOpen()) {
-        host.log(`Retour de partie : du neuf sur ${f.table.title}, mais la roue n'est plus à l'écran.`); // i18n-ignore : journal
+        host.log(`Retour de partie : ${f.table.title} à montrer, mais la roue n'est plus à l'écran.`); // i18n-ignore : journal
         return false;
       }
-      shown = { f, news: n, at: now() };
-      host.log(`Retour de partie : ${f.table.title}${n.record ? ', record battu' : ''}${n.overtake ? `, ${n.overtake.passed.length} joueur(s) dépassé(s)` : ''}.`); // i18n-ignore : journal
+      const place = n.overtake ? undefined : standing(f);
+      const board = n.overtake || place ? undefined : boardOf(f);
+      shown = { f, news: n, ...(place ? { standing: place } : {}), ...(board ? { board } : {}), at: now() };
+      const what = n.overtake ? `${n.overtake.passed.length} joueur(s) dépassé(s)` : place ? `${place.rank}e sur ${place.players}` : board ? 'tableau de la table' : 'score seul'; // i18n-ignore : journal
+      host.log(`Retour de partie : ${f.table.title}, ${f.report.best}${n.record ? ', record battu' : ''}, ${what}.`); // i18n-ignore : journal
       hub.open(leave);
       return true;
     },

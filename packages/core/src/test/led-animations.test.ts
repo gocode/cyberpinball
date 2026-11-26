@@ -38,6 +38,8 @@ import {
   type LedStripSpec,
   type Rgb,
   ledLevelGain,
+  ledStripPosition,
+  ledXY,
 } from '../index';
 
 const strip = (over: Partial<LedStripSpec> = {}): LedStripSpec => ({
@@ -394,10 +396,12 @@ test('Animations LED : le balayage traverse la bande dans le sens demandé, puis
   const early = lit(1, 250);
   const late = lit(1, 600);
   assert.ok(early.best > 0 && late.best > 0, 'le balayage se voit');
-  assert.ok(late.where > early.where, 'vers la fin de la bande');
+  // Le sens se lit en hauteur (disposition déclarée), pas en ordre de câblage : grid est câblée par le haut.
+  const up = (k: number) => ledStripPosition(grid, k);
+  assert.ok(up(late.where) > up(early.where), 'vers le haut de la bande');
   const back = lit(-1, 250);
   const backLate = lit(-1, 600);
-  assert.ok(backLate.where < back.where, 'vers le début de la bande');
+  assert.ok(up(backLate.where) < up(back.where), 'vers le bas de la bande');
   const engine = new LedAmbientEngine(settings(style));
   const plain = engine.render(grid, 105_000);
   engine.sweep(100_000, 1);
@@ -447,12 +451,70 @@ test('Ouverture des LED : noire avant la mise sous tension, puis une lueur discr
   assert.ok(peak(glow) < 255 * 0.4, `discrète (${peak(glow)})`);
 });
 
-test('Ouverture des LED : la bille monte jusqu’à l’ignition, le pic est à l’ignition', () => {
+// 26/11/2026, borne d'essai : « la projection ne part pas dans le bon sens » ; elle doit partir du bas du
+// plateau (côté flippers) vers le haut, quel que soit le bout de la bande câblé en premier.
+test('Ouverture des LED : le front du faisceau avance du bas vers le haut et s’arrête au milieu, sur tout câblage', () => {
   const T = INTRO_TIMELINE;
-  // La bille monte vers la fin de la bande.
-  const low = brightest(renderLedIntro(grid, 1800, 1));
-  const high = brightest(renderLedIntro(grid, 2300, 1));
-  assert.ok(high > low, `la bille monte (${low} → ${high})`);
+  const grids: LedGrid[] = [
+    { width: 1, height: 20, arrangement: 'TopDownLeftRight' },
+    { width: 1, height: 60, arrangement: 'BottomUpLeftRight' },
+    { width: 1, height: 144, arrangement: 'LeftRightTopDown' },
+    { width: 1, height: 30, arrangement: 'LeftRightBottomUp' },
+  ];
+  for (const g of grids) {
+    const n = g.width * g.height;
+    // Hauteur de chaque LED (0 en bas) lue dans la disposition, et luminosité de chacune.
+    const height = (k: number) => ledStripPosition(g, k);
+    // Le front : la tête du faisceau, la LED la plus claire (les étincelles de la mise sous tension restent bien en dessous).
+    const front = (ms: number) => height(brightest(renderLedIntro(g, ms, 1)));
+    let prev = -1;
+    const fronts: string[] = [];
+    for (let ms = 1650; ms <= T.ignition - 20; ms += 50) {
+      const f = front(ms);
+      fronts.push(f.toFixed(2));
+      assert.ok(f >= prev - 1e-6, `${g.arrangement} ${n} : le front recule à ${ms} ms (${fronts.join(' ')})`);
+      prev = f;
+    }
+    assert.ok(front(1650) < 0.2, `${g.arrangement} : départ en bas (${front(1650)})`);
+    assert.ok(prev > 0.4 && prev < 0.62, `${g.arrangement} : arrêt au milieu (${prev})`);
+    assert.ok(ledStripPosition(g, brightest(renderLedIntro(g, 2000, 1))) < 0.45, 'la tête est sous le milieu en route');
+    // L'explosion part du milieu : peu après l'ignition, autant de lumière au-dessus qu'en dessous.
+    const blast = renderLedIntro(g, T.ignition + 200, 1);
+    let below = 0;
+    let above = 0;
+    for (let k = 0; k < n; k++) {
+      const v = blast[k * 3]! + blast[k * 3 + 1]! + blast[k * 3 + 2]!;
+      if (height(k) < 0.5) below += v;
+      else above += v;
+    }
+    assert.ok(Math.abs(above - below) < 0.15 * (above + below), `${g.arrangement} : explosion centrée (${below} / ${above})`);
+    // Le centre s'allume avant les bouts : l'onde s'étend.
+    const early = renderLedIntro(g, T.ignition + 60, 1);
+    const at = (h: number) => {
+      let best = 0;
+      let lum = 0;
+      for (let k = 0; k < n; k++) if (Math.abs(height(k) - h) < Math.abs(height(best) - h)) best = k;
+      lum = early[best * 3]! + early[best * 3 + 1]! + early[best * 3 + 2]!;
+      return lum;
+    };
+    assert.ok(at(0.5) > at(0) && at(0.5) > at(1), `${g.arrangement} : le milieu d’abord (${at(0)} / ${at(0.5)} / ${at(1)})`);
+    // En vert : le vert domine le faisceau et l'explosion.
+    for (const ms of [2000, T.ignition + 200]) {
+      const [r, gr, b] = channels(renderLedIntro(g, ms, 1));
+      assert.ok(gr > r && gr > b, `${ms} ms : vert (${r} / ${gr} / ${b})`);
+    }
+  }
+  // Une matrice : le faisceau monte aussi par ses colonnes du milieu.
+  const m: LedGrid = { width: 9, height: 16, arrangement: 'LeftRightAlternateTopDown' };
+  const rowOf = (k: number) => {
+    const { y } = ledXY(m, k);
+    return m.height - 1 - y;
+  };
+  assert.ok(rowOf(brightest(renderLedIntro(m, 2300, 1))) > rowOf(brightest(renderLedIntro(m, 1800, 1))), 'matrice : la tête monte');
+});
+
+test('Ouverture des LED : le pic est à l’ignition', () => {
+  const T = INTRO_TIMELINE;
   // Le pic : l'éclair de l'ignition.
   const atIgnition = renderLedIntro(grid, T.ignition + 30, 1);
   assert.ok(peak(atIgnition) >= 240, `éclair (${peak(atIgnition)})`);

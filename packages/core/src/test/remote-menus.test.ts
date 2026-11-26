@@ -14,6 +14,7 @@ import {
   parsePhoneMessage,
   REMOTE_ENTRIES_MAX,
   remoteEntries,
+  remoteEntriesShape,
   remoteMenuTarget,
   remoteMenuTree,
   remoteLayout,
@@ -186,8 +187,30 @@ test('accès direct : mêmes portes que la borne, rien ne se déverrouille du t�
   // Les réglages en partie : la porte game.settings, comme les deux MagnaSave.
   assert.match(frontend, /inGameMenu\.openable\(\) === true/);
   assert.match(read('app', 'src', 'in-game-menu.ts'), /if \(!opts\.allowed\(\)\) return t\('Fermés en mode invité\.'\);/);
-  // Un rang ne vaut que pour l'écran envoyé sous cette version.
-  assert.match(remote, /case 'pick': \{[\s\S]*?if \(message\.v !== entriesVersion\) return;/);
+  // Un rang ne vaut que pour l'écran envoyé sous cette version, ou sous une version récente de même forme
+  // (seul un détail a changé) : pick, focus et collection, tous les trois.
+  assert.match(remote, /case 'pick': \{[\s\S]*?if \(!sameScreen\(message\.v\)\) return;/);
+  assert.equal(remote.match(/if \(!sameScreen\(message\.v\)\) return;/g)?.length, 3);
+  assert.doesNotMatch(remote, /message\.v !== entriesVersion/);
+  assert.match(remote, /const sameScreen = \(v: number\): boolean => v === entriesVersion \|\| \(entriesShapes\.has\(v\) && entriesShapes\.get\(v\) === entriesShapes\.get\(entriesVersion\)\);/);
+  assert.match(remote, /entriesVersion\+\+;\s*entriesShapes\.set\(entriesVersion, remoteEntriesShape\(shown\)\);/);
   // La page n'envoie que des nombres et des identifiants de l'arbre.
   assert.deepEqual(page.match(/send\(\{ t: '(pick|open)'[^}]*\}\)/g), ["send({ t: 'pick', v, i })", "send({ t: 'open', id: node.id })", "send({ t: 'open', id: 'in-game' })", "send({ t: 'open', id: 'feedback' })"]);
+});
+
+test('forme d’un écran au téléphone : un détail qui change la garde, une entrée, un titre ou une collection la change', () => {
+  // 26/11/2026 : un toucher fait juste avant qu'un détail de l'écran change (progression, note) était ignoré.
+  const base = { kind: 'screen' as const, title: 'Télécommande', current: 0, items: [{ label: 'Déconnecter', detail: 'a' }, { label: 'Retour', group: 'g' }] };
+  const shape = remoteEntriesShape(base);
+  assert.equal(remoteEntriesShape({ ...base, note: 'n', items: [{ label: 'Déconnecter', detail: 'b' }, { label: 'Retour', group: 'g' }] }), shape, 'détail et note : même forme');
+  assert.equal(remoteEntriesShape({ ...base, current: 1 }), shape, 'le choix courant ne compte pas');
+  for (const other of [
+    { ...base, title: 'Autre' },
+    { ...base, kind: 'choice' as const },
+    { ...base, items: [{ label: 'Retour', group: 'g' }, { label: 'Déconnecter' }] },
+    { ...base, items: [{ label: 'Déconnecter', quiet: true }, { label: 'Retour', group: 'g' }] },
+    { ...base, items: [{ label: 'Déconnecter' }, { label: 'Retour', group: 'h' }] },
+    { ...base, items: [{ label: 'Déconnecter' }] },
+    { ...base, collections: { items: [{ label: 'Toutes' }], current: 0 } },
+  ]) assert.notEqual(remoteEntriesShape(other), shape, JSON.stringify(other));
 });

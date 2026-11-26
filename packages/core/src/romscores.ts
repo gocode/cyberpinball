@@ -467,6 +467,22 @@ export function writeRomVolume(memory: RomMemory, nv: Buffer, value: number): { 
   return { ok: true, data: out };
 }
 
+/**
+ * Pourquoi la carte d'une ROM n'est pas en cache (journal du relevé en direct, 26/11/2026 : une table
+ * originale n'était pas relevée sans un mot) : `no-index`, l'index des cartes jamais téléchargé ;
+ * `unknown`, la ROM n'a pas de carte publiée (table originale sans PinMAME, ROM inconnue du projet) ;
+ * `not-cached`, sa carte existe mais n'est pas encore téléchargée.
+ */
+export function romMapMissing(cacheDir: string, rom: string): 'no-index' | 'unknown' | 'not-cached' {
+  let index: Record<string, unknown>;
+  try {
+    index = JSON.parse(fs.readFileSync(path.join(cacheDir, 'index.json'), 'utf8')) as Record<string, unknown>;
+  } catch {
+    return 'no-index';
+  }
+  return typeof index[rom.trim().toLowerCase()] === 'string' ? 'not-cached' : 'unknown';
+}
+
 /** Carte d'une ROM déjà en cache (loadRomMemory l'y a mise), sans réseau ; undefined sinon. */
 export function cachedRomMemory(cacheDir: string, rom: string): RomMemory | undefined {
   try {

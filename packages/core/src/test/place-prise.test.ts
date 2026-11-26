@@ -12,7 +12,7 @@ import type { DailyInput } from '../dailytables';
 import { setLanguage } from '../i18n';
 import { createNoticeCenter, NOTICE_RULES, noticeText, type NoticeEvent } from '../notices';
 import { emptyLevels } from '../levels';
-import { gameNews, gameOvertake, placesTaken, placeTakenKey, placeTakenTable, stillTaken, type PlaceTaken } from '../overtakes';
+import { gameNews, gameOvertake, gameStanding, placesTaken, placeTakenKey, placeTakenTable, stillTaken, type PlaceTaken } from '../overtakes';
 import type { RankedScore, RankingStore } from '../rankings';
 import { fakeSocialNet } from './doublures';
 import { frontendSource } from './frontend-source';
@@ -248,6 +248,11 @@ test('retour de partie : du neuf seulement pour un record battu ou un joueur dé
   // Une partie qui ne passe personne : rien.
   const small = score(ME, 'Kiko', 7_000_000, 5);
   assert.equal(gameOvertake(input([...before, small]), { board: AFM }, since, { now: NOW }), undefined);
+  // Mais sa place au classement se lit quand même, avec le prochain à battre (retour de partie, 26/11/2026).
+  const better = score(ME, 'Kiko', 9_000_000, 5);
+  const place = gameStanding(input([...before, better]), { board: AFM }, since, { now: NOW });
+  assert.deepEqual([place?.period, place?.rank, place?.players, place?.passed.length, place?.next?.name, place?.gap], ['today', 3, 4, 0, 'Léa', 450_000]);
+  assert.equal(gameStanding(input(before), { board: AFM }, since, { now: NOW }), undefined, 'score pas publié : pas de place');
 });
 
 interface ReturnBuilt {
@@ -255,7 +260,7 @@ interface ReturnBuilt {
   keys?: (i: { code: string }) => boolean;
   back: () => void;
   hint?: string;
-  hub: { tabs: unknown[]; band?: { fresh?: number; lines: string[] }; sections: { cards: { title: string; buttons?: { label: string; action?: number; off?: string }[] }[] }[] };
+  hub: { tabs: unknown[]; band?: { fresh?: number; lines: string[] }; sections: { title?: string; cards: { title: string; eyebrow?: string; aside?: string; buttons?: { label: string; action?: number; off?: string }[] }[] }[] };
 }
 
 interface GameReturnLike {
@@ -265,11 +270,11 @@ interface GameReturnLike {
   holding(): boolean;
 }
 
-function gameReturn(over: { friend?: boolean; now?: () => number } = {}) {
+function gameReturn(over: { friend?: boolean; now?: () => number; mine?: number; board?: { rank: number; score: number; initials?: string; at?: string }[] } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createGameReturn } = require(path.join(REPO_ROOT, 'app', 'dist', 'game-return.js')) as { createGameReturn(host: unknown): GameReturnLike };
   const lea = score(LEA, 'Léa', 9_450_000, 120);
-  const mine = score(ME, 'Kiko', 9_712_450, 5);
+  const mine = score(ME, 'Kiko', over.mine ?? 9_712_450, 5);
   let opened: { build: () => ReturnBuilt; at?: number } | undefined;
   const events: string[] = [];
   let clock = NOW.getTime();
@@ -279,23 +284,46 @@ function gameReturn(over: { friend?: boolean; now?: () => number } = {}) {
     friends: { isFriend: () => over.friend === true, send: (_k: string, text: string) => (events.push(`mot : ${text}`), true) },
     play: (t: { title: string }) => events.push(`rejouer ${t.title}`),
     zoneKeys: () => [],
+    ...(over.board ? { board: () => over.board } : {}),
     canOpen: () => true,
     log: () => undefined,
     now: over.now ?? (() => clock),
   });
   const table = { title: 'Attack from Mars', file: 'afm.vpx' };
-  const facts = (best: number, previousBest?: number) => ({ table, version: { board: AFM }, since: new Date(NOW.getTime() - 15 * 60_000), report: { gains: [{ kind: 'game' as const, xp: 10, at: NOW.toISOString() }, { kind: 'play' as const, xp: 12, at: NOW.toISOString(), value: 12 }], from: 1000, to: 1022, best, ...(previousBest ? { previousBest } : {}) } });
+  const facts = (best: number | undefined, previousBest?: number) => ({ table, version: { board: AFM }, since: new Date(NOW.getTime() - 15 * 60_000), report: { gains: [{ kind: 'game' as const, xp: 10, at: NOW.toISOString() }, { kind: 'play' as const, xp: 12, at: NOW.toISOString(), value: 12 }], from: 1000, to: 1022, best, ...(previousBest ? { previousBest } : {}) } });
   return { r, events, facts, built: () => opened?.build(), at: () => opened?.at, tick: (ms: number) => (clock += ms) };
 }
 
-test('retour de partie : pas d’écran sans neuf ; avec du neuf, score, XP, joueur dépassé, suite', () => {
+test('retour de partie : un écran après toute partie au score connu, avec le classement ou le tableau de la table', () => {
+  // Aucun score relevé : pas d'écran, le moment des badges passe.
   const nothing = gameReturn();
   nothing.r.expect();
   assert.equal(nothing.r.holding(), true, 'le moment des badges attend le bilan');
-  // Un score sous mon record, sur une version où personne n'est dépassé : on le simule sans version.
-  assert.equal(nothing.r.report({ ...nothing.facts(5_000_000, 9_000_000), version: undefined }), false);
+  assert.equal(nothing.r.report(nothing.facts(undefined)), false);
   assert.equal(nothing.built(), undefined, 'aucun écran');
   assert.equal(nothing.r.holding(), false, 'le moment des badges passe');
+
+  // Rien de neuf (sous mon record, personne de dépassé) : l'écran s'ouvre avec la place et le prochain.
+  const plain = gameReturn({ mine: 9_000_000 });
+  assert.equal(plain.r.report(plain.facts(9_000_000, 9_800_000)), true);
+  const ranked = plain.built()!.hub.sections;
+  const rankTitles = ranked.flatMap((s) => s.cards.map((c) => c.title));
+  assert.ok(rankTitles.includes('9 000 000') || rankTitles.some((x) => x.replace(/\D/g, '') === '9000000'), 'le score');
+  assert.ok(rankTitles.includes('Ta place : 3ᵉ du jour'), rankTitles.join(' | '));
+  assert.ok(rankTitles.includes('Prochain : Léa'));
+
+  // Premier score, sur une table sans classement publié (table originale) : le tableau de la table.
+  const at = new Date(NOW.getTime() - 60_000).toISOString();
+  const board = [{ rank: 1, score: 90_000_000, initials: 'ABC' }, { rank: 2, score: 74_800_050, initials: 'JUL', at }];
+  const original = gameReturn({ board });
+  assert.equal(original.r.report({ ...original.facts(74_800_050), version: undefined }), true, 'un premier score ouvre l’écran');
+  const lines = original.built()!.hub.sections.find((s) => s.title === 'Tableau de la table')!.cards;
+  assert.deepEqual(lines.map((c) => [c.title, c.eyebrow]), [['1. ABC', undefined], ['2. JUL', 'Ta partie']]);
+
+  // Ni classement ni tableau : le score seul.
+  const alone = gameReturn();
+  assert.equal(alone.r.report({ ...alone.facts(5_000), version: undefined }), true);
+  assert.ok(!alone.built()!.hub.sections.some((s) => s.title === 'Tableau de la table'));
 
   const h = gameReturn();
   h.r.expect();

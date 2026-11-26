@@ -1491,8 +1491,27 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     const compat = [...new Set([...own.compat, ...missing])];
     content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat, own.prewarm) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat, own.prewarm);
   }
+  // Own Sub DOF of the script (scriptcompat.ts, dofTapOwnSub): no fault of the table, it only feeds the LED effects.
+  // With another fix, that one's message is shown; the .vbs gets both.
+  const shown = missing.filter((f) => f !== 'dofTapOwnSub');
+  if (!shown.length) {
+    return {
+      code: 'scriptCoreCompat',
+      severity: 'info',
+      title: t('Événements DOF du script pour les effets LED'),
+      detail: [
+        t('Le script de la table a sa propre procédure DOF au lieu de celle de controller.vbs : sans retouche, ses événements DOF n’arrivent pas aux effets LED de Cyber Pinball.'),
+        !content
+          ? t('Le script de la table est protégé : Cyber Pinball ne peut pas lui ajouter cette transmission.')
+          : foreign
+            ? t('Ajouté dans {file}, le script que VPX joue à la place de celui de la table : chaque événement DOF est aussi transmis aux effets LED.', { file })
+            : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui transmet aussi chaque événement DOF aux effets LED.', { file }),
+      ].join(' '),
+      fix: content ? { label: t('Transmettre les événements DOF aux effets LED (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    };
+  }
   // Call to the B2S backglass that VPX's plugin refuses (text instead of a number): the script stopped there.
-  if (missing.every((f) => f === 'b2sArgs')) {
+  if (shown.every((f) => f === 'b2sArgs')) {
     return {
       code: 'scriptCoreCompat',
       severity: 'warning',
@@ -1509,7 +1528,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     };
   }
   // DMD folder looked for in TablesDirectory, which is not the table's folder (scriptcompat.ts).
-  if (missing.every((f) => f === 'tablesDirectoryDmd')) {
+  if (shown.every((f) => f === 'tablesDirectoryDmd')) {
     const folder = facts?.dmdFolder ?? 'UltraDMD';
     return {
       code: 'scriptCoreCompat',
@@ -1528,7 +1547,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   }
   // Procedures redefined during the game (FlashForMs and SetFlash blinking): the only fix missing.
   // vpmTimer timers described by a text: compiled by Execute at each deadline.
-  if (missing.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
+  if (shown.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
     const blinks = missing.includes('executeGlobalOnce');
     const timers = missing.includes('timerTextOnce');
     const detail = [
@@ -1554,7 +1573,7 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     };
   }
   // VR room switched on on the screens (VR version of the table, or test switch left at 1): alone, or with vpmInit.
-  if (!missing.includes('vpmInitOnce')) {
+  if (!shown.includes('vpmInitOnce')) {
     const flags = code !== undefined ? vrRoomFlags(code) : [];
     const detail = [
       t('Version VR de la table : son script allume sa pièce VR (meuble, salle, fronton en 3D) même sans casque ({flags}). Sur les écrans, VPX la dessine à chaque image alors qu’elle ne sert que dans le casque.', { flags: formatList(flags.length ? flags : ['VR_Room']) }),

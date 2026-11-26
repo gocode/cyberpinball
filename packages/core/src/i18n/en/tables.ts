@@ -31,6 +31,15 @@ export const messages: Record<string, string> = {
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où un nombre écrit en texte est converti, et où un appel encore refusé n’arrête plus le script.':
     'The table is not modified: VPX plays {file}, a copy of its script where a number written as text is converted, and where a call still refused no longer stops the script.',
   'Adapter les appels au fronton B2S (dans {file})': 'Adapt the calls to the B2S backglass (in {file})',
+  'Événements DOF du script pour les effets LED': 'Script DOF events for the LED effects',
+  'Le script de la table a sa propre procédure DOF au lieu de celle de controller.vbs : sans retouche, ses événements DOF n’arrivent pas aux effets LED de Cyber Pinball.':
+    'The table script has its own DOF procedure instead of controller.vbs’s: without a change, its DOF events do not reach Cyber Pinball’s LED effects.',
+  'Le script de la table est protégé : Cyber Pinball ne peut pas lui ajouter cette transmission.': 'The table script is protected: Cyber Pinball cannot add this to it.',
+  'Ajouté dans {file}, le script que VPX joue à la place de celui de la table : chaque événement DOF est aussi transmis aux effets LED.':
+    'Added in {file}, the script VPX plays instead of the table’s: each DOF event is also passed on to the LED effects.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui transmet aussi chaque événement DOF aux effets LED.':
+    'The table is not modified: VPX plays {file}, a copy of its script that also passes each DOF event on to the LED effects.',
+  'Transmettre les événements DOF aux effets LED (dans {file})': 'Pass the DOF events on to the LED effects (in {file})',
   '{file} règle {keys} à 0 pour cette table seulement : elle se joue sans ce son.': '{file} sets {keys} to 0 for this table only: it plays without that sound.',
   'Rendre le son à cette table': 'Give this table its sound back',
   'Musique introuvable': 'Music not found',

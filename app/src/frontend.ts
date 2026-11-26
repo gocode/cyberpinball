@@ -105,7 +105,9 @@ import {
   loadCabinet,
   ledsFromCabinet,
   dofScenePalette,
+  dofScriptEvents,
   refreshDofFallback,
+  scriptCode as vbsCode,
   dofRomNumbers,
   joystickButtonsUnrecorded,
   playfieldOrientation,
@@ -1449,13 +1451,17 @@ let gameLeds: DofTapGame | 'dof' | undefined;
 // Table à ROM : avant que libdof ne lise sa config, le repli (dof-repli.ts) écrit directoutputconfig99.ini,
 // des effets pour les bandes de LED aux ROM dont la config n'en a presque pas (riches : laissées telles
 // quelles). Les ROM de la bibliothèque se relisent au plus toutes les 10 min ; la table lancée prend ses couleurs.
+// Table originale relayée à libdof (original) : jugée sur les « DOF n, état » que son script envoie vraiment ;
+// la config qui en suit moins de la moitié sur les bandes est complétée de la même façon (DOF_ORIGINAL_COVERED).
 let libraryRomsMemo: { at: number; roms: string[] } | undefined;
-function refreshRomFallback(table: TableEntry): void {
+function refreshRomFallback(table: TableEntry, original?: string): void {
   try {
     const setup = readDof(loc);
     if (!setup) return;
     if (!libraryRomsMemo || Date.now() - libraryRomsMemo.at > 600_000) libraryRomsMemo = { at: Date.now(), roms: [...new Set(tables.flatMap((t) => romsOf(t)))] };
-    const played = [...new Set([...romsOf(table), ...loadedRoms(table.folder, romsOf(table))])];
+    const script = original ? tableScriptText(table) : undefined;
+    const events = script ? dofScriptEvents(vbsCode(script)) : undefined;
+    const played = original ? [original] : [...new Set([...romsOf(table), ...loadedRoms(table.folder, romsOf(table))])];
     const tint = tints?.current()?.color;
     const p = dofScenePalette(tint, tints?.current()?.leds);
     const colors = [p.primary, p.accent, p.secondary].map((c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`);
@@ -1463,6 +1469,7 @@ function refreshRomFallback(table: TableEntry): void {
     const result = refreshDofFallback(setup, [...libraryRomsMemo.roms, ...played], {
       enabled: loadEventSettings(loc.dataDir).romFallback !== false,
       ...(tint ? { palette: (rom: string) => (playedSet.has(rom.toLowerCase()) ? colors : undefined) } : {}),
+      ...(original && events?.size ? { events: (rom: string) => (rom.toLowerCase() === original.toLowerCase() ? events : undefined) } : {}),
     });
     if (result.refused) console.warn(`[dof] repli : ${result.refused}`);
     if (result.wrote || result.removed || result.cabinetUpdated) {
@@ -4089,6 +4096,8 @@ const gameReturn = createGameReturn({
   // « Défier {nom} » : le joueur dépassé, avec le score de cette partie, sur sa version exacte.
   challenge: (rival, f, reopen) => challengesMenu.button({ key: rival.key, name: rival.name, ...(rival.country ? { country: rival.country } : {}) }, f.version ? challengeTableOf(f.version, presenceTable(f.table).title, presenceTable(f.table).vpsId) : undefined, f.report.best, 'game', 'challenge', reopen),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  // Sans classement publié pour la version (table originale…) : le tableau de la table sur la borne.
+  board: (table) => tableScores.board(table, 'all').lines,
   canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
   log: (line) => console.log(line),
 });
@@ -6510,6 +6519,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Le fichier d'écoute de toute partie aux LED, table à ROM comprise : si PinMAME n'y démarre pas, la partie
   // passe aux effets sans ROM sur ce fichier (led-rom.ts).
   const ledTap = ledGame ? openTap(install.exe) : undefined;
+  // Avant que libdof ne lise sa config : le repli complète celle d'une table originale qui suit peu ses événements.
+  if (dofMode?.kind === 'relais' && ledTap) refreshRomFallback(table, dofMode.rom);
   let dofTap = dofMode && ledTap ? startTap(dofTapDeps, install.exe, dofMode, played.file, ledAbout(), { tap: ledTap }) : undefined;
   gameLeds = simulated === undefined ? (dofTap ?? 'dof') : undefined;
   if (simulated === undefined && !displayMode && !otherVpx && romsOf(table).length) refreshRomFallback(table);
@@ -6527,6 +6538,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           if (!pinmame) {
             const mode = tapMode(dofTapDeps, { hasRom: false, b2sName: b2sNameOf(table) });
             console.log(`LED de la partie : PinMAME n'a pas démarré (vpinball.log), table retenue sans ROM pour les LED : ${mode ? (mode.kind === 'relais' ? 'relais vers libdof' : 'effets sans ROM') : 'aucun effet (effets sans ROM coupés, ou pas de bandes décrites)'}.`); // i18n-ignore : journal
+            if (mode?.kind === 'relais') refreshRomFallback(table, mode.rom);
             dofTap = mode ? startTap(dofTapDeps, install.exe, mode, played.file, ledAbout(), { tap: ledTap, takeBack: true }) : undefined;
             gameLeds = dofTap ?? 'dof';
           } else {
@@ -6546,6 +6558,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   let soloWatch: SoloScoreWatch | undefined;
   const soloPlan = simulated === undefined && !double && !vrGame && !recordIni && !otherVpx && !displayMode && mode !== 'display' && !autoStopAfterMs && scoresBefore ? tableScores.solo(table) : undefined;
   const soloPort = soloPlan ? inspector?.port : undefined;
+  if (soloPlan && !soloPort) console.log(`Relevé en direct (${table.id}) : inspector de VPX absent (plugin manquant ou pare-feu), score lu à la fermeture seulement.`); // i18n-ignore : journal
   if (soloPlan && soloPort) soloSetup = prepareSoloInspector({ dataDir: loc.dataDir, ini: activeVpxIni(loc), tableFolder: table.folder, games: soloPlan.games, states: soloPlan.plan.states, port: soloPort, log: (line) => console.log(line) });
   const game =
     simulated !== undefined

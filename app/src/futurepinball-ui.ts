@@ -19,7 +19,6 @@ import {
   futurePinballTableInMenu,
   installFuturePinballArchive,
   licensePages,
-  looksLikePupTable,
   managedFuturePinballDir,
   migrateFuturePinball,
   planFuturePinballMigration,
@@ -36,7 +35,6 @@ import {
 import type { Action, Built, Row } from './library-types';
 import { onGesture } from './gesture-flash';
 import { detectFuturePinball } from './futurepinball-play';
-import { findPinupPlayer, type PinupPlayer } from './pinup-player';
 import { downloadFuturePinball, extractManagedFuturePinball, futurePinballComponent, type FuturePinballDownload, type FuturePinballDownloaded, type FuturePinballSetup } from './futurepinball-install';
 
 export interface FuturePinballUiHost {
@@ -78,28 +76,17 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
   /** Relit le jeu sur ce PC : à l'ouverture de « Ajouter une table » et de cet écran. */
   function refresh(): FuturePinballInstall | undefined {
     install = detectFuturePinball(host.dataDir(), host.root());
-    pinup = findPinupPlayer();
     read = true;
     return install;
   }
 
   /**
-   * PuP-Packs (24/11/2026) : les tables « PinEvent » pilotent des vidéos par PinUP Player, que Future Pinball n'a pas.
-   * Il s'installe avec PinUP Popper (ensemble PinUPSystem) ; Popper n'a pas besoin d'être ouvert. Relu avec le jeu.
+   * Tables « PinEvent » (26/11/2026 : Cyber Pinball n'utilise pas PinUP). Leur script teste
+   * l'objet PinUP et, s'il manque, coupe de lui-même ses vidéos et ses sons PUP : la table se joue avec le DMD et
+   * les sons du jeu. Rien à installer de plus, rien à détecter.
    */
-  let pinup: PinupPlayer | undefined;
-  function pupRow(): Row {
-    return pinup
-      ? {
-          text: t('PuP-Packs : PinUP Player présent'),
-          detail: t('{dir}. Les tables « PinEvent » jouent leurs vidéos (fronton, DMD, topper) ; leurs PuP-Packs se rangent dans {videos}. PinUP Popper n’a pas besoin d’être ouvert : Cyber Pinball reste le front-end.', { dir: pinup.dir, videos: pinup.videos }),
-          tone: 'ok',
-        }
-      : {
-          text: t('PuP-Packs : PinUP Player absent'),
-          detail: t('Certaines tables (« PinEvent ») pilotent un PuP-Pack : les vidéos du fronton, du DMD et du topper. {game} n’a pas de lecteur intégré : il faut PinUP Player, qui s’installe avec PinUP Popper (ensemble PinUPSystem). Popper n’a pas besoin d’être ouvert : Cyber Pinball reste le front-end. Sans lui, ces tables se jouent sans leurs vidéos.', { game: FUTURE_PINBALL_NAME }),
-          tone: 'quiet',
-        };
+  function pinEventRow(): Row {
+    return { text: t('Tables « PinEvent »'), detail: t('Elles se jouent avec le DMD et les sons de {game}, sans rien à installer de plus.', { game: FUTURE_PINBALL_NAME }), icon: 'info', tone: 'quiet' };
   }
 
   /**
@@ -255,7 +242,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
         notice ??
         t('Start : ajouter une table au front-end. Elle y garde son dossier, ses médias et ses statistiques ; l’original reste dans Future Pinball, intact. La partie se lance dans Future Pinball, par BAM s’il est installé ; ses écrans se règlent dans ses préférences (Vidéo).') + ' ' + bamMenuHelp(),
       sections: [
-        { title: FUTURE_PINBALL_NAME, rows: [game, pupRow()] },
+        { title: FUTURE_PINBALL_NAME, rows: [game, pinEventRow()] },
         {
           title: tn(rows.length, '{n} table', '{n} tables'),
           rows: rows.length
@@ -298,14 +285,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
               { text: t('Où'), detail: t('{dir} : le dossier de Cyber Pinball ; rien ailleurs, ton installation actuelle n’est pas touchée. Aucune demande d’administrateur.', { dir }), icon: 'folder' },
               { text: t('Licences'), detail: t('Deux contrats, celui de Future Pinball et celui de BAM : tu les lis en entier après le téléchargement, et rien n’est installé tant que tu ne les as pas acceptés. Les fichiers sont posés sans aucune modification.'), icon: 'rules', tone: 'quiet' },
               { text: t('Ce que fait cette installation en moins'), detail: t('L’installateur n’est pas lancé : pas de désinstalleur, pas de raccourcis, pas d’association des fichiers .fpt (Cyber Pinball lance lui-même les tables). Supprimer le dossier ci-dessus suffit à tout retirer.'), icon: 'info', tone: 'quiet' },
-              {
-                text: t('PuP-Packs'),
-                detail: pinup
-                  ? t('Pas fournis ici, mais PinUP Player est déjà sur ce PC ({dir}) : les tables « PinEvent » joueront leurs vidéos (fronton, DMD, topper).', { dir: pinup.dir })
-                  : t('Pas fournis ici : les tables « PinEvent » pilotent leurs vidéos (fronton, DMD, topper) par PinUP Player, qui s’installe avec PinUP Popper (ensemble PinUPSystem). Popper n’a pas besoin d’être ouvert. Sans lui, ces tables se jouent sans leurs vidéos.'),
-                icon: 'info',
-                tone: 'quiet',
-              },
+              pinEventRow(),
             ],
           },
         ],
@@ -509,9 +489,7 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       writeFuturePinballConfig(host.dataDir(), undefined);
       notice = result.bam
         ? t('{game} et BAM sont installés dans {dir}. Les tables que tu ajoutes y sont rangées.', { game: FUTURE_PINBALL_NAME, dir: result.dir })
-        : t('{game} est installé dans {dir}, mais BAM n’y est pas : les tables récentes en ont besoin.', { game: FUTURE_PINBALL_NAME, dir: result.dir });
-      if (!findPinupPlayer()) notice += ` ${t('Les tables « PinEvent » jouent leurs vidéos (PuP-Pack) par PinUP Player, qui s’installe avec PinUP Popper : voir la ligne « PuP-Packs ».')}`;
-    } else {
+        : t('{game} est installé dans {dir}, mais BAM n’y est pas : les tables récentes en ont besoin.', { game: FUTURE_PINBALL_NAME, dir: result.dir });    } else {
       // Pas de réponse de la tâche (annulée) : rien n'a été posé.
       notice = t('{game} n’est pas installé : {reason}.', { game: FUTURE_PINBALL_NAME, reason: '?' });
     }
@@ -531,13 +509,6 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
     }
     notice = tn(copied, '{n} fichier repris dans {dir} ; l’ancienne installation est intacte.', '{n} fichiers repris dans {dir} ; l’ancienne installation est intacte.', { dir: plan.to });
     open();
-  }
-
-  /** Une table ajoutée dont le nom annonce un PuP-Pack (« PinEvent ») alors que PinUP Player manque : sans ses vidéos. */
-  function pupWarning(added: TableEntry[]): string | undefined {
-    const pup = added.filter((e) => looksLikePupTable(e.title) || looksLikePupTable(path.basename(e.file)));
-    if (!pup.length || findPinupPlayer()) return undefined;
-    return tn(pup.length, '« {title} » semble piloter un PuP-Pack : sans PinUP Player (installé avec PinUP Popper), elle se joue sans ses vidéos.', '{n} tables semblent piloter un PuP-Pack : sans PinUP Player (installé avec PinUP Popper), elles se jouent sans leurs vidéos.', { title: pup[0]!.title });
   }
 
   async function pickTables(): Promise<void> {
@@ -592,7 +563,6 @@ export function createFuturePinballUi(host: FuturePinballUiHost) {
       added.length === 1 ? t('« {title} » ajoutée au front-end.', { title: added[0]!.title }) : added.length ? tn(added.length, '{n} table ajoutée au front-end.', '{n} tables ajoutées au front-end.') : undefined,
       added.some((e) => e.info.Info?.VPSId) ? (added.length > 1 ? t('Leurs médias arrivent (Téléchargements).') : t('Ses médias arrivent (Téléchargements).')) : undefined,
       already ? tn(already, '{n} déjà dans le front-end.', '{n} déjà dans le front-end.') : undefined,
-      pupWarning(added),
       failed.length ? t('Pas ajoutées : {list}', { list: formatList(failed) }) : undefined,
     ]
       .filter(Boolean)

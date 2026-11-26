@@ -28,6 +28,7 @@ import {
   createLaunchDetector,
   dofEventClass,
   dofScenePalette,
+  dofTapReach,
   parseTapChunk,
   readLedAnimations,
   type CabinetLeds,
@@ -223,6 +224,7 @@ function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: st
   });
   if (relay.ready) void relay.done.then(() => ready && fail('relais arrêté en cours de partie')); // i18n-ignore : journal
   deps.log(`${prefix} relais vers libdof.`); // i18n-ignore : journal
+  logTapReach(deps, about.script);
   return {
     env: tap.env,
     ownsLeds: () => Boolean(generic),
@@ -235,6 +237,18 @@ function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: st
       void relay.done.finally(() => fs.rmSync(tap.file, { force: true }));
     },
   };
+}
+
+/**
+ * Au journal, quand les appels DOF du script joué ne passent pas par controller.vbs : écoute branchée dans la Sub DOF
+ * du script (scriptcompat.ts, dofTapOwnSub), ou appels qu'aucune écoute ne voit (26/11/2026 : Stranger Things,
+ * 312 appels DOF dans sa propre Sub DOF, LED muettes sans aucune trace).
+ */
+function logTapReach(deps: Pick<DofTapDeps, 'log'>, script: string | undefined): void {
+  if (!script) return;
+  const reach = dofTapReach(script);
+  if (reach === 'table') deps.log('Écoute DOF : branchée dans la Sub DOF du script de la table.'); // i18n-ignore : journal
+  else if (reach === 'missed') deps.log('Écoute DOF : les appels DOF du script n’atteignent aucune écoute (Sub DOF du script non retouchée, ou venue d’ailleurs que controller.vbs) : LED sans les événements de la table.'); // i18n-ignore : journal
 }
 
 /** Ce que la partie sait de la table pour ses effets : son script (rôle des événements) et sa couleur. */
@@ -380,6 +394,7 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
   const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
+  logTapReach(deps, about.script);
   return {
     stop() {
       if (stopped) return;

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import { DEFAULT_DMD_COLOR, DMD_TABLE_COLOR, dmdColorReadable, effectiveDmdColor } from '../dmdcolor';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
 import type { RgbaImage } from '../png';
@@ -55,6 +55,21 @@ function image(parts: [Rgba, number][], width = 40, height = 20): RgbaImage {
     for (let k = 0; k < n && i < total; k++, i++) data.set(color, i * 4);
   }
   return { width, height, data };
+}
+
+/**
+ * Horloge factice des essais du menu (TableTints) : le temps n'avance que par l'attente rendue, qui
+ * déclenche les minuteries échues puis laisse finir la mesure lancée (le faux convertisseur et le cache
+ * n'attendent que des promesses déjà tenues, jamais une entrée-sortie). Avec de vraies attentes (5 ms
+ * face à une attente de 30 ms, 80 ms pour attente, mesure et écriture du cache), une machine chargée
+ * décalait les minuteries et le test tombait sans rien dire du code (13 chutes, 25/11/2026).
+ */
+function fakeClock(t: TestContext): (ms: number) => Promise<void> {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  return async (ms) => {
+    t.mock.timers.tick(ms);
+    await new Promise((resolve) => setImmediate(resolve));
+  };
 }
 
 const solid = (hex: string, alpha = 255): RgbaImage => image([[[...hexToRgb(hex), alpha], 1]]);
@@ -200,7 +215,7 @@ test('réglages : couleur de chaque table affichée par défaut, DMD au vert sig
   assert.equal(effectiveDmdColor('#ff8a1f', '#ffa09d'), '#ff8a1f');
 });
 
-test('menu : rien n’est mesuré pendant le défilement, la teinte suit la table arrêtée, fronton puis plateau, une mesure par média', async () => {
+test('menu : rien n’est mesuré pendant le défilement, la teinte suit la table arrêtée, fronton puis plateau, une mesure par média', async (t) => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[] } | undefined): void;
     current(): TableTint | undefined;
@@ -229,7 +244,7 @@ test('menu : rien n’est mesuré pendant le défilement, la teinte suit la tabl
         },
       }),
     });
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = fakeClock(t);
     const blue = { key: 'bleu', files: [files['bleu-backglass.png']!, files['rose-playfield.png']!] };
     const grey = { key: 'gris', files: [files['gris-backglass.png']!, files['rose-playfield.png']!] };
     // Défilement rapide : dix crans en moins de l'attente, rien n'est mesuré.
@@ -268,7 +283,7 @@ test('menu : rien n’est mesuré pendant le défilement, la teinte suit la tabl
 
 // 21/11/2026 : même connue, la teinte attendait toujours SETTLE_MS, puis repartait dans un second envoi
 // de tout l'état ; son fondu tombait en plein atterrissage de la roue, après celui des médias.
-test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de suite, dans l’état envoyé ; en rafale, elle attend l’arrêt', async () => {
+test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de suite, dans l’état envoyé ; en rafale, elle attend l’arrêt', async (t) => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[] } | undefined): void;
     current(): TableTint | undefined;
@@ -293,7 +308,7 @@ test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de 
       onChange: () => changes++,
       converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
     });
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = fakeClock(t);
     const blue = { key: 'bleu', files: [at('bleu-backglass.png')] };
     const pink = { key: 'rose', files: [at('rose-backglass.png')] };
     const hueOf = () => tints.current()?.hue ?? -1;
@@ -320,7 +335,7 @@ test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de 
   }
 });
 
-test('menu : les points du DMD prennent d’abord la couleur du média de l’écran du DMD, l’ambiance celle du fronton (12/11/2026)', async () => {
+test('menu : les points du DMD prennent d’abord la couleur du média de l’écran du DMD, l’ambiance celle du fronton (12/11/2026)', async (t) => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[]; dmdFiles?: readonly string[] } | undefined): void;
     current(): Partial<TableTint> | undefined;
@@ -352,7 +367,7 @@ test('menu : les points du DMD prennent d’abord la couleur du média de l’é
       onChange() {},
       converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
     });
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = fakeClock(t);
     tints.follow({ key: 'orange', files: [backglass], dmdFiles: [orange] });
     await wait(60);
     const shown = tints.current()!;
@@ -412,7 +427,7 @@ test('LED : une table toute verte n’a pas de teinte d’interface (vert signal
   assert.deepEqual(tintRecord([solid('#7a7f80')]), { refused: 'terne' }, 'un gris ne donne rien');
 });
 
-test('LED : la roue transmet les couleurs de la table, même refusée pour l’interface', async () => {
+test('LED : la roue transmet les couleurs de la table, même refusée pour l’interface', async (t) => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[] } | undefined): void;
     current(): (Partial<TableTint> & { leds?: string[] }) | undefined;
@@ -441,7 +456,7 @@ test('LED : la roue transmet les couleurs de la table, même refusée pour l’i
       onChange() {},
       converter: () => ({ mediaFrames: async (file: string) => ({ width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!]!] }) }),
     });
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = fakeClock(t);
     tints.follow({ key: 'duo', files: [duo] });
     await wait(60);
     assert.deepEqual(tints.current()!.leds, measureLedPalette([images.duo!]));
@@ -458,7 +473,7 @@ test('LED : la roue transmet les couleurs de la table, même refusée pour l’i
 // 25/11/2026, borne d'essai : fronton vert refusé pour l'interface, la roue donnait seule les couleurs des LED
 // et le plateau n'était jamais lu. Invariant : les LED mêlent les dominantes du fronton et du plateau ; la
 // roue ne sert qu'en dernier.
-test('LED : les dominantes du fronton et du plateau se mêlent, la roue en dernier recours', async () => {
+test('LED : les dominantes du fronton et du plateau se mêlent, la roue en dernier recours', async (t) => {
   const merged = mergeLedPalettes([['#20d040', '#2060ff'], ['#2a6aff', '#e02020'], undefined]);
   assert.deepEqual(merged, ['#20d040', '#2a6aff', '#e02020'], 'la dominante de chacun d’abord, puis les suivantes, sans doublon proche');
   assert.equal(mergeLedPalettes([['#ff0000', '#00ff00', '#0000ff', '#ffff00'], ['#ff00ff', '#00ffff']]).length, LED_PALETTE_MAX);
@@ -492,7 +507,7 @@ test('LED : les dominantes du fronton et du plateau se mêlent, la roue en derni
       },
     });
     const tints = new TableTints({ dataDir: dir, settleMs: 10, onChange() {}, converter });
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = fakeClock(t);
     const subject = { key: 'matrice', files: [backglass, playfield, wheel], ledFiles: [backglass, playfield] };
     tints.follow(subject);
     await wait(80);

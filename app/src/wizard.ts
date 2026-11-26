@@ -167,7 +167,7 @@ import { qrRows } from './remote-qr';
 import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { onKeyInput, sendableKey, sendableModifiers } from './key-input';
-import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualHat, pressVirtualPinscapeButton, retryJoysticks } from './joystick-input';
+import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualHat, pressVirtualPinscapeButton, readJoysticksNow, retryJoysticks } from './joystick-input';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { vcRuntimeReady } from './vc-runtime';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, withoutPlunger, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
@@ -210,8 +210,11 @@ type Phase = WizardPhase;
 
 const DIAGONAL = { min: 10, max: 110, fallback: 42 };
 
-/** Sans aucun bouton pressé pendant ce délai, l'étape « Boutons » garde les touches actuelles. */
-const BUTTONS_TIMEOUT_MS = 20_000;
+/**
+ * Sans aucun bouton pressé pendant ce délai, l'étape « Boutons » garde les touches actuelles.
+ * CYBERPINBALL_DELAI_BOUTONS_MS : plus court pour les essais, qui attendent sa fin (« FinDuDelai »).
+ */
+const BUTTONS_TIMEOUT_MS = Number(process.env.CYBERPINBALL_DELAI_BOUTONS_MS) || 20_000;
 
 /**
  * --assistant --boutons, --ecrans, --playfield, --disposition, --son : seulement
@@ -421,7 +424,15 @@ export function startWizard(): void {
   otherFrontends = otherFrontendsOnThisPc();
   ipcMain.on('ready', () => broadcast());
   // Souris : étape « Boutons » (refaire un bouton, précédent, touches par défaut…).
-  ipcMain.on('action', (_event, action: WizardAction) => handleWizardAction(action));
+  ipcMain.on('action', (_event, action: WizardAction) => {
+    actionsReceived++;
+    handleWizardAction(action);
+    wakeAutopilot();
+  });
+  ipcMain.on('state-shown', (event, seq: number) => {
+    stateShown.set(event.sender.id, Math.max(seq, stateShown.get(event.sender.id) ?? 0));
+    wakeAutopilot();
+  });
   ipcMain.on('sound-status', (_event, status: SoundStatus) => {
     if (status.key !== soundSent.key) return; // compte rendu d'un son déjà remplacé
     // Sans opérateur, le compte rendu est la seule trace que le son a bien été joué.
@@ -541,6 +552,40 @@ function vpxNotice(): string | undefined {
   return continueAfterVpx ? `${line} · ${t('le front-end s’ouvre à la fin de l’installation')}` : line;
 }
 
+/**
+ * Ce que l'autopilote attend, par événement et non par délai : le dernier état envoyé (broadcast) affiché par
+ * chaque écran, le clic reçu par le processus principal, la fin du délai des boutons. Sur une machine chargée,
+ * le rendu peut avoir plus de 400 ms de retard : le geste suivant visait alors un bouton pas encore là
+ * (clavier-reel, 26/11/2026).
+ */
+let stateSent = 0;
+const stateShown = new Map<number, number>();
+let actionsReceived = 0;
+let buttonsTimedOut = false;
+const autopilotWaiters = new Set<() => void>();
+function wakeAutopilot(): void {
+  for (const check of [...autopilotWaiters]) check();
+}
+/** Attend que `ok()` soit vrai, réveillé par wakeAutopilot ; au bout d'une minute, le dit (l'essai échoue) et continue. */
+function autopilotUntil(ok: () => boolean, what: string): Promise<void> {
+  if (ok()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      autopilotWaiters.delete(check);
+      resolve();
+    };
+    const check = () => ok() && done();
+    const timer = setTimeout(() => {
+      console.error(`Autopilote : ${what} au bout d’une minute`); // i18n-ignore : console de l'autopilote
+      done();
+    }, 60_000);
+    autopilotWaiters.add(check);
+  });
+}
+/** Chaque écran a affiché le dernier état envoyé. */
+const allShown = () => windows.every((w) => w.isDestroyed() || (stateShown.get(w.webContents.id) ?? 0) >= stateSent);
+
 /** Touche que l'autopilote rejoue en ce moment par le chemin d'une vraie touche (« Clavier:KeyA »). */
 let replaying: string | undefined;
 
@@ -556,8 +601,13 @@ function ignoredKey(input: Input): boolean {
  * Autopilote « Clavier:KeyA » : la touche appuyée puis relâchée par webContents.sendInputEvent,
  * comme une vraie touche (before-input-event, Chromium, preload.ts), sur l'écran principal.
  * Faux si elle n'y est pas arrivée, appui et relâchement compris.
+ *
+ * Le relâchement suit l'appui sans minuterie entre les deux (before-input-event est émis pendant
+ * sendInputEvent). Bancs du 26/11/2026 : une pause de 50 ms entre eux a duré 6 s sur une machine
+ * chargée ; la touche était alors vraiment tenue pour l'assistant, dont le maintien ouvrait
+ * « Quitter sans enregistrer ? », et l'essai partait sur un autre chemin que celui écrit.
  */
-async function pressRealKey(code: string): Promise<boolean> {
+function pressRealKey(code: string): boolean {
   const keyCode = sendableKey(code);
   const win = windows[displays.findIndex((d) => d.primary)] ?? windows[0];
   if (!keyCode || !win || win.isDestroyed()) return false;
@@ -567,9 +617,7 @@ async function pressRealKey(code: string): Promise<boolean> {
   replaying = code;
   try {
     win.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: sendableModifiers(code) });
-    await delay(50);
     win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
-    await delay(50);
   } finally {
     replaying = undefined;
     win.webContents.off('before-input-event', watch);
@@ -604,8 +652,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
   for (const [step, code] of ['start', ...codes].entries()) {
     // « Attendre16 » : laisser passer 16 s sans toucher à rien (fin du compte à rebours).
     // « SansBoutons » : comme si personne n'avait touché à rien pendant l'étape « Boutons ».
+    // « FinDuDelai » : jusqu'à ce que le délai de l'étape « Boutons » soit écoulé, par sa propre horloge.
     const wait = /^Attendre(\d+)$/.exec(code);
     if (wait) await delay(Number(wait[1]) * 1000);
+    else if (code === 'FinDuDelai') await autopilotUntil(() => buttonsTimedOut, 'le délai des boutons ne s’est pas écoulé'); // i18n-ignore : console de l'autopilote
     else if (code === 'SansBoutons') buttonsTimeout();
     // « Sorties:<fichier> » : les sorties audio relues ensuite viennent de ce fichier, comme si le
     // joueur avait changé un réglage du panneau Son de Windows (carte passée en 7.1).
@@ -613,12 +663,15 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     // « click:<sélecteur> » : clic de souris sur le premier écran qui montre cet élément (les
     // commandes d'une étape sont sur l'écran que le joueur regarde, souvent celui du playfield).
     else if (code.startsWith('click:')) {
-      let clicked = false;
+      // Un élément qui porte une commande (data-act) l'envoie au processus principal : attendue avant la suite.
+      const before = actionsReceived;
+      let clicked: string | undefined;
       for (const win of windows) {
         if (clicked || win.isDestroyed()) continue;
-        clicked = Boolean(await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(code.slice(6))}); el?.click(); return Boolean(el); })()`));
+        clicked = await win.webContents.executeJavaScript(`(() => { const el = document.querySelector(${JSON.stringify(code.slice(6))}); el?.click(); return el ? (el.closest('[data-act]') ? 'act' : 'page') : ''; })()`);
       }
       if (!clicked) console.error(`Autopilote : ${code} n’est pas arrivée jusqu’à l’assistant, aucun élément à cliquer`); // i18n-ignore : console de l'autopilote
+      else if (clicked === 'act') await autopilotUntil(() => actionsReceived > before, `${code} : clic jamais reçu`); // i18n-ignore : console de l'autopilote
     }
     // « drag:<écran>:<rôle>:<poignée>:<dx>:<dy> » : la zone (poignée « move ») ou l'un de ses
     // coins tiré à la souris sur cet écran (numéro à partir de 1), par de vrais événements de pointeur.
@@ -651,7 +704,7 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     } else if (code === 'CtrlQ') handleKey({ type: 'keyDown', code: 'KeyQ', control: true } as Input);
     // « Clavier:KeyA » : la touche par le chemin d'une vraie touche du clavier (pressRealKey).
     else if (code.startsWith('Clavier:')) {
-      if (!(await pressRealKey(code.slice(8)))) console.error(`Autopilote : ${code} n’est pas arrivée jusqu’à l’assistant, appui et relâchement`); // i18n-ignore : console de l'autopilote
+      if (!pressRealKey(code.slice(8))) console.error(`Autopilote : ${code} n’est pas arrivée jusqu’à l’assistant, appui et relâchement`); // i18n-ignore : console de l'autopilote
     }
     // « Axe2:0.9 » : l'axe 2 (Z) d'un Pinscape virtuel à 0,9, par le chemin d'un vrai lanceur.
     else if (/^Axe\d+:-?[\d.]+$/.test(code)) {
@@ -676,6 +729,8 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
       handleKey({ type: 'keyUp', code, control: false } as Input);
     }
     await delay(400);
+    // Le geste suivant et les relevés de mise en page partent de ce que les écrans montrent vraiment.
+    await autopilotUntil(allShown, `écran resté sur un état ancien (${stateSent} envoyés)`); // i18n-ignore : console de l'autopilote
     // L'étape où chaque geste a mené : les essais suivent le parcours, clic après clic.
     console.log(`Autopilote : ${code} → ${wizard.phase}${wizard.quit ? ' (question de sortie)' : ''}`); // i18n-ignore : console de l'autopilote
     // Les quatre écrans inspectés en même temps (LayoutReport.checkAll), puis capturés.
@@ -907,6 +962,9 @@ function watchHold(code: string): void {
       if (elapsed >= HOLD_SHOWN_MS && (answering || !wizard.quit)) broadcast();
       return;
     }
+    // Un bouton du joystick relâché pendant que le processus était occupé : lu avant de conclure.
+    readJoysticksNow();
+    if (held?.timer !== timer) return;
     stopHold();
     // La touche tenue n'est pas relevée comme un bouton.
     pressed.delete(code);
@@ -1585,6 +1643,7 @@ function finishCapture(capture: ButtonCapture): void {
 
 /** Personne n'a touché à rien : les touches actuelles restent (celles des encodeurs sur une nouvelle borne). */
 function buttonsTimeout(): void {
+  buttonsTimedOut = true;
   stopButtonsCountdown();
   wizard.capture = undefined;
   if (buttonsOnly) {
@@ -3860,11 +3919,13 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
 
 function broadcast(): void {
   updateSound();
+  // Sans opérateur, chaque état porte un numéro que l'écran renvoie une fois affiché (preload.ts).
+  const seq = process.env.CYBERPINBALL_AUTOPILOT ? { autopilotSeq: ++stateSent } : {};
   windows.forEach((win, i) => {
     if (win.isDestroyed()) return;
     // Frise des étapes en haut de chaque écran, la même partout.
     const progress = wizard.leaving ? undefined : progressView(wizard.phase, only?.label, progressCount());
-    win.webContents.send('state', { ...viewFor(i), progress, quit: quitView() });
+    win.webContents.send('state', { ...viewFor(i), progress, quit: quitView(), ...seq });
   });
 }
 

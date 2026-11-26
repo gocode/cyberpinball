@@ -61,6 +61,12 @@ test('navigateur intégré : WebAuthn retiré de toutes ses pages, autorisations
   for (const view of views) assert.match(view, /disableBlinkFeatures: NO_WEBAUTHN/, view);
   for (const guard of ['setPermissionRequestHandler', 'setPermissionCheckHandler', 'setDevicePermissionHandler', "'select-hid-device'", "'select-usb-device'", "'select-serial-port'", 'setBluetoothPairingHandler', "'select-bluetooth-device'", 'acquire-page-preload.js'])
     assert.ok(source.includes(guard), `${guard} manque dans acquire-window.ts`);
+  // Appareil photo et micro : refusés dans la page, sans attendre Chromium qui démarre d'abord ses services de
+  // périphériques (plus de 30 s sur une machine chargée, 26/11/2026) ; le refus est noté par la borne.
+  const preload = fs.readFileSync(path.join(APP_SRC, 'acquire-page-preload.ts'), 'utf8');
+  assert.match(preload, /'getUserMedia'[\s\S]*?Promise\.reject\(new DOMException\([^)]*'NotAllowedError'\)\)/, 'getUserMedia refusé sur-le-champ');
+  assert.match(preload, /ipcRenderer\.send\('acquire:media-refused'\)/);
+  assert.match(source, /ipcMain\.on\('acquire:media-refused'[\s\S]{0,200}refused\('media'/, 'le refus de l’appareil photo et du micro est noté');
 });
 
 test('saisie du téléphone, clés d’accès, autorisations, page de Google refusée : rien ne tombe, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {

@@ -104,12 +104,19 @@ test('à-coups : chacun dit où était le fil des images (relevé pendant l’at
   assert.ok(suspended.length > 0);
   const calls = [...suspended.matchAll(/\b([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]);
   for (const call of calls) assert.ok(['SuspendThread', 'GetThreadContext', 'static_cast', 'reinterpret_cast', 'VirtualQuery', 'sizeof', 'min', 'memcpy', 'if', 'defined'].includes(call!), `appel pendant la suspension : ${call}`);
-  // Les fils à relever se cherchent entre les arrêts, jamais pendant : l'instantané des fils de la machine prend des
-  // centaines de ms quand elle est chargée et mangeait tout le relevé d'un à-coup (banc du 25/11/2026).
+  // Les fils à relever se cherchent sur un autre fil, jamais sur la veille : l'instantané des fils de la machine prend
+  // des centaines de ms quand elle est chargée ; fait pendant un arrêt, il en mangeait tout le relevé (banc du
+  // 25/11/2026), et fait entre deux arrêts, il aveuglait la veille sur l'arrêt qui commençait (banc du 26/11/2026).
   const veiller = h.slice(h.indexOf('void veiller()'), h.indexOf('timeEndPeriodSur();', h.indexOf('void veiller()')));
-  const pendant = veiller.slice(veiller.indexOf('MAX_PAR_ARRET'));
-  assert.ok(veiller.includes('ouvrirFilNomme(') && veiller.includes('ouvrirAutres()') && pendant.length > 0);
-  assert.doesNotMatch(pendant, /ouvrirFilNomme\(|ouvrirAutres\(|CreateToolhelp32Snapshot/, 'recherche des fils pendant un arrêt');
+  assert.ok(veiller.length > 0 && veiller.includes('prendreFils()'));
+  assert.doesNotMatch(veiller, /ouvrirFilNomme\(|listerAutres\(|CreateToolhelp32Snapshot/, 'recherche des fils sur le fil de veille');
+  const chercher = h.slice(h.indexOf('void chercher()'), h.indexOf('void prendreFils()'));
+  assert.ok(chercher.includes('ouvrirFilNomme(') && chercher.includes('listerAutres('), 'le chercheur cherche le rendu et les autres fils');
+  // La veille prend la liste prête sans rien chercher : sous son verrou, des échanges, rien d'autre.
+  const prendre = h.slice(h.indexOf('void prendreFils()'), h.indexOf('void listerAutres('));
+  assert.doesNotMatch(prendre, /OpenThread|CloseHandle|CreateToolhelp32Snapshot|Thread32/, 'la veille prend la liste sans la refaire');
+  // Machine chargée : le fil de veille passe devant ceux de la partie, sinon il ne relève presque rien (26/11/2026).
+  assert.match(veiller, /SetThreadPriority\(GetCurrentThread\(\), THREAD_PRIORITY_TIME_CRITICAL\);/, 'fil de veille au-dessus des fils de la partie');
   assert.match(read('packages', 'vpx-vision3d', 'CMakeLists.txt'), /add_executable\(banc-arrets test\/banc-arrets\.cpp\)/);
 });
 

@@ -303,7 +303,6 @@ export * from './futurepinball-keys';
 export * from './futurepinball-bam-menu';
 export * from './futurepinball-managed';
 export * from './futurepinball-licenses';
-export * from './futurepinball-pup';
 export * from './futurepinball-screens';
 export * from './nudge-keys';
 export * from './table-surprise';

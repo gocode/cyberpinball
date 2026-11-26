@@ -244,7 +244,12 @@ public:
          m_comptes.remiseAZero();
          m_arret = 0;
       }
+      m_aPrendre.store(false);
+      m_filsCherches.store(!m_nomRendu && !m_tous);
       m_veille = std::thread([this] { veiller(); });
+      m_idVeille = GetThreadId(m_veille.native_handle());
+      if (m_nomRendu || m_tous)
+         m_chercheur = std::thread([this] { chercher(); });
       return true;
    }
 
@@ -253,19 +258,32 @@ public:
       m_fin.store(true);
       if (m_veille.joinable())
          m_veille.join();
+      if (m_chercheur.joinable())
+         m_chercheur.join();
       if (m_fil)
          CloseHandle(m_fil);
       m_fil = nullptr;
       if (m_rendu)
          CloseHandle(m_rendu);
       m_rendu = nullptr;
-      m_renduCherche = 0;
+      if (m_renduPret)
+         CloseHandle(m_renduPret);
+      m_renduPret = nullptr;
+      m_aPrendre.store(false);
+      m_filsCherches.store(false);
       fermerAutres();
       m_derniere.store(0);
    }
 
    /** Nom du second fil relevé pendant un arrêt (celui du rendu de VPX) ; à appeler avant demarrer(). */
    void suivreAussi(const wchar_t* nom) { m_nomRendu = nom; }
+
+   /**
+    * Les fils à relever en plus (rendu, autres) ont été cherchés une première fois et pris par le fil de veille, et le
+    * rendu trouvé. Pour le banc : la recherche prend des centaines de ms sur une machine chargée ; un arrêt provoqué
+    * avant sa fin n'était relevé que sur le fil des images (26/11/2026).
+    */
+   bool filsCherches() const { return m_filsCherches.load(); }
 
    /**
     * Banc et essais seulement ([Plugin.CyberPinballDmd] StallThreads = 1) : pendant un arrêt, tous les autres fils du
@@ -276,9 +294,13 @@ public:
    void suivreTous(bool oui)
    {
       m_tous = oui;
-      // Sur le tas, et seulement s'il sert : 64 fils et leurs comptes pèsent plus de 300 Ko.
+      // Sur le tas, et seulement s'il sert : 64 fils et leurs comptes pèsent plus de 300 Ko (deux listes : la relevée
+      // et celle que prépare le chercheur).
       if (oui && !m_autres)
+      {
          m_autres = std::make_unique<AutreFil[]>(AUTRES);
+         m_autresPrets = std::make_unique<AutreFil[]>(AUTRES);
+      }
    }
 
    /**
@@ -330,6 +352,11 @@ private:
    {
       // Une minuterie fine le temps de la partie : sans elle, Sleep(4) dure 15,6 ms.
       timeBeginPeriodSur();
+      // Au-dessus des fils de la partie : ce fil dort presque tout le temps, mais quand la machine est chargée
+      // (antivirus, décodage, compilation), un fil de priorité normale attend son tour derrière les autres et ne
+      // relève presque plus rien de l'à-coup qu'il devait expliquer (banc du 26/11/2026 sous charge : 15 relevés
+      // pour 300 ms au lieu d'une soixantaine). Les profileurs par échantillons font de même.
+      SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
       while (!m_fin.load())
       {
          Sleep(PERIODE_MS);
@@ -340,21 +367,13 @@ private:
          QueryPerformanceCounter(&t);
          if ((t.QuadPart - derniere) * 1000 < static_cast<int64_t>(SEUIL_MS) * m_frequence)
          {
-            // Les fils à relever se cherchent ici, entre les arrêts, au plus une fois par seconde : la recherche fait
-            // un instantané de tous les fils de la machine, qui prend des centaines de ms quand elle est chargée.
-            // Faite au début d'un arrêt, elle en mangeait le relevé (banc du 25/11/2026 : à-coup de 300 ms sans un
-            // seul relevé). Le fil du rendu naît après la première image : cherché tant qu'il n'est pas trouvé.
-            if ((m_nomRendu && !m_rendu) || (m_tous && m_autres))
-            {
-               if (t.QuadPart - m_renduCherche > m_frequence)
-               {
-                  m_renduCherche = t.QuadPart;
-                  if (m_nomRendu && !m_rendu)
-                     m_rendu = ouvrirFilNomme(m_nomRendu);
-                  if (m_tous && m_autres)
-                     ouvrirAutres();
-               }
-            }
+            // Les fils à relever se cherchent sur un autre fil (chercher) : la recherche fait un instantané de tous les
+            // fils de la machine, qui prend des centaines de ms quand elle est chargée. Faite ici, elle aveuglait la
+            // veille : un arrêt qui commençait pendant la recherche n'était pas relevé du tout (bancs du 25 et du
+            // 26/11/2026 sous charge : à-coup de 300 ms sans un seul relevé). La veille prend seulement la liste
+            // prête, entre les arrêts : elle ne change jamais au milieu d'un arrêt.
+            if (m_aPrendre.load(std::memory_order_acquire))
+               prendreFils();
             continue;
          }
          if (m_parArret.first == derniere && m_parArret.second >= MAX_PAR_ARRET)
@@ -385,29 +404,84 @@ private:
       for (int i = 0; i < m_nAutres; i++)
          CloseHandle(m_autres[i].h);
       m_nAutres = 0;
+      for (int i = 0; i < m_nAutresPrets; i++)
+         CloseHandle(m_autresPrets[i].h);
+      m_nAutresPrets = 0;
    }
 
-   /** Tous les fils du processus sauf la veille, la boucle de jeu et le rendu, avec leur nom ; refait chaque seconde entre les arrêts. */
-   void ouvrirAutres()
+   /**
+    * Le fil chercheur, de priorité normale : cherche le fil du rendu (il naît après la première image : cherché tant
+    * qu'il n'est pas trouvé) et, pour suivreTous, la liste des autres fils, refaite chaque seconde. Il prépare ce qu'il
+    * trouve (m_renduPret, m_autresPrets) et le donne à la veille par m_aPrendre ; il ne touche jamais à ce qu'elle relève.
+    */
+   void chercher()
    {
-      fermerAutres();
+      DWORD idRendu = 0;
+      while (!m_fin.load())
+      {
+         // Tant que m_aPrendre est levé, ce qui est prêt appartient à la veille : attendre qu'elle l'ait pris.
+         if (!m_aPrendre.load(std::memory_order_acquire))
+         {
+            if (m_nomRendu && !idRendu)
+            {
+               m_renduPret = ouvrirFilNomme(m_nomRendu);
+               if (m_renduPret)
+                  idRendu = GetThreadId(m_renduPret);
+            }
+            if (m_tous && m_autresPrets)
+               listerAutres(idRendu);
+            m_aPrendre.store(true, std::memory_order_release);
+            if (!m_tous && idRendu)
+               return; // le rendu trouvé, plus rien à chercher
+         }
+         for (int i = 0; i < 50 && !m_fin.load(); i++)
+            Sleep(20);
+      }
+   }
+
+   /** La veille prend ce que le chercheur a préparé (entre les arrêts) ; l'ancienne liste lui revient, à fermer. */
+   void prendreFils()
+   {
+      {
+         const std::lock_guard<std::mutex> verrou(m_verrou);
+         if (m_renduPret)
+         {
+            m_rendu = m_renduPret;
+            m_renduPret = nullptr;
+            m_comptesRendu.remiseAZero();
+         }
+         if (m_tous && m_autres && m_autresPrets)
+         {
+            std::swap(m_autres, m_autresPrets);
+            std::swap(m_nAutres, m_nAutresPrets);
+         }
+      }
+      m_filsCherches.store(!m_nomRendu || m_rendu);
+      m_aPrendre.store(false, std::memory_order_release);
+   }
+
+   /** Tous les fils du processus sauf la veille, le chercheur, la boucle de jeu et le rendu, avec leur nom, dans m_autresPrets (chercheur seul). */
+   void listerAutres(DWORD idRendu)
+   {
+      for (int i = 0; i < m_nAutresPrets; i++)
+         CloseHandle(m_autresPrets[i].h);
+      m_nAutresPrets = 0;
       using GetDescription = HRESULT(WINAPI*)(HANDLE, PWSTR*);
       static const auto getDescription = reinterpret_cast<GetDescription>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetThreadDescription"));
       HANDLE instantane = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
       if (instantane == INVALID_HANDLE_VALUE)
          return;
       const DWORD moi = GetCurrentProcessId();
-      const DWORD fil = GetThreadId(m_fil), rendu = m_rendu ? GetThreadId(m_rendu) : 0;
+      const DWORD fil = GetThreadId(m_fil);
       THREADENTRY32 e { sizeof(e) };
-      const std::lock_guard<std::mutex> verrou(m_verrou);
-      for (BOOL encore = Thread32First(instantane, &e); encore && m_nAutres < AUTRES; encore = Thread32Next(instantane, &e))
+      for (BOOL encore = Thread32First(instantane, &e); encore && m_nAutresPrets < AUTRES; encore = Thread32Next(instantane, &e))
       {
-         if (e.th32OwnerProcessID != moi || e.th32ThreadID == GetCurrentThreadId() || e.th32ThreadID == fil || e.th32ThreadID == rendu)
+         if (e.th32OwnerProcessID != moi || e.th32ThreadID == GetCurrentThreadId() || e.th32ThreadID == m_idVeille || e.th32ThreadID == fil || e.th32ThreadID == idRendu)
             continue;
          HANDLE h = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_QUERY_LIMITED_INFORMATION, FALSE, e.th32ThreadID);
          if (!h)
             continue;
-         AutreFil& a = m_autres[m_nAutres++];
+         AutreFil& a = m_autresPrets[m_nAutresPrets++];
          a.h = h;
          a.comptes.remiseAZero();
          std::snprintf(a.nom, sizeof(a.nom), "tid%lu", static_cast<unsigned long>(e.th32ThreadID));
@@ -604,15 +678,22 @@ private:
    HANDLE m_fil = nullptr;
    HANDLE m_rendu = nullptr; // fil de veille seul (et arreter, une fois la veille finie)
    const wchar_t* m_nomRendu = nullptr;
-   int64_t m_renduCherche = 0; // fil de veille seul : dernière recherche des fils à relever (rendu, autres)
    Comptes m_comptesRendu; // sous m_verrou
    bool m_tous = false;
    std::unique_ptr<AutreFil[]> m_autres; // poignées : fil de veille (et arreter) ; comptes : sous m_verrou
    int m_nAutres = 0;
+   // Préparés par le chercheur, à lui tant que m_aPrendre est baissé, à la veille quand il est levé.
+   HANDLE m_renduPret = nullptr;
+   std::unique_ptr<AutreFil[]> m_autresPrets;
+   int m_nAutresPrets = 0;
+   std::atomic<bool> m_aPrendre { false };
+   std::thread m_chercheur;
+   DWORD m_idVeille = 0;
    HMODULE m_winmm = nullptr;
    int64_t m_frequence = 1;
    std::atomic<int64_t> m_derniere { 0 };
    std::atomic<bool> m_fin { false };
+   std::atomic<bool> m_filsCherches { false };
    std::thread m_veille;
    std::mutex m_verrou;
    Comptes m_comptes; // sous m_verrou

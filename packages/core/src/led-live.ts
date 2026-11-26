@@ -91,6 +91,21 @@ export function ledXY(grid: LedGrid, k: number): { x: number; y: number } {
   return { y: first === 'TopDown' ? pos : run - 1 - pos, x: second === 'LeftRight' ? line : grid.width - 1 - line };
 }
 
+/**
+ * Position (0 à 1) de la LED de rang `k` sur une bande simple, d'après sa disposition déclarée (Cabinet.xml) :
+ * bande verticale (largeur 1), du BAS (0, côté flippers) vers le HAUT (1), que la première LED soit en haut
+ * (TopDown, le cas courant de DOF) ou en bas (BottomUp) ; bande à plat (hauteur 1), de gauche (0) à droite (1).
+ * Les effets qui « montent » s'en servent, comme la scène DOF des flips : jamais l'ordre de câblage seul
+ * (retour d'essai du 26/11/2026 : l'ouverture descendait sur une bande câblée par le haut).
+ */
+export function ledStripPosition(grid: LedGrid, k: number): number {
+  const w = Math.max(0, Math.floor(grid.width) || 0);
+  const h = Math.max(0, Math.floor(grid.height) || 0);
+  const { x, y } = ledXY(grid, k);
+  if (h > 1) return (h - 1 - y) / (h - 1);
+  return w > 1 ? x / (w - 1) : 0.5;
+}
+
 /** Rang de la LED à la colonne x et à la ligne y (réciproque de `ledXY`). */
 export function ledIndexAt(grid: LedGrid, x: number, y: number): number {
   const n = Math.max(0, grid.width) * Math.max(0, grid.height);

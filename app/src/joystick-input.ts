@@ -98,6 +98,42 @@ export function joystickStatus(): JoystickStatus {
 
 /** Joystick virtuel de SDL des essais sans opérateur, attaché au premier appui. */
 let virtualId: number | undefined;
+const VIRTUAL_NAME = 'Cyber Pinball (joystick virtuel)'; // i18n-ignore : nom de périphérique SDL des essais
+const VIRTUAL_PINSCAPE_NAME = 'mjrnet Pinscape Controller (joystick virtuel)'; // i18n-ignore : nom de périphérique SDL des essais
+
+/** Ce que les appuis de l'autopilote attendent du sondage : chaque changement lu, une fois remis aux fenêtres. */
+const readWaiters = new Set<(device: string, down: boolean) => void>();
+
+/**
+ * Un appui de l'autopilote sur un joystick virtuel : `press`, puis `release` dès que le sondage a lu
+ * l'appui et l'a remis aux fenêtres, jamais au bout d'un délai ; la promesse se résout quand le
+ * relâchement est lu à son tour. Bancs du 26/11/2026 : sur une machine chargée, la pause de 50 ms
+ * entre l'appui et le relâchement durait plusieurs secondes ; le bouton restait tenu pour l'assistant,
+ * qui ouvrait « Quitter sans enregistrer ? » (maintien) ou le répétait. Faux si rien n'est lu.
+ */
+function pressAndRelease(name: string, press: () => void, release: () => void): Promise<boolean> {
+  const device = reader?.devices().find((d) => d.name === name)?.id;
+  if (!device) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let pressed = false;
+    // Garde-fou d'un sondage arrêté, pas une attente : l'appui est rendu dès qu'il est lu.
+    const stuck = setTimeout(() => finish(false), 60_000);
+    const finish = (ok: boolean) => {
+      clearTimeout(stuck);
+      readWaiters.delete(waiter);
+      resolve(ok);
+    };
+    const waiter = (from: string, down: boolean) => {
+      if (from !== device) return;
+      if (down && !pressed) {
+        pressed = true;
+        release();
+      } else if (!down && pressed) finish(true);
+    };
+    readWaiters.add(waiter);
+    press();
+  });
+}
 
 /**
  * Essai sans opérateur (autopilote « Joy<n> ») : le bouton `button` (numéro SDL, à partir
@@ -108,13 +144,9 @@ export async function pressVirtualButton(button: number): Promise<boolean> {
   start();
   if (!reader && status.state !== 'error') open();
   if (!reader) return false;
-  virtualId ??= reader.attachVirtual('Cyber Pinball (joystick virtuel)', 32, 0, 1);
-  const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
-  reader.pressVirtual(virtualId, button, true);
-  await pause();
-  reader.pressVirtual(virtualId, button, false);
-  await pause();
-  return true;
+  const r = reader;
+  const id = (virtualId ??= r.attachVirtual(VIRTUAL_NAME, 32, 0, 1));
+  return pressAndRelease(VIRTUAL_NAME, () => r.pressVirtual(id, button, true), () => r.pressVirtual(id, button, false));
 }
 
 /**
@@ -125,13 +157,9 @@ export async function pressVirtualHat(direction: HatDirection): Promise<boolean>
   start();
   if (!reader && status.state !== 'error') open();
   if (!reader) return false;
-  virtualId ??= reader.attachVirtual('Cyber Pinball (joystick virtuel)', 32, 0, 1);
-  const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
-  reader.moveVirtualHat(virtualId, 0, hatValue([direction]));
-  await pause();
-  reader.moveVirtualHat(virtualId, 0, 0);
-  await pause();
-  return true;
+  const r = reader;
+  const id = (virtualId ??= r.attachVirtual(VIRTUAL_NAME, 32, 0, 1));
+  return pressAndRelease(VIRTUAL_NAME, () => r.moveVirtualHat(id, 0, hatValue([direction])), () => r.moveVirtualHat(id, 0, 0));
 }
 
 /**
@@ -156,7 +184,7 @@ export function moveVirtualAxis(axis: number, value: number): boolean {
   start();
   if (!reader && status.state !== 'error') open();
   if (!reader) return false;
-  virtualPinscape ??= reader.attachVirtual('mjrnet Pinscape Controller (joystick virtuel)', 32, 6);
+  virtualPinscape ??= reader.attachVirtual(VIRTUAL_PINSCAPE_NAME, 32, 6);
   reader.moveVirtual(virtualPinscape, axis, value);
   return true;
 }
@@ -167,12 +195,18 @@ export function moveVirtualAxis(axis: number, value: number): boolean {
  */
 export async function pressVirtualPinscapeButton(button: number): Promise<boolean> {
   if (!moveVirtualAxis(0, 0)) return false;
-  const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
-  reader!.pressVirtual(virtualPinscape!, button, true);
-  await pause();
-  reader!.pressVirtual(virtualPinscape!, button, false);
-  await pause();
-  return true;
+  const r = reader!;
+  const id = virtualPinscape!;
+  return pressAndRelease(VIRTUAL_PINSCAPE_NAME, () => r.pressVirtual(id, button, true), () => r.pressVirtual(id, button, false));
+}
+
+/**
+ * Sondage tout de suite, avant de conclure qu'un bouton est tenu : un bouton relâché pendant que le
+ * processus était occupé (machine chargée) n'est lu qu'au sondage suivant, qui pouvait passer après
+ * la minuterie du maintien ; son relâchement est ainsi remis avant la décision.
+ */
+export function readJoysticksNow(): void {
+  if (timer && reader) tick();
 }
 
 function start(): void {
@@ -234,6 +268,7 @@ function tick(): void {
       held.delete(code);
       send(code, 'keyUp');
     }
+    for (const waiter of [...readWaiters]) waiter(e.device, e.down);
   }
   for (const [code, at] of held) {
     if (now < at) continue;

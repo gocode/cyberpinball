@@ -18,6 +18,7 @@ import {
   iniWithInspector,
   inspectorIds,
   inspectorStates,
+  romMapMissing,
   soloInspectPlan,
   type PlayedScore,
   type RomMemory,
@@ -133,6 +134,18 @@ test('réparation : la partie fantôme déjà gardée au journal est retirée, r
   assert.equal(withoutGhosts([rom('2026-11-25T21:08:00Z', 700, { player: 2, of: 2 }), rom('2026-11-25T21:00:00Z', 700)]).length, 2);
   assert.equal(withoutGhosts([{ ...rom('2026-11-25T21:08:00Z', 700), how: 'live' }, rom('2026-11-25T21:00:00Z', 700)]).length, 2);
   assert.equal(withoutGhosts([rom('2026-11-25T21:08:00Z', 700)]).length, 1);
+});
+
+test('relevé en direct : la raison d’une carte absente est dite (table originale, index ou carte pas téléchargés)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cartes-'));
+  try {
+    assert.equal(romMapMissing(dir, 'afm_113b'), 'no-index');
+    fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ afm_113b: 'maps/williams/afm.json' }));
+    assert.equal(romMapMissing(dir, 'AFM_113b'), 'not-cached');
+    assert.equal(romMapMissing(dir, 'TheMatrix'), 'unknown', 'nom VPReg d’une table originale : pas de carte');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('inspector : valeurs de la ROM relues dans /api/tree et /api/states, état de jeu décodé', () => {

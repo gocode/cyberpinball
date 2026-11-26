@@ -24,7 +24,7 @@ import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  BASE, DUREE_FUSION_MS, REPO, announce, coordinationDir, currentBranch, git, mainDir, readCertificate, sleep, withdraw, workFingerprint,
+  BASE, DUREE_FUSION_MS, REPO, announce, coordinationDir, currentBranch, git, mainDir, readCertificate, recentFlaky, sleep, withdraw, workFingerprint,
 } from './coordination.mjs';
 import { printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport } from './sortie-tests.mjs';
@@ -154,6 +154,15 @@ export async function confier({ dir, main, branche, head, say, publier = true, w
   }
 }
 
+/**
+ * Les tests qui tombent le plus en ce moment (instables.json, 7 derniers jours), dits avant tout : une session voit
+ * venir celui qui ralentira le train, et peut s'en charger (26/11/2026).
+ */
+export function flakyLine(recent) {
+  if (!recent.length) return '';
+  return `Tests instables des 7 derniers jours (tombés dans la suite complète, passés seuls) : ${recent.map((e) => `${e.test} (${e.fois} fois)`).join(', ')}.`;
+}
+
 export async function fusionner({ cwd = REPO, say = console.log, leger = false, publier = true } = {}) {
   const dir = coordinationDir(cwd);
   const main = mainDir(cwd);
@@ -166,6 +175,8 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
     say('Des modifications ne sont pas commitées : commite-les (ou mets-les de côté), puis relance.');
     return 1;
   }
+  const flaky = flakyLine(recentFlaky(dir));
+  if (flaky) say(`${flaky}\n`);
   const status = trainStatus(dir);
   if (status) say(`${status}\n`);
   const previous = readMergeQueue(dir).find((e) => e.branche === branche);

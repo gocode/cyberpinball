@@ -19,9 +19,10 @@
 //   fondu de palette (`setPalette`), des effets posés par-dessus (`trigger`) et `next(now)` pour passer
 //   à l'effet suivant. `render(grid, now, out?)` donne l'image à l'instant `now`.
 //
-// Géométrie : une bande simple (largeur ou hauteur 1) se lit dans l'ordre des LED, de la première (0) à
-// la dernière (1) ; une matrice se lit par `ledXY`, colonne et ligne. « Monter » : vers la fin d'une
-// bande, vers le haut d'une matrice. Un même rendu sert aux deux.
+// Géométrie : une bande simple (largeur ou hauteur 1) se lit selon sa disposition déclarée
+// (`ledStripPosition`) : du bas (0) vers le haut (1) d'une bande verticale, quel que soit le bout câblé
+// en premier ; de gauche à droite d'une bande à plat. Une matrice se lit par `ledXY`, colonne et ligne.
+// « Monter » : vers le haut, côté fronton. Un même rendu sert aux deux.
 //
 // Invariants (fixés par led-effets.test.ts) : aucune LED ne dépasse la luminosité maximale donnée (0 à 1) ;
 // une image ne dépend que de (effet, instant, graine, palette) ; un ponctuel est noir après sa durée ;
@@ -31,7 +32,7 @@
 
 import { hsvToRgb, rgbToHsv, type Rgb } from './jukebox-visualizer';
 import { LED_AMBIENT_CEILING, ledHash, ledSmooth, ledSoftNoise } from './led-animations';
-import { ledXY, parseLedColor, type LedGrid } from './led-live';
+import { ledStripPosition, ledXY, parseLedColor, type LedGrid } from './led-live';
 import { ledDitherByte } from './led-luminosite';
 import { hexToRgb, NEUTRAL_TINT } from './tabletint';
 
@@ -245,14 +246,16 @@ function geometry(grid: LedGrid): Geo {
   const maxd = Math.max(1e-6, Math.hypot(cx, cy));
   for (let k = 0; k < n; k++) {
     if (strip) {
-      const u = n > 1 ? k / (n - 1) : 0.5;
+      // Selon la disposition déclarée, pas l'ordre de câblage : 0 en bas d'une bande verticale.
+      const u = ledStripPosition(grid, k);
+      const at = u * Math.max(0, n - 1);
       g.a[k] = u;
-      g.pos[k] = k;
+      g.pos[k] = at;
       g.up[k] = u;
-      g.upPos[k] = k;
+      g.upPos[k] = at;
       g.rad[k] = Math.abs(u - 0.5) * 2;
       g.ang[k] = Math.abs(u - 0.5);
-      g.gx[k] = k;
+      g.gx[k] = at;
       g.gy[k] = 0;
       g.lane[k] = 0;
     } else {

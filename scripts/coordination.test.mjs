@@ -7,8 +7,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   DUREE_PUBLICATION_DEFAUT_MS, DUREE_SUITE_DEFAUT_MS, IMMINENT_MS, PART_SANS_TESTS_RAPIDES, expectedPublicationMs, expectedSuiteMs, imminent, liveEntries, readDurations, readJson,
-  recordDuration, recordPublication, tryLock, writeJson,
+  recentFlaky, recordDuration, recordFlaky, recordPublication, tryLock, writeJson,
 } from './coordination.mjs';
+import { flakyLine } from './fusionner.mjs';
 import {
   ATTENTE_MAX_MS, dropMerge, enqueueMerge, pickSuspects, publicationPlan, publicationRetry, publicationSteps, readMergeQueue, stepsSummary, trainStatus, worthWaiting,
 } from './publication-groupee.mjs';
@@ -214,6 +215,33 @@ ok 2 - scripts\\verifier.test.mjs
 # pass 39
 # fail 1
 `;
+
+test('instables : npm run fusionner dit d’abord les trois tests tombés le plus souvent ces 7 derniers jours', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-instables-'));
+  try {
+    assert.deepEqual(recentFlaky(dir), []);
+    assert.equal(flakyLine([]), '', 'rien à dire sans instable');
+    const day = 24 * 3600_000;
+    const now = T0 + 40 * day;
+    // Une entrée d'avant les dates : sa dernière chute seule compte.
+    writeJson(path.join(dir, 'instables.json'), { 'ancien.test.js': { fois: 9, dernier: new Date(now - 2 * day).toISOString(), branche: 'x' } });
+    recordFlaky(['a.test.js', 'b.test.js'], 'x', dir, now - 8 * day); // hors des 7 jours
+    recordFlaky(['a.test.js', 'c.test.js'], 'x', dir, now - 3 * day);
+    recordFlaky(['a.test.js', 'c.test.js', 'd.test.js'], 'y', dir, now - day);
+    recordFlaky(['e.test.js'], 'y', dir, now - 33 * day); // oubliée au relevé suivant, 31 jours plus tard
+    recordFlaky(['e.test.js'], 'y', dir, now - 2 * day);
+    const reg = readJson(path.join(dir, 'instables.json'), {});
+    assert.equal(reg['a.test.js'].fois, 3, 'le total ne change pas de sens');
+    assert.equal(reg['e.test.js'].dates.length, 1, 'les dates de plus de 30 jours sont oubliées');
+    const recent = recentFlaky(dir, { nowMs: now });
+    assert.deepEqual(recent.map((e) => [e.test, e.fois]), [['a.test.js', 2], ['c.test.js', 2], ['d.test.js', 1]], 'les plus fréquents, puis le plus récent');
+    assert.equal(recentFlaky(dir, { nowMs: now, max: 10 }).find((e) => e.test === 'b.test.js'), undefined, 'b n’est tombé qu’il y a 8 jours');
+    assert.equal(recentFlaky(dir, { nowMs: now, max: 10 }).find((e) => e.test === 'ancien.test.js')?.fois, 1);
+    assert.equal(flakyLine(recent), 'Tests instables des 7 derniers jours (tombés dans la suite complète, passés seuls) : a.test.js (2 fois), c.test.js (2 fois), d.test.js (1 fois).');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('sortie des tests : fichiers en échec, cas le plus profond et son erreur, totaux', () => {
   assert.deepEqual(failedFiles(TAP), ['packages\\core\\dist\\test\\groupes.test.js']);

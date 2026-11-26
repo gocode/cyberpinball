@@ -24,6 +24,7 @@ import {
   readRomLastGame,
   readRomRecords,
   readTableRecords,
+  romMapMissing,
   romPlayedScores,
   saveScoreJournal,
   soloInspectPlan,
@@ -262,13 +263,21 @@ export function createTableScores(opts: TableScoresOptions): TableScores {
 
     solo(table) {
       const list = roms(table);
+      // Chaque raison de ne pas relever est dite (26/11/2026 : une table originale passait sans un mot).
+      if (!list.length) log(`Relevé en direct (${table.id}) : aucune ROM, score lu à la fermeture seulement (tableau d'honneur de la table).`); // i18n-ignore : journal
+      const missing: string[] = [];
       for (const rom of list) {
         const memory = memoryOf(rom);
-        if (!memory) continue;
+        if (!memory) {
+          const why = romMapMissing(cacheDir, rom);
+          missing.push(`${rom} : ${why === 'unknown' ? 'pas de carte mémoire publiée (table originale ou ROM inconnue)' : why === 'no-index' ? 'index des cartes pas encore téléchargé' : 'carte pas encore téléchargée'}`); // i18n-ignore : journal
+          continue;
+        }
         const plan = soloInspectPlan(memory);
         if (plan.ok) return { games: [...new Set([...opts.romsOf(table), ...list])], plan: plan.plan };
         log(`Relevé en direct (${table.id}) : ${rom} pas relevable (${plan.reason}), mémoire de la ROM à la fermeture seulement.`); // i18n-ignore : journal
       }
+      if (missing.length) log(`Relevé en direct (${table.id}) : ${missing.join(' ; ')}. Score lu à la fermeture seulement.`); // i18n-ignore : journal
       return undefined;
     },
 

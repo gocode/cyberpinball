@@ -21,7 +21,15 @@ window.addEventListener(
 // souris et les fichiers glissés sur la fenêtre.
 contextBridge.exposeInMainWorld('cyber', {
   onState: (callback: (state: unknown) => void) => {
-    ipcRenderer.on('state', (_event, state) => callback(state));
+    ipcRenderer.on('state', (_event, state) => {
+      try {
+        callback(state);
+      } finally {
+        // Autopilote de l'assistant (wizard.ts, runAutopilot) : l'écran dit quel état il vient d'afficher.
+        const seq = (state as { autopilotSeq?: unknown } | undefined)?.autopilotSeq;
+        if (typeof seq === 'number') ipcRenderer.send('state-shown', seq);
+      }
+    });
   },
   ready: () => ipcRenderer.send('ready'),
   // DMD du menu vivant (live-dmd.ts) : chaque image changée de l'afficheur, ou le média de la table.

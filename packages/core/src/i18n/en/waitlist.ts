@@ -240,5 +240,6 @@ export const messages: Record<string, string> = {
   'minuteries sans analyse de l’antivirus': 'timers without antivirus scans',
   'dossier du DMD cherché dans celui de la table': 'DMD folder looked for in the table’s own folder',
   'appels au fronton B2S convertis en nombres': 'B2S backglass calls converted to numbers',
+  'événements DOF du script transmis aux effets LED': 'script DOF events passed on to the LED effects',
   'images du DMD chargées d’avance': 'DMD images loaded in advance',
 };

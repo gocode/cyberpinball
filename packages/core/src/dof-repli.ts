@@ -171,19 +171,51 @@ function isReactive(setting: string): boolean {
  * n'en font qu'un). Les éclairages permanents ne comptent pas.
  */
 export function dofRomStripEffects(configs: DofIniConfig[], equivalents: DofEquivalentOutputs[], stripNames: string[], rom: string): number {
-  const strips = new Set(stripNames);
   const seen = new Set<string>();
+  for (const { strip, setting } of stripSettings(configs, equivalents, stripNames, rom)) if (isReactive(setting)) seen.add(`${strip}|${settingTriggers(setting).sort().join('+')}`);
+  return seen.size;
+}
+
+/** Réglages que libdof enverra aux bandes de LED pour cette ROM. */
+function stripSettings(configs: DofIniConfig[], equivalents: DofEquivalentOutputs[], stripNames: string[], rom: string): { strip: string; setting: string }[] {
+  const strips = new Set(stripNames);
+  const found: { strip: string; setting: string }[] = [];
   for (const line of dofRomLines(configs, rom).lines) {
     const config = configs.find((c) => c.number === line.number)!;
     const outputs = new Map<number, string>();
     for (const e of equivalents.filter((x) => x.number === line.number)) for (const o of e.outputs) outputs.set(o.number, o.name);
     for (const col of columnOutputs(line.columns, config.colors)) {
       const name = outputs.get(col.output);
-      if (!name || !strips.has(name)) continue;
-      for (const s of col.settings) if (isReactive(s)) seen.add(`${name}|${settingTriggers(s).sort().join('+')}`);
+      if (name && strips.has(name)) for (const setting of col.settings) found.push({ strip: name, setting });
     }
   }
-  return seen.size;
+  return found;
+}
+
+/** Appels DOF du script d'une table originale : numéro d'événement → nombre d'appels. */
+export type DofScriptEvents = ReadonlyMap<number, number>;
+
+/**
+ * Part des appels DOF du script d'une table originale qu'au moins un effet des bandes de LED suit, en
+ * dessous de laquelle la config est complétée. Mesuré le 26/11/2026 sur une borne à bandes seules : la
+ * config du configtool vise surtout les jouets (bobines, contacteurs), et pour JP's Space Cadet une autre
+ * version du script (événements 302 à 485, quand la table jouée envoie 101 à 153) : 9 % des appels suivis,
+ * LED muettes ; The Matrix 26 %, City Hunter 36 % : effets « assez légers ».
+ */
+export const DOF_ORIGINAL_COVERED = 0.5;
+
+/** Événements du script qu'un effet des bandes suit, et part des appels qu'ils représentent. */
+export function dofOriginalCoverage(configs: DofIniConfig[], equivalents: DofEquivalentOutputs[], stripNames: string[], rom: string, events: DofScriptEvents): { covered: Set<number>; share: number } {
+  const followed = new Set<number>();
+  for (const { setting } of stripSettings(configs, equivalents, stripNames, rom)) for (const t of settingTriggers(setting)) if (t[0] === 'E') followed.add(Number(t.slice(1)));
+  const covered = new Set([...events.keys()].filter((n) => followed.has(n)));
+  let all = 0;
+  let hit = 0;
+  for (const [n, count] of events) {
+    all += count;
+    if (covered.has(n)) hit += count;
+  }
+  return { covered, share: all ? hit / all : 1 };
 }
 
 /** Déclencheurs (L lampes, S bobines, W contacts, E événements, G éclairage général) des lignes de la ROM. */
@@ -273,6 +305,29 @@ function stripColumn(strip: DofFallbackStrip, index: number, triggers: { hits: s
   return settings.join('/');
 }
 
+/** Part des événements (les plus appelés d'abord) aux couleurs de la table ; les autres, plus rares, plus variées. */
+const COMMON_SHARE = 0.6;
+/** Événements d'une table originale complétés au plus, par bande. */
+const ORIGINAL_MAX = 24;
+
+/**
+ * Colonne d'une bande pour une table originale : un effet par événement du script qu'aucun effet ne suit,
+ * aux couleurs de la table (principale, secondaire) pour les plus appelés, variées pour les rares. Pas
+ * d'éclairage général : sans ROM, G1 ne s'allume jamais.
+ */
+function originalColumn(strip: DofFallbackStrip, index: number, events: string[], colors: string[], rom: string): string {
+  const vertical = strip.height > strip.width;
+  const common = [colors[0]!, colors[2] ?? colors[0]!];
+  const rare = [colors[1] ?? colors[0]!, ...romPalette(rom)];
+  const commonCount = Math.ceil(events.length * COMMON_SHARE);
+  return events
+    .map((t, i) => {
+      const color = i < commonCount ? common[(i + index) % common.length]! : rare[(i - commonCount + index) % rare.length]!;
+      return RECIPES[(i + index) % RECIPES.length]!(t, color, 10 + i, vertical, i + index);
+    })
+    .join('/');
+}
+
 export interface DofFallbackInput {
   /** Ini lus par libdof, sans celui du repli. */
   configs: DofIniConfig[];
@@ -283,6 +338,8 @@ export interface DofFallbackInput {
   roms: string[];
   /** Couleurs de la table d'une ROM (#RRGGBB), sinon tirées de son nom. */
   palette?: (rom: string) => string[] | undefined;
+  /** Appels DOF du script, pour une table originale (sans ROM, ses événements relayés à libdof). */
+  events?: (rom: string) => DofScriptEvents | undefined;
 }
 
 export interface DofFallbackPlan {
@@ -316,18 +373,33 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
   if (!outputs.length) return plan;
   const stripNames = input.strips.map((s) => s.name);
   const poorBelow = dofPoorBelow(input.strips.length);
-  const keys = new Map<string, { rom: string; before: number; triggers: string[] }>();
+  const keys = new Map<string, { rom: string; before: number; triggers: string[]; original?: { events: string[]; share: number; total: number } }>();
   for (const rom of [...new Set(input.roms.filter(Boolean))].sort((a, b) => a.localeCompare(b))) {
-    const before = dofRomStripEffects(input.configs, input.equivalents, stripNames, rom);
-    if (before >= poorBelow) {
-      plan.rich.push(rom);
-      continue;
+    const events = input.events?.(rom);
+    let original: { events: string[]; share: number; total: number } | undefined;
+    let before: number;
+    if (events?.size) {
+      // Table originale : jugée sur les événements que son script envoie vraiment, pas sur ceux que la config prévoit.
+      const cov = dofOriginalCoverage(input.configs, input.equivalents, stripNames, rom, events);
+      before = cov.covered.size;
+      if (cov.share >= DOF_ORIGINAL_COVERED) {
+        plan.rich.push(rom);
+        continue;
+      }
+      const missing = [...events].filter(([n]) => !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+      original = { events: missing.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size };
+    } else {
+      before = dofRomStripEffects(input.configs, input.equivalents, stripNames, rom);
+      if (before >= poorBelow) {
+        plan.rich.push(rom);
+        continue;
+      }
     }
     const { lines } = dofRomLines(input.configs, rom);
     // Même clé que la vraie config : le repli ne change pas le rang que libdof retient.
     const key = lines[0]?.key ?? rom;
     if (keys.has(key.toLowerCase())) continue;
-    keys.set(key.toLowerCase(), { rom, before, triggers: dofRomTriggers(input.configs, rom) });
+    keys.set(key.toLowerCase(), { rom, before, triggers: dofRomTriggers(input.configs, rom), ...(original ? { original } : {}) });
     plan.added.push({ rom, key, before });
   }
   if (!plan.added.length) return plan;
@@ -346,11 +418,12 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
         columns.push('0');
         n++;
       }
-      columns.push(stripColumn(strip, index, triggers, colors));
+      columns.push(info.original ? originalColumn(strip, index, info.original.events, colors, a.rom) : stripColumn(strip, index, triggers, colors));
       n += 3;
     });
     configLines.push(`${a.key},${columns.join(',')}`);
-    comments.push(`# ${a.rom}: ${a.before} LED strip effect(s) in the configuration, ${triggers.hits.length + triggers.gi.length} added per strip.`); // i18n-ignore : fichier lu par DOF
+    if (info.original) comments.push(`# ${a.rom}: ${a.before} of the ${info.original.total} DOF events of the table script followed on the LED strips (${Math.round(info.original.share * 100)} % of its calls), ${info.original.events.length} added per strip.`); // i18n-ignore : fichier lu par DOF
+    else comments.push(`# ${a.rom}: ${a.before} LED strip effect(s) in the configuration, ${triggers.hits.length + triggers.gi.length} added per strip.`); // i18n-ignore : fichier lu par DOF
   }
   plan.content = [
     `${DOF_FALLBACK_MARK} (LED et retours (DOF)). Generic LED strip effects for ROMs whose DOF configuration has few or none.`, // i18n-ignore : fichier lu par DOF
@@ -431,7 +504,7 @@ function readText(file: string, encoding: BufferEncoding = 'latin1'): string | u
  * quand il n'y a rien à ajouter ou que le joueur a coupé l'option. Un fichier sans la marque de Cyber
  * Pinball n'est jamais touché.
  */
-export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enabled: boolean; palette?: (rom: string) => string[] | undefined }): DofFallbackResult {
+export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enabled: boolean; palette?: (rom: string) => string[] | undefined; events?: (rom: string) => DofScriptEvents | undefined }): DofFallbackResult {
   const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false };
   const globalDir = setup.globalConfig ? path.dirname(setup.globalConfig.file) : setup.dir;
   const file = setup.fallbackIni ?? path.join(setup.iniDir ?? globalDir, `directoutputconfig${DOF_FALLBACK_NUMBER}.ini`);
@@ -473,7 +546,7 @@ export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enab
     ...cabinet.equivalents.filter((e) => e.number !== DOF_FALLBACK_NUMBER),
     { number: DOF_FALLBACK_NUMBER, outputs: stripNames.map((name, i) => ({ number: 1 + 3 * i, name })) },
   ];
-  const plan = planDofFallback({ configs, equivalents, strips: cabinet.strips, roms, ...(opts.palette ? { palette: opts.palette } : {}) });
+  const plan = planDofFallback({ configs, equivalents, strips: cabinet.strips, roms, ...(opts.palette ? { palette: opts.palette } : {}), ...(opts.events ? { events: opts.events } : {}) });
   result.plan = plan;
   if (!plan.content) return remove();
   if (existing !== plan.content) {

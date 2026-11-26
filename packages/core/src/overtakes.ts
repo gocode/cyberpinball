@@ -8,7 +8,8 @@
 //   « Léa vous a dépassé sur Attack from Mars » en vient, une fois par table et par jour au plus
 //   (placeTakenKey), et l'Arène en fait son action du moment tant que la place reste prise (stillTaken).
 // - Retour de partie : ma partie vient de publier un score ; les joueurs que je passe, la place gagnée
-//   et le prochain à battre (gameOvertake). L'écran de retour ne s'ouvre que s'il y a du neuf.
+//   et le prochain à battre (gameOvertake) ; sans dépassement, la place de la partie (gameStanding).
+//   L'écran de retour s'ouvre après toute partie dont le score est connu (26/11/2026).
 //
 // On compare toujours la même version exacte et le même nombre de billes (boardKey, groupboard.ts).
 
@@ -147,9 +148,22 @@ export interface GameOvertake {
  * quelqu'un. Undefined : je ne passe personne (ou rien n'est publié).
  */
 export function gameOvertake(input: DailyInput, table: { board: string; balls?: number }, since: Date, opts: { now?: Date } = {}): GameOvertake | undefined {
+  return placeOfGame(input, table, since, opts.now ?? new Date(), true);
+}
+
+/**
+ * La place de ma partie au classement, même si elle ne passe personne (retour de partie : l'écran
+ * montre toujours le classement, 26/11/2026) : la portée du pays puis du monde, le classement du jour
+ * puis de tout temps, le premier où mon meilleur est celui de cette partie ; `passed` peut être vide.
+ * Undefined : son score n'est pas (encore) publié.
+ */
+export function gameStanding(input: DailyInput, table: { board: string; balls?: number }, since: Date, opts: { now?: Date } = {}): GameOvertake | undefined {
+  return placeOfGame(input, table, since, opts.now ?? new Date(), false);
+}
+
+function placeOfGame(input: DailyInput, table: { board: string; balls?: number }, since: Date, now: Date, mustPass: boolean): GameOvertake | undefined {
   const me = input.me?.key;
   if (!me) return undefined;
-  const now = opts.now ?? new Date();
   const from = since.getTime() - 1000;
   const version = versionOf(table);
   const before = without(input, (s) => s.key === me && groupOf(s) === groupOf(version) && Date.parse(s.at) >= from);
@@ -163,7 +177,7 @@ export function gameOvertake(input: DailyInput, table: { board: string; balls?: 
       const prior = rankedOn(before, version, scope, period, now);
       const old = prior.find((h) => h.mine);
       const passed = after.filter((h) => !h.mine && h.score < mine.score && h.score > (old?.score ?? -1)).sort((a, b) => b.score - a.score);
-      if (!passed.length) continue;
+      if (mustPass && !passed.length) continue;
       const above = after.filter((h) => !h.mine && h.score > mine.score);
       const next = above[above.length - 1];
       return { scope, period, rank: mine.rank, ...(old ? { previous: old.rank } : {}), players: after.length, passed, ...(next ? { next, gap: next.score - mine.score } : {}) };
@@ -179,8 +193,8 @@ export interface GameNews {
 }
 
 /**
- * Le retour de partie ne s'ouvre que s'il y a du neuf (planche validée) : mon record battu (un premier
- * score ne bat rien), ou au moins un joueur dépassé au classement. Undefined : rien de neuf.
+ * Ce qu'il y a de neuf : mon record battu (un premier score ne bat rien), ou au moins un joueur dépassé
+ * au classement. Undefined : rien de neuf (l'écran s'ouvre quand même, avec le score et la place).
  */
 export function gameNews(d: { best?: number; previousBest?: number; overtake?: GameOvertake }): GameNews | undefined {
   const record = d.best !== undefined && d.previousBest !== undefined && d.previousBest > 0 && d.best > d.previousBest ? { score: d.best, previous: d.previousBest } : undefined;

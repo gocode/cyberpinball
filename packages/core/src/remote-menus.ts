@@ -247,6 +247,17 @@ const GROUP_MAX = 120;
 const REMOTE_LINK = /^https:\/\/[^\s"'<>\\]{1,300}$/;
 
 /** Liste bornée (REMOTE_ENTRIES_MAX) ; `current` ramené dans la liste ; les images, des jetons seulement. */
+/**
+ * Ce qu'un rang touché au téléphone désigne sur un écran : son genre, son titre, ses entrées (libellé,
+ * groupe, grisée ou non) et ses collections, dans leur ordre. Deux versions de même forme ne diffèrent
+ * que par un détail (une progression, une note, l'état du nom de la borne) : un rang de l'une désigne
+ * la même entrée dans l'autre. 26/11/2026 : la borne ignorait un toucher fait sur la version d'avant un
+ * tel détail ; sur un écran qui se met à jour (téléchargement en cours), le toucher ne faisait rien.
+ */
+export function remoteEntriesShape(e: Pick<RemoteEntries, 'kind' | 'title' | 'items'> & Partial<RemoteEntries>): string {
+  return JSON.stringify([e.kind, e.title, e.items.map((i) => [i.label, i.group ?? '', Boolean(i.quiet)]), e.collections?.items.map((c) => c.label) ?? []]);
+}
+
 export function remoteEntries(e: RemoteEntries): RemoteEntries {
   const items = e.items.slice(0, REMOTE_ENTRIES_MAX).map(({ art, ...item }) => {
     const wheel = art?.wheel && REMOTE_IMAGE.test(art.wheel) ? art.wheel : undefined;

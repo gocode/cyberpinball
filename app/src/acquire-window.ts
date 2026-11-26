@@ -367,6 +367,11 @@ export function createAcquirer(events: AcquireEvents) {
     // Ce que le navigateur intégré ne sait pas servir : refusé, sans fenêtre (NO_WEBAUTHN, PAGE_PERMISSIONS).
     // Une demande de clé d'accès faite sans vérifier : refusée sur-le-champ (acquire-page-preload.ts).
     s.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'acquire-page-preload.js') });
+    // Appareil photo et micro : refusés sur-le-champ dans la page (acquire-page-preload.ts), qui le dit ici. Le site
+    // vu est celui du cadre qui a demandé, jamais un texte venu de la page.
+    ipcMain.on('acquire:media-refused', (e) => {
+      if (e.sender.session === s) refused('media', e.senderFrame?.url || e.sender.getURL());
+    });
     s.setPermissionRequestHandler((contents, permission, callback, details) => {
       const ok = PAGE_PERMISSIONS.has(permission);
       if (!ok) refused(permission, details.requestingUrl || contents?.getURL() || '');

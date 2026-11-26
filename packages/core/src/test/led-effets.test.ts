@@ -12,6 +12,7 @@ import {
   LedFxSequencer,
   ledFxInfo,
   ledFxPalette,
+  ledStripPosition,
   ledXY,
   renderLedFx,
   rgbToHsv,
@@ -153,15 +154,27 @@ test('vitesse : une boucle à vitesse 2 montre à t ce qu’elle montrerait à 2
   }
 });
 
-test('géométrie : « monter » va vers la fin d’une bande et vers le haut d’une matrice', () => {
-  const litAt = (ms: number) => {
-    const f = renderLedFx('rise-burst', STRIP, ms, { palette: COLORS, brightness: 1 });
-    return [...Array(60).keys()].filter((k) => f[k * 3]! + f[k * 3 + 1]! + f[k * 3 + 2]! > 0);
-  };
-  const early = litAt(100);
-  const later = litAt(400);
-  assert.ok(early.length > 0 && Math.max(...early) <= 5, `au départ, LED ${early.join(', ')}`);
-  assert.ok(Math.max(...later) > Math.max(...early) + 10 && Math.max(...later) < 40, `ensuite, LED ${later.join(', ')}`);
+// 26/11/2026 : « monter » suivait l'ordre de câblage ; une bande câblée par le haut (TopDown, le cas courant de
+// DOF) voyait tout descendre. La hauteur vient de la disposition déclarée, pour tout câblage.
+test('géométrie : « monter » va vers le haut d’une bande selon sa disposition, et vers le haut d’une matrice', () => {
+  for (const arrangement of ['TopDownLeftRight', 'BottomUpLeftRight', 'LeftRightTopDown', 'LeftRightBottomUp'] as const) {
+    const g: LedGrid = { width: 1, height: 60, arrangement };
+    const litAt = (ms: number) => {
+      const f = renderLedFx('rise-burst', g, ms, { palette: COLORS, brightness: 1 });
+      // Hauteur en LED depuis le bas, lue dans la disposition.
+      return [...Array(60).keys()].filter((k) => f[k * 3]! + f[k * 3 + 1]! + f[k * 3 + 2]! > 0).map((k) => Math.round(ledStripPosition(g, k) * 59));
+    };
+    const early = litAt(100);
+    const later = litAt(400);
+    assert.ok(early.length > 0 && Math.max(...early) <= 5, `${arrangement} : au départ, hauteurs ${early.join(', ')}`);
+    assert.ok(Math.max(...later) > Math.max(...early) + 10 && Math.max(...later) < 40, `${arrangement} : ensuite, hauteurs ${later.join(', ')}`);
+  }
+  // Bande à plat : de gauche à droite, même câblée de droite à gauche.
+  const flat: LedGrid = { width: 30, height: 1, arrangement: 'RightLeftTopDown' };
+  assert.equal(ledStripPosition(flat, 0), 1);
+  assert.equal(ledStripPosition(flat, 29), 0);
+  assert.equal(ledStripPosition(STRIP, 0), 1, 'TopDown : la première LED est en haut');
+  assert.equal(ledStripPosition(STRIP, 59), 0);
   const ms = 400;
   const grid: LedGrid = { width: 16, height: 8, arrangement: 'TopDownLeftRight' };
   const m = renderLedFx('rise-burst', grid, ms, { palette: COLORS, brightness: 1 });

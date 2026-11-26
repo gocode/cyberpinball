@@ -32,6 +32,7 @@ const COMPAT_FIX_LABELS: Record<CompatFix, () => string> = {
   timerTextOnce: () => t('minuteries sans analyse de l’antivirus'),
   tablesDirectoryDmd: () => t('dossier du DMD cherché dans celui de la table'),
   b2sArgs: () => t('appels au fronton B2S convertis en nombres'),
+  dofTapOwnSub: () => t('événements DOF du script transmis aux effets LED'),
 };
 
 export const compatFixLabel = (fix: CompatFix): string => COMPAT_FIX_LABELS[fix]();

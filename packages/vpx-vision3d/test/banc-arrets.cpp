@@ -21,15 +21,35 @@ static int echecs = 0;
 
 static volatile double puits = 0.0;
 
-/** Du calcul pendant `ms` millisecondes, dans le code de ce banc. */
+/**
+ * Du calcul pendant `ms` millisecondes, dans le code de ce banc. L'horloge est lue rarement (une fois par 100 000
+ * racines, une fraction de milliseconde) : lue toutes les 2000, elle passait par Windows (ntdll) si souvent qu'un
+ * fil préempté sous charge y était surpris la plupart du temps, au retour de l'appel (26/11/2026).
+ */
 __declspec(noinline) static void calcul(int ms)
 {
    const auto fin = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
    double x = 1.0;
    while (std::chrono::steady_clock::now() < fin)
-      for (int i = 0; i < 2000; i++)
+      for (int i = 0; i < 100000; i++)
          x = std::sqrt(x + i);
    puits = x;
+}
+
+/**
+ * Le fil des images du banc passe devant les autres programmes, comme la boucle de jeu de VPX : sur une machine
+ * chargée, ses écarts courts restent courts (« rien n'est dit »), et ses arrêts sont ceux qu'il fait lui-même.
+ */
+static void filDesImages() { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST); }
+
+/**
+ * Les fils du banc se nomment en démarrant, et le relevé les liste au début (puis une fois par seconde). Sur une
+ * machine chargée, un fil créé n'avait pas encore tourné : relevé sous « tid… », ou pas du tout (26/11/2026).
+ */
+static void attendreNoms(const std::atomic<int>& nommes, int n)
+{
+   while (nommes.load() < n)
+      std::this_thread::yield();
 }
 
 int main()
@@ -67,6 +87,7 @@ int main()
       std::string surCalcul, surSleep, horsArret;
       std::thread images([&]
       {
+         filDesImages();
          VERIFIE(releve.demarrer());
          char ou[448];
          auto image = [&](bool aCoup) -> std::string
@@ -106,31 +127,41 @@ int main()
       // « RenderThread » calcule. Le relevé doit dire aussi où était ce fil-là.
       ReleveArrets releve;
       releve.suivreAussi(L"RenderThread");
-      std::atomic<bool> calculer { false }, fini { false };
+      std::atomic<bool> calculer { false }, commence { false }, fini { false };
+      std::atomic<int> nommes { 0 };
       std::thread rendu([&]
       {
          SetThreadDescription(GetCurrentThread(), L"RenderThread");
+         nommes++;
          while (!fini.load())
          {
             if (calculer.load())
             {
+               commence.store(true);
                calcul(300);
                calculer.store(false);
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
          }
       });
+      attendreNoms(nommes, 1);
       std::string attente;
       std::thread images([&]
       {
+         filDesImages();
          VERIFIE(releve.demarrer());
          char ou[900];
-         for (int i = 0; i < 20; i++)
+         // Des images jusqu'à ce que le relevé ait trouvé le rendu (la recherche est lente sur une machine chargée).
+         for (int i = 0; i < 20 || !releve.filsCherches(); i++)
          {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             releve.image(false, ou, sizeof(ou));
          }
          calculer.store(true);
+         // L'à-coup commence le calcul lancé : sous charge, le réveil du rendu (dans Windows) n'en fait pas partie.
+         while (!commence.load())
+            std::this_thread::yield();
+         releve.image(false, ou, sizeof(ou));
          while (calculer.load())
             Sleep(1); // la boucle de jeu attend le rendu
          releve.image(true, ou, sizeof(ou));
@@ -155,9 +186,11 @@ int main()
       releve.suivreTous(true);
       std::mutex verrou;
       std::atomic<bool> tenir { false }, tenu { false }, fini { false };
+      std::atomic<int> nommes { 0 };
       std::thread travailleur([&]
       {
          SetThreadDescription(GetCurrentThread(), L"Travailleur.CmdQueue");
+         nommes++;
          while (!fini.load())
          {
             if (tenir.load())
@@ -173,15 +206,19 @@ int main()
       std::thread dormeur([&]
       {
          SetThreadDescription(GetCurrentThread(), L"Dormeur");
+         nommes++;
          while (!fini.load())
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
       });
+      attendreNoms(nommes, 2);
       std::string attente;
       std::thread images([&]
       {
+         filDesImages();
          VERIFIE(releve.demarrer());
          char ou[2048];
-         for (int i = 0; i < 20; i++)
+         // Des images jusqu'à ce que le relevé ait listé les autres fils (la recherche est lente sur une machine chargée).
+         for (int i = 0; i < 20 || !releve.filsCherches(); i++)
          {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             releve.image(false, ou, sizeof(ou));
@@ -189,6 +226,8 @@ int main()
          tenir.store(true);
          while (!tenu.load())
             std::this_thread::yield();
+         // L'à-coup commence le verrou pris : sous charge, le réveil du travailleur (dans Windows) n'en fait pas partie.
+         releve.image(false, ou, sizeof(ou));
          {
             std::lock_guard l(verrou); // la boucle de jeu attend le verrou, comme Render du lecteur PuP
          }

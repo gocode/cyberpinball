@@ -282,16 +282,23 @@ export function readCertificate(branche, dir = coordinationDir()) {
 
 // ---------------------------------------------------------------- tests instables
 
-/** Tests tombés dans la suite complète puis passés seuls : comptés, pour la session qui les corrigera. */
-export function recordFlaky(files, branche, dir = coordinationDir()) {
+/** Jours de chutes gardés par test (dates) : de quoi dire lesquels tombent en ce moment. */
+const FLAKY_KEEP_MS = 30 * 24 * 3600_000;
+
+/**
+ * Tests tombés dans la suite complète puis passés seuls : comptés, pour la session qui les corrigera, avec la date
+ * de chaque chute (les 30 derniers jours) pour recentFlaky.
+ */
+export function recordFlaky(files, branche, dir = coordinationDir(), nowMs = Date.now()) {
   const file = path.join(dir, 'instables.json');
   const reg = readJson(file, {});
-  const now = new Date().toISOString();
+  const now = new Date(nowMs).toISOString();
   for (const f of files) {
     const e = reg[f] ?? { fois: 0 };
     e.fois++;
     e.dernier = now;
     e.branche = branche;
+    e.dates = [...(e.dates ?? []).filter((d) => nowMs - Date.parse(d) < FLAKY_KEEP_MS), now];
     reg[f] = e;
   }
   writeJson(file, reg);
@@ -300,4 +307,17 @@ export function recordFlaky(files, branche, dir = coordinationDir()) {
 
 export function readFlaky(dir = coordinationDir()) {
   return readJson(path.join(dir, 'instables.json'), {});
+}
+
+/**
+ * Les tests qui tombent le plus en ce moment : chutes des `days` derniers jours, les plus nombreuses d'abord. Une
+ * entrée d'avant les dates (25/11/2026) compte pour sa dernière chute seulement.
+ */
+export function recentFlaky(dir = coordinationDir(), { days = 7, max = 3, nowMs = Date.now() } = {}) {
+  const since = nowMs - days * 24 * 3600_000;
+  return Object.entries(readFlaky(dir))
+    .map(([test, e]) => ({ test, fois: (e.dates ?? (e.dernier ? [e.dernier] : [])).filter((d) => Date.parse(d) >= since).length, dernier: e.dernier }))
+    .filter((e) => e.fois > 0)
+    .sort((a, b) => b.fois - a.fois || Date.parse(b.dernier) - Date.parse(a.dernier))
+    .slice(0, max);
 }

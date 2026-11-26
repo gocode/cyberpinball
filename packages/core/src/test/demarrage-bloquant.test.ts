@@ -80,7 +80,6 @@ const SYNC_CALLS: Record<string, { count: number; why: string }> = {
   'nvidia-3dvision.ts': { count: 1, why: 'écran Lunettes 3D ouvert ou « Vérifier à nouveau » (readDriver), jamais au lancement' },
   'offscreen.ts': { count: 1, why: 'essais hors écran : relais arrêté après délai, processus sans fenêtre' },
   'origin-framing.ts': { count: 1, why: 'cadrage d’origine d’une table, au lancement d’une partie' },
-  'pinup-player.ts': { count: 1, why: 'écran Future Pinball, à la demande' },
   'start-relaunch-process.ts': { count: 1, why: 'veilleur de la relance par Start, et 15 s après l’ouverture du front-end' },
 };
 
