@@ -724,6 +724,15 @@ export const NAVIGATION: readonly NavigationInfo[] = [
     required: false,
     fallback: [],
   },
+  // Mode nuit (26/11/2026) : active ou retire le mode d'un appui, au front-end et en partie ; s'ajoute au bouton avancé du
+  // même nom des boutons du jeu (les deux peuvent servir). Lu par Cyber Pinball, jamais par VPX (modenuit-bouton.ts).
+  {
+    id: 'nightMode',
+    get label() { return t('Mode nuit'); },
+    get how() { return t('Un appui active le mode nuit (écrans, son, LED et toys baissés, selon tes réglages), le suivant le désactive ; au front-end comme pendant une partie'); },
+    required: false,
+    fallback: [],
+  },
   // Configuration de la borne (assistant, étapes seules) : en sortir sans rien écrire, d'un appui (wizardsteps.ts, quitButtonActs).
   { id: 'quit', get label() { return t('Quitter sans enregistrer'); }, required: false, fallback: [] },
 ];

@@ -36,6 +36,12 @@ export type DofSide = 'left' | 'right' | 'center';
 export interface DofEventClass {
   kind: DofEventKind;
   side: DofSide;
+  /**
+   * Allumé puis éteint par le script (DOFOn puis DOFOff), pas une impulsion : un état qui dure, comme la bille
+   * posée au lanceur (« DOF 208, DOFOn » à son arrivée, « DOFOff » quand elle part). Pour un lanceur, l'envoi de
+   * la bille est alors l'extinction de l'événement, pas son allumage.
+   */
+  held?: boolean;
 }
 
 /** Mots du script, du plus précis au plus vague : le premier qui répond l'emporte. */
@@ -114,17 +120,22 @@ interface Call {
   arg: string;
   sound?: string;
   toy?: string;
+  /** Second argument : DOFOn, DOFOff, DOFPulse, 0, 1, 2… */
+  state?: string;
 }
 
 /** Les appels DOF d'une instruction : DOF n, s / DOF(n, s) / DOFALT n, s / SoundFXDOF("son", n, s, jouet). */
 function callsIn(statement: string): Call[] {
   const calls: Call[] = [];
-  const fx = /SoundFXDOF\s*\(\s*(?:"([^"]*)"|([^,()]+(?:\([^()]*\))?))\s*,\s*(\w+)\s*,\s*\w+\s*,\s*(\w+)/gi;
-  for (const m of statement.matchAll(fx)) calls.push({ arg: m[3]!, sound: m[1] ?? m[2]?.trim(), toy: m[4] });
-  const plain = /(?:^|[^\w.])DOF(?:ALT)?\s*\(?\s*(\w+)\s*,\s*\w+/gi;
-  for (const m of statement.replace(fx, '').matchAll(plain)) calls.push({ arg: m[1]! });
+  const fx = /SoundFXDOF\s*\(\s*(?:"([^"]*)"|([^,()]+(?:\([^()]*\))?))\s*,\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)/gi;
+  for (const m of statement.matchAll(fx)) calls.push({ arg: m[3]!, sound: m[1] ?? m[2]?.trim(), state: m[4], toy: m[5] });
+  const plain = /(?:^|[^\w.])DOF(?:ALT)?\s*\(?\s*(\w+)\s*,\s*(\w+)/gi;
+  for (const m of statement.replace(fx, '').matchAll(plain)) calls.push({ arg: m[1]!, state: m[2] });
   return calls;
 }
+
+const STATE_ON = /^(?:dofon|1|true)$/i;
+const STATE_OFF = /^(?:dofoff|0|false)$/i;
 
 /**
  * Le type et le côté de chaque événement DOF appelé par le script d'une table (numéro → classe). Un
@@ -140,6 +151,7 @@ export function classifyDofScript(script: string): Map<number, DofEventClass> {
     }
   }
   const votes = new Map<number, Map<string, number>>();
+  const states = new Map<number, { on: boolean; off: boolean }>();
   let sub = '';
   const conds: string[] = [];
   for (const raw of script.split(/\r?\n/)) {
@@ -163,6 +175,10 @@ export function classifyDofScript(script: string): Map<number, DofEventClass> {
     for (const call of callsIn(line)) {
       const number = /^\d+$/.test(call.arg) ? Number(call.arg) : consts.get(call.arg.toLowerCase());
       if (number === undefined || number <= 0) continue;
+      const st = states.get(number) ?? { on: false, off: false };
+      if (call.state && STATE_ON.test(call.state)) st.on = true;
+      if (call.state && STATE_OFF.test(call.state)) st.off = true;
+      states.set(number, st);
       const statement = line.replace(/\w*DOF\w*/gi, ' ');
       const constName = /^\d+$/.test(call.arg) ? '' : call.arg.replace(/^dof_?/i, '');
       const cond = conds.join(' ');
@@ -190,7 +206,8 @@ export function classifyDofScript(script: string): Map<number, DofEventClass> {
     // Le plus fréquent ; « other » ne l'emporte que seul.
     const best = [...v.entries()].sort((a, b) => Number(a[0].startsWith('other/')) - Number(b[0].startsWith('other/')) || b[1] - a[1])[0]![0];
     const [kind, side] = best.split('/') as [DofEventKind, DofSide];
-    out.set(number, { kind, side });
+    const st = states.get(number);
+    out.set(number, st?.on && st.off ? { kind, side, held: true } : { kind, side });
   }
   return out;
 }

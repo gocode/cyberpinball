@@ -76,7 +76,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'boutons',
     flag: '--boutons',
-    icon: 'button',
+    icon: 'gamepad',
     get label() { return t('Boutons du jeu'); },
     get detail() { return t('Ce que VPX reçoit en partie : flippers, Start, crédit, lanceur…'); },
     get saved() { return t('Boutons du jeu enregistrés'); },
@@ -87,7 +87,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'interface',
     flag: '--interface',
-    icon: 'gamepad',
+    icon: 'button',
     get label() { return t('Boutons de l’interface'); },
     get detail() { return t('Ce qui pilote Cyber Pinball : précédent, suivant, valider, retour…'); },
     get saved() { return t('Boutons de l’interface enregistrés'); },

@@ -39,12 +39,13 @@ export function createSurpriseCatalog(host: {
       const isOut = out(drawFrom, read());
       return tables.filter((table) => eligible(table, drawFrom, isOut)).map((table) => ({ id: table.id, title: table.title, wheel: host.wheel(table) }));
     },
-    /** Gérer la table : interrupteur « Dans le tirage ». */
+    /** Gérer la table : interrupteur « Table surprise : Peut sortir / Ne sort jamais » (la valeur dit l'effet,
+     *  un « Oui/Non » sous « Dans le tirage » n'était pas compris). */
     tableAction(table: TableEntry, refresh: () => void): Action {
       const out = read().tables.includes(table.id);
       return {
-        label: t('Dans le tirage'), icon: 'shuffle', door: 'sheet.manage',
-        detail: out ? t('Non') : t('Oui'),
+        label: t('Table surprise'), icon: 'shuffle', door: 'sheet.manage',
+        detail: out ? t('Ne sort jamais') : t('Peut sortir'),
         run: () => { toggle('tables', table.id); refresh(); },
       };
     },

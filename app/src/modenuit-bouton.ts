@@ -6,7 +6,7 @@
 // Hors écran (essais sans opérateur), GetAsyncKeyState ne voit rien : les appuis arrivent par les
 // fenêtres du menu (autopilote), comme pour le volume.
 
-import { buttonKeys, windowsVk, type CabinetButtons } from '@cyberpinball/core';
+import { buttonKeys, windowsVk, type CabinetButtons, type NavigationButtons } from '@cyberpinball/core';
 import { keysDown } from '@cyberpinball/win-displays';
 import type { Input } from 'electron';
 import { joystickButtonsHeld, watchJoystickButtons } from './joystick-input';
@@ -18,8 +18,8 @@ const POLL_MS = 25;
 const CONFIG_TTL_MS = 2000;
 
 export interface NightButtonOptions {
-  /** Boutons de la configuration branchée (relus de temps en temps). */
-  buttons(): CabinetButtons | undefined;
+  /** Boutons du jeu et de l'interface de la configuration branchée (relus de temps en temps). */
+  buttons(): { buttons?: CabinetButtons; navigation?: NavigationButtons } | undefined;
   /** Un appui : le mode nuit bascule. */
   press(): void;
 }
@@ -31,19 +31,22 @@ export interface NightButton {
 }
 
 export function startNightButton(opts: NightButtonOptions): NightButton {
-  let cached: { at: number; code: string | undefined } | undefined;
+  let cached: { at: number; codes: string[] } | undefined;
   const windowHeld = new Set<string>();
   let wasHeld = false;
 
-  function code(): string | undefined {
+  /** Le bouton avancé des boutons du jeu et le bouton de l'interface : l'un ou l'autre bascule le mode. */
+  function codes(): string[] {
     const now = Date.now();
-    if (!cached || now - cached.at > CONFIG_TTL_MS) cached = { at: now, code: buttonKeys(opts.buttons()).nightMode };
-    return cached.code;
+    if (!cached || now - cached.at > CONFIG_TTL_MS) {
+      const source = opts.buttons();
+      const list = [buttonKeys(source?.buttons).nightMode, source?.navigation?.nightMode].filter((c): c is string => Boolean(c));
+      cached = { at: now, codes: [...new Set(list)] };
+    }
+    return cached.codes;
   }
 
-  function held(): boolean {
-    const c = code();
-    if (!c) return false;
+  function codeHeld(c: string): boolean {
     if (c.startsWith('SDLJoy_')) return joystickButtonsHeld().includes(c);
     if (OFFSCREEN) return windowHeld.has(c);
     const vk = windowsVk(c);
@@ -53,6 +56,10 @@ export function startNightButton(opts: NightButtonOptions): NightButton {
     } catch {
       return false; // API de Windows indisponible : seuls les joysticks comptent
     }
+  }
+
+  function held(): boolean {
+    return codes().some(codeHeld);
   }
 
   function poll(): void {

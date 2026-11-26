@@ -165,6 +165,13 @@ export function createLedAnimationsMenu(host: LedAnimationsMenuHost) {
         icon: 'clock',
         run: () => change({ idleMinutes: nextChoice(LED_IDLE_CHOICES, LED_IDLE_CHOICES.includes(s.idleMinutes) ? s.idleMinutes : 30) }, 6),
       },
+      {
+        label: s.jukeboxMusic ? t('Juke-box : les LED suivent la musique') : t('Juke-box : les LED ne suivent pas la musique'),
+        detail: t('Les graves montent depuis le bas des bandes, les aigus les éclairent en haut, aux couleurs de la pochette'),
+        icon: 'spectrum',
+        tone: s.jukeboxMusic ? 'ok' : 'quiet',
+        run: () => change({ jukeboxMusic: !s.jukeboxMusic }, 7),
+      },
       { label: t('Retour'), icon: 'back', run: back },
     ];
     return {

@@ -22,6 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { zedmdLogPorts, type DmdPortHints } from './dmd';
 import { DOF_FALLBACK_NUMBER, fallbackEquivalentLines, isOwnedFallbackIni } from './dof-repli';
+import { restoreStripOutputs } from './dof-remplacement';
 import { formatDate, t, tn } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { DofFacts } from './health';
@@ -498,7 +499,8 @@ function readGlobalConfig(file: string): DofGlobalConfig {
 
 /** Lit un Cabinet.xml de DOF : contrôleurs, bandes et LedWizEquivalent. */
 export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8')): DofCabinetFile {
-  const root = child(parseXml(text), 'Cabinet');
+  // Sorties des bandes en sommeil pendant une partie en remplacement (dof-remplacement.ts) : lues comme rendues.
+  const root = child(parseXml(restoreStripOutputs(text)), 'Cabinet');
   if (!root) throw new Error(t('Ce n’est pas un Cabinet.xml de DOF (pas d’élément <Cabinet>).'));
   const owned = OWNED_COMMENT.test(text);
   const controllers: DofCabinetController[] = [];

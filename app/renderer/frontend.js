@@ -2296,7 +2296,7 @@ window.cyber.onState((s) => {
 // La souris (souris-roue.js) : un clic réveille ce qu'un bouton quelconque quitte, la molette
 // fait tourner la roue de l'écran des tables.
 window.CyberSouris?.install({
-  waking: () => Boolean(lastState && !lastState.game && (lastState.intro || lastState.attract || (lastState.night ?? 0) > 0 || lastState.stop)),
+  waking: () => Boolean(lastState && !lastState.game && (lastState.intro || lastState.attract || lastState.stop)),
   wheelArea: () => (lastState?.phase === 'menu' && !lastState.game && menuView?.node.isConnected ? menuView.node : undefined),
 });
 window.cyber.ready();

@@ -1,10 +1,11 @@
 /** Catalogue anglais : tirage dans la collection courante. */
 export const messages: Record<string, string> = {
   'Table surprise': 'Surprise table',
-  'Dans le tirage': 'In the draw',
+  'Peut sortir': 'Can be drawn',
+  'Ne sort jamais': 'Never drawn',
   'Exclure du tirage de Toutes les tables': 'Exclude from the All tables draw',
   'Aucune table à tirer': 'No table to draw',
-  'Aucune table de cette collection ne peut sortir : son jeu n’est pas installé, ou elle est exclue (Gérer la table > Dans le tirage).': 'No table in this collection can be drawn: its game is not installed, or it is excluded (Manage the table > In the draw).',
+  'Aucune table de cette collection ne peut sortir : son jeu n’est pas installé, ou elle est exclue (Gérer la table > Table surprise).': 'No table in this collection can be drawn: its game is not installed, or it is excluded (Manage the table > Surprise table).',
   'Exclure du tirage…': 'Exclude from the draw…',
   'Table surprise : les collections dont les tables ne sortent pas dans Toutes les tables': 'Surprise table: the collections whose tables are not drawn from All tables',
   'Table surprise : les tables d’une collection marquée Oui ne sortent pas quand on tire dans Toutes les tables. Tirer dans la collection elle-même reste possible.':

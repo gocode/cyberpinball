@@ -78,6 +78,8 @@ export interface LedAnimationSettings {
   color: string;
   /** Minutes sans rien toucher avant d'éteindre ; 0 : jamais. */
   idleMinutes: number;
+  /** Pendant le Juke-box, les bandes suivent la musique (led-jukebox-musique.ts) au lieu de l'ambiance. */
+  jukeboxMusic: boolean;
 }
 
 /**
@@ -93,6 +95,7 @@ export const DEFAULT_LED_ANIMATIONS: Readonly<LedAnimationSettings> = {
   followTable: true,
   color: NEUTRAL_TINT,
   idleMinutes: 30,
+  jukeboxMusic: true,
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -110,6 +113,7 @@ export function normalizeLedAnimations(raw: unknown): LedAnimationSettings {
     followTable: typeof o.followTable === 'boolean' ? o.followTable : d.followTable,
     color: typeof o.color === 'string' && HEX.test(o.color.trim()) ? o.color.trim().toLowerCase() : d.color,
     idleMinutes: num(o.idleMinutes, d.idleMinutes, 0, 24 * 60),
+    jukeboxMusic: typeof o.jukeboxMusic === 'boolean' ? o.jukeboxMusic : d.jukeboxMusic,
   };
 }
 

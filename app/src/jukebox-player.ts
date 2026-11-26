@@ -118,6 +118,8 @@ export interface JukeboxPlayerHost {
   dmdOn(): boolean;
   /** Visualiseur du DMD (réglage « Visualiseur du Juke-box ») et couleur réglée des points (Classique). */
   visualizer?(): { mode: JukeboxVisualizerMode; color: string };
+  /** Niveaux du spectre et couleurs de la pochette (#rrggbb) : les LED de la borne suivent la musique. */
+  ledMusic?(levels: readonly number[], palette?: readonly string[]): void;
   banner(text: string): void;
   log(line: string): void;
   /**
@@ -828,6 +830,9 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     };
     const pulse = { bass: avg(0, 6), mid: avg(6, 16), high: avg(16, JUKEBOX_SPECTRUM_BANDS) };
     for (const win of host.windows().values()) if (!win.isDestroyed()) win.webContents.send('jukebox-pulse', pulse);
+    // Les LED de la borne : les mêmes niveaux (pas de seconde analyse), aux couleurs de la pochette.
+    const cover = order && coverColors?.key === order.key ? coverColors.palette : undefined;
+    host.ledMusic?.(values, cover?.map(([r, g, b]) => '#' + [r, g, b].map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')));
   }
 
   function sendTime(): void {

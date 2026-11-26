@@ -87,14 +87,15 @@ test('Repli DOF : invariant — aucune ROM de la bibliothèque ne reste sans eff
   // Signaux de la ROM, formes et couleurs variées, calques explicites.
   const mm = plan.content.split(/\r?\n/).find((l) => l.startsWith('mm,'))!;
   for (const t of ['S9 ', 'S47 ', 'W15 ', 'G1 ']) assert.ok(mm.includes(t), t);
-  assert.ok(/ADU/.test(mm) && /AFDEN/.test(mm) && / 70 3 /.test(mm) && / F\d+/.test(mm), 'balayage vers le haut, scintillement, clignotement borné, fondu');
+  assert.ok(/ADU/.test(mm) && /AFDEN/.test(mm) && /APC#/.test(mm) && / FD\d+/.test(mm), 'comète vers le haut, étincelles, plasma à deux teintes, fondu');
   assert.ok(new Set(mm.match(/#[0-9A-F]{6}/g)).size >= 4, 'plusieurs couleurs');
   // Sans signal connu : les bobines de la ROM.
   const totan = plan.content.split(/\r?\n/).find((l) => l.startsWith('totan_14,'))!;
   assert.ok(totan.includes('S1 ') && totan.includes('S28 '));
   // Couleurs de la table lancée.
   const tinted = planDofFallback({ configs: c, equivalents: EQUIVALENTS, strips: STRIPS, roms: ['mm_109b'], palette: () => ['#12ab34'] });
-  assert.ok(tinted.content!.includes('#12AB34'));
+  // Même teinte, en pleine luminosité (dofVivid) : une couleur sombre ne se verrait pas sur la bande.
+  assert.ok(tinted.content!.includes('#1BFF4E'));
   // Marqué, sans date : réécrit seulement s'il change.
   assert.ok(plan.content.startsWith('# Written by Cyber Pinball'));
   assert.equal(planDofFallback({ configs: c, equivalents: EQUIVALENTS, strips: STRIPS, roms: [...LIBRARY].reverse() }).content, plan.content);

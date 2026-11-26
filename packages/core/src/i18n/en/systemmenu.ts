@@ -5,7 +5,7 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
   'Toutes les tables, collections, ajouter une table, médias, ROM, roue, son et mode attente, migration': 'All tables, collections, add a table, media, ROMs, wheel, sound and attract mode, migration',
   'Ma borne': 'My cabinet',
-  'Configuration, mode nuit, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes': 'Setup, night mode, VPX, DMD and LEDs, VR and 3D vision, remote, startup, health and backups',
+  'Configuration, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes': 'Setup, VPX, DMD and LEDs, VR and 3D vision, remote, startup, health and backups',
   'Réglages de VPX pour toutes les tables, autres versions installées': 'VPX settings for every table, other installed versions',
   'DMD et LED': 'DMD and LEDs',
   'Écran du DMD, DMD du front-end et sa couleur, DMD réel, LED et retours (DOF)': 'DMD screen, menu DMD and its colour, real DMD, LEDs and feedback (DOF)',

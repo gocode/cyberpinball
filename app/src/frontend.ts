@@ -423,6 +423,7 @@ import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { LaunchReservation, SurpriseGesture, SurpriseSession, guestUnlockSlots } from '@cyberpinball/core';
 import { createSurpriseCatalog } from './table-surprise';
+import { createDofReplace } from './dof-remplacement';
 import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
 import { deleteAccount, eraseAccountFiles } from './account-delete';
@@ -1151,7 +1152,7 @@ const surprise = new SurpriseSession({
   },
   changed: () => broadcast(),
   empty: () => {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Aucune table à tirer'), lines: [t('Aucune table de cette collection ne peut sortir : son jeu n’est pas installé, ou elle est exclue (Gérer la table > Dans le tirage).'), t('Start ou Exit : revenir au front-end.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Aucune table à tirer'), lines: [t('Aucune table de cette collection ne peut sortir : son jeu n’est pas installé, ou elle est exclue (Gérer la table > Table surprise).'), t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
   },
   failed: () => {
@@ -1469,12 +1470,16 @@ function refreshRomFallback(table: TableEntry, original?: string): void {
     const p = dofScenePalette(tint, tints?.current()?.leds);
     const colors = [p.primary, p.accent, p.secondary].map((c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`);
     const playedSet = new Set(played.map((r) => r.toLowerCase()));
+    const replace = dofReplace.isOn(table);
     const result = refreshDofFallback(setup, [...libraryRomsMemo.roms, ...played], {
       enabled: loadEventSettings(loc.dataDir).romFallback !== false,
       ...(tint ? { palette: (rom: string) => (playedSet.has(rom.toLowerCase()) ? colors : undefined) } : {}),
       ...(original && events?.size ? { events: (rom: string) => (rom.toLowerCase() === original.toLowerCase() ? events : undefined), classes: () => classes } : {}),
+      // « Effets LED de Cyber Pinball » choisi pour la table (dof-remplacement.ts) : ses bandes ne suivent que le repli.
+      ...(replace ? { replace: played } : {}),
     });
     if (result.refused) console.warn(`[dof] repli : ${result.refused}`);
+    if (replace) console.log(`[dof] remplacement : ${played.join(', ')} ; ${result.suspended.length} sortie(s) de bandes du configtool en sommeil pour cette partie.`); // i18n-ignore : journal
     if (result.wrote || result.removed || result.cabinetUpdated) {
       const added = result.plan?.added.filter((a) => playedSet.has(a.rom.toLowerCase())) ?? [];
       console.log(`[dof] repli ${result.removed ? 'retiré' : 'écrit'} (${result.file}) : ${result.plan?.added.length ?? 0} ROM complétée(s), ${result.plan?.rich.length ?? 0} laissée(s) ; table lancée : ${added.map((a) => `${a.rom} (${a.before} effet(s) d'origine)`).join(', ') || 'config riche'}.`);
@@ -1484,6 +1489,12 @@ function refreshRomFallback(table: TableEntry, original?: string): void {
     console.warn(`[dof] repli impossible : ${(error as Error).message}`);
   }
 }
+// « Effets LED de Cyber Pinball » à la place de la config DOF d'une table (dof-remplacement.ts).
+const dofReplace = createDofReplace({
+  tablesDir: () => (loc.root ? layoutOf(loc.root).tables : undefined),
+  dof: () => dofSetupNow(),
+  changed: (table) => reloadTables(table.file),
+});
 // Animations des LED hors partie (led-animations.ts) : ambiance de la roue et des écrans, jamais pendant une partie.
 // Les bandes décrites se relisent au plus toutes les 5 s (la lecture touche le disque).
 let savedLedsMemo: { at: number; leds: CabinetLeds | undefined } | undefined;
@@ -1548,6 +1559,7 @@ const library = createLibrary({
   // « Ajouter à une collection… » sur la fiche (library, créée plus bas, n'est lue qu'à l'appel).
   tableCollections: (table, back) => tableCollectionsAction({ collections, library, redraw: () => broadcast() })(table, back),
   tableSurprise: (table, refresh) => surpriseCatalog.tableAction(table, refresh),
+  dofReplace: (table, refresh) => dofReplace.tableAction(table, refresh),
   favorite: (table, on) => {
     if (!loc.root) return;
     setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
@@ -1670,6 +1682,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   dmd: (name, animation) => liveDmd.custom(name, animation),
   dmdOn: () => Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active,
   visualizer: () => ({ mode: mediaSettings.jukeboxVisualizer, color: menuDmdColor() }),
+  ledMusic: (levels, palette) => ledAnimations.feedMusic(levels, palette),
   banner: (text) => showBanner(text),
   log: (line) => console.log(line),
   // Les boutons de la roue, résolus comme sur la roue (menuButton) ; les codes de la borne gardent leur rôle (une flèche relevée reste un flipper).
@@ -2480,6 +2493,17 @@ function screenSetupItems(): SystemItem[] {
   return [...(['ecrans', 'playfield', 'disposition'] as const).map(wizardStepItem), ...(dmd ? [dmd] : [])];
 }
 
+// Mode nuit : l'écran des réglages (modenuit-menu.ts), rangé dans Configuration de la borne (26/11/2026) ;
+// « Son et mode attente » y garde aussi sa ligne.
+const nightModeMenu = createNightModeMenu({
+  library,
+  settings: () => mediaSettings.nightMode,
+  save: (next) => saveMediaSettings({ ...mediaSettings, nightMode: next }),
+  on: () => nightMode?.on() ?? false,
+  toggle: () => nightMode?.toggle() ?? false,
+  dofRefusal: () => nightMode?.dofRefusal(),
+});
+
 /**
  * Sous-menu « Configuration de la borne » (20/11/2026 : six lignes au lieu de treize) : Boutons et
  * Écrans regroupent leurs étapes, puis le son, la langue de la borne, les configurations et
@@ -2492,6 +2516,7 @@ function cabinetSetupItems(): SystemItem[] {
     { label: t('Boutons'), detail: t('Boutons du jeu et de l’interface, lanceur analogique, tilt, touches par défaut'), icon: 'button', attention: buttonsPart.some((i) => i.attention), run: () => openCabinetPart('buttons') },
     { label: t('Écrans'), detail: t('Écrans, playfield, disposition, écran du DMD'), icon: 'screens', attention: screensPart.some((i) => i.attention), run: () => openCabinetPart('screens') },
     wizardStepItem('son'),
+    { label: t('Mode nuit'), detail: nightModeMenu.summary(), icon: 'moon', run: () => nightModeMenu.open(() => openCabinetSetup()) },
     { label: languageItem.label ?? t('Langue / Language'), detail: languageItem.detail, icon: 'language', run: () => languageItem.run() },
     // Copiée : ses accesseurs (la configuration active, lue sur le disque) sont lus une fois, ici.
     { ...configurations.systemItem },
@@ -2666,22 +2691,6 @@ const introMenu = createIntroMenu({
     return new Set([...windowRoles.values()].flat().map((r) => introScreenOf(r, dmdType)));
   },
   preview: () => beginIntro('library'),
-});
-// Mode nuit : l'écran des réglages (modenuit-menu.ts).
-const nightModeMenu = createNightModeMenu({
-  library,
-  settings: () => mediaSettings.nightMode,
-  save: (next) => saveMediaSettings({ ...mediaSettings, nightMode: next }),
-  on: () => nightMode?.on() ?? false,
-  toggle: () => nightMode?.toggle() ?? false,
-  dofRefusal: () => nightMode?.dofRefusal(),
-});
-// Entrée directe du Menu système > Ma borne > Mode nuit (le même écran que dans « Son et mode attente »).
-library.provideSystemItem('night-mode', {
-  get detail() {
-    return nightModeMenu.summary();
-  },
-  run: () => nightModeMenu.open(() => library.openSystem()),
 });
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
 const menuSettings = createMenuSettings({
@@ -4810,7 +4819,7 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   nightButton = startNightButton({
-    buttons: () => loadCabinet(loc.dataDir)?.buttons,
+    buttons: () => loadCabinet(loc.dataDir),
     press: () => {
       const on = nightMode?.toggle();
       console.log(`Mode nuit : bouton pressé, mode ${on ? 'actif' : 'inactif'}.`); // i18n-ignore : journal
@@ -6699,6 +6708,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   pinmameWatch?.stop();
   if (dofTap) dofTap.stop();
   else if (ledTap) fs.rmSync(ledTap.file, { force: true });
+  dofReplace.afterGame();
   gameLeds = undefined;
   vrFront.vrGameStop = undefined;
   // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
@@ -7861,8 +7871,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
     attract: shown ? { ...describe(shown), wheel: m?.wheel(shown), ...(mediaSettings.attractCredits ? { credits: library.credits.attractLine(shown) } : {}) } : undefined,
-    // Horaire : voile noir de la nuit (0 à 1) sur chaque écran, en attente seulement.
-    night: shown ? Math.max(hours.night() ? mediaSettings.hours.nightDim / 100 : 0, nightMode?.screenDim() ?? 0) : 0,
+    // Voile noir (0 à 1) sur chaque écran : celui de l'horaire en attente seulement ; celui du mode nuit
+    // partout hors partie (roue et menus compris : le joueur le règle pour voir encore, 85 % au plus).
+    night: Math.max(shown && hours.night() ? mediaSettings.hours.nightDim / 100 : 0, nightMode?.screenDim() ?? 0),
     // Préavis d'arrêt (dessiné par le playfield) : son heure dans l'horloge de la fenêtre.
     stop: stopNotice ? { action: stopNotice.action, endsAt: Date.now() + (stopNotice.endsAt - hoursClock.now()), ms: STOP_NOTICE_MS } : undefined,
     // Partie en cours (fenêtre de jeu de VPX à l'écran) : fond de partie de chaque rôle de

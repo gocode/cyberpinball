@@ -59,11 +59,11 @@ test('table originale : config qui suit moins de la moitié des appels du script
   const cols = content.split(/\r?\n/).find((l) => l.startsWith('Neo,'))!.split(',');
   assert.equal(cols.length, 3, 'clé, sortie 1 (bande RVB : sorties 1 à 3), sortie 4');
   for (const col of [cols[1]!, cols[2]!]) {
-    // Les plus appelés d'abord, aux couleurs principale et secondaire de la table.
+    // Les plus appelés d'abord, aux couleurs principale et secondaire de la table (pleines : #003B00 → #00FF00).
     const effects = col.split('/');
-    assert.match(effects[0]!, /^E101 #(00FF41|003B00) /);
-    assert.match(effects[1]!, /^E102 #(00FF41|003B00) /);
-    assert.equal(effects.length, 24, 'au plus 24 événements par bande');
+    assert.match(effects[0]!, /^E101 #(00FF41|00FF00) /);
+    assert.ok(effects.some((e) => /^E102 #(00FF41|00FF00) /.test(e)));
+    assert.equal(new Set(effects.map((e) => e.split(' ')[0])).size, 24, 'au plus 24 événements par bande');
     assert.ok(!effects.some((e) => e.startsWith('E108 ')), 'déjà suivi : laissé à la config d’origine');
   }
   assert.ok(!line.some((s) => /^G1 /.test(s)), 'sans ROM, G1 ne s’allume jamais');
@@ -85,16 +85,22 @@ test('table originale : config qui suit déjà la plupart des appels laissée te
 });
 
 /**
- * Durée d'un effet DOF une fois déclenché, en ms ; Infinity s'il dure tant que l'événement reste allumé (« BLINK »,
- * ou sans durée). « 70 3 » : trois clignotements de 70 ms (allumé puis éteint).
+ * Durée d'un effet DOF une fois déclenché, attente W comprise, en ms ; Infinity s'il dure tant que l'événement
+ * reste allumé (« BLINK », ou sans durée). « 420 3 » : trois clignotements en 420 ms (TableConfigSetting de
+ * libdof : la durée est divisée par le nombre de clignotements).
  */
 function effectMs(setting: string): number {
   const tokens = setting.trim().split(/\s+/).slice(1);
   if (tokens.some((t) => /^blink$/i.test(t))) return Infinity;
   const numbers = tokens.filter((t) => /^\d+$/.test(t)).map(Number);
   if (!numbers.length) return Infinity;
-  return numbers.length > 1 ? numbers[0]! * 2 * numbers[1]! : numbers[0]!;
+  const wait = Number(tokens.find((t) => /^W\d+$/i.test(t))?.slice(1) ?? 0);
+  return wait + numbers[0]!;
 }
+/** Jetons qu'un réglage du repli peut porter : tout autre ferait rejeter le réglage par libdof (TableConfigSetting). */
+const TOKEN = /^(?:#[0-9A-F]{6}|A[LTWH]\d+|AS\d+|AD[UDLR]|APS\d+|APD\d+|APC#[0-9A-F]{6}|AF(?:DEN|MIN|MAX|FADE)\d+|F[UD]?\d+|W\d+|L\d+|INVERT|\d+)$/;
+/** Composantes d'une couleur #RRGGBB. */
+const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const settingsOf = (content: string) =>
   content
     .split(/\r?\n/)
@@ -140,17 +146,17 @@ test('flippers : une petite barre aux couleurs de la table, du bas de la bande, 
   const [speaker, back, bar] = [cols[1]!, cols[2]!, cols[3]!].map((c) => c.split('/'));
   for (const [strip, column] of [['Speaker', speaker!], ['PF Back', back!]] as const) {
     for (const n of [101, 102]) {
-      const s = column.find((x) => x.startsWith(`E${n} `))!;
+      const all = column.filter((x) => x.startsWith(`E${n} `));
+      const s = all[0]!;
       assert.ok(s, `${strip} E${n}`);
       // Bande verticale : du bas (AT + AH = 100), au plus la moitié, en montant.
-      assert.equal(zone(s, 'AT') + zone(s, 'AH'), 100, s);
-      assert.ok(zone(s, 'AH') <= 50 && zone(s, 'AH') === Math.round(DOF_FLIPPER_REACH * 100), s);
+      for (const x of all) assert.ok(zone(x, 'AT') + zone(x, 'AH') === 100 && zone(x, 'AH') <= 50, x);
+      assert.ok(zone(s, 'AH') === Math.round(DOF_FLIPPER_REACH * 100), s);
       assert.ok(/\bADU\b/.test(s), s);
-      // Couleur principale de la table, atténuée : très léger.
-      const color = /#([0-9A-F]{6})/.exec(s)![1]!;
-      assert.equal(color.slice(0, 2), '00');
-      assert.ok(parseInt(color.slice(2, 4), 16) < 0xff * 0.6 && parseInt(color.slice(2, 4), 16) > 0, s);
-      assert.ok(effectMs(s) <= DOF_EFFECT_MAX_MS);
+      // Couleur principale de la table, pleine (visible sur une bande à 11 % de luminosité), base de sa teinte voisine.
+      assert.match(s, /^E\d+ #00FF41 /);
+      assert.ok(all.length >= 2 && new Set(all.map((x) => x.split(' ')[1])).size >= 2, `dégradé : ${all.join(' / ')}`);
+      for (const x of all) assert.ok(effectMs(x) <= DOF_EFFECT_MAX_MS);
     }
   }
   // Bande horizontale : chaque flipper part de son bord, au plus la moitié de la largeur.
@@ -158,6 +164,88 @@ test('flippers : une petite barre aux couleurs de la table, du bas de la bande, 
   const right = bar!.find((x) => x.startsWith('E102 '))!;
   assert.ok(zone(left, 'AL') === 0 && zone(left, 'AW') <= 50 && /\bADR\b/.test(left), left);
   assert.ok(zone(right, 'AL') + zone(right, 'AW') === 100 && zone(right, 'AW') <= 50 && /\bADL\b/.test(right), right);
+});
+
+/** Réglages de chaque événement, bande par bande. */
+function byEvent(content: string, key: string): Map<string, string[]>[] {
+  const cols = content.split(/\r?\n/).find((l) => l.startsWith(`${key},`))!.split(',').slice(1).filter((c) => c !== '0');
+  return cols.map((col) => {
+    const m = new Map<string, string[]>();
+    for (const s of col.split('/')) {
+      const t = s.split(' ')[0]!;
+      m.set(t, [...(m.get(t) ?? []), s]);
+    }
+    return m;
+  });
+}
+
+/**
+ * Invariants de tout effet du repli, table originale ou ROM : jetons que libdof sait lire, couleur pleine (jamais
+ * assombrie : invisible sur une bande à faible luminosité), au moins deux teintes par événement (dégradé), durée
+ * bornée. L'éclairage général des ROM (G, lueur de fond) est seul à rester sombre.
+ */
+function assertRichEffects(content: string, label: string) {
+  for (const s of settingsOf(content)) {
+    const [trigger, ...tokens] = s.split(' ');
+    for (const tok of tokens) assert.match(tok, TOKEN, `${label} : jeton inconnu de libdof « ${tok} » dans ${s}`);
+    if (/^G\d+$/.test(trigger!)) continue;
+    for (const hex of s.match(/#[0-9A-F]{6}/g) ?? []) assert.ok(Math.max(...rgb(hex)) >= 0xf0, `${label} : couleur sombre ${hex} dans ${s}`);
+    assert.ok(effectMs(s) <= DOF_EFFECT_MAX_MS, `${label} : ${s}`);
+  }
+  for (const strip of byEvent(content, content.split(/\r?\n/).find((l) => /^[^#\[].*,/.test(l) && !l.includes('='))!.split(',')[0]!)) {
+    for (const [t, list] of strip) {
+      if (/^G/.test(t)) continue;
+      const hues = new Set(list.flatMap((s) => s.match(/#[0-9A-F]{6}/g) ?? []));
+      assert.ok(hues.size >= 2, `${label} : ${t} d'une seule teinte : ${list.join(' / ')}`);
+    }
+  }
+}
+
+test('bille envoyée : une comète qui monte toute la bande, à l’impulsion comme à la sortie du lanceur', () => {
+  // The Matrix : E120 impulsion (lancement automatique), E208 tenu tant que la bille est au lanceur (DOFOn / DOFOff).
+  const code = scriptCode(
+    [
+      'Sub swPlungerRest_Hit() : DOF 208, DOFOn : End Sub',
+      'Sub swPlungerRest_UnHit() : DOF 208, DOFOff : End Sub',
+      'Sub AutoFire() : PlungerIM.AutoFire : DOF 120, DOFPulse : End Sub',
+      'Sub Bumper1_Hit() : DOF 105, DOFPulse : End Sub',
+      'Sub LeftFlipper_Hit : DOF 101, DOFOn : End Sub',
+    ].join('\r\n'),
+  );
+  const classes = classifyDofScript(code);
+  assert.deepEqual(classes.get(208), { kind: 'launch', side: 'center', held: true });
+  assert.deepEqual(classes.get(120), { kind: 'launch', side: 'center' });
+  const events = new Map([[208, 4], [120, 1], [105, 6]]);
+  const plan = planDofFallback({ configs: configs(), equivalents: EQUIVALENTS, strips: STRIPS, roms: ['Neo'], palette: () => ['#E8B400', '#1060FF', '#00C060'], events: () => events, classes: () => classes });
+  for (const strip of byEvent(plan.content!, 'Neo')) {
+    for (const t of ['E120', 'E208']) {
+      const list = strip.get(t)!;
+      // Toute la bande, en montant, à la couleur principale de la table (pleine) puis sa teinte voisine.
+      const sweeps = list.filter((s) => /\bAL0 AT0 AW100 AH100\b/.test(s) && /\bADU\b/.test(s));
+      assert.ok(sweeps.length >= 2, `${t} : ${list.join(' / ')}`);
+      assert.match(sweeps[0]!, /^E\d+ #FFC600 /, 'jaune #E8B400 de la table, plein');
+      assert.ok(list.some((s) => /#FFFFFF/.test(s)), `${t} : éclair blanc au départ`);
+      assert.ok(list.some((s) => /\bAFDEN\d+/.test(s)), `${t} : étincelles`);
+    }
+    // Tenu : la comète part quand la bille quitte le lanceur (extinction de l'événement), pas à son arrivée.
+    assert.ok(strip.get('E208')!.filter((s) => /\bADU\b/.test(s)).every((s) => /\bINVERT\b/.test(s)));
+    assert.ok(!strip.get('E120')!.some((s) => /\bINVERT\b/.test(s)));
+  }
+  assertRichEffects(plan.content!, 'Neo');
+});
+
+test('effets riches partout : jetons libdof, couleurs pleines, dégradé à deux teintes, durée bornée (originales et ROM)', () => {
+  const kinds = ['flipper', 'sling', 'bumper', 'launch', 'ball-start', 'drain', 'kicker', 'target', 'spinner', 'ramp', 'rollover', 'award', 'jackpot', 'multiball', 'tilt', 'game-start', 'game-over', 'flasher', 'other'] as const;
+  const events = new Map(kinds.map((_, i) => [300 + i, 30 - i] as [number, number]));
+  const classes = new Map(kinds.map((kind, i) => [300 + i, { kind, side: 'center' as const }]));
+  // Palette sombre (#003B00) ou grise : remontée à pleine luminosité.
+  for (const palette of [TABLE, ['#202020', '#003B00', '#400000']]) {
+    const equivalents: DofEquivalentOutputs[] = [EQUIVALENTS[0]!, { number: DOF_FALLBACK_NUMBER, outputs: [...EQUIVALENTS[1]!.outputs, { number: 7, name: 'Bar' }] }];
+    const plan = planDofFallback({ configs: configs(), equivalents, strips: [...STRIPS, { name: 'Bar', width: 60, height: 1 }], roms: ['Neo'], palette: () => palette, events: () => events, classes: () => classes });
+    assertRichEffects(plan.content!, `originale ${palette.join(' ')}`);
+  }
+  const rom = planDofFallback({ configs: [], equivalents: EQUIVALENTS, strips: STRIPS, roms: ['mm_109b', 'taf_l7'] });
+  assertRichEffects(rom.content!, 'ROM');
 });
 
 // Corpus : scripts réels des tables originales et config DOF relevés sur la borne d'essai (tmp/, hors dépôt).

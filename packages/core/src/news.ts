@@ -72,7 +72,7 @@ export const NEWS: readonly NewsItem[] = [
     get more() {
       return [
         t('Sur la roue, tiens les deux flippers une seconde et demie : les logos des tables défilent comme à la loterie, puis l’une d’elles est tirée. Relâche les deux flippers et la partie démarre ; Exit ou un MagnaSave annule.'),
-        t('Le tirage se fait dans la collection affichée. Une table s’en écarte dans Gérer la table > Dans le tirage ; une de tes collections s’écarte du tirage de « Toutes les tables » dans Gérer mes collections.'),
+        t('Le tirage se fait dans la collection affichée. Une table s’en écarte dans Gérer la table > Table surprise ; une collection s’écarte du tirage de « Toutes les tables » dans Collections.'),
       ];
     },
     get where() { return t('Sur la roue : les deux flippers tenus'); },

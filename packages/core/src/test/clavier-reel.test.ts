@@ -109,9 +109,9 @@ test('assistant complet au clavier : boutons de l’interface puis du jeu relev�
       [
         // Borne neuve : « Vos boutons sont-ils déjà les bons ? » ; Échap (Exit) : modifier mes
         // boutons, sans être relevé. Les boutons de l'interface d'abord (16/11/2026) : ils pilotent
-        // toute la suite. Retour (U) passe les réglages, le bureau Windows et la sortie sans enregistrer.
+        // toute la suite. Retour (U) passe les réglages, le bureau Windows, le mode nuit et la sortie sans enregistrer.
         ...keyboard('Escape'),
-        ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU', 'KeyU'),
+        ...keyboard(...Object.values(navigation), 'KeyU', 'KeyU', 'KeyU', 'KeyU'),
         ...keyboard('KeyJ', 'KeyL', 'KeyU', 'KeyK'),
         // Boutons du jeu proposés sur ceux de l'interface ; Retour arrière revient à l'interface,
         // valider (K) la garde, puis « Tout modifier » et le jeu au clavier.
@@ -123,12 +123,13 @@ test('assistant complet au clavier : boutons de l’interface puis du jeu relev�
       ],
       [],
     );
-    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings', 'desktop', 'quit']);
+    assert.deepEqual(INTERFACE_KEYS.items.map((b) => b.id), [...Object.keys(navigation), 'settings', 'desktop', 'nightMode', 'quit']);
     for (const line of [
       ...Object.entries(GAME_BY_KEYBOARD).map(([id, code]) => recorded('game', id, code)),
       ...Object.entries(navigation).map(([id, code]) => recorded('interface', id, code)),
       recorded('interface', 'settings', 'KeyU', 'passé'),
       recorded('interface', 'desktop', 'KeyU', 'passé'),
+      recorded('interface', 'nightMode', 'KeyU', 'passé'),
       recorded('interface', 'quit', 'KeyU', 'passé'),
     ])
       assert.ok(output.includes(line), `${line}\n---\n${output}`);

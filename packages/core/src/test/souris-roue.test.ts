@@ -45,7 +45,7 @@ test('clic dans le vide : réveille l’ouverture, le mode attente, le voile de 
   for (const [name, s] of [
     ['ouverture', introState()],
     ['attente', state('medaillons', { attract: { title: 'b' } })],
-    ['nuit', state('medaillons', { night: 0.6 })],
+    ['nuit', state('medaillons', { attract: { title: 'b' }, night: 0.6 })],
     ['préavis', state('medaillons', { stop: { action: 'sleep', endsAt: Date.now() + 60_000 } })],
   ] as const) {
     const p = page();
@@ -55,6 +55,13 @@ test('clic dans le vide : réveille l’ouverture, le mode attente, le voile de 
     // L'écran éveillé : la minuterie du préavis s'arrête, l'essai peut finir.
     p.send(state());
   }
+});
+
+test('clic dans le vide : le voile du mode nuit (dans la roue, hors attente) ne réveille rien', () => {
+  const p = page();
+  p.send(state('medaillons', { night: 0.5 }));
+  p.fire(p.document.body, 'click');
+  assert.deepEqual(p.acts, []);
 });
 
 test('clic dans le vide : rien sur l’écran des tables éveillé, ni en plus de l’action d’un élément cliquable', () => {

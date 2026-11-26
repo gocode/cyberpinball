@@ -2783,8 +2783,11 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
       { label: t('Supprimer la table'), detail: fp ? t('Mise à la corbeille ; l’original n’est pas touché') : fx ? t('Retirée du front-end ; elle reste dans {game}', { game: zenName }) : t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
     ];
-    // Table surprise : « Dans le tirage : oui / non », relu sur place ; le mode invité ne change pas les exclusions.
+    // Table surprise : « Peut sortir / Ne sort jamais », relu sur place ; le mode invité ne change pas les exclusions.
     if (host.tableSurprise && !guest) manage.push({ ...host.tableSurprise(table, () => openSheet(table)), door: 'sheet.manage' });
+    // Effets LED de Cyber Pinball à la place de la config DOF de la table (dof-remplacement.ts).
+    const dofReplace = host.dofReplace && !guest ? host.dofReplace(table, () => openSheet(table)) : undefined;
+    if (dofReplace) manage.push({ ...dofReplace, door: 'sheet.manage' });
     if (s.manage) {
       // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
       const up = () => {

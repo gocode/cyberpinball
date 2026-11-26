@@ -257,6 +257,9 @@ test('les chemins « Menu système > … » du manuel et de l’interface existe
     lines.forEach((line, i) => {
       for (const m of line.matchAll(/(?:menu système|system menu)\s*(?:\*{0,2}\s*\([^)]*\))?\s*\*{0,2}\s*>\s*(.*)/gi)) {
         const parts = segments(m[1]!);
+        // Chemins publiés dans le CHANGELOG puis déplacés (il ne se corrige pas) : « Mode nuit » est passé de
+        // Ma borne à Configuration de la borne le 26/11/2026 (essai.53).
+        if (path.basename(file).startsWith('CHANGELOG') && /^(ma borne|my cabinet)$/i.test(parts[0] ?? '') && /^(mode nuit|night mode)$/i.test(parts[1] ?? '')) return;
         const problem = checkPath(parts);
         if (problem) problems.push(`${path.relative(REPO, file)}:${i + 1} : ${problem}`);
       }

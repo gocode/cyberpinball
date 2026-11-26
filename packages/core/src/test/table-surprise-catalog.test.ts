@@ -40,14 +40,16 @@ test('S11 : par défaut, toutes les tables jouables entrent dans le tirage, sans
     assert.deepEqual(ids(f.catalog().candidates(f.tables, 'all')), ['Ocean', 'Galaxy'], 'jeu absent ou fichier refusé : pas de tirage');
   } finally { removeTempDir(f.dir); }
 });
-test('S11 : exclusion par table (Gérer la table > Dans le tirage), persistante, jamais écrite dans la table', () => {
+test('S11 : exclusion par table (Gérer la table > Table surprise), persistante, jamais écrite dans la table', () => {
   const f = setup(); let refreshed = 0;
   try {
     const catalog = f.catalog();
-    assert.equal(catalog.tableAction(f.tables[0]!, () => {}).detail, 'Oui');
+    // La valeur dit l'effet : un « Oui/Non » sous « Dans le tirage » n'était pas compris.
+    assert.equal(catalog.tableAction(f.tables[0]!, () => {}).label, 'Table surprise');
+    assert.equal(catalog.tableAction(f.tables[0]!, () => {}).detail, 'Peut sortir');
     catalog.tableAction(f.tables[0]!, () => refreshed++).run();
     assert.equal(refreshed, 1); assert.equal(f.state.changed, 1);
-    assert.equal(catalog.tableAction(f.tables[0]!, () => {}).detail, 'Non');
+    assert.equal(catalog.tableAction(f.tables[0]!, () => {}).detail, 'Ne sort jamais');
     for (const from of ['all', 'favorites', 'mine:adulte']) assert.equal(f.catalog().eligible(f.tables[0]!, from), false);
     catalog.tableAction(f.tables[0]!, () => {}).run();
     assert.equal(f.catalog().eligible(f.tables[0]!, 'all'), true, 'second appui : de nouveau dans le tirage');

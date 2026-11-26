@@ -19,6 +19,7 @@
 
 import {
   LedAmbientEngine,
+  LedJukeboxMusic,
   ledProblems,
   ledsOnBoard,
   normalizeLedAnimations,
@@ -76,6 +77,8 @@ export interface LedAnimationsOptions {
 export interface LedAnimations {
   update(context: LedAnimationContext): void;
   settings(): LedAnimationSettings;
+  /** Niveaux du spectre du Juke-box (0 à 1, par bande) et couleurs de la pochette (#rrggbb) : les bandes suivent la musique. */
+  feedMusic(levels: readonly number[], palette?: readonly string[]): void;
   /** Change des réglages, les enregistre, et les montre aussitôt. */
   change(patch: Partial<LedAnimationSettings>): void;
   /** Il y a des bandes que les animations peuvent piloter (sert à l'écran de réglage). */
@@ -97,6 +100,7 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
   const clearTimer = options.clearInterval ?? ((id) => clearInterval(id as ReturnType<typeof setInterval>));
   let settings = readLedAnimations(options.dataDir);
   const engine = new LedAmbientEngine(settings, { seed: options.seed });
+  const music = new LedJukeboxMusic();
   let context: LedAnimationContext = { phase: 'menu' };
   let seen: LedAnimationContext | undefined;
   let timer: unknown;
@@ -144,8 +148,12 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
       return clear();
     }
     const t = now();
+    // Juke-box : tant que le morceau joue (ou que sa dernière lumière s'éteint), les bandes suivent le son.
+    const follow = settings.jukeboxMusic && context.phase === 'jukebox' && music.active(t);
+    if (follow) music.step(t);
     leds.strips.forEach((strip, i) => {
-      service.setFrame('#' + i, engine.render({ width: strip.width, height: strip.height, arrangement: strip.arrangement }, t), 'ambient');
+      const grid = { width: strip.width, height: strip.height, arrangement: strip.arrangement };
+      service.setFrame('#' + i, follow ? music.render(grid, settings.brightness) : engine.render(grid, t), 'ambient');
     });
     shown = true;
   }
@@ -227,6 +235,9 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
 
   return {
     update,
+    feedMusic(levels, palette) {
+      if (!disposed) music.feed(levels, now(), palette);
+    },
     settings: () => settings,
     change(patch) {
       settings = normalizeLedAnimations({ ...settings, ...patch });

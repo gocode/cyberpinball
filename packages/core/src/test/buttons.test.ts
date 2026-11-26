@@ -835,14 +835,14 @@ test('interface : les touches de secours du clavier gardent toujours leur rôle'
 });
 
 test('interface : relevé au clavier et au joystick mélangés, Retour passe les facultatifs', () => {
-  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5), joy(7), joy(8)];
+  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5), joy(7), joy(6), joy(8)];
   let keys: SetKeys = {};
   for (const [i, n] of NAVIGATION.entries()) {
     const record = recordKey(INTERFACE_KEYS, keys, n.id, pressed[i]!);
     assert.equal(record.refused, undefined, n.id);
     keys = record.keys;
   }
-  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5), desktop: joy(7), quit: joy(8) });
+  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5), desktop: joy(7), nightMode: joy(6), quit: joy(8) });
   // Une touche d'un autre bouton de l'interface passe au nouveau : Précédent, obligatoire, est à relever de nouveau.
   assert.deepEqual(recordKey(INTERFACE_KEYS, keys, 'help', 'KeyJ').taken, { id: 'previous', label: 'Précédent', required: true });
   // Le même bouton physique peut servir au jeu et à l'interface : chaque jeu ne refuse que ses propres doublons.

@@ -12,7 +12,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import type { DofSetup } from './dof';
+import { hasSuspendedStripOutputs, restoreStripOutputs, suspendStripOutputs, type SuspendedOutput } from './dof-remplacement';
 import type { DofEventClass, DofEventKind } from './dof-evenements-script';
 
 /** Numéro de l'ini et du LedWizEquivalent du repli (libre dans le configtool : 1–94, 120+). */
@@ -262,42 +264,188 @@ function dim(hex: string, factor: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 }
 
-type Recipe = (trigger: string, color: string, layer: number, vertical: boolean, slot: number) => string;
-const FULL = 'AL0 AT0 AW100 AH100';
-const ZONES = [0, 33, 66];
-/**
- * Formes variées : balayage vers le haut, éclair qui s'estompe, tiers de la bande, scintillement, balayage inverse,
- * clignotement. Chacune a une durée (DOF_EFFECT_MAX_MS au plus) : elle part quand l'événement s'allume et
- * s'arrête seule, même s'il reste allumé. Jamais « BLINK » : libdof clignote alors tant que l'événement est
- * allumé — essai du 26/11/2026, The Matrix clignotait sans fin au repos (éclairage général E118 tenu allumé),
- * Space Cadet et City Hunter tant que les flippers restaient levés. « 70 3 » : trois clignotements de 70 ms.
- */
-const RECIPES: Recipe[] = [
-  (t, c, l, v) => `${t} ${c} ${FULL} AS350 AD${v ? 'U' : 'R'} 400 L${l}`,
-  (t, c, l) => `${t} ${c} ${FULL} F120 260 L${l}`,
-  (t, c, l, v, slot) => `${t} ${c} ${v ? `AL0 AW100 AT${ZONES[slot % 3]} AH34` : `AT0 AH100 AL${ZONES[slot % 3]} AW34`} F60 180 L${l}`,
-  (t, c, l) => `${t} ${c} ${FULL} AFDEN45 AFMIN40 AFMAX100 AFFADE80 450 L${l}`,
-  (t, c, l, v) => `${t} ${c} ${FULL} AS350 AD${v ? 'D' : 'L'} 400 L${l}`,
-  (t, c, l) => `${t} ${c} ${FULL} 70 3 L${l}`,
-];
-/** Durée la plus longue d'un effet du repli (ms) : sans événement nouveau, les bandes s'éteignent après. */
-export const DOF_EFFECT_MAX_MS = 600;
-/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais ; et sa luminosité relative. */
-export const DOF_FLIPPER_REACH = 0.35;
-const FLIPPER_LEVEL = 0.45;
+function rgbOf(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const hexOf = (c: number[]) => `#${c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 
 /**
- * Flippers : très léger, ils sont actionnés sans cesse. Une petite barre aux couleurs de la table qui part du
- * bas de la bande (du bord, côté du flipper, sur une bande horizontale) et monte un peu, jamais au-delà de
- * DOF_FLIPPER_REACH ; une fois, même flipper tenu levé.
+ * Couleur d'un effet : pleine, sa composante la plus forte à 255, même teinte. Les bandes d'une borne tournent
+ * souvent à 10–30 % de luminosité, avec une courbe qui écrase les tons bas : une couleur assombrie n'y est plus
+ * visible. Essai du 26/11/2026, The Matrix : « pas vu l'animation des flips », jaune atténué à 45 % (#685100).
+ * La légèreté d'un effet tient à sa taille et à sa durée, jamais à une couleur sombre.
  */
-function flipperBar(trigger: string, color: string, layer: number, vertical: boolean, side: 'left' | 'right' | 'center'): string {
-  const reach = Math.round(DOF_FLIPPER_REACH * 100);
-  const area = vertical ? `AL0 AW100 AT${100 - reach} AH${reach} ADU` : side === 'right' ? `AT0 AH100 AL${100 - reach} AW${reach} ADL` : `AT0 AH100 AL0 AW${reach} ADR`;
-  return `${trigger} ${dim(color, FLIPPER_LEVEL)} ${area} AS300 250 L${layer}`;
+export function dofVivid(hex: string): string {
+  const c = rgbOf(hex);
+  const max = Math.max(...c);
+  return max === 0 ? '#FFFFFF' : hexOf(c.map((v) => (v * 255) / max));
 }
-/** Lampes : courtes et partielles, elles clignotent souvent. */
-const LAMP_RECIPES: Recipe[] = [RECIPES[2]!, RECIPES[1]!];
+
+/** Le plancher de dofVivid : la composante la plus forte de toute couleur d'effet (l'éclairage général à part). */
+export const DOF_COLOR_FLOOR = 255;
+
+function hueOf(hex: string): { h: number; s: number; l: number } {
+  const [r, g, b] = rgbOf(hex).map((v) => v / 255) as [number, number, number];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (!d) return { h: 0, s: 0, l };
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h * 60, s, l };
+}
+
+/**
+ * La teinte voisine d'un dégradé : la même couleur, décalée vers sa voisine plus chaude (jaune → orange,
+ * vert → vert-jaune, bleu → bleu-cyan), aussi pleine. Un blanc ou un gris : un blanc chaud.
+ */
+export function dofGradientPartner(hex: string): string {
+  const { h, s } = hueOf(dofVivid(hex));
+  if (s < 0.15) return '#FFD8A0';
+  return dofVivid(hslHex((h - 22 + 360) % 360, 1, 0.5));
+}
+
+/** Reflet : la couleur mêlée de blanc (pastel), pour les étincelles et le cœur des éclairs. */
+function sheen(hex: string, k = 0.55): string {
+  return hexOf(rgbOf(dofVivid(hex)).map((v) => v + (255 - v) * k));
+}
+
+/** Durée la plus longue d'un effet du repli, attente comprise (ms) : sans événement nouveau, les bandes s'éteignent après. */
+export const DOF_EFFECT_MAX_MS = 600;
+/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais. */
+export const DOF_FLIPPER_REACH = 0.35;
+
+const FULL = 'AL0 AT0 AW100 AH100';
+const WHITE = '#FFFFFF';
+
+/** Une bande vue le long de sa longueur : du bas (verticale) ou de la gauche (horizontale), en pourcentage. */
+interface Axis {
+  /** Zone de from à from + size (0 : le bas de la bande verticale, la gauche d'une horizontale). */
+  span: (from: number, size: number) => string;
+  up: string;
+  down: string;
+}
+const axisOf = (vertical: boolean): Axis =>
+  vertical
+    ? { span: (from, size) => `AL0 AW100 AT${100 - from - size} AH${size}`, up: 'U', down: 'D' }
+    : { span: (from, size) => `AT0 AH100 AL${from} AW${size}`, up: 'R', down: 'L' };
+
+/**
+ * Un effet d'événement : plusieurs calques sur le même déclencheur, chacun borné (durée et attente W comprises,
+ * DOF_EFFECT_MAX_MS au plus), qui partent quand l'événement s'allume et s'arrêtent seuls, même s'il reste allumé.
+ * Jamais « BLINK » : libdof clignote alors tant que l'événement est allumé (essai du 26/11/2026, The Matrix
+ * clignotait sans fin au repos). Toujours deux teintes au moins (couleur et sa voisine), pour la profondeur.
+ *
+ * Les briques que libdof sait rendre sur une bande adressable (Configurator.cpp) :
+ * - comète : balayage AS/AD d'une durée courte et d'un fondu FD — libdof pousse chaque valeur du fondu dans le
+ *   balayage, d'où une tête brillante et une traînée qui s'estompe ; une seconde comète de la teinte voisine,
+ *   partie W ms plus tard sur un calque au-dessus, fait le dégradé de la traînée ;
+ * - plasma : APC (seconde couleur), APS (vitesse), APD (densité) — deux teintes qui ondulent et se mêlent ;
+ * - étincelles : AFDEN/AFMIN/AFMAX/AFFADE — des points qui s'allument au hasard et s'éteignent en fondu ;
+ * - éclair : une zone qui s'allume et s'estompe (FD), blanc au cœur pour l'éclat.
+ */
+type Fx = (t: string, c: string, l: number, a: Axis, slot: number) => string[];
+
+const comet = (t: string, c: string, l: number, dir: string, speed: number, hold: number, tail: number, wait = 0) => `${t} ${c} ${FULL} AS${speed} AD${dir} FD${tail}${wait ? ` W${wait}` : ''} ${hold} L${l}`;
+const plasma = (t: string, c: string, area: string, l: number, ms: number, speed = 350, density = 90, wait = 0) =>
+  `${t} ${c} ${area} APC${dofGradientPartner(c)} APS${speed} APD${density} FU60 FD220${wait ? ` W${wait}` : ''} ${ms} L${l}`;
+const sparkles = (t: string, c: string, area: string, l: number, ms: number, wait = 0, density = 35) => `${t} ${c} ${area} AFDEN${density} AFMIN40 AFMAX140 AFFADE110${wait ? ` W${wait}` : ''} ${ms} L${l}`;
+const flash = (t: string, c: string, area: string, l: number, ms: number, fade = 180, wait = 0) => `${t} ${c} ${area} FD${fade}${wait ? ` W${wait}` : ''} ${ms} L${l}`;
+
+/**
+ * Bille envoyée : une comète qui monte toute la bande, tête de la couleur de la table, traînée de sa teinte
+ * voisine, éclair blanc au départ en bas, étincelles en haut quand elle arrive. Essai du 26/11/2026 : « pas
+ * d'animation à l'envoi d'une bille ».
+ */
+const launchFx: Fx = (t, c, l, a) => [
+  comet(t, c, l, a.up, 260, 160, 220),
+  comet(t, dofGradientPartner(c), l + 1, a.up, 260, 110, 200, 70),
+  sparkles(t, sheen(c), a.span(65, 35), l + 2, 260, 300),
+  flash(t, WHITE, a.span(0, 18), l + 3, 90, 160),
+];
+/** Bille servie, partie lancée : une vague de plasma aux deux teintes sur toute la bande, éclat blanc bref. */
+const waveFx: Fx = (t, c, l) => [plasma(t, c, FULL, l, 450, 420, 110), flash(t, sheen(c, 0.7), FULL, l + 1, 60, 200)];
+/** Bille perdue : la comète redescend, de la teinte voisine vers la couleur de la table. */
+const drainFx: Fx = (t, c, l, a) => [comet(t, dofGradientPartner(c), l, a.down, 220, 180, 260), comet(t, c, l + 1, a.down, 220, 110, 220, 90)];
+/** Grands moments (jackpot, multibille, extra-bille, fin de partie) : éclair blanc, plasma, pluie d'étincelles. */
+const bigFx: Fx = (t, c, l) => [flash(t, WHITE, FULL, l + 2, 80, 260), plasma(t, c, FULL, l, 520, 600, 130, 60), sparkles(t, sheen(c, 0.7), FULL, l + 1, 420, 150, 45)];
+/**
+ * Tilt : trois éclairs francs, aux deux teintes. « 420 3 » : trois clignotements en 420 ms (libdof divise la
+ * durée par leur nombre : 140 ms par cycle, 70 allumé) ; « 70 3 » n'en faisait que trois de 12 ms.
+ */
+const tiltFx: Fx = (t, c, l) => [`${t} ${c} ${FULL} 420 3 L${l}`, `${t} ${dofGradientPartner(c)} ${FULL} W70 420 3 L${l + 1}`];
+/** Les tiers de la bande, de bas en haut, pour varier la place des petits effets. */
+const THIRDS = [0, 33, 66];
+/** Choc (bumper, slingshot, éjecteur) : un éclair dans un tiers, dégradé de la teinte voisine au bord, cœur blanc. */
+const hitFx: Fx = (t, c, l, a, slot) => {
+  const from = THIRDS[slot % 3]!;
+  return [flash(t, c, a.span(from, 34), l, 110, 200), flash(t, dofGradientPartner(c), a.span(from, 10), l + 1, 90, 180), flash(t, sheen(c, 0.75), a.span(from + 14, 6), l + 2, 50, 120)];
+};
+/** Cible, couloir, spinner, rampe : un plasma bref dans un tiers, quelques étincelles par-dessus. */
+const sparkFx: Fx = (t, c, l, a, slot) => {
+  const area = a.span(THIRDS[slot % 3]!, 34);
+  return [plasma(t, c, area, l, 260, 500, 150), sparkles(t, sheen(c), area, l + 1, 220, 40)];
+};
+/** Rampe, orbite : une comète courte qui monte, sa teinte voisine en traînée. */
+const rushFx: Fx = (t, c, l, a) => [comet(t, c, l, a.up, 380, 90, 180), comet(t, dofGradientPartner(c), l + 1, a.up, 380, 60, 160, 50)];
+
+/** Effet de chaque rôle ; les autres (« other ») tournent sur ROTATION, pour la variété. */
+const ROLE_FX: Partial<Record<DofEventKind, Fx>> = {
+  launch: launchFx,
+  'ball-start': waveFx,
+  'game-start': bigFx,
+  drain: drainFx,
+  jackpot: bigFx,
+  multiball: bigFx,
+  award: bigFx,
+  'game-over': drainFx,
+  tilt: tiltFx,
+  bumper: hitFx,
+  sling: hitFx,
+  kicker: hitFx,
+  flasher: hitFx,
+  target: sparkFx,
+  rollover: sparkFx,
+  spinner: sparkFx,
+  ramp: rushFx,
+};
+/** Formes variées des événements sans rôle connu, et des signaux des ROM (bobines, contacts, événements). */
+const ROTATION: Fx[] = [rushFx, hitFx, sparkFx, waveFx, drainFx, hitFx];
+/** Lampes des ROM : courtes et partielles, elles clignotent souvent. */
+const LAMP_ROTATION: Fx[] = [hitFx, sparkFx];
+/** Calques réservés à chaque événement (les effets en superposent jusqu'à quatre). */
+const LAYERS = 5;
+
+/**
+ * Flippers : très légers, ils sont actionnés sans cesse. Une petite barre aux couleurs de la table qui part du
+ * bas de la bande (du bord, côté du flipper, sur une bande horizontale) et monte un peu, jamais au-delà de
+ * DOF_FLIPPER_REACH ; sa base de la teinte voisine, pour le dégradé ; une fois, même flipper tenu levé. Couleur
+ * pleine : la légèreté tient à la taille de la barre, pas à sa luminosité (dofVivid).
+ */
+function flipperBar(trigger: string, color: string, layer: number, vertical: boolean, side: 'left' | 'right' | 'center'): string[] {
+  const reach = Math.round(DOF_FLIPPER_REACH * 100);
+  const base = Math.round(reach / 3);
+  const fromRight = !vertical && side === 'right';
+  const area = (size: number) => (vertical ? `AL0 AW100 AT${100 - size} AH${size}` : fromRight ? `AT0 AH100 AL${100 - size} AW${size}` : `AT0 AH100 AL0 AW${size}`);
+  const dir = vertical ? 'U' : fromRight ? 'L' : 'R';
+  return [`${trigger} ${color} ${area(reach)} AD${dir} AS450 FD160 130 L${layer}`, `${trigger} ${dofGradientPartner(color)} ${area(base)} FD180 110 L${layer + 1}`];
+}
+
+/**
+ * Effet d'un événement d'une table originale selon son rôle. Un lanceur tenu (bille posée au lanceur, DOFOn à
+ * son arrivée, DOFOff quand elle part) : la comète part à l'extinction (INVERT de libdof), au moment où la bille
+ * est envoyée ; à l'arrivée, une lueur brève en bas, la bille prête.
+ */
+function roleEffect(t: string, cls: DofEventClass | undefined, color: string, layer: number, vertical: boolean, slot: number): string[] {
+  const a = axisOf(vertical);
+  const c = dofVivid(color);
+  if (cls?.kind === 'flipper') return flipperBar(t, c, layer, vertical, cls.side);
+  if (cls?.kind === 'launch' && cls.held) return [...launchFx(t, c, layer, a, slot).map((s) => s.replace(/ L(\d+)$/, ' INVERT L$1')), plasma(t, c, a.span(0, 25), layer + 4, 400, 250, 80)];
+  const fx = (cls && ROLE_FX[cls.kind]) ?? ROTATION[slot % ROTATION.length]!;
+  return fx(t, c, layer, a, slot);
+}
 
 /** Déclencheurs retenus, dans l'ordre des effets : bobines, contacts, lampes, événements ; GI à part. */
 function pickTriggers(found: string[]): { hits: string[]; gi: string[] } {
@@ -320,10 +468,11 @@ function pickTriggers(found: string[]): { hits: string[]; gi: string[] } {
 function stripColumn(strip: DofFallbackStrip, index: number, triggers: { hits: string[]; gi: string[] }, palette: string[]): string {
   const vertical = strip.height > strip.width;
   const settings = triggers.gi.map((g, i) => `${g} ${dim(palette[(index + i) % palette.length]!, 0.18)} ${FULL} FU300 FD500 L${1 + i}`);
+  const axis = axisOf(vertical);
   triggers.hits.forEach((t, i) => {
-    const recipes = t[0] === 'L' ? LAMP_RECIPES : RECIPES;
-    const recipe = recipes[(i + index) % recipes.length]!;
-    settings.push(recipe(t, palette[(i + index) % palette.length]!, 10 + i, vertical, i + index));
+    const rotation = t[0] === 'L' ? LAMP_ROTATION : ROTATION;
+    const fx = rotation[(i + index) % rotation.length]!;
+    settings.push(...fx(t, dofVivid(palette[(i + index) % palette.length]!), 10 + LAYERS * i, axis, i + index));
   });
   return settings.join('/');
 }
@@ -344,11 +493,11 @@ function originalColumn(strip: DofFallbackStrip, index: number, events: string[]
   const rare = [colors[1] ?? colors[0]!, ...romPalette(rom)];
   const commonCount = Math.ceil(events.length * COMMON_SHARE);
   return events
-    .map((t, i) => {
+    .flatMap((t, i) => {
       const cls = classes?.get(Number(t.slice(1)));
-      if (cls?.kind === 'flipper') return flipperBar(t, colors[0]!, 10 + i, vertical, cls.side);
-      const color = i < commonCount ? common[(i + index) % common.length]! : rare[(i - commonCount + index) % rare.length]!;
-      return RECIPES[(i + index) % RECIPES.length]!(t, color, 10 + i, vertical, i + index);
+      // Flippers et lanceur : la couleur principale de la table, toujours.
+      const color = cls?.kind === 'flipper' || cls?.kind === 'launch' ? colors[0]! : i < commonCount ? common[(i + index) % common.length]! : rare[(i - commonCount + index) % rare.length]!;
+      return roleEffect(t, cls, color, 10 + LAYERS * i, vertical, i + index);
     })
     .join('/');
 }
@@ -377,12 +526,20 @@ export interface DofFallbackInput {
   events?: (rom: string) => DofScriptEvents | undefined;
   /** Rôle des événements de ce script (classifyDofScript) : flippers, éclairage général… */
   classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined;
+  /**
+   * ROM dont les bandes ne suivent que le repli (dof-remplacement.ts) : une ligne pour elles, config riche
+   * ou pas, faite de tous leurs signaux.
+   */
+  replace?: string[];
+  /** Compléter les ROM pauvres (option « Effets LED ajoutés aux tables à ROM ») ; false : seulement `replace`. */
+  complete?: boolean;
 }
 
 export interface DofFallbackPlan {
   /** Contenu de directoutputconfig99.ini ; undefined : rien à ajouter (le fichier est à retirer). */
   content?: string;
-  added: { rom: string; key: string; before: number }[];
+  /** `replaced` : ROM en remplacement, ses effets d'origine sur les bandes neutralisés. */
+  added: { rom: string; key: string; before: number; replaced?: true }[];
   /** ROM laissées telles quelles : leur config a déjà assez d'effets sur les bandes. */
   rich: string[];
 }
@@ -412,7 +569,13 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
   const poorBelow = dofPoorBelow(input.strips.length);
   type Original = { events: string[]; share: number; total: number; classes?: ReadonlyMap<number, DofEventClass> };
   const keys = new Map<string, { rom: string; before: number; triggers: string[]; original?: Original }>();
-  for (const rom of [...new Set(input.roms.filter(Boolean))].sort((a, b) => a.localeCompare(b))) {
+  const replace = new Set((input.replace ?? []).filter(Boolean).map((r) => r.toLowerCase()));
+  const roms = [...new Set([...(input.replace ?? []), ...input.roms].filter(Boolean))];
+  // ROM en remplacement d'abord : une ROM complétée qui partage sa clé ne lui prend pas sa ligne.
+  roms.sort((a, b) => Number(replace.has(b.toLowerCase())) - Number(replace.has(a.toLowerCase())) || a.localeCompare(b));
+  for (const rom of roms) {
+    const replaced = replace.has(rom.toLowerCase());
+    if (!replaced && input.complete === false) continue;
     const sent = input.events?.(rom);
     const classes = sent?.size ? input.classes?.(rom) : undefined;
     const events = sent?.size ? dofPlayEvents(sent, classes) : undefined;
@@ -426,15 +589,16 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
       // Table originale : jugée sur les événements que son script envoie vraiment, pas sur ceux que la config prévoit.
       const cov = dofOriginalCoverage(input.configs, input.equivalents, stripNames, rom, events);
       before = cov.covered.size;
-      if (cov.share >= DOF_ORIGINAL_COVERED) {
+      if (!replaced && cov.share >= DOF_ORIGINAL_COVERED) {
         plan.rich.push(rom);
         continue;
       }
-      const missing = [...events].filter(([n]) => !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
-      original = { events: missing.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size, ...(classes ? { classes } : {}) };
+      // En remplacement, les effets d'origine ne comptent plus : tous les événements du script, les plus appelés d'abord.
+      const wanted = [...events].filter(([n]) => replaced || !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+      original = { events: wanted.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size, ...(classes ? { classes } : {}) };
     } else {
       before = dofRomStripEffects(input.configs, input.equivalents, stripNames, rom);
-      if (before >= poorBelow) {
+      if (!replaced && before >= poorBelow) {
         plan.rich.push(rom);
         continue;
       }
@@ -444,7 +608,7 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
     const key = lines[0]?.key ?? rom;
     if (keys.has(key.toLowerCase())) continue;
     keys.set(key.toLowerCase(), { rom, before, triggers: dofRomTriggers(input.configs, rom), ...(original ? { original } : {}) });
-    plan.added.push({ rom, key, before });
+    plan.added.push({ rom, key, before, ...(replaced ? { replaced: true as const } : {}) });
   }
   if (!plan.added.length) return plan;
   const configLines: string[] = [];
@@ -466,7 +630,8 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
       n += 3;
     });
     configLines.push(`${a.key},${columns.join(',')}`);
-    if (info.original) comments.push(`# ${a.rom}: ${a.before} of the ${info.original.total} DOF events of the table script followed on the LED strips (${Math.round(info.original.share * 100)} % of its calls), ${info.original.events.length} added per strip.`); // i18n-ignore : fichier lu par DOF
+    if (a.replaced) comments.push(`# ${a.rom}: replaces the ${a.before} LED strip effect(s) of its DOF configuration (chosen for this table), ${info.original ? info.original.events.length : triggers.hits.length + triggers.gi.length} per strip; its other toys keep their configuration.`); // i18n-ignore : fichier lu par DOF
+    else if (info.original) comments.push(`# ${a.rom}: ${a.before} of the ${info.original.total} DOF events of the table script followed on the LED strips (${Math.round(info.original.share * 100)} % of its calls), ${info.original.events.length} added per strip.`); // i18n-ignore : fichier lu par DOF
     else comments.push(`# ${a.rom}: ${a.before} LED strip effect(s) in the configuration, ${triggers.hits.length + triggers.gi.length} added per strip.`); // i18n-ignore : fichier lu par DOF
   }
   plan.content = [
@@ -527,8 +692,10 @@ export interface DofFallbackResult {
   /** Ce qui a changé sur le disque. */
   wrote: boolean;
   removed: boolean;
-  /** Cabinet.xml complété du LedWizEquivalent du repli. */
+  /** Cabinet.xml complété du LedWizEquivalent du repli, ou sorties des bandes mises en sommeil ou rendues. */
   cabinetUpdated: boolean;
+  /** Sorties des bandes du configtool en sommeil pour cette partie (remplacement, dof-remplacement.ts). */
+  suspended: SuspendedOutput[];
   /** Pourquoi rien n'a pu être écrit (Cabinet.xml ou ini 99 écrits à la main). */
   refused?: string;
   plan?: DofFallbackPlan;
@@ -547,18 +714,40 @@ function readText(file: string, encoding: BufferEncoding = 'latin1'): string | u
  * écrit directoutputconfig99.ini dans le dossier des ini de libdof (seulement s'il change), ou le retire
  * quand il n'y a rien à ajouter ou que le joueur a coupé l'option. Un fichier sans la marque de Cyber
  * Pinball n'est jamais touché.
+ *
+ * `replace` : ROM de la table lancée dont les bandes suivent les effets de Cyber Pinball à la place de
+ * la config DOF (dof-remplacement.ts), même option coupée ; leurs sorties de bandes du configtool sont
+ * mises en sommeil dans Cabinet.xml pour cette partie, et rendues à toute autre remise à jour.
  */
-export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enabled: boolean; palette?: (rom: string) => string[] | undefined; events?: (rom: string) => DofScriptEvents | undefined; classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined }): DofFallbackResult {
-  const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false };
+export function refreshDofFallback(
+  setup: DofSetup,
+  roms: string[],
+  opts: {
+    enabled: boolean;
+    palette?: (rom: string) => string[] | undefined;
+    events?: (rom: string) => DofScriptEvents | undefined;
+    classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined;
+    replace?: string[];
+  },
+): DofFallbackResult {
+  const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false, suspended: [] };
+  const replace = (opts.replace ?? []).filter(Boolean);
+  const cabinet = setup.cabinet;
+  // Sorties en sommeil d'une partie précédente : rendues avant tout, quoi qu'il arrive ensuite.
+  const wake = () => {
+    if (cabinet && restoreDofReplacement(cabinet.file)) result.cabinetUpdated = true;
+    return result;
+  };
   const globalDir = setup.globalConfig ? path.dirname(setup.globalConfig.file) : setup.dir;
   const file = setup.fallbackIni ?? path.join(setup.iniDir ?? globalDir, `directoutputconfig${DOF_FALLBACK_NUMBER}.ini`);
   result.file = file;
   const existing = readText(file);
   if (existing !== undefined && !isOwnedFallbackIni(existing)) {
     result.refused = `${path.basename(file)}: not written by Cyber Pinball, left as is.`; // i18n-ignore : journal
-    return result;
+    return wake();
   }
   const remove = () => {
+    wake();
     if (existing === undefined) return result;
     try {
       fs.rmSync(file, { force: true });
@@ -568,20 +757,10 @@ export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enab
     }
     return result;
   };
-  const cabinet = setup.cabinet;
-  if (!opts.enabled || !cabinet?.strips.length) return remove();
+  if ((!opts.enabled && !replace.length) || !cabinet?.strips.length) return remove();
   const stripNames = cabinet.strips.map((s) => s.name);
   const cabinetText = readText(cabinet.file, 'utf8');
   if (cabinetText === undefined) return remove();
-  const wanted = withFallbackEquivalent(cabinetText, stripNames);
-  if (wanted !== cabinetText) {
-    if (!cabinet.owned) {
-      result.refused = `${path.basename(cabinet.file)}: hand-written, no LedWizEquivalent ${DOF_FALLBACK_NUMBER} for the fallback effects.`; // i18n-ignore : journal
-      return remove();
-    }
-    fs.writeFileSync(cabinet.file, wanted, 'utf8');
-    result.cabinetUpdated = true;
-  }
   const configs = setup.ini.flatMap((f) => {
     const text = readText(f.file);
     return text === undefined ? [] : [parseDofIni(text, f.number)];
@@ -590,13 +769,50 @@ export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enab
     ...cabinet.equivalents.filter((e) => e.number !== DOF_FALLBACK_NUMBER),
     { number: DOF_FALLBACK_NUMBER, outputs: stripNames.map((name, i) => ({ number: 1 + 3 * i, name })) },
   ];
-  const plan = planDofFallback({ configs, equivalents, strips: cabinet.strips, roms, ...(opts.palette ? { palette: opts.palette } : {}), ...(opts.events ? { events: opts.events } : {}), ...(opts.classes ? { classes: opts.classes } : {}) });
+  const plan = planDofFallback({
+    configs,
+    equivalents,
+    strips: cabinet.strips,
+    roms,
+    ...(opts.palette ? { palette: opts.palette } : {}),
+    ...(opts.events ? { events: opts.events } : {}),
+    ...(opts.classes ? { classes: opts.classes } : {}),
+    ...(replace.length ? { replace } : {}),
+    complete: opts.enabled,
+  });
   result.plan = plan;
   if (!plan.content) return remove();
+  // Cabinet.xml voulu : LedWizEquivalent du repli, sorties des bandes du configtool en sommeil si la table lancée les remplace.
+  const withFallback = withFallbackEquivalent(restoreStripOutputs(cabinetText), stripNames);
+  const suspension = suspendStripOutputs(withFallback, plan.added.some((a) => a.replaced) ? stripNames : []);
+  if (suspension.xml !== cabinetText) {
+    if (!cabinet.owned) {
+      result.refused = `${path.basename(cabinet.file)}: hand-written, no LedWizEquivalent ${DOF_FALLBACK_NUMBER} for the fallback effects.`; // i18n-ignore : journal
+      return remove();
+    }
+    writeFileAtomic(cabinet.file, suspension.xml);
+    result.cabinetUpdated = true;
+  }
+  result.suspended = suspension.suspended;
   if (existing !== plan.content) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, plan.content, 'latin1');
     result.wrote = true;
   }
   return result;
+}
+
+/**
+ * Rend les sorties des bandes mises en sommeil pour une partie en remplacement (fin de partie, ou avant
+ * toute autre partie) ; true si Cabinet.xml a changé. Ne touche qu'aux commentaires marqués par Cyber Pinball.
+ */
+export function restoreDofReplacement(cabinetFile: string): boolean {
+  const text = readText(cabinetFile, 'utf8');
+  if (text === undefined || !hasSuspendedStripOutputs(text)) return false;
+  try {
+    writeFileAtomic(cabinetFile, restoreStripOutputs(text));
+    return true;
+  } catch {
+    return false; // fichier tenu : rendu à la prochaine remise à jour
+  }
 }

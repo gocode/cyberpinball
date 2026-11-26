@@ -3,8 +3,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { NAVIGATION } from '../buttons';
 import { keyboard, recorded, runWizard, skip } from './clavier-reel-outils';
 import { removeTempDir } from './temp-dir';
+
+/** Un Échap par bouton de l'interface relevé après les Réglages de VPX (tous facultatifs : Retour les passe). */
+const passes = Array.from({ length: NAVIGATION.length - 1 - NAVIGATION.findIndex((b) => b.id === 'settings') }, () => 'Clavier:Escape');
 
 // Suite de releve-modificateurs.test.ts, dans son propre fichier (26/11/2026) : node:test lance les fichiers en parallele
 // mais chaque fichier est sequentiel ; les deux essais (52 s et 24 s) fixaient ensemble la duree du fichier.
@@ -19,8 +23,9 @@ test('assistant complet d’une PinOne : les MagnaSave mis sur l’aide-mémoire
         // Borne neuve : Échap (Exit) ouvre le relevé, l'interface d'abord.
         ...keyboard('Escape'),
         // Précédent, Suivant, Valider, Retour ; les MagnaSave pour l'aide-mémoire et les réglages ;
-        // Retour (Échap) passe le bureau Windows et la sortie sans enregistrer.
-        'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Digit1', 'Clavier:Escape', 'Clavier:ControlLeft', 'ControlRight', 'Clavier:Escape', 'Clavier:Escape',
+        // Retour (Échap) passe chaque bouton facultatif qui suit les Réglages de VPX (bureau Windows, mode nuit, sortie
+        // sans enregistrer… : le décompte suit NAVIGATION, un bouton de plus n'est plus à ajouter ici à la main).
+        'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Digit1', 'Clavier:Escape', 'Clavier:ControlLeft', 'ControlRight', ...passes,
         // Essai des boutons de l'interface, puis Valider : les boutons du jeu proposés dessus, validés tels quels.
         'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Escape', 'Clavier:Digit1',
         'Clavier:Digit1',

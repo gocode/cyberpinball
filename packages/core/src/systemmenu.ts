@@ -67,7 +67,6 @@ export const SYSTEM_ITEM_IDS = [
   'tech-sheet',
   'debug-mode',
   'cabinet',
-  'night-mode',
   'vpx-presets',
   'vpx-framing',
   'vpx-settings',
@@ -192,8 +191,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Ma borne'); },
-    get detail() { return t('Configuration, mode nuit, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes'); },
-    entries: ['cabinet', 'night-mode', 'vpx', 'dmd', 'realite-virtuelle', 'phone-remote', 'demarrage', 'sante'],
+    get detail() { return t('Configuration, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes'); },
+    entries: ['cabinet', 'vpx', 'dmd', 'realite-virtuelle', 'phone-remote', 'demarrage', 'sante'],
   },
   vpx: {
     id: 'vpx',
@@ -385,8 +384,6 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'debug-mode': { icon: 'gauge', get label() { return t('Mode débogage'); } },
   // Boutons, écrans, son, langue de la borne, configurations, assistant (frontend.ts, cabinetSetupItems).
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
-  // Mode nuit (app/src/modenuit-menu.ts) : activer ou régler en un geste ; le même écran que dans « Son et mode attente ».
-  'night-mode': { icon: 'moon', get label() { return t('Mode nuit'); } },
   // Qualité de l'image et fluidité en un choix (app/src/qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.
   'vpx-presets': { icon: 'gauge', get label() { return t('Pré-réglages'); } },
   // Le cadrage de toutes les tables en vue borne, choisi sur une image de sa table (app/src/cadrage-menu.ts).
