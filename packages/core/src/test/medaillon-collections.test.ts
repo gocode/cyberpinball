@@ -56,10 +56,11 @@ function fakeCollections() {
     menu: {
       list: () => list,
       current: () => list.find((c) => c.id === active)!,
-      choose: (id: string) => {
+      choose: (id: string, opened?: () => void) => {
         chosen.push(id);
         const changed = id !== active;
         active = id;
+        opened?.();
         return changed;
       },
       mine: () => [],

@@ -2091,6 +2091,7 @@ let lastState;
 /** Ce que montre cette fenêtre, relevé par l'autopilote après chaque étape (library.ts). */
 window.cyberEtat = () => ({
   phase: lastState?.phase,
+  verrouParental: Boolean(lastState?.parentalPin),
   position: lastState?.position,
   attente: lastState?.attract?.title,
   // Horaire : voile de nuit (opacité) et préavis d'arrêt affiché (action, secondes restantes).
@@ -2184,6 +2185,7 @@ function renderGameReturn(view) {
 }
 
 window.cyber.onState((s) => {
+  if (role === 'playfield') window.CyberParentalPin?.(s.parentalPin);
   lastState = s;
   // Avant tout média : cet état fait-il partie d'une rafale d'appuis dans la roue ?
   const burst = wheelBurst(s);

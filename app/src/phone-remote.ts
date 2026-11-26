@@ -537,6 +537,8 @@ export interface ExternalTarget {
 }
 
 export interface PhoneRemoteOptions {
+  mayReadImage?(file: string): boolean;
+  allowControl?(): boolean;
   mode(): PhoneRemoteMode;
   /** État de la règle du pare-feu de Cyber Pinball (relu s'il n'est pas encore connu). */
   firewall?(): Promise<FirewallState | undefined>;
@@ -1005,8 +1007,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const news = REMOTE_NEWS_IMAGE.test(url.slice(1)) ? url.slice(1) : undefined;
     const image: RemoteImage | undefined = flag ? { file: path.join(rendererDir, 'drapeaux', `${flag[1]}.svg`) } : news ? { file: path.join(rendererDir, news) } : token ? images.get(token) : undefined;
     if (image) {
+      if (opts.mayReadImage?.(image.file) === false) return void res.writeHead(404, headers).end();
       readImage(image, token, (body, type) => {
-        if (!body) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
+        if (!body || opts.mayReadImage?.(image.file) === false) return void res.writeHead(404, { ...headers, 'Content-Type': 'text/plain; charset=utf-8' }).end();
         // Une image ne change pas sous son jeton : le téléphone la garde le temps de la liaison.
         res.writeHead(200, { ...headers, 'Content-Type': type, 'Cache-Control': 'private, max-age=3600' }).end(req.method === 'HEAD' ? undefined : body);
       });
@@ -1698,6 +1701,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   async function inject(message: PhoneMessage): Promise<void> {
+    if (opts.allowControl?.() === false) return;
     if (mode() !== 'browser') return injectMenu(message);
     if (!target && external) return injectExternal(external, message);
     if (!target || !wc()) return;
@@ -1837,6 +1841,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /** Au menu : les boutons, le clavier à l'écran, l'envoi, l'accès direct. Les gestes du navigateur arrivés en retard sont ignorés. */
   function injectMenu(message: PhoneMessage): void {
+    if (opts.allowControl?.() === false) return;
     if (!menu) return;
     switch (message.t) {
       case 'btn':
