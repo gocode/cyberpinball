@@ -104,7 +104,8 @@ for (const fx of LED_FX) {
   for (const [name, grid] of GRIDS) {
     test(`${fx.id} (${name}) : allumé, sous le plafond, mouvant, déterministe, aux couleurs de la palette`, () => {
       const brightness = 0.37;
-      const cap = Math.round(255 * brightness);
+      // Arrondi supérieur : l'arrondi tramé (ledDitherByte) monte d'une unité sur une partie des LED.
+      const cap = Math.ceil(255 * brightness);
       const frames = times(fx).map((ms) => renderLedFx(fx.id, grid, ms, { palette: COLORS, brightness, seed: 42 }));
       assert.equal(frames[0]!.length, grid.width * grid.height * 3);
       let lit = 0;
@@ -168,10 +169,10 @@ test('géométrie : « monter » va vers la fin d’une bande et vers le haut d�
   for (let k = 0; k < 128; k++) if (m[k * 3]! + m[k * 3 + 1]! + m[k * 3 + 2]! > 0) rows.add(ledXY(grid, k).y);
   assert.ok(rows.size > 0 && [...rows].every((y) => y >= 3), `lignes allumées : ${[...rows].join(', ')} (0 : en haut)`);
   assert.ok(rows.has(7), 'la montée part du bas');
-  // Une ligne entière monte d'un bloc : toutes les LED d'une même ligne sont égales.
+  // Une ligne entière monte d'un bloc : toutes les LED d'une même ligne sont égales (à l'unité du tramage près).
   for (const y of rows) {
-    const row = [...Array(128).keys()].filter((k) => ledXY(grid, k).y === y).map((k) => m[k * 3]);
-    assert.equal(new Set(row).size, 1, `ligne ${y} inégale`);
+    const row = [...Array(128).keys()].filter((k) => ledXY(grid, k).y === y).map((k) => m[k * 3]!);
+    assert.ok(Math.max(...row) - Math.min(...row) <= 1, `ligne ${y} inégale : ${row.join(' ')}`);
   }
 });
 

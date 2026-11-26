@@ -5,12 +5,13 @@
 
 import {
   LED_AMBIENT_STYLES,
-  LED_BRIGHTNESS_CHOICES,
   LED_FIXED_COLORS,
   LED_IDLE_CHOICES,
+  LED_LEVEL_CHOICES,
   LED_SPEEDS,
   ledColorLabel,
   ledFixedColorId,
+  nearestLedLevel,
   ledSpeedLabel,
   ledStyleDetail,
   ledStyleLabel,
@@ -45,6 +46,51 @@ export function ledAnimationsSummary(animations: LedAnimations): string {
 export function nextChoice<T>(list: readonly T[], current: T): T {
   const i = list.indexOf(current);
   return list[(i + 1) % list.length]!;
+}
+
+export interface LedLevelPicker {
+  heading: string;
+  lead: string;
+  /** Libellé du cran 0 (« éteintes », « effets coupés »). */
+  zero: string;
+  current(): number;
+  set(level: number): void;
+  back(): void;
+}
+
+/**
+ * Écran de choix d'une luminosité LED parmi ses crans (LED_LEVEL_CHOICES, de 10 en 10, en % perçu) : chaque choix s'applique aussitôt et l'écran reste ouvert sur lui, pour comparer sur les bandes.
+ */
+export function openLedLevelPicker(library: LedAnimationsMenuHost['library'], p: LedLevelPicker): void {
+  const show = () =>
+    library.openCustom(
+      () => {
+        const current = p.current();
+        return {
+          heading: p.heading,
+          icon: 'sun',
+          lead: p.lead,
+          sections: [],
+          actions: [
+            ...LED_LEVEL_CHOICES.map(
+              (level): Action => ({
+                key: String(level),
+                label: level === 0 ? p.zero : t('{n} %', { n: level }),
+                ...(level === current ? { detail: t('Choix actuel'), tone: 'ok' as const } : {}),
+                run: () => {
+                  p.set(level);
+                  show();
+                },
+              }),
+            ),
+            { label: t('Retour'), icon: 'back', run: p.back },
+          ],
+          back: p.back,
+        };
+      },
+      Math.max(0, LED_LEVEL_CHOICES.indexOf(nearestLedLevel(p.current()))),
+    );
+  show();
 }
 
 export function createLedAnimationsMenu(host: LedAnimationsMenuHost) {
@@ -83,9 +129,17 @@ export function createLedAnimationsMenu(host: LedAnimationsMenuHost) {
       },
       {
         label: t('Luminosité maximale : {n} %', { n: s.brightness }),
-        detail: t('Rien ne dépasse ce niveau, pas même les balayages de la roue'),
+        detail: t('Rien ne dépasse ce niveau, pas même les balayages de la roue ni l’ouverture · Start : de 0 à 100 %'),
         icon: 'sun',
-        run: () => change({ brightness: nextChoice(LED_BRIGHTNESS_CHOICES, LED_BRIGHTNESS_CHOICES.includes(s.brightness) ? s.brightness : 40) }, 2),
+        run: () =>
+          openLedLevelPicker(library, {
+            heading: t('Luminosité maximale'),
+            lead: t('En luminosité perçue : 50 % paraît moitié moins fort que 100 %, 10 % est très tamisé. Chaque choix se voit aussitôt sur les bandes.'),
+            zero: t('0 % : éteintes'),
+            current: () => animations.settings().brightness,
+            set: (brightness) => animations.change({ brightness }),
+            back: () => open(back, 2),
+          }),
       },
       {
         label: t('Vitesse : {speed}', { speed: ledSpeedLabel(s.speed) }),

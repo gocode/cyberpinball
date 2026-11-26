@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs: the animations' maximum brightness (menus, wheel, opening) and the in-game effects intensity for tables without a ROM can be set in steps of 10, from 0% (off) to 100%; each choice shows on the strips right away.
+- LEDs: the percentages now follow perceived brightness: 50% looks half as bright as 100%, 10% is barely lit, and the colour holds all the way down without visible steps. An existing setting keeps the same light (30% becomes 60%, for example).
 - Surprise table (beta, contributed by lechable472-cloud): on the wheel, hold both flippers for 1.5 seconds to draw a random table from the active collection, with a logo lottery on the playfield; the game starts when you release both flippers. Exit or a MagnaSave cancels.
 - Only tables you have allowed take part in the draw: table sheet, Manage table > Surprise table. Guest mode only draws tables marked family-friendly.
 - During a game, joystick buttons no longer go to the front-end, so it no longer takes the foreground back from VPX.

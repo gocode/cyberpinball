@@ -72,10 +72,9 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
 import type { LedService } from './led-live';
-import { DOF_EVENT_LEVELS } from './dof-evenements-jeu';
 import type { DofEventSettings } from '@cyberpinball/core';
 import type { LedAnimations } from './led-animations';
-import { createLedAnimationsMenu } from './led-animations-menu';
+import { createLedAnimationsMenu, openLedLevelPicker } from './led-animations-menu';
 
 /** Adresse du configtool : la configuration DOF de la borne s'y fait, avec un compte VPUniverse. */
 export const CONFIGTOOL_URL = 'https://configtool.vpuniverse.com/';
@@ -522,19 +521,23 @@ export function createDofMenu(host: DofMenuHost) {
       },
     };
     if (!s.enabled) return [fallback, relay, toggle];
-    const next = DOF_EVENT_LEVELS.find((l) => l > s.intensity) ?? DOF_EVENT_LEVELS[0];
     return [
       fallback,
       relay,
       toggle,
       {
         label: t('Intensité des effets : {n} %', { n: s.intensity }),
-        detail: t('Start : passer à {n} %', { n: next }),
-        icon: 'bulb',
-        run: () => {
-          ev.set({ ...s, intensity: next });
-          open();
-        },
+        detail: t('Jamais au-dessus de la luminosité maximale des animations · Start : de 0 à 100 %'),
+        icon: 'gauge',
+        run: () =>
+          openLedLevelPicker(library, {
+            heading: t('Intensité des effets'),
+            lead: t('En luminosité perçue, comme les animations : 50 % paraît moitié moins fort que 100 %, 10 % est très tamisé. En partie, la plus basse des deux s’applique.'),
+            zero: t('0 % : effets coupés'),
+            current: () => ev.get().intensity,
+            set: (intensity) => ev.set({ ...ev.get(), intensity }),
+            back: () => open(),
+          }),
       },
     ];
   }

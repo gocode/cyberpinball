@@ -83,6 +83,7 @@ export * from './led-live';
 export * from './led-animations';
 export * from './led-effets';
 export * from './led-ouverture';
+export * from './led-luminosite';
 export * from './vpx-plugin-settings';
 export * from './puppack';
 export { emptyPlayedPlaylists, missingPackFiles } from './pupfiles';

@@ -19,6 +19,9 @@ import {
   DOF_EVENT_DEFAULTS,
   DOF_TAP_ENV,
   LED_ALL,
+  LED_LEVEL_SCALE,
+  ledLevelFromLinear,
+  ledLevelGain,
   addDofTap,
   classifyDofScript,
   createDofScene,
@@ -37,13 +40,13 @@ import type { LedService } from './led-live';
 
 const SETTINGS_FILE = 'dof-evenements.json';
 const BACKUP = '.cyberpinball-avant';
-/** Intensités proposées par le menu. */
-export const DOF_EVENT_LEVELS = [30, 50, 70, 100] as const;
 
 export function loadEventSettings(dataDir: string): DofEventSettings {
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, SETTINGS_FILE), 'utf8')) as Partial<DofEventSettings>;
-    const intensity = typeof raw.intensity === 'number' ? Math.max(0, Math.min(100, raw.intensity)) : DOF_EVENT_DEFAULTS.intensity;
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, SETTINGS_FILE), 'utf8')) as Partial<DofEventSettings> & { scale?: unknown };
+    // Fichier d'avant la courbe perçue (sans `scale`) : son intensité était linéaire, reprise au cran qui donne la même lumière.
+    const stored = typeof raw.intensity === 'number' && Number.isFinite(raw.intensity) ? Math.max(0, Math.min(100, Math.round(raw.intensity))) : undefined;
+    const intensity = stored === undefined ? DOF_EVENT_DEFAULTS.intensity : raw.scale === LED_LEVEL_SCALE ? stored : ledLevelFromLinear(stored);
     return { enabled: raw.enabled === true, intensity, ...(raw.originals === false ? { originals: false } : {}), ...(raw.romFallback === false ? { romFallback: false } : {}) };
   } catch {
     return { ...DOF_EVENT_DEFAULTS };
@@ -52,15 +55,17 @@ export function loadEventSettings(dataDir: string): DofEventSettings {
 
 export function saveEventSettings(dataDir: string, settings: DofEventSettings): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(path.join(dataDir, SETTINGS_FILE), JSON.stringify(settings));
+  fs.writeFileSync(path.join(dataDir, SETTINGS_FILE), JSON.stringify({ ...settings, scale: LED_LEVEL_SCALE }));
 }
 
 /**
- * Force des effets en partie (0..1) : l'intensité des événements, jamais au-dessus de la luminosité maximale
- * des animations LED (retour d'essai du 25/11/2026 : réglée basse au menu, la partie l'ignorait).
+ * Force des effets en partie (gain linéaire, 0..1) : l'intensité des événements, jamais au-dessus de la
+ * luminosité maximale des animations LED (retour d'essai du 25/11/2026 : réglée basse au menu, la partie
+ * l'ignorait). Les deux sont des % perçus : le plus bas passe par la même courbe que les animations, la
+ * partie ne paraît donc jamais plus forte que le menu.
  */
 export function gameLedGain(dataDir: string): number {
-  return Math.min(loadEventSettings(dataDir).intensity, readLedAnimations(dataDir).brightness) / 100;
+  return ledLevelGain(Math.min(loadEventSettings(dataDir).intensity, readLedAnimations(dataDir).brightness));
 }
 
 /** Ligne de journal à la fin d'une partie en effets génériques : événements reçus et part du temps allumé. */
@@ -374,7 +379,7 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   }, 15);
   const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
   const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
-  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, luminosité ${Math.round(gain * 100)} %.`); // i18n-ignore : journal
+  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
   return {
     stop() {
       if (stopped) return;

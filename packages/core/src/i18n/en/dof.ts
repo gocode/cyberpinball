@@ -61,7 +61,11 @@ export const messages: Record<string, string> = {
   'Effets LED des tables sans ROM : coupés': 'LED effects for tables without a ROM: off',
   'Flippers et slingshots allument tes bandes pendant une partie que DOF ne prend pas en charge': 'Flippers and slingshots light your strips during a game that DOF does not handle',
   'Intensité des effets : {n} %': 'Effect intensity: {n}%',
-  'Start : passer à {n} %': 'Start: switch to {n}%',
+  'Jamais au-dessus de la luminosité maximale des animations · Start : de 0 à 100 %': 'Never above the maximum brightness of the animations · Start: from 0 to 100%',
+  'Intensité des effets': 'Effect intensity',
+  'En luminosité perçue, comme les animations : 50 % paraît moitié moins fort que 100 %, 10 % est très tamisé. En partie, la plus basse des deux s’applique.':
+    'In perceived brightness, like the animations: 50% looks half as bright as 100%, 10% is very dim. During a game, the lower of the two applies.',
+  '0 % : effets coupés': '0%: effects off',
   'LED et retours (DOF)': 'LED and feedback (DOF)',
   'DOF allume les LED, flashers, contacteurs et le vibreur de la borne pendant les parties, d’après la configuration faite sur configtool.vpuniverse.com.': 'DOF lights the cabinet’s LEDs, flashers, contactors and shaker during games, from the configuration made on configtool.vpuniverse.com.',
   'Configuration DOF : choisir le ZIP du configtool': 'DOF configuration: choose the configtool ZIP',

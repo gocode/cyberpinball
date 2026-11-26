@@ -32,6 +32,7 @@
 import { hsvToRgb, rgbToHsv, type Rgb } from './jukebox-visualizer';
 import { LED_AMBIENT_CEILING, ledHash, ledSmooth, ledSoftNoise } from './led-animations';
 import { ledXY, parseLedColor, type LedGrid } from './led-live';
+import { ledDitherByte } from './led-luminosite';
 import { hexToRgb, NEUTRAL_TINT } from './tabletint';
 
 // ---------------------------------------------------------------------------
@@ -944,13 +945,16 @@ function drawFx(id: string, g: Geo, ms: number, P: Float32Array, seed: number, s
   return true;
 }
 
-/** Octets d'après la lumière (0 à 1 par canal) : gamma 2, plafonnés à la luminosité maximale. */
+/**
+ * Octets d'après la lumière (0 à 1 par canal) : gamma 2, plafonnés à la luminosité maximale (un gain
+ * linéaire, 0 à 1), arrondis par le seuil de chaque LED (`ledDitherByte`) pour garder la nuance à faible niveau.
+ */
 function toBytes(B: Float32Array, count: number, brightness: number, out: Uint8Array): void {
   const top = 255 * (Number.isFinite(brightness) ? clamp01(brightness) : 0);
   for (let i = 0; i < count; i++) {
     const v = B[i]!;
     const c = v > 0 ? (v < 1 ? v : 1) : 0;
-    out[i] = Math.round(top * c * c);
+    out[i] = ledDitherByte(top * c * c, (i / 3) | 0);
   }
 }
 

@@ -14,6 +14,7 @@ import type { LedArrangement } from './dof';
 import { ledXY } from './led-live';
 import { ledPalette } from './led-animations';
 import { ledFxPalette, renderLedFx, type LedFxId } from './led-effets';
+import { ledDitherByte } from './led-luminosite';
 import type { DofEventKind, DofSide } from './dof-evenements-script';
 
 type Rgb = readonly [number, number, number];
@@ -350,9 +351,10 @@ export function createDofScene(palette: DofScenePalette, intensity = 1): DofScen
           g = Math.max(g, layer[i * 3 + 1]!);
           b = Math.max(b, layer[i * 3 + 2]!);
         }
-        out[i * 3] = Math.round(r * k);
-        out[i * 3 + 1] = Math.round(g * k);
-        out[i * 3 + 2] = Math.round(b * k);
+        // Gain de la luminosité réglée (linéaire, led-luminosite.ts), arrondi tramé : la nuance tient à faible niveau.
+        out[i * 3] = ledDitherByte(r * k, i);
+        out[i * 3 + 1] = ledDitherByte(g * k, i);
+        out[i * 3 + 2] = ledDitherByte(b * k, i);
       }
       return out;
     },

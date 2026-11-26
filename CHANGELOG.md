@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- LED : la luminosité maximale des animations (menus, roue, ouverture) et l'intensité des effets en partie des tables sans ROM se règlent de 10 en 10, de 0 % (éteintes) à 100 % ; chaque choix se voit aussitôt sur les bandes.
+- LED : les pourcentages suivent maintenant la luminosité perçue : 50 % paraît moitié moins fort que 100 %, 10 % est la quasi-extinction, et la couleur tient jusqu'en bas sans paliers. Un réglage déjà fait garde la même lumière (30 % devient 60 %, par exemple).
 - Table surprise (bêta, contribution de lechable472-cloud) : dans la roue, maintiens les deux flippers 1,5 seconde pour tirer au hasard une table de la collection active, avec une loterie de logos sur le plateau ; la partie part quand tu relâches les deux flippers. Exit ou un MagnaSave annule.
 - Seules les tables que tu as autorisées entrent dans le tirage : fiche de la table, Gérer la table > Table surprise. Le mode invité ne tire que les tables marquées adaptées à la famille.
 - Pendant une partie, les boutons du joystick ne vont plus au front-end : il ne reprend plus le premier plan à VPX.

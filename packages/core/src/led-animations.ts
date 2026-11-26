@@ -28,6 +28,7 @@ import { hsvToRgb, rgbToHsv, type Rgb } from './jukebox-visualizer';
 // jamais au chargement, et ce module ne se sert d'eux que dans le moteur (import circulaire sans risque).
 import { LedFxSequencer, ledLightToBytes, type LedFxId } from './led-effets';
 import { ledXY, type LedGrid } from './led-live';
+import { LED_LEVEL_CHOICES, LED_LEVEL_SCALE, ledDitherByte, ledLevelFromLinear, ledLevelGain } from './led-luminosite';
 import { ledIntroLight } from './led-ouverture';
 import { hexToRgb, NEUTRAL_TINT } from './tabletint';
 
@@ -42,8 +43,8 @@ export type LedAmbientStyle = (typeof LED_AMBIENT_STYLES)[number];
 export const LED_SPEEDS = ['slow', 'normal', 'fast'] as const;
 export type LedSpeed = (typeof LED_SPEEDS)[number];
 
-/** Luminosité maximale proposée, en % de celle des bandes. */
-export const LED_BRIGHTNESS_CHOICES: readonly number[] = [10, 20, 30, 40, 50, 60, 80, 100];
+/** Luminosité maximale proposée, en % perçu de celle des bandes (led-luminosite.ts), de l'extinction au plein. */
+export const LED_BRIGHTNESS_CHOICES: readonly number[] = LED_LEVEL_CHOICES;
 /** Extinction après inactivité, en minutes (0 : jamais). */
 export const LED_IDLE_CHOICES: readonly number[] = [5, 15, 30, 60, 120, 0];
 
@@ -65,7 +66,10 @@ export interface LedAnimationSettings {
   /** Animations allumées (sans effet quand aucune bande n'est décrite). */
   enabled: boolean;
   style: LedAmbientStyle;
-  /** Luminosité maximale, de 5 à 100 % : rien ne dépasse, transitions comprises. */
+  /**
+   * Luminosité maximale, de 0 (éteint) à 100 %, en clarté perçue (`ledLevelGain`) : rien ne dépasse,
+   * transitions comprises.
+   */
   brightness: number;
   speed: LedSpeed;
   /** Les couleurs viennent de la table choisie ; sinon `color`. */
@@ -77,13 +81,14 @@ export interface LedAnimationSettings {
 }
 
 /**
- * Valeurs sûres : allumées, douces (40 %), le Florilège (de la variété aux menus et au repos), qui
- * suivent la table, éteintes après 30 minutes. Un style déjà enregistré reste celui du joueur.
+ * Valeurs sûres : allumées, douces (50 % perçus, moins de la moitié de l'ancien défaut de 40 %
+ * linéaires), le Florilège (de la variété aux menus et au repos), qui suivent la table, éteintes après
+ * 30 minutes. Un style déjà enregistré reste celui du joueur.
  */
 export const DEFAULT_LED_ANIMATIONS: Readonly<LedAnimationSettings> = {
   enabled: true,
   style: 'medley',
-  brightness: 40,
+  brightness: 50,
   speed: 'normal',
   followTable: true,
   color: NEUTRAL_TINT,
@@ -100,7 +105,7 @@ export function normalizeLedAnimations(raw: unknown): LedAnimationSettings {
   return {
     enabled: typeof o.enabled === 'boolean' ? o.enabled : d.enabled,
     style: (LED_AMBIENT_STYLES as readonly unknown[]).includes(o.style) ? (o.style as LedAmbientStyle) : d.style,
-    brightness: num(o.brightness, d.brightness, 5, 100),
+    brightness: num(o.brightness, d.brightness, 0, 100),
     speed: (LED_SPEEDS as readonly unknown[]).includes(o.speed) ? (o.speed as LedSpeed) : d.speed,
     followTable: typeof o.followTable === 'boolean' ? o.followTable : d.followTable,
     color: typeof o.color === 'string' && HEX.test(o.color.trim()) ? o.color.trim().toLowerCase() : d.color,
@@ -112,16 +117,28 @@ export function ledAnimationsFile(dataDir: string): string {
   return path.join(dataDir, 'led-animations.json');
 }
 
+/**
+ * Fichier lu tel quel vers les réglages : un fichier d'avant la courbe perçue (sans `scale`) avait une
+ * luminosité linéaire, reprise au cran perçu qui donne la même lumière (`ledLevelFromLinear`).
+ */
+export function ledAnimationsFromFile(raw: unknown): LedAnimationSettings {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : undefined;
+  if (o && o.scale !== LED_LEVEL_SCALE && typeof o.brightness === 'number' && Number.isFinite(o.brightness)) {
+    return normalizeLedAnimations({ ...o, brightness: ledLevelFromLinear(o.brightness) });
+  }
+  return normalizeLedAnimations(raw);
+}
+
 export function readLedAnimations(dataDir: string): LedAnimationSettings {
   try {
-    return normalizeLedAnimations(JSON.parse(fs.readFileSync(ledAnimationsFile(dataDir), 'utf8')));
+    return ledAnimationsFromFile(JSON.parse(fs.readFileSync(ledAnimationsFile(dataDir), 'utf8')));
   } catch {
     return { ...DEFAULT_LED_ANIMATIONS };
   }
 }
 
 export function writeLedAnimations(dataDir: string, settings: LedAnimationSettings): void {
-  writeFileAtomic(ledAnimationsFile(dataDir), JSON.stringify(normalizeLedAnimations(settings), null, 2) + '\n');
+  writeFileAtomic(ledAnimationsFile(dataDir), JSON.stringify({ ...normalizeLedAnimations(settings), scale: LED_LEVEL_SCALE }, null, 2) + '\n');
 }
 
 // Textes (tutoiement) des écrans de réglage.
@@ -471,7 +488,7 @@ export class LedAmbientEngine {
     const n = u.length;
     const out = new Uint8Array(n * 3);
     if (!this.settings.enabled || !n) return out;
-    const cap = clamp01(this.settings.brightness / 100);
+    const cap = ledLevelGain(this.settings.brightness);
     if (this.handoff && now - this.handoff.start >= HANDOFF_MS) this.handoff = undefined;
     // Ouverture : son image seule, sans ambiance ni transitions.
     if (this.introStart !== undefined) {
@@ -526,10 +543,11 @@ export class LedAmbientEngine {
         g += c[1] * add;
         b += c[2] * add;
       }
-      // Gamma 2 : sur une LED, un quart de la valeur paraît déjà à moitié allumé ; la luminosité réglée plafonne.
-      out[k * 3] = Math.round(255 * cap * clamp01(r / 255) ** 2);
-      out[k * 3 + 1] = Math.round(255 * cap * clamp01(g / 255) ** 2);
-      out[k * 3 + 2] = Math.round(255 * cap * clamp01(b / 255) ** 2);
+      // Gamma 2 : sur une LED, un quart de la valeur paraît déjà à moitié allumé ; la luminosité réglée
+      // plafonne (gain de sa courbe perçue), et l'arrondi tramé garde la nuance à faible niveau.
+      out[k * 3] = ledDitherByte(255 * cap * clamp01(r / 255) ** 2, k);
+      out[k * 3 + 1] = ledDitherByte(255 * cap * clamp01(g / 255) ** 2, k);
+      out[k * 3 + 2] = ledDitherByte(255 * cap * clamp01(b / 255) ** 2, k);
     }
     return out;
   }

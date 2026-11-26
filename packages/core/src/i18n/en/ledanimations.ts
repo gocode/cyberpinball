@@ -41,7 +41,11 @@ export const messages: Record<string, string> = {
   'Une ambiance douce quand rien ne se passe, dans les écrans et à la roue ; elle s’éteint dès qu’une partie se prépare': 'A soft mood when nothing is happening, in the screens and at the wheel; it goes out as soon as a game is being prepared',
   'Style : {style}': 'Style: {style}',
   'Luminosité maximale : {n} %': 'Maximum brightness: {n}%',
-  'Rien ne dépasse ce niveau, pas même les balayages de la roue': 'Nothing goes above this level, not even the sweeps at the wheel',
+  'Rien ne dépasse ce niveau, pas même les balayages de la roue ni l’ouverture · Start : de 0 à 100 %': 'Nothing goes above this level, not even the sweeps at the wheel or the opening · Start: from 0 to 100%',
+  'Luminosité maximale': 'Maximum brightness',
+  'En luminosité perçue : 50 % paraît moitié moins fort que 100 %, 10 % est très tamisé. Chaque choix se voit aussitôt sur les bandes.':
+    'In perceived brightness: 50% looks half as bright as 100%, 10% is very dim. Each choice shows on the strips right away.',
+  '0 % : éteintes': '0%: off',
   'Vitesse : {speed}': 'Speed: {speed}',
   'Le rythme de l’ambiance et des transitions': 'The pace of the mood and of the transitions',
   'Couleurs : celles de la table choisie': 'Colours: those of the chosen table',

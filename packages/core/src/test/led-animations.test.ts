@@ -37,6 +37,7 @@ import {
   type LedGrid,
   type LedStripSpec,
   type Rgb,
+  ledLevelGain,
 } from '../index';
 
 const strip = (over: Partial<LedStripSpec> = {}): LedStripSpec => ({
@@ -73,18 +74,20 @@ const channels = (rgb: Uint8Array): [number, number, number] => {
   return s;
 };
 const peak = (rgb: Uint8Array) => rgb.reduce((m, v) => Math.max(m, v), 0);
+/** Plus haut octet permis par une luminosité réglée (% perçu) : sa lumière, arrondie au-dessus par la trame. */
+const capOf = (brightness: number) => Math.ceil(255 * ledLevelGain(brightness));
 const sum = (rgb: Uint8Array) => rgb.reduce((a, v) => a + v, 0);
 
 // --- Réglages ---------------------------------------------------------------------------------
 
 test('Animations LED : des valeurs sûres par défaut, et tout réglage illisible les retrouve', () => {
   assert.equal(DEFAULT_LED_ANIMATIONS.enabled, true);
-  assert.ok(DEFAULT_LED_ANIMATIONS.brightness <= 40, 'luminosité modérée par défaut');
+  assert.ok(DEFAULT_LED_ANIMATIONS.brightness <= 50, 'luminosité modérée par défaut (en % perçu)');
   assert.deepEqual(normalizeLedAnimations(undefined), DEFAULT_LED_ANIMATIONS);
   assert.deepEqual(normalizeLedAnimations('n’importe quoi'), DEFAULT_LED_ANIMATIONS);
   assert.deepEqual(normalizeLedAnimations({ style: 'disco', speed: 3, color: 'rouge', brightness: 'fort', enabled: 'oui', idleMinutes: NaN }), DEFAULT_LED_ANIMATIONS);
   assert.equal(normalizeLedAnimations({ brightness: 5000 }).brightness, 100);
-  assert.equal(normalizeLedAnimations({ brightness: -4 }).brightness, 5);
+  assert.equal(normalizeLedAnimations({ brightness: -4 }).brightness, 0);
   assert.equal(normalizeLedAnimations({ idleMinutes: -9 }).idleMinutes, 0);
   assert.equal(normalizeLedAnimations({ color: ' #FF7A1A ' }).color, '#ff7a1a');
   for (const style of LED_AMBIENT_STYLES) assert.equal(normalizeLedAnimations({ style }).style, style);
@@ -220,8 +223,8 @@ test('Animations LED : le Florilège prend les couleurs de la table, ou la coule
 // --- Moteur -----------------------------------------------------------------------------------
 
 test('Animations LED : aucune LED ne dépasse la luminosité maximale, quel que soit le style, la vitesse ou la transition', () => {
-  for (const brightness of [5, ...LED_BRIGHTNESS_CHOICES]) {
-    const cap = Math.round((255 * brightness) / 100);
+  for (const brightness of LED_BRIGHTNESS_CHOICES) {
+    const cap = capOf(brightness);
     for (const style of LED_AMBIENT_STYLES) {
       for (const speed of LED_SPEEDS) {
         const engine = engineOf({ brightness, style, speed });
@@ -598,7 +601,7 @@ test(
     assert.equal(b.controller.running, true);
     await b.timer.beat();
     assert.ok(sum(shown(b)) > 0, 'les LED montrent quelque chose');
-    assert.ok(peak(shown(b)) <= Math.round((255 * DEFAULT_LED_ANIMATIONS.brightness) / 100), 'sous la luminosité réglée');
+    assert.ok(peak(shown(b)) <= capOf(DEFAULT_LED_ANIMATIONS.brightness), 'sous la luminosité réglée');
     b.controller.dispose();
     await b.service.stop();
   }),
@@ -672,8 +675,8 @@ test(
     await settle();
     assert.equal(b.controller.running, true);
     await b.timer.beat();
-    const cap = Math.round((255 * DEFAULT_LED_ANIMATIONS.brightness) / 100);
-    assert.ok(peak(shown(b)) >= cap - 15, `l’éclair de l’ignition (${peak(shown(b))} / ${cap})`);
+    const cap = capOf(DEFAULT_LED_ANIMATIONS.brightness);
+    assert.ok(peak(shown(b)) >= cap * 0.7, `l’éclair de l’ignition (${peak(shown(b))} / ${cap})`);
     assert.ok(peak(shown(b)) <= cap);
     // Ambiance posée de l'ouverture, puis le premier bouton : la roue, sans passer par le noir.
     b.clock.now += 8000;
@@ -784,7 +787,7 @@ test(
     b.controller.change({ brightness: 10 });
     assert.equal(readLedAnimations(dir).brightness, 10, 'écrit sur le disque');
     await b.timer.beat();
-    assert.ok(peak(shown(b)) <= Math.round(25.5), 'plafonnée à 10 %');
+    assert.ok(peak(shown(b)) <= capOf(10), 'plafonnée à 10 % perçus (très tamisé)');
     b.controller.change({ brightness: 7777 });
     assert.equal(b.controller.settings().brightness, 100, 'valeur bornée');
     b.controller.change({ enabled: false });

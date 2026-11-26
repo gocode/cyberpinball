@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { DOF_TAP_ENV, DOF_TAP_MARK, type CabinetLeds, type LedStripSpec, type SimulatedStripDevice } from '../index';
+import { DEFAULT_LED_ANIMATIONS, DOF_TAP_ENV, DOF_TAP_MARK, LED_LEVEL_SCALE, ledLevelGain, type CabinetLeds, type LedStripSpec, type SimulatedStripDevice } from '../index';
 
 interface Service {
   configure(l: CabinetLeds | undefined): void;
@@ -57,12 +57,29 @@ test('effets sans ROM : réglage coupé par défaut, gardé, et jamais pour une 
 test('effets sans ROM : la partie ne dépasse jamais la luminosité maximale des animations LED', () => {
   const { dir } = setup();
   tap.saveEventSettings(dir, { enabled: true, intensity: 100 });
-  assert.equal(tap.gameLedGain(dir), 0.4, 'luminosité maximale par défaut : 40 %');
-  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 20 }));
-  assert.equal(tap.gameLedGain(dir), 0.2);
+  // Les deux réglages sont des % perçus : le plus bas passe par la courbe des animations (ledLevelGain).
+  assert.equal(tap.gameLedGain(dir), ledLevelGain(DEFAULT_LED_ANIMATIONS.brightness), 'luminosité maximale par défaut');
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 20, scale: LED_LEVEL_SCALE }));
+  assert.equal(tap.gameLedGain(dir), ledLevelGain(20));
   tap.saveEventSettings(dir, { enabled: true, intensity: 30 });
-  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100 }));
-  assert.equal(tap.gameLedGain(dir), 0.3, 'intensité des événements plus basse : elle compte');
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100, scale: LED_LEVEL_SCALE }));
+  assert.equal(tap.gameLedGain(dir), ledLevelGain(30), 'intensité des événements plus basse : elle compte');
+  tap.saveEventSettings(dir, { enabled: true, intensity: 0 });
+  assert.equal(tap.gameLedGain(dir), 0, '0 % : rien ne s’allume');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// 26/11/2026 : les anciens fichiers avaient une intensité linéaire ; reprise au cran perçu de même lumière.
+test('effets sans ROM : une ancienne intensité linéaire est reprise sans surprise', () => {
+  const { dir } = setup();
+  const file = path.join(dir, 'dof-evenements.json');
+  for (const [old, now] of [[30, 60], [50, 80], [70, 90], [100, 100], [0, 0]] as const) {
+    fs.writeFileSync(file, JSON.stringify({ enabled: true, intensity: old }));
+    assert.equal(tap.loadEventSettings(dir).intensity, now, `${old} % linéaires`);
+    assert.ok(Math.abs(ledLevelGain(now) - old / 100) < 0.1, `${old} % : même lumière à un cran près`);
+  }
+  tap.saveEventSettings(dir, { enabled: true, intensity: 10 });
+  assert.equal(tap.loadEventSettings(dir).intensity, 10, 'un fichier écrit depuis : relu tel quel');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -75,6 +92,8 @@ test('effets sans ROM : bandes de gauche et de droite trouvées par leur nom, si
 test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le script, sur le faux contrôleur', async () => {
   const { dir, exe } = setup();
   tap.saveEventSettings(dir, { enabled: true, intensity: 100 });
+  // Pleine luminosité : ce test vérifie où vont les effets, pas leur niveau (la courbe a ses propres tests).
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100, scale: LED_LEVEL_SCALE }));
   const service = driver.createLedService({ simulated: true, manual: true });
   const tall = (name: string, output: number): LedStripSpec => ({ ...strip(name, output), height: 10 });
   const leds: CabinetLeds = { ...LEDS, strips: [tall('Gauche', 1), tall('Droite', 2)] };
@@ -122,7 +141,7 @@ test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le s
   s = await shown(60);
   assert.ok(s.left > ambient.left + 100 && s.right > ambient.right + 100, `bumper : ${JSON.stringify(s)}`);
   game.stop();
-  assert.match(logs[0] ?? '', /couleurs #[0-9a-f]{6} .* luminosité 40 %/, 'couleurs et luminosité au journal');
+  assert.match(logs[0] ?? '', /couleurs #[0-9a-f]{6} .* gain de luminosité 100\.0 %/, 'couleurs et luminosité au journal');
   const summary = logs.at(-1) ?? '';
   assert.match(summary, /fin de partie, 3 événement\(s\) \(.*flipper 1.*\), bandes allumées \d+ % du temps/, summary);
   assert.ok(!/allumées 100 %/.test(summary), 'pas allumées tout le temps');
