@@ -11,23 +11,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { runElectron } from './electron-run';
+import { PARTIES, parcoursEcrans } from './ecrans-rapides-banc';
 import { REPO_ROOT } from './i18n-scan';
-import { DEMOS, withoutInternal } from './interne';
 import { removeTempDir } from './temp-dir';
 
 const APP_SRC = path.join(REPO_ROOT, 'app', 'src');
 const code = (file: string) => fs.readFileSync(path.join(APP_SRC, file), 'utf8').replace(/\/\/.*$/gm, '');
 
-function electronPath(): string | undefined {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require(require.resolve('electron', { paths: [REPO_ROOT] })) as string;
-  } catch {
-    return undefined;
-  }
-}
-const electron = process.platform === 'win32' ? electronPath() : undefined;
 const built = fs.existsSync(path.join(REPO_ROOT, 'app', 'dist', 'library.js'));
 
 interface DiskReads {
@@ -90,27 +80,16 @@ test('une construction ne relit le disque qu’à l’ouverture de l’écran : 
   assert.match(code('frontend.ts'), /library\.changed\(\);\s*broadcast\(\);/);
 });
 
-const skip = (electron ? false : 'Electron sous Windows requis') || (built ? false : 'npm run build requis') || withoutInternal();
-
-test('borne chargée : aucun écran du parcours ne lit le disque en se reconstruisant, chacun sous 40 ms', { skip, timeout: 600_000 }, () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ecrans-'));
-  // La borne d'essai (des milliers de fichiers) est gardée d'un passage à l'autre : l'écrire prend du temps.
-  const root = path.join(os.tmpdir(), 'cp-banc-ecrans-racine');
-  try {
-    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CYBERPINBALL_HORS_LIGNE: '1', CP_BANC_OUT: dir, CP_BANC_RACINE: root, CYBERPINBALL_LANGUE: 'fr' };
-    delete env.ELECTRON_RUN_AS_NODE;
-    delete env.CYBERPINBALL_A_L_ECRAN;
-    delete env.CP_BANC_STRICT;
-    const run = runElectron(electron!, [path.join(DEMOS, 'banc-ecrans-rapides.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 540_000, cwd: REPO_ROOT });
-    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
-    assert.equal(run.status, 0, result);
-    assert.match(result, /^RÉUSSI$/m, result);
-    assert.doesNotMatch(result, /lit le disque en se construisant/, result);
-    // Le parcours couvre bien les écrans du relevé.
-    for (const heading of ['Back to the Future', 'Gérer la table', 'Parties du jeu', 'Médias du jeu', 'Crédits', 'Ajouter une table', 'Choisir des fichiers', 'Menu système', 'Toutes les tables']) {
-      assert.match(result, new RegExp(`« ${heading}`), `${heading} absent du parcours\n${result}`);
-    }
-  } finally {
-    removeTempDir(dir);
+// Le parcours des écrans est découpé en parties (ecrans-rapides-banc.ts), une par fichier de test : celui-ci passe la première.
+test('le parcours du banc est découpé en autant de parties que de fichiers de test, et le banc connaît les mêmes', () => {
+  const banc = fs.readFileSync(path.join(REPO_ROOT, 'interne', 'demos', 'banc-ecrans-rapides.cjs'), 'utf8');
+  assert.ok(banc.includes(`const PARTIES = [${PARTIES.map((p) => `'${p}'`).join(', ')}];`), 'le banc et ecrans-rapides-banc.ts ont les mêmes parties');
+  const dir = path.join(REPO_ROOT, 'packages', 'core', 'src', 'test');
+  for (const partie of PARTIES) {
+    const file = partie === PARTIES[0] ? 'ecrans-rapides.test.ts' : `ecrans-rapides-${partie}.test.ts`;
+    assert.ok(fs.existsSync(path.join(dir, file)), `${file} : un fichier de test par partie`);
+    assert.match(fs.readFileSync(path.join(dir, file), 'utf8'), new RegExp(`parcoursEcrans\\('${partie}'\\)`), `${file} passe la partie ${partie}`);
   }
 });
+
+parcoursEcrans('fiches');

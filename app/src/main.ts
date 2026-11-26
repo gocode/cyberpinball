@@ -8,6 +8,8 @@ import './sandbox-guard';
 import './sandbox-profile';
 // Puis la garde des liens physiques : aucune écriture sur place dans un fichier partagé avec une autre installation.
 import './hardlink-guard';
+// Puis le chronomètre des appels bloquants (spawnSync…) jusqu'à la première fenêtre, noté au journal (startup-blocking.ts).
+import { stopStartupBlockingWatch } from './startup-blocking';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
 // Puis une restauration préparée (Sauvegardes) : ses fichiers posés avant que quoi que ce soit ne les lise.
@@ -73,10 +75,16 @@ if (!superviseCabinet(loc.dataDir) && !runRelaunchWatcher() && !relaunchOnHidden
   configureLifetime({ relaunching: isRelaunching });
   // Une seule instance : un second lancement ramène celle qui est ouverte (single-instance.ts).
   const single = holdSingleInstance({ relaying: isRelay(), ignore: () => isRelaunching() || isQuitting() });
-  // Avant toute fenêtre : la 3D stéréoscopique globale du pilote NVIDIA coupée, sinon l'ouverture reste figée (nvidia-3dvision.ts).
-  stereoOffAtStart();
+  // Les appels bloquants faits avant la première fenêtre, au journal (startup-blocking.ts).
+  app.once('browser-window-created', () => stopStartupBlockingWatch());
+  // Avant toute fenêtre : la 3D stéréoscopique globale du pilote NVIDIA coupée, sinon l'ouverture reste
+  // figée (nvidia-3dvision.ts). Sonde lancée dès que ce lancement est sûr de démarrer (jamais par un
+  // second lancement, qui couperait le relief d'une partie en cours), pendant qu'Electron démarre ;
+  // attendue avant la première fenêtre, sans jamais bloquer le processus principal.
+  const stereoOff = single.then((go) => (go ? stereoOffAtStart() : undefined));
   app.whenReady().then(async () => {
     if (!(await single)) return app.exit(0);
+    await stereoOff;
     // Le veilleur de la relance par Start sait que Cyber Pinball est ouvert : il ne relance rien.
     noteAppRunning(loc.dataDir);
     // Un autre menu de borne ouvert (PinUP Popper…) : aucun écran n'est pris avant qu'il soit

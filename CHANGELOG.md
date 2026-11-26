@@ -11,6 +11,13 @@ son interface).
 
 ## 0.2.4
 
+- Les vérifications automatiques lentes avant chaque préversion vont plus vite : le plus long essai (le parcours des écrans de la borne chargée, jusqu'à 167 s) est découpé en quatre parties qui tournent en même temps (une cinquantaine de secondes chacune), les mêmes écrans sont toujours visités et chronométrés. La borne d'essai qu'il construit n'est plus effacée par une autre vérification lancée en même temps, ce qui le rallongeait à tort.
+- Les essais de la disposition des écrans (une langue par fichier), du relevé des touches Maj et Ctrl (un essai par fichier) et des parties enchaînées en réseau (compte à rebours et renvois raccourcis pour l'essai seulement, jamais sur la borne) ne se font plus attendre les uns les autres.
+- Chaque vérification lente écrit maintenant la durée de chaque fichier d'essai, et avertit de tout fichier de plus de 90 s, qui retarde seul toute la suite ; une règle de test le fixe.
+- Lunettes NVIDIA 3D Vision : la lecture du pilote au lancement ne fige plus Cyber Pinball pendant environ 5 s avant ses premières fenêtres ; elle se fait pendant le démarrage, et la 3D stéréoscopique reste coupée avant que le front-end ne s'affiche.
+- Lunettes NVIDIA 3D Vision : la Santé de la borne et le lancement d'une partie en relief ne figent plus le front-end quelques secondes pour relire le pilote.
+- Un second lancement de Cyber Pinball, déjà ouvert, ne coupe plus la 3D stéréoscopique d'une partie en relief en cours.
+- Le journal signale tout appel qui bloquerait encore le démarrage avant les premières fenêtres.
 - Plus de VPX figé quelques secondes en pleine partie quand Windows réaffiche sans cesse la barre des tâches (Copilot, menu Démarrer ou une notification au premier plan) : Cyber Pinball ne la remasque plus en rafale, il la laisse un moment, et le journal dit quel programme avait le premier plan. Ces rafales faisaient aussi sortir le fronton du plein écran, comme si les écrans étaient redétectés.
 - Après une mise à jour légère, Cyber Pinball restait figé environ une minute à chaque lancement : l'ancienne version, encore tenue par le veilleur de la relance par Start, était retirée en bloquant tout le front-end. Elle se retire maintenant sans rien bloquer, le veilleur resté sur l'ancienne version est arrêté puis relancé depuis la nouvelle, et il n'est plus relancé pendant une mise à jour.
 - Un lancement retardé ne provoque plus l'erreur « app.getSystemLocale() can only be called after app is ready » dans le journal.

@@ -72,8 +72,11 @@ export interface HealthContext {
   hardwareDmd?(): HardwareDmdFacts | undefined;
   /** Le réseau du casque (vr-reseau.ts) : transport de Link et carte réseau du PC ; undefined sans casque. */
   vr?(): VrNetworkFacts | undefined;
-  /** Lunettes actives NVIDIA 3D Vision (nvidia-3dvision.ts) ; undefined si elles ne sont pas choisies et activées. */
-  glasses3d?(): Nvidia3dVisionFacts | undefined;
+  /**
+   * Lunettes actives NVIDIA 3D Vision (nvidia-3dvision.ts) ; undefined si elles ne sont pas choisies et
+   * activées. Asynchrone : la sonde du pilote prend plusieurs secondes et ne doit pas figer le front-end.
+   */
+  glasses3d?(): Promise<Nvidia3dVisionFacts | undefined> | Nvidia3dVisionFacts | undefined;
   /** Le PC et Windows, d'après le dernier relevé de la fiche technique ; undefined avant le premier. */
   pc?(): PcHealthFacts | undefined;
   /** Le nom de la borne sur le réseau pour le téléphone gardé (phone-remote.ts) ; undefined hors réseau local. */
@@ -203,7 +206,7 @@ export function createHealth(ctx: HealthContext) {
     const vr = ctx.vr?.();
     let glasses3d: Nvidia3dVisionFacts | undefined;
     try {
-      glasses3d = ctx.glasses3d?.();
+      glasses3d = await ctx.glasses3d?.();
     } catch (error) {
       console.error(`Santé de la borne, lunettes 3D : ${(error as Error).message}`); // i18n-ignore : journal
     }

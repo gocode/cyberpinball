@@ -9,6 +9,13 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- The slow automatic checks before each prerelease are faster: the longest test (the walk through the loaded cabinet's screens, up to 167 s) is split into four parts that run at the same time (about fifty seconds each), and the same screens are still visited and timed. The test cabinet it builds is no longer wiped by another check started at the same time, which made it take longer than it should.
+- The screen layout tests (one language per file), the Shift and Ctrl key capture tests (one test per file) and the chained network games test (shorter countdown and resend delays for the test only, never on the cabinet) no longer make each other wait.
+- Every slow check now writes the duration of each test file, and warns about any file over 90 s, which alone delays the whole suite; a test rule fixes it.
+- NVIDIA 3D Vision glasses: reading the driver at launch no longer freezes Cyber Pinball for about 5 s before its first windows; it now runs during startup, and stereoscopic 3D is still turned off before the front-end shows.
+- NVIDIA 3D Vision glasses: the cabinet Health check and launching a game in 3D no longer freeze the front-end for a few seconds to read the driver.
+- Launching Cyber Pinball a second time while it is open no longer turns off stereoscopic 3D during a game in 3D.
+- The log reports any call that would still block startup before the first windows.
 - VPX no longer freezes for a few seconds mid-game when Windows keeps bringing the taskbar back (Copilot, the Start menu or a notification in front): Cyber Pinball no longer hides it again in bursts, it leaves it for a moment, and the log says which program was in front. These bursts also knocked the backglass out of full screen, as if the screens were being detected again.
 - After a light update, Cyber Pinball froze for about a minute at every launch: the old version, still held by the Start relaunch watcher, was removed while blocking the whole front-end. It is now removed without blocking anything, the watcher left on the old version is stopped and restarted from the new one, and it is no longer restarted during an update.
 - A delayed launch no longer logs the error "app.getSystemLocale() can only be called after app is ready".

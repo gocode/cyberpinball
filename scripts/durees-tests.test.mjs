@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { run as runTests, test } from 'node:test';
-import { SEUIL_FICHIER_LENT_MS, avertissementsLents, dureesParFichier, fichiersLents, lireDurees, reporterArgs } from './durees-tests.mjs';
+import { GENRES, SEUIL_FICHIER_ELECTRON_MS, SEUIL_FICHIER_LENT_MS, avertissementsLents, dureesFile, dureesParFichier, fichiersLents, lireDurees, reporterArgs } from './durees-tests.mjs';
 import reporterDurees from './durees-tests.mjs';
 
 const cwd = path.resolve('/depot');
@@ -25,6 +25,15 @@ test('durées : un fichier est connu par son propre événement de niveau 0, pas
   ];
   // Du plus long au plus court, chemins relatifs au dossier des contrôles.
   assert.deepEqual(dureesParFichier(events, cwd), { 'scripts/lent.test.mjs': 61_234, 'scripts/vif.test.mjs': 800 });
+});
+
+test('durées : les essais déclarés par un module d’aide (parcoursEcrans, runWizard) ne sont pas un fichier lancé', () => {
+  const events = [
+    complet('packages/aide-banc.js', 'essai déclaré par l’aide', 0, 150_000),
+    complet('packages/partie.test.js', 'packages/partie.test.js', 0, 151_000),
+  ];
+  // Seul le fichier de test compte : sinon l'aide serait signalée comme un second fichier lent de 150 s.
+  assert.deepEqual(dureesParFichier(events, cwd), { 'packages/partie.test.js': 151_000 });
 });
 
 test('durées : sans événement de fichier (autre version de node), la somme des essais de niveau 0', () => {
@@ -99,4 +108,28 @@ test('durées : les contrôles express branchent le reporter et signalent les fi
   const controles = fs.readFileSync(new URL('./controles.mjs', import.meta.url), 'utf8');
   assert.match(controles, /\.\.\.reporterArgs\(cwd\)/, 'les tests rapides passent par le reporter de durées');
   assert.match(controles, /avertissementsLents\(lireDurees\(cwd\)/, 'les contrôles avertissent des fichiers lents');
+});
+
+test('durées : les tests lents ont leur rapport (tmp/durees-tests-lents.json) et leur seuil de 90 s, fixés par avant-fusion', () => {
+  assert.equal(SEUIL_FICHIER_ELECTRON_MS, 90_000);
+  assert.equal(GENRES.lents.seuilMs, SEUIL_FICHIER_ELECTRON_MS);
+  assert.equal(GENRES.rapides.seuilMs, SEUIL_FICHIER_LENT_MS);
+  // Une série n'écrase pas l'autre : un fichier par genre.
+  assert.equal(dureesFile(cwd, 'lents'), path.join(cwd, 'tmp', 'durees-tests-lents.json'));
+  assert.notEqual(dureesFile(cwd, 'lents'), dureesFile(cwd));
+  assert.equal(reporterArgs(cwd, 'lents')[3], `--test-reporter-destination=${path.join(cwd, 'tmp', 'durees-tests-lents.json')}`);
+  // Ni 89 s ni 90 s pile : seulement au-delà. 167 s (le test « borne chargée » du 26/11/2026) est signalé, nom et durée.
+  const durees = { 'packages/core/dist/test/a.test.js': 90_000, 'packages/core/dist/test/b.test.js': 167_000, 'packages/core/dist/test/c.test.js': 89_000 };
+  assert.deepEqual(fichiersLents(durees, GENRES.lents.seuilMs).map((l) => l.fichier), ['packages/core/dist/test/b.test.js']);
+  const lignes = avertissementsLents(durees, GENRES.lents.seuilMs, 'lents');
+  assert.equal(lignes.length, 2);
+  assert.match(lignes[0], /tests lents .*de plus de 90 s/);
+  assert.match(lignes[1], /b\.test\.js : 167 s/);
+  assert.deepEqual(avertissementsLents({ 'a.test.js': 80_000 }, GENRES.lents.seuilMs, 'lents'), []);
+  // Un fichier de 70 s est lent pour les tests rapides (60 s), pas pour les tests Electron (90 s).
+  assert.equal(avertissementsLents({ 'a.test.js': 70_000 }).length, 2);
+  // Branché : la vérification de branche et le train (avant-fusion) passent par le reporter et avertissent.
+  const avant = fs.readFileSync(new URL('./avant-fusion.mjs', import.meta.url), 'utf8');
+  assert.match(avant, /\.\.\.reporterArgs\(cwd, 'lents'\)/, 'les tests lents passent par le reporter de durées');
+  assert.match(avant, /avertissementsLents\(lireDurees\(cwd, 'lents'\)\?\.fichiers \?\? \{\}, GENRES\.lents\.seuilMs, 'lents'\)/, 'avant-fusion avertit des fichiers lents');
 });

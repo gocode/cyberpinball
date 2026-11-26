@@ -146,6 +146,12 @@ type Games = {
 const { createLiveGames } = require(path.join(REPO_ROOT, 'app', 'dist', 'live-game.js')) as { createLiveGames(o: object): Games };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
+/**
+ * Rythmes du service réduits (26/11/2026) : le test attendait 52 s de minuteries réelles (compte à rebours de 5 s
+ * × 4 parties, invitation renvoyée toutes les 10 s × 2). Chaque règle reste vérifiée, seule l'attente raccourcit.
+ */
+const FAST = { tickMs: 100, inviteResendMs: 1000, joinResendMs: 500, countdownS: 1 };
+
 const until = async (what: string, ok: () => boolean, ms = 30_000) => {
   for (const end = Date.now() + ms; !ok(); ) {
     if (Date.now() > end) throw new Error(`attendu : ${what}`);
@@ -189,8 +195,8 @@ test('service : trois parties à la suite (même table, puis une autre) ; chacun
     await new Promise((r) => setTimeout(r, 1000));
     return { ok: true, seconds: 61, records: [], score: who === 'borne' ? 1000 * plays[who]! : 2000 * plays[who]! };
   };
-  const host = createLiveGames({ net: net('borne', 'Borne', 'poste', 'Poste'), dataDir: path.join(dir, 'a'), tables: () => tables, play: player('borne'), log: (l: string) => logs.push(`borne ${l}`) });
-  const guest = createLiveGames({ net: net('poste', 'Poste', 'borne', 'Borne'), dataDir: path.join(dir, 'b'), tables: () => tables, play: player('poste'), log: (l: string) => logs.push(`poste ${l}`) });
+  const host = createLiveGames({ net: net('borne', 'Borne', 'poste', 'Poste'), dataDir: path.join(dir, 'a'), tables: () => tables, timing: FAST, play: player('borne'), log: (l: string) => logs.push(`borne ${l}`) });
+  const guest = createLiveGames({ net: net('poste', 'Poste', 'borne', 'Borne'), dataDir: path.join(dir, 'b'), tables: () => tables, timing: FAST, play: player('poste'), log: (l: string) => logs.push(`poste ${l}`) });
   const ids: string[] = [];
   try {
     for (const [round, table] of [tables[0]!, tables[0]!, tables[1]!, tables[2]!].entries()) {

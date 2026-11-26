@@ -27,6 +27,7 @@ import {
   readDurations, readFlaky, recordDuration, sleep, tryLock, withdraw, workFingerprint, writeCertificate,
 } from './coordination.mjs';
 import { TEST_TIMEOUT_MS, printControles, rerunAlone, run, runControles } from './controles.mjs';
+import { GENRES, avertissementsLents, lireDurees, reporterArgs } from './durees-tests.mjs';
 import { failedFiles, shortReport, totals } from './sortie-tests.mjs';
 import { changedFiles, collectTests, touchedTests } from './verifier.mjs';
 import { NODE_TEST_ARGS, ensureElectron } from './tests-node.mjs';
@@ -119,9 +120,10 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
       say(`Tests lents : ${chosen.length} fichier(s)${complete ? '' : ` touché(s) par la branche (${chosen.map((c) => c.name.replace(/\.test\.m?js$/, '')).join(', ')})`}…`);
       const log = path.join(tmp, 'avant-fusion.txt');
       // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond.
-      const first = await run(process.execPath, [...NODE_TEST_ARGS, '--test-reporter=tap', `--test-timeout=${TEST_TIMEOUT_MS}`, ...chosen.map((c) => path.relative(cwd, c.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
+      const first = await run(process.execPath, [...NODE_TEST_ARGS, ...reporterArgs(cwd, 'lents'), `--test-timeout=${TEST_TIMEOUT_MS}`, ...chosen.map((c) => path.relative(cwd, c.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
       if (first.timedOut) say(`Tests lents arrêtés au plafond${first.hung.length ? ` ; figés : ${first.hung.map((f) => path.basename(f)).join(', ')}` : ''}.`);
       else recordDuration(Date.now() - started, dir, durations, chemin);
+      for (const l of avertissementsLents(lireDurees(cwd, 'lents')?.fichiers ?? {}, GENRES.lents.seuilMs, 'lents')) say(l);
       t = totals(first.out);
       failing = first.code === 0 ? [] : [...new Set([...failedFiles(first.out), ...first.hung])];
       if (first.code !== 0 && !failing.length) failing = ['(sortie illisible : voir tmp/avant-fusion.txt)'];

@@ -59,31 +59,3 @@ test('boutons du jeu d’une PinOne en mode clavier : Maj, Ctrl, Échap et Alt r
     removeTempDir(dir);
   }
 });
-
-test('assistant complet d’une PinOne : les MagnaSave mis sur l’aide-mémoire et les réglages gardent Ctrl dans le jeu', { skip, timeout: 290_000 }, () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-modificateurs-complet-'));
-  try {
-    const home = path.join(dir, 'home');
-    const output = runWizard(
-      home,
-      [
-        // Borne neuve : Échap (Exit) ouvre le relevé, l'interface d'abord.
-        ...keyboard('Escape'),
-        // Précédent, Suivant, Valider, Retour ; les MagnaSave pour l'aide-mémoire et les réglages ;
-        // Retour (Échap) passe le bureau Windows et la sortie sans enregistrer.
-        'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Digit1', 'Clavier:Escape', 'Clavier:ControlLeft', 'ControlRight', 'Clavier:Escape', 'Clavier:Escape',
-        // Essai des boutons de l'interface, puis Valider : les boutons du jeu proposés dessus, validés tels quels.
-        'Clavier:ShiftLeft', 'ShiftRight', 'Clavier:Escape', 'Clavier:Digit1',
-        'Clavier:Digit1',
-        'CtrlQ',
-      ],
-      [],
-    );
-    assert.ok(output.includes(recorded('interface', 'help', 'ControlLeft')), output);
-    assert.ok(output.includes(recorded('interface', 'settings', 'ControlRight')), output);
-    // Les MagnaSave du jeu gardent leur touche : le même bouton physique sert au menu et en partie.
-    assert.match(output, /Assistant : touches validées \(game\) : .*leftMagna=ControlLeft rightMagna=ControlRight /, output);
-  } finally {
-    removeTempDir(dir);
-  }
-});

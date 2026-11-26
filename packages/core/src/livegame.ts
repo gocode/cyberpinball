@@ -607,12 +607,12 @@ export function canStartGame(game: LiveGame): boolean {
 }
 
 /** Départ commun : compte à rebours ; les invitations sans réponse tombent. */
-export function startGame(game: LiveGame, now = new Date()): LiveGame {
+export function startGame(game: LiveGame, now = new Date(), countdownS = LIVE_COUNTDOWN_S): LiveGame {
   if (!canStartGame(game)) return game;
   return {
     ...game,
     phase: 'countdown',
-    startAt: new Date(now.getTime() + LIVE_COUNTDOWN_S * 1000).toISOString(),
+    startAt: new Date(now.getTime() + countdownS * 1000).toISOString(),
     players: game.players.map((p) => (p.state === 'invited' ? { ...p, state: 'expired', answeredAt: now.toISOString() } : p)),
   };
 }

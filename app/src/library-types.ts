@@ -77,7 +77,7 @@ export interface LibraryHost {
   /** Le réseau du casque pour la santé de la borne (vr-reseau.ts) ; undefined sans casque relevé. */
   vrNetwork?(): VrNetworkFacts | undefined;
   /** Lunettes actives NVIDIA 3D Vision pour la santé de la borne ; undefined si elles ne sont pas choisies et activées. */
-  glasses3d?(): Nvidia3dVisionFacts | undefined;
+  glasses3d?(): Promise<Nvidia3dVisionFacts | undefined>;
   /** Fiche technique : ce que l'application sait d'elle-même (mode, borne dédiée, réseau des amis…). */
   techApp?(): Partial<NonNullable<TechFacts['app']>>;
   /** Connexion et fréquences des écrans (win-displays, probeDisplayLinks). */

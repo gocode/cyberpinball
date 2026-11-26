@@ -358,13 +358,17 @@ export const STARTUP_STEREO_SETTLE_MS = 1500;
 /**
  * Lit la stéréo et ne la coupe que si elle est active, puis la relit après STARTUP_STEREO_SETTLE_MS.
  * `probe` : un processus neuf à chaque appel (NVAPI garde dans un processus l'état lu la première fois).
+ * Asynchrone : le processus principal reste libre pendant la sonde (5 s sur la PinCab, 26/11/2026).
  */
-export function cutStereoAtStart(probe: (op: 'read' | 'disable') => { nvapi: boolean; stereo?: boolean }, wait: (ms: number) => void): StartupStereo {
-  const read = probe('read');
+export async function cutStereoAtStart(
+  probe: (op: 'read' | 'disable') => Promise<{ nvapi: boolean; stereo?: boolean }>,
+  wait: (ms: number) => Promise<void>,
+): Promise<StartupStereo> {
+  const read = await probe('read');
   if (!read.nvapi || read.stereo !== true) return read.nvapi && read.stereo === false ? { before: false } : {};
-  probe('disable');
-  wait(STARTUP_STEREO_SETTLE_MS);
-  const again = probe('read');
+  await probe('disable');
+  await wait(STARTUP_STEREO_SETTLE_MS);
+  const again = await probe('read');
   return { before: true, ...(again.nvapi && again.stereo !== undefined ? { after: again.stereo } : {}) };
 }
 

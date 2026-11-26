@@ -4167,10 +4167,16 @@ const anaglyphMenu = createAnaglyphMenu({
 function nvidia3dVision(fresh = false, inis?: string[]) {
   return nvidia3dVisionFacts({ usb: () => usbDevices(), inis: () => inis ?? [activeVpxIni(loc)], vpx: () => vpxInstall(loc) }, fresh);
 }
-/** Pour la santé de la borne : relevé seulement quand les lunettes NVIDIA sont choisies et activées (lu sur disque). */
-function nvidia3dVisionChosen() {
+/**
+ * Pour la santé de la borne : relevé seulement quand les lunettes NVIDIA sont choisies et activées (lu sur
+ * disque). Le pilote relu d'abord sans bloquer : sinon une sonde synchrone figeait le front-end plusieurs
+ * secondes à chaque relevé (15 s après le démarrage, puis toutes les 30 min).
+ */
+async function nvidia3dVisionChosen() {
   const s = readAnaglyph(loc.dataDir);
-  return s.mode === 'on' && s.kind === 'nvidia' ? nvidia3dVision() : undefined;
+  if (s.mode !== 'on' || s.kind !== 'nvidia') return undefined;
+  await refreshNvidiaDriver();
+  return nvidia3dVision();
 }
 
 

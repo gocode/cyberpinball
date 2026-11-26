@@ -144,6 +144,14 @@ export interface LiveProgress {
   players: number;
 }
 
+/** Les minuteries du service : vérification, renvoi d'une invitation sans réponse, renvoi de « je rejoins », compte à rebours (s). */
+export interface LiveTiming {
+  tickMs: number;
+  inviteResendMs: number;
+  joinResendMs: number;
+  countdownS: number;
+}
+
 export interface LiveGamesOptions {
   net: Pick<SocialNet, 'state' | 'online' | 'send' | 'onMessage'> & Partial<Pick<SocialNet, 'setPartners' | 'announceInstant' | 'instantGames'>>;
   dataDir: string;
@@ -172,6 +180,11 @@ export interface LiveGamesOptions {
   /** Une partie finie vient d'entrer à l'historique (niveau : partie en ligne). */
   onFinished?(entry: HistoryGame): void;
   now?(): Date;
+  /**
+   * Rythmes du service, pour les essais seulement (jamais passés par l'application) : sans eux, trois parties à la
+   * suite attendent 50 s de minuteries réelles (compte à rebours de 5 s, invitation renvoyée toutes les 10 s).
+   */
+  timing?: Partial<LiveTiming>;
   log?(line: string): void;
   /** Version de Cyber Pinball de cette borne (app.getVersion()), annoncée aux autres. */
   appVersion?: string;
@@ -250,6 +263,7 @@ const JOIN_GIVE_UP_MS = 45_000;
 
 export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   const now = () => opts.now?.() ?? new Date();
+  const timing: LiveTiming = { tickMs: TICK_MS, inviteResendMs: INVITE_RESEND_MS, joinResendMs: JOIN_RESEND_MS, countdownS: LIVE_COUNTDOWN_S, ...opts.timing };
   const net = opts.net;
   const log = (line: string) => opts.log?.(line);
   const me = () => ({ key: net.state().key.publicKey, name: net.state().name });
@@ -818,15 +832,15 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         }
       }
       // Une réponse en tête du salon : il se redessine jusqu'à ce qu'elle en parte.
-      if (game?.phase === 'gathering' && game.players.some((p) => p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS + 2 * TICK_MS)) changed();
+      if (game?.phase === 'gathering' && game.players.some((p) => p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS + 2 * timing.tickMs)) changed();
       maybeGo();
       // Une invitation sans réponse repart (message perdu sur une liaison qui tombe), jusqu'à sa réponse ou son expiration.
       if (game?.phase === 'gathering') {
         for (const p of game.players) {
           const sent = own().invites.get(p.key);
-          if (p.state !== 'invited' || !sent || now().getTime() - sent.at < INVITE_RESEND_MS || !net.online(p.key)) continue;
+          if (p.state !== 'invited' || !sent || now().getTime() - sent.at < timing.inviteResendMs || !net.online(p.key)) continue;
           sent.at = now().getTime();
-          if (!sent.told) log(`Partie en direct : invitation renvoyée à ${p.name} (pas encore de réponse ; toutes les ${INVITE_RESEND_MS / 1000} s jusqu'à sa réponse).`); // i18n-ignore : journal
+          if (!sent.told) log(`Partie en direct : invitation renvoyée à ${p.name} (pas encore de réponse ; toutes les ${timing.inviteResendMs / 1000} s jusqu'à sa réponse).`); // i18n-ignore : journal
           sent.told = true;
           net.send(p.key, sent.message);
         }
@@ -857,7 +871,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
           game = { ...game, phase: 'cancelled', endWhy: 'expired' };
           joining = undefined;
           changed();
-        } else if (now().getTime() - joining.sentAt >= JOIN_RESEND_MS) {
+        } else if (now().getTime() - joining.sentAt >= timing.joinResendMs) {
           joining.sentAt = now().getTime();
           net.send(game.host, joining.message);
         }
@@ -870,7 +884,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     const waiting = !!waitView();
     if (game?.phase === 'countdown' || waiting || waitWas) changed();
     waitWas = waiting;
-  }, TICK_MS);
+  }, timing.tickMs);
   ticker.unref?.();
 
   /**
@@ -887,9 +901,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   /** Départ commun (celui qui invite ; tout seul quand une partie en direct est complète). */
   function start(): boolean {
     if (!game || !isHost()) return false;
-    const next = startGame(game, now());
+    const next = startGame(game, now(), timing.countdownS);
     if (next === game) return false;
-    for (const p of next.players) if (!p.host && p.state === 'accepted') net.send(p.key, { t: 'game-start', game: next.id, in: LIVE_COUNTDOWN_S * 1000 });
+    for (const p of next.players) if (!p.host && p.state === 'accepted') net.send(p.key, { t: 'game-start', game: next.id, in: timing.countdownS * 1000 });
     // Ceux qui n'avaient pas encore répondu : la partie part sans eux, ils l'apprennent.
     tellEnds(game, next, () => 'started');
     setGame(next);

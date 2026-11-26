@@ -29,6 +29,7 @@ import {
   vpxDisplayId,
   type Nvidia3dVisionFacts,
   type ObservedUsbDevice,
+  type StartupStereo,
   type VpxDisplayCandidate,
 } from '@cyberpinball/core';
 import { runningProcessNames } from '@cyberpinball/win-displays';
@@ -161,7 +162,10 @@ export async function stereoFor(wanted: boolean, settle = true): Promise<StereoC
   if (!settle) return { ...result, ...(changed.stereo !== undefined ? { after: changed.stereo } : {}) };
   await new Promise((r) => setTimeout(r, SETTLE_MS));
   const again = await runProbe('read');
-  kept = undefined; // le relevé gardé ne vaut plus
+  // Le relevé gardé ne vaut plus : remplacé par cette relecture, sans quoi nvidia3dVisionFacts relirait
+  // le pilote par une sonde synchrone juste avant la partie.
+  if (again.nvapi) keep(again);
+  else kept = undefined;
   if (wanted) refused = again.stereo !== true;
   return { ...result, ...(again.stereo !== undefined ? { after: again.stereo } : {}) };
 }
@@ -174,7 +178,11 @@ let noStereoDriver = false;
 /** Relit le pilote sans bloquer le front-end (avant une partie) ; nvidia3dVisionFacts rend ensuite ce relevé. */
 export async function refreshNvidiaDriver(): Promise<void> {
   const fixed = fixtureFacts();
-  const facts: NvapiProbe = fixed ?? (nvapiPresent() ? await runProbe('read') : { nvapi: false });
+  keep(fixed ?? (nvapiPresent() ? await runProbe('read') : { nvapi: false }));
+}
+
+/** Garde ce relevé du pilote (sans le code d'un appel) pour nvidia3dVisionFacts. */
+function keep(facts: NvapiProbe): void {
   kept = { at: Date.now(), facts: { nvapi: facts.nvapi, ...(facts.driver !== undefined ? { driver: facts.driver } : {}), ...(facts.stereo !== undefined ? { stereo: facts.stereo } : {}) } };
 }
 
@@ -192,18 +200,17 @@ function stereoDriverInstalled(): boolean {
  * Au lancement, avant toute fenêtre : la 3D stéréoscopique globale du pilote coupée si elle est active.
  * Active, le pilote 452.06 prend aussi les fenêtres de Cyber Pinball et leur ouverture reste figée sur sa
  * première image (PinCab, 25/11/2026). Cyber Pinball la rallume pour chaque partie en relief
- * (stereoFor). Bloquant, mais seulement avec le pilote 3D installé : une sonde, trois si elle était active.
+ * (stereoFor). Seulement avec le pilote 3D installé : une sonde, trois si elle était active.
+ * Jamais bloquant : lancée dès le verrou d'instance pris, pendant qu'Electron démarre, et attendue
+ * juste avant la première fenêtre (main.ts) ; une sonde synchrone figeait le processus principal
+ * 5 s avant ready (PinCab, 26/11/2026). Ne rejette jamais.
  * Jamais pendant un essai sans opérateur (le pilote du poste), sauf avec le relevé des essais.
  */
-export function stereoOffAtStart(): void {
+export async function stereoOffAtStart(): Promise<void> {
   if (OFFSCREEN && !process.env.CYBERPINBALL_NVIDIA_3DVISION) return;
   if (!nvapiPresent() || !stereoDriverInstalled()) return;
   const started = Date.now();
-  const sleeper = new Int32Array(new SharedArrayBuffer(4));
-  const result = cutStereoAtStart(
-    (op) => fixtureFacts() ?? parseProbe(spawnSync(process.execPath, [SONDE, op], { windowsHide: true, env: sondeEnv(), encoding: 'utf8', timeout: PROBE_TIMEOUT_MS }).stdout ?? '', op),
-    (ms) => Atomics.wait(sleeper, 0, 0, ms),
-  );
+  const result = await cutStereoAtStart(runProbe, (ms) => new Promise((resolve) => setTimeout(resolve, ms))).catch(() => ({}) as StartupStereo);
   const took = `${Date.now() - started} ms`;
   if (result.before !== true) return console.log(`Lunettes 3D : 3D stéréoscopique du pilote ${result.before === false ? 'coupée' : 'non lue'} au lancement (${took}).`); // i18n-ignore : journal
   if (result.after === false) return console.log(`Lunettes 3D : 3D stéréoscopique du pilote active au lancement, coupée avant les fenêtres de Cyber Pinball (${took}) ; rallumée pour chaque partie en relief.`); // i18n-ignore : journal

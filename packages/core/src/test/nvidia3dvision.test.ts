@@ -113,28 +113,26 @@ test('le pilote NVIDIA se lit par un processus neuf, jamais dans le front-end', 
 // PinCab, 25/11/2026 : la stéréo globale activée par 3D Fix Manager figeait chaque lancement sur la première
 // image de l'ouverture. Coupée au lancement, avant toute fenêtre, et seulement quand elle est active ;
 // relue après coup, pour dire quand un programme ouvert la remet aussitôt.
-test('au lancement, la stéréo globale active est coupée, puis relue', () => {
-  const run = (states: (boolean | undefined)[], nvapi = true) => {
+test('au lancement, la stéréo globale active est coupée, puis relue', async () => {
+  const run = async (states: (boolean | undefined)[], nvapi = true) => {
     const ops: string[] = [];
     let waited = 0;
-    const result = cutStereoAtStart(
-      (op) => {
+    const result = await cutStereoAtStart(
+      async (op) => {
         ops.push(op);
         const stereo = op === 'read' ? states.shift() : undefined;
         return { nvapi, ...(stereo !== undefined ? { stereo } : {}) };
       },
-      (ms) => (waited += ms),
+      async (ms) => void (waited += ms),
     );
     return { result, ops, waited };
   };
-  assert.deepEqual(run([false]), { result: { before: false }, ops: ['read'], waited: 0 }, 'déjà coupée : une seule lecture');
-  assert.deepEqual(run([undefined]), { result: {}, ops: ['read'], waited: 0 }, 'pas de pilote 3D : rien');
-  assert.deepEqual(run([true], false), { result: {}, ops: ['read'], waited: 0 }, 'pas de pilote NVIDIA : rien');
-  assert.deepEqual(run([true, false]), { result: { before: true, after: false }, ops: ['read', 'disable', 'read'], waited: STARTUP_STEREO_SETTLE_MS });
-  assert.deepEqual(run([true, true]).result, { before: true, after: true }, '3D Fix Manager la remet : dit');
-  // Appelée avant toute fenêtre, dans le processus principal.
-  const main = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'main.ts'), 'utf8');
-  assert.ok(main.indexOf('stereoOffAtStart()') > 0 && main.indexOf('stereoOffAtStart()') < main.indexOf('app.whenReady()'));
+  assert.deepEqual(await run([false]), { result: { before: false }, ops: ['read'], waited: 0 }, 'déjà coupée : une seule lecture');
+  assert.deepEqual(await run([undefined]), { result: {}, ops: ['read'], waited: 0 }, 'pas de pilote 3D : rien');
+  assert.deepEqual(await run([true], false), { result: {}, ops: ['read'], waited: 0 }, 'pas de pilote NVIDIA : rien');
+  assert.deepEqual(await run([true, false]), { result: { before: true, after: false }, ops: ['read', 'disable', 'read'], waited: STARTUP_STEREO_SETTLE_MS });
+  assert.deepEqual((await run([true, true])).result, { before: true, after: true }, '3D Fix Manager la remet : dit');
+  // Lancée avant ready, attendue avant toute fenêtre : demarrage-bloquant.test.ts.
 });
 
 // La table de l'émetteur stocke la fréquence pixel sur 32 bits (relevé sur une borne réelle, 25/11/2026) :
