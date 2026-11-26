@@ -77,7 +77,16 @@ let offset = 0;
 let rest = '';
 let poll: ReturnType<typeof setInterval> | undefined;
 
-/** Les nouvelles lignes du fichier, passées à libdof (0 éteint, 1 allumé ; 2, l'impulsion, arrive déjà cassée en 1 puis 0). */
+/** Bilan de la partie, dit en fin de partie (« bilan ») : de quoi voir après coup ce que libdof a reçu. */
+const counts = { events: 0, pulses: 0, ignored: 0 };
+
+/**
+ * Les nouvelles lignes du fichier, passées à libdof : 0 éteint, 1 allumé, 2 impulsion (DOFPulse), passée
+ * comme B2S.Server la passe à DOF : allumé puis éteint. L'écoute de controller.vbs est posée en tête de
+ * `Sub DOF`, avant que la Sub ne casse l'impulsion : elle arrive bien en 2. Jetées jusqu'au 26/11/2026,
+ * les impulsions étaient presque tous les appels DOF des tables originales (Matrix, City Hunter, Space
+ * Cadet : 46 à 103 impulsions par script, contre 13 à 47 allumés ou éteints) : leurs LED restaient muettes.
+ */
 function relay(): void {
   let size: number;
   try {
@@ -99,8 +108,19 @@ function relay(): void {
   rest = cut < 0 ? text : text.slice(cut + 1);
   for (const line of (cut < 0 ? '' : text.slice(0, cut)).split(/\r?\n/)) {
     const m = /^E,(\d{1,5}),(-?\d{1,3}),/.exec(line.trim());
-    const state = m ? Number(m[2]) : -1;
-    if (m && (state === 0 || state === 1)) dataReceive(dof, E, Number(m[1]), state);
+    if (!m) continue;
+    const n = Number(m[1]);
+    const state = Number(m[2]);
+    if (state === 2) {
+      dataReceive(dof, E, n, 1);
+      dataReceive(dof, E, n, 0);
+      counts.pulses++;
+    } else if (state === 0 || state === 1) dataReceive(dof, E, n, state);
+    else {
+      counts.ignored++;
+      continue;
+    }
+    counts.events++;
   }
 }
 
@@ -127,7 +147,9 @@ function end(): void {
     }
     finish(dof);
   }
-  process.exit(0);
+  // Sortie une fois le bilan écrit (une écriture dans un tube peut être différée).
+  process.stdout.write(`bilan\t${JSON.stringify(counts)}\n`, () => process.exit(0));
+  setTimeout(() => process.exit(0), 1000).unref();
 }
 
 process.stdin.setEncoding('utf8');

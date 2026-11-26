@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs: a table is no longer treated as a ROM table just because its script calls VPinMAME; it needs its ROM name and the ROM file on the cabinet. Original tables that copy that code without a ROM (Stranger Things, for example) get their no-ROM effects back instead of dark LEDs.
+- LEDs: during the game, Cyber Pinball checks the VPX log to confirm that PinMAME really started. If not, the game switches to the no-ROM effects; conversely, a table that starts PinMAME hands the LEDs back to DOF. The finding is remembered for the table until its file changes.
+- LEDs (original tables relayed to DOF: The Matrix, City Hunter, JP's Space Cadet…): the script's DOF pulses, which are nearly all of their effects, finally reach DOF. They were lost, hence nearly silent LEDs.
+- LEDs: if the DOF relay of an original table fails to start or stops during the game, the no-ROM effects take over (when enabled).
+- Log: summary of each game relayed to DOF (events received, including pulses), and LED mode changes during the game.
 - Live score tracking: when a game starts, some tables still show the previous game's score for a moment. That score is no longer counted as an abandoned game: no more duplicates on the cabinet's board or in the rankings. Duplicates already kept by previous pre-releases are removed.
 - The slow automatic checks before each prerelease are faster: the longest test (the walk through the loaded cabinet's screens, up to 167 s) is split into four parts that run at the same time (about fifty seconds each), and the same screens are still visited and timed. The test cabinet it builds is no longer wiped by another check started at the same time, which made it take longer than it should.
 - The screen layout tests (one language per file), the Shift and Ctrl key capture tests (one test per file) and the chained network games test (shorter countdown and resend delays for the test only, never on the cabinet) no longer make each other wait.

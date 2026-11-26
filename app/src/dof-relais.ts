@@ -20,6 +20,21 @@ export interface DofRelay {
   stop(): void;
   /** Code de sortie du relais (null : arrêté de force, ou pas lancé). */
   done: Promise<number | null>;
+  /** true : libdof initialisée (« prêt ») ; false : le relais est sorti avant. Absent : pas suivi (essais). */
+  ready?: Promise<boolean>;
+}
+
+/** Ligne de journal du bilan d'une partie relayée, d'après la ligne « bilan » du relais. */
+export function relayGameSummary(prefix: string, json: string): string | undefined {
+  try {
+    const c = JSON.parse(json) as { events?: number; pulses?: number; ignored?: number };
+    const events = Number(c.events) || 0;
+    const pulses = Number(c.pulses) || 0;
+    const ignored = Number(c.ignored) || 0;
+    return `${prefix} fin de partie, ${events} événement(s) relayé(s) à libdof (dont ${pulses} impulsion(s))${ignored ? `, ${ignored} ignoré(s)` : ''}${events ? '' : ' : le script n’a appelé aucun DOF que l’écoute ait vu'}.`; // i18n-ignore : journal
+  } catch {
+    return undefined;
+  }
 }
 
 /** La libdof de VPX (plugins\dof\dof64.dll) ; undefined si cette installation n'a pas le plugin. */
@@ -43,6 +58,8 @@ export function startDofRelay(job: DofRelayJob, log: (line: string) => void, scr
   let out = '';
   let err = '';
   let kept = 0;
+  let readyNow: (ok: boolean) => void = () => undefined;
+  const ready = new Promise<boolean>((resolve) => (readyNow = resolve));
   child.stdout?.on('data', (data: Buffer) => {
     out += data.toString('utf8');
     const cut = out.lastIndexOf('\n');
@@ -51,8 +68,13 @@ export function startDofRelay(job: DofRelayJob, log: (line: string) => void, scr
     out = out.slice(cut + 1);
     for (const line of lines) {
       const [level, text = ''] = line.split('\t');
-      if (level === 'ready') log(`${prefix} prêt.`); // i18n-ignore : journal
-      else if (kept < MAX_LINES && (level === '1' || level === '2' || USEFUL.test(text))) {
+      if (level === 'ready') {
+        log(`${prefix} prêt.`); // i18n-ignore : journal
+        readyNow(true);
+      } else if (level === 'bilan') {
+        const summary = relayGameSummary(prefix, text);
+        if (summary) log(summary);
+      } else if (kept < MAX_LINES && (level === '1' || level === '2' || USEFUL.test(text))) {
         kept++;
         log(`${prefix} ${text}`);
       }
@@ -64,10 +86,12 @@ export function startDofRelay(job: DofRelayJob, log: (line: string) => void, scr
     child.once('error', (error) => {
       exited = true;
       log(`${prefix} relais non lancé (${error.message}).`); // i18n-ignore : journal
+      readyNow(false);
       resolve(null);
     });
     child.once('exit', (code, signal) => {
       exited = true;
+      readyNow(false);
       if (code !== 0) log(`${prefix} le relais s'est arrêté (${signal ?? `code ${code}`})${err.trim() ? ` : ${err.trim().split(/\r?\n/).slice(-3).join(' | ')}` : ''}.`); // i18n-ignore : journal
       resolve(code);
     });
@@ -86,5 +110,6 @@ export function startDofRelay(job: DofRelayJob, log: (line: string) => void, scr
       void done.then(() => clearTimeout(kill));
     },
     done,
+    ready,
   };
 }

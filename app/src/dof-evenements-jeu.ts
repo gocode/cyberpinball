@@ -8,6 +8,9 @@
 // - générique : sinon, et si le joueur l'a voulu, le pilote des LED (led-live.ts) joue les effets de
 //   dof-scene.ts sur les bandes décrites : événements du script (rôle lu dans le script), boutons de la
 //   borne et lanceur analogique. Le port série des LED reste alors à Cyber Pinball pour cette partie.
+// Un relais impossible, qui ne s'initialise pas ou qui s'arrête en cours de partie passe au profil générique
+// (s'il est voulu) : la table n'est jamais muette pour une panne du relais. Une table crue « à ROM » dont
+// PinMAME ne démarre pas y passe aussi, en cours de partie (led-rom.ts, frontend.ts).
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -75,7 +78,7 @@ export interface DofTapDeps {
   dataDir: string;
   /** Bandes décrites dans Cabinet.xml ; undefined : pas de LED adressables. */
   leds(): CabinetLeds | undefined;
-  service: Pick<LedService, 'configure' | 'start' | 'setFrame' | 'blackout' | 'stop' | 'gameStarted'>;
+  service: Pick<LedService, 'configure' | 'start' | 'setFrame' | 'blackout' | 'stop' | 'gameStarted'> & Partial<Pick<LedService, 'gameReleased'>>;
   /** Boutons de la borne pendant la partie (VPX au premier plan) : `on(bouton, appuyé)` ; rend de quoi arrêter. */
   watchButtons?(on: (button: DofButton, down: boolean) => void): () => void;
   /** Tirette du lanceur analogique : 0 au repos, 1 tirée à fond ; undefined sans lanceur analogique. */
@@ -129,6 +132,14 @@ export interface DofTapGame {
   /** À passer à VPX (variables d'environnement de la partie). */
   env: Record<string, string>;
   stop(): void;
+  /** Le port des LED est-il à Cyber Pinball (effets sans ROM), et non à DOF ? Change si le relais échoue. */
+  ownsLeds(): boolean;
+}
+
+/** Fichier d'écoute d'une partie, ouvert avant le lancement de VPX (son nom part dans l'environnement). */
+export interface DofTapFile {
+  file: string;
+  env: Record<string, string>;
 }
 
 /** Nouveau fichier d'écoute, vide, pour une partie. */
@@ -138,25 +149,85 @@ function tapFile(): string {
   return file;
 }
 
-/** Relais vers libdof : écoute posée, port des LED rendu, puis initialisation (sans rien attendre ici). */
-function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: string): DofTapGame | undefined {
+/**
+ * Pose l'écoute et ouvre le fichier de la partie, même pour une table à ROM : si PinMAME ne démarre pas
+ * (led-rom.ts), la partie passe aux effets sans ROM avec ce fichier. undefined : écoute impossible.
+ */
+export function openTap(vpxExe: string): DofTapFile | undefined {
+  if (!installTap(vpxExe)) return undefined;
+  try {
+    const file = tapFile();
+    return { file, env: { [DOF_TAP_ENV]: file } };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Effets sans ROM possibles : voulus par le joueur, et des bandes décrites. */
+function genericAllowed(deps: DofTapDeps): boolean {
+  return loadEventSettings(deps.dataDir).enabled && Boolean(deps.leds()?.strips.length);
+}
+
+/** Délai laissé à libdof pour s'initialiser, une fois le port rendu. */
+const RELAY_READY_MS = 30_000;
+
+/**
+ * Relais vers libdof : port des LED rendu, puis initialisation (sans rien attendre ici). Un relais qui ne
+ * s'initialise pas ou s'arrête en cours de partie laisse la place aux effets sans ROM, s'ils sont voulus.
+ * undefined : relais impossible (VPX sans plugin DOF, config DOF introuvable).
+ */
+function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: string, tap: DofTapFile, about: DofTapTable): DofTapGame | undefined {
   const dll = vpxDofDll(vpxExe);
   const base = deps.dof?.()?.base;
-  if (!dll || !base || !installTap(vpxExe)) return undefined;
-  const file = tapFile();
-  const relay = (deps.startRelay ?? startDofRelay)({ dll, base, table, rom, tap: file }, deps.log);
+  if (!dll || !base) return undefined;
+  const prefix = `DOF de la table originale (${rom}) :`; // i18n-ignore : journal
+  const relay = (deps.startRelay ?? startDofRelay)({ dll, base, table, rom, tap: tap.file }, deps.log);
+  let stopped = false;
+  let ready = false;
+  let generic: { stop(): void } | undefined;
+  let readyTimer: ReturnType<typeof setTimeout> | undefined;
+  const fail = (why: string) => {
+    if (stopped || generic) return;
+    if (readyTimer) clearTimeout(readyTimer);
+    const allowed = genericAllowed(deps);
+    deps.log(`${prefix} ${why} : ${allowed ? 'effets sans ROM à la place' : 'LED éteintes (effets sans ROM coupés, ou pas de bandes décrites)'}.`); // i18n-ignore : journal
+    relay.stop();
+    if (!allowed) return;
+    // Le port n'est libre qu'une fois le relais sorti.
+    void relay.done.then(() => {
+      if (!stopped && !generic) generic = startGenericGame(deps, tap, about, { takeBack: true, fromEnd: true });
+    });
+  };
   // Le port des LED est peut-être ouvert (animations du menu) : libdof ne l'aurait pas.
   deps.service.gameStarted().then(
-    () => relay.begin(),
-    () => relay.begin(),
+    () => begin(),
+    () => begin(),
   );
-  deps.log(`DOF de la table originale (${rom}) : relais vers libdof.`); // i18n-ignore : journal
+  function begin() {
+    if (stopped) return;
+    relay.begin();
+    if (!relay.ready) return;
+    readyTimer = setTimeout(() => fail(`libdof ne s'est pas initialisée en ${RELAY_READY_MS / 1000} s`), RELAY_READY_MS); // i18n-ignore : journal
+    readyTimer.unref?.();
+  }
+  void relay.ready?.then((ok) => {
+    if (ok) {
+      ready = true;
+      if (readyTimer) clearTimeout(readyTimer);
+    } else fail('relais sorti avant que libdof ne soit prête'); // i18n-ignore : journal
+  });
+  if (relay.ready) void relay.done.then(() => ready && fail('relais arrêté en cours de partie')); // i18n-ignore : journal
+  deps.log(`${prefix} relais vers libdof.`); // i18n-ignore : journal
   return {
-    env: { [DOF_TAP_ENV]: file },
+    env: tap.env,
+    ownsLeds: () => Boolean(generic),
     stop() {
+      stopped = true;
+      if (readyTimer) clearTimeout(readyTimer);
       relay.stop();
+      generic?.stop();
       // Le relais lit encore la fin du fichier : effacé quand il est sorti.
-      void relay.done.finally(() => fs.rmSync(file, { force: true }));
+      void relay.done.finally(() => fs.rmSync(tap.file, { force: true }));
     },
   };
 }
@@ -178,22 +249,61 @@ const BUTTON_EVENTS: Readonly<Record<DofButton, DofEventClass>> = {
   start: { kind: 'game-start', side: 'center' },
 };
 
+export interface StartTapOptions {
+  /** Fichier d'écoute déjà ouvert (openTap), dont le nom est déjà parti dans l'environnement de VPX. */
+  tap?: DofTapFile;
+  /** Partie en cours dont le port avait été rendu à DOF (gameStarted) : Cyber Pinball le reprend. */
+  takeBack?: boolean;
+}
+
 /**
  * Au lancement d'une partie dont `tapMode` a dit le mode : pose l'écoute, puis lance le relais, ou ouvre
  * les LED du profil générique (sans attendre : le lancement de VPX ne patiente jamais). undefined : rien à faire.
+ * Relais impossible ou en échec : profil générique à la place, s'il est voulu.
  *
  * Profil générique : chaque événement DOF du script prend le rôle que lui donne le script de la table
  * (classifyDofScript), les boutons de la borne (flippers, lanceur, Start) et la tirette du lanceur
  * analogique ont leur effet même si le script n'appelle pas DOF, et les bandes reçoivent une image par
  * 1/30 s (dof-scene.ts) aux couleurs de la table.
  */
-export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { kind: 'generique' }, table = '', about: DofTapTable = {}): DofTapGame | undefined {
-  if (mode.kind === 'relais') return startRelayGame(deps, vpxExe, mode.rom, table);
+export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { kind: 'generique' }, table = '', about: DofTapTable = {}, options: StartTapOptions = {}): DofTapGame | undefined {
+  const tap = options.tap ?? openTap(vpxExe);
+  if (!tap) return undefined;
+  const drop = () => {
+    if (!options.tap) fs.rmSync(tap.file, { force: true });
+  };
+  let takeBack = options.takeBack === true;
+  if (mode.kind === 'relais') {
+    const relayed = startRelayGame(deps, vpxExe, mode.rom, table, tap, about);
+    if (relayed) return relayed;
+    const allowed = genericAllowed(deps);
+    deps.log(`DOF de la table originale (${mode.rom}) : relais impossible (${vpxDofDll(vpxExe) ? 'config DOF introuvable' : 'VPX sans plugin DOF'}) : ${allowed ? 'effets sans ROM à la place' : 'LED éteintes'}.`); // i18n-ignore : journal
+    if (!allowed) return void drop();
+    // Le port a pu être rendu à DOF pour le relais prévu.
+    takeBack = true;
+  }
+  const generic = startGenericGame(deps, tap, about, { takeBack, fromEnd: false });
+  if (!generic) return void drop();
+  return { env: tap.env, ownsLeds: () => true, stop: () => generic.stop() };
+}
+
+/** Profil générique sur le fichier d'écoute : undefined sans bandes décrites. */
+function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable, how: { takeBack: boolean; fromEnd: boolean }): { stop(): void } | undefined {
   const leds = deps.leds();
-  if (!leds || !installTap(vpxExe)) return undefined;
-  const file = tapFile();
-  deps.service.configure(leds);
-  deps.service.start().catch((e: Error) => deps.log(`Effets LED sans DOF : ${e.message}`)); // i18n-ignore : journal
+  if (!leds) return undefined;
+  const file = tap.file;
+  let stopped = false;
+  const open = async () => {
+    if (how.takeBack) {
+      // Après un gameStarted en cours ou fini : port fermé, puis repris.
+      await deps.service.gameStarted().catch(() => undefined);
+      deps.service.gameReleased?.();
+    }
+    if (stopped) return;
+    deps.service.configure(leds);
+    await deps.service.start();
+  };
+  open().catch((e: Error) => deps.log(`Effets LED sans DOF : ${e.message}`)); // i18n-ignore : journal
   const gain = gameLedGain(deps.dataDir);
   const palette = dofScenePalette(about.color, about.colors);
   const scene = createDofScene(palette, gain);
@@ -219,7 +329,15 @@ export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { 
     play(BUTTON_EVENTS[button], down);
   });
   const launched = createLaunchDetector();
+  // Repli en cours de partie : ce que le relais a déjà reçu n'est pas rejoué d'un coup.
   let offset = 0;
+  if (how.fromEnd) {
+    try {
+      offset = fs.statSync(file).size;
+    } catch {
+      offset = 0;
+    }
+  }
   let rest = '';
   let lastFrame = 0;
   const poll = setInterval(() => {
@@ -258,8 +376,9 @@ export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { 
   const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, luminosité ${Math.round(gain * 100)} %.`); // i18n-ignore : journal
   return {
-    env: { [DOF_TAP_ENV]: file },
     stop() {
+      if (stopped) return;
+      stopped = true;
       clearInterval(poll);
       deps.log(ledGameSummary(seen, frames, litFrames));
       stopButtons?.();

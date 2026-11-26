@@ -32,6 +32,11 @@ function controllerDll(): string | undefined {
   return undefined;
 }
 
+/** Ce que le registre a déjà dit cette session, sans le relire (jamais bloquant) ; undefined : pas encore lu. */
+export function installationHintsIfKnown(): InstallationHints | undefined {
+  return cached;
+}
+
 /**
  * rompath (tous ses dossiers), nvram_directory et vpxpath de VPinMAME, et le dossier où il est
  * inscrit, s'ils sont dans le registre.

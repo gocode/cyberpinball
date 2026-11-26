@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- LED : une table n'est plus traitée comme une table à ROM parce que son script appelle VPinMAME ; il faut le nom de sa ROM et son fichier sur la borne. Les tables originales qui recopient ce code sans ROM (Stranger Things, par exemple) retrouvent leurs effets sans ROM au lieu de LED éteintes.
+- LED : pendant la partie, Cyber Pinball vérifie dans le journal de VPX que PinMAME a vraiment démarré. Sinon, la partie passe aux effets sans ROM ; à l'inverse, une table qui lance PinMAME rend les LED à DOF. Le constat est retenu pour la table jusqu'à ce que son fichier change.
+- LED (tables originales relayées à DOF : The Matrix, City Hunter, JP's Space Cadet…) : les impulsions DOF du script, qui sont presque tous leurs effets, arrivent enfin à DOF. Elles étaient perdues, d'où des LED presque muettes.
+- LED : si le relais DOF d'une table originale ne démarre pas ou s'arrête en cours de partie, les effets sans ROM prennent le relais (s'ils sont activés).
+- Journal : bilan de chaque partie relayée à DOF (événements reçus, dont impulsions), et changement de mode LED en cours de partie.
 - Relevé des scores en direct : au lancement d'une partie, certaines tables affichent encore un instant le score de la partie d'avant. Ce score n'est plus compté comme une partie quittée : plus de doublon au tableau de la borne ni aux classements. Les doublons déjà gardés par les préversions précédentes sont retirés.
 - Les vérifications automatiques lentes avant chaque préversion vont plus vite : le plus long essai (le parcours des écrans de la borne chargée, jusqu'à 167 s) est découpé en quatre parties qui tournent en même temps (une cinquantaine de secondes chacune), les mêmes écrans sont toujours visités et chronométrés. La borne d'essai qu'il construit n'est plus effacée par une autre vérification lancée en même temps, ce qui le rallongeait à tort.
 - Les essais de la disposition des écrans (une langue par fichier), du relevé des touches Maj et Ctrl (un essai par fichier) et des parties enchaînées en réseau (compte à rebours et renvois raccourcis pour l'essai seulement, jamais sur la borne) ne se font plus attendre les uns les autres.

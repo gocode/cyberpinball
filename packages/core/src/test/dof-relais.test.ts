@@ -15,16 +15,19 @@ interface Relay {
   begin(): void;
   stop(): void;
   done: Promise<number | null>;
+  ready?: Promise<boolean>;
 }
 interface TapModule {
   saveEventSettings(dir: string, s: Record<string, unknown>): void;
   loadEventSettings(dir: string): Record<string, unknown>;
   tapMode(deps: unknown, table: { hasRom: boolean; b2sName?: string }): Mode;
   tapPlanned(deps: unknown, hasRom: boolean, b2sName?: string): boolean;
-  startTap(deps: unknown, exe: string, mode?: Mode, tablePath?: string): { env: Record<string, string>; stop(): void } | undefined;
+  startTap(deps: unknown, exe: string, mode?: Mode, tablePath?: string, about?: Record<string, unknown>, options?: Record<string, unknown>): { env: Record<string, string>; stop(): void; ownsLeds(): boolean } | undefined;
+  openTap(exe: string): { file: string; env: Record<string, string> } | undefined;
 }
 interface RelayModule {
   startDofRelay(job: Record<string, string>, log: (line: string) => void, script?: string): Relay;
+  relayGameSummary(prefix: string, json: string): string | undefined;
 }
 const APP = path.resolve(__dirname, '../../../../app');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -131,7 +134,114 @@ test('DOF des tables originales : le relais charge la vraie libdof, lit la confi
   await wait(100);
   relay.stop();
   assert.equal(await relay.done, 0, `sortie propre :\n${lines.join('\n')}`);
+  // Les impulsions (DOFPulse, état 2) arrivent à libdof : jetées jusqu'au 26/11/2026, LED muettes.
+  assert.ok(lines.some((l) => /fin de partie, 3 événement\(s\) relayé\(s\) à libdof \(dont 1 impulsion\(s\)\)\.$/.test(l)), `bilan de la partie :\n${lines.join('\n')}`);
+  assert.equal(await relay.ready, true);
   fs.rmSync(base, { recursive: true, force: true });
+});
+
+test('DOF des tables originales : bilan de la partie relayée au journal', () => {
+  const p = 'DOF de la table originale (TheMatrix) :';
+  assert.equal(relayModule.relayGameSummary(p, '{"events":120,"pulses":95,"ignored":0}'), `${p} fin de partie, 120 événement(s) relayé(s) à libdof (dont 95 impulsion(s)).`);
+  assert.equal(relayModule.relayGameSummary(p, '{"events":0,"pulses":0,"ignored":2}'), `${p} fin de partie, 0 événement(s) relayé(s) à libdof (dont 0 impulsion(s)), 2 ignoré(s) : le script n’a appelé aucun DOF que l’écoute ait vu.`);
+  assert.equal(relayModule.relayGameSummary(p, 'pas du json'), undefined);
+});
+
+/** Faux pilote des LED : ce qu'on lui demande, dans l'ordre. */
+function fakeService(calls: string[]) {
+  return {
+    gameStarted: async () => void calls.push('port rendu'),
+    gameReleased: () => void calls.push('port repris'),
+    configure: () => void calls.push('configure'),
+    start: async () => void calls.push('start'),
+    setFrame: () => undefined,
+    blackout: () => void calls.push('blackout'),
+    stop: async () => void calls.push('arrêt'),
+  };
+}
+const LEDS = () => ({ controller: 'TeensyStripController', port: 'COM250', strips: [{ name: 'Gauche', width: 1, height: 10, arrangement: 'TopDownLeftRight' }] });
+
+test('DOF des tables originales : relais qui ne s’initialise pas ou s’arrête en cours de partie → effets sans ROM à la place', async () => {
+  for (const failure of ['sorti avant prêt', 'arrêté en cours de partie'] as const) {
+    const { dir, exe } = setup();
+    tap.saveEventSettings(dir, { enabled: true, intensity: 70 });
+    const calls: string[] = [];
+    const logs: string[] = [];
+    let exit: (code: number) => void = () => undefined;
+    let readyNow: (ok: boolean) => void = () => undefined;
+    const deps = {
+      dataDir: dir,
+      leds: LEDS,
+      service: fakeService(calls),
+      log: (l: string) => logs.push(l),
+      dof: dofWith('thematrix'),
+      startRelay: () => ({
+        begin: () => void calls.push('init'),
+        stop: () => void calls.push('relais arrêté'),
+        done: new Promise<number>((resolve) => (exit = resolve)),
+        ready: new Promise<boolean>((resolve) => (readyNow = resolve)),
+      }),
+    };
+    const game = tap.startTap(deps, exe, { kind: 'relais', rom: 'TheMatrix' }, 'C:\\Tables\\Matrix.vpx', { script: 'Sub DOF(a, b)\r\nEnd Sub' });
+    assert.ok(game);
+    assert.equal(game.ownsLeds(), false, 'port à libdof');
+    await wait(10);
+    const file = game.env[DOF_TAP_ENV]!;
+    // Ce que le relais a déjà reçu n'est pas rejoué d'un coup par les effets de repli.
+    fs.appendFileSync(file, 'E,101,1,1.0\r\n');
+    if (failure === 'sorti avant prêt') {
+      readyNow(false);
+      exit(1);
+    } else {
+      readyNow(true);
+      await wait(5);
+      exit(1);
+    }
+    await wait(30);
+    assert.equal(game.ownsLeds(), true, failure);
+    assert.deepEqual(calls.slice(0, 2), ['port rendu', 'init']);
+    const stopAt = calls.indexOf('relais arrêté');
+    assert.ok(stopAt > 0, calls.join(', '));
+    assert.deepEqual(calls.slice(stopAt + 1, stopAt + 5), ['port rendu', 'port repris', 'configure', 'start'], 'port repris après DOF, puis rouvert');
+    assert.ok(logs.some((l) => /DOF de la table originale \(TheMatrix\) : .* : effets sans ROM à la place\./.test(l)), logs.join('\n'));
+    game.stop();
+    assert.ok(logs.some((l) => /^Effets LED sans DOF : fin de partie, 0 événement/.test(l)), 'événement d’avant le repli non rejoué : ' + logs.join('\n'));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('DOF des tables originales : relais impossible (VPX sans plugin DOF) → effets sans ROM s’ils sont voulus, sinon rien', async () => {
+  const { dir, exe } = setup();
+  fs.rmSync(path.join(dir, 'vpx', 'plugins', 'dof', 'dof64.dll'));
+  const calls: string[] = [];
+  const logs: string[] = [];
+  const deps = { dataDir: dir, leds: LEDS, service: fakeService(calls), log: (l: string) => logs.push(l), dof: dofWith('thematrix') };
+  assert.equal(tap.startTap(deps, exe, { kind: 'relais', rom: 'TheMatrix' }, 'C:\\Tables\\Matrix.vpx'), undefined, 'effets sans ROM coupés : rien');
+  assert.ok(logs.some((l) => /relais impossible \(VPX sans plugin DOF\) : LED éteintes/.test(l)), logs.join('\n'));
+  tap.saveEventSettings(dir, { enabled: true, intensity: 70 });
+  const game = tap.startTap(deps, exe, { kind: 'relais', rom: 'TheMatrix' }, 'C:\\Tables\\Matrix.vpx');
+  assert.ok(game);
+  assert.equal(game.ownsLeds(), true);
+  await wait(10);
+  assert.deepEqual(calls, ['port rendu', 'port repris', 'configure', 'start']);
+  game.stop();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('LED d’une table crue à ROM dont PinMAME ne démarre pas : effets sans ROM sur le fichier d’écoute ouvert au lancement', async () => {
+  const { dir, exe } = setup();
+  tap.saveEventSettings(dir, { enabled: true, intensity: 70 });
+  const opened = tap.openTap(exe);
+  assert.ok(opened);
+  const calls: string[] = [];
+  const deps = { dataDir: dir, leds: LEDS, service: fakeService(calls), log: () => undefined, dof: dofWith() };
+  const game = tap.startTap(deps, exe, { kind: 'generique' }, 'C:\\Tables\\Stranger.vpx', {}, { tap: opened, takeBack: true });
+  assert.ok(game);
+  assert.equal(game.env[DOF_TAP_ENV], opened.file, 'le fichier déjà passé à VPX');
+  await wait(10);
+  assert.deepEqual(calls, ['port rendu', 'port repris', 'configure', 'start']);
+  game.stop();
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('Repli DOF des tables à ROM : la vraie libdof lit directoutputconfig99.ini et son LedWizEquivalent sans erreur', { skip: !fs.existsSync(REAL_DLL) && 'pas de VPX sur ce poste' }, async () => {

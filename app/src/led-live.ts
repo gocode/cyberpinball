@@ -156,6 +156,11 @@ export interface LedService {
   gameStarted(): Promise<void>;
   /** À appeler au retour d'une partie : rouvre la liaison si elle était voulue. */
   gameEnded(): void;
+  /**
+   * Partie en cours dont DOF n'a finalement pas le port (table passée aux effets sans ROM) : `start()`
+   * redevient possible tout de suite, sans la reprise différée de `gameEnded()`.
+   */
+  gameReleased(): void;
   status(): LedStatus;
   onStatus(listener: (status: LedStatus) => void): () => void;
   /** Une image : calcule, envoie, rend quand la carte a répondu. Appelée par la minuterie, ou à la main dans les essais. */
@@ -583,6 +588,13 @@ export function createLedService(options: LedServiceOptions = {}): LedService {
     }, resumeDelayMs);
   }
 
+  function gameReleased(): void {
+    gameActive = false;
+    if (resumeTimer) clearTimeout(resumeTimer);
+    resumeTimer = undefined;
+    if (state === 'paused-by-game') setState('closed');
+  }
+
   const layerMap = (layer: LedLayer | undefined) => layers[layer ?? 'ambient'];
 
   return {
@@ -631,6 +643,7 @@ export function createLedService(options: LedServiceOptions = {}): LedService {
     },
     gameStarted,
     gameEnded,
+    gameReleased,
     status,
     onStatus(listener) {
       listeners.add(listener);

@@ -255,6 +255,7 @@ import {
   liveDmdArea,
   readHostSettings,
   loadedRoms,
+  tableRomsDir,
   readTableRecords,
   vpRegFile,
   presenceTable,
@@ -502,7 +503,9 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createLedService } from './led-live';
-import { loadEventSettings, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps } from './dof-evenements-jeu';
+import { loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame } from './dof-evenements-jeu';
+import { ledsHaveRom, rememberPinmame, rememberedPinmame, watchPinmame } from './led-rom';
+import { installationHintsIfKnown } from './installation-hints';
 import { createLedAnimations } from './led-animations';
 import { readDof } from './dof-files';
 import { type CabinetLeds } from '@cyberpinball/core';
@@ -1364,6 +1367,11 @@ const dofTapDeps: DofTapDeps = {
   },
 };
 const b2sNameOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.b2sName;
+/**
+ * Qui a le port des LED pendant la partie en cours : undefined hors partie lancée (tapPlanned en décide),
+ * 'dof' : DOF de VPX, sinon l'écoute de la partie, dont `ownsLeds()` change si son relais échoue.
+ */
+let gameLeds: DofTapGame | 'dof' | undefined;
 // Table à ROM : avant que libdof ne lise sa config, le repli (dof-repli.ts) écrit directoutputconfig99.ini,
 // des effets pour les bandes de LED aux ROM dont la config n'en a presque pas (riches : laissées telles
 // quelles). Les ROM de la bibliothèque se relisent au plus toutes les 10 min ; la table lancée prend ses couleurs.
@@ -2958,8 +2966,20 @@ function downloadsChanged(): void {
 }
 // Dans un écran de la gestion des tables (bibliothèque d'un ami, sa table) : lu à son ouverture, gardé pour les touches (library.kept).
 const romsOf = (table: TableEntry) => library.kept(`roms:${table.file}`, () => cachedScript(table.file, loc.dataDir)?.roms ?? []);
-/** Table à ROM pour les LED : une table PinMAME dont le nom de ROM n'a pas été trouvé en est une (DOF de VPX garde le port). */
-const hasRomOf = (table: TableEntry) => romsOf(table).length > 0 || cachedScript(table.file, loc.dataDir)?.usesPinmame === true;
+/** Dossiers où PinMAME cherche les zips de ROM : celui de la table, la bibliothèque, le rompath de VPinMAME (s'il a déjà été lu). */
+function romDirsOf(table: TableEntry): (string | undefined)[] {
+  const hints = installationHintsIfKnown();
+  return [tableRomsDir(table.folder), loc.root ? layoutOf(loc.root).roms : undefined, ...[hints?.roms ?? []].flat(), hints?.pinmame ? path.join(hints.pinmame, 'roms') : undefined];
+}
+/**
+ * Table à ROM pour les LED (DOF de VPX garde le port) : ce qu'une partie a montré (led-rom.ts), sinon un nom de
+ * ROM dans le script ET son zip là où PinMAME le cherche. Le seul appel de VPinMAME dans le script ne suffit
+ * plus (26/11/2026 : code de contrôleur recopié dans une table originale, LED muettes toute la partie).
+ */
+const hasRomOf = (table: TableEntry) => {
+  const roms = romsOf(table);
+  return ledsHaveRom(roms.length ? [...roms, ...loadedRoms(table.folder, roms)] : [], romDirsOf(table), rememberedPinmame(loc.dataDir, table.file));
+};
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
 /** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */
 function tableInventory(table: TableEntry) {
@@ -6381,14 +6401,42 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const hasRom = hasRomOf(table);
   const ledGame = simulated === undefined && !displayMode && !otherVpx && !vrGame;
   const dofMode = ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table) }) : undefined;
+  const ledAbout = () => ({ script: tableScriptText(table), ...(tints?.current()?.color ? { color: tints.current()!.color } : {}), ...(tints?.current()?.leds?.length ? { colors: tints.current()!.leds! } : {}) });
   // Au journal, le mode LED de chaque partie (25/11/2026 : une table à ROM jouée en effets sans ROM, sans trace).
   if (ledGame && hasRom) console.log(`LED de la partie : DOF de VPX (ROM ${romsOf(table).join(', ') || 'au nom inconnu'}).`); // i18n-ignore : journal
   else if (ledGame && !dofMode) console.log('LED de la partie : aucun effet (table sans ROM ; effets sans ROM coupés, ou pas de bandes décrites).'); // i18n-ignore : journal
-  const dofTap = dofMode
-    ? startTap(dofTapDeps, install.exe, dofMode, played.file, dofMode.kind === 'generique' ? { script: tableScriptText(table), ...(tints?.current()?.color ? { color: tints.current()!.color } : {}), ...(tints?.current()?.leds?.length ? { colors: tints.current()!.leds! } : {}) } : {})
-    : undefined;
+  // Le fichier d'écoute de toute partie aux LED, table à ROM comprise : si PinMAME n'y démarre pas, la partie
+  // passe aux effets sans ROM sur ce fichier (led-rom.ts).
+  const ledTap = ledGame ? openTap(install.exe) : undefined;
+  let dofTap = dofMode && ledTap ? startTap(dofTapDeps, install.exe, dofMode, played.file, ledAbout(), { tap: ledTap }) : undefined;
+  gameLeds = simulated === undefined ? (dofTap ?? 'dof') : undefined;
   if (simulated === undefined && !displayMode && !otherVpx && romsOf(table).length) refreshRomFallback(table);
-  const dofTapEnv = dofTap ? { env: dofTap.env } : {};
+  const dofTapEnv = ledTap ? { env: ledTap.env } : {};
+  // vpinball.log dit si PinMAME a vraiment démarré : une table crue à ROM qui ne le lance pas passe aux effets
+  // sans ROM, une table crue sans ROM qui le lance rend le port à DOF ; le constat est gardé pour la table.
+  const pinmameLogFrom = ledTap ? vpxLogSize(vpxLog) : 0;
+  const pinmameWatch = ledTap
+    ? watchPinmame({
+        logFile: vpxLog,
+        fromOffset: pinmameLogFrom,
+        onVerdict: (pinmame) => {
+          if (pinmame === hasRom || gameLeds === undefined) return;
+          rememberPinmame(loc.dataDir, table.file, pinmame);
+          if (!pinmame) {
+            const mode = tapMode(dofTapDeps, { hasRom: false, b2sName: b2sNameOf(table) });
+            console.log(`LED de la partie : PinMAME n'a pas démarré (vpinball.log), table retenue sans ROM pour les LED : ${mode ? (mode.kind === 'relais' ? 'relais vers libdof' : 'effets sans ROM') : 'aucun effet (effets sans ROM coupés, ou pas de bandes décrites)'}.`); // i18n-ignore : journal
+            dofTap = mode ? startTap(dofTapDeps, install.exe, mode, played.file, ledAbout(), { tap: ledTap, takeBack: true }) : undefined;
+            gameLeds = dofTap ?? 'dof';
+          } else {
+            console.log('LED de la partie : PinMAME a démarré (vpinball.log), table retenue à ROM : port des LED rendu à DOF de VPX (ses effets à la prochaine partie).'); // i18n-ignore : journal
+            dofTap?.stop();
+            dofTap = undefined;
+            gameLeds = 'dof';
+            void ledService.gameStarted();
+          }
+        },
+      })
+    : undefined;
   const vpxEnv = { ...(roomEnv ? { env: roomEnv } : {}), ...(vrGame?.tableIni ? { tableIni: vrGame.tableIni.file } : anaglyphGame ? { tableIni: anaglyphGame.file } : {}) };
   const classicTableIni = otherVpx && simulated === undefined ? prepareClassicPov(install.version, played.file, loc.dataDir) : undefined;
   // Partie seul : le score relevé pendant toute la session, par l'inspector de VPX (solo-score-watch.ts) ; table jamais copiée ni modifiée.
@@ -6500,7 +6548,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const trackedGames = soloWatch?.stop();
   soloSetup?.restore();
   stopOtherExit?.();
-  dofTap?.stop();
+  pinmameWatch?.stop();
+  if (dofTap) dofTap.stop();
+  else if (ledTap) fs.rmSync(ledTap.file, { force: true });
+  gameLeds = undefined;
   vrFront.vrGameStop = undefined;
   // Une partie réussie efface les pièces d'un échec précédent, qui ne partent plus dans un rapport (launch-evidence.ts).
   if (result.ok) rememberLaunch(result, table.title);
@@ -8147,7 +8198,9 @@ function broadcast(): void {
   const gameOn = state.phase === 'loading' || state.phase === 'playing';
   nightMode?.game(gameOn); // variante DOF du mode nuit posée avant le lancement de VPX, remise à la fin
   const tapTable = gameOn ? (playing ?? tables[state.index]) : undefined;
-  if (gameOn && !(tapTable && tapPlanned(dofTapDeps, hasRomOf(tapTable), b2sNameOf(tapTable)))) void ledService.gameStarted();
+  // Partie lancée : ce qu'elle a décidé (et changé en route : relais en échec, PinMAME absent ou présent).
+  const tapOwns = gameLeds !== undefined ? gameLeds !== 'dof' && gameLeds.ownsLeds() : Boolean(tapTable && tapPlanned(dofTapDeps, hasRomOf(tapTable), b2sNameOf(tapTable)));
+  if (gameOn && !tapOwns) void ledService.gameStarted();
   else if (!gameOn) ledService.gameEnded();
   ledAnimations.update(ledContext());
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
