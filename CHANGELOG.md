@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Miroir du téléphone : le texte d'aide disparaît dès la première image (ou au premier appui). Une fenêtre en paysage (le fronton) s'affiche tournée d'un quart de tour pour remplir la place du pavé : on penche le téléphone pour la lire, la page reste en portrait (verrou d'orientation demandé quand le navigateur l'autorise).
+- Pavé tactile sur une application d'Edge : la borne suit toujours la plus grande fenêtre d'Edge (et non une bulle d'Edge qui coinçait le pointeur dans un petit rectangle en haut de l'écran), et le journal note le rectangle sur lequel agit le pavé.
 - PuP-Packs : un nom suivi ou précédé d'une espace dans un fichier .pup (playlist, vidéo, mode d'écran, déclencheur) est maintenant corrigé avant la partie. PinUP Popper ignorait ces espaces, le plugin PUP de VPX non : la vidéo ou le déclencheur ne jouait jamais.
 - L'aperçu sonore d'une carte de l'écran des tables s'arrête quand une partie démarre, au lieu de continuer par-dessus la musique de la table.
 - Le secret caché dans la roue a maintenant son propre affichage : le fronton et le DMD ne montrent plus les médias de la table, ses LED suivent la partie comme sur une table de flipper, une musique de fond discrète l'accompagne, et une bille perdue redescend d'un étage au lieu de tout arrêter.

@@ -740,6 +740,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let pointerShown = false;
   /** Pointeur, en pixels du contenu de la fenêtre (bandeau compris). */
   let at = { x: 0, y: 0 };
+  /** Dernier rectangle de fenêtre journalisé pour le pavé (un changement se note, pas chaque geste). */
+  let padRect = '';
   /** Vitesse lissée des derniers gestes (smoothSpeed), et l'heure du dernier. */
   let speed: number | undefined;
   let lastMoveAt = 0;
@@ -1792,6 +1794,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       case 'move': {
         const r = ext.rect();
         if (!r) return;
+        // Le pavé couvre le rectangle de la fenêtre : s'il est petit, le pointeur est coincé ; le journal le dit.
+        const rectKey = `${Math.round(r.width)} × ${Math.round(r.height)} en ${Math.round(r.x)}, ${Math.round(r.y)}`;
+        if (rectKey !== padRect) {
+          padRect = rectKey;
+          log(`Télécommande : pavé tactile sur une fenêtre de ${rectKey}.`); // i18n-ignore : journal
+        }
         const now = Date.now();
         speed = smoothSpeed(speed, message, now - lastMoveAt);
         lastMoveAt = now;

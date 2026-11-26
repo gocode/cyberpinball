@@ -40,6 +40,8 @@ const FIND_TIMEOUT_MS = 20_000;
 const CLOSE_GRACE_MS = 10_000;
 /** Délai laissé à Edge pour se mettre en plein écran avant de contrôler sa position. */
 const PLACEMENT_CHECK_MS = 2000;
+/** Au plus une recherche de la fenêtre principale par ce délai (le pavé relit le rectangle à chaque geste). */
+const WINDOW_RECHECK_MS = 1000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -132,6 +134,19 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
       }, PLACEMENT_CHECK_MS).unref?.();
       return true;
     })();
+    // La fenêtre trouvée au départ peut n'être qu'une bulle d'Edge : le pavé suit alors un petit rectangle et le
+    // pointeur reste coincé en haut de l'écran. Toutes les secondes, si une fenêtre bien plus grande existe, c'est elle.
+    let rechecked = 0;
+    const recheckWindow = (): void => {
+      if (!win || Date.now() - rechecked < WINDOW_RECHECK_MS) return;
+      rechecked = Date.now();
+      const best = ops().find(child.pid ?? -1);
+      const area = (r: ScreenRect | undefined) => (r ? r.width * r.height : 0);
+      if (!best || area(ops().rect(best)) <= area(ops().rect(win)) * 1.5) return;
+      log(`Applications : ${app.name}, fenêtre de ${Math.round(area(ops().rect(win)) / 1000)} k pixels remplacée par une plus grande (${Math.round(area(ops().rect(best)) / 1000)} k)`); // i18n-ignore : journal
+      win = best;
+      ops().place(win, at);
+    };
     const ready = (): boolean => {
       if (!win) return false;
       ops().front(win);
@@ -145,7 +160,10 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
         if (current === session) current = undefined;
         log(`Applications : ${app.name} refermée`); // i18n-ignore : journal
       }),
-      rect: () => (win ? ops().rect(win) : undefined),
+      rect: () => {
+        recheckWindow();
+        return win ? ops().rect(win) : undefined;
+      },
       pointer: (x, y) => win && ops().pointer(x, y),
       click: (button, count) => ready() && ops().click(button, count),
       wheel: (dx, dy) => win && ops().wheel(dx, dy),

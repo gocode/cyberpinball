@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Phone mirror: the help text disappears as soon as the first image arrives (or on the first touch). A landscape window (the backglass) is shown turned a quarter turn to fill the pad area: tilt the phone to read it, the page stays in portrait (orientation lock requested where the browser allows it).
+- Touch pad on an Edge application: the cabinet now always follows the largest Edge window (not an Edge bubble that trapped the pointer in a small rectangle at the top of the screen), and the log records the rectangle the pad acts on.
 - PuP-Packs: a name with a leading or trailing space in a .pup file (playlist, video, screen mode, trigger) is now fixed before the game. PinUP Popper ignored those spaces, VPX's PUP plugin does not: the video or trigger never played.
 - The sound preview of a card on the tables screen now stops when a game starts, instead of playing on top of the table's music.
 - The secret hidden in the wheel now has its own display: the backglass and DMD no longer show the table's media, its LEDs follow the game like on a pinball table, a quiet background music plays along, and a lost ball drops back one floor instead of ending everything.

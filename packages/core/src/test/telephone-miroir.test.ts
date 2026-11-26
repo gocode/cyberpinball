@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import * as vm from 'node:vm';
 import { appBrowserArgs } from '../applications';
 import {
   MIRROR_BOX_MAX,
@@ -473,4 +474,95 @@ test('page du téléphone : les gestes du miroir sont ceux du brief (appui, glis
 
 test('page du téléphone : les messages de la borne sont branchés, et la liaison coupée est oubliée', () => {
   for (const hook of ["case 'frame':", "case 'mirror-state':", 'mirrorPage(m)', 'mirrorMode()', 'mirrorLinkLost()']) assert.ok(phoneMain.includes(hook), `telephone.js appelle ${hook}`);
+});
+
+// ---------------------------------------------------------------------------
+// La page du téléphone exécutée avec un faux DOM : le fronton en paysage, l'aide qui s'efface
+
+/** Charge telephone-miroir.js dans un contexte à faux DOM ; `area` : la place de l'image en pixels de l'écran. */
+function loadMirrorPage(area: { width: number; height: number }, frameSize: { width: number; height: number }) {
+  const sent: Array<Record<string, unknown>> = [];
+  const classes = new Set<string>();
+  const view = {
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: area.width, height: area.height, right: area.width, bottom: area.height }),
+    classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), toggle: (c: string, on: boolean) => (on ? classes.add(c) : classes.delete(c)) },
+    addEventListener: () => undefined,
+    setPointerCapture: () => undefined,
+  };
+  const calls: string[] = [];
+  const context2d = { clearRect: () => undefined, setTransform: () => calls.push('setTransform'), translate: () => calls.push('translate'), rotate: () => calls.push('rotate'), drawImage: () => calls.push('drawImage') };
+  const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: () => undefined };
+  const tab = { setAttribute: () => undefined, addEventListener: () => undefined };
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'mirror-tab-pad': tab, 'mirror-tab-mirror': tab };
+  const sandbox: Record<string, unknown> = {
+    document: { getElementById: (id: string) => elements[id], addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
+    window: { devicePixelRatio: 1, addEventListener: () => undefined },
+    sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    screen: {},
+    navigator: {},
+    atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
+    Blob,
+    Uint8Array,
+    Math,
+    Promise,
+    createImageBitmap: async () => ({ ...frameSize, close: () => undefined }),
+    clearTimeout,
+    setTimeout,
+    mode: 'browser',
+    state: 'paired',
+    send: (m: Record<string, unknown>) => (sent.push(m), true),
+  };
+  const context = vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(PHONE_DIR, 'telephone-miroir.js'), 'utf8'), context);
+  vm.runInContext('mirror.available = true; mirror.choice = true;', context);
+  // JSON : les objets d'un autre contexte vm ne passent pas deepEqual.
+  const run = <T>(code: string) => { const v = vm.runInContext(code, context) as unknown; return (v === undefined || typeof (v as { then?: unknown }).then === 'function' ? v : JSON.parse(JSON.stringify(v))) as T; };
+  return { sent, classes, canvas, calls, run, frame: () => run<Promise<void>>("mirrorFrame({ n: 1, d: 'eA==' })") };
+}
+
+test('page du téléphone : le fronton (paysage) dans la place en portrait est tourné d\'un quart de tour, et un appui retombe au bon endroit', async () => {
+  const page = loadMirrorPage({ width: 400, height: 800 }, { width: 1920, height: 1080 });
+  await page.frame();
+  assert.equal(page.run('mirror.turned'), true);
+  assert.deepEqual([page.canvas.width, page.canvas.height], [1080, 1920], 'le canvas est en portrait');
+  assert.ok(page.calls.includes('rotate'));
+  // L'image tournée occupe toute la largeur (400) et 711 de hauteur, centrée : coin haut gauche de la fenêtre = coin haut droit de l'écran.
+  const top = (800 - 400 * (1920 / 1080)) / 2;
+  const at = (x: number, y: number) => page.run<{ fx: number; fy: number } | undefined>(`mirrorFraction(${x}, ${y}, false)`);
+  const topRight = at(399.99, top + 0.01)!;
+  assert.ok(topRight.fx < 0.001 && topRight.fy < 0.001, 'haut droit du téléphone = haut gauche de la fenêtre');
+  const bottomLeft = at(0.01, 800 - top - 0.01)!;
+  assert.ok(bottomLeft.fx > 0.999 && bottomLeft.fy > 0.999, 'bas gauche du téléphone = bas droit de la fenêtre');
+  const centre = at(200, 400)!;
+  assert.ok(Math.abs(centre.fx - 0.5) < 0.001 && Math.abs(centre.fy - 0.5) < 0.001);
+  assert.equal(at(200, 5), undefined, 'hors de l\'image : aucun appui');
+});
+
+test('page du téléphone : la borne prépare l\'image pour la place tournée, et une fenêtre en portrait n\'est pas tournée', async () => {
+  const landscape = loadMirrorPage({ width: 400, height: 800 }, { width: 1920, height: 1080 });
+  assert.deepEqual(landscape.run('mirrorBox()'), { w: 400, h: 800 }, 'avant la première image : place telle quelle');
+  await landscape.frame();
+  assert.deepEqual(landscape.run('mirrorBox()'), { w: 800, h: 400 }, 'place échangée une fois l\'image connue en paysage');
+  assert.ok(landscape.sent.some((m) => m.t === 'mirror' && m.on === true && m.w === 800 && m.h === 400), 'la borne en est avertie');
+
+  const portrait = loadMirrorPage({ width: 400, height: 800 }, { width: 1080, height: 1920 });
+  await portrait.frame();
+  assert.equal(portrait.run('mirror.turned'), false, 'TikTok en portrait : image droite');
+  assert.equal(portrait.calls.includes('rotate'), false);
+  assert.deepEqual(portrait.run('mirrorBox()'), { w: 400, h: 800 });
+
+  // Téléphone passé en paysage (verrou refusé) : le paysage s'affiche droit, sans rotation.
+  const sideways = loadMirrorPage({ width: 800, height: 400 }, { width: 1920, height: 1080 });
+  await sideways.frame();
+  assert.equal(sideways.run('mirror.turned'), false);
+});
+
+test('page du téléphone : le texte d\'aide s\'efface dès la première image, et le verrou de portrait est demandé', async () => {
+  const page = loadMirrorPage({ width: 400, height: 800 }, { width: 1080, height: 1920 });
+  page.run('mirrorHint()');
+  assert.ok(page.classes.has('hinting'));
+  await page.frame();
+  assert.equal(page.classes.has('hinting'), false, 'aide partie avec la première image');
+  assert.ok(page.classes.has('has-frame'));
+  assert.match(phoneMirror, /orientation[\s\S]*lock\?\.\('portrait'\)/, 'verrou de portrait demandé (sans effet là où il est refusé)');
 });

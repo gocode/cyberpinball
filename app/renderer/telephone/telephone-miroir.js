@@ -22,7 +22,8 @@ const MIRROR_LONG_MS = 550;
 const MIRROR_SLOP = 10;
 /** Au plus 1,5 pixel d'image par pixel CSS : au-delà, l'image ne gagne rien et la liaison s'alourdit. */
 const MIRROR_DENSITY_MAX = 1.5;
-const MIRROR_HINT_MS = 7000;
+/** L'aide des gestes ne reste jamais longtemps : elle part dès la première image, ou au premier appui. */
+const MIRROR_HINT_MS = 2500;
 
 const mirror = {
   /** La borne annonce que cette fenêtre se capture (message « page »). */
@@ -37,6 +38,12 @@ const mirror = {
   /** Une image est en cours de décodage : la suivante, si elle arrive, la remplace (la borne n'en envoie qu'une à la fois). */
   decoding: false,
   hasFrame: false,
+  /** Dernière image décodée, gardée pour la redessiner quand la place change (rotation du téléphone). */
+  bitmap: undefined,
+  /** La fenêtre est en paysage (dernière image). */
+  landscape: false,
+  /** L'image est dessinée tournée d'un quart de tour : paysage dans une place en portrait. */
+  turned: false,
   hintTimer: undefined,
 };
 
@@ -64,12 +71,24 @@ function mirrorWanted() {
   return mirror.available && mirror.choice && mode === 'browser' && state === 'paired' && !document.hidden;
 }
 
+/**
+ * Une fenêtre en paysage (le fronton) dans une place en portrait : l'image est tournée d'un quart de tour
+ * pour remplir la place, et on penche le téléphone pour la lire ; la page reste en portrait (verrou
+ * d'orientation demandé à l'ouverture du miroir, sans quoi une rotation du téléphone changerait la page).
+ */
+function mirrorTurns(landscape, areaW, areaH) {
+  return landscape && areaH > areaW;
+}
+
 /** La place de l'image, en pixels de l'écran du téléphone ; undefined tant que la scène n'a pas de taille (clavier ouvert…). */
 function mirrorBox() {
   const r = mirrorView.getBoundingClientRect();
   if (r.width < 8 || r.height < 8) return undefined;
   const k = Math.min(window.devicePixelRatio || 1, MIRROR_DENSITY_MAX);
-  return { w: Math.min(4000, Math.round(r.width * k)), h: Math.min(4000, Math.round(r.height * k)) };
+  const w = Math.min(4000, Math.round(r.width * k));
+  const h = Math.min(4000, Math.round(r.height * k));
+  // Fenêtre en paysage dans une place en portrait : l'image sera tournée, la borne la prépare pour la place tournée.
+  return mirrorTurns(mirror.landscape, r.width, r.height) ? { w: h, h: w } : { w, h };
 }
 
 /** Texte du bouton et vue montrée, puis ce que la borne doit savoir. */
@@ -104,12 +123,29 @@ function mirrorChoose(on) {
   mirrorRemember();
   mirror.broken = false;
   if (on) mirrorHint();
+  mirrorLockPortrait(on);
   // Retour au pavé : la borne s'arrête (mirrorSync), et plus rien de l'image ne reste affiché ni attendu.
   if (!on) mirrorClear();
   mirrorRefresh();
 }
 
+/** Garde la page en portrait pendant le miroir (Android : seulement en plein écran ; ailleurs sans effet, la place s'adapte alors toute seule). */
+function mirrorLockPortrait(on) {
+  try {
+    const o = screen.orientation;
+    if (!o) return;
+    if (on) o.lock?.('portrait')?.catch?.(() => undefined);
+    else o.unlock?.();
+  } catch {
+    // Verrou refusé ou absent.
+  }
+}
+
 function mirrorClear() {
+  mirror.bitmap?.close?.();
+  mirror.bitmap = undefined;
+  mirror.landscape = false;
+  mirror.turned = false;
   mirror.hasFrame = false;
   mirrorView.classList.remove('has-frame');
   mirrorContext.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
@@ -164,6 +200,26 @@ function mirrorState(m) {
   mirrorView.classList.toggle('broken', mirror.broken);
 }
 
+/** Dessine la dernière image dans le canvas, tournée d'un quart de tour si c'est un paysage dans une place en portrait. */
+function mirrorPaint() {
+  const b = mirror.bitmap;
+  if (!b) return;
+  const r = mirrorView.getBoundingClientRect();
+  mirror.turned = mirrorTurns(b.width > b.height, r.width, r.height);
+  const w = mirror.turned ? b.height : b.width;
+  const h = mirror.turned ? b.width : b.height;
+  if (mirrorCanvas.width !== w) mirrorCanvas.width = w;
+  if (mirrorCanvas.height !== h) mirrorCanvas.height = h;
+  mirrorContext.setTransform(1, 0, 0, 1, 0, 0);
+  mirrorContext.clearRect(0, 0, w, h);
+  // Un quart de tour dans le sens des aiguilles : le haut de l'image passe à droite du téléphone.
+  if (mirror.turned) {
+    mirrorContext.translate(w, 0);
+    mirrorContext.rotate(Math.PI / 2);
+  }
+  mirrorContext.drawImage(b, 0, 0);
+}
+
 /** Message « frame » : une image JPEG, dessinée puis acquittée. */
 async function mirrorFrame(m) {
   if (!mirrorWanted() || typeof m.n !== 'number' || typeof m.d !== 'string' || !m.d) return;
@@ -176,16 +232,25 @@ async function mirrorFrame(m) {
     const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
     // Le miroir a pu être quitté pendant le décodage : rien ne s'affiche (la borne a arrêté).
     if (mirrorWanted()) {
-      if (mirrorCanvas.width !== bitmap.width) mirrorCanvas.width = bitmap.width;
-      if (mirrorCanvas.height !== bitmap.height) mirrorCanvas.height = bitmap.height;
-      mirrorContext.drawImage(bitmap, 0, 0);
+      mirror.bitmap?.close?.();
+      mirror.bitmap = bitmap;
+      const landscape = bitmap.width > bitmap.height;
+      const changed = landscape !== mirror.landscape;
+      mirror.landscape = landscape;
+      mirrorPaint();
       mirror.hasFrame = true;
       mirror.broken = false;
+      // Le texte d'aide part dès que l'image est là.
+      clearTimeout(mirror.hintTimer);
+      mirrorView.classList.remove('hinting');
       mirrorView.classList.add('has-frame');
       mirrorView.classList.remove('broken');
       send({ t: 'mirror-ack', n: m.n });
+      // Le sens de l'image vient d'être connu : la borne prépare la taille pour la place telle qu'elle est montrée.
+      if (changed) mirrorSync();
+    } else {
+      bitmap.close?.();
     }
-    bitmap.close?.();
   } catch {
     // Image illisible : pas d'accusé, la borne reprend d'elle-même après son délai.
   } finally {
@@ -212,9 +277,12 @@ function mirrorImageRect() {
 function mirrorFraction(clientX, clientY, clamp) {
   const r = mirrorImageRect();
   if (!r) return undefined;
-  const fx = (clientX - r.x) / r.w;
-  const fy = (clientY - r.y) / r.h;
-  if (!clamp && (fx < 0 || fx > 1 || fy < 0 || fy > 1)) return undefined;
+  const cx = (clientX - r.x) / r.w;
+  const cy = (clientY - r.y) / r.h;
+  if (!clamp && (cx < 0 || cx > 1 || cy < 0 || cy > 1)) return undefined;
+  // Image tournée : le point du canvas (cx, cy) est, dans la fenêtre, à (cy, 1 - cx).
+  const fx = mirror.turned ? cy : cx;
+  const fy = mirror.turned ? 1 - cx : cy;
   const c = (v) => Math.round(Math.min(1, Math.max(0, v)) * 10000) / 10000;
   return { fx: c(fx), fy: c(fy) };
 }
@@ -231,14 +299,19 @@ function mirrorFlush() {
   const r = mirrorImageRect();
   if (!g || !r || (!mirrorPending.dx && !mirrorPending.dy)) return;
   // Le doigt a fait dx × dy pixels de l'écran : en fractions de l'image, la borne les rend en pixels de la fenêtre.
-  const dx = Math.round((mirrorPending.dx / r.w) * 10000) / 10000;
-  const dy = Math.round((mirrorPending.dy / r.h) * 10000) / 10000;
+  const cdx = mirrorPending.dx / r.w;
+  const cdy = mirrorPending.dy / r.h;
+  // Image tournée : aller à droite sur le téléphone, c'est monter dans la fenêtre.
+  const dx = Math.round((mirror.turned ? cdy : cdx) * 10000) / 10000;
+  const dy = Math.round((mirror.turned ? -cdx : cdy) * 10000) / 10000;
   mirrorPending = { dx: 0, dy: 0 };
   if (dx || dy) send({ t: 'mscroll', fx: g.fx, fy: g.fy, dx: Math.max(-2, Math.min(2, dx)), dy: Math.max(-2, Math.min(2, dy)) });
 }
 
 mirrorView.addEventListener('pointerdown', (e) => {
   if (state !== 'paired' || !mirror.hasFrame) return;
+  clearTimeout(mirror.hintTimer);
+  mirrorView.classList.remove('hinting');
   mirrorView.setPointerCapture(e.pointerId);
   mirrorPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   e.preventDefault();
@@ -304,6 +377,12 @@ mirrorView.addEventListener('pointercancel', mirrorRelease);
 document.addEventListener('visibilitychange', () => mirrorSync(true));
 // Clavier ouvert, rotation : la place de l'image change, la borne en redemande une à la bonne taille.
 window.addEventListener('resize', () => {
+  mirrorPaint();
   if (mirror.asked) mirrorSync();
 });
-if (window.ResizeObserver) new ResizeObserver(() => mirror.asked && mirrorSync()).observe(mirrorView);
+if (window.ResizeObserver) {
+  new ResizeObserver(() => {
+    mirrorPaint();
+    if (mirror.asked) mirrorSync();
+  }).observe(mirrorView);
+}

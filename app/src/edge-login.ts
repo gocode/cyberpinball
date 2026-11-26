@@ -100,7 +100,8 @@ export function edgeWindowOps(): EdgeWindowOps {
   const w = require('@cyberpinball/win-displays') as typeof import('@cyberpinball/win-displays');
   type Win = import('@cyberpinball/win-displays').WindowInfo;
   return {
-    find: (pid) => w.listWindows((x) => x.pid === pid && x.visible && x.className.startsWith('Chrome_WidgetWin') && x.rect.width > 200)[0],
+    // La plus grande : Edge ouvre d'autres fenêtres (bulle « Échap pour quitter le plein écran », info-bulles) qui ne sont pas la page.
+    find: (pid) => w.listWindows((x) => x.pid === pid && x.visible && x.className.startsWith('Chrome_WidgetWin') && x.rect.width > 200).sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0],
     rect: (win) => w.windowOfHandle((win as Win).handle)?.rect,
     place: (win, at) => {
       w.setWindowBounds(win as Win, at);
