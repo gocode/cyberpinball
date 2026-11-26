@@ -23,7 +23,9 @@ import {
   ledLevelFromLinear,
   ledLevelGain,
   addDofTap,
+  applyDofLedLevel,
   classifyDofScript,
+  dofLedLevelSummary,
   createDofScene,
   createLaunchDetector,
   dofEventClass,
@@ -32,6 +34,7 @@ import {
   parseTapChunk,
   readLedAnimations,
   type CabinetLeds,
+  type DofCabinetFile,
   type DofEventClass,
   type DofEventSettings,
   type DofZone,
@@ -67,6 +70,26 @@ export function saveEventSettings(dataDir: string, settings: DofEventSettings): 
  */
 export function gameLedGain(dataDir: string): number {
   return ledLevelGain(Math.min(loadEventSettings(dataDir).intensity, readLedAnimations(dataDir).brightness));
+}
+
+/**
+ * Avant une partie : le même plafond pour les LED que libdof pilote seule (table à ROM, table originale
+ * relayée), posé dans le <Brightness> des bandes du Cabinet.xml qu'elle va lire (dof-niveau.ts). Sans
+ * cela, le réglage n'agissait que sur les effets sans ROM (retour d'essai du 26/11/2026). Rend true si
+ * Cabinet.xml a été réécrit.
+ */
+export function capDofLeds(cabinet: Pick<DofCabinetFile, 'file'> | undefined, dataDir: string, log: (line: string) => void): boolean {
+  if (!cabinet) return false;
+  try {
+    const gain = gameLedGain(dataDir);
+    const result = applyDofLedLevel(cabinet, gain);
+    if (result.refused) log(`[dof] ${result.refused}`); // i18n-ignore : journal
+    if (result.strips.length) log(dofLedLevelSummary(result, gain));
+    return result.updated;
+  } catch (error) {
+    log(`[dof] plafond des LED de libdof impossible : ${(error as Error).message}`); // i18n-ignore : journal
+    return false;
+  }
 }
 
 /** Ligne de journal à la fin d'une partie en effets génériques : événements reçus et part du temps allumé. */

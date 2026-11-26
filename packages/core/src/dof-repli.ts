@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { DofSetup } from './dof';
+import type { DofEventClass, DofEventKind } from './dof-evenements-script';
 
 /** Numéro de l'ini et du LedWizEquivalent du repli (libre dans le configtool : 1–94, 120+). */
 export const DOF_FALLBACK_NUMBER = 99;
@@ -264,15 +265,37 @@ function dim(hex: string, factor: number): string {
 type Recipe = (trigger: string, color: string, layer: number, vertical: boolean, slot: number) => string;
 const FULL = 'AL0 AT0 AW100 AH100';
 const ZONES = [0, 33, 66];
-/** Formes variées : balayage vers le haut, éclair qui s'estompe, tiers de la bande, scintillement, balayage inverse, clignotement. */
+/**
+ * Formes variées : balayage vers le haut, éclair qui s'estompe, tiers de la bande, scintillement, balayage inverse,
+ * clignotement. Chacune a une durée (DOF_EFFECT_MAX_MS au plus) : elle part quand l'événement s'allume et
+ * s'arrête seule, même s'il reste allumé. Jamais « BLINK » : libdof clignote alors tant que l'événement est
+ * allumé — essai du 26/11/2026, The Matrix clignotait sans fin au repos (éclairage général E118 tenu allumé),
+ * Space Cadet et City Hunter tant que les flippers restaient levés. « 70 3 » : trois clignotements de 70 ms.
+ */
 const RECIPES: Recipe[] = [
   (t, c, l, v) => `${t} ${c} ${FULL} AS350 AD${v ? 'U' : 'R'} 400 L${l}`,
   (t, c, l) => `${t} ${c} ${FULL} F120 260 L${l}`,
   (t, c, l, v, slot) => `${t} ${c} ${v ? `AL0 AW100 AT${ZONES[slot % 3]} AH34` : `AT0 AH100 AL${ZONES[slot % 3]} AW34`} F60 180 L${l}`,
   (t, c, l) => `${t} ${c} ${FULL} AFDEN45 AFMIN40 AFMAX100 AFFADE80 450 L${l}`,
   (t, c, l, v) => `${t} ${c} ${FULL} AS350 AD${v ? 'D' : 'L'} 400 L${l}`,
-  (t, c, l) => `${t} ${c} ${FULL} BLINK 70 3 L${l}`,
+  (t, c, l) => `${t} ${c} ${FULL} 70 3 L${l}`,
 ];
+/** Durée la plus longue d'un effet du repli (ms) : sans événement nouveau, les bandes s'éteignent après. */
+export const DOF_EFFECT_MAX_MS = 600;
+/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais ; et sa luminosité relative. */
+export const DOF_FLIPPER_REACH = 0.35;
+const FLIPPER_LEVEL = 0.45;
+
+/**
+ * Flippers : très léger, ils sont actionnés sans cesse. Une petite barre aux couleurs de la table qui part du
+ * bas de la bande (du bord, côté du flipper, sur une bande horizontale) et monte un peu, jamais au-delà de
+ * DOF_FLIPPER_REACH ; une fois, même flipper tenu levé.
+ */
+function flipperBar(trigger: string, color: string, layer: number, vertical: boolean, side: 'left' | 'right' | 'center'): string {
+  const reach = Math.round(DOF_FLIPPER_REACH * 100);
+  const area = vertical ? `AL0 AW100 AT${100 - reach} AH${reach} ADU` : side === 'right' ? `AT0 AH100 AL${100 - reach} AW${reach} ADL` : `AT0 AH100 AL0 AW${reach} ADR`;
+  return `${trigger} ${dim(color, FLIPPER_LEVEL)} ${area} AS300 250 L${layer}`;
+}
 /** Lampes : courtes et partielles, elles clignotent souvent. */
 const LAMP_RECIPES: Recipe[] = [RECIPES[2]!, RECIPES[1]!];
 
@@ -315,17 +338,29 @@ const ORIGINAL_MAX = 24;
  * aux couleurs de la table (principale, secondaire) pour les plus appelés, variées pour les rares. Pas
  * d'éclairage général : sans ROM, G1 ne s'allume jamais.
  */
-function originalColumn(strip: DofFallbackStrip, index: number, events: string[], colors: string[], rom: string): string {
+function originalColumn(strip: DofFallbackStrip, index: number, events: string[], colors: string[], rom: string, classes?: ReadonlyMap<number, DofEventClass>): string {
   const vertical = strip.height > strip.width;
   const common = [colors[0]!, colors[2] ?? colors[0]!];
   const rare = [colors[1] ?? colors[0]!, ...romPalette(rom)];
   const commonCount = Math.ceil(events.length * COMMON_SHARE);
   return events
     .map((t, i) => {
+      const cls = classes?.get(Number(t.slice(1)));
+      if (cls?.kind === 'flipper') return flipperBar(t, colors[0]!, 10 + i, vertical, cls.side);
       const color = i < commonCount ? common[(i + index) % common.length]! : rare[(i - commonCount + index) % rare.length]!;
       return RECIPES[(i + index) % RECIPES.length]!(t, color, 10 + i, vertical, i + index);
     })
     .join('/');
+}
+
+/**
+ * Événements d'une table originale qui ne sont pas des actions de jeu : éclairage général, moteurs et aimants.
+ * Ils restent allumés longtemps (E118 de The Matrix, toute la partie) : rien sur les bandes, au repos elles
+ * restent calmes. Ils ne comptent pas non plus dans la part des appels suivis.
+ */
+const QUIET_KINDS: ReadonlySet<DofEventKind> = new Set(['gi', 'mech']);
+export function dofPlayEvents(events: DofScriptEvents, classes: ReadonlyMap<number, DofEventClass> | undefined): Map<number, number> {
+  return new Map([...events].filter(([n]) => !QUIET_KINDS.has(classes?.get(n)?.kind ?? 'other')));
 }
 
 export interface DofFallbackInput {
@@ -340,6 +375,8 @@ export interface DofFallbackInput {
   palette?: (rom: string) => string[] | undefined;
   /** Appels DOF du script, pour une table originale (sans ROM, ses événements relayés à libdof). */
   events?: (rom: string) => DofScriptEvents | undefined;
+  /** Rôle des événements de ce script (classifyDofScript) : flippers, éclairage général… */
+  classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined;
 }
 
 export interface DofFallbackPlan {
@@ -373,11 +410,18 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
   if (!outputs.length) return plan;
   const stripNames = input.strips.map((s) => s.name);
   const poorBelow = dofPoorBelow(input.strips.length);
-  const keys = new Map<string, { rom: string; before: number; triggers: string[]; original?: { events: string[]; share: number; total: number } }>();
+  type Original = { events: string[]; share: number; total: number; classes?: ReadonlyMap<number, DofEventClass> };
+  const keys = new Map<string, { rom: string; before: number; triggers: string[]; original?: Original }>();
   for (const rom of [...new Set(input.roms.filter(Boolean))].sort((a, b) => a.localeCompare(b))) {
-    const events = input.events?.(rom);
-    let original: { events: string[]; share: number; total: number } | undefined;
+    const sent = input.events?.(rom);
+    const classes = sent?.size ? input.classes?.(rom) : undefined;
+    const events = sent?.size ? dofPlayEvents(sent, classes) : undefined;
+    let original: Original | undefined;
     let before: number;
+    if (sent?.size && !events?.size) {
+      plan.rich.push(rom); // rien que de l'éclairage ou des moteurs : rien à ajouter
+      continue;
+    }
     if (events?.size) {
       // Table originale : jugée sur les événements que son script envoie vraiment, pas sur ceux que la config prévoit.
       const cov = dofOriginalCoverage(input.configs, input.equivalents, stripNames, rom, events);
@@ -387,7 +431,7 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
         continue;
       }
       const missing = [...events].filter(([n]) => !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
-      original = { events: missing.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size };
+      original = { events: missing.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size, ...(classes ? { classes } : {}) };
     } else {
       before = dofRomStripEffects(input.configs, input.equivalents, stripNames, rom);
       if (before >= poorBelow) {
@@ -418,7 +462,7 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
         columns.push('0');
         n++;
       }
-      columns.push(info.original ? originalColumn(strip, index, info.original.events, colors, a.rom) : stripColumn(strip, index, triggers, colors));
+      columns.push(info.original ? originalColumn(strip, index, info.original.events, colors, a.rom, info.original.classes) : stripColumn(strip, index, triggers, colors));
       n += 3;
     });
     configLines.push(`${a.key},${columns.join(',')}`);
@@ -504,7 +548,7 @@ function readText(file: string, encoding: BufferEncoding = 'latin1'): string | u
  * quand il n'y a rien à ajouter ou que le joueur a coupé l'option. Un fichier sans la marque de Cyber
  * Pinball n'est jamais touché.
  */
-export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enabled: boolean; palette?: (rom: string) => string[] | undefined; events?: (rom: string) => DofScriptEvents | undefined }): DofFallbackResult {
+export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enabled: boolean; palette?: (rom: string) => string[] | undefined; events?: (rom: string) => DofScriptEvents | undefined; classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined }): DofFallbackResult {
   const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false };
   const globalDir = setup.globalConfig ? path.dirname(setup.globalConfig.file) : setup.dir;
   const file = setup.fallbackIni ?? path.join(setup.iniDir ?? globalDir, `directoutputconfig${DOF_FALLBACK_NUMBER}.ini`);
@@ -546,7 +590,7 @@ export function refreshDofFallback(setup: DofSetup, roms: string[], opts: { enab
     ...cabinet.equivalents.filter((e) => e.number !== DOF_FALLBACK_NUMBER),
     { number: DOF_FALLBACK_NUMBER, outputs: stripNames.map((name, i) => ({ number: 1 + 3 * i, name })) },
   ];
-  const plan = planDofFallback({ configs, equivalents, strips: cabinet.strips, roms, ...(opts.palette ? { palette: opts.palette } : {}), ...(opts.events ? { events: opts.events } : {}) });
+  const plan = planDofFallback({ configs, equivalents, strips: cabinet.strips, roms, ...(opts.palette ? { palette: opts.palette } : {}), ...(opts.events ? { events: opts.events } : {}), ...(opts.classes ? { classes: opts.classes } : {}) });
   result.plan = plan;
   if (!plan.content) return remove();
   if (existing !== plan.content) {

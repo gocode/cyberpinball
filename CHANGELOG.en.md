@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LED effects added by Cyber Pinball (tables with a poor DOF configuration): no more endless blinking. Each effect stops by itself in less than a second, even when the event stays on. Before, The Matrix blinked all the time while idle, and Space Cadet or City Hunter as long as a flipper was held up. General illumination and motors no longer light the strips: at rest, they stay calm.
+- Flipper effect on the LED strips: very light. A small bar in the table's colors starts at the bottom of the strip and rises a little, never beyond half of the strip.
+- LEDs: the in-game effects intensity now also applies to ROM tables and to original tables whose strips are driven by DOF. At 10 %, the strips stay barely visible, whatever the table's DOF config.
 - Credit 1 is now optional: a cabinet only needs one coin slot, Credit 1 or Credit 2 to 4 (advanced buttons). Without a key, Credit 1 is no longer active in VPX, and VPX's in-game menu, the help and "Cancel changes" follow the first coin button set.
 - Buttons: "Undo the last key" on the summary and during the capture, with the flippers or the mouse. Each key set, skipped or reset to default is undone one at a time, the key taken from another button goes back to it, and the screen says what was undone, without leaving the step.
 - Opening the wizard from the menu: the screen now says "Opening the wizard…" right away instead of staying unchanged while the wizard starts; the opening time is written in the log, with a warning above 4 s.

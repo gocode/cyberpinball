@@ -87,7 +87,7 @@ test('Repli DOF : invariant — aucune ROM de la bibliothèque ne reste sans eff
   // Signaux de la ROM, formes et couleurs variées, calques explicites.
   const mm = plan.content.split(/\r?\n/).find((l) => l.startsWith('mm,'))!;
   for (const t of ['S9 ', 'S47 ', 'W15 ', 'G1 ']) assert.ok(mm.includes(t), t);
-  assert.ok(/ADU/.test(mm) && /AFDEN/.test(mm) && /BLINK/.test(mm) && / F\d+/.test(mm), 'balayage vers le haut, scintillement, clignotement, fondu');
+  assert.ok(/ADU/.test(mm) && /AFDEN/.test(mm) && / 70 3 /.test(mm) && / F\d+/.test(mm), 'balayage vers le haut, scintillement, clignotement borné, fondu');
   assert.ok(new Set(mm.match(/#[0-9A-F]{6}/g)).size >= 4, 'plusieurs couleurs');
   // Sans signal connu : les bobines de la ROM.
   const totan = plan.content.split(/\r?\n/).find((l) => l.startsWith('totan_14,'))!;

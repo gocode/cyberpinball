@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { DEFAULT_LED_ANIMATIONS, DOF_TAP_ENV, DOF_TAP_MARK, LED_LEVEL_SCALE, ledLevelGain, type CabinetLeds, type LedStripSpec, type SimulatedStripDevice } from '../index';
+import { DEFAULT_LED_ANIMATIONS, DOF_TAP_ENV, DOF_TAP_MARK, LED_LEVEL_SCALE, cabinetXml, ledLevelGain, libdofBrightnessFactor, readCabinetXml, type CabinetLeds, type LedStripSpec, type SimulatedStripDevice } from '../index';
 
 interface Service {
   configure(l: CabinetLeds | undefined): void;
@@ -22,6 +22,7 @@ interface TapModule {
   zoneTarget(leds: CabinetLeds, zone: string): string;
   startTap(deps: unknown, exe: string, mode?: { kind: 'generique' }, table?: string, about?: { script?: string; color?: string }): { env: Record<string, string>; stop(): void } | undefined;
   gameLedGain(dir: string): number;
+  capDofLeds(cabinet: { file: string } | undefined, dir: string, log: (line: string) => void): boolean;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const driver = require(path.resolve(__dirname, '../../../../app/dist/led-live.js')) as { createLedService(o: Record<string, unknown>): Service };
@@ -66,6 +67,29 @@ test('effets sans ROM : la partie ne dépasse jamais la luminosité maximale des
   assert.equal(tap.gameLedGain(dir), ledLevelGain(30), 'intensité des événements plus basse : elle compte');
   tap.saveEventSettings(dir, { enabled: true, intensity: 0 });
   assert.equal(tap.gameLedGain(dir), 0, '0 % : rien ne s’allume');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// 26/11/2026, borne d'essai : intensité à 10 %, les LED d'une partie à ROM (libdof) restaient aveuglantes.
+test('table à ROM : le plafond des effets en partie atteint les LED de libdof (10 % : quasi éteint)', () => {
+  const { dir } = setup();
+  const file = path.join(dir, 'Cabinet.xml');
+  const leds: CabinetLeds = { controller: 'TeensyStripController', port: 'COM5', strips: [strip('PF Left', 1), { ...strip('PF Back', 2), width: 32, height: 8, brightness: 60 }] };
+  fs.writeFileSync(file, cabinetXml(leds), 'utf8');
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100, scale: LED_LEVEL_SCALE }));
+  tap.saveEventSettings(dir, { enabled: false, intensity: 10 });
+  const lines: string[] = [];
+  assert.equal(tap.capDofLeds({ file }, dir, (l) => lines.push(l)), true, 'Cabinet.xml réécrit avant la partie');
+  const written = [...fs.readFileSync(file, 'utf8').matchAll(/<Brightness>(\d+)<\/Brightness>/g)].map((m) => Number(m[1]));
+  assert.equal(written.length, 2);
+  for (const b of written) assert.ok(Math.floor(255 * libdofBrightnessFactor(b)) <= 3, `blanc plein ${Math.floor(255 * libdofBrightnessFactor(b))}/255 à 10 %`);
+  assert.match(lines.join('\n'), /PF Left 100 → \d+, PF Back 60 → \d+/);
+  // Retour au cran 100 : la description d'origine, et l'éditeur relit toujours la luminosité décrite.
+  tap.saveEventSettings(dir, { enabled: false, intensity: 100 });
+  assert.equal(tap.capDofLeds({ file }, dir, () => undefined), true);
+  assert.deepEqual(readCabinetXml(file).strips.map((s) => s.brightness), [100, 60]);
+  assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /CyberPinballBrightness/);
+  assert.equal(tap.capDofLeds(undefined, dir, () => undefined), false, 'pas de Cabinet.xml : rien');
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

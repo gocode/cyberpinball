@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Effets LED ajoutés par Cyber Pinball (tables dont la config DOF est pauvre) : plus aucun clignotement sans fin. Chaque effet s'arrête seul en moins d'une seconde, même si l'événement reste allumé. Avant, The Matrix clignotait en permanence au repos, et Space Cadet ou City Hunter tant qu'un flipper restait levé. L'éclairage général et les moteurs n'allument plus les bandes : au repos, elles restent calmes.
+- Effet des flippers sur les bandes de LED : très léger. Une petite barre aux couleurs de la table part du bas de la bande et monte un peu, sans jamais dépasser la moitié de la bande.
+- LED : l'intensité des effets en partie s'applique aussi aux tables à ROM et aux tables originales dont DOF pilote les bandes. Réglée à 10 %, les bandes restent à peine visibles, quelle que soit la config DOF de la table.
 - Crédit 1 devient facultatif : une borne n'a besoin que d'un monnayeur, Crédit 1 ou Crédit 2 à 4 (boutons avancés). Sans touche, Crédit 1 n'est plus actif dans VPX, et le menu de VPX en partie, l'aide et "Annuler les changements" suivent le premier monnayeur relevé.
 - Boutons : "Annuler la dernière touche" au récapitulatif et pendant le relevé, aux flippers comme à la souris. Chaque touche relevée, passée ou remise par défaut s'annule une à une, la touche prise à un autre bouton lui est rendue, et l'écran dit ce qui a été défait, sans quitter l'étape.
 - Ouverture de l'assistant depuis le menu : l'écran dit tout de suite "Ouverture de l'assistant…" au lieu de rester inchangé pendant que l'assistant démarre ; la durée de l'ouverture est écrite dans le journal, avec un avertissement au-delà de 4 s.

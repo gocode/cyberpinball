@@ -322,6 +322,18 @@ function childText(el: XmlElement | undefined, name: string): string | undefined
 export const DOF_OWNED_MARK = 'Cyber Pinball';
 const OWNED_COMMENT = /<!--\s*(?:Écrit|Written) (?:par|by) Cyber Pinball/;
 
+/** Le Cabinet.xml est-il de Cyber Pinball (réécrit par lui) ? */
+export function isOwnedCabinetText(text: string): boolean {
+  return OWNED_COMMENT.test(text);
+}
+
+/**
+ * Élément d'un <LedStrip> où Cyber Pinball garde la luminosité décrite de la bande quand <Brightness>
+ * porte le plafond des effets en partie (dof-niveau.ts). libdof (LedStrip::FromXml) ne lit que les
+ * éléments qu'il connaît : celui-ci lui est invisible.
+ */
+export const DOF_DESCRIBED_BRIGHTNESS = 'CyberPinballBrightness';
+
 export interface DofIniFile {
   number: number;
   file: string;
@@ -488,6 +500,7 @@ function readGlobalConfig(file: string): DofGlobalConfig {
 export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8')): DofCabinetFile {
   const root = child(parseXml(text), 'Cabinet');
   if (!root) throw new Error(t('Ce n’est pas un Cabinet.xml de DOF (pas d’élément <Cabinet>).'));
+  const owned = OWNED_COMMENT.test(text);
   const controllers: DofCabinetController[] = [];
   for (const c of child(root, 'OutputControllers')?.children ?? []) {
     const leds: number[] = [];
@@ -524,7 +537,9 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
       const controller = childText(toy, 'OutputControllerName');
       const arrangement = childText(toy, 'LedStripArrangement');
       const colorOrder = childText(toy, 'ColorOrder');
-      const brightness = childText(toy, 'Brightness');
+      // Fichier de Cyber Pinball : <Brightness> porte le plafond des effets en partie (dof-niveau.ts), la
+      // luminosité décrite de la bande est gardée à côté.
+      const brightness = (owned ? childText(toy, DOF_DESCRIBED_BRIGHTNESS) : undefined) ?? childText(toy, 'Brightness');
       strips.push({
         name: toyName ?? '',
         width: Number(childText(toy, 'Width') ?? 1),
@@ -546,7 +561,7 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
     }
   }
   const auto = childText(root, 'AutoConfigEnabled');
-  return { file, owned: OWNED_COMMENT.test(text), autoConfig: auto === undefined ? true : auto.toLowerCase() === 'true', controllers, strips, equivalents, toyNames };
+  return { file, owned, autoConfig: auto === undefined ? true : auto.toLowerCase() === 'true', controllers, strips, equivalents, toyNames };
 }
 
 /**

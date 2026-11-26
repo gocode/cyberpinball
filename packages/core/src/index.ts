@@ -77,6 +77,7 @@ export * from './dmdserver';
 export * from './dof';
 export * from './dof-evenements';
 export * from './dof-repli';
+export * from './dof-niveau';
 export * from './dof-evenements-script';
 export * from './dof-scene';
 export * from './led-live';

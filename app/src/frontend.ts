@@ -105,6 +105,7 @@ import {
   loadCabinet,
   ledsFromCabinet,
   dofScenePalette,
+  classifyDofScript,
   dofScriptEvents,
   refreshDofFallback,
   scriptCode as vbsCode,
@@ -508,7 +509,7 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createLedService } from './led-live';
-import { loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame } from './dof-evenements-jeu';
+import { capDofLeds, loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame } from './dof-evenements-jeu';
 import { ledsHaveRom, rememberPinmame, rememberedPinmame, watchPinmame } from './led-rom';
 import { installationHintsIfKnown } from './installation-hints';
 import { createLedAnimations } from './led-animations';
@@ -1460,7 +1461,9 @@ function refreshRomFallback(table: TableEntry, original?: string): void {
     if (!setup) return;
     if (!libraryRomsMemo || Date.now() - libraryRomsMemo.at > 600_000) libraryRomsMemo = { at: Date.now(), roms: [...new Set(tables.flatMap((t) => romsOf(t)))] };
     const script = original ? tableScriptText(table) : undefined;
-    const events = script ? dofScriptEvents(vbsCode(script)) : undefined;
+    const code = script ? vbsCode(script) : undefined;
+    const events = code ? dofScriptEvents(code) : undefined;
+    const classes = code ? classifyDofScript(code) : undefined;
     const played = original ? [original] : [...new Set([...romsOf(table), ...loadedRoms(table.folder, romsOf(table))])];
     const tint = tints?.current()?.color;
     const p = dofScenePalette(tint, tints?.current()?.leds);
@@ -1469,7 +1472,7 @@ function refreshRomFallback(table: TableEntry, original?: string): void {
     const result = refreshDofFallback(setup, [...libraryRomsMemo.roms, ...played], {
       enabled: loadEventSettings(loc.dataDir).romFallback !== false,
       ...(tint ? { palette: (rom: string) => (playedSet.has(rom.toLowerCase()) ? colors : undefined) } : {}),
-      ...(original && events?.size ? { events: (rom: string) => (rom.toLowerCase() === original.toLowerCase() ? events : undefined) } : {}),
+      ...(original && events?.size ? { events: (rom: string) => (rom.toLowerCase() === original.toLowerCase() ? events : undefined), classes: () => classes } : {}),
     });
     if (result.refused) console.warn(`[dof] repli : ${result.refused}`);
     if (result.wrote || result.removed || result.cabinetUpdated) {
@@ -6547,6 +6550,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Le fichier d'écoute de toute partie aux LED, table à ROM comprise : si PinMAME n'y démarre pas, la partie
   // passe aux effets sans ROM sur ce fichier (led-rom.ts).
   const ledTap = ledGame ? openTap(install.exe) : undefined;
+  // Avant que libdof ne lise Cabinet.xml (ROM, relais, casque compris) : le plafond des effets en partie sur ses bandes.
+  if (simulated === undefined && capDofLeds(readDof(loc)?.cabinet, loc.dataDir, (line) => console.log(line))) dofSetupMemo = undefined;
   // Avant que libdof ne lise sa config : le repli complète celle d'une table originale qui suit peu ses événements.
   if (dofMode?.kind === 'relais' && ledTap) refreshRomFallback(table, dofMode.rom);
   let dofTap = dofMode && ledTap ? startTap(dofTapDeps, install.exe, dofMode, played.file, ledAbout(), { tap: ledTap }) : undefined;
