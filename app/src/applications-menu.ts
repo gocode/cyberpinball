@@ -20,6 +20,7 @@ import {
   DEFAULT_APPS,
   addApplication,
   appInitials,
+  appMobile,
   appScreenLabel,
   appSite,
   appsBrowserMissingText,
@@ -240,6 +241,7 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
         pager: { count: tiles.length, at: current },
         facts: [
           { icon: 'monitor', label: t('S’ouvre sur'), value: chosen.screen === 'playfield' ? t('Playfield, plein écran') : t('Fronton, plein écran') },
+          { icon: 'phone', label: t('Affichage mobile'), value: appMobile(chosen) ? t('Oui') : t('Non') },
           { icon: 'history', label: t('Dernière ouverture'), value: chosen.opened ? socialAgo(chosen.opened, now()) : t('Jamais ouverte') },
           { icon: isLocalApp(chosen) ? 'network' : 'globe', label: t('Site'), value: appSite(chosen.url) },
         ],
@@ -569,6 +571,14 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
         sections: [],
         actions: [
           { label: t('Écran'), activeChoice: appScreenLabel(a.screen), detail: t('Start : {screen}', { screen: appScreenLabel(other) }), icon: 'screens', key: 'screen', run: () => (save(updateApplication(store, id, { screen: other })), host.library.openCustom(build)) },
+          {
+            label: t('Affichage mobile'),
+            activeChoice: appMobile(a) ? t('Oui') : t('Non'),
+            detail: appMobile(a) ? t('Le site s’affiche comme sur un téléphone · Start : Non') : t('Le site s’affiche comme sur un ordinateur · Start : Oui'),
+            icon: 'phone',
+            key: 'mobile',
+            run: () => (save(updateApplication(store, id, { mobile: !appMobile(a) })), host.library.openCustom(build)),
+          },
           {
             label: t('Nom'),
             activeChoice: a.name,

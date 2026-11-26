@@ -11,7 +11,7 @@
 // fractions de l'image, la borne les convertit en pixels de la fenêtre.
 //
 // Limite connue : les vidéos protégées (Netflix, Prime Video, Disney+) sortent noires de la capture
-// d'écran ; le miroir n'y peut rien et le dit dans son aide.
+// d'écran ; le miroir n'y peut rien. Il n'affiche aucun texte d'aide : rien d'autre que l'image.
 //
 // Ce fichier est chargé avant telephone.js : il n'utilise ses globales (send, mode, state, t, $) que
 // dans des fonctions appelées plus tard.
@@ -22,9 +22,6 @@ const MIRROR_LONG_MS = 550;
 const MIRROR_SLOP = 10;
 /** Au plus 1,5 pixel d'image par pixel CSS : au-delà, l'image ne gagne rien et la liaison s'alourdit. */
 const MIRROR_DENSITY_MAX = 1.5;
-/** L'aide des gestes ne reste jamais longtemps : elle part dès la première image, ou au premier appui. */
-const MIRROR_HINT_MS = 2500;
-
 const mirror = {
   /** La borne annonce que cette fenêtre se capture (message « page »). */
   available: false,
@@ -44,7 +41,6 @@ const mirror = {
   landscape: false,
   /** L'image est dessinée tournée d'un quart de tour : paysage dans une place en portrait. */
   turned: false,
-  hintTimer: undefined,
 };
 
 try {
@@ -73,8 +69,8 @@ function mirrorWanted() {
 
 /**
  * Une fenêtre en paysage (le fronton) dans une place en portrait : l'image est tournée d'un quart de tour
- * pour remplir la place, et on penche le téléphone pour la lire ; la page reste en portrait (verrou
- * d'orientation demandé à l'ouverture du miroir, sans quoi une rotation du téléphone changerait la page).
+ * pour remplir la place, et on pivote le téléphone pour la lire. Si la page passe en paysage (téléphone
+ * pivoté, verrou accordé), la place est plus large que haute : l'image est alors droite (mirrorLockOrientation).
  */
 function mirrorTurns(landscape, areaW, areaH) {
   return landscape && areaH > areaW;
@@ -122,19 +118,25 @@ function mirrorChoose(on) {
   mirror.choice = on;
   mirrorRemember();
   mirror.broken = false;
-  if (on) mirrorHint();
-  mirrorLockPortrait(on);
+  // Aucun texte d'aide en miroir : rien d'autre que l'image (ou, avant elle, un point qui pulse).
+  mirrorLockOrientation();
   // Retour au pavé : la borne s'arrête (mirrorSync), et plus rien de l'image ne reste affiché ni attendu.
   if (!on) mirrorClear();
   mirrorRefresh();
 }
 
-/** Garde la page en portrait pendant le miroir (Android : seulement en plein écran ; ailleurs sans effet, la place s'adapte alors toute seule). */
-function mirrorLockPortrait(on) {
+/**
+ * Orientation de la page pendant le miroir : verrouillée sur celle de la fenêtre montrée, pour que la page
+ * ne se retourne pas quand on pivote le téléphone. Une fenêtre en paysage (le fronton) : paysage, et on
+ * pivote le téléphone pour la lire ; une fenêtre en portrait (TikTok sur le playfield) : portrait. Hors miroir : libre.
+ * Android n'accorde le verrou qu'en plein écran, iOS jamais : sans verrou, la place s'adapte toute seule
+ * (image tournée d'un quart de tour dans une page en portrait, droite dans une page en paysage ; mirrorTurns).
+ */
+function mirrorLockOrientation() {
   try {
     const o = screen.orientation;
     if (!o) return;
-    if (on) o.lock?.('portrait')?.catch?.(() => undefined);
+    if (mirror.choice) o.lock?.(mirror.landscape ? 'landscape' : 'portrait')?.catch?.(() => undefined);
     else o.unlock?.();
   } catch {
     // Verrou refusé ou absent.
@@ -149,13 +151,6 @@ function mirrorClear() {
   mirror.hasFrame = false;
   mirrorView.classList.remove('has-frame');
   mirrorContext.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
-}
-
-/** L'aide est visible un moment à chaque ouverture du miroir, puis s'efface. */
-function mirrorHint() {
-  mirrorView.classList.add('hinting');
-  clearTimeout(mirror.hintTimer);
-  mirror.hintTimer = setTimeout(() => mirrorView.classList.remove('hinting'), MIRROR_HINT_MS);
 }
 
 mirrorTabs.pad.addEventListener('click', () => mirrorChoose(false));
@@ -240,14 +235,14 @@ async function mirrorFrame(m) {
       mirrorPaint();
       mirror.hasFrame = true;
       mirror.broken = false;
-      // Le texte d'aide part dès que l'image est là.
-      clearTimeout(mirror.hintTimer);
-      mirrorView.classList.remove('hinting');
       mirrorView.classList.add('has-frame');
       mirrorView.classList.remove('broken');
       send({ t: 'mirror-ack', n: m.n });
       // Le sens de l'image vient d'être connu : la borne prépare la taille pour la place telle qu'elle est montrée.
-      if (changed) mirrorSync();
+      if (changed) {
+        mirrorSync();
+        mirrorLockOrientation();
+      }
     } else {
       bitmap.close?.();
     }
@@ -310,8 +305,6 @@ function mirrorFlush() {
 
 mirrorView.addEventListener('pointerdown', (e) => {
   if (state !== 'paired' || !mirror.hasFrame) return;
-  clearTimeout(mirror.hintTimer);
-  mirrorView.classList.remove('hinting');
   mirrorView.setPointerCapture(e.pointerId);
   mirrorPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   e.preventDefault();

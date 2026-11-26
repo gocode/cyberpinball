@@ -490,6 +490,7 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
     setPointerCapture: () => undefined,
   };
   const calls: string[] = [];
+  const locks: string[] = [];
   const context2d = { clearRect: () => undefined, setTransform: () => calls.push('setTransform'), translate: () => calls.push('translate'), rotate: () => calls.push('rotate'), drawImage: () => calls.push('drawImage') };
   const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: () => undefined };
   const tab = { setAttribute: () => undefined, addEventListener: () => undefined };
@@ -498,7 +499,7 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
     document: { getElementById: (id: string) => elements[id], addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
     window: { devicePixelRatio: 1, addEventListener: () => undefined },
     sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
-    screen: {},
+    screen: { orientation: { lock: (o: string) => (locks.push(o), Promise.resolve()), unlock: () => locks.push('unlock') } },
     navigator: {},
     atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
     Blob,
@@ -517,7 +518,7 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
   vm.runInContext('mirror.available = true; mirror.choice = true;', context);
   // JSON : les objets d'un autre contexte vm ne passent pas deepEqual.
   const run = <T>(code: string) => { const v = vm.runInContext(code, context) as unknown; return (v === undefined || typeof (v as { then?: unknown }).then === 'function' ? v : JSON.parse(JSON.stringify(v))) as T; };
-  return { sent, classes, canvas, calls, run, frame: () => run<Promise<void>>("mirrorFrame({ n: 1, d: 'eA==' })") };
+  return { sent, classes, canvas, calls, locks, run, frame: () => run<Promise<void>>("mirrorFrame({ n: 1, d: 'eA==' })") };
 }
 
 test('page du téléphone : le fronton (paysage) dans la place en portrait est tourné d\'un quart de tour, et un appui retombe au bon endroit', async () => {
@@ -557,12 +558,29 @@ test('page du téléphone : la borne prépare l\'image pour la place tournée, e
   assert.equal(sideways.run('mirror.turned'), false);
 });
 
-test('page du téléphone : le texte d\'aide s\'efface dès la première image, et le verrou de portrait est demandé', async () => {
+test('page du téléphone : aucun texte en miroir (ni aide ni attente), seulement l\'image ou un point', async () => {
+  const mirrorBlock = phonePage.slice(phonePage.indexOf('<div class="mirror" id="mirror">'), phonePage.indexOf('<div class="pad" id="pad">'));
+  const texts = [...mirrorBlock.matchAll(/data-i18n>([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(texts, ['La borne n\'arrive pas à capturer la fenêtre. Reviens au pavé.'], 'le seul texte est l\'erreur de capture');
+  assert.equal(/hinting|mirrorHint/.test(phoneMirror), false, 'plus d\'aide temporaire');
   const page = loadMirrorPage({ width: 400, height: 800 }, { width: 1080, height: 1920 });
-  page.run('mirrorHint()');
-  assert.ok(page.classes.has('hinting'));
   await page.frame();
-  assert.equal(page.classes.has('hinting'), false, 'aide partie avec la première image');
   assert.ok(page.classes.has('has-frame'));
-  assert.match(phoneMirror, /orientation[\s\S]*lock\?\.\('portrait'\)/, 'verrou de portrait demandé (sans effet là où il est refusé)');
+  assert.equal(page.classes.has('hinting'), false);
+});
+
+test('page du téléphone : la page est verrouillée dans le sens de la fenêtre montrée, libérée au retour au pavé', async () => {
+  // Le fronton (paysage) : paysage ; TikTok sur le playfield (portrait) : portrait ; retour au pavé : libre.
+  const landscape = loadMirrorPage({ width: 400, height: 800 }, { width: 1920, height: 1080 });
+  landscape.run('mirror.choice = false; mirrorChoose(true)');
+  assert.deepEqual(landscape.locks, ['portrait'], 'avant la première image : portrait');
+  await landscape.frame();
+  assert.deepEqual(landscape.locks, ['portrait', 'landscape'], 'image en paysage : verrou en paysage');
+  landscape.run('mirrorChoose(false)');
+  assert.equal(landscape.locks.at(-1), 'unlock');
+
+  const portrait = loadMirrorPage({ width: 400, height: 800 }, { width: 1080, height: 1920 });
+  portrait.run('mirror.choice = false; mirrorChoose(true)');
+  await portrait.frame();
+  assert.deepEqual(portrait.locks, ['portrait'], 'fenêtre en portrait : le portrait reste');
 });

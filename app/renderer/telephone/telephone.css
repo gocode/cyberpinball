@@ -493,17 +493,30 @@ body.typing[data-miroir] .mirror-seg {
   display: flex;
 }
 
-/* L'aide des gestes se pose par-dessus l'image un moment, puis s'efface. */
-.mirror.hinting .mirror-gestures {
-  display: flex;
-  background: rgba(0, 0, 0, 0.72);
-  color: var(--ink);
+/* Attente de la première image : un point, jamais de texte. */
+.mirror-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--signal);
+  animation: mirror-pulse 1.1s ease-in-out infinite;
 }
 
-.mirror-limit {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--ink-muted);
+@keyframes mirror-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mirror-dot {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .mirror.broken #mirror-broken {

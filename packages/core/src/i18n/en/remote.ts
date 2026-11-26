@@ -32,9 +32,6 @@ export const messages: Record<string, string> = {
   // Miroir du navigateur (telephone-miroir.js)
   Pavé: 'Pad',
   Miroir: 'Mirror',
-  "Image du navigateur en cours d'arrivée…": 'Waiting for the browser image…',
-  'Glisse pour défiler': 'Swipe to scroll',
-  "Les vidéos protégées (Netflix, Prime Video, Disney+) s'affichent en noir.": 'Protected videos (Netflix, Prime Video, Disney+) show up black.',
   "La borne n'arrive pas à capturer la fenêtre. Reviens au pavé.": "The cabinet can't capture the window. Go back to the pad.",
   Masquer: 'Hide',
   'Champ suivant': 'Next field',

@@ -16,6 +16,7 @@ import {
   JUKEBOX_SEEK_EVERY_MS,
   JUKEBOX_SEEK_HOLD_MS,
   appBrowserArgs,
+  appMobile,
   appButtonKey,
   appSeekKeyCount,
   chromeExePaths,
@@ -108,7 +109,7 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
     current?.finish();
     fs.mkdirSync(profile, { recursive: true });
     // Edge est l'application elle-même : sa fenêtre doit se voir.
-    const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url)], { stdio: 'ignore' }); // fenêtre voulue
+    const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app))], { stdio: 'ignore' }); // fenêtre voulue
     child.once('error', () => undefined);
     log(`Applications : ${app.name} ouverte dans ${found.kind === 'edge' ? 'Edge' : 'Chrome'} (${Math.round(at.width)} × ${Math.round(at.height)} en ${Math.round(at.x)}, ${Math.round(at.y)})`); // i18n-ignore : journal
     let win: unknown;

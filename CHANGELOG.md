@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Miroir du téléphone : plus aucun texte en miroir (ni aide des gestes, ni message d'attente : un simple point qui pulse avant la première image). La page se verrouille dans le sens de la fenêtre montrée : paysage pour le fronton (on pivote le téléphone pour le lire), portrait pour une fenêtre en portrait ; le verrou est libéré au retour au pavé. Là où le navigateur refuse le verrou (Android hors plein écran, iPhone), l'image est tournée d'un quart de tour dans la page en portrait, et droite dans la page en paysage.
+- Applications : nouvelle option « Affichage mobile » (Oui par défaut) dans les réglages de chaque application et sur sa fiche. En Oui, Edge s'ouvre avec l'en-tête de navigateur d'un téléphone Android et le site rend sa version mobile ; en Non, le site s'affiche comme sur un ordinateur (utile si un site refuse la version mobile).
 - Root Access : la musique de fond et les bruitages suivent les volumes réglés dans la roue (musique, sons de l'interface) et sont nettement plus forts qu'avant.
 - PuP-Packs : le plugin PuP de VPX corrigé (« patched Cyber Pinball 8 ») reprend celui de la version de développement de VPX. Les vidéos d'un écran PuP qui n'est pas affiché (DMD, topper) se terminent maintenant à l'heure, la file d'attente avance, la musique de fond démarre, et les sons du pack ne se superposent plus. Le plugin des versions publiées de VPX gardait ces vidéos figées : la suite du pack ne venait jamais.
 - PuP-Packs : comme dans PinUP Player, une table qui redéclare une playlist depuis son script en change maintenant l'ordre et le temps de repos. Sur Stranger Things 4, les annonces et les sons d'une même playlist étaient sautés pendant 30 secondes.

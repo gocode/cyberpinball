@@ -37,6 +37,12 @@ export interface AppEntry {
   name: string;
   url: string;
   screen: AppScreen;
+  /**
+   * Affichage mobile : le navigateur se présente comme un téléphone (en-tête User-Agent mobile) et le site
+   * rend sa version mobile, souvent la mieux adaptée à un écran de borne (TikTok, YouTube…). Absent : oui ;
+   * seul « non » s'écrit (appMobile).
+   */
+  mobile?: boolean;
   /** Teinte de la tuile composée (#rrggbb), et du halo de l'icône. */
   color: string;
   /** Fichier de l'icône relevée sur le site, dans APPLICATIONS_ICON_DIR ; absent : tuile composée. */
@@ -446,6 +452,7 @@ function cleanApp(v: unknown): AppEntry | undefined {
     name: name.slice(0, 40),
     url,
     screen: APP_SCREENS.includes(r.screen as AppScreen) ? (r.screen as AppScreen) : 'backglass',
+    ...(r.mobile === false ? { mobile: false } : {}),
     color: cleanColor(r.color) ?? appColorFor(name),
     // Un nom de fichier seul : jamais un chemin qui sortirait du dossier des icônes.
     ...(icon && /^[a-z0-9-]+\.(png|jpg|webp|gif)$/.test(icon) ? { icon } : {}),
@@ -523,15 +530,27 @@ export function chromeExePaths(env: Record<string, string | undefined>): string[
 export const EDGE_DOWNLOAD_URL = 'https://www.microsoft.com/edge/download';
 
 /**
+ * En-tête User-Agent d'un téléphone Android (Edge mobile) : les sites répondent en version mobile. Un
+ * seul en-tête change ; aucun port de débogage ni émulation pilotée dans Edge.
+ */
+export const APP_MOBILE_USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 EdgA/131.0.0.0';
+
+/** L'application s'affiche-t-elle en version mobile ? Oui tant que « non » n'a pas été choisi. */
+export function appMobile(app: Pick<AppEntry, 'mobile'>): boolean {
+  return app.mobile !== false;
+}
+
+/**
  * Edge (ou Chrome) d'une application : fenêtre d'application (ni barre d'adresse ni onglets), posée
  * sur l'écran voulu puis en plein écran, lecture automatique permise (la télécommande n'est pas un
  * clic de souris). Aucun port de débogage.
  */
-export function appBrowserArgs(profile: string, at: ScreenRect, url: string): string[] {
+export function appBrowserArgs(profile: string, at: ScreenRect, url: string, mobile = false): string[] {
   return [
     `--user-data-dir=${profile}`,
     ...EDGE_QUIET_ARGS,
     '--autoplay-policy=no-user-gesture-required',
+    ...(mobile ? [`--user-agent=${APP_MOBILE_USER_AGENT}`] : []),
     `--window-position=${Math.round(at.x)},${Math.round(at.y)}`,
     `--window-size=${Math.max(1, Math.round(at.width))},${Math.max(1, Math.round(at.height))}`,
     '--start-fullscreen',

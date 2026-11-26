@@ -248,15 +248,8 @@
       </div>
       <div class="mirror" id="mirror">
         <canvas class="mirror-canvas" id="mirror-canvas" width="1" height="1"></canvas>
-        <div class="mirror-hint" id="mirror-wait">
-          <span data-i18n>Image du navigateur en cours d'arrivée…</span>
-        </div>
-        <div class="mirror-hint mirror-gestures" id="mirror-gestures">
-          <span data-i18n>Touche pour cliquer</span>
-          <span data-i18n>Glisse pour défiler</span>
-          <span data-i18n>Appui long pour le clic droit</span>
-          <span class="mirror-limit" data-i18n>Les vidéos protégées (Netflix, Prime Video, Disney+) s'affichent en noir.</span>
-        </div>
+        <!-- Aucun texte pendant le miroir : un point qui pulse tant que la première image n'est pas là. -->
+        <div class="mirror-hint" id="mirror-wait" aria-hidden="true"><span class="mirror-dot"></span></div>
         <div class="mirror-hint mirror-broken" id="mirror-broken">
           <span data-i18n>La borne n'arrive pas à capturer la fenêtre. Reviens au pavé.</span>
         </div>

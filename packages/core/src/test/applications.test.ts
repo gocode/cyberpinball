@@ -12,7 +12,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   addApplication,
+  APP_MOBILE_USER_AGENT,
+  appBrowserArgs,
   appIdFor,
+  appMobile,
   appInitials,
   appScreenLabel,
   appSite,
@@ -28,6 +31,7 @@ import {
   sameSite,
   saveApplications,
   turnPlayfieldForApp,
+  updateApplication,
   type AppEntry,
 } from '../applications';
 import { toPhysicalScreen } from '../fingerprint';
@@ -456,4 +460,32 @@ test('frontend.ts : médaillon juste après le Juke-box, icônes servies, applic
   // Le playfield tourné pour l'application : le crochet du menu est branché sur la rotation de session (oublié le 26/11/2026).
   const menuHost = front.slice(front.indexOf('createApplicationsMenu({'), front.indexOf('createGameReturn({'));
   assert.match(menuHost, /portrait: \(\) => orientationForApp\(\)/);
+});
+
+test('affichage mobile : oui par défaut, seul « non » s\'écrit, et l\'en-tête User-Agent mobile part avec Edge', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-mobile-'));
+  after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const base = { id: 'ok', name: 'Fictive', url: 'https://fictive.example.com/', screen: 'backglass' as const, color: '#112233', added: 'x' };
+  // Une liste écrite avant l'option : oui.
+  saveApplications(dir, { apps: [base, { ...base, id: 'non', url: 'https://non.example.com/', mobile: false }, { ...base, id: 'oui', url: 'https://oui.example.com/', mobile: true }] });
+  const loaded = loadApplications(dir);
+  saveApplications(dir, loaded);
+  const raw = fs.readFileSync(path.join(dir, 'applications.json'), 'utf8');
+  assert.equal(raw.includes('"mobile": true'), false, 'oui n\'est jamais écrit : c\'est l\'absence de choix');
+  assert.equal(raw.includes('"mobile": false'), true, 'non s\'écrit');
+  assert.deepEqual(loaded.apps.map((a) => appMobile(a)), [true, false, true]);
+  // Le réglage : non, puis oui de nouveau (le champ disparaît).
+  const off = updateApplication(loaded, 'ok', { mobile: false });
+  assert.equal(appMobile(off.apps[0]!), false);
+  const on = updateApplication(off, 'ok', { mobile: true });
+  assert.equal(appMobile(on.apps[0]!), true);
+  assert.equal('mobile' in on.apps[0]!, false);
+  // Les applications ajoutées sont en affichage mobile.
+  const added = addApplication({ apps: [] }, { name: 'Neuve', url: 'https://neuve.example.com/' });
+  assert.ok(added.ok && appMobile(added.app));
+  // Les arguments d'Edge : l'en-tête mobile seulement quand l'option est active.
+  const at = { x: 0, y: 0, width: 1920, height: 1080 };
+  assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes(`--user-agent=${APP_MOBILE_USER_AGENT}`));
+  assert.equal(appBrowserArgs('p', at, 'https://a.example.com/', false).some((a) => a.startsWith('--user-agent')), false);
+  assert.match(APP_MOBILE_USER_AGENT, /Android[\s\S]*Mobile/);
 });

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Phone mirror: no text at all in mirror mode (no gesture help, no waiting message: just a pulsing dot before the first image). The page locks to the orientation of the window shown: landscape for the backglass (turn the phone to read it), portrait for a portrait window; the lock is released when going back to the pad. Where the browser refuses the lock (Android outside full screen, iPhone), the image is turned a quarter turn in the portrait page, and upright in the landscape page.
+- Applications: new "Mobile display" option (Yes by default) in each application's settings and on its sheet. When Yes, Edge opens with the browser header of an Android phone and the site renders its mobile version; when No, the site shows as on a computer (useful if a site refuses the mobile version).
 - Root Access: the background music and the sound effects follow the volumes set in the wheel (music, interface sounds) and are much louder than before.
 - PuP-Packs: the PuP plugin of the patched VPX ("patched Cyber Pinball 8") now follows the one of the VPX development version. Videos on a PuP screen that is not displayed (DMD, topper) now end on time, the queue moves on, the background music starts, and the pack's sounds no longer overlap. The plugin of released VPX versions kept these videos frozen, so the rest of the pack never came.
 - PuP-Packs: like in PinUP Player, a table that declares a playlist again from its script now changes its order and rest time. On Stranger Things 4, callouts and sounds of the same playlist were skipped for 30 seconds.
