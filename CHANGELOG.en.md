@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Root Access: a lost ball keeps falling into the floor below at the same speed instead of going back to the plunger; the backglass and DMD now show the game display even when the Jukebox was selected in the wheel; the background music is a little louder.
 - Phone mirror: the help text disappears as soon as the first image arrives (or on the first touch). A landscape window (the backglass) is shown turned a quarter turn to fill the pad area: tilt the phone to read it, the page stays in portrait (orientation lock requested where the browser allows it).
 - Touch pad on an Edge application: the cabinet now always follows the largest Edge window (not an Edge bubble that trapped the pointer in a small rectangle at the top of the screen), and the log records the rectangle the pad acts on.
 - PuP-Packs: a name with a leading or trailing space in a .pup file (playlist, video, screen mode, trigger) is now fixed before the game. PinUP Popper ignored those spaces, VPX's PUP plugin does not: the video or trigger never played.

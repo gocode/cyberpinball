@@ -1778,7 +1778,7 @@ function jukeboxShown(): boolean {
 
 /** Le médaillon est choisi dans la roue (pas en mode attente, qui montre une table). */
 function onJukebox(): boolean {
-  return jukeboxShown() && state.medallion === 'jukebox' && !attractTable();
+  return jukeboxShown() && state.medallion === 'jukebox' && !attractTable() && !rootAccess.isOpen();
 }
 
 /** Le médaillon Communauté est dans la roue (réglage « Communauté dans la roue ») ; jamais en mode invité, qui ferme la communauté, ni en jeu local. */
@@ -1801,7 +1801,7 @@ function socialClosed(): boolean {
 
 /** Le médaillon Communauté est choisi dans la roue. */
 function onCommunity(): boolean {
-  return communityShown() && state.medallion === 'community' && !attractTable();
+  return communityShown() && state.medallion === 'community' && !attractTable() && !rootAccess.isOpen();
 }
 
 /**
@@ -1814,7 +1814,7 @@ function arenaShown(): boolean {
 
 /** Le médaillon Arène est choisi dans la roue. */
 function onArena(): boolean {
-  return arenaShown() && state.medallion === 'arena' && !attractTable();
+  return arenaShown() && state.medallion === 'arena' && !attractTable() && !rootAccess.isOpen();
 }
 
 /**
@@ -1827,7 +1827,7 @@ function collectionsShown(): boolean {
 
 /** Le médaillon Collections est choisi dans la roue. */
 function onCollections(): boolean {
-  return collectionsShown() && state.medallion === 'collections' && !attractTable();
+  return collectionsShown() && state.medallion === 'collections' && !attractTable() && !rootAccess.isOpen();
 }
 
 /**
@@ -1840,10 +1840,10 @@ function applicationsShown(): boolean {
 
 /** Le médaillon Applications est choisi dans la roue. */
 function onApplications(): boolean {
-  return applicationsShown() && state.medallion === 'applications' && !attractTable();
+  return applicationsShown() && state.medallion === 'applications' && !attractTable() && !rootAccess.isOpen();
 }
 
-/** Un médaillon (Juke-box, Applications, Communauté, Arène, Collections) est choisi : rien de ce qui parle d'une table ne s'applique. */
+/** Un médaillon (Juke-box, Applications, Communauté, Arène, Collections) est choisi (pas pendant Root Access : le jeu a ses propres écrans, même si la combinaison de flips a fait tourner la roue jusqu'à un médaillon) : rien de ce qui parle d'une table ne s'applique. */
 function onMedallion(): boolean {
   return onJukebox() || onApplications() || onCommunity() || onArena() || onCollections();
 }

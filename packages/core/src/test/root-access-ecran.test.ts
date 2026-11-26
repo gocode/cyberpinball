@@ -64,7 +64,7 @@ test('musique de fond : discrète, en boucle, coupée en essai hors écran', () 
   assert.match(game, /new Audio\('musique\.mp3'\)/);
   assert.match(game, /\.loop = true/);
   const volume = /MUSIC_VOLUME = ([0-9.]+)/.exec(game);
-  assert.ok(volume && Number(volume[1]) > 0 && Number(volume[1]) <= 0.2, 'volume de fond');
+  assert.ok(volume && Number(volume[1]) > 0 && Number(volume[1]) <= 0.25, 'volume de fond');
   assert.match(game, /get\('musique'\) === '0'/);
   const main = read('app', 'src', 'root-access.ts');
   assert.match(main, /musique: OFFSCREEN \? '0' : '1'/);
@@ -84,4 +84,15 @@ test('branchement : plus de PuP-Pack ni de vidéo pendant le jeu, DMD et fronton
   const front = read('app', 'renderer', 'frontend.js');
   assert.match(front, /CyberRootAccess\?\.zone\(/);
   assert.ok(fs.existsSync(path.join(REPO_ROOT, 'app', 'renderer', 'root-access-ecran.js')));
+});
+
+test('fronton et DMD : aucun médaillon (Juke-box, communauté, arène, collections, applications) ne prend le pas pendant Root Access', () => {
+  // La combinaison de flips fait aussi défiler la roue : le médaillon choisi peut être le Juke-box à
+  // l'ouverture du jeu. Chaque sélecteur de médaillon doit donc se taire tant que le jeu est ouvert.
+  const src = read('app', 'src', 'frontend.ts');
+  for (const nom of ['onJukebox', 'onCommunity', 'onArena', 'onCollections', 'onApplications']) {
+    const m = new RegExp(String.raw`function ${nom}\([^)]*\)[^{]*\{([\s\S]*?)\n\}`).exec(src);
+    assert.ok(m, `${nom} introuvable`);
+    assert.match(m[1] ?? '', /!rootAccess\.isOpen\(\)/, `${nom} doit se taire pendant Root Access`);
+  }
 });

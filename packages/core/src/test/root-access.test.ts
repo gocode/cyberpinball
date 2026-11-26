@@ -397,22 +397,32 @@ test('bille perdue au premier étage : la partie est perdue', () => {
   assert.equal(g.events.filter((e) => e.type === 'descente').length, 0);
 });
 
-test('bille perdue à l\'étage 2 ou plus : elle redescend d\'un étage, score gardé, étage à rejouer', () => {
+/** Pas à pas jusqu'à ce que la bille quitte l'étage (perdue) ; rend le nombre de pas faits. */
+function jusquaLaChute(g: FloorGame, depuis: number): void {
+  for (let i = 0; i < 600 && g.floor === depuis; i++) E.step(g, NONE);
+}
+
+test('bille perdue à l\'étage 2 ou plus : elle poursuit sa chute dans l\'étage du dessous, même vitesse, sans lanceur', () => {
   const g = EF.createGame(LEVELS) as FloorGame;
   EF.enterFloor(g, 2);
   g.score = 1234;
-  perdre(g);
-  run(g, 0.5);
-  assert.equal(g.status, 'descente');
+  EF.release(g);
+  g.saveT = 0;
+  Object.assign(g.ball, { x: 360, y: 1300, vx: -80, vy: 500 });
+  jusquaLaChute(g, 2);
   assert.equal(g.events.filter((e) => e.type === 'descente').length, 1);
   assert.equal(g.events.filter((e) => e.type === 'perdue').length, 0);
-  run(g, 0.2);
-  assert.ok(g.camera < 2 && g.camera > 1, `la caméra glisse vers l'étage du dessous (${g.camera})`);
-  run(g, EF.DESCENTE + 0.2);
   assert.equal(g.floor, 1, 'étage du dessous');
-  assert.equal(g.camera, 1);
-  assert.equal(g.status, 'cradle', 'la bille attend au lanceur');
-  assert.equal(g.score, 1234, 'le score reste');
+  assert.equal(g.status, 'play', 'la bille tombe en jeu, elle ne repasse pas par le lanceur');
+  assert.ok(g.ball.vy >= 400, `elle garde sa vitesse de chute (${g.ball.vy})`);
+  assert.ok(g.ball.vx < -40, `et sa dérive (${g.ball.vx})`);
+  assert.ok(g.camera > 1 && g.camera <= 2, `la caméra suit la chute (${g.camera})`);
+  run(g, EF.DESCENTE + 0.2);
+  // Sans palette, la bille traverse aussi l'étage 1 et poursuit sa chute : la caméra reste
+  // toujours entre l'étage courant et celui du dessus, sans saut.
+  assert.ok(g.camera >= g.floor && g.camera <= g.floor + 1, `caméra sur l'étage courant (${g.camera} / ${g.floor})`);
+  assert.ok(g.score >= 1234, `le score reste (${g.score})`);
+  assert.notEqual(g.status, 'cradle');
 });
 
 test('bille perdue : on redescend étage par étage jusqu\'au premier, qui seul perd la partie', () => {
@@ -420,9 +430,8 @@ test('bille perdue : on redescend étage par étage jusqu\'au premier, qui seul 
   EF.enterFloor(g, FLOORS - 1);
   for (let k = FLOORS - 1; k > 0; k--) {
     perdre(g);
-    run(g, 0.5 + EF.DESCENTE + 0.2);
+    jusquaLaChute(g, k);
     assert.equal(g.floor, k - 1);
-    assert.equal(g.status, 'cradle');
   }
   perdre(g);
   run(g, 0.5);

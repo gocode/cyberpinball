@@ -218,6 +218,7 @@
   }
 
   function enterFloor(g, k) {
+    g.descente = null;
     g.floor = k;
     g.camera = k;
     g.f = buildFloor(g.levels[k]);
@@ -594,13 +595,35 @@
     }
   }
 
-  // Bille perdue sous les flips : elle ne tue plus qu'au premier étage ; ailleurs, elle redescend d'un étage
-  // (qu'il faut rejouer : il est reconstruit à l'arrivée), score gardé. L'étage perdu se rejoue ensuite en remontant.
+  // Bille perdue sous les flips : elle ne tue plus qu'au premier étage ; ailleurs, elle poursuit sa chute dans
+  // l'étage du dessous (reconstruit à l'arrivée : il se rejoue), par le haut, avec la vitesse qu'elle avait, sans
+  // repasser par le lanceur ; score gardé. La caméra suit la chute pendant que la partie continue (g.descente).
+  // Le bas d'un étage est le haut de celui d'en dessous : même x, y local - H. Sous la sortie de l'étage, que la
+  // bille ne retraverse pas (elle remonterait aussitôt).
   function startDescente(g) {
-    g.status = 'descente'; g.statusT = 0;
-    g.descente = { from: g.floor };
-    emit(g, { type: 'descente', from: g.floor });
-    say(g, 'BILLE PERDUE : RETOUR À L’ÉTAGE ' + g.floor, 'warning', 2.5);
+    const from = g.floor;
+    const b = g.ball;
+    const vx = b.vx, vy = Math.max(b.vy, 120), x = b.x, y = b.y - H;
+    g.floor = from - 1;
+    g.f = buildFloor(g.levels[g.floor]);
+    g.floorT = 0;
+    if (g.f.aimant != null) g.aimant = g.f.aimant;
+    const haut = (g.f.exit ? g.f.exit.y2 : 0) + BALL_R + 6;
+    b.x = clamp(x, BALL_R + 30, W - BALL_R - 30);
+    b.y = Math.max(y, haut);
+    b.vx = vx; b.vy = vy;
+    g.status = 'play'; g.statusT = 0;
+    g.charge = 0; g.charging = false;
+    g.tire = false; g.tirette = [];
+    g.prise = null;
+    g.immobile = null;
+    g.secousses = 0;
+    g.saveT = 0;
+    g.f.departs++;
+    g.camera = from;
+    g.descente = { from, t: 0 };
+    emit(g, { type: 'descente', from });
+    say(g, 'BILLE PERDUE : RETOUR À L’ÉTAGE ' + from, 'warning', 2.5);
   }
 
   function startTransit(g) {
@@ -615,6 +638,7 @@
     }
     g.status = 'transit';
     g.statusT = 0;
+    g.descente = null;
     const c = g.levels[next].cradle;
     g.transit = { from: g.floor, ex: b.x, ey: b.y, cx: c.x, cy: c.y };
   }
@@ -653,6 +677,13 @@
     input = input || { left: false, right: false };
     g.t++;
     if (g.msg.t > 0) g.msg.t -= DT;
+    if (g.descente) {
+      // La caméra glisse d'un étage vers celui où la bille tombe ; la partie, elle, continue.
+      g.descente.t += DT;
+      const u = clamp(g.descente.t / DESCENTE, 0, 1);
+      g.camera = g.descente.from - u * u * (3 - 2 * u);
+      if (u >= 1) { g.descente = null; g.camera = g.floor; }
+    }
     switch (g.status) {
       case 'cradle':
         g.statusT += DT;
@@ -682,13 +713,6 @@
         tickTimers(g, DT);
         if (g.statusT >= FALL) toCradle(g);
         break;
-      case 'descente': {
-        g.statusT += DT;
-        const u = clamp(g.statusT / DESCENTE, 0, 1);
-        g.camera = g.descente.from - u * u * (3 - 2 * u);
-        if (g.statusT >= DESCENTE) { const to = g.descente.from - 1; g.descente = null; enterFloor(g, to); }
-        break;
-      }
       case 'transit': {
         g.statusT += DT;
         const u = clamp(g.statusT / TRANSIT, 0, 1);

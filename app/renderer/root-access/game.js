@@ -34,7 +34,7 @@
   // Une boucle (musique.mp3) très en retrait : elle comble le silence sans se mêler aux bruitages (master 0,22
   // de fx.js) ni lasser. Entrée en fondu, arrêtée avec la fenêtre. Dans Cyber Pinball, `musique=0` la coupe
   // (essais hors écran : aucun son) ; seule, la page la lance au premier geste (politique de lecture du navigateur).
-  const MUSIC_VOLUME = 0.1;
+  const MUSIC_VOLUME = 0.18;
   const MUSIC_FADE_MS = 2500;
   const musique = new Audio('musique.mp3');
   musique.loop = true;
