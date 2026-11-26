@@ -93,3 +93,47 @@ test('contrôle parental : parcours Electron avec les flippers, annulation, mauv
     assert.match(JSON.stringify(views[16]), /Ocean\.png/, 'le jeu autorisé retrouve ses médias');
   } finally { removeTempDir(dir); }
 });
+
+test('contrôle parental : les quatre cases restent cadrées à 0, 90, 180 et 270 degrés', { skip: !electron, timeout: 45_000 }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-parental-orientation-'));
+  try {
+    const entry = path.join(dir, 'rotations.cjs');
+    const output = path.join(dir, 'rotations.json');
+    const style = ['frontend.css', 'parental-pin.css'].map((name) => fs.readFileSync(path.join(REPO_ROOT, 'app/renderer', name), 'utf8')).join('\n');
+    const renderer = fs.readFileSync(path.join(REPO_ROOT, 'app/renderer/parental-pin.js'), 'utf8');
+    fs.writeFileSync(entry, [
+      'const fs = require("node:fs");',
+      'const { app, BrowserWindow } = require("electron");',
+      'app.whenReady().then(async () => {',
+      '  const win = new BrowserWindow({ width: 1920, height: 1080, show: false, frame: false, webPreferences: { offscreen: true } });',
+      '  const html = "<!doctype html><style>" + ' + JSON.stringify(style) + ' + "</style><div id=parental-pin hidden></div>";',
+      '  await win.loadURL("data:text/html," + encodeURIComponent(html));',
+      '  await win.webContents.executeJavaScript(' + JSON.stringify(renderer) + ');',
+      '  const result = await win.webContents.executeJavaScript(' + JSON.stringify(`[0,90,180,270].map(rotation => {
+        document.documentElement.dataset.rotation = String(rotation);
+        window.CyberParentalPin({title:'PIN', digits:['●','0','—','—'], index:1, hint:''});
+        const root = document.querySelector('#parental-pin');
+        const area = root.getBoundingClientRect();
+        const digits = [...root.querySelectorAll('.parental-pin-digit')].map(b => {
+          const r=b.getBoundingClientRect();
+          return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,label:b.textContent};
+        });
+        return {rotation,transform:getComputedStyle(root).transform,area:{x:area.x,y:area.y,right:area.right,bottom:area.bottom},digits};
+      })`) + ');',
+      '  fs.writeFileSync(' + JSON.stringify(output) + ', JSON.stringify(result));',
+      '  win.destroy(); app.exit(0);',
+      '}).catch(error => { console.error(error); app.exit(1); });',
+    ].join('\n'));
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    const run = runElectron(electron!, [entry, '--user-data-dir=' + path.join(dir, 'chromium')], { dir, env, cwd: REPO_ROOT, timeout: 35_000 });
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    const views = JSON.parse(fs.readFileSync(output, 'utf8')) as { rotation: number; transform: string; area: { x: number; y: number; right: number; bottom: number }; digits: { x: number; y: number; right: number; bottom: number; label: string }[] }[];
+    assert.deepEqual(views.map((v) => v.rotation), [0, 90, 180, 270]);
+    for (const { digits, area, rotation, transform } of views) {
+      assert.equal(transform === 'none', rotation === 0);
+      assert.deepEqual(digits.map((digit) => digit.label), ['●', '0', '—', '—']);
+      assert.ok(digits.every((digit) => digit.x >= area.x && digit.y >= area.y && digit.right <= area.right && digit.bottom <= area.bottom), String(rotation));
+    }
+  } finally { removeTempDir(dir); }
+});
