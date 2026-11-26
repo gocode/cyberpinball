@@ -1,0 +1,45 @@
+#parental-pin[hidden] { display: none; }
+
+#parental-pin {
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 14, 16, .97);
+  color: var(--text, #f4fffd);
+}
+
+.parental-pin-panel {
+  box-sizing: border-box;
+  width: min(90%, 38rem);
+  padding: clamp(1.25rem, 5cqmin, 3.5rem);
+  border: 2px solid #33cabb;
+  border-radius: 1rem;
+  text-align: center;
+  background: #102427;
+}
+
+.parental-pin-title { margin: 0 0 1.5rem; font-size: clamp(1.4rem, 5cqmin, 2.6rem); }
+
+.parental-pin-digits {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(.3rem, 1.5cqmin, 1rem);
+  max-width: 25rem;
+  margin: auto;
+}
+
+.parental-pin-digit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(2.5rem, 11cqmin, 6rem);
+  border: 2px solid #527776;
+  border-radius: .45rem;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.5rem, 7cqmin, 3.6rem);
+}
+
+.parental-pin-digit.parental-pin-current { color: #122512; background: #b5ed58; border-color: #b5ed58; }
+.parental-pin-status { font-size: clamp(20px, 2cqmin, 30px); min-height: 1.3em; margin: 1.25rem 0 .5rem; color: #ffe285; }
+.parental-pin-hint { font-size: clamp(20px, 2cqmin, 30px); margin: .75rem 0 0; color: #c4dfd9; }

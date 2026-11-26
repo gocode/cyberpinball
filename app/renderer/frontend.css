@@ -58,6 +58,7 @@ body {
 #cinema,
 #stop,
 #game-return,
+#parental-pin,
 #level-moment {
   position: fixed;
   left: calc(var(--pf-x, 0) * 100vw);
@@ -106,7 +107,10 @@ html[data-rotation='180'] #game-return,
 html[data-rotation='270'] #game-return,
 html[data-rotation='90'] #level-moment,
 html[data-rotation='180'] #level-moment,
-html[data-rotation='270'] #level-moment {
+html[data-rotation='270'] #level-moment,
+html[data-rotation='90'] #parental-pin,
+html[data-rotation='180'] #parental-pin,
+html[data-rotation='270'] #parental-pin {
   position: fixed;
   top: calc((var(--pf-y, 0) + var(--pf-h, 1) / 2) * 100vh);
   left: calc((var(--pf-x, 0) + var(--pf-w, 1) / 2) * 100vw);

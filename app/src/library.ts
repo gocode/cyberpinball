@@ -734,6 +734,8 @@ export function createLibrary(host: LibraryHost) {
   function go(next: Screen, at = 0): void {
     // Mode invité : un écran fermé ne s'ouvre pas, le cadenas le dit.
     if (!host.guest.knock(GUEST_SCREENS[next.kind])) return;
+    const table = tableOf(next);
+    if (table && host.tableAllowed?.(table) === false) return;
     if (screen?.kind === 'custom' && anchor?.screen === screen && anchor.id !== undefined) lastFocus.set((screen as Extract<Screen, { kind: 'custom' }>).build, anchor.id);
     if (screen !== next) endPromptInput(screen);
     screen = next;
@@ -6517,6 +6519,7 @@ export function createLibrary(host: LibraryHost) {
     const local = localPlay();
     return {
       nodes: remoteMenuTree((id) => {
+        if (id === 'parental') return undefined;
         const item = systemItems.get(id);
         // Retirée en jeu local (localplay.ts) : comme une entrée absente.
         if (!item || hiddenInLocalPlay(id, local)) return undefined;

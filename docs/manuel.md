@@ -61,6 +61,7 @@ Une nouvelle rubrique prend son titre ci-dessous, à sa place, et sa traduction 
 ## [Retours et propositions](manuel/retours-et-propositions.md)
 ## [Éteindre, mettre en veille, redémarrer la borne](manuel/eteindre-mettre-en-veille-redemarrer-la-borne.md)
 ## [Mode invité](manuel/mode-invite.md)
+## [Contrôle parental](manuel/controle-parental.md)
 ## [Sauvegardes](manuel/sauvegardes.md)
 ## [Mon compte](manuel/mon-compte.md)
 ## [Communauté : le réseau des bornes](manuel/amis-le-reseau-des-bornes.md)

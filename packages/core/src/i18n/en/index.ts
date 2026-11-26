@@ -82,9 +82,10 @@ import { messages as qualitevpx } from './qualitevpx';
 import { messages as challenges } from './challenges';
 import { messages as debogage } from './debogage';
 import { messages as tableSurprise } from './table-surprise';
+import { parental } from './parental';
 import { messages as applications } from './applications';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, ledtest, ledanimations, hardwaredmd, dedicated, power, hours, modenuit, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, cartefinpartie, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads, dailytables, arena, communityhub, overtakes, anaglyph, qualitevpx, challenges, profile, debogage, systemsearch, tableSurprise, applications };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, ledtest, ledanimations, hardwaredmd, dedicated, power, hours, modenuit, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, cartefinpartie, backups, installation, avatar, activity, remote, collections, scores, jukebox, jukeboxplayer, jukeboxmanage, youtubeaccount, jukeboxdesign, chat, techsheet, terms, credits, community, rooms, moderation, jukeboxsettings, feedback, pinballfx, futurepinball, pinballfx3folder, instant, groups, news, levels, invitations, romvolume, autresvpx, account, localplay, follow, systemmenu, teamthreads, dailytables, arena, communityhub, overtakes, anaglyph, qualitevpx, challenges, profile, debogage, systemsearch, tableSurprise, applications, parental };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

@@ -1,6 +1,8 @@
 import * as fs from 'node:fs';
 import { prepareClassicPov } from './vpx-launch-compat';
 import { findWheelTable } from './wheel-table';
+import { createParentalMenu } from './parental-menu';
+import { ParentalControl, navigationKeys, b2sCacheDir, romAudioDir } from '@cyberpinball/core';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, net,powerMonitor, screen as electronScreen, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
@@ -693,8 +695,15 @@ function cancelWheelPress(): void {
 }
 
 /** Start sur la roue : la fiche (réglage par défaut), ou la partie de la table choisie. */
-function wheelConfirm(table: TableEntry, sheet: boolean): void {
-  if (surprise.busy || launchReservation.busy) return;
+function wheelConfirm(table: TableEntry | undefined, sheet: boolean): void {
+  if (surprise.busy || launchReservation.busy || parentalMenu.active) return;
+  const group = collections.current();
+  if (collections.protectedEntry(group.id)) { collections.choose(group.id, () => broadcast()); return; }
+  if (!table || !guestTableAllowed(table)) return;
+  if (!parental.tableAllowed(table.id)) {
+    parentalMenu.request({ kind: 'table', id: table.id }, () => wheelConfirm(table, sheet));
+    return;
+  }
   cancelWheelPress();
   if (sheet) {
     if (guest.knock('menu.sheet')) library.openSheet(table);
@@ -1039,8 +1048,9 @@ let attractRecent: number[] = [];
 
 function showAttractTable(): void {
   // La table tirée vient de la collection active (Favoris, un fabricant…), comme la roue.
-  const shelf = collections.shelf().tables;
-  if (!shelf.length) return;
+  if (parentalMenu.active) return;
+  const shelf = collections.shelf().tables.filter((table) => !parental.tableProtected(table.id));
+  if (!shelf.length) { attractIndex = undefined; broadcast(); return; }
   const avoid = [tables[state.index], ...attractRecent.map((i) => tables[i])].map((x) => (x ? shelf.indexOf(x) : -1)).filter((i) => i >= 0);
   attractIndex = tables.indexOf(shelf[pickAttractTable(shelf.length, avoid)]!);
   attractRecent = [...attractRecent, attractIndex].slice(-attractMemory(shelf.length));
@@ -1058,7 +1068,8 @@ function leaveAttract(): boolean {
 
 /** Table montrée en mode attente, s'il est en cours. */
 function attractTable(): TableEntry | undefined {
-  return attract.active && attractIndex !== undefined ? tables[attractIndex] : undefined;
+  const table = attract.active && attractIndex !== undefined ? tables[attractIndex] : undefined;
+  return table && !parental.tableProtected(table.id) ? table : undefined;
 }
 
 /** Réglages de VPX ouverts par-dessus le menu ; `about` : la table réglée (réglages d'une table, depuis sa fiche). */
@@ -1071,7 +1082,7 @@ let vpxSettingsOpen: { about?: TableEntry } | undefined;
  */
 function screensSubject(): TableEntry | undefined {
   const find = (file: string | undefined) => (file ? tables.find((t) => samePath(t.file, file)) : undefined);
-  return screensTable({
+  const subject = screensTable({
     phase: state.phase,
     help: state.help,
     selected: attractTable() ?? (onMedallion() ? undefined : tables[state.index]),
@@ -1079,6 +1090,7 @@ function screensSubject(): TableEntry | undefined {
     about: state.phase === 'library' ? find(library.table()) : state.phase === 'message' ? find(state.message?.table) : undefined,
     overlay: vpxSettingsOpen,
   });
+  return subject && mediaTableAllowed(subject) && !parentalMenu.active ? subject : undefined;
 }
 
 /**
@@ -1088,7 +1100,7 @@ function screensSubject(): TableEntry | undefined {
 const guest = new GuestMode({
   dataDir: loc.dataDir,
   buttons: () => buttons,
-  onChange: () => broadcast(),
+  onChange: parentalGuestChanged,
   onUnlock: () => console.log('Mode invité : déverrouillé par la combinaison des boutons.'),
 });
 /** Cyber Pinball se ferme lui-même (quitter, relance, arrêt de Windows) : le mode invité laisse fermer ses fenêtres. */
@@ -1098,6 +1110,63 @@ let closing = false;
  * Collections du menu des tables (collections-menu.ts) : la roue ne montre que celles de la
  * collection active ; les MagnaSave en changent ; le mode invité peut en imposer une.
  */
+const parental = new ParentalControl({ dataDir: loc.dataDir, groups: protectedGroupInventory });
+
+function protectedGroupInventory() { return collections.parentalInventory(); }
+
+function parentalGuestChanged(): void {
+  if (parental.sync(guest.active, collections.context())) closeProtectedLibrary();
+  broadcast();
+}
+
+function requestParentalCollection(id: string, next: () => void): void {
+  parentalMenu.request({ kind: 'collection', id }, next);
+}
+
+function guestTableAllowed(table: TableEntry): boolean {
+  const collection = guest.collection;
+  return !collection || Boolean(collections.inventory().find((group) => group.id === collection)?.tables.some((entry) => entry.id === table.id));
+}
+
+function browseTables(remote = false): TableEntry[] {
+  if (!parental.enabled) return tables;
+  return tables.filter((table) => remote ? !parental.tableProtected(table.id) : parental.tableAllowed(table.id));
+}
+
+function protectedLibrary(): boolean {
+  const file = library.table();
+  return Boolean(file && tables.some((table) => samePath(table.file, file) && !parental.tableAllowed(table.id)));
+}
+
+function closeProtectedLibrary(): void {
+  if (state.phase === 'library' && protectedLibrary()) library.leave();
+}
+
+function mediaTableAllowed(table: TableEntry): boolean {
+  return (state.phase === 'playing' && table.id === playing?.id) || (parental.tableAllowed(table.id) && guestTableAllowed(table));
+}
+
+const mediaOwners = new Map<string, Set<string>>();
+const fileKey = (file: string) => path.resolve(file).toLowerCase();
+function rememberParentalMedia(table: TableEntry, file: string): void {
+  const resolved = fileKey(file);
+  let owners = mediaOwners.get(resolved);
+  if (!owners) { owners = new Set(); mediaOwners.set(resolved, owners); }
+  owners.add(table.id);
+}
+
+function parentalMediaAllowed(file: string, remote = false): boolean {
+  if (!parental.enabled) return true;
+  if (parental.damaged) return false;
+  const resolved = fileKey(file);
+  const allowed = (table: TableEntry) => remote ? !parental.tableProtected(table.id) : mediaTableAllowed(table);
+  const associated = mediaOwners.get(resolved);
+  if (associated && !tables.some((table) => associated.has(table.id) && allowed(table))) return false;
+  const dir = fileKey(path.dirname(file));
+  if ([b2sCacheDir(loc.dataDir), romAudioDir(loc.dataDir), wheelThumbs?.dir].some((folder) => folder && dir === fileKey(folder))) return associated !== undefined;
+  return !tables.some((table) => !allowed(table) && table.id.includes('/') && resolved.startsWith(fileKey(table.folder) + path.sep));
+}
+
 const collections = createCollectionsMenu({
   dataDir: loc.dataDir,
   tables: () => tables,
@@ -1109,18 +1178,28 @@ const collections = createCollectionsMenu({
   // Réseau coupé (essais) : « Avec mes amis en ligne » le dit, grisée.
   ...(socialNetMode(process.env) === 'off' ? {} : { friends: (list: readonly TableEntry[]) => friendsMenu.live.playableWithFriends(list) }),
   guestCollection: () => guest.collection,
+  parental: {
+    allowed: (id) => parental.collectionAllowed(id),
+    hidden: () => parental.settings.hidden,
+    tableVisible: (table) => !parental.settings.hidden || parental.tableAllowed(table.id),
+    mayEdit: (id) => !parental.enabled || !parental.collectionConfigured(id) || parental.canConfigure,
+    restoredMembers: (id) => id.startsWith('mine:') && parental.collectionProtected(id) ? tables.filter((table) => parental.memberOf(id, table.id)) : undefined,
+    request: requestParentalCollection,
+    changed: (id) => { if (parental.sync(guest.active, id)) closeProtectedLibrary(); },
+  },
   startIndex: (list) => startIndex(list, mediaSettings.startTable),
   redraw: () => broadcast(),
 });
 
 const launchReservation = new LaunchReservation();
 function surpriseContext(): string | undefined {
-  if (state.phase !== 'menu' || state.help || closing || desktop.active || attract.active || levelMomentAt || vrFront.controllerWizard || vrFront.calibration) return undefined;
+  if (parentalMenu.active || state.phase !== 'menu' || state.help || closing || desktop.active || attract.active || levelMomentAt || vrFront.controllerWizard || vrFront.calibration) return undefined;
   const collection = collections.exact();
   return JSON.stringify([guest.active, guest.collection, collection?.id, collection?.tables.map((table) => table.id) ?? []]);
 }
 /** Les mêmes contrôles que Start avant de lancer, sans rien lancer : moteur présent, fichier accepté. */
 function surprisePlayable(table: TableEntry): boolean {
+  if (parental.tableProtected(table.id) || !guestTableAllowed(table)) return false;
   // Hors écran, la partie simulée joue une table VPX sans lire son fichier : Start la lancerait aussi.
   if (table.emulator === 'vpx' && OFFSCREEN && process.env.CYBERPINBALL_PARTIE_SIMULEE !== undefined) return Boolean(vpxInstall(loc));
   if (table.emulator === 'vpx') {
@@ -1359,6 +1438,8 @@ const phoneRemote = createPhoneRemote({
   fromSources: !app.isPackaged,
   // Le volume de la borne au téléphone : le même réglage que ses boutons de volume (cabinet-volume.ts).
   volume: (command) => cabinetVolume?.remote(command),
+  mayReadImage: (file) => parentalMediaAllowed(file, true),
+  allowControl: () => !parentalRemoteBlocked(),
 });
 // Retours des joueurs (feedback-service.ts) : propositions publiques, votes, rapports privés chiffrés.
 // La clé du joueur (réseau des amis) signe les propositions et les votes : une voix par borne.
@@ -1565,7 +1646,8 @@ const library = createLibrary({
   // jamais celui du poste, dont les noms de fichiers finiraient dans les captures.
   ...(process.env.CYBERPINBALL_BUREAU ? { desktopDir: () => process.env.CYBERPINBALL_BUREAU! } : {}),
   vpxExe: () => vpxInstall(loc)?.exe,
-  tables: () => tables,
+  tables: () => browseTables(),
+  tableAllowed: (file) => { const table = tables.find((entry) => samePath(entry.file, file)); return !table || (parental.tableAllowed(table.id) && guestTableAllowed(table)); },
   reload: (file) => reloadTables(file),
   enter: () => (state = { ...state, phase: 'library', help: false, message: undefined }),
   leave: () => (state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() }),
@@ -2001,6 +2083,35 @@ library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing'
 // Le téléphone pilote le menu quand « Récupérer » est fermé : ses boutons passent par handleKey
 // (portes du mode invité comprises, jamais la combinaison de déverrouillage), son texte remplace
 // celui du clavier à l'écran, un fichier envoyé arrive dans le dossier d'import (porte phone.files).
+const parentalMenu = createParentalMenu({
+  policy: parental,
+  keys: () => {
+    const keys = navigationKeys({ buttons });
+    return { ...keys, confirm: [...keys.confirm, ...KEYS.confirm], exit: [...keys.exit, ...KEYS.exit] };
+  },
+  guest: () => guest.active,
+  allowed: () => !closing && (state.phase === 'library' || state.phase === 'menu') && !surprise.busy,
+  changed: () => {
+    cancelWheelPress();
+    if (parentalMenu.active) attract.activity();
+    closeProtectedLibrary();
+    broadcast();
+  },
+  ownerMenu: (build) => library.openCustom(build),
+  back: () => library.openSystemEntry('borne'),
+  groups: () => collections.inventory(),
+  tables: () => tables,
+  pickGroup: (id) => collections.choose(id, () => library.leave()),
+  pickTable: (table) => library.openSheet(table),
+});
+parental.sync(guest.active, collections.context());
+setInterval(() => {
+  if (state.phase === 'playing' || state.phase === 'loading') { parental.touch(); return; }
+  if (parental.expire()) { closeProtectedLibrary(); broadcast(); }
+  else if (parentalMenu.active) broadcast();
+}, 1000).unref();
+library.provideSystemItem('parental', { label: t('Contrôle parental'), run: () => parentalMenu.open() });
+
 let phoneUploadShown = 0;
 let phoneRedraw = false;
 phoneRemote.setMenu({
@@ -2015,8 +2126,8 @@ phoneRemote.setMenu({
   // Classements au téléphone (remote-ranks.ts) : le tableau des scores de la borne, en lecture seule ;
   // la table choisie sur la roue ou lancée d'abord ; en mode invité, la porte et la collection de la borne.
   ranks: createRemoteRanks({
-    tables: () => (guest.active && collections.locked() ? collections.shelf(false).tables : tables),
-    current: () => playing ?? tables[state.index],
+    tables: () => (guest.active && collections.locked() ? collections.shelf(false).tables.filter((table) => !parental.tableProtected(table.id)) : browseTables(true)),
+    current: () => { const table = playing ?? tables[state.index]; return table && !parental.tableProtected(table.id) ? table : undefined; },
     scores: (table, period) => tableScores.board(table, period),
     rankings: (table, scope, period) => tableRankings.view(table, scope, period),
     closed: () => (guest.allows('sheet.scores') ? undefined : t('Fermés en mode invité.')),
@@ -2153,21 +2264,26 @@ function remoteJukeboxAct(op: RemoteJukeboxOp, key?: string, fraction?: number):
 
 /** Le téléphone peut-il écrire : jamais en mode invité ; pendant une partie, seulement si « Messagerie au téléphone pendant la partie » le permet. */
 function phoneMayWrite(): boolean {
-  if (guest.active) return false;
+  if (guest.active || parentalRemoteBlocked()) return false;
   const playing = state.phase === 'loading' || state.phase === 'playing';
   return !playing || chatService.state().phoneInGame;
 }
 
 /** En tête de la page du téléphone : l'écran du menu affiché et ce qui y est choisi. */
 function remoteScreen(): { title: string; item?: string; zone?: string } {
-  if (state.phase === 'loading' || state.phase === 'playing') return { title: playing?.title ?? tables[state.index]?.title ?? t('Partie en cours') };
+  if (parentalRemoteBlocked()) return { title: t('Contrôle parental') };
+  if (state.phase === 'loading' || state.phase === 'playing') {
+    const table = playing ?? tables[state.index];
+    return { title: table && !parental.tableProtected(table.id) ? table.title : t('Partie en cours') };
+  }
   if (state.phase === 'library') return library.remoteScreen() ?? { title: t('Menu système') };
   if (state.phase === 'message') return { title: state.message?.title ?? '' };
   if (state.phase === 'confirmQuit') return { title: t('Quitter Cyber Pinball ?') };
   // Juke-box : MagnaSave y passe à la playlist suivante, dans une playlist ouverte et si la borne a ce bouton.
   if (state.phase === 'jukebox') return { title: t('Juke-box'), ...(jukeboxPlayer.level() === 'tracks' && collectionKeys().next.length ? { zone: t('Playlist suivante') } : {}) };
   // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
-  return { title: collections.current().label || t('Écran des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
+  const table = tables[state.index];
+  return { title: collections.current().label || t('Écran des tables'), item: table && !parental.tableProtected(table.id) ? table.title : undefined, zone: collections.locked() ? undefined : t('Collection suivante') };
 }
 
 // --- Accès direct depuis le téléphone (remote-menus.ts) ---------------------------------------
@@ -2196,8 +2312,13 @@ function remotePress(b: 'confirm' | 'exit'): void {
 }
 
 /** L'écran que montre la borne, pour la liste du téléphone. */
+function parentalRemoteBlocked(): boolean {
+  return parental.granted || parentalMenu.active || (state.phase === 'library' && parentalMenu.ownerOpen);
+}
+
 function remoteEntries(media = false): MenuEntries {
   const none = (title: string, note: string): MenuEntries => ({ kind: 'none', title, items: [], current: -1, note });
+  if (parentalRemoteBlocked()) return none(t('Contrôle parental'), t('Opération disponible sur la borne.'));
   if (surprise.busy) return none(t('Table surprise'), t('Tirage en cours · Exit : annuler'));
   if (state.phase === 'loading') return none(remoteScreen().title, t('La partie se charge.'));
   if (state.phase === 'playing') return inGameEntries();
@@ -2260,6 +2381,7 @@ function wheelEntries(media = false): MenuEntries {
   if (leads.includes('arena')) items.push({ ...toRemoteEntry({ label: t('Arène'), detail: arenaCard().subtitle, icon: 'trophy' }), pick: () => remotePickArena() });
   if (leads.includes('collections')) items.push({ ...toRemoteEntry({ label: t('Collections'), detail: collectionsCard().subtitle, icon: 'star' }), pick: () => remotePickCollections() });
   for (const table of shelf.tables) {
+    if (parental.tableProtected(table.id)) continue;
     const file = table.file;
     // Les images de la table, lues à la demande dans les médias de la borne (une table ajoutée a les siennes) :
     // son médaillon toujours ; l'image de son fronton seulement quand le téléphone montre la grille.
@@ -2285,6 +2407,7 @@ function wheelEntries(media = false): MenuEntries {
 
 /** Une collection choisie au téléphone : comme un clic sur la ligne de la liste des collections à la borne. */
 function remoteChooseCollection(id: string): void {
+  if (parentalRemoteBlocked() || parental.collectionProtected(id)) return;
   if (!remoteWakes() || state.phase !== 'menu') return;
   if (collections.choose(id)) {
     state = { ...state, medallion: undefined };
@@ -2295,9 +2418,9 @@ function remoteChooseCollection(id: string): void {
 
 /** Une table touchée au téléphone : choisie sur la roue, ou, déjà choisie, Start. */
 function remotePickTable(file: string): void {
-  if (!remoteWakes() || state.phase !== 'menu') return;
+  if (parentalRemoteBlocked() || !remoteWakes() || state.phase !== 'menu') return;
   const index = tables.findIndex((x) => x.file === file);
-  if (index < 0) return;
+  if (index < 0 || parentalRemoteBlocked() || parental.tableProtected(tables[index]!.id)) return;
   if (index === state.index && !onMedallion()) {
     wheelConfirm(tables[index]!, !wheelPlays());
     return void broadcast();
@@ -2456,6 +2579,7 @@ function inGameEntries(): MenuEntries {
 function remoteOpen(id: string): void {
   const target = remoteMenuTarget(id);
   if (!target) return void console.log('Télécommande : menu inconnu demandé, ignoré.'); // i18n-ignore : journal
+  if (parentalRemoteBlocked() || ('id' in target && target.id === 'parental')) return;
   if (target.kind === 'in-game') {
     if (state.phase === 'playing' && inGameMenu.openable() === true && !inGameMenu.isOpen()) inGameMenu.open();
     return;
@@ -2837,7 +2961,7 @@ library.provideSystemItem(
   createFramingMenu({
     ...framingHost,
     library,
-    sampleTable: () => [tables[state.index], ...tables].find((x) => x?.emulator === 'vpx' && fs.existsSync(x.file)),
+    sampleTable: () => [tables[state.index], ...browseTables(true)].find((x) => x?.emulator === 'vpx' && !parental.tableProtected(x.id) && fs.existsSync(x.file)),
     choose: (style) => {
       const cabinet = loadCabinet(loc.dataDir);
       if (!cabinet) return;
@@ -3174,7 +3298,7 @@ function tableInventory(table: TableEntry) {
 const friendContent = createFriendContent({
   net: socialNet,
   dataDir: loc.dataDir,
-  tables: () => tables,
+  tables: () => browseTables(true),
   root: () => loc.root,
   romsOf,
   contents: tableInventory,
@@ -3306,6 +3430,7 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       return { run: () => { library.leave(); void surprise.start(); } };
     case 'sheet': {
       const table = tables[state.index];
+      if (table && (!parental.tableAllowed(table.id) || !guestTableAllowed(table))) return { gone: t('Table verrouillée') };
       if (!table) return { gone: t('Choisis d’abord une table sur la roue') };
       if (target.part === 'pov') {
         if (table.emulator !== 'vpx') return { gone: t('Indisponible : choisis une table VPX sur la roue') };
@@ -3418,7 +3543,7 @@ const liveGames = createLiveGames({
   net: socialNet,
   dataDir: loc.dataDir,
   appVersion: app.getVersion(),
-  tables: () => tables,
+  tables: () => browseTables(true),
   romsOf,
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
   // Mes réglages (mémoire et interrupteurs de la ROM, valeurs enregistrées) pour le double de chaque invité.
@@ -3474,7 +3599,7 @@ const liveGames = createLiveGames({
 const levelTracker = createLevelTracker({
   dataDir: loc.dataDir,
   net: socialNet,
-  tables: () => tables,
+  tables: () => browseTables(true),
   history: () => liveGames.history(),
   groups: () => ({ count: groupService.groups().length, wins: 0 }),
   contributions: () => feedbackService.contributions(),
@@ -3489,7 +3614,7 @@ const dailyTables = createDailyTables({
   dataDir: loc.dataDir,
   net: socialNet,
   myXp: () => levelTracker.state().xp,
-  tables: () => tables,
+  tables: () => browseTables(true),
   versionOf: (table) => tableRankings.version(table),
   myBest: (table) => myTableBest(table),
   log: (line) => console.log(line),
@@ -3726,7 +3851,7 @@ const friendsMenu = createFriendsMenu({
   content: friendContent,
   downloads: library.downloads,
   games: liveGames,
-  tables: () => tables,
+  tables: () => browseTables(true),
   romsOf,
   root: () => loc.root,
   redraw: socialChanged,
@@ -3825,7 +3950,7 @@ const roomsMenu = createRoomsMenu({
   library,
   net: socialNet,
   openProfile: (key, back) => profileMenu.openProfile(key, back),
-  currentTable: () => tables[state.index],
+  currentTable: () => { const table = tables[state.index]; return table && !parental.tableProtected(table.id) ? table : undefined; },
   phoneLinked: () => phoneRemote?.connected() === 'menu',
 });
 library.provideSystemItem('community-settings', roomsMenu.settingsItem);
@@ -3834,7 +3959,7 @@ const groupsMenu = createGroupsMenu({
   library,
   net: socialNet,
   groups: groupService,
-  tables: () => tables,
+  tables: () => browseTables(true),
   wheel: (table) => medias?.wheel(table),
   play: (table) => {
     void play(table);
@@ -3876,7 +4001,7 @@ socialNet.onRoomLines((lines) => {
 const dailyTablesMenu = createDailyTablesMenu({
   library,
   service: dailyTables,
-  tables: () => tables,
+  tables: () => browseTables(true),
   play: (table) => {
     if (library.isActive()) library.leave();
     void play(table);
@@ -3921,7 +4046,7 @@ const tableSocial = createTableSocial({
 const rankingsMenu = createRankingsMenu({
   library,
   daily: { detail: () => dailyTablesMenu.detail(), open: (back) => dailyTablesMenu.open(back) },
-  tables: () => tables,
+  tables: () => browseTables(true),
   local: (table, period) => tableScores.board(table, period),
   network: (table, scope, period) => tableRankings.view(table, scope, period),
   // Classement des joueurs par XP (playerranking.ts) : les cartes publiques reçues, et moi.
@@ -3958,8 +4083,8 @@ const instantMenu = createInstantMenu({
   net: socialNet,
   games: liveGames,
   live: friendsMenu.live,
-  tables: () => tables,
-  selected: () => tables[state.index],
+  tables: () => browseTables(true),
+  selected: () => { const table = tables[state.index]; return table && !parental.tableProtected(table.id) ? table : undefined; },
   busy: () => remoteBusy(),
   openSharing: (back) => library.runSystemItem('sharing', back),
   redraw: () => broadcast(),
@@ -4025,7 +4150,7 @@ const communityMenu = createCommunityMenu({
   library,
   net: socialNet,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
-  tables: () => tables,
+  tables: () => browseTables(true),
   // Le logo de roue d'une table : les médaillons des tables en commun avec un joueur.
   wheel: (table) => medias?.wheel(table),
   openProfile: (key, back) => profileMenu.openProfile(key, back),
@@ -4160,7 +4285,7 @@ const communityHub = createCommunityHub({
 // Progression (fournis ci-dessus et par level-menu.ts).
 /** Une table des classements (son nom, sa référence VPS) dans la collection montrée par la roue. */
 function shelfTableOf(table: PresenceTable): TableEntry | undefined {
-  return findWheelTable(collections.shelf().tables, table);
+  return findWheelTable(collections.shelf().tables.filter((entry) => !parental.tableProtected(entry.id)), table);
 }
 const arenaMenu = createArenaMenu({
   library,
@@ -4244,6 +4369,7 @@ const gameReturn = createGameReturn({
   play: (table) => playFromNotice(table),
   // Sans classement publié pour la version (table originale…) : le tableau de la table sur la borne.
   board: (table) => tableScores.board(table, 'all').lines,
+  tableAllowed: mediaTableAllowed,
   canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
   log: (line) => console.log(line),
 });
@@ -4799,6 +4925,8 @@ export function startFrontend(): void {
   ipcMain.on('action', (event, action: UiAction) => {
     // Les fenêtres du casque ne reçoivent aucun geste ; leurs mesures ne valent pas pour les écrans.
     if (isHeadsetView(event.sender)) return;
+    if (parentalMenu.active) return;
+    if (parentalMenu.ownerOpen && !['reading', 'key', 'activate', 'focus'].includes(action.type)) return;
     // Mesure du texte par le rendu (zone de lecture) : pas un geste, elle ne réveille rien.
     if (action.type === 'reading') return library.handleAction(action);
     // Un clic en mode attente y met fin, sans autre effet ; de même pour le préavis d'arrêt de l'horaire.
@@ -4980,7 +5108,7 @@ export function startFrontend(): void {
     automatic: !OFFSCREEN,
     log: (line) => console.log(line),
   });
-  medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, romAudio: (table) => romMusic?.file(table), onChange: () => broadcast() });
+  medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, romAudio: (table) => romMusic?.file(table), onChange: () => broadcast(), allowed: mediaTableAllowed, served: rememberParentalMedia });
   // Couleur de chaque table (table-tint.ts) : mesurée par le convertisseur hors écran, une fois par média.
   // La teinte passe aussi au halo des cadres de la borne dans le casque (casque.ts).
   tints = new TableTints({
@@ -4999,7 +5127,7 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   // Les avatars des joueurs (avatar.ts) et les miniatures de la roue se lisent aussi par le protocole des médias.
-  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir), wheelThumbs!.dir, applicationsIconDir(loc.dataDir)]);
+  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir), wheelThumbs!.dir, applicationsIconDir(loc.dataDir)], parentalMediaAllowed);
   // Morceaux du Juke-box lus hors du processus principal (jukebox-media-server.ts).
   startJukeboxMedia({ log: (line) => console.log(line) });
   app.on('will-quit', () => {
@@ -5117,7 +5245,7 @@ export function startFrontend(): void {
       broadcast();
     },
     openViews: () => {
-      headsetMedias ??= loc.root ? new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), rotation: vrFront.headsetTurn(), romAudio: (table) => romMusic?.file(table), onChange: () => broadcast() }) : undefined;
+      headsetMedias ??= loc.root ? new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), rotation: vrFront.headsetTurn(), romAudio: (table) => romMusic?.file(table), onChange: () => broadcast(), allowed: mediaTableAllowed, served: rememberParentalMedia }) : undefined;
       openHeadsetViews(headsetPages, {
         appDir: path.join(__dirname, '..'),
         playfieldRotation: vrFront.headsetTurn(),
@@ -5513,7 +5641,7 @@ interface MediaErrorReport {
  */
 function recordMediaError(error: MediaErrorReport): void {
   const file = typeof error?.url === 'string' ? mediaPathFromUrl(error.url) : undefined;
-  if (!file || !medias || !isServedMedia(file, medias.allowedDirs(tables))) return;
+  if (!file || !parentalMediaAllowed(file) || !medias || !isServedMedia(file, medias.allowedDirs(tables))) return;
   const message = typeof error.message === 'string' ? error.message : t('Erreur de lecture');
   try {
     const entry = logMediaError(mediaErrorLog, {
@@ -5543,6 +5671,8 @@ function unlockListening(): boolean {
  * `fromPhone` : relâché au téléphone (remoteButton), qui ne compte pas dans la combinaison.
  */
 function handleKeyUp(input: Input, fromPhone = false): void {
+  if (!fromPhone) parentalMenu.release(input.code);
+  if (parentalMenu.active) return;
   if (!fromPhone) {
     cabinetVolume?.windowInput(input);
     guest.input(input.code, false, unlockListening());
@@ -5569,6 +5699,12 @@ const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(
  * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
  */
 function handleKey(input: Input, fromPhone = false): boolean {
+  if (parentalMenu.active) {
+    if (!fromPhone && !input.control && !input.alt && !input.meta) parentalMenu.input(input.code, Boolean(input.isAutoRepeat));
+    return true;
+  }
+  if (fromPhone && parentalRemoteBlocked()) return true;
+  if (!fromPhone && !input.isAutoRepeat) parental.touch();
   if (!fromPhone && !input.isAutoRepeat) surpriseGesture.input(input.code, true);
   // Root Access : la combinaison de flips sur la roue (vrais boutons seulement, sans répétitions).
   if (!fromPhone && !input.isAutoRepeat) rootAccessCombo.press(input.code);
@@ -6289,7 +6425,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
  * l'a demandée (la fiche) reprend la main.
  */
 async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}, reserved?: symbol, firstRunSeen = false): Promise<PlayReport | undefined> {
-  if (surprise.busy || state.phase === 'loading' || state.phase === 'playing') return undefined;
+  if (parentalMenu.active || surprise.busy || state.phase === 'loading' || state.phase === 'playing') return undefined;
+  if (!parental.tableAllowed(table.id) || !guestTableAllowed(table) || (reserved && parental.tableProtected(table.id))) return undefined;
   if (reserved && !launchReservation.owns(reserved)) return undefined;
   const owner = reserved ?? launchReservation.reserve();
   if (!owner) return undefined;
@@ -6310,6 +6447,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
   await backups.yieldToGame();
   if (!launchReservation.owns(owner) || (reserved && reservedContext !== surpriseContext())) return undefined;
+  if (!parental.tableAllowed(table.id) || !guestTableAllowed(table)) return undefined;
   if (reserved && !surpriseCatalog.eligible(table, collections.exact()?.id)) return undefined;
   const copying = backups.busy();
   if (copying) {
@@ -7915,11 +8053,13 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   const shelf = collections.shelf(state.phase === 'menu');
   const list = shelf.tables;
   const at = shelf.index;
-  const table = shown ?? tables[state.index];
+  const shelfSelection = tables[state.index];
+  const table = shown ?? (shelfSelection && shelf.tables.includes(shelfSelection) ? shelfSelection : undefined);
   // Le logo n'est cherché que pour la liste, dessinée par le playfield.
   const wheel = (t: TableEntry) => (role === 'playfield' ? m?.wheel(t) : undefined);
   // `credit` : la table choisie dans la roue, « Data East · 1990 · par TastyWasps » (l'auteur principal de la recréation).
   const describe = (entry: TableEntry, credit = false) => {
+    if (!mediaTableAllowed(entry)) return { title: '🔒 ' + t('Table verrouillée'), favorite: false, plays: 0 };
     const lead = credit ? library.credits.lead(entry) : undefined;
     return {
       title: entry.title,
@@ -7938,8 +8078,15 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
   // titre, fabricant et année (logo de repli de la roue), version et logo.
   // Dans la roue et la liste, le logo réduit à sa taille d'affichage dès qu'il existe (wheel-thumbs.ts).
-  const small = (t: TableEntry) => (wheelThumbs ? wheelThumbs.url(wheel(t)) : wheel(t));
-  const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: small(t) });
+  const small = (t: TableEntry) => {
+    const art = wheelThumbs ? wheelThumbs.url(wheel(t)) : wheel(t);
+    const file = art && mediaPathFromUrl(art);
+    if (file) rememberParentalMedia(t, file);
+    return art;
+  };
+  const neighbor = (entry: TableEntry, offset: number) => mediaTableAllowed(entry)
+    ? { offset, key: entry.file, title: entry.title, manufacturer: entry.manufacturer, year: entry.year, version: entry.version, wheel: small(entry) }
+    : { offset, key: 'locked:' + offset, title: '🔒 ' + t('Table verrouillée') };
   // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent ;
   // moins de neuf entrées : chacune une seule fois (aucune répétée pour remplir), réparties de part
   // et d'autre du choix, en boucle comme la liste. Le médaillon Juke-box en tête de la collection
@@ -7999,6 +8146,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     intro: state.phase === 'intro' ? introFor(role) : undefined,
     // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
+    parentalPin: role === 'playfield' ? parentalMenu.view() : undefined,
     surprise: role === 'playfield' ? surprise.view() : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && m && table ? m.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
@@ -8029,7 +8177,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     ...(role === 'playfield' ? menuCorner() : {}),
     // Badge reçu, niveau qui monte : le moment, au retour sur l'écran des tables (level-tracker.ts, niveau.js).
     ...(role === 'playfield' ? { levelMoment: levelMomentView(), gameReturn: gameReturnView() } : {}),
-    library: state.phase === 'library' ? library.view() : undefined,
+    library: state.phase === 'library' && !protectedLibrary() ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
     attract: shown ? { ...describe(shown), wheel: m?.wheel(shown), ...(mediaSettings.attractCredits ? { credits: library.credits.attractLine(shown) } : {}) } : undefined,
@@ -8156,7 +8304,7 @@ function gameReturnPlace(): boolean {
   return state.phase === 'menu' && !playing && !attract.active && !guest.active && !localPlay() && !library.isActive() && !desktop.active;
 }
 
-/** La carte du bilan est à l'écran (sans effet de bord) : le moment des badges passe avant elle. */
+/** La carte du bilan est à l'écran tant que la table le permet ; le moment des badges passe avant elle. */
 function gameReturnShowing(): boolean {
   return gameReturn.showing() && gameReturnPlace() && !levelMomentShowing();
 }

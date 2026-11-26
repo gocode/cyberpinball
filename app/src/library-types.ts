@@ -102,6 +102,7 @@ export interface LibraryHost {
   dataDir: string;
   vpxExe(): string | undefined;
   tables(): TableEntry[];
+  tableAllowed?(file: string): boolean;
   /** Relit les tables et sélectionne celle-ci dans le menu. */
   reload(selectFile?: string): void;
   /** La gestion des tables prend la main sur le menu (phase « library »). */
