@@ -10,7 +10,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import { readJsonFile } from './store';
-import { isZenEmulator, ZEN_GAMES, zenTable, type ZenTable } from './zen';
+import { isZenEmulator, ZEN_GAMES, zenEntryKey, zenTable, type ZenGameKey, type ZenTable } from './zen';
+import { isPinballFxMidnightId, PINBALLFX_MIDNIGHT_APP_ID } from './pinballfx-midnight';
 
 /** Format .info de VPX : champs connus, les autres sont conservés tels quels. */
 export interface TableInfoFile {
@@ -36,7 +37,7 @@ export interface TableInfoFile {
   [key: string]: unknown;
 }
 
-export type TableEmulator = 'vpx' | 'pinballfx' | 'pinballfx3' | 'futurepinball';
+export type TableEmulator = 'vpx' | ZenGameKey | 'futurepinball';
 
 /**
  * Le logiciel qui joue la table, tel que la roue et les collections le nomment (17/11/2026) :
@@ -47,6 +48,7 @@ export const TABLE_ENGINES: Record<TableEmulator, { short: string; long: string;
   vpx: { short: 'VPX', long: 'Visual Pinball X', icon: 'playfield' },
   pinballfx: { short: 'Pinball FX', long: 'Pinball FX', icon: 'pinball-app' },
   pinballfx3: { short: 'Pinball FX3', long: 'Pinball FX3 (Pinball FX Classic)', icon: 'pinball-app' },
+  pinballfxmidnight: { short: 'Pinball FX Midnight', long: 'Pinball FX Midnight', icon: 'pinball-app' },
   futurepinball: { short: 'Future Pinball', long: 'Future Pinball', icon: 'pinball-app' },
 };
 
@@ -55,10 +57,12 @@ export const PINBALLFX_EXT = ZEN_GAMES.pinballfx.ext;
 /** Extension d'une fiche de table de Pinball FX3 (JSON : { "PinballFX3": { "Table": "WMS_Fish_Tales" } }). */
 export const PINBALLFX3_EXT = ZEN_GAMES.pinballfx3.ext;
 
-const TABLE_FILE = /\.(vpx|pinballfx3?|fpt)$/i;
+const TABLE_FILE = /\.(vpx|pinballfx(?:3|midnight)?|fpt)$/i;
 
 /** Extension d'un fichier de table -> le logiciel qui la joue (.fpt : Future Pinball, 19/11/2026). */
-const EMULATOR_OF_EXTENSION: Readonly<Record<string, TableEmulator>> = { vpx: 'vpx', pinballfx: 'pinballfx', pinballfx3: 'pinballfx3', fpt: 'futurepinball' };
+const EMULATOR_OF_EXTENSION: Readonly<Record<string, TableEmulator>> = {
+  vpx: 'vpx', pinballfx: 'pinballfx', pinballfx3: 'pinballfx3', pinballfxmidnight: 'pinballfxmidnight', fpt: 'futurepinball',
+};
 
 /** Nom d'un fichier de table sans son extension (.vpx, .pinballfx, .pinballfx3 ou .fpt). */
 export function tableBaseName(file: string): string {
@@ -82,6 +86,8 @@ export interface TableEntry {
   emulator: TableEmulator;
   /** Numéro de la table dans Pinball FX (fiche .pinballfx lisible) ; absent pour VPX. */
   pinballFxTable?: number;
+  /** Numéro dans Pinball FX Midnight, indépendant de la numérotation de Pinball FX. */
+  pinballFxMidnightTable?: number;
   /** Fichier de la table dans Pinball FX3, sans .pxp (fiche .pinballfx3 lisible) ; absent ailleurs. */
   pinballFx3Table?: string;
   /** Fichier .vpx, ou fiche .pinballfx / .pinballfx3. */
@@ -130,7 +136,11 @@ export function scanTables(tablesDir: string): TableEntry[] {
 function describeTable(tablesDir: string, folder: string, fileName: string): TableEntry {
   const file = path.join(folder, fileName);
   const base = fileName.replace(TABLE_FILE, '');
-  const emulator = tableFileEmulator(fileName) ?? 'vpx';
+  const extensionEmulator = tableFileEmulator(fileName) ?? 'vpx';
+  const numeric = extensionEmulator === 'pinballfx' || extensionEmulator === 'pinballfxmidnight'
+    ? readNumericZenFile(file, extensionEmulator)
+    : undefined;
+  const emulator = numeric?.game ?? extensionEmulator;
   const inOwnFolder = path.resolve(folder) !== path.resolve(tablesDir);
   const folderName = path.basename(folder);
 
@@ -141,10 +151,9 @@ function describeTable(tablesDir: string, folder: string, fileName: string): Tab
 
   const fromFile = parseTableName(base);
   const fromFolder = inOwnFolder ? parseTableName(folderName) : undefined;
-  const fx = emulator === 'pinballfx' ? readPinballFxFile(file) : undefined;
   const fx3 = emulator === 'pinballfx3' ? readPinballFx3File(file) : undefined;
   // Une table que le catalogue ne connaît pas garde le nom de son dossier.
-  const catalog = fx !== undefined ? zenTable('pinballfx', String(fx)) : fx3 !== undefined ? zenTable('pinballfx3', fx3) : undefined;
+  const catalog = numeric?.table !== undefined ? zenTable(numeric.game, String(numeric.table)) : fx3 !== undefined ? zenTable('pinballfx3', fx3) : undefined;
   const known = catalog?.unknown ? undefined : catalog;
   // Table de Zen : son jeu VPS vient du catalogue tant que le .info n'en donne pas d'autre
   // (en mémoire seulement) ; les médias (VPinMediaDB, « Médias manquants ») la reconnaissent ainsi,
@@ -154,7 +163,8 @@ function describeTable(tablesDir: string, folder: string, fileName: string): Tab
   return {
     id: path.relative(tablesDir, file).split(path.sep).join('/'),
     emulator,
-    ...(fx === undefined ? {} : { pinballFxTable: fx }),
+    ...(numeric?.game === 'pinballfx' && numeric.table !== undefined ? { pinballFxTable: numeric.table } : {}),
+    ...(numeric?.game === 'pinballfxmidnight' && numeric.table !== undefined ? { pinballFxMidnightTable: numeric.table } : {}),
     ...(fx3 === undefined ? {} : { pinballFx3Table: fx3 }),
     file,
     folder,
@@ -250,12 +260,23 @@ export function removalTargets(entry: TableEntry, tablesDir: string): { whole: b
 
 /** Numéro de table d'une fiche .pinballfx, ou undefined si elle est illisible. */
 export function readPinballFxFile(file: string): number | undefined {
+  const entry = readNumericZenFile(file, 'pinballfx');
+  return entry.game === 'pinballfx' ? entry.table : undefined;
+}
+
+function readNumericZenFile(file: string, extensionGame: 'pinballfx' | 'pinballfxmidnight'): { game: 'pinballfx' | 'pinballfxmidnight'; table?: number } {
   try {
-    const data = readJsonFile(file) as { PinballFX?: { Table?: unknown } };
+    const data = readJsonFile(file) as { PinballFX?: { Table?: unknown }; PinballFXMidnight?: { Table?: unknown; AppId?: unknown } };
+    // Les fiches des premiers essais utilisaient l'extension .pinballfx avec la clé Midnight.
+    // Leur chemin reste le même, donc leurs collections et leurs médias sont conservés.
+    if (extensionGame === 'pinballfxmidnight' || Object.hasOwn(data, 'PinballFXMidnight')) {
+      const { AppId, Table } = data.PinballFXMidnight ?? {};
+      return { game: 'pinballfxmidnight', ...(isPinballFxMidnightId(Table) && (AppId === undefined || AppId === PINBALLFX_MIDNIGHT_APP_ID) ? { table: Table } : {}) };
+    }
     const n = data.PinballFX?.Table;
-    return typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : undefined;
+    return { game: 'pinballfx', ...(typeof n === 'number' && Number.isInteger(n) && n > 0 ? { table: n } : {}) };
   } catch {
-    return undefined;
+    return { game: extensionGame };
   }
 }
 
@@ -278,7 +299,8 @@ export function pinballFxFolderName(tableId: number): string {
 /** Nom de dossier lisible et valable sous Windows : « Titre (Fabricant Année) » ; table inconnue : « Jeu clé ». */
 export function zenFolderName(table: ZenTable): string {
   const label = table.unknown ? `${ZEN_GAMES[table.game].name} ${table.key}` : `${table.title} (${table.manufacturer}${table.year ? ` ${table.year}` : ''})`;
-  return label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/[ .]+$/, '').trim();
+  const suffix = table.game === 'pinballfxmidnight' && !table.unknown ? ' Pinball FX Midnight' : '';
+  return label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/[ .]+$/, '').trim() + suffix;
 }
 
 /**
@@ -299,14 +321,14 @@ export function addPinballFxTable(tablesDir: string, tableId: number): TableEntr
  */
 export function addZenTable(tablesDir: string, table: ZenTable): TableEntry {
   const game = ZEN_GAMES[table.game];
-  const existing = scanTables(tablesDir).find((e) => e.emulator === table.game && (table.game === 'pinballfx' ? String(e.pinballFxTable) : e.pinballFx3Table) === table.key);
+  const existing = scanTables(tablesDir).find((e) => e.emulator === table.game && zenEntryKey(e) === table.key);
   if (existing) return existing;
   const name = zenFolderName(table);
   let folder = path.join(tablesDir, name);
   if (fs.existsSync(folder) && fs.readdirSync(folder).some((f) => { const e = tableFileEmulator(f); return e !== undefined && e !== table.game; })) folder = path.join(tablesDir, `${name} ${game.name}`);
   fs.mkdirSync(folder, { recursive: true });
   const file = path.join(folder, `${path.basename(folder)}${game.ext}`);
-  const value = table.game === 'pinballfx' ? Number(table.key) : table.key;
+  const value = table.game === 'pinballfx3' ? table.key : Number(table.key);
   writeFileAtomic(file, JSON.stringify({ [game.jsonKey]: { Table: value } }, null, 2) + '\n');
   return describeTable(tablesDir, folder, path.basename(file));
 }
