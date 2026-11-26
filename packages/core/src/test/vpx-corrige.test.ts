@@ -174,17 +174,23 @@ test('le correctif livré bride bien chaque fenêtre annexe à son écran, et la
   assert.match(frontend, /installVpxCorrige\(path\.dirname\(install\.exe\), install\.version/, 'posé avant chaque partie, avec la version du VPX lancé');
 });
 
-test('correctif 03, plugin PuP : le label décode son image sans garder son verrou, et la fabrication livre le plugin', () => {
-  // Rapport du 21/11/2026 (The Matrix) : arrêts de 200 à 300 ms, boucle de jeu en attente d'un verrou du plugin PuP ;
-  // le label décodait un GIF plein écran de 5 Mo en gardant son verrou, que Render et LabelSet attendent.
-  const diff = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs', '03-pup-label-sans-verrou.patch'), 'utf8');
+test('correctif 07 (série 8), plugin PuP amont bdbccaf30 sur l’interface de la 5436, et la fabrication livre le plugin', () => {
+  // Novembre 2026 : PuP-Packs aux vidéos qui ne finissent pas, file bloquée, musique absente, sons superposés. Le plugin
+  // de la 5436 n'avançait les médias qu'au dessin de leur écran ; celui de VPX au commit bdbccaf30 les tient à jour seul.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  assert.ok(!fs.existsSync(path.join(dir, '03-pup-label-sans-verrou.patch')), 'le correctif 03 est dans le plugin amont');
+  const diff = fs.readFileSync(path.join(dir, '07-pup-amont-bdbccaf30.patch'), 'utf8');
   assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
-  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2}/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
-  const added = (marker: string) => diff.split('\n').filter((l) => l.startsWith(marker)).join('\n');
-  assert.match(added('-'), /std::async\(std::launch::async, \[this\]\(\) \{\n-\s+std::lock_guard lock\(m_mutex\);\n-\s+return UpdateImageTexture/, 'l’ancienne tâche prenait le verrou avant de décoder');
-  assert.match(added('+'), /std::async\(std::launch::async, \[this, type, path\]\(\) \{\n\+\s+return UpdateImageTexture\(type, path\);/, 'la nouvelle décode sans lui');
-  assert.match(added('+'), /SDL_Surface\* const decoded = cached \? nullptr : loadRGBA\(szPath\);\n\+\s+std::lock_guard lock\(m_mutex\);/, 'image tournée : décodée avant de prendre le verrou');
-  assert.match(added('+'), /frames\[i\] = converted/, 'images du GIF converties hors du rendu');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 8\)/, 'le code modifié dit qui l’a modifié, et quand (GPL)');
+  // Les autres plugins viennent de l'archive officielle : les en-têtes de l'interface de la 5436 ne changent pas.
+  const touched = [...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]!);
+  assert.deepEqual(touched.filter((f) => f.startsWith('plugins/plugins/')), ['plugins/plugins/PluginStrings.h'], 'seul un en-tête nouveau s’ajoute');
+  assert.ok(touched.every((f) => f.startsWith('plugins/pup/') || f.startsWith('plugins/plugins/') || f === 'make/CMakeLists_plugin_PUP.txt'), 'rien d’autre que le plugin PuP');
+  for (const f of ['plugins/pup/PUPSound.cpp', 'plugins/pup/Compat5436.h']) assert.ok(touched.includes(f), f);
+  const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+  assert.match(added, /void PUPManager::Tick\(\)\n\+\{\n\+.*GetGameTime\(\).*\n\+.*m_screenMap\)\n\+\s+screen->Update\(gameTime\);\n\+\s+RunLater\(0\.05/, 'médias tenus à jour sur une horloge, même sur un écran jamais dessiné');
+  assert.match(added, /std::async\(std::launch::async, \[this, type = m_type, path = m_szPath[^\n]*\n\+\s+return UpdateImageTexture/, 'label décodé sans garder son verrou (ancien correctif 03)');
+  assert.doesNotMatch(added, /#include "(plugins\/PagedUIPlugin|DMDOverlay\/)/, 'pas d’interface absente de la 5436');
   const fabriquer = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
   assert.match(fabriquer, /'plugins', 'pup', VPX_CORRIGE_PUP/, 'le plugin PuP corrigé part avec l’application');
   const recette = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige.mjs'), 'utf8');
@@ -192,6 +198,22 @@ test('correctif 03, plugin PuP : le label décode son image sans garder son verr
   const sources = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige-sources.mjs'), 'utf8');
   for (const lib of ['SDL_image-', 'SDL_ttf-', 'FFmpeg-', 'libdmdutil-', 'libpupdmd-']) assert.ok(sources.includes(`'${lib}'`), `sources complètes : ${lib}`);
   assert.deepEqual((corrige as unknown as { VPX_CORRIGE_FILES: string[] }).VPX_CORRIGE_FILES.slice(0, 2), ['VPinballX_BGFX64.exe', 'plugins/pup/plugin-pup64.dll']);
+});
+
+test('correctif 08 (série 8) : playlistadd sur une playlist déjà déclarée la met à jour, comme PinUP Player', () => {
+  // PinCab, 26/11/2026 : Stranger Things 4 déclare toutes ses playlists avec 30 s de repos et les remet à 0 par son
+  // script ; le plugin ignorait l'appel (« Playlist already exists ») et sautait annonces et sons pendant 30 s.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  const diff = fs.readFileSync(path.join(dir, '08-pup-playlistadd-met-a-jour.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 8\)/);
+  const touched = [...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]!);
+  assert.ok(touched.every((f) => f.startsWith('plugins/pup/')), 'rien d’autre que le plugin PuP');
+  const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).join('\n');
+  assert.match(added, /pExisting->SetRandomize\(sort != 0\);\n\+\s+pExisting->SetRestSeconds\(restSeconds\);/, 'ordre et repos mis à jour');
+  assert.doesNotMatch(added, /Playlist already exists/, 'l’appel n’est plus ignoré');
+  // Appliqué après le 07, dont il modifie le code : l'ordre alphabétique des correctifs est celui de la recette.
+  assert.ok(fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort().indexOf('08-pup-playlistadd-met-a-jour.patch') > fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort().indexOf('07-pup-amont-bdbccaf30.patch'));
 });
 
 test('série 6, bibliothèque DOF : posée à côté du plugin-dof64.dll officiel, qui n’est jamais touché', () => {

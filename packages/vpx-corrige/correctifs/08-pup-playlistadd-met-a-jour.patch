@@ -1,0 +1,55 @@
+diff --git a/plugins/pup/PUPPinDisplay.cpp b/plugins/pup/PUPPinDisplay.cpp
+index 67f0402..1f4fcf6 100644
+--- a/plugins/pup/PUPPinDisplay.cpp
++++ b/plugins/pup/PUPPinDisplay.cpp
+@@ -43,8 +43,13 @@ void PUPPinDisplay::playlistadd(int screenNum, const string& folder, int sort, i
+    if (!pScreen)
+       return;
+ 
+-   if (pScreen->GetPlaylist(folder)) {
+-      LOGE(std::format("Playlist already exists: screenNum={}, folder={}", screenNum, folder));
++   // Modified by Cyber Pinball, 2026-11-26 (patched Cyber Pinball 8): like PinUP Player, playlistadd on a playlist already
++   // declared in playlists.pup updates its order and rest time instead of being ignored. Stranger Things 4 declares every
++   // playlist with 30 rest seconds and sets them to 0 from its script: ignored, callouts and events were skipped for 30 s.
++   if (PUPPlaylist* pExisting = pScreen->GetPlaylist(folder)) {
++      LOGI(std::format("Playlist updated: screenNum={}, folder={}, sort={}, restSeconds={} (was {})", screenNum, folder, sort, restSeconds, pExisting->GetRestSeconds()));
++      pExisting->SetRandomize(sort != 0);
++      pExisting->SetRestSeconds(restSeconds);
+       return;
+    }
+ 
+diff --git a/plugins/pup/PUPPlaylist.cpp b/plugins/pup/PUPPlaylist.cpp
+index d6244d6..41ce1ec 100644
+--- a/plugins/pup/PUPPlaylist.cpp
++++ b/plugins/pup/PUPPlaylist.cpp
+@@ -87,6 +87,18 @@ PUPPlaylist::PUPPlaylist(PUPManager* manager, const std::filesystem::path& szFol
+       std::shuffle(m_files.begin(), m_files.end(), std::mt19937(std::random_device {}()));
+ }
+ 
++// Modified by Cyber Pinball, 2026-11-26 (patched Cyber Pinball 8): playlistadd on an existing playlist updates its order
++void PUPPlaylist::SetRandomize(bool randomize)
++{
++   if (randomize == m_randomize)
++      return;
++   m_randomize = randomize;
++   std::ranges::sort(m_files.begin(), m_files.end());
++   if (m_randomize)
++      std::shuffle(m_files.begin(), m_files.end(), std::mt19937(std::random_device {}()));
++   m_lastIndex = 0;
++}
++
+ PUPPlaylist* PUPPlaylist::CreateFromCSV(PUPManager* manager, const string& line)
+ {
+    if (trim_string(line).empty())
+diff --git a/plugins/pup/PUPPlaylist.h b/plugins/pup/PUPPlaylist.h
+index 184ba33..e558c43 100644
+--- a/plugins/pup/PUPPlaylist.h
++++ b/plugins/pup/PUPPlaylist.h
+@@ -27,6 +27,7 @@ public:
+    bool IsRandomize() const { return m_randomize; }
+    int GetRestSeconds() const { return m_restSeconds; }
+    void SetRestSeconds(int seconds) { m_restSeconds = seconds; }
++   void SetRandomize(bool randomize); // Modified by Cyber Pinball, 2026-11-26 (patched Cyber Pinball 8)
+    float GetVolume() const { return m_volume; }
+    int GetPriority() const { return m_priority; }
+    PUPPlaylist::Function GetFunction() const { return m_function; }

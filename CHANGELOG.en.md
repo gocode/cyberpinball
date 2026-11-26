@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- PuP-Packs: the PuP plugin of the patched VPX ("patched Cyber Pinball 8") now follows the one of the VPX development version. Videos on a PuP screen that is not displayed (DMD, topper) now end on time, the queue moves on, the background music starts, and the pack's sounds no longer overlap. The plugin of released VPX versions kept these videos frozen, so the rest of the pack never came.
+- PuP-Packs: like in PinUP Player, a table that declares a playlist again from its script now changes its order and rest time. On Stranger Things 4, callouts and sounds of the same playlist were skipped for 30 seconds.
 - Root Access: a lost ball keeps falling into the floor below at the same speed instead of going back to the plunger; the backglass and DMD now show the game display even when the Jukebox was selected in the wheel; the background music is a little louder.
 - Phone mirror: the help text disappears as soon as the first image arrives (or on the first touch). A landscape window (the backglass) is shown turned a quarter turn to fill the pad area: tilt the phone to read it, the page stays in portrait (orientation lock requested where the browser allows it).
 - Touch pad on an Edge application: the cabinet now always follows the largest Edge window (not an Edge bubble that trapped the pointer in a small rectangle at the top of the screen), and the log records the rectangle the pad acts on.

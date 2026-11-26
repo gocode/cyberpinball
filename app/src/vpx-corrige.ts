@@ -14,6 +14,8 @@
 //   des correctifs amont 0383246 et c79bcff. Le plugin-dof64.dll officiel la charge telle quelle (DOF.h inchangé).
 // - l'exécutable encore (série 7, 24/11/2026) : lunettes actives NVIDIA 3D Vision en mode direct (NVAPI, Direct3D 11,
 //   plein écran exclusif), réglage [Player] Stereo3DNvidiaDirect posé par nvidia-3dvision.ts.
+// - le plugin PuP encore (série 8, 26/11/2026) : celui de VPX au commit bdbccaf30, construit pour l'interface des plugins
+//   de la 5436 ; les vidéos d'un écran PuP non affiché (DMD, topper) se terminent, la file avance, la musique démarre.
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -137,8 +139,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 7 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 7;
+/** Série de correctifs livrée (« patched Cyber Pinball 8 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 8;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

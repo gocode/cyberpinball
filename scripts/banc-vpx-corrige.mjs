@@ -29,6 +29,33 @@ function args(argv) {
 }
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Ce que le plugin PuP a joué, par écran PuP, d'après ses lignes de débogage (« MAIN PLAY », « BG PLAY », « ON END » du
+ * plugin amont, série 8) : écrites seulement par un plugin construit avec ses LOGD au niveau info (--pup <dll>).
+ * Une vidéo qui démarre sans jamais finir sur un écran non affiché (DMD, topper) se voit ici.
+ */
+function bilanPup(log) {
+  const ecrans = {};
+  const compte = (n, k) => { (ecrans[n] ??= { joue: 0, fond: 0, fin: 0 })[k]++; };
+  // Écrans qui jouent un média en même temps (son compris) : des pistes qui se recouvrent se voient au maximum.
+  const enCours = new Set();
+  let ensemble = 0;
+  for (const l of log) {
+    const m = /(MAIN PLAY|BG PLAY|ON END|STOP): screen=(\d+)/.exec(l);
+    if (!m) continue;
+    if (m[1] !== 'STOP') compte(m[2], m[1] === 'MAIN PLAY' ? 'joue' : m[1] === 'BG PLAY' ? 'fond' : 'fin');
+    if (m[1] === 'MAIN PLAY' || m[1] === 'BG PLAY') enCours.add(m[2]);
+    else enCours.delete(m[2]);
+    ensemble = Math.max(ensemble, enCours.size);
+  }
+  return {
+    ecrans,
+    ensemble,
+    introuvables: log.filter((l) => /PlayFile not found|Playlist not found/.test(l)).length,
+    sons: log.find((l) => /Sound bank loaded/.test(l))?.replace(/^.*?Sound bank/, 'Sound bank'),
+  };
+}
+
 /** Une partie de `dureeMs` avec l'exécutable `exe` posé dans une copie de `vpx` ; le bilan lu dans son journal. */
 async function partie({ nom, vpx, exe, pup, table, roms, dureeMs, core }) {
   const dir = path.join(os.tmpdir(), 'banc-vpx-corrige', nom);
@@ -54,8 +81,19 @@ async function partie({ nom, vpx, exe, pup, table, roms, dureeMs, core }) {
   if (!fs.existsSync(jouee)) fs.copyFileSync(table, jouee);
   const b2s = table.replace(/\.vpx$/i, '.directb2s');
   if (fs.existsSync(b2s) && !fs.existsSync(jouee.replace(/\.vpx$/i, '.directb2s'))) fs.copyFileSync(b2s, jouee.replace(/\.vpx$/i, '.directb2s'));
+  // Le script à côté de la table (.vbs) et les dossiers qu'il lit (FlexDMD, musique) : sans eux, une table comme
+  // les Goonies ne joue pas son PuP-Pack. Les dossiers de Cyber Pinball (médias, cache) restent où ils sont.
+  for (const e of fs.readdirSync(path.dirname(table), { withFileTypes: true })) {
+    const src = path.join(path.dirname(table), e.name);
+    if (e.isFile() && /\.vbs$/i.test(e.name) && !fs.existsSync(path.join(tableDir, e.name))) fs.copyFileSync(src, path.join(tableDir, e.name));
+    if (e.isDirectory() && !/^(pupvideos|cache|medias|user|pinmame)$/i.test(e.name)) {
+      const r = spawnSync('robocopy', [src, path.join(tableDir, e.name), '/E', '/XJ', '/NFL', '/NDL', '/NJH', '/NJS', '/NP'], { windowsHide: true });
+      if (r.status >= 8) throw new Error(`copie de ${e.name} impossible (robocopy ${r.status})`);
+    }
+  }
   const pack = path.join(path.dirname(table), 'pupvideos');
-  if (fs.existsSync(pack) && !fs.existsSync(path.join(tableDir, 'pupvideos'))) {
+  // Robocopy recopie seulement ce qui manque : une seconde table ajoute son pack à côté du premier.
+  if (fs.existsSync(pack)) {
     const r = spawnSync('robocopy', [pack, path.join(tableDir, 'pupvideos'), '/E', '/XJ', '/NFL', '/NDL', '/NJH', '/NJS', '/NP'], { windowsHide: true });
     if (r.status >= 8) throw new Error(`copie du PuP-Pack impossible (robocopy ${r.status})`);
   }
@@ -116,6 +154,7 @@ async function partie({ nom, vpx, exe, pup, table, roms, dureeMs, core }) {
     cadence,
     erreurs: log.filter((l) => / ERROR /.test(l)).map((l) => l.replace(/^.*?\] /, '').slice(0, 160)),
     pup: log.filter((l) => /\[PUP:/.test(l)).length,
+    pupMedias: bilanPup(log),
     arrets: log.filter((l) => /Cadence: stall/.test(l)).map((l) => l.replace(/^.*?Cadence: /, '').slice(0, 200)),
     crash: fs.existsSync(path.join(path.dirname(jouee), 'crash.txt')),
   };
@@ -124,7 +163,7 @@ async function partie({ nom, vpx, exe, pup, table, roms, dureeMs, core }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = args(process.argv.slice(2));
   if (!a.vpx || !a.table) {
-    console.error('Usage : --vpx <dossier de VPX 10.8.1-5436> --table <fichier.vpx> [--roms <dossier des ROM>] [--duree 75000]');
+    console.error('Usage : --vpx <dossier de VPX 10.8.1-5436> --table <fichier.vpx> [--roms <dossier des ROM>] [--duree 75000] [--pup <plugin-pup64.dll de la partie corrigée>]');
     process.exit(2);
   }
   if (!fs.existsSync(VPX_CORRIGE_EXE)) {
@@ -134,7 +173,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const core = await import(pathToFileURL(path.join(repo, 'packages', 'core', 'dist', 'index.js')).href);
   const dureeMs = Number(a.duree ?? 75000);
   const resultats = [];
-  const pupCorrige = path.join(path.dirname(VPX_CORRIGE_EXE), PUP);
+  // --pup : un autre plugin PuP pour la partie corrigée (par exemple construit avec ses journaux de débogage).
+  const pupCorrige = a.pup ?? path.join(path.dirname(VPX_CORRIGE_EXE), PUP);
   for (const [nom, exe, pup] of [
     ['officiel', path.join(a.vpx, EXE), undefined],
     ['corrige', VPX_CORRIGE_EXE, fs.existsSync(pupCorrige) ? pupCorrige : undefined],
@@ -147,6 +187,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(`   fenêtres : ${r.fenetres.join(', ') || 'aucune'}`);
     console.log(c ? `   cadence : ${c.fps} i/s, médiane ${c.p50} ms, 99e centile ${c.p99} ms, ${c.stalls} à-coup(s), sur ${c.durationS} s` : '   cadence : aucun bilan');
     console.log(`   erreurs du journal : ${r.erreurs.length}${r.erreurs.length ? `\n     ${r.erreurs.slice(0, 8).join('\n     ')}` : ''}`);
+    const p = r.pupMedias;
+    const ecrans = Object.entries(p.ecrans).map(([n, e]) => `écran ${n} : ${e.joue} lancée(s), ${e.fond} en fond, ${e.fin} finie(s)`);
+    if (ecrans.length || p.introuvables || p.sons) console.log(`   médias PuP : ${ecrans.join(' ; ') || 'aucun relevé'}${ecrans.length ? ` ; au plus ${p.ensemble} écran(s) en même temps` : ''}${p.introuvables ? ` ; ${p.introuvables} fichier(s) ou liste(s) introuvable(s)` : ''}${p.sons ? ` ; ${p.sons}` : ''}`);
     console.log(`   lignes du plugin PuP : ${r.pup} ; à-coups relevés : ${r.arrets.length}${r.arrets.length ? `\n     ${r.arrets.slice(0, 5).join('\n     ')}` : ''}`);
   }
   const [o, n] = resultats;

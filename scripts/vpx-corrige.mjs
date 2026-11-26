@@ -39,7 +39,7 @@ export const LIBDOF_PATCHES = path.join(VPX_CORRIGE_SOURCE, 'correctifs-libdof')
  * dépendent). `patch` : numéro de la série de correctifs, nommée en anglais partout où elle se voit (« patched Cyber
  * Pinball 1 ») : version produit de l'exécutable, journal de VPX, release des sources, fiche technique.
  */
-export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 7 };
+export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 8 };
 VPX_BASE.sha = `af26b2d93-patched-cyberpinball-${VPX_BASE.patch}`;
 
 const work = process.env.CYBERPINBALL_VPX_BUILD ?? path.join(process.env.LOCALAPPDATA ?? os.tmpdir(), 'cpvpx');
@@ -203,7 +203,7 @@ function officialPluginDir(name, dll) {
 }
 
 /**
- * Ce que demande le plugin PuP (plugins\pup\plugin-pup64.dll, reconstruit pour 03-pup-label-sans-verrou.patch).
+ * Ce que demande le plugin PuP (plugins\pup\plugin-pup64.dll, reconstruit pour 07-pup-amont-bdbccaf30.patch).
  * Ses bibliothèques restent celles de l'archive officielle : seuls leurs en-têtes sont téléchargés (SDL_image,
  * SDL_ttf, FFmpeg aux commits de platforms/config.sh, pupdmd.h au commit de libdmdutil), et les bibliothèques
  * d'import sont tirées des DLL de l'archive officielle.
