@@ -62,7 +62,7 @@ test('chaque action de [Input] de VPX 10.8.1 a un bouton, ou est laissée à VPX
 });
 
 test('boutons avancés : Crédit 2 à 4, Fire, règles et mode debug, facultatifs et sans touche d’office', () => {
-  assert.deepEqual(ADVANCED_BUTTONS.map((b) => b.id), ['credit2', 'credit3', 'credit4', 'lockbar', 'showRules', 'debug']);
+  assert.deepEqual(ADVANCED_BUTTONS.map((b) => b.id), ['credit2', 'credit3', 'credit4', 'lockbar', 'showRules', 'debug', 'nightMode']);
   assert.deepEqual(ADVANCED_BUTTONS.flatMap((b) => b.vpx), ['Credit2', 'Credit3', 'Credit4', 'Lockbar', 'ShowRules', 'PerfOverlay']);
   for (const b of ADVANCED_BUTTONS) {
     assert.equal(b.required, false, b.id);

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Night mode: an optional button toggles it with one press, in the front-end as well as during a game. It is recorded with the other buttons, in the collapsed "Advanced buttons" section of the summary (System menu > My cabinet > "Cabinet setup" > Buttons); empty by default.
+- Night mode: a direct entry in System menu > My cabinet > "Night mode" opens its settings (screens, sound, LEDs, toys, schedule), without going through "Sound and attract mode".
 - LED effects: ROM-less tables that have their own Sub DOF in the script (Stranger Things, for example) now light the LEDs. Before, their DOF calls did not go through controller.vbs and had no effect. Cyber Pinball's .vbs hooks the listener into the table's Sub DOF without moving any line. The game log says when the script's DOF calls reach no listener.
 - LED effects of original tables that have a DOF configuration: Cyber Pinball counts the DOF calls the table script really sends. If the configuration follows less than half of those calls on the LED strips (another version of the script, effects meant for toys only), it is completed on every strip: the most frequent events take the table's colors, the rarer ones varied colors. The original configuration's effects stay as they are. Seen on JP's Space Cadet (no effect), The Matrix and City Hunter (weak effects, on one strip only).
 - After every game whose score is known, the end screen opens, even for a first score, a game quit midway or a game without a record: your score, your place in the ranking and the next player to beat. On a table without an online ranking (original table), the screen shows the table's scoreboard, with your game highlighted.

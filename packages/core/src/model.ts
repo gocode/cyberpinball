@@ -259,7 +259,8 @@ export type ButtonId =
   | 'credit4'
   | 'lockbar'
   | 'showRules'
-  | 'debug';
+  | 'debug'
+  | 'nightMode';
 
 /**
  * Button -> key it sends (KeyboardEvent.code: "ShiftLeft", "Digit1"...).

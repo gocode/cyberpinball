@@ -457,6 +457,7 @@ import { createEndCard } from './carte-fin-partie';
 import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
 import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createNightMode, type NightMode } from './modenuit';
+import { startNightButton, type NightButton } from './modenuit-bouton';
 import { createNightModeMenu } from './modenuit-menu';
 import { createBallCounts } from './ball-count';
 import { createRomVolumes } from './rom-volume';
@@ -2673,6 +2674,13 @@ const nightModeMenu = createNightModeMenu({
   toggle: () => nightMode?.toggle() ?? false,
   dofRefusal: () => nightMode?.dofRefusal(),
 });
+// Entrée directe du Menu système > Ma borne > Mode nuit (le même écran que dans « Son et mode attente »).
+library.provideSystemItem('night-mode', {
+  get detail() {
+    return nightModeMenu.summary();
+  },
+  run: () => nightModeMenu.open(() => library.openSystem()),
+});
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
 const menuSettings = createMenuSettings({
   library,
@@ -3461,6 +3469,8 @@ function myTableBest(table: TableEntry): number | undefined {
 }
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
 let cabinetVolume: CabinetVolume | undefined;
+// Bouton du mode nuit : un appui bascule le mode, au menu comme en partie (modenuit-bouton.ts).
+let nightButton: NightButton | undefined;
 // Fiche > « DMD sur la roue » : le DMD du menu affiché ou masqué pour chaque table, et sa place (menu-dmd.ts).
 const menuDmd = createMenuDmd({
   dataDir: loc.dataDir,
@@ -4793,6 +4803,13 @@ export function startFrontend(): void {
     captureDir: process.env.CYBERPINBALL_CAPTURE,
     log: (line) => console.log(line),
   });
+  nightButton = startNightButton({
+    buttons: () => loadCabinet(loc.dataDir)?.buttons,
+    press: () => {
+      const on = nightMode?.toggle();
+      console.log(`Mode nuit : bouton pressé, mode ${on ? 'actif' : 'inactif'}.`); // i18n-ignore : journal
+    },
+  });
   romFirstBoot ??= new RomFirstBoot({
     dataDir: loc.dataDir,
     root: () => loc.root,
@@ -4874,6 +4891,7 @@ export function startFrontend(): void {
     // Le téléphone apprend que Cyber Pinball se ferme ; plus rien n'écoute.
     phoneRemote.close();
     cabinetVolume?.stop();
+    nightButton?.stop();
     guest.dispose();
     mediaWatch?.close();
     saveSettings();
@@ -5380,6 +5398,7 @@ function handleKeyUp(input: Input, fromPhone = false): void {
   if (!fromPhone) {
     cabinetVolume?.windowInput(input);
     guest.input(input.code, false, unlockListening());
+    nightButton?.windowInput(input);
     surpriseGesture.input(input.code, false);
   }
   // Roue en « jouer directement » : Start relâché tôt lance la partie (au téléphone aussi).
@@ -5403,7 +5422,10 @@ const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(
  */
 function handleKey(input: Input, fromPhone = false): boolean {
   if (!fromPhone && !input.isAutoRepeat) surpriseGesture.input(input.code, true);
-  if (!fromPhone) cabinetVolume?.windowInput(input);
+  if (!fromPhone) {
+    cabinetVolume?.windowInput(input);
+    nightButton?.windowInput(input);
+  }
   // Le moment d'un badge ou d'un niveau : une touche le ferme (pas dans la première seconde et
   // demie : un bouton encore tenu au retour de la partie ne l'efface pas avant qu'on l'ait vu).
   if (levelMomentAt && state.phase === 'menu' && levelTracker.pending()) {

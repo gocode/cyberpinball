@@ -133,6 +133,9 @@ export const BUTTONS: readonly ButtonInfo[] = [
   { id: 'showRules', get label() { return t('Afficher les règles'); }, get how() { return t('Affiche les règles de la table, quand elle en a'); }, required: false, vpx: ['ShowRules'], advanced: true },
   // Le mode debug : les statistiques d'affichage de VPX en partie (PerfOverlay, F11 d'office).
   { id: 'debug', get label() { return t('Mode debug'); }, get how() { return t('Affiche ou masque les statistiques d’affichage de VPX pendant la partie (images par seconde, temps de calcul)'); }, required: false, vpx: ['PerfOverlay'], advanced: true },
+  // Le mode nuit (modenuit.ts) : Cyber Pinball lit ce bouton lui-même, au front-end comme en partie
+  // (app/src/modenuit-bouton.ts) ; aucune action de VPX. Un appui l'active, le suivant le désactive.
+  { id: 'nightMode', get label() { return t('Mode nuit'); }, get how() { return t('Un appui active le mode nuit (écrans, son, LED et toys baissés, selon tes réglages), le suivant le désactive ; au front-end comme pendant une partie'); }, required: false, vpx: [], advanced: true },
 ];
 
 /** Boutons avancés, dans l'ordre de leur section. */

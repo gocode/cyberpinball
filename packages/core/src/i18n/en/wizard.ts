@@ -513,6 +513,7 @@ export const messages: Record<string, string> = {
   'Afficher les règles': 'Show rules',
   'Affiche les règles de la table, quand elle en a': 'Shows the table rules, when it has some',
   'Mode debug': 'Debug mode',
+  'Un appui active le mode nuit (écrans, son, LED et toys baissés, selon tes réglages), le suivant le désactive ; au front-end comme pendant une partie': 'One press turns night mode on (screens, sound, LEDs and toys lowered, per your settings), the next turns it off; in the front-end and during a game',
   'Affiche ou masque les statistiques d’affichage de VPX pendant la partie (images par seconde, temps de calcul)': 'Shows or hides VPX display statistics during the game (frames per second, computing time)',
   'Boutons avancés': 'Advanced buttons',
   'Bouton avancé': 'Advanced button',
