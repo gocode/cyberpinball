@@ -55,6 +55,8 @@ import {
   stackingReport,
   STARTUP_SHORTCUT,
   TaskbarGuard,
+  TaskbarRehideThrottle,
+  rehidePauseNotice,
   taskbarMarkerText,
   taskbarRescueScript,
   taskbarsToRestore,
@@ -337,6 +339,8 @@ function startTaskbarRescue(): void {
     console.warn(`Secours des barres des tâches non lancé : ${(error as Error).message}`); // i18n-ignore : console
   }
 }
+/** Remasquages pendant la partie, freinés quand Windows remet la barre aussitôt. */
+const rehideThrottle = new TaskbarRehideThrottle();
 /** Barres déjà masquées au début de la partie : pas les nôtres, même réaffichées par Windows entre-temps. */
 let notOurs = new Set<bigint>();
 
@@ -385,9 +389,18 @@ export function hideTaskbars(): void {
   // Windows réaffiche parfois lui-même une barre masquée quand VPX prend le premier plan
   // (une fois sur onze parties, sur l'écran du DMD) : elle est aussitôt masquée de nouveau.
   // Une barre apparue pendant la partie (écran branché) devient l'une des nôtres.
+  // Une barre que Windows remet aussitôt n'est pas remasquée en rafale : chaque masquage fige VPX
+  // (TaskbarRehideThrottle, taskbarguard.ts) ; elle est laissée un moment, avec qui avait le premier plan.
   taskbarWatch ??= setInterval(() => {
     for (const w of taskbarWindows()) {
       if (!w.visible) continue;
+      const rehide = rehideThrottle.decide(w.handle, Date.now());
+      if (rehide.act === 'wait') continue;
+      if (rehide.act === 'pause') {
+        const fg = foregroundWindow();
+        console.log(rehidePauseNotice(w.className, rehide.hides, rehide.pauseMs, fg && { title: fg.title, className: fg.className }));
+        continue;
+      }
       hideWindow(w);
       if (!notOurs.has(w.handle) && !hiddenTaskbars.some((h) => h.handle === w.handle)) {
         hiddenTaskbars.push({ handle: w.handle, className: w.className });
@@ -412,6 +425,7 @@ export function restoreTaskbars(moment: TaskbarRestoreMoment, hidden: HiddenTask
   }
   if (taskbarWatch) clearInterval(taskbarWatch);
   taskbarWatch = undefined;
+  rehideThrottle.reset();
   // Réaffichée telle quelle, une barre revient devant tout : l'Explorateur l'a remise au premier
   // plan permanent pendant la partie, et seul le playfield reprend ensuite le premier plan (le
   // DMD et le fronton jamais). Elle est donc d'abord rangée sous la fenêtre du menu de son

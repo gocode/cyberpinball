@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Plus de VPX figé quelques secondes en pleine partie quand Windows réaffiche sans cesse la barre des tâches (Copilot, menu Démarrer ou une notification au premier plan) : Cyber Pinball ne la remasque plus en rafale, il la laisse un moment, et le journal dit quel programme avait le premier plan. Ces rafales faisaient aussi sortir le fronton du plein écran, comme si les écrans étaient redétectés.
 - Après une mise à jour légère, Cyber Pinball restait figé environ une minute à chaque lancement : l'ancienne version, encore tenue par le veilleur de la relance par Start, était retirée en bloquant tout le front-end. Elle se retire maintenant sans rien bloquer, le veilleur resté sur l'ancienne version est arrêté puis relancé depuis la nouvelle, et il n'est plus relancé pendant une mise à jour.
 - Un lancement retardé ne provoque plus l'erreur « app.getSystemLocale() can only be called after app is ready » dans le journal.
 - Les contrôles avant publication sont plus rapides : le banc du casque (26 essais) tourne en parallèle, en une trentaine de secondes au lieu de quatre minutes, et deux tests de la bibliothèque du menu système ne relisent plus tout le code pour chaque libellé.

@@ -185,6 +185,59 @@ export function repairNotice(r: TaskbarRepair): string {
   return `Barre des tâches (${r.taskbar.className}) devant « ${r.under.title || r.under.className} » sur l’écran « ${r.screen} » (${taskbarMomentLabel(r.moment)}) : ${what}.`; // i18n-ignore : journal
 }
 
+// ---------- Remasquage pendant une partie ----------
+
+/**
+ * Remasquage d'une barre que Windows réaffiche pendant une partie (rapport du 25/11/2026 : VPX figé
+ * 3 s à chaque fois, le fronton sorti du plein écran). Tant qu'une autre fenêtre a le premier plan
+ * (Copilot, menu Démarrer, une notification), l'Explorateur la remet aussitôt : la masquer de
+ * nouveau toutes les 50 ms change la zone de travail à chaque fois, Windows prévient toutes les
+ * fenêtres, et VPX reste bloqué dans win32u le temps de la rafale. Au-delà de quelques remasquages
+ * rapprochés, la barre est laissée un moment (pause doublée à chaque rafale, plafonnée), puis reprise.
+ */
+export const TASKBAR_REHIDES_BEFORE_PAUSE = 3;
+/** Délai dans lequel ces remasquages comptent comme une rafale. */
+export const TASKBAR_REHIDE_WINDOW_MS = 5_000;
+/** Première pause, doublée à chaque rafale suivante… */
+export const TASKBAR_REHIDE_PAUSE_MS = 2_000;
+/** … jusqu'à ce plafond ; une barre restée calme aussi longtemps après sa pause repart de la première. */
+export const TASKBAR_REHIDE_PAUSE_MAX_MS = 30_000;
+
+export type TaskbarRehide = { act: 'hide' } | { act: 'wait' } | { act: 'pause'; hides: number; pauseMs: number };
+
+export class TaskbarRehideThrottle {
+  private readonly bars = new Map<bigint, { hides: number[]; pausedUntil: number; pauseMs: number }>();
+
+  /** Que faire d'une barre trouvée visible à `now` (ms) : la masquer, attendre la fin de sa pause, ou en commencer une. */
+  decide(handle: bigint, now: number): TaskbarRehide {
+    let bar = this.bars.get(handle);
+    if (!bar) this.bars.set(handle, (bar = { hides: [], pausedUntil: 0, pauseMs: 0 }));
+    if (now < bar.pausedUntil) return { act: 'wait' };
+    bar.hides = bar.hides.filter((at) => now - at < TASKBAR_REHIDE_WINDOW_MS);
+    if (bar.pauseMs && !bar.hides.length && now - bar.pausedUntil >= TASKBAR_REHIDE_PAUSE_MAX_MS) bar.pauseMs = 0;
+    if (bar.hides.length >= TASKBAR_REHIDES_BEFORE_PAUSE) {
+      const hides = bar.hides.length;
+      bar.pauseMs = bar.pauseMs ? Math.min(bar.pauseMs * 2, TASKBAR_REHIDE_PAUSE_MAX_MS) : TASKBAR_REHIDE_PAUSE_MS;
+      bar.pausedUntil = now + bar.pauseMs;
+      bar.hides = [];
+      return { act: 'pause', hides, pauseMs: bar.pauseMs };
+    }
+    bar.hides.push(now);
+    return { act: 'hide' };
+  }
+
+  /** Fin de la surveillance (fin de partie, bureau, fermeture) : tout repart de zéro. */
+  reset(): void {
+    this.bars.clear();
+  }
+}
+
+/** Ligne du journal quand une barre est laissée : qui avait le premier plan, pour repérer le programme qui la rappelle. */
+export function rehidePauseNotice(className: string, hides: number, pauseMs: number, foreground: { title: string; className: string } | undefined): string {
+  const who = foreground ? `« ${foreground.title || foreground.className} » au premier plan` : 'aucune fenêtre au premier plan'; // i18n-ignore : journal
+  return `Barre des tâches (${className}) réaffichée par Windows ${hides} fois de suite (${who}) : laissée ${Math.round(pauseMs / 1000)} s, pour ne pas figer VPX.`; // i18n-ignore : journal
+}
+
 // ---------- Journal des écrans ----------
 
 /** Fichier du journal des bascules, dans <données>\logs. */

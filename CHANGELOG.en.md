@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- VPX no longer freezes for a few seconds mid-game when Windows keeps bringing the taskbar back (Copilot, the Start menu or a notification in front): Cyber Pinball no longer hides it again in bursts, it leaves it for a moment, and the log says which program was in front. These bursts also knocked the backglass out of full screen, as if the screens were being detected again.
 - After a light update, Cyber Pinball froze for about a minute at every launch: the old version, still held by the Start relaunch watcher, was removed while blocking the whole front-end. It is now removed without blocking anything, the watcher left on the old version is stopped and restarted from the new one, and it is no longer restarted during an update.
 - A delayed launch no longer logs the error "app.getSystemLocale() can only be called after app is ready".
 - Pre-release checks are faster: the headset bench (26 tests) now runs in parallel, in about thirty seconds instead of four minutes, and two tests of the system menu library no longer re-read all the code for every label.

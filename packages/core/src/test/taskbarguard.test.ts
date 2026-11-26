@@ -3,7 +3,20 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { screenCover } from '../screencover';
-import { guardMayAct, repairNotice, stackingReport, TASKBAR_REPAIRS_BEFORE_HIDE, TaskbarGuard, type GuardScreen } from '../taskbarguard';
+import {
+  guardMayAct,
+  rehidePauseNotice,
+  repairNotice,
+  stackingReport,
+  TASKBAR_REHIDE_PAUSE_MAX_MS,
+  TASKBAR_REHIDE_PAUSE_MS,
+  TASKBAR_REHIDE_WINDOW_MS,
+  TASKBAR_REHIDES_BEFORE_PAUSE,
+  TASKBAR_REPAIRS_BEFORE_HIDE,
+  TaskbarGuard,
+  TaskbarRehideThrottle,
+  type GuardScreen,
+} from '../taskbarguard';
 import { healthLines, type HealthFacts } from '../health';
 import { SimulatedExplorer, type SimWindow } from './simulated-explorer';
 
@@ -188,4 +201,42 @@ test('retour de partie et retour du bureau : le gardien des barres passe une foi
   assert.ok(back.indexOf('showMenuAgain()') < back.indexOf("settleScreens('return')"));
   const desk = front.slice(front.indexOf('function restoreFromDesktop'));
   assert.match(desk.slice(0, desk.indexOf('\n}\n')), /settleScreens\('desktop-back'\)/);
+});
+
+// Rapport du 25/11/2026 : Windows remettait la barre (Copilot au premier plan), Cyber Pinball la
+// remasquait toutes les 50 ms, et VPX restait figé 3 s à chaque rafale.
+test('remasquage pendant une partie : une barre que Windows remet sans cesse est laissée, la pause grandit puis se plafonne', () => {
+  const throttle = new TaskbarRehideThrottle();
+  const bar = 1n;
+  // Une rafale comme celle du rapport : une barre visible à chaque tour de 50 ms.
+  const acts: string[] = [];
+  for (let now = 0; now < 1_000; now += 50) acts.push(throttle.decide(bar, now).act);
+  assert.equal(acts.filter((a) => a === 'hide').length, TASKBAR_REHIDES_BEFORE_PAUSE, 'au plus quelques masquages par rafale');
+  assert.equal(acts.filter((a) => a === 'pause').length, 1, 'une seule ligne au journal par rafale');
+  // Après la pause, la rafale qui continue : pause doublée, jusqu'au plafond.
+  const pauses: number[] = [];
+  for (let now = 1_000; now < 300_000; now += 50) {
+    const r = throttle.decide(bar, now);
+    if (r.act === 'pause') pauses.push(r.pauseMs);
+  }
+  assert.deepEqual(pauses.slice(0, 4), [TASKBAR_REHIDE_PAUSE_MS * 2, TASKBAR_REHIDE_PAUSE_MS * 4, TASKBAR_REHIDE_PAUSE_MS * 8, TASKBAR_REHIDE_PAUSE_MAX_MS]);
+  assert.ok(pauses.every((p) => p <= TASKBAR_REHIDE_PAUSE_MAX_MS));
+  // Une barre réaffichée de loin en loin (une fois sur onze parties) est toujours remasquée aussitôt.
+  const calm = new TaskbarRehideThrottle();
+  for (let now = 0; now < 120_000; now += TASKBAR_REHIDE_WINDOW_MS) assert.equal(calm.decide(2n, now).act, 'hide');
+  // Restée calme après sa pause, la barre repart de la première pause ; fin de partie : tout repart de zéro.
+  const later = 300_000 + TASKBAR_REHIDE_PAUSE_MAX_MS * 3;
+  for (let i = 0; i < TASKBAR_REHIDES_BEFORE_PAUSE; i++) assert.equal(throttle.decide(bar, later + i).act, 'hide');
+  assert.deepEqual(throttle.decide(bar, later + 10), { act: 'pause', hides: TASKBAR_REHIDES_BEFORE_PAUSE, pauseMs: TASKBAR_REHIDE_PAUSE_MS });
+  throttle.reset();
+  assert.equal(throttle.decide(bar, later + 20).act, 'hide');
+  assert.match(rehidePauseNotice('Shell_SecondaryTrayWnd', 3, 2_000, { title: 'Copilot Quick View', className: 'X' }), /Copilot Quick View.*laissée 2 s/);
+});
+
+test('remasquage pendant une partie : la surveillance des barres passe par le frein et le remet à zéro en fin de partie', () => {
+  const guard = read('screen-guard.ts');
+  const watch = guard.slice(guard.indexOf('taskbarWatch ??= setInterval'));
+  assert.ok(watch.indexOf('rehideThrottle.decide') >= 0 && watch.indexOf('rehideThrottle.decide') < watch.indexOf('hideWindow(w)'), 'décider avant de masquer');
+  const restore = guard.slice(guard.indexOf('export function restoreTaskbars'));
+  assert.match(restore.slice(0, restore.indexOf('\n}\n')), /rehideThrottle\.reset\(\)/);
 });
