@@ -1,6 +1,6 @@
 // Sélecteur sur la borne, commun aux deux jeux Steam de Zen.
 
-import { t, zenTableOfEntry, type PinballFxGameMode, type TableEntry } from '@cyberpinball/core';
+import { isPinballFxMidnightId, t, zenTableOfEntry, type PinballFxGameMode, type TableEntry } from '@cyberpinball/core';
 import type { Action, Built } from './library-types';
 
 export function openPinballFxModes(
@@ -9,10 +9,11 @@ export function openPinballFxModes(
   open: (build: () => Built) => void,
   openSheet: (table: TableEntry) => void,
 ): boolean {
+  const midnight = table.emulator === 'pinballfxmidnight' && isPinballFxMidnightId(table.pinballFxMidnightTable);
   const standard = table.emulator === 'pinballfx' && typeof table.pinballFxTable === 'number' &&
     Number.isInteger(table.pinballFxTable) && table.pinballFxTable > 0;
-  if (!standard) return false;
-  const pro = ['Williams', 'Bally'].includes(zenTableOfEntry(table)?.manufacturer ?? '');
+  if (!midnight && !standard) return false;
+  const pro = standard && ['Williams', 'Bally'].includes(zenTableOfEntry(table)?.manufacturer ?? '');
   const back = () => openSheet(table);
   const playMode = (mode: PinballFxGameMode, label: string): Action => ({
     label,
@@ -31,7 +32,7 @@ export function openPinballFxModes(
       playMode('Hotseat_2', t('{count} joueurs', { count: 2 })),
       playMode('Hotseat_3', t('{count} joueurs', { count: 3 })),
       playMode('Hotseat_4', t('{count} joueurs', { count: 4 })),
-      { label: t('Autres modes'), door: 'sheet.play', run: more },
+      ...(standard ? [{ label: t('Autres modes'), door: 'sheet.play' as const, run: more }] : []),
       { label: t('Retour à la fiche'), door: 'sheet.back', run: back },
     ],
     back,

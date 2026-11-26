@@ -4,6 +4,7 @@
 export const messages: Record<string, string> = {
   // app/src/frontend.ts
   'Mode de jeu': 'Game mode',
+  'Ce mode de jeu n’est pas disponible dans {game}.': 'This game mode is unavailable in {game}.',
   '1 joueur': '1 player',
   '{count} joueurs': '{count} players',
   'Autres modes': 'Other modes',

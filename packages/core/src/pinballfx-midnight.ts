@@ -9,6 +9,14 @@ import type { PinballFxGetter } from './pinballfx';
 
 export const PINBALLFX_MIDNIGHT_APP_ID = '2337640';
 
+// Modes de jeu en alternance vérifiés séparément dans la documentation Midnight de Zen.
+export const PINBALLFX_MIDNIGHT_PLAYER_MODES = ['Classic', 'Hotseat_2', 'Hotseat_3', 'Hotseat_4'] as const;
+export type PinballFxMidnightMode = (typeof PINBALLFX_MIDNIGHT_PLAYER_MODES)[number];
+
+export function isPinballFxMidnightMode(mode: string): mode is PinballFxMidnightMode {
+  return PINBALLFX_MIDNIGHT_PLAYER_MODES.some((supported) => supported === mode);
+}
+
 export const PINBALLFX_MIDNIGHT_TABLES: ReadonlyMap<number, string> = new Map([
   [147, "Wrath of the Elder Gods Director's Cut"],
   [171, "Chucky's Killer Pinball"],
@@ -41,7 +49,8 @@ export function pinballFxMidnightSetup(steamDir?: string): { install?: PinballFx
   };
 }
 
-export function pinballFxMidnightCommand(install: PinballFxMidnightInstall, table: number): { file: string; args: string[] } {
+export function pinballFxMidnightCommand(install: PinballFxMidnightInstall, table: number, mode: PinballFxMidnightMode = 'Classic'): { file: string; args: string[] } {
   if (!isPinballFxMidnightId(table)) throw new RangeError('Invalid Pinball FX Midnight table ID');
-  return { file: install.launcher, args: ['-applaunch', PINBALLFX_MIDNIGHT_APP_ID, '-Table', String(table), '-GameMode', 'Classic'] };
+  if (!isPinballFxMidnightMode(mode)) throw new RangeError('Invalid Pinball FX Midnight game mode');
+  return { file: install.launcher, args: ['-applaunch', PINBALLFX_MIDNIGHT_APP_ID, '-Table', String(table), '-GameMode', mode] };
 }

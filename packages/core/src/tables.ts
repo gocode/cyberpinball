@@ -324,8 +324,10 @@ export function addZenTable(tablesDir: string, table: ZenTable): TableEntry {
   const existing = scanTables(tablesDir).find((e) => e.emulator === table.game && zenEntryKey(e) === table.key);
   if (existing) return existing;
   const name = zenFolderName(table);
+  const occupied = (folder: string) => fs.existsSync(folder) && fs.readdirSync(folder).some((f) => tableFileEmulator(f) !== undefined);
   let folder = path.join(tablesDir, name);
-  if (fs.existsSync(folder) && fs.readdirSync(folder).some((f) => { const e = tableFileEmulator(f); return e !== undefined && e !== table.game; })) folder = path.join(tablesDir, `${name} ${game.name}`);
+  if (occupied(folder)) folder = path.join(tablesDir, `${name} ${game.name}`);
+  for (let number = 2; occupied(folder); number++) folder = path.join(tablesDir, `${name} ${game.name} ${number}`);
   fs.mkdirSync(folder, { recursive: true });
   const file = path.join(folder, `${path.basename(folder)}${game.ext}`);
   const value = table.game === 'pinballfx3' ? table.key : Number(table.key);
