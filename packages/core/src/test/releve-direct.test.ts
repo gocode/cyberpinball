@@ -23,6 +23,7 @@ import {
   type RomMemory,
   type TableEntry,
   type TrackedGame,
+  withoutGhosts,
 } from '../index';
 
 /** La carte de T2 (t2_l8), réduite à l'état de jeu ; adresses réelles. */
@@ -88,6 +89,50 @@ test('suivi : plusieurs joueurs, le score de chacun est gardé, jamais en baisse
   t.feed(sample(2000, true, 2, 90, 400));
   const g = t.stop(3000)!;
   assert.deepEqual(g.scores, [100, 400]);
+});
+
+test('suivi : le score de la partie d’avant, encore affiché au Start, ne fait pas de partie fantôme', () => {
+  // Rejoue l'essai réel sur Attack from Mars : la ROM passe « en partie » avec le score de la veille,
+  // puis remet à zéro ; une seule partie, finie à 118 874 400.
+  const t = new GameTracker();
+  t.feed(sample(0, false, 1, 2_728_739_260, 0, 0, 0));
+  t.feed(sample(11_000, true, 1, 2_728_739_260, 0, 0, 0));
+  t.feed(sample(12_000, true, 1, 0, 0, 0, 0));
+  t.feed(sample(60_000, true, 3, 118_874_400, 0, 0, 0));
+  t.feed(sample(130_000, false, 3, 118_874_400, 0, 0, 0));
+  t.feed(sample(130_000 + GAME_SETTLE_MS, false, 3, 118_874_400, 0, 0, 0));
+  assert.deepEqual(t.games().map((g) => [g.scores[0], g.finished]), [[118_874_400, true]]);
+  // Deuxième partie de la session : le score de la première, encore affiché au Start, ne compte pas non plus.
+  t.feed(sample(140_000, true, 1, 118_874_400, 0, 0, 0));
+  assert.equal(t.stop(141_000), undefined, 'quittée avant le premier point : rien');
+  assert.equal(t.games().length, 1);
+  // Mais un score qui part du score affiché (la ROM ne remet pas à zéro) compte dès qu'il bouge.
+  const u = new GameTracker();
+  u.feed(sample(0, false, 1, 500));
+  u.feed(sample(1000, true, 1, 500));
+  u.feed(sample(2000, true, 1, 1500));
+  assert.deepEqual(u.stop(3000)?.scores, [1500]);
+});
+
+test('réparation : la partie fantôme déjà gardée au journal est retirée, rien d’autre', () => {
+  const rom = (at: string, score: number, more: Partial<PlayedScore> = {}): PlayedScore => ({ at, score, how: 'rom', ...more });
+  const journal = [
+    rom('2026-11-25T21:10:00Z', 118_874_400),
+    rom('2026-11-25T21:08:00Z', 2_728_739_260), // le fantôme : score de la partie d'avant
+    rom('2026-11-24T20:00:00Z', 2_728_739_260),
+  ];
+  assert.deepEqual(withoutGhosts(journal).map((p) => p.score), [118_874_400, 2_728_739_260]);
+  // Gardés : avec initiales, hors période, autre joueur, autre source, ou premier score de la table.
+  const kept = [
+    rom('2026-11-25T21:08:00Z', 500, { initials: 'ABC' }),
+    rom('2026-11-25T21:07:00Z', 500),
+    rom('2026-11-20T10:00:00Z', 500),
+    rom('2026-11-19T10:00:00Z', 500),
+  ];
+  assert.equal(withoutGhosts(kept).length, 3, 'seul le doublon sans initiales de la période part');
+  assert.equal(withoutGhosts([rom('2026-11-25T21:08:00Z', 700, { player: 2, of: 2 }), rom('2026-11-25T21:00:00Z', 700)]).length, 2);
+  assert.equal(withoutGhosts([{ ...rom('2026-11-25T21:08:00Z', 700), how: 'live' }, rom('2026-11-25T21:00:00Z', 700)]).length, 2);
+  assert.equal(withoutGhosts([rom('2026-11-25T21:08:00Z', 700)]).length, 1);
 });
 
 test('inspector : valeurs de la ROM relues dans /api/tree et /api/states, état de jeu décodé', () => {

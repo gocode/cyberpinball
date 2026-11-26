@@ -10,6 +10,11 @@
 // de plus bas (redémarrage rapide) ou que les scores retombent à zéro. VPX quitté : la partie en cours
 // est gardée avec son dernier score connu, non finie. Une partie sans aucun point n'est pas gardée.
 //
+// Score de la partie d'avant (essai du 25/11/2026 sur Attack from Mars : une partie fantôme à
+// 2 728 739 260 points, le score de la veille) : au Start, la ROM passe « en partie » avant de remettre
+// les scores à zéro, et montre encore un instant ceux de la partie précédente. Un score vu à l'attente
+// juste avant le début ne compte pour la nouvelle partie qu'une fois qu'il a changé.
+//
 // Pur : le temps vient des échantillons, aucune dépendance (tests du cœur).
 
 /** Ce que la table dit à un instant. */
@@ -42,6 +47,9 @@ export class GameTracker {
   private current: TrackedGame | undefined;
   /** Premier échantillon « hors partie » de la série en cours. */
   private idleSince: number | undefined;
+  /** Scores affichés à l'attente (ceux de la dernière partie), et ce qu'il en reste à ignorer dans la partie en cours. */
+  private shown: readonly number[] = [];
+  private carried: (number | undefined)[] = [];
 
   /** Un échantillon ; rend la partie qu'il vient de terminer, s'il y en a une. */
   feed(s: GameSample): TrackedGame | undefined {
@@ -54,10 +62,19 @@ export class GameTracker {
       if (c && (s.ball < c.ball || (total(c.scores) > 0 && total(s.scores) === 0))) {
         ended = this.close(c, s.at, false);
         this.current = undefined;
+        this.shown = [];
       }
-      if (!this.current) this.current = { startedAt: s.at, scores: [], ball: 0, finished: false };
+      if (!this.current) {
+        this.current = { startedAt: s.at, scores: [], ball: 0, finished: false };
+        this.carried = [...this.shown];
+      }
       const g = this.current;
       s.scores.forEach((v, i) => {
+        // Le score de la partie d'avant, encore affiché : ignoré tant qu'il n'a pas changé.
+        if (this.carried[i] !== undefined) {
+          if (v === this.carried[i]) return;
+          this.carried[i] = undefined;
+        }
         if (Number.isSafeInteger(v) && v > (g.scores[i] ?? 0)) g.scores[i] = v;
       });
       for (let i = 0; i < g.scores.length; i++) g.scores[i] ??= 0;
@@ -65,7 +82,10 @@ export class GameTracker {
       return ended;
     }
     const c = this.current;
-    if (!c) return undefined;
+    if (!c) {
+      this.shown = s.scores.map((v) => (v > 0 ? v : 0));
+      return undefined;
+    }
     this.idleSince ??= s.at;
     // Les scores de la fin de partie se lisent encore à l'attente : gardés si plus hauts.
     s.scores.forEach((v, i) => {
@@ -73,6 +93,7 @@ export class GameTracker {
     });
     if (s.at - this.idleSince < GAME_SETTLE_MS) return undefined;
     ended = this.close(c, this.idleSince, true);
+    this.shown = [...c.scores];
     this.current = undefined;
     this.idleSince = undefined;
     return ended;

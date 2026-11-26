@@ -230,10 +230,29 @@ export function loadScoreJournal(file: string, now = new Date()): { journal: Sco
     for (const [id, list] of Object.entries(raw.tables as Record<string, unknown>)) {
       if (!id || id.length > 400 || !Array.isArray(list)) continue;
       const scores = list.map(parsePlayed).filter((p): p is PlayedScore => !!p);
-      if (scores.length) tables[id] = scores.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+      if (scores.length) tables[id] = withoutGhosts(scores.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)));
     }
   }
   return { journal: { v, tables }, ...(v > SCORES_VERSION ? { newer: true } : {}) };
+}
+
+/** Période où le relevé en direct a pu garder une partie fantôme (préversions du 25/11/2026, avant la correction). */
+const GHOST_FROM = Date.parse('2026-11-25T00:00:00Z');
+const GHOST_TO = Date.parse('2026-12-15T00:00:00Z');
+
+/**
+ * Réparation des parties fantômes : au Start, la ROM montrait encore le score de la partie d'avant,
+ * gardé comme une partie quittée (corrigé dans GameTracker). Une telle entrée relevée par la ROM, sans
+ * initiales, dans cette période, au même score que la partie précédente du même joueur, est retirée.
+ */
+export function withoutGhosts(newestFirst: readonly PlayedScore[]): PlayedScore[] {
+  return newestFirst.filter((p, i) => {
+    if (p.how !== 'rom' || p.initials) return true;
+    const t = Date.parse(p.at);
+    if (!(t >= GHOST_FROM && t < GHOST_TO)) return true;
+    const before = newestFirst.slice(i + 1).find((q) => (q.player ?? 1) === (p.player ?? 1));
+    return !before || before.score !== p.score;
+  });
 }
 
 export function saveScoreJournal(file: string, journal: ScoreJournal): void {

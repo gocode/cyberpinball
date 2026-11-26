@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Live score tracking: when a game starts, some tables still show the previous game's score for a moment. That score is no longer counted as an abandoned game: no more duplicates on the cabinet's board or in the rankings. Duplicates already kept by previous pre-releases are removed.
 - The slow automatic checks before each prerelease are faster: the longest test (the walk through the loaded cabinet's screens, up to 167 s) is split into four parts that run at the same time (about fifty seconds each), and the same screens are still visited and timed. The test cabinet it builds is no longer wiped by another check started at the same time, which made it take longer than it should.
 - The screen layout tests (one language per file), the Shift and Ctrl key capture tests (one test per file) and the chained network games test (shorter countdown and resend delays for the test only, never on the cabinet) no longer make each other wait.
 - Every slow check now writes the duration of each test file, and warns about any file over 90 s, which alone delays the whole suite; a test rule fixes it.

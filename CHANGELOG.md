@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Relevé des scores en direct : au lancement d'une partie, certaines tables affichent encore un instant le score de la partie d'avant. Ce score n'est plus compté comme une partie quittée : plus de doublon au tableau de la borne ni aux classements. Les doublons déjà gardés par les préversions précédentes sont retirés.
 - Les vérifications automatiques lentes avant chaque préversion vont plus vite : le plus long essai (le parcours des écrans de la borne chargée, jusqu'à 167 s) est découpé en quatre parties qui tournent en même temps (une cinquantaine de secondes chacune), les mêmes écrans sont toujours visités et chronométrés. La borne d'essai qu'il construit n'est plus effacée par une autre vérification lancée en même temps, ce qui le rallongeait à tort.
 - Les essais de la disposition des écrans (une langue par fichier), du relevé des touches Maj et Ctrl (un essai par fichier) et des parties enchaînées en réseau (compte à rebours et renvois raccourcis pour l'essai seulement, jamais sur la borne) ne se font plus attendre les uns les autres.
 - Chaque vérification lente écrit maintenant la durée de chaque fichier d'essai, et avertit de tout fichier de plus de 90 s, qui retarde seul toute la suite ; une règle de test le fixe.
