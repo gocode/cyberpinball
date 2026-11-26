@@ -8,8 +8,8 @@
 // ferme le jeu et rend la roue.
 
 import * as path from 'node:path';
-import { app, BrowserWindow, type Rectangle } from 'electron';
-import { frontMove, type AxisReading, type CabinetButtons, type FrontMove, type PlungerSensor } from '@cyberpinball/core';
+import { app, BrowserWindow, ipcMain, type Rectangle } from 'electron';
+import { frontMove, parseRootAccessSignal, parseRootAccessStatus, sameRootAccessCard, type AxisReading, type CabinetButtons, type FrontMove, type PlungerSensor, type RootAccessSignal, type RootAccessStatus } from '@cyberpinball/core';
 import { keepOverlayOnScreen } from './cover-display';
 import { keyboardFollows } from './foreground';
 import { createWindow, OFFSCREEN } from './offscreen';
@@ -31,6 +31,10 @@ export interface RootAccessDeps {
   claimJoystick(win: BrowserWindow): void;
   /** Un geste du joueur (le mode attente ne part pas pendant la partie). */
   activity(): void;
+  /** Le jeu ouvert, ou son étage changé : le fronton et le DMD de la borne le montrent. */
+  changed(): void;
+  /** Un événement du jeu (flip, bumper, cible, sortie d'étage, bille perdue…) : les LED de la borne l'animent. */
+  signal?(signal: RootAccessSignal, arg?: string | number): void;
   /** Le jeu fermé : la roue reprend la main. */
   closed(): void;
   log(line: string): void;
@@ -41,6 +45,8 @@ export interface RootAccess {
   open(): boolean;
   close(): void;
   isOpen(): boolean;
+  /** Où en est la partie (écran, étage, score) ; undefined : pas encore dite, ou jeu fermé. */
+  status(): RootAccessStatus | undefined;
   /** La fenêtre du jeu (essais). */
   window(): BrowserWindow | undefined;
 }
@@ -50,6 +56,25 @@ const POLL_MS = 8;
 
 export function createRootAccess(deps: RootAccessDeps): RootAccess {
   let win: BrowserWindow | undefined;
+  let status: RootAccessStatus | undefined;
+
+  // La page dit où en est la partie ; seul le jeu ouvert est écouté. Le score ne change pas la carte du fronton :
+  // seul un autre écran ou étage prévient la roue (le DMD relit le score à chaque image).
+  ipcMain.on('root-access:status', (event, raw) => {
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    const next = parseRootAccessStatus(raw);
+    if (!next) return;
+    const same = sameRootAccessCard(status, next);
+    status = next;
+    if (!same) deps.changed();
+  });
+
+  // Les signaux du jeu pour les LED : un nom connu seulement, et du jeu ouvert.
+  ipcMain.on('root-access:signal', (event, name, arg) => {
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    const parsed = parseRootAccessSignal(name, arg);
+    if (parsed) deps.signal?.(parsed.signal, parsed.arg);
+  });
 
   function open(): boolean {
     if (win && !win.isDestroyed()) {
@@ -98,11 +123,15 @@ export function createRootAccess(deps: RootAccessDeps): RootAccess {
     w.webContents.on('render-process-gone', () => close());
     w.on('closed', () => {
       stop();
-      if (win === w) win = undefined;
+      if (win === w) {
+        win = undefined;
+        status = undefined;
+      }
       deps.log('Root Access : fermé.'); // i18n-ignore : journal
       deps.closed();
     });
-    void w.loadFile(path.join(__dirname, '..', 'renderer', 'root-access', 'index.html'), { query: { rot: String(place.rotation) } });
+    void w.loadFile(path.join(__dirname, '..', 'renderer', 'root-access', 'index.html'), { query: { rot: String(place.rotation), musique: OFFSCREEN ? '0' : '1' } });
+    deps.changed();
     deps.log(`Root Access : ouvert sur le plateau (${place.bounds.width}×${place.bounds.height}, rotation ${place.rotation}°).`); // i18n-ignore : journal
     return true;
   }
@@ -163,6 +192,7 @@ export function createRootAccess(deps: RootAccessDeps): RootAccess {
     open,
     close,
     isOpen: () => Boolean(win && !win.isDestroyed()),
+    status: () => status,
     window: () => (win && !win.isDestroyed() ? win : undefined),
   };
 }

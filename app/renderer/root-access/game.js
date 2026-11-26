@@ -29,6 +29,34 @@
   // Dans Cyber Pinball : les commandes de la borne (root-access-preload.ts), seules lues.
   const borne = window.borne && typeof window.borne.on === 'function' ? window.borne : null;
 
+  // ---------- Musique de fond ----------
+
+  // Une boucle (musique.mp3) très en retrait : elle comble le silence sans se mêler aux bruitages (master 0,22
+  // de fx.js) ni lasser. Entrée en fondu, arrêtée avec la fenêtre. Dans Cyber Pinball, `musique=0` la coupe
+  // (essais hors écran : aucun son) ; seule, la page la lance au premier geste (politique de lecture du navigateur).
+  const MUSIC_VOLUME = 0.1;
+  const MUSIC_FADE_MS = 2500;
+  const musique = new Audio('musique.mp3');
+  musique.loop = true;
+  musique.volume = 0;
+  function lancerMusique() {
+    if (params.get('musique') === '0') return;
+    musique.play().then(() => {
+      const t0 = performance.now();
+      const monter = () => {
+        const k = Math.min(1, (performance.now() - t0) / MUSIC_FADE_MS);
+        musique.volume = MUSIC_VOLUME * k;
+        if (k < 1) setTimeout(monter, 50);
+      };
+      monter();
+    }).catch(() => {
+      // Lecture refusée (pas de geste) : elle repart au premier appui.
+      const reprendre = () => { window.removeEventListener('keydown', reprendre); window.removeEventListener('pointerdown', reprendre); lancerMusique(); };
+      window.addEventListener('keydown', reprendre);
+      window.addEventListener('pointerdown', reprendre);
+    });
+  }
+
   const canvas = document.getElementById('jeu');
   // Canevas à faible latence : l'image va droit à l'écran sans attendre la composition de la page,
   // une image de moins (16 ms à 60 Hz) entre l'appui sur un flip et son mouvement. Opaque : le jeu
@@ -532,7 +560,7 @@
       if (g.status === 'cradle' && (g.charging || g.tire)) by += g.charge * 14;   // le piston tire la bille en arrière
       if (g.status === 'falling') { const u = Math.min(1, g.statusT / E.FALL); alpha = 1 - u; radius = E.BALL_R * (1 - 0.7 * u); }
     }
-    if (g.status !== 'dead') {
+    if (g.status !== 'dead' && g.status !== 'descente') {
       for (let i = 0; i < trail.length; i++) {
         const p = trail[i];
         ctx.globalAlpha = (i / trail.length) * 0.25 * alpha;
@@ -703,6 +731,22 @@
     };
   }
 
+  // ---------- Où en est le jeu : le DMD et le fronton de la borne le montrent ----------
+
+  // Dans Cyber Pinball (root-access.ts), l'écran, l'étage et le score partent au processus principal, qui
+  // les pose sur le DMD et le fronton à la place des médias de la table. Rien ne part s'ils n'ont pas changé.
+  let publie = '';
+  function publier() {
+    if (!borne || typeof borne.statut !== 'function') return;
+    const ecran = screen === 'titre' ? 'titre' : g.status === 'dead' ? 'dead' : g.status === 'won' ? 'won' : 'jeu';
+    const etage = Math.min(LEVELS.length - 1, Math.max(0, g.floor));
+    const statut = { screen: ecran, floor: etage + 1, floors: LEVELS.length, name: ecran === 'titre' ? '' : LEVELS[etage].nom, score: ecran === 'titre' ? 0 : g.score };
+    const cle = JSON.stringify(statut);
+    if (cle === publie) return;
+    publie = cle;
+    borne.statut(statut);
+  }
+
   // ---------- Boucle ----------
 
   let last = performance.now();
@@ -742,6 +786,7 @@
       } else if (g.status === 'cradle') trail = [];
     }
     prevInput = input;
+    publier();
     const r0 = performance.now();
     render(now / 1000);
     renderMs += performance.now() - r0;
@@ -752,6 +797,7 @@
   window.addEventListener('resize', resize);
   resize();
   requestAnimationFrame(frame);
+  lancerMusique();
 
   // ---------- Accroches d'essai (captures hors écran, mesure de charge) ----------
 

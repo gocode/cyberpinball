@@ -373,3 +373,71 @@ test('la page du jeu : dans Cyber Pinball, seules les commandes de la borne comp
   }
   assert.match(html, /default-src 'self'/);
 });
+
+// ---------- Bille perdue : redescendre d'un étage, perdre seulement au premier ----------
+
+interface FloorGame extends Game { floor: number; score: number; camera: number; saveT: number; ball: { vy: number; x: number; y: number; vx: number } }
+interface FloorEngine extends Engine { enterFloor(g: Game, k: number): void; release(g: Game): void; DESCENTE: number }
+const EF = E as FloorEngine;
+const FLOORS = (LEVELS as unknown[]).length;
+
+/** La bille en jeu sous les flips, sans vitesse utile, sans sauve-bille : elle sort par le bas. */
+function perdre(g: FloorGame): void {
+  EF.release(g);
+  g.saveT = 0;
+  Object.assign(g.ball, { x: 360, y: 1300, vx: 0, vy: 500 });
+}
+
+test('bille perdue au premier étage : la partie est perdue', () => {
+  const g = EF.createGame(LEVELS) as FloorGame;
+  perdre(g);
+  run(g, 0.5);
+  assert.equal(g.status, 'dead');
+  assert.equal(g.events.filter((e) => e.type === 'perdue').length, 1);
+  assert.equal(g.events.filter((e) => e.type === 'descente').length, 0);
+});
+
+test('bille perdue à l\'étage 2 ou plus : elle redescend d\'un étage, score gardé, étage à rejouer', () => {
+  const g = EF.createGame(LEVELS) as FloorGame;
+  EF.enterFloor(g, 2);
+  g.score = 1234;
+  perdre(g);
+  run(g, 0.5);
+  assert.equal(g.status, 'descente');
+  assert.equal(g.events.filter((e) => e.type === 'descente').length, 1);
+  assert.equal(g.events.filter((e) => e.type === 'perdue').length, 0);
+  run(g, 0.2);
+  assert.ok(g.camera < 2 && g.camera > 1, `la caméra glisse vers l'étage du dessous (${g.camera})`);
+  run(g, EF.DESCENTE + 0.2);
+  assert.equal(g.floor, 1, 'étage du dessous');
+  assert.equal(g.camera, 1);
+  assert.equal(g.status, 'cradle', 'la bille attend au lanceur');
+  assert.equal(g.score, 1234, 'le score reste');
+});
+
+test('bille perdue : on redescend étage par étage jusqu\'au premier, qui seul perd la partie', () => {
+  const g = EF.createGame(LEVELS) as FloorGame;
+  EF.enterFloor(g, FLOORS - 1);
+  for (let k = FLOORS - 1; k > 0; k--) {
+    perdre(g);
+    run(g, 0.5 + EF.DESCENTE + 0.2);
+    assert.equal(g.floor, k - 1);
+    assert.equal(g.status, 'cradle');
+  }
+  perdre(g);
+  run(g, 0.5);
+  assert.equal(g.status, 'dead');
+});
+
+test('bille perdue : le sauve-bille reste prioritaire sur la descente', () => {
+  const g = EF.createGame(LEVELS) as FloorGame;
+  EF.enterFloor(g, 2);
+  EF.release(g);
+  g.saveT = 5;
+  Object.assign(g.ball, { x: 360, y: 1300, vx: 0, vy: 500 });
+  run(g, 0.5);
+  assert.equal(g.floor, 2, 'même étage');
+  assert.equal(g.status, 'cradle');
+  assert.equal(g.events.filter((e) => e.type === 'sauve-bille').length, 1);
+  assert.equal(g.events.filter((e) => e.type === 'descente').length, 0);
+});

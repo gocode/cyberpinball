@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Le secret caché dans la roue a maintenant son propre affichage : le fronton et le DMD ne montrent plus les médias de la table, ses LED suivent la partie comme sur une table de flipper, une musique de fond discrète l'accompagne, et une bille perdue redescend d'un étage au lieu de tout arrêter.
 - Applications sur le playfield (TikTok en portrait) : le pavé tactile du téléphone couvre maintenant tout l'écran, et non plus une bande du haut. Windows rend encore les dimensions d'avant juste après avoir tourné l'écran : Edge était posé en paysage sur un écran devenu portrait. Le rectangle est désormais recalculé, et le journal signale une fenêtre mal placée.
 - Coulisses : une correction écartée de la livraison parce qu'elle faisait tomber un test est reprise toute seule dès que le reste a changé et que ses tests repassent ; après quelques essais, elle reste signalée jusqu'à ce qu'on la corrige.
 - Télécommande du téléphone : un bouton "Pavé" / "Miroir" pour les fenêtres Edge (rubrique Applications, connexion YouTube du Juke-box). En "Miroir", tu vois sur ton téléphone le site affiché à l'écran de la borne : touche une image pour cliquer, glisse pour défiler, appui long pour le clic droit. Le pavé tactile reste le réglage de départ. Les vidéos protégées (Netflix, Prime Video, Disney+) restent noires dans le miroir.

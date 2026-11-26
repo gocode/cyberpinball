@@ -103,6 +103,7 @@ const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'ad-blocker.ts': { count: 3, why: 'bloqueur de publicités : canaux des scripts préchargés des pages du navigateur intégré, qui ne rendent que des filtres (styles, scriptlets) et ne changent rien ; aiguillés par la session de la page, celle de « Récupérer »' },
   'vision3d.ts': { count: 2, why: 'Vision 3D : fichiers de MediaPipe demandés et position des yeux renvoyée par sa propre fenêtre cachée (event.sender vérifié), jamais une commande ; allumée seulement pendant une partie' },
   'in-game-menu.ts': { count: 3, why: 'réglages en partie : la combinaison des MagnaSave passe par game.settings, fermée ; touches, boutons et canal de ses propres fenêtres (event.sender vérifié), qui n’existent qu’une fois le menu ouvert' },
+  'root-access.ts': { count: 2, why: 'Root Access (le jeu caché) : état de la partie (écran, étage, score) et signaux pour les LED (flip, bumper, étage…) envoyés par la page de sa propre fenêtre (event.sender vérifié), noms et valeurs bornés ; aucun geste, aucun réglage, rien n’est lancé' },
 };
 const INPUT_PATTERN = /ipcMain\.(?:on|once|handle|handleOnce)\(|globalShortcut\.register\(|'before-input-event'|(?<!function )onJoystickInput\(|(?<!function )onKeyInput\(/g;
 

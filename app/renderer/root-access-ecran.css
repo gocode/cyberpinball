@@ -1,0 +1,70 @@
+/* ---------- Root Access : le fronton pendant le jeu (root-access-ecran.js) ----------
+   Tailles en cqmin de la zone du fronton. Couleurs de la marque : sarcelle pour la tour, vert signal pour l'étage joué. */
+.ra-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  justify-items: center;
+  align-items: center;
+  gap: 3cqmin;
+  padding: 8cqmin 10cqmin;
+  background: radial-gradient(ellipse at 50% 100%, #14403a99, transparent 60%), var(--void);
+}
+
+.ra-title {
+  color: var(--signal);
+  font-size: 7cqmin;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 2.4cqmin var(--signal-haze);
+}
+
+/* La tour : l'étage 1 en bas, le dernier en haut. */
+.ra-tower {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqmin;
+  width: 30cqmin;
+  height: 100%;
+  min-height: 0;
+}
+
+.ra-floor {
+  flex: 1 1 0;
+  border: 0.3cqmin solid var(--line-strong);
+  border-radius: 0.8cqmin;
+  background: var(--surface-sunken);
+  transition: background-color 0.4s, box-shadow 0.4s;
+}
+
+.ra-floor.ra-on {
+  background: color-mix(in oklab, var(--table-tint) 46%, #000);
+  border-color: var(--table-tint);
+}
+
+.ra-floor.now {
+  background: var(--signal);
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal);
+}
+
+.ra-level {
+  color: var(--ink-muted);
+  font-size: 5cqmin;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  min-height: 6cqmin;
+}
+
+.ra-name {
+  font-size: 6cqmin;
+  font-weight: 600;
+  text-align: center;
+  min-height: 7cqmin;
+}
+
+.ra-card[data-screen='dead'] .ra-name {
+  color: var(--danger);
+}

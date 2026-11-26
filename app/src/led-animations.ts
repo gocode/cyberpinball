@@ -27,6 +27,7 @@ import {
   writeLedAnimations,
   type CabinetLeds,
   type LedAnimationSettings,
+  type LedGrid,
 } from '@cyberpinball/core';
 import type { LedService } from './led-live';
 
@@ -65,6 +66,11 @@ export interface LedAnimationsOptions {
   dataDir: string;
   /** Millisecondes sans que personne n'ait touché à rien (AttractMode.idleFor). */
   idleFor: () => number;
+  /**
+   * Un écran qui joue sa propre lumière (Root Access) : tant qu'il rend un dessinateur, les bandes montrent
+   * ses images à la place de l'ambiance, quel que soit l'écran de la roue et sans extinction pour inactivité.
+   */
+  takeover?: () => ((grid: LedGrid, now: number) => Uint8Array) | undefined;
   now?: () => number;
   /** Remplaçables par les essais. */
   /** Graine du Florilège (par défaut : tirée au lancement). */
@@ -117,7 +123,7 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
 
   /** L'ouverture a démarré : ses animations LED ont leur instant de départ. */
   const introOn = (): boolean => context.phase === LED_INTRO_PHASE && context.introStartedAt !== undefined && Number.isFinite(context.introStartedAt);
-  const wanted = (): boolean => settings.enabled && (LED_AMBIENT_PHASES.includes(context.phase) || introOn()) && !idle && Boolean(usable());
+  const wanted = (): boolean => settings.enabled && Boolean(usable()) && (Boolean(options.takeover?.()) || ((LED_AMBIENT_PHASES.includes(context.phase) || introOn()) && !idle));
 
   function stopTimer(): void {
     if (timer !== undefined) clearTimer(timer);
@@ -142,18 +148,19 @@ export function createLedAnimations(options: LedAnimationsOptions): LedAnimation
     if (!leds || disposed || service.status().state !== 'running') return stopTimer();
     const saved = usable();
     if (!saved || testing(saved)) return clear();
+    const taken = options.takeover?.();
     const minutes = settings.idleMinutes;
-    if (minutes > 0 && options.idleFor() >= minutes * 60_000) {
+    if (!taken && minutes > 0 && options.idleFor() >= minutes * 60_000) {
       idle = true;
       return clear();
     }
     const t = now();
     // Juke-box : tant que le morceau joue (ou que sa dernière lumière s'éteint), les bandes suivent le son.
-    const follow = settings.jukeboxMusic && context.phase === 'jukebox' && music.active(t);
+    const follow = !taken && settings.jukeboxMusic && context.phase === 'jukebox' && music.active(t);
     if (follow) music.step(t);
     leds.strips.forEach((strip, i) => {
       const grid = { width: strip.width, height: strip.height, arrangement: strip.arrangement };
-      service.setFrame('#' + i, follow ? music.render(grid, settings.brightness) : engine.render(grid, t), 'ambient');
+      service.setFrame('#' + i, taken ? taken(grid, t) : follow ? music.render(grid, settings.brightness) : engine.render(grid, t), 'ambient');
     });
     shown = true;
   }

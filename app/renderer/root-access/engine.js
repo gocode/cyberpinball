@@ -30,6 +30,7 @@
   const TIRETTE_REPOS = 0.05;   // position sous laquelle la tirette est au repos
   const TRANSIT = 1.1;         // s de montée entre deux étages
   const FALL = 0.8;            // s de chute dans un vide
+  const DESCENTE = 1.0;        // s de descente d'un étage, bille perdue
   const TIP_IMPACT = 150;      // vitesse d'impact qui fait basculer une bascule
   const AIMANT_DUREE = 1;      // s pendant lesquelles l'aimant retient la bille sur un flip
   const AIMANT_PRISE = 0.15;   // s pour amener la bille au-dessus du flip
@@ -209,6 +210,7 @@
       immobile: null,            // { x, y, t } : depuis quand la bille ne bouge plus (secousse)
       secousses: 0,              // secousses depuis le dernier passage sur un flip
       transit: null,
+      descente: null,
       f: null,
     };
     enterFloor(g, 0);
@@ -576,7 +578,10 @@
         emit(g, { type: 'sauve-bille' });
         say(g, 'SAUVE-BILLE', 'signal', 2);
         toCradle(g);
+      } else if (g.floor > 0) {
+        startDescente(g);
       } else {
+        // Entre les flips du premier étage : plus d'étage où redescendre, la partie est perdue.
         g.status = 'dead'; g.statusT = 0;
         emit(g, { type: 'perdue' });
       }
@@ -587,6 +592,15 @@
       emit(g, { type: 'fuite', x: b.x, y: b.y });
       toCradle(g);
     }
+  }
+
+  // Bille perdue sous les flips : elle ne tue plus qu'au premier étage ; ailleurs, elle redescend d'un étage
+  // (qu'il faut rejouer : il est reconstruit à l'arrivée), score gardé. L'étage perdu se rejoue ensuite en remontant.
+  function startDescente(g) {
+    g.status = 'descente'; g.statusT = 0;
+    g.descente = { from: g.floor };
+    emit(g, { type: 'descente', from: g.floor });
+    say(g, 'BILLE PERDUE : RETOUR À L’ÉTAGE ' + g.floor, 'warning', 2.5);
   }
 
   function startTransit(g) {
@@ -668,6 +682,13 @@
         tickTimers(g, DT);
         if (g.statusT >= FALL) toCradle(g);
         break;
+      case 'descente': {
+        g.statusT += DT;
+        const u = clamp(g.statusT / DESCENTE, 0, 1);
+        g.camera = g.descente.from - u * u * (3 - 2 * u);
+        if (g.statusT >= DESCENTE) { const to = g.descente.from - 1; g.descente = null; enterFloor(g, to); }
+        break;
+      }
       case 'transit': {
         g.statusT += DT;
         const u = clamp(g.statusT / TRANSIT, 0, 1);
@@ -691,7 +712,7 @@
   }
 
   const Engine = {
-    W, H, DT, BALL_R, TRANSIT, FALL, BALL_SAVE, CONDUIT, AIMANT_DUREE, AIMANT_Y, TIRETTE_MIN, TIRETTE_REPOS,
+    W, H, DT, BALL_R, TRANSIT, FALL, DESCENTE, BALL_SAVE, CONDUIT, AIMANT_DUREE, AIMANT_Y, TIRETTE_MIN, TIRETTE_REPOS,
     createGame, enterFloor, step, release, saveDuration, toCradle, transitBall, hash, buildFloor, emit,
     ouvert, pointAimant,
   };

@@ -388,6 +388,7 @@ import { onKeyInput } from './key-input';
 import { joystickAxes, onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { createApplicationsMenu } from './applications-menu';
 import { createRootAccess } from './root-access';
+import { RootAccessLeds, rootAccessAnimation } from '@cyberpinball/core';
 import { createAppsBrowser, watchAppButtons } from './applications-browser';
 import { fetchSiteLook, storedIconSide } from './applications-icons';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
@@ -1070,6 +1071,8 @@ let vpxSettingsOpen: { about?: TableEntry } | undefined;
  * menu des tables, seul un écran qui parle d'une table la garde (fiche, médias du jeu…).
  */
 function screensSubject(): TableEntry | undefined {
+  // Root Access ouvert : aucune table n'est montrée ni entendue (ni PuP-Pack, ni vidéo) ; le jeu a son affichage.
+  if (rootAccess.isOpen()) return undefined;
   const find = (file: string | undefined) => (file ? tables.find((t) => samePath(t.file, file)) : undefined);
   return screensTable({
     phase: state.phase,
@@ -1179,6 +1182,8 @@ const surpriseGesture = new SurpriseGesture({
   },
   released: () => { void surprise.release(); },
 });
+// Root Access ouvert : les LED jouent le jeu (flips, bumpers, cibles, étages…), voir packages/core/src/root-access-led.ts.
+const rootAccessLeds = new RootAccessLeds(Date.now());
 // Root Access (root-access.ts, 26/11/2026) : le jeu de flipper caché, sur la zone du plateau. La roue
 // l'ouvre par une combinaison de flips (ROOT_ACCESS_SEQUENCE : gauche, droite, deux fois à gauche, deux
 // fois à droite, trois fois à gauche, trois fois à droite), qui la ramène sur sa table. Exit le ferme.
@@ -1195,6 +1200,8 @@ const rootAccess = createRootAccess({
   watchJoystick: watchJoystickButtons,
   claimJoystick: (win) => onJoystickInput(win, () => undefined),
   activity: () => void attract.activity(),
+  changed: () => broadcast(),
+  signal: (signal, arg) => rootAccessLeds.signal(signal, Date.now(), arg),
   closed: () => {
     rootAccessCombo.reset();
     void takeForeground();
@@ -1540,6 +1547,11 @@ const ledAnimations = createLedAnimations({
   service: ledService,
   dataDir: loc.dataDir,
   idleFor: () => attract.idleFor(),
+  takeover: () => {
+    if (!rootAccess.isOpen()) return undefined;
+    rootAccessLeds.setStatus(rootAccess.status(), Date.now());
+    return (grid, now) => rootAccessLeds.render(grid, now);
+  },
   leds: () => {
     if (!savedLedsMemo || Date.now() - savedLedsMemo.at > 5000) {
       const setup = readDof(loc);
@@ -7908,6 +7920,12 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Ce que le fronton montre de Root Access : l'écran, l'étage et son nom (le score vit sur le DMD). */
+function rootAccessCard() {
+  const { screen, floor, floors, name } = rootAccess.status() ?? { screen: 'titre' as const, floor: 1, floors: 6, name: '' };
+  return { screen, floor, floors, name };
+}
+
 function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   // En mode attente, chaque écran montre la table tirée au hasard ; la sélection ne bouge pas.
   const shown = attractTable();
@@ -7993,6 +8011,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     tint: mediaSettings.tableColor ? tints?.current()?.color : undefined,
     // DMD du menu vivant : où poser les points dans la zone du DMD de cette fenêtre (absent : DMD classique).
     liveDmd: liveDmdView(role),
+    // Root Access ouvert : où en est la partie, pour la carte du fronton (app/renderer/root-access-ecran.js).
+    rootAccess: rootAccess.isOpen() ? rootAccessCard() : undefined,
     medias: subject ? mediasOf(subject) : defaults,
     preload,
     // Ouverture au démarrage : l'écran de chaque rôle de cette fenêtre, et l'invite du plateau.
@@ -8340,6 +8360,8 @@ const dmdWheels = new DmdWheels({ converter: () => (converter ??= createConverte
 let dmdShown: { file: string; index: number } | undefined;
 /** Animation jouée sur le DMD pendant le lancement d'une table : « lancement » (cinéma) ou « chargement ». */
 let loadingDmd: LiveDmdAnimationHandle | undefined;
+/** Le DMD de Root Access (packages/core/src/root-access-dmd.ts), tant que le jeu est ouvert. */
+let rootAccessDmd: LiveDmdAnimationHandle | undefined;
 /** Records lus de chaque table, relus quand son VPReg.stg change (après une partie). */
 const recordsCache = new Map<string, { stamp: string; records?: TableRecords }>();
 /** Cadre de chaque média FullDMD par adresse (elle change avec le fichier), une fois lu ou cherché. */
@@ -8365,7 +8387,7 @@ function dmdWindow(): BrowserWindow | undefined {
 
 /** Le DMD vivant se montre : réglé ainsi, un écran du DMD, ni partie ni mode bureau. */
 function liveDmdOn(): boolean {
-  return (mediaSettings.dmd === 'live' || jukeboxDmd()) && Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active;
+  return (mediaSettings.dmd === 'live' || jukeboxDmd() || rootAccess.isOpen()) && Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active;
 }
 
 /** Le DMD est au Juke-box : son médaillon choisi dans la roue, ou le lecteur ouvert (points même en DMD classique). */
@@ -8437,7 +8459,7 @@ function autoDmdPlace(table: TableEntry | undefined): { zone: ReturnType<typeof 
 function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean; hidden?: boolean; editing?: string } | undefined {
   if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
   // Juke-box : la bande 4:1 à sa place automatique, sur du noir (le spectre, JUKE-BOX) ; l'Arène de même (son tableau des records).
-  if (jukeboxDmd() || arenaDmd()) {
+  if (jukeboxDmd() || arenaDmd() || rootAccess.isOpen()) {
     const auto = autoDmdPlace(undefined);
     return auto ? { area: auto.zone, framed: false } : undefined;
   }
@@ -8468,7 +8490,15 @@ function syncLiveDmd(): void {
   if (!liveDmdOn() && !hardware) {
     loadingDmd?.stop();
     loadingDmd = undefined;
+    rootAccessDmd?.stop();
+    rootAccessDmd = undefined;
     return liveDmd.pause();
+  }
+  // Root Access : son score, son étage, à la place de l'alternance de la table (le score est relu à chaque image).
+  if (rootAccess.isOpen()) rootAccessDmd ??= liveDmd.custom('root-access', rootAccessAnimation(() => rootAccess.status()));
+  else if (rootAccessDmd) {
+    rootAccessDmd.stop();
+    rootAccessDmd = undefined;
   }
   // Chargement : l'animation du lancement en cinéma (le logo traverse l'afficheur, puis le titre et la bille), sinon celle du chargement.
   const launch = cinema.subject;
@@ -8580,7 +8610,7 @@ function broadcast(): void {
   syncLiveDmd();
   jukeboxPlayer.syncDmd((state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging());
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
-  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active && !surprise.busy);
+  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active && !surprise.busy && !rootAccess.isOpen());
   if (!attract.active) attractIndex = undefined;
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));

@@ -84,6 +84,7 @@
       lance: (c) => { hiss(0.08, 900 + 1400 * c, 0.5, 0.6); tone(90 + 120 * c, 60, 0.12, 'square', 0.18); },
       chute: () => { tone(500, 50, 0.7, 'sine', 0.4); },
       sauve: () => { tone(523, 523, 0.08, 'sine', 0.35); tone(784, 784, 0.14, 'sine', 0.35, 0.08); },
+      descente: () => { tone(420, 70, 0.9, 'triangle', 0.4); hiss(0.3, 400, 0.2, 0.6); },
       perdue: () => { tone(220, 30, 1.1, 'sawtooth', 0.25); hiss(0.6, 300, 0.4, 0.5); },
       chaine: () => { [1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.07, 'sine', 0.3, i * 0.05)); },
       catapulte: () => { tone(180, 520, 0.16, 'triangle', 0.45); hiss(0.1, 1400, 0.2, 0.8); },
@@ -92,9 +93,12 @@
 
     // Relevé du coût de chaque son (appels et millisecondes), lu par la mesure de charge.
     const sonStats = {};
+    // Dans Cyber Pinball, chaque son est aussi un signal pour les LED de la borne (window.borne, root-access-preload.ts) :
+    // le flip, le bumper, la cible, la sortie d'étage, la bille perdue… allument les LED comme une table de flipper.
+    const signal = (nom, arg) => { try { if (window.borne && window.borne.signal) window.borne.signal(nom, arg); } catch (e) { /* les LED ne gênent jamais le jeu */ } };
     for (const k of Object.keys(SFX)) {
       const f0 = SFX[k];
-      SFX[k] = (...args) => { const t = performance.now(); f0(...args); const s = sonStats[k] || (sonStats[k] = { n: 0, ms: 0 }); s.n++; s.ms += performance.now() - t; };
+      SFX[k] = (...args) => { const t = performance.now(); f0(...args); signal(k, args[0]); const s = sonStats[k] || (sonStats[k] = { n: 0, ms: 0 }); s.n++; s.ms += performance.now() - t; };
     }
 
     // ---------- Suivi de l'état (après chaque pas du moteur) ----------
@@ -137,7 +141,7 @@
       for (const fl of f.flippers) {
         const up = fl.w * (fl.up - fl.rest) > 0.01;
         if (up) flipUp.set(fl, now);
-        if (up && !flipWasUp.get(fl) && son) SFX.flip();
+        if (up && !flipWasUp.get(fl) && son) SFX.flip(fl.side);
         flipWasUp.set(fl, up);
       }
 
@@ -163,6 +167,7 @@
         else if (e.type === 'chute') SFX.chute();
         else if (e.type === 'sauve-bille') SFX.sauve();
         else if (e.type === 'perdue') SFX.perdue();
+        else if (e.type === 'descente') SFX.descente();
         else if (e.type === 'porte-fermee' || e.type === 'pont-releve') SFX.ferme();
         else if (e.type === 'catapulte') SFX.catapulte();
         else if (e.type === 'aimant') SFX.aimant();

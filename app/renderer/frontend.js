@@ -1843,7 +1843,9 @@ function renderZones(s, burst = false) {
     const collectionsZone = Boolean(window.CyberCollections?.zone(z.node, z.role, s));
     // Applications : l'affiche du médaillon au fronton ; l'écran ouvert, la grille au fronton et le nom au DMD.
     const appsZone = Boolean(window.CyberApplications?.zone(z.node, z.role, s));
-    if (jukeboxZone || communityZone || arenaZone || collectionsZone || appsZone) {
+    // Root Access : le titre et la tour des étages au fronton, aucun média au DMD (root-access-ecran.js).
+    const rootAccessZone = Boolean(window.CyberRootAccess?.zone(z.node, z.role, s));
+    if (jukeboxZone || communityZone || arenaZone || collectionsZone || appsZone || rootAccessZone) {
       z.layer.show(undefined);
       z.layer.setActive(false);
       continue;
