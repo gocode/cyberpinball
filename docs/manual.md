@@ -61,6 +61,7 @@ A new section gets its heading below, in its place, and its translation in [manu
 ## [Feedback and ideas](manual/feedback-and-ideas.md)
 ## [Shutting down, sleeping, restarting the cabinet](manual/shutting-down-sleeping-restarting-the-cabinet.md)
 ## [Guest mode](manual/guest-mode.md)
+## [Parental controls](manual/parental-controls.md)
 ## [Backups](manual/backups.md)
 ## [My account](manual/my-account.md)
 ## [Community: the cabinet network](manual/friends-the-cabinet-network.md)
