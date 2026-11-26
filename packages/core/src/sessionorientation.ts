@@ -226,6 +226,36 @@ export class SessionOrientation {
     return report;
   }
 
+  /**
+   * Un écran tourné le temps d'une application (Edge sur le playfield en portrait, 26/11/2026) : même
+   * mécanisme que `want` (origine notée avant, reprise après plantage, rendue à la sortie, gardée
+   * par `check` après une veille), mais l'orientation de jeu d'avant se remet par `giveBack`, quelle
+   * que soit la façon dont l'application se ferme. Rien n'est tourné quand la session n'est pas active
+   * (bureau, partie sur l'orientation de Windows : `active` le dit) ; `giveBack` ne change alors rien.
+   */
+  lend(fingerprint: string, rotation: Rotation): { report: OrientationReport; giveBack(): OrientationReport } {
+    const before = this.wanted.get(fingerprint);
+    let given = false;
+    const giveBack = (): OrientationReport => {
+      const report: OrientationReport = { turned: [], problems: [] };
+      if (given) return report;
+      given = true;
+      if (before === undefined) this.wanted.delete(fingerprint);
+      else this.wanted.set(fingerprint, before);
+      // Après la sortie (end) l'origine est déjà rendue ; au bureau, la reprise (resume) remettra l'orientation de jeu.
+      if (this.state === 'active') {
+        this.apply(report);
+        this.save();
+      }
+      return report;
+    };
+    if (this.state !== 'active') return { report: { turned: [], problems: [] }, giveBack };
+    const report = this.want(fingerprint, rotation);
+    // Refusé par Windows : want a oublié l'orientation de jeu d'avant, elle revient.
+    if (report.problems.length && before !== undefined) this.wanted.set(fingerprint, before);
+    return { report, giveBack };
+  }
+
   /** L'assistant n'a plus d'orientation à garder pour cet écran (rotation non confirmée, déjà remise). */
   forget(fingerprint: string): void {
     this.wanted.delete(fingerprint);

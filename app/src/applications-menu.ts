@@ -112,7 +112,7 @@ export interface ApplicationsMenuHost {
    * Le playfield tourné pour qu'Edge y dessine le site à l'endroit : son rectangle tourné, et de quoi
    * rendre l'orientation de jeu. undefined : rien à tourner (ou pas de playfield relevé).
    */
-  portrait?(): { rect: ScreenRect; leave(): void } | undefined;
+  portrait(): { rect: ScreenRect; leave(): unknown } | undefined;
   browser: AppsBrowser;
   /** Boutons de la borne pendant une application (watchAppButtons). */
   buttons: {
@@ -382,10 +382,10 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
   function openApp(app: AppEntry): void {
     if (running) running.session.finish();
     if (!host.browser.browser()) return openMissing();
-    let turned: { rect: ScreenRect; leave(): void } | undefined;
+    let turned: { rect: ScreenRect; leave(): unknown } | undefined;
     let rect = host.screen(app.screen);
     if (app.screen === 'playfield' && rect) {
-      turned = host.portrait?.();
+      turned = host.portrait();
       if (turned) rect = turned.rect;
     }
     rect ??= host.screen('backglass') ?? host.screen('playfield');

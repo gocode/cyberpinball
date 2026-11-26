@@ -25,9 +25,23 @@ import {
   portraitTurn,
   sameSite,
   saveApplications,
+  turnPlayfieldForApp,
   type AppEntry,
 } from '../applications';
+import { toPhysicalScreen } from '../fingerprint';
 import { setLanguage } from '../i18n';
+import type { Cabinet, Rotation } from '../model';
+import {
+  ORIENTATION_FILE,
+  readSimulatedOrientations,
+  rotateSimulated,
+  SessionOrientation,
+  sessionScreens,
+  SIMULATED_ORIENTATION_FILE,
+  wantedOrientations,
+  withSimulatedOrientations,
+} from '../sessionorientation';
+import { devPcDisplays, emptyCabinet } from './fixtures';
 import { frontendSource } from './frontend-source';
 
 setLanguage('fr');
@@ -149,7 +163,14 @@ function fakeSession(app: AppEntry) {
   };
 }
 
-function makeMenu() {
+interface MenuOptions {
+  /** La liste écrite avant l'ouverture du menu (sinon les six d'office). */
+  apps?: AppEntry[];
+  portrait?: () => { rect: unknown; leave(): unknown } | undefined;
+  screen?: (where: string) => unknown;
+}
+
+function makeMenu(options: MenuOptions = {}) {
   // Le module du front-end charge @cyberpinball/core, comme dans l'application.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createApplicationsMenu } = require(path.join(APP_DIST, 'applications-menu.js'));
@@ -168,8 +189,9 @@ function makeMenu() {
     },
     keys: () => ({ previous: ['ArrowLeft'], next: ['ArrowRight'], confirm: ['Enter'], exit: ['Escape'] }),
     zoneKeys: () => ['ShiftLeft'],
-    screen: (where: string) => (where === 'backglass' ? { x: 1920, y: 0, width: 1920, height: 1080 } : { x: 0, y: 0, width: 1920, height: 1080 }),
+    screen: options.screen ?? ((where: string) => (where === 'backglass' ? { x: 1920, y: 0, width: 1920, height: 1080 } : { x: 0, y: 0, width: 1920, height: 1080 })),
     fronton: () => true,
+    portrait: options.portrait ?? (() => undefined),
     browser: {
       browser: () => ({ exe: 'edge.exe', kind: 'edge' }),
       open: (app: AppEntry, rect: unknown) => {
@@ -188,6 +210,7 @@ function makeMenu() {
     iconUrl: (file: string) => `media://${file}`,
     edgeDownloadUrl: 'https://exemple.example.com/edge',
   };
+  if (options.apps) saveApplications(host.dataDir, { apps: options.apps });
   const menu = createApplicationsMenu(host);
   menu.open(() => backs++);
   return {
@@ -281,6 +304,113 @@ test('Retour à la roue depuis la grille', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Playfield en portrait : Windows tourne l'écran le temps de l'application, puis le rend
+// (écrans simulés : jamais un vrai écran, jamais l'orientation réelle de Windows)
+
+/** Un playfield 1920 × 1080 simulé, sa session d'orientation (celle des parties) et les fichiers qui l'enregistrent. */
+function simulatedPlayfield(playfield: Cabinet['playfield']) {
+  const dir = tmp();
+  const panel = devPcDisplays()[3]!;
+  const screen = toPhysicalScreen(panel);
+  const cabinet: Cabinet = { ...emptyCabinet(), screens: [screen], roles: { playfield: screen.fingerprint }, playfield };
+  const simulatedFile = path.join(dir, SIMULATED_ORIENTATION_FILE);
+  const recordFile = path.join(dir, ORIENTATION_FILE);
+  const displays = () => withSimulatedOrientations([panel], readSimulatedOrientations(simulatedFile));
+  const options = { file: recordFile, screens: () => sessionScreens(displays(), cabinet), rotate: (gdiName: string, rotation: Rotation, persist: boolean) => rotateSimulated(simulatedFile, gdiName, rotation, persist) };
+  const session = new SessionOrientation(options);
+  session.start(wantedOrientations(cabinet));
+  const turn = () => turnPlayfieldForApp({ session, cabinet, displays });
+  return { cabinet, displays, session, options, turn, recordFile, rotation: () => displays()[0]!.rotation, bounds: () => displays()[0]!.bounds };
+}
+
+function playfieldApp(screen: AppEntry['screen']): AppEntry {
+  return { id: 'fictive', name: 'Fictive', url: 'https://fictive.example.com/', screen, color: '#112233', added: 'x' };
+}
+
+test('une application ouverte sur le playfield tourne l’écran puis le rétablit ; rien ne tourne sur le fronton', async () => {
+  // Flippers à gauche de l'image : Windows tourne l'écran de 270° pour les mettre en bas.
+  const sim = simulatedPlayfield({ flipperEdge: 'left' });
+  let calls = 0;
+  const portrait = () => (calls++, sim.turn());
+  const screen = (where: string) => (where === 'backglass' ? { x: 1920, y: 0, width: 1920, height: 1080 } : sim.bounds());
+
+  // Fronton : le crochet n'est pas même appelé, l'écran garde son orientation.
+  const backglass = makeMenu({ apps: [playfieldApp('backglass')], portrait, screen });
+  backglass.top().keys(key('keyDown', 'Enter'));
+  backglass.top().keys(key('keyUp', 'Enter'));
+  assert.equal(backglass.opened.length, 1);
+  assert.deepEqual(backglass.opened[0]!.rect, { x: 1920, y: 0, width: 1920, height: 1080 });
+  assert.equal(calls, 0);
+  assert.equal(sim.rotation(), 0);
+  backglass.sessions[0]!.finish();
+  await settle();
+  assert.equal(sim.rotation(), 0);
+
+  // Playfield : l'écran tourne avant l'ouverture, Edge est posé sur le rectangle tourné.
+  const m = makeMenu({ apps: [playfieldApp('playfield')], portrait, screen });
+  m.top().keys(key('keyDown', 'Enter'));
+  m.top().keys(key('keyUp', 'Enter'));
+  assert.equal(calls, 1);
+  assert.equal(sim.rotation(), 270);
+  assert.deepEqual(m.opened[0]!.rect, { x: 1920, y: 0, width: 1080, height: 1920 }, 'largeur et hauteur échangées');
+  assert.ok(fs.existsSync(sim.recordFile), 'l’origine est notée : un plantage laisse de quoi la rendre');
+  // Fermée (bouton, Edge fermé, Exit tenu : la session se termine) : l'orientation d'origine revient.
+  m.sessions[0]!.finish();
+  await settle();
+  assert.equal(sim.rotation(), 0);
+  assert.equal(fs.existsSync(sim.recordFile), false, 'plus rien à rendre');
+  assert.equal(m.menu.running(), undefined);
+});
+
+test('playfield : rien à tourner quand l’image est déjà à l’endroit, ou sans playfield relevé', () => {
+  const upright = simulatedPlayfield({ flipperEdge: 'bottom' });
+  assert.equal(upright.turn(), undefined);
+  assert.equal(upright.rotation(), 0);
+  const unknown = simulatedPlayfield({ flipperEdge: 'left' });
+  assert.equal(turnPlayfieldForApp({ session: unknown.session, cabinet: undefined, displays: unknown.displays }), undefined);
+  assert.equal(unknown.rotation(), 0);
+});
+
+test('playfield : l’orientation de jeu revient (pas celle de Windows), une seule fois', () => {
+  // Orientation de jeu 90° ; flippers en haut de l'image à 90° : l'application les veut en bas (270°).
+  const sim = simulatedPlayfield({ flipperEdge: 'left', windowsRotation: 90 });
+  assert.equal(sim.rotation(), 90);
+  const portrait = sim.turn();
+  assert.ok(portrait);
+  assert.equal(sim.rotation(), 270);
+  // Une veille qui remet Windows à son réglage pendant l'application : la session reprend le portrait.
+  sim.session.check();
+  assert.equal(sim.rotation(), 270);
+  portrait.leave();
+  assert.equal(sim.rotation(), 90, 'l’orientation de jeu, pas celle de Windows (0°)');
+  portrait.leave();
+  assert.equal(sim.rotation(), 90);
+});
+
+test('playfield : Cyber Pinball quitté ou planté pendant l’application, l’écran retrouve son orientation', () => {
+  // Quitté : la sortie de la session rend l'origine, puis la fermeture tardive d'Edge ne touche plus à rien.
+  const quit = simulatedPlayfield({ flipperEdge: 'right' });
+  const portrait = quit.turn();
+  assert.ok(portrait);
+  assert.equal(quit.rotation(), 90);
+  quit.session.end();
+  assert.equal(quit.rotation(), 0);
+  portrait.leave();
+  assert.equal(quit.rotation(), 0);
+  assert.equal(fs.existsSync(quit.recordFile), false);
+
+  // Planté : le fichier de la session reste ; le démarrage suivant rend l'origine.
+  const crash = simulatedPlayfield({ flipperEdge: 'left' });
+  assert.ok(crash.turn());
+  assert.equal(crash.rotation(), 270);
+  assert.ok(fs.existsSync(crash.recordFile));
+  const next = new SessionOrientation(crash.options);
+  next.start(wantedOrientations(crash.cabinet));
+  assert.equal(crash.rotation(), 0);
+  assert.equal(fs.existsSync(crash.recordFile), false);
+});
+
+// ---------------------------------------------------------------------------
 // Branchement dans le front-end
 
 test('frontend.ts : médaillon juste après le Juke-box, icônes servies, application fermée avant une partie et à la sortie', () => {
@@ -294,4 +424,7 @@ test('frontend.ts : médaillon juste après le Juke-box, icônes servies, applic
   const play = front.slice(front.indexOf('async function play(table: TableEntry'));
   assert.ok(play.indexOf('applicationsMenu.close();') >= 0 && play.indexOf('applicationsMenu.close();') < play.indexOf('\n}'), 'play() ferme l’application ouverte');
   assert.match(front, /'will-quit', \(\) => \{[^}]*applicationsMenu\.close\(\)/);
+  // Le playfield tourné pour l'application : le crochet du menu est branché sur la rotation de session (oublié le 26/11/2026).
+  const menuHost = front.slice(front.indexOf('createApplicationsMenu({'), front.indexOf('createGameReturn({'));
+  assert.match(menuHost, /portrait: \(\) => orientationForApp\(\)/);
 });

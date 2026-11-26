@@ -22,8 +22,10 @@ import {
   saveCabinet,
   SessionOrientation,
   sessionScreens,
+  turnPlayfieldForApp,
   wantedOrientations,
   fingerprintOf,
+  type AppPortrait,
   type Cabinet,
   type LegacyOrientation,
   type ObservedDisplay,
@@ -134,6 +136,16 @@ export function orientationForGame(game: string): void {
 /** Fin de cette partie : l'orientation de jeu revient. */
 export function orientationAfterGame(game: string): void {
   log(`retour de ${game}`, orientation.resume()); // i18n-ignore : journal
+}
+
+/**
+ * Application ouverte sur le playfield (applications-menu.ts) : l'écran est tourné pour que le bord
+ * du joueur soit en bas, par la rotation de session (origine notée avant, reprise après un
+ * plantage, rendue à la sortie de Cyber Pinball) ; `leave` rend l'orientation de jeu à la
+ * fermeture de l'application. undefined : rien à tourner (applications.ts, turnPlayfieldForApp).
+ */
+export function orientationForApp(): AppPortrait | undefined {
+  return turnPlayfieldForApp({ session: orientation, cabinet: loadCabinet(loc.dataDir), displays: observedDisplays, log: (report) => log('application', report) }); // i18n-ignore : journal
 }
 
 /**

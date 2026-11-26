@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications: an application opened on the playfield now shows the right way up for you, even when the playfield image is on its side: Windows turns the screen for as long as the application is open, then puts it back to its orientation when it closes (button, Edge closed or Cyber Pinball quit).
 - VR: Pimax headsets (Pimax OpenXR runtime) now start. If the runtime refuses something, the error is written to the headset log instead of a silent restart loop every 2 seconds.
 - If the headset companion stops right after launch before you have put the headset on, Cyber Pinball now waits longer and longer before trying again (up to 5 minutes).
 - Applications: when a site only has a small favicon, its sharing image (og:image) becomes its icon; applications already showing a small favicon look for it the next time the grid opens.

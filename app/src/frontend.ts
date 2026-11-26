@@ -400,7 +400,7 @@ import { activeVpxIni, audioOutputs, syncConfiguration, usbDevices } from './vpx
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
-import { answerLegacy, legacyDesktopTurned, orientationAfterGame, orientationForDesktop, orientationForGame, orientationFromDesktop, playfieldOrigin, takeOrientationProblems } from './display-orientation';
+import { answerLegacy, legacyDesktopTurned, orientationAfterGame, orientationForDesktop, orientationForApp, orientationForGame, orientationFromDesktop, playfieldOrigin, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
 import { followScreens, watchGameWindows } from './game-screens';
@@ -4190,8 +4190,9 @@ const arenaMenu = createArenaMenu({
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
 });
 // Applications (applications-menu.ts, 26/11/2026) : le médaillon après le Juke-box, la grille des sites
-// ouverts dans Edge sur un écran de la borne. Le playfield n'est pas tourné pour l'application : une
-// rotation d'écran pendant qu'Edge est ouvert replacerait les voiles et les fenêtres (screen-guard.ts).
+// ouverts dans Edge sur un écran de la borne. Sur le playfield, Windows tourne l'écran le temps de
+// l'application (display-orientation.ts, orientationForApp) pour que le site s'affiche à l'endroit ; les
+// voiles et les fenêtres du menu suivent le changement d'écrans (screen-guard.ts, followMenuScreens).
 const applicationsMenu = createApplicationsMenu({
   dataDir: loc.dataDir,
   library,
@@ -4205,6 +4206,7 @@ const applicationsMenu = createApplicationsMenu({
     return OFFSCREEN ? primaryRect() : electronScreen.dipToScreenRect(null, primaryRect());
   },
   fronton: () => Boolean(menuAssignments.backglass),
+  portrait: () => orientationForApp(),
   browser: createAppsBrowser({ dataDir: loc.dataDir, log: (line) => console.log(line) }),
   buttons: {
     keys: () => buttons ?? {},

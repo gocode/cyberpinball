@@ -15,8 +15,10 @@ import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { readJsonFile } from './store';
 import { EDGE_QUIET_ARGS, type ScreenRect } from './youtube-account';
-import { FLIPPER_EDGES } from './layout';
-import type { FlipperEdge, Rotation } from './model';
+import { fingerprintOf } from './fingerprint';
+import { currentFlipperEdge, FLIPPER_EDGES } from './layout';
+import type { Cabinet, FlipperEdge, ObservedDisplay, Rotation } from './model';
+import type { OrientationReport, SessionOrientation } from './sessionorientation';
 
 /** Liste des applications, dans le dossier des données. */
 export const APPLICATIONS_FILE = 'applications.json';
@@ -548,6 +550,52 @@ export function appBrowserArgs(profile: string, at: ScreenRect, url: string): st
 export function portraitTurn(edge: FlipperEdge, current: Rotation): Rotation | undefined {
   const steps = (FLIPPER_EDGES.length - FLIPPER_EDGES.indexOf(edge)) % FLIPPER_EDGES.length;
   return steps === 0 ? undefined : (((current + steps * 90) % 360) as Rotation);
+}
+
+export interface AppPortraitInput {
+  /** Orientations de la session (sessionorientation.ts) : celle qui note l'origine et la rend à la sortie. */
+  session: SessionOrientation;
+  cabinet: Cabinet | undefined;
+  /** Écrans tels que Windows les donne à cet instant (relus après la rotation). */
+  displays(): ObservedDisplay[];
+  log?(report: OrientationReport): void;
+}
+
+/** L'écran du playfield tourné pour une application : son rectangle une fois tourné, et de quoi rendre l'orientation d'avant. */
+export interface AppPortrait {
+  /** Pixels physiques du bureau (largeur et hauteur échangées après un quart de tour). */
+  rect: ScreenRect;
+  /** Rend l'orientation de jeu d'avant ; sans effet la seconde fois, et après la sortie (rendue alors par la session). */
+  leave(): OrientationReport;
+}
+
+/**
+ * Application ouverte sur le playfield (26/11/2026) : Windows tourne l'écran pour que le bord du joueur
+ * soit en bas (portraitTurn), le temps de l'application, par la rotation de session des parties
+ * (SessionOrientation.lend : origine notée avant, reprise après un plantage, rendue à la sortie).
+ * undefined : rien à tourner (playfield déjà à l'endroit, pas de playfield relevé, session sans la
+ * main) ou rotation refusée par Windows ; l'application s'ouvre alors dans l'orientation actuelle.
+ */
+export function turnPlayfieldForApp(input: AppPortraitInput): AppPortrait | undefined {
+  const fp = input.cabinet?.roles.playfield;
+  const find = () => (fp ? input.displays().find((d) => fingerprintOf(d).key === fp) : undefined);
+  const display = find();
+  if (!input.cabinet || !fp || !display || !input.session.active) return undefined;
+  const edge = currentFlipperEdge(input.cabinet, display);
+  const to = edge && portraitTurn(edge, display.rotation);
+  if (to === undefined) return undefined;
+  const lent = input.session.lend(fp, to);
+  input.log?.(lent.report);
+  const turned = find();
+  if (lent.report.problems.length || turned?.rotation !== to) {
+    input.log?.(lent.giveBack());
+    return undefined;
+  }
+  return { rect: { ...turned.bounds }, leave: () => {
+    const report = lent.giveBack();
+    input.log?.(report);
+    return report;
+  } };
 }
 
 // ---------------------------------------------------------------------------
