@@ -1394,6 +1394,8 @@ export function createLibrary(host: LibraryHost) {
       pointer: (x: number, y: number) => session.pointer(x, y),
       click: (button: 'left' | 'right', count: number) => session.click(button, count),
       scroll: (dx: number, dy: number) => session.wheel(dx, dy),
+      // Le miroir du téléphone : seulement si la session sait capturer sa fenêtre.
+      ...(session.capture ? { capture: (size: { width: number; height: number }, quality: number) => session.capture!(size, quality) } : {}),
       text: (del: number, ins: string) => {
         for (let i = 0; i < del; i++) session.key('Backspace');
         if (ins) session.type(ins);

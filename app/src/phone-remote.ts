@@ -144,6 +144,7 @@ import type { RemoteLevel } from './level-menu';
 import type { RemoteActivity } from './activity-menu';
 import type { RemotePageView } from './phone-pages';
 import { journalIncident } from './uncaught';
+import { createPhoneMirror, type MirrorShot } from './phone-mirror';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
 export type PhoneRemoteMode = 'lan' | 'loopback' | 'off';
@@ -523,6 +524,8 @@ export interface ExternalTarget {
   click(button: 'left' | 'right', count: number): void;
   /** Au sens de sendInputEvent d'Electron (wheelFor). */
   scroll(deltaX: number, deltaY: number): void;
+  /** Image de la fenêtre pour le miroir du téléphone (phone-mirror.ts) ; absent : pas de miroir, le pavé seul. */
+  capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   /** `del` retours arrière, puis `ins`. */
   text(del: number, ins: string): void;
   /** Tout le champ remplacé (Ctrl+A puis le texte). */
@@ -588,6 +591,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-niveau.js': 'telephone/telephone-niveau.js',
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   '/telephone-retour.js': 'telephone/telephone-retour.js',
+  '/telephone-miroir.js': 'telephone/telephone-miroir.js',
   '/telephone-volume.js': 'telephone/telephone-volume.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
@@ -710,6 +714,23 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let active: Link | undefined;
   const sockets = new Set<import('node:stream').Duplex>();
   const links = new Set<WebSocketLink>();
+  /**
+   * Miroir de la fenêtre externe (Edge) au téléphone, en option au pavé tactile (phone-mirror.ts).
+   * Il ne capture que si le téléphone l'a demandé, qu'il est relié et accepté, et que la fenêtre
+   * sait se capturer ; le pavé (move, click, scroll) n'en sait rien.
+   */
+  const mirror = createPhoneMirror({
+    live: () => Boolean(active && pairing?.session() === 'paired' && !target && external?.capture && mode() === 'browser'),
+    rect: () => external?.rect(),
+    capture: async (size, quality) => external?.capture?.(size, quality),
+    send: (message) => {
+      if (active) sendTo(active, message);
+    },
+    pointer: (x, y) => external?.pointer(x, y),
+    click: (button, count) => external?.click(button, count),
+    wheel: (dx, dy) => external?.scroll(dx, dy),
+    log,
+  });
   let ticker: NodeJS.Timeout | undefined;
   let lastBar = '';
   let lastPhase: string | undefined;
@@ -1051,6 +1072,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ws.onClose(() => {
       links.delete(ws);
       if (active?.ws === ws) {
+        mirror.stop();
         if (upload?.link === active) void abortUpload(undefined);
         active = undefined;
         showPointer(false);
@@ -1134,6 +1156,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     sendTo(link, { t: 'end', why });
     link.ws.close();
     if (active === link) {
+      mirror.stop();
       active = undefined;
       releaseButtons();
     }
@@ -1155,7 +1178,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     const relay = isKept ? opts.relay?.url() : undefined;
     sendTo(link, { t: 'ready', kept: isKept, ...(name ? { name } : {}), ...(nameIssue ? { nameIssue } : {}), ...(relay ? { relay } : {}) });
     lastActivity = Date.now();
-    // Une liaison neuve : la vue Scores redemande ce qu'elle montre (« ranks »).
+    // Une liaison neuve : le miroir est à redemander (la page le fait dès qu'elle reçoit la page), et la vue Scores redemande ce qu'elle montre (« ranks »).
+    mirror.stop();
     ranksWatch = undefined;
     communityOpen = undefined;
     profileOpen = undefined;
@@ -1535,7 +1559,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   function pageState(): Record<string, unknown> | undefined {
     if (!target && external) {
       const p = external.page();
-      return { page: { title: p.title.slice(0, 120), host: p.host, canBack: true, canForward: false }, actions: external.actions() };
+      // `mirror` : le miroir de la fenêtre est possible ; la page du téléphone n'en propose le bouton que dans ce cas.
+      return { page: { title: p.title.slice(0, 120), host: p.host, canBack: true, canForward: false }, actions: external.actions(), ...(external.capture ? { mirror: true } : {}) };
     }
     if (!target || target.view.webContents.isDestroyed()) return undefined;
     const wc = target.view.webContents;
@@ -1934,6 +1959,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   function handle(link: Link, message: PhoneMessage): void {
     if (message.t === 'bye') {
       log('Télécommande : le téléphone s’est déconnecté.'); // i18n-ignore : journal
+      mirror.stop();
       if (upload?.link === link) void abortUpload(undefined);
       pairing?.end();
       link.ws.close();
@@ -1947,7 +1973,12 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (pairing?.session() !== 'paired' || message.t === 'ping') return;
     // Ce que la page a obtenu du nom : pas un geste (l'inactivité ne repart pas).
     if (message.t === 'name') return phoneNameResult(message.r);
+    // Miroir : l'accusé d'une image n'est pas un geste non plus ; la demande, les appuis et les glissements en sont.
+    if (message.t === 'mirror-ack') return mirror.ack(message.n);
     lastActivity = Date.now();
+    if (message.t === 'mirror') return mirror.request(message.on, { w: message.w, h: message.h });
+    if (message.t === 'tap') return mirror.tap(message);
+    if (message.t === 'mscroll') return mirror.scroll(message);
     // L'envoi ne passe pas par la file des gestes : sa réponse ne doit pas attendre une injection.
     if (message.t === 'up') return void startUpload(link, message);
     // Les classements non plus : une lecture, sans geste injecté à la borne.
@@ -2529,6 +2560,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /** La fenêtre d'un autre programme s'ouvre (Edge) : le téléphone connecté passe au pavé tactile. */
   function attachExternal(next: ExternalTarget): void {
+    mirror.stop();
     external = next;
     // Le QR code d'association vit tant qu'Edge est ouvert : l'écran de connexion le montre en grand.
     surfaces.add('browser');
@@ -2543,6 +2575,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   function detachExternal(next?: ExternalTarget): void {
     if (!external || (next && next !== external)) return;
+    mirror.stop();
     external = undefined;
     if (!target) surfaces.delete('browser');
     log('Télécommande : fenêtre externe fermée, le téléphone revient au front-end.'); // i18n-ignore : journal

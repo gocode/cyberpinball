@@ -268,6 +268,7 @@ export * from './gamenotice';
 export * from './dmdscore';
 export * from './remote';
 export * from './remote-name';
+export * from './remote-mirror';
 export * from './remote-kept';
 export * from './remote-relay';
 export * from './remote-menus';

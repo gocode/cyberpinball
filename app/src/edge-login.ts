@@ -22,6 +22,7 @@ import {
   type CookieRecord,
   type ScreenRect,
 } from '@cyberpinball/core';
+import { captureWindow, windowCapture, type MirrorShot } from './phone-mirror';
 
 export interface KeyMods {
   shift?: boolean;
@@ -45,6 +46,8 @@ export interface EdgeWindowOps {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Image de la fenêtre (miroir du téléphone, phone-mirror.ts) ; absent si la capture n'est pas possible. */
+  capture?(win: unknown, size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
 }
 
 export interface EdgeLoginOptions {
@@ -71,6 +74,8 @@ export interface EdgeSession {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Image de la fenêtre d'Edge, pour le miroir du téléphone ; absent si la capture n'est pas possible. */
+  capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   type(text: string): void;
   key(key: EdgeKey, mods?: KeyMods): void;
   /** Tout le champ remplacé : Ctrl+A, puis le texte (ou Retour arrière s'il est vide). */
@@ -112,6 +117,7 @@ export function edgeWindowOps(): EdgeWindowOps {
     pointer: (x, y) => void w.setCursorPosition(x, y),
     click: (button, count) => void w.mouseClick(button, count),
     wheel: (dx, dy) => void w.mouseWheel(dx, dy),
+    capture: (win, size, quality) => captureWindow((win as Win).handle, size, quality),
   };
 }
 
@@ -239,6 +245,7 @@ export function createEdgeLogin(opts: EdgeLoginOptions) {
       pointer: (x, y) => win && ops().pointer(x, y),
       click: (button, count) => ready() && ops().click(button, count),
       wheel: (dx, dy) => win && ops().wheel(dx, dy),
+      ...windowCapture(ops, () => win),
       type: (text) => ready() && ops().type(text),
       key: (k, mods) => ready() && ops().key(VK[k], mods),
       set: (value) => {

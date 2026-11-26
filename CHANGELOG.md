@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Télécommande du téléphone : un bouton "Pavé" / "Miroir" pour les fenêtres Edge (rubrique Applications, connexion YouTube du Juke-box). En "Miroir", tu vois sur ton téléphone le site affiché à l'écran de la borne : touche une image pour cliquer, glisse pour défiler, appui long pour le clic droit. Le pavé tactile reste le réglage de départ. Les vidéos protégées (Netflix, Prime Video, Disney+) restent noires dans le miroir.
 - Coulisses : les préversions partent plus régulièrement. Chaque lot de corrections est d'abord essayé à part, et la version de travail n'avance que si tous les tests passent. Si une correction fait tomber un test, elle est écartée avec sa cause et les autres partent sans elle.
 - Coulisses : un test qui se lance sur une sortie illisible est refait au lieu de bloquer la livraison, et les tests qui relisent tout le code sont passés à chaque vérification.
 - Applications : une application ouverte sur le playfield s'affiche maintenant à l'endroit pour toi, même quand l'image du playfield est couchée : Windows tourne l'écran le temps de l'application, puis le remet dans son orientation à sa fermeture (bouton, Edge fermé ou Cyber Pinball quitté).

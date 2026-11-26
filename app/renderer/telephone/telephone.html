@@ -240,6 +240,27 @@
           </form>
         </section>
       </div>
+      <!-- Miroir du navigateur (telephone-miroir.js) : offert quand la fenêtre d'Edge de la borne se capture ;
+           « Pavé » reste le réglage de départ. -->
+      <div class="mirror-seg" id="mirror-seg" role="group">
+        <button type="button" class="seg-tab" id="mirror-tab-pad" aria-selected="true" data-i18n>Pavé</button>
+        <button type="button" class="seg-tab" id="mirror-tab-mirror" aria-selected="false" data-i18n>Miroir</button>
+      </div>
+      <div class="mirror" id="mirror">
+        <canvas class="mirror-canvas" id="mirror-canvas" width="1" height="1"></canvas>
+        <div class="mirror-hint" id="mirror-wait">
+          <span data-i18n>Image du navigateur en cours d'arrivée…</span>
+        </div>
+        <div class="mirror-hint mirror-gestures" id="mirror-gestures">
+          <span data-i18n>Touche pour cliquer</span>
+          <span data-i18n>Glisse pour défiler</span>
+          <span data-i18n>Appui long pour le clic droit</span>
+          <span class="mirror-limit" data-i18n>Les vidéos protégées (Netflix, Prime Video, Disney+) s'affichent en noir.</span>
+        </div>
+        <div class="mirror-hint mirror-broken" id="mirror-broken">
+          <span data-i18n>La borne n'arrive pas à capturer la fenêtre. Reviens au pavé.</span>
+        </div>
+      </div>
       <div class="pad" id="pad">
         <div class="pad-hint" id="pad-hint">
           <span data-i18n>Glisse pour déplacer le pointeur</span>
@@ -337,6 +358,7 @@
     <script src="telephone-jukebox.js"></script>
     <script src="telephone-volume.js"></script>
     <script src="telephone-retour.js"></script>
+    <script src="telephone-miroir.js"></script>
     <script src="telephone.js"></script>
   </body>
 </html>

@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Phone remote: a "Pad" / "Mirror" button for Edge windows (Applications section, Jukebox YouTube sign-in). In "Mirror", you see on your phone the site shown on the cabinet screen: tap an image to click, swipe to scroll, long press to right-click. The touch pad is still the default. Protected videos (Netflix, Prime Video, Disney+) stay black in the mirror.
 - Behind the scenes: prereleases ship more steadily. Each batch of fixes is first tried on its own, and the working version only moves forward when every test passes. If a fix breaks a test, it is set aside with its cause and the others ship without it.
 - Behind the scenes: a test run with unreadable output is redone instead of blocking the release, and the tests that re-read the whole code base run on every check.
 - Applications: an application opened on the playfield now shows the right way up for you, even when the playfield image is on its side: Windows turns the screen for as long as the application is open, then puts it back to its orientation when it closes (button, Edge closed or Cyber Pinball quit).

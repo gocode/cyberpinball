@@ -1250,6 +1250,8 @@ function connect(force = false) {
     releaseButtons(false);
     // La borne oublie la vue Scores avec la liaison : la suivante la redemande (message « mode »).
     ranks.live = false;
+    // Le miroir aussi : la borne l'arrête avec la liaison, la suivante le redemande (message « page »).
+    mirrorLinkLost();
     // Un envoi est lié à sa connexion : coupée, il s'arrête (la borne efface ce qu'elle avait reçu).
     if (upload && (upload.phase === 'asking' || upload.phase === 'sending')) failUpload(t('La liaison avec la borne a été coupée. Sélectionne à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
     // Téléphone gardé et Cyber Pinball fermé : il revient seul quand la borne écoute de nouveau.
@@ -1327,6 +1329,7 @@ function handle(m) {
     }
     case 'mode':
       setMode(m.mode);
+      mirrorMode();
       // La grille des tables montrée : la borne joint l'image du fronton de chaque table.
       if (gridOn && m.mode === 'menu') send({ t: 'grid', on: true });
       // Une liaison neuve (ou une partie qui commence) : la vue Scores ouverte redemande son tableau.
@@ -1405,6 +1408,14 @@ function handle(m) {
       showPage(m.page ?? {});
       actions = Array.isArray(m.actions) ? m.actions : [];
       search = m.search;
+      // Le miroir (telephone-miroir.js) : la fenêtre se capture-t-elle ? S'il est choisi, la borne le redemande ici.
+      mirrorPage(m);
+      break;
+    case 'frame':
+      void mirrorFrame(m);
+      break;
+    case 'mirror-state':
+      mirrorState(m);
       break;
     case 'chat':
       chat = m.chat && typeof m.chat === 'object' && typeof m.chat.key === 'string' && Array.isArray(m.chat.lines) ? m.chat : null;

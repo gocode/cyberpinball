@@ -44,6 +44,7 @@ import { RANKING_SCOPES, type RankingScope } from './rankings';
 import { SCORE_PERIODS, type ScorePeriod } from './scoreboard';
 import { REMOTE_PHONE_NAME_RESULTS, type RemotePhoneNameResult } from './remote-name';
 import { isRoomId } from './rooms';
+import { parseMirrorMessage, type MirrorMessage } from './remote-mirror';
 
 /** Durée de validité d'un QR code (sa clé d'appairage), puis il se renouvelle. */
 export const REMOTE_PAIRING_MS = 3 * 60_000;
@@ -520,6 +521,8 @@ export type PhoneMessage =
    * commande, ou « read » pour le seul niveau. Dans tous les modes : menu, partie, applications.
    */
   | { t: 'vol'; s: number; c: RemoteVolumeCommand }
+  /** Miroir du navigateur (remote-mirror.ts) : demande, accusé d'image, appui, glissement. */
+  | MirrorMessage
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -689,6 +692,11 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'activity-act':
       if (m.a === 'clear') return m.ref === undefined ? { t: 'activity-act', s, a: 'clear' } : undefined;
       return m.a === 'open' && isHexId(m.ref) ? { t: 'activity-act', s, a: 'open', ref: m.ref } : undefined;
+    case 'mirror':
+    case 'mirror-ack':
+    case 'tap':
+    case 'mscroll':
+      return parseMirrorMessage(m, s);
     case 'ping':
       return { t: 'ping', s };
     case 'bye':

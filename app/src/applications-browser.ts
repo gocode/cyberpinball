@@ -31,6 +31,7 @@ import {
   type SeekPress,
 } from '@cyberpinball/core';
 import { edgeWindowOps, type EdgeKey, type EdgeWindowOps, type KeyMods } from './edge-login';
+import { windowCapture, type MirrorShot } from './phone-mirror';
 
 const VK: Record<EdgeKey, number> = { Enter: 0x0d, Tab: 0x09, Backspace: 0x08, ArrowLeft: 0x25, ArrowUp: 0x26, ArrowRight: 0x27, ArrowDown: 0x28, Space: 0x20, Escape: 0x1b };
 const VK_A = 0x41;
@@ -66,6 +67,8 @@ export interface AppSession {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Image de la fenêtre, pour le miroir du téléphone ; absent si la capture n'est pas possible. */
+  capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   type(text: string): void;
   key(key: EdgeKey, mods?: KeyMods): void;
   /** Tout le champ remplacé : Ctrl+A, puis le texte (ou Retour arrière s'il est vide). */
@@ -136,6 +139,7 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
       pointer: (x, y) => win && ops().pointer(x, y),
       click: (button, count) => ready() && ops().click(button, count),
       wheel: (dx, dy) => win && ops().wheel(dx, dy),
+      ...windowCapture(ops, () => win),
       type: (text) => ready() && ops().type(text),
       key: (k, mods) => ready() && ops().key(VK[k], mods),
       set: (value) => {
