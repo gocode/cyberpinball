@@ -195,6 +195,7 @@ export * from './systemmemory';
 export * from './systemsearch';
 export * from './systemsearch-places';
 export * from './guestmode';
+export * from './parental';
 export * from './health';
 export * from './techsheet';
 export * from './update';
