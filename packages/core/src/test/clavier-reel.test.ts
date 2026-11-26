@@ -58,10 +58,10 @@ test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bou
       home,
       [
         // « Boutons du jeu » s'ouvre sur les touches actuelles. Flèches jusqu'à « Crédit »
-        // (après les quatre actions), Entrée (Start) le refait, 5 le relève.
-        ...keyboard(...repeat('ArrowRight', 8), 'Enter', 'Digit5'),
+        // (après les cinq actions), Entrée (Start) le refait, 5 le relève.
+        ...keyboard(...repeat('ArrowRight', 9), 'Enter', 'Digit5'),
         // Le lanceur choisi puis laissé : Retour arrière annule, sa touche reste.
-        ...keyboard(...repeat('ArrowRight', 9), 'Enter', 'Backspace'),
+        ...keyboard(...repeat('ArrowRight', 10), 'Enter', 'Backspace'),
         // « Quitter sans enregistrer ? » : Échap répond non, l'étape reprend.
         'click:#quit',
         ...keyboard('Escape'),

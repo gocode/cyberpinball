@@ -186,6 +186,7 @@ import { nextAssignableRole } from './wizard-roles';
 import { openSoundPanel } from './sound-panel';
 import { quickCheckCabinet, quickCheckTexts, setupsView } from './sound-setups';
 import { probeAudioJacks } from '@cyberpinball/win-displays';
+import { lignePourLeJournal, reperer } from './ouverture-chrono';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
@@ -323,7 +324,25 @@ interface ButtonCapture {
   notice?: string;
   /** Section « Boutons avancés » dépliée (repliée par défaut : advanced-buttons.ts). */
   advancedOpen?: boolean;
+  /** Ce que chaque touche relevée, passée ou remise par défaut a changé, la dernière en dernier : « Annuler la dernière touche » les défait une à une. */
+  history?: UndoStep[];
 }
+
+/** L'état du relevé juste avant un changement, et ce que le retour dit au joueur. */
+interface UndoStep {
+  message: string;
+  keys: SetKeys;
+  answered: string[];
+  tried: string[];
+  lost?: Record<string, string>;
+  last?: string;
+  index: number;
+  phase: Phase;
+  action: number;
+}
+
+/** Annulations gardées : bien plus que les boutons d'une borne. */
+const UNDO_LIMIT = 50;
 
 interface SoundStep {
   /** Sorties proposées, dans l'ordre où on les joue. */
@@ -420,8 +439,22 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Autres menus de borne de ce PC (PinUP Popper…), relevés au démarrage de l'assistant. */
 let otherFrontends: OtherFrontend[] = [];
 
+/** La durée d'ouverture n'est écrite qu'une fois : à la première fenêtre montrée. */
+let openingLogged = false;
+
+/** Première fenêtre montrée : la durée de l'ouverture va au journal (avertissement au-delà du plafond). */
+function logOpening(): void {
+  reperer('fenêtre montrée'); // i18n-ignore : journal
+  if (openingLogged) return;
+  openingLogged = true;
+  const line = lignePourLeJournal('Assistant, ouverture');
+  (line.lente ? console.warn : console.log)(line.texte);
+}
+
 export function startWizard(): void {
+  reperer('démarrage du processus'); // i18n-ignore : journal
   otherFrontends = otherFrontendsOnThisPc();
+  reperer('autres menus'); // i18n-ignore : journal
   ipcMain.on('ready', () => broadcast());
   // Souris : étape « Boutons » (refaire un bouton, précédent, touches par défaut…).
   ipcMain.on('action', (_event, action: WizardAction) => {
@@ -445,8 +478,11 @@ export function startWizard(): void {
   // pages locales de l'assistant ont besoin.
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
   displays = observedDisplays();
+  reperer('écrans'); // i18n-ignore : journal
   audio = loadAudioOutputs();
+  reperer('sorties audio'); // i18n-ignore : journal
   previous = loadCabinet(loc.dataDir);
+  reperer('modèle de borne'); // i18n-ignore : journal
   // Sans modèle enregistré, il n'y a rien à garder : l'assistant complet.
   only = previous ? STEP_ARGUMENT : undefined;
   buttonsOnly = isOnly('boutons');
@@ -454,8 +490,9 @@ export function startWizard(): void {
   arrangeOnly = isOnly('disposition');
   // Avant le relevé des boutons : VPX, sans qui les boutons d'un Pinscape ne sont pas lus.
   prepareVpx();
+  reperer('VPX'); // i18n-ignore : journal
   startMode();
-
+  reperer('départ de l’étape'); // i18n-ignore : journal
   windows = displays.map((d) => {
     const win = createWindow({
       frame: false,
@@ -490,6 +527,7 @@ export function startWizard(): void {
     win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
     whenReadyToShow(win, () => {
       win.show();
+      logOpening();
       if (windows.every((w) => w.isDestroyed() || isShown(w))) takeKeyboard();
     });
     return win;
@@ -1170,13 +1208,13 @@ function quitView() {
 // défaut n'ont pas à l'être.
 
 /** Actions du récapitulatif, choisies aux boutons ou à la souris. */
-const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
+const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart', 'undo'] as const;
 /**
  * Actions du relevé, à la souris : le bouton d'avant, passer celui-ci (facultatif seulement),
  * terminer le relevé (les boutons restants gardent la touche affichée), les touches par défaut.
  * Au relevé, chaque appui est relevé : rien ne s'y choisit aux boutons.
  */
-const CAPTURE_ACTIONS = ['previous', 'skip', 'finish', 'defaults', 'restart'] as const;
+const CAPTURE_ACTIONS = ['previous', 'skip', 'finish', 'defaults', 'restart', 'undo'] as const;
 /** Plie ou déplie la section « Boutons avancés » (la ligne qui l'ouvre, au récapitulatif). */
 const ADVANCED_ACTION = 'advanced';
 /** Premier écran d'une borne sans boutons enregistrés : garder les touches actuelles, ou les modifier. */
@@ -1396,6 +1434,14 @@ function handleButtonKey(input: Input): void {
   // rien à nous envoyer) ; les essais de bout en bout suivent la même ligne (clavier-reel.test.ts).
   console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : record.taken ? `gardé, ${record.taken.id} vidé` : 'gardé'}`); // i18n-ignore : journal
   if (record.refused) return;
+  remember(
+    capture,
+    record.skipped
+      ? t('Annulé : {button} : pas de bouton.', { button: button.label })
+      : record.taken
+        ? t('Annulé : {button} sur {key} ; {taken} retrouve sa touche.', { button: button.label, key: keyLabel(code), taken: record.taken.label })
+        : t('Annulé : {button} sur {key}.', { button: button.label, key: keyLabel(code) }),
+  );
   // Une autre touche : l'essai de ce bouton est à refaire.
   if (capture.keys[button.id] !== record.keys[button.id]) capture.tried.delete(button.id);
   capture.keys = record.keys;
@@ -1413,6 +1459,47 @@ function handleButtonKey(input: Input): void {
   // Pas après Exit qui passe un bouton : on le presse plusieurs fois de suite, vite.
   capture.bounce = record.skipped ? undefined : { code, at: Date.now() };
   nextButton(capture);
+}
+
+/** Garde l'état d'avant un changement du relevé : « Annuler la dernière touche » y revient (undoLast). */
+function remember(capture: ButtonCapture, message: string): void {
+  const history = (capture.history ??= []);
+  history.push({
+    message,
+    keys: { ...capture.keys },
+    answered: [...capture.answered],
+    tried: [...capture.tried],
+    ...(capture.lost && { lost: { ...capture.lost } }),
+    ...(capture.last !== undefined && { last: capture.last }),
+    index: capture.index,
+    phase: wizard.phase,
+    action: capture.action,
+  });
+  if (history.length > UNDO_LIMIT) history.shift();
+}
+
+/**
+ * « Annuler la dernière touche » : le relevé revient à l'état d'avant le dernier changement, touches rendues
+ * à ceux qui les avaient perdues comprises, et l'écran dit ce qui a été défait. Autant de fois qu'il y a eu de
+ * changements, sans quitter l'étape ni refaire l'essai des touches déjà essayées.
+ */
+function undoLast(capture: ButtonCapture): void {
+  const step = capture.history?.pop();
+  if (!step) {
+    capture.notice = t('Rien à annuler.');
+    return;
+  }
+  capture.keys = step.keys;
+  capture.answered = new Set(step.answered);
+  capture.tried = new Set(step.tried);
+  capture.lost = step.lost;
+  capture.last = step.last;
+  capture.index = step.index;
+  capture.action = step.action;
+  capture.bounce = undefined;
+  wizard.phase = step.phase;
+  capture.notice = step.message;
+  console.log(`Assistant : relevé ${capture.set.kind} : ${step.message} (${capture.history?.length ?? 0} à annuler encore)`); // i18n-ignore : journal
 }
 
 /**
@@ -1567,7 +1654,10 @@ function runButtonsAction(action: ButtonsAction): void {
       return finishCapture(capture);
     case 'restart':
       return startCapture(set);
+    case 'undo':
+      return undoLast(capture);
     case 'defaults':
+      remember(capture, t('Annulé : touches par défaut.'));
       // Les touches des encodeurs, ou pour l'interface les flippers, Start et Exit du jeu : connues, elles s'enregistrent sans essai.
       capture.keys = set === GAME_KEYS ? buttonKeys(undefined) : defaultNavigation(wizard.buttons);
       capture.reference = { ...capture.keys };
@@ -1598,6 +1688,7 @@ function skipButton(capture: ButtonCapture): void {
     return;
   }
   console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} : passé à la souris`); // i18n-ignore : journal
+  remember(capture, t('Annulé : {button} : pas de bouton.', { button: button.label }));
   const keys = { ...capture.keys };
   delete keys[button.id];
   capture.keys = keys;
@@ -1623,6 +1714,7 @@ function finishCapture(capture: ButtonCapture): void {
     capture.notice = t('Encore à relever sur la borne : {buttons}.', { buttons: missing.map((b) => b.label).join(', ') });
     return;
   }
+  remember(capture, t('Annulé : relevé terminé avec les touches actuelles.'));
   const inForceSet = inForceKeys(set);
   const keys = { ...capture.keys };
   const used = new Set(Object.values(keys).filter(Boolean));
@@ -1902,6 +1994,7 @@ const ACTION_LABELS: Record<ButtonsAction, string> = {
   get finish() { return t('Terminer le relevé'); },
   get defaults() { return t('Touches par défaut'); },
   get restart() { return t('Tout modifier'); },
+  get undo() { return t('Annuler la dernière touche'); },
   get keep() { return t('Garder ces touches'); },
   get modify() { return t('Modifier mes boutons'); },
   get advanced() { return t('Boutons avancés'); },
@@ -1988,6 +2081,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     // Indisponibles : grisés, avec leur raison, jamais cachés.
     ...(id === 'skip' && asked?.required && { disabled: true, reason: t('Bouton obligatoire') }),
     ...(id === 'finish' && finishReason && { disabled: true, reason: finishReason }),
+    ...(id === 'undo' && !capture.history?.length && { disabled: true, reason: t('Rien à annuler') }),
   }));
   // Compte à rebours toujours visible : une barre, et la phrase qui dit ce qui se passera à la fin.
   const countdown = capture.deadline === undefined ? undefined : Math.max(0, capture.deadline - Date.now()) / BUTTONS_TIMEOUT_MS;
@@ -2043,6 +2137,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
             : t('« {save} »', { save: only ? t('Enregistrer') : t('Valider') }),
         },
         { label: t('Corriger'), text: t('un bouton de la liste pour le refaire, ou « Tout modifier »') },
+        { label: t('Défaire'), text: t('« Annuler la dernière touche » : choisis-la aux flippers ({left} / {right}) puis Start ({start}) ; la touche d’avant revient, autant de fois qu’il faut', choose) },
       ],
     };
   }
@@ -3939,10 +4034,12 @@ function progressCount(): string | undefined {
     const items = capture.set.items;
     const button = items[capture.index]!;
     if (button.advanced) return t('Bouton avancé');
+    // Compté dans l'ordre de l'assistant : un facultatif (Crédit 1) peut précéder un obligatoire (le lanceur).
+    const before = items.slice(0, capture.index + 1);
     const required = items.filter((b) => b.required).length;
     return button.required
-      ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
-      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: items.filter((b) => !b.advanced).length - required });
+      ? t('Bouton {n} sur {total}', { n: before.filter((b) => b.required).length, total: required })
+      : t('Bouton facultatif {n} sur {total}', { n: before.filter((b) => !b.required && !b.advanced).length, total: items.filter((b) => !b.required && !b.advanced).length });
   }
   if (wizard.phase === 'assign' && ROLES[wizard.roleIndex]) return t('Rôle {n} sur {total}', { n: wizard.roleIndex + 1, total: ROLES.length });
   const sound = wizard.sound;

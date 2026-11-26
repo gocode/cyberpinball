@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- Crédit 1 devient facultatif : une borne n'a besoin que d'un monnayeur, Crédit 1 ou Crédit 2 à 4 (boutons avancés). Sans touche, Crédit 1 n'est plus actif dans VPX, et le menu de VPX en partie, l'aide et "Annuler les changements" suivent le premier monnayeur relevé.
+- Boutons : "Annuler la dernière touche" au récapitulatif et pendant le relevé, aux flippers comme à la souris. Chaque touche relevée, passée ou remise par défaut s'annule une à une, la touche prise à un autre bouton lui est rendue, et l'écran dit ce qui a été défait, sans quitter l'étape.
+- Ouverture de l'assistant depuis le menu : l'écran dit tout de suite "Ouverture de l'assistant…" au lieu de rester inchangé pendant que l'assistant démarre ; la durée de l'ouverture est écrite dans le journal, avec un avertissement au-delà de 4 s.
+- Table surprise : toute collection, personnelle ou automatique (Favoris, Pinball FX, un fabricant, une décennie…), peut être écartée du tirage dans « Toutes les tables » : Menu système > Tables > Collections > Exclure du tirage…, puis Start sur la collection. Dans la liste des collections, une collection écartée affiche « hors tirage ». Tirer dans la collection elle-même reste possible.
 - Table surprise : toutes les tables jouables de la collection affichée entrent maintenant dans le tirage, sans rien confirmer table par table ; une mise à jour de la table ou de VPX ne la retire plus.
 - Pour écarter une table : sa fiche, Gérer la table > Dans le tirage : non. Pour écarter toute une collection personnelle du tirage dans « Toutes les tables » : Menu système > Tables > Collections > Gérer mes collections > la collection > Exclure du tirage de Toutes les tables. Tirer dans cette collection elle-même reste possible.
 - Les tables de Pinball FX entrent dans le tirage quelle que soit la boutique du jeu (Steam, Epic…), et celles de Pinball FX3 aussi, comme avec Start.

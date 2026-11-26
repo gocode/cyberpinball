@@ -1131,7 +1131,7 @@ function surprisePlayable(table: TableEntry): boolean {
 }
 const surpriseCatalog = createSurpriseCatalog({
   dataDir: loc.dataDir, guest: () => guest.active, playable: surprisePlayable,
-  mine: () => collections.mine(),
+  collections: () => collections.list().map((c) => ({ id: c.id, tables: c.tables.map((table) => table.id) })),
   wheel: (table) => medias?.wheel(table),
   changed: () => { surprise.cancel(); broadcast(); },
 });
@@ -2921,7 +2921,7 @@ const collectionsItem = createCollectionsItem({
     return keys.previous.length && keys.next.length ? `${keyLabel(keys.previous[0]!)} / ${keyLabel(keys.next[0]!)}` : undefined;
   },
   captureKeys: (back) => startCollectionCapture(back),
-  surpriseAction: (id, refresh) => (guest.active ? undefined : surpriseCatalog.collectionAction(id, refresh)),
+  surprise: () => (guest.active ? undefined : { excluded: (id) => surpriseCatalog.collectionExcluded(id), action: (id, refresh) => surpriseCatalog.collectionAction(id, refresh) }),
 });
 library.provideSystemItem('collections', collectionsItem);
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
@@ -7648,6 +7648,9 @@ function openConfig(): boolean {
 
 /** Assistant complet, ou seulement l'une de ses étapes (option de WIZARD_STEPS : --boutons, --son…) ; ou une nouvelle configuration. */
 function relaunchWizard(stepFlag?: string, newConfiguration = false): boolean {
+  // Le nouvel assistant met 2 à 3 s à peindre (plus au premier lancement) : le menu le dit tout de suite, sans quoi
+  // le joueur croit sa validation perdue et la renvoie (mesure du 26/11/2026, app/src/ouverture-chrono.ts).
+  if (state.phase === 'library') library.showOpening(stepFlag ? t('Ouverture de l’étape…') : t('Ouverture de l’assistant…'));
   relaunchCovered([...process.argv.slice(1), '--assistant', ...(stepFlag ? [stepFlag] : []), ...(newConfiguration ? ['--nouvelle-configuration'] : [])]);
   return true;
 }

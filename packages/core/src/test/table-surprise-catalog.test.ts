@@ -7,11 +7,13 @@ import type { TableEntry } from '../tables';
 import { frontendSource } from './frontend-source';
 import { removeTempDir } from './temp-dir';
 import { REPO_ROOT } from './i18n-scan';
+import { fakeMenuLibrary } from './doublures';
 interface Action { label: string; detail?: string; run(): void }
 interface Catalog {
   eligible(table: TableEntry, drawFrom: string | undefined): boolean;
   candidates(tables: TableEntry[], drawFrom: string | undefined): { id: string }[];
   tableAction(table: TableEntry, refresh: () => void): Action;
+  collectionExcluded(id: string): boolean;
   collectionAction(id: string, refresh: () => void): Action;
 }
 const { createCollectionsMenu } = require(path.join(REPO_ROOT, 'app/dist/collections-menu.js')) as { createCollectionsMenu(host: unknown): { exact(): { tables: TableEntry[] } | undefined; current(): unknown } };
@@ -21,8 +23,11 @@ function setup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'surprise-catalog-'));
   const table = (id: string) => ({ id, title: id, emulator: 'futurepinball', file: path.join(dir, `${id}.fpt`), folder: dir, infoFile: path.join(dir, `${id}.info`), info: {} }) as TableEntry;
   const tables = ['Ocean', 'Galaxy', 'Castle'].map(table);
-  const state = { guest: false, playable: new Set(tables.map((t) => t.id)), mine: [{ id: 'mine:adulte', tables: ['Galaxy'] }], changed: 0 };
-  const catalog = (): Catalog => createSurpriseCatalog({ dataDir: dir, guest: () => state.guest, playable: (t: TableEntry) => state.playable.has(t.id), mine: () => state.mine, wheel: () => undefined, changed: () => state.changed++ });
+  const state = {
+    guest: false, playable: new Set(tables.map((t) => t.id)), changed: 0, reads: 0,
+    collections: [{ id: 'all', tables: ['Ocean', 'Galaxy', 'Castle'] }, { id: 'mine:adulte', tables: ['Galaxy'] }, { id: 'engine:pinballfx', tables: ['Castle'] }],
+  };
+  const catalog = (): Catalog => createSurpriseCatalog({ dataDir: dir, guest: () => state.guest, playable: (t: TableEntry) => state.playable.has(t.id), collections: () => (state.reads++, state.collections), wheel: () => undefined, changed: () => state.changed++ });
   return { dir, tables, state, catalog };
 }
 const ids = (list: { id: string }[]) => list.map((e) => e.id);
@@ -59,6 +64,62 @@ test('S11 : collection exclue du tirage de Toutes les tables, mais tirable pour 
     assert.deepEqual(ids(catalog.candidates(f.tables, 'all')), ['Ocean', 'Castle']);
     assert.deepEqual(ids(catalog.candidates([f.tables[1]!], 'mine:adulte')), ['Galaxy']);
     assert.deepEqual(ids(catalog.candidates(f.tables, 'favorites')), ['Ocean', 'Galaxy', 'Castle']);
+  } finally { removeTempDir(f.dir); }
+});
+test('S11 : toute collection s’exclut, automatique comme Pinball FX ; jamais Toutes les tables d’elle-même', () => {
+  const f = setup();
+  try {
+    const catalog = f.catalog();
+    catalog.collectionAction('engine:pinballfx', () => {}).run();
+    assert.equal(catalog.collectionExcluded('engine:pinballfx'), true);
+    assert.deepEqual(ids(catalog.candidates(f.tables, 'all')), ['Ocean', 'Galaxy'], 'les tables Pinball FX ne sortent plus de Toutes les tables');
+    assert.deepEqual(ids(catalog.candidates([f.tables[2]!], 'engine:pinballfx')), ['Castle'], 'tirer dans Pinball FX reste possible');
+    catalog.collectionAction('all', () => {}).run();
+    assert.deepEqual(ids(catalog.candidates(f.tables, 'all')), ['Ocean', 'Galaxy'], 'Toutes les tables ne s’exclut pas d’elle-même');
+  } finally { removeTempDir(f.dir); }
+});
+test('S29 : les collections sont lues une fois par tirage, et seulement s’il y a une collection exclue', () => {
+  const f = setup();
+  try {
+    const catalog = f.catalog();
+    catalog.candidates(f.tables, 'all'); assert.equal(f.state.reads, 0, 'aucune collection exclue : rien à lire');
+    catalog.collectionAction('mine:adulte', () => {}).run();
+    catalog.candidates(f.tables, 'all'); assert.equal(f.state.reads, 1, 'une seule lecture pour toutes les tables');
+    catalog.candidates(f.tables, 'favorites'); assert.equal(f.state.reads, 1, 'hors Toutes les tables : rien à lire');
+  } finally { removeTempDir(f.dir); }
+});
+test('Collections > Exclure du tirage… : toutes les collections sauf Toutes les tables, « hors tirage » dans la liste, absent en invité', () => {
+  const f = setup();
+  try {
+    const { createCollectionsItem } = require(path.join(REPO_ROOT, 'app/dist/collections-menu.js')) as { createCollectionsItem(host: unknown): { run(): void } };
+    type Built = { heading: string; sections: { rows: { text: string; detail?: string }[] }[]; actions: { label: string; run(): void }[] };
+    const list = [
+      { id: 'all', group: 'fixed', label: 'Toutes', icon: 'list', tables: f.tables },
+      { id: 'favorites', group: 'fixed', label: 'Favoris', icon: 'star', tables: [f.tables[0]!] },
+      { id: 'engine:pinballfx', group: 'engine', label: 'Pinball FX', icon: 'list', tables: [f.tables[2]!] },
+    ];
+    const screens: Built[] = []; const builds: (() => Built)[] = [];
+    const catalog = f.catalog();
+    const item = createCollectionsItem({
+      collections: { list: () => list, current: () => list[0], choose: () => true, mine: () => [] },
+      library: fakeMenuLibrary({ openCustom: (build: () => Built) => builds.push(build) }),
+      keysLabel: () => undefined, captureKeys() {},
+      surprise: () => (f.state.guest ? undefined : { excluded: (id: string) => catalog.collectionExcluded(id), action: (id: string, refresh: () => void) => catalog.collectionAction(id, refresh) }),
+    });
+    const last = () => { const b = builds[builds.length - 1]!(); screens.push(b); return b; };
+    const rows = (b: Built) => b.sections.flatMap((s) => s.rows);
+    item.run();
+    last().actions.find((a) => a.label === 'Exclure du tirage…')!.run();
+    const surprise = last();
+    assert.equal(surprise.heading, 'Exclure du tirage de Toutes les tables');
+    assert.deepEqual(rows(surprise).map((r) => `${r.text} ${r.detail}`), ['Favoris Non', 'Pinball FX Non']);
+    surprise.actions.find((a) => a.label === 'Pinball FX')!.run();
+    assert.deepEqual(rows(last()).map((r) => `${r.text} ${r.detail}`), ['Favoris Non', 'Pinball FX Oui'], 'Start bascule, la liste se redessine');
+    assert.deepEqual(ids(catalog.candidates(f.tables, 'all')), ['Ocean', 'Galaxy']);
+    item.run();
+    assert.match(rows(last()).find((r) => r.text === 'Pinball FX')!.detail ?? '', /hors tirage/);
+    f.state.guest = true; item.run();
+    assert.equal(last().actions.some((a) => a.label === 'Exclure du tirage…'), false, 'l’invité ne change pas les exclusions');
   } finally { removeTempDir(f.dir); }
 });
 test('S15 : mode invité, tirage dans la collection imposée sans pouvoir changer les exclusions', () => {
@@ -119,7 +180,7 @@ test('S29 : une grande collection entièrement exclue ne lit aucun moteur ni log
   const f = setup(); let engineReads = 0, logoReads = 0;
   try {
     fs.writeFileSync(path.join(f.dir, 'table-surprise.json'), JSON.stringify({ tables: Array.from({ length: 500 }, (_, i) => `t-${i}`), collections: [] }));
-    const catalog = createSurpriseCatalog({ dataDir: f.dir, guest: () => false, playable: () => { engineReads++; return true; }, mine: () => [], wheel: () => { logoReads++; return undefined; }, changed() {} });
+    const catalog = createSurpriseCatalog({ dataDir: f.dir, guest: () => false, playable: () => { engineReads++; return true; }, collections: () => [], wheel: () => { logoReads++; return undefined; }, changed() {} });
     const many = Array.from({ length: 500 }, (_, i) => ({ ...f.tables[0]!, id: `t-${i}` }));
     assert.deepEqual(catalog.candidates(many, 'all'), []); assert.equal(engineReads, 0); assert.equal(logoReads, 0);
   } finally { removeTempDir(f.dir); }

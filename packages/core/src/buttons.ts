@@ -40,6 +40,11 @@ export interface ButtonInfo {
    * « Boutons avancés ». Le relevé pas à pas ne le demande pas ; on le relève depuis le récapitulatif.
    */
   advanced?: boolean;
+  /**
+   * Sans touche (passé dans l'assistant), le bouton n'en garde aucune dans [Input] : une valeur vide rendrait
+   * sa touche par défaut à VPX (Crédit 1 sur 5), alors que la borne n'a pas ce monnayeur.
+   */
+  noKeyWhenUnset?: boolean;
 }
 
 /** Ordre de l'assistant : les boutons qui pilotent l'interface d'abord, Exit avant les facultatifs. */
@@ -52,7 +57,8 @@ export const BUTTONS: readonly ButtonInfo[] = [
   { id: 'rightFlipper', get label() { return t('Flipper droit'); }, required: true, default: 'ShiftRight', vpx: ['RightFlipper', 'RightStagedFlipper', 'UIDown'] },
   { id: 'start', label: 'Start', required: true, default: 'Digit1', vpx: ['Start'] },
   { id: 'exit', label: 'Exit', required: true, default: 'Escape', vpx: ['ExitGame'] },
-  { id: 'credit', get label() { return t('Crédit'); }, required: true, default: 'Digit5', vpx: ['Credit1'] },
+  // Crédit 1 est facultatif depuis le 26/11/2026 : une borne peut n'avoir que Crédit 2 (au moins un monnayeur de Crédit 1 à 4, COIN_RULE).
+  { id: 'credit', get label() { return t('Crédit'); }, get how() { return t('Le monnayeur : une borne en a au moins un (Crédit 1 à 4, les trois derniers dans les boutons avancés)'); }, required: false, default: 'Digit5', vpx: ['Credit1'], noKeyWhenUnset: true },
   { id: 'plunger', get label() { return t('Lanceur'); }, required: true, default: 'Enter', vpx: ['LaunchBall'] },
   { id: 'leftMagna', get label() { return t('MagnaSave gauche'); }, required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UILeft'] },
   { id: 'rightMagna', get label() { return t('MagnaSave droit'); }, required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIRight'] },
@@ -141,6 +147,14 @@ export const BUTTONS: readonly ButtonInfo[] = [
 /** Boutons avancés, dans l'ordre de leur section. */
 export const ADVANCED_BUTTONS: readonly ButtonInfo[] = BUTTONS.filter((b) => b.advanced);
 
+/** Les monnayeurs : une borne en a au moins un (Crédit 1 à 4). */
+export const COIN_BUTTONS: readonly ButtonId[] = ['credit', 'credit2', 'credit3', 'credit4'];
+
+/** Le premier monnayeur qui a une touche (Crédit 1 si aucun : une borne valide en a un). */
+export function coinButton(keys: CabinetButtons): ButtonId {
+  return COIN_BUTTONS.find((id) => keys[id]) ?? 'credit';
+}
+
 export function buttonInfo(id: ButtonId): ButtonInfo {
   return BUTTONS.find((b) => b.id === id)!;
 }
@@ -220,6 +234,8 @@ export interface KeySet {
   tried: readonly string[];
   /** Pourquoi ce bouton ne peut pas avoir cette touche ; undefined : accepté. */
   refused(id: string, code: string): string | undefined;
+  /** Au moins un de ces boutons doit avoir une touche (les monnayeurs du jeu) ; sinon `problem` est dit. */
+  needsOne?: { ids: readonly string[]; problem: () => string };
 }
 
 export const GAME_KEYS: KeySet = {
@@ -229,6 +245,8 @@ export const GAME_KEYS: KeySet = {
   move: { previous: 'leftFlipper', next: 'rightFlipper', confirm: 'start', exit: 'exit' },
   tried: MAIN_GAME_BUTTONS,
   refused: (_id, code) => refusedKey(code),
+  // Crédit 1 à 4 : au moins un monnayeur, pas forcément le premier.
+  needsOne: { ids: COIN_BUTTONS, problem: () => t('Aucun monnayeur : relève Crédit 1, ou Crédit 2 à 4 dans les boutons avancés') },
 };
 
 /**
@@ -278,6 +296,7 @@ export function keyProblems(set: KeySet, keys: SetKeys): string[] {
     if (other) problems.push(t('{first} et {second} : même touche ({key})', { first: other, second: b.label, key: keyLabel(code) }));
     else holders.set(code, b.label);
   }
+  if (set.needsOne && !set.needsOne.ids.some((id) => keys[id])) problems.push(set.needsOne.problem());
   return problems;
 }
 
@@ -930,7 +949,7 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
   const rows: [string, string][] = [
     ['Flippers', list(['leftFlipper', 'rightFlipper'])],
     [t('Lanceur'), label('plunger')],
-    [t('Crédit'), label('credit')],
+    [t('Crédit'), list(COIN_BUTTONS.filter((id) => keys[id]).length ? COIN_BUTTONS.filter((id) => keys[id]) : ['credit'])],
     ['Start', label('start')],
     [t('Quitter la partie'), label('exit')],
     [t('Position du DMD, menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
@@ -995,7 +1014,7 @@ export function displayKeys(buttons: CabinetButtons | undefined): [string, strin
     // VPX n'allume « Enregistrer » qu'après un changement (InGameUIPage::IsModified) : après Annuler, il reste gris, et
     // Lancer (valeur par défaut) suffit à le rallumer (geste trouvé par un joueur, 17/11/2026).
     [t('Enregistrer grisé : rien n’a changé ; Lancer le rallume'), label('plunger')],
-    [t('Annuler les changements'), label('credit')],
+    [t('Annuler les changements'), label(coinButton(keys))],
     [t('Valeur par défaut'), label('plunger')],
     [t('Page précédente, puis fermer'), label('exit')],
     [t('Réglages en partie, menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
@@ -1013,7 +1032,8 @@ export function displayKeys(buttons: CabinetButtons | undefined): [string, strin
  * (01/11/2026). Exit seul quitterait la partie : il n'entre dans aucune combinaison.
  */
 export function inGameMenuButtons(keys: CabinetButtons): ButtonId[] {
-  return keys.leftMagna && keys.rightMagna ? ['leftMagna', 'rightMagna'] : ['credit', 'start'];
+  // Sans MagnaSave : un monnayeur (le premier renseigné : Crédit 1 n'est plus obligatoire) et Start.
+  return keys.leftMagna && keys.rightMagna ? ['leftMagna', 'rightMagna'] : [coinButton(keys), 'start'];
 }
 
 // ---------------------------------------------------------------------------
@@ -1277,7 +1297,7 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
       driven.add(action);
       // Touche de secours au clavier : celle du bouton par défaut (le flipper reste sur Maj, même pour
       // UIUp), pas celle de VPX pour l'action, qui croise flippers et MagnaSave dans son menu.
-      const fallback = (b.default ? sdlScancode(b.default) : undefined) ?? VPX_INPUT_DEFAULTS[action];
+      const fallback = b.noKeyWhenUnset && code === undefined ? undefined : (b.default ? sdlScancode(b.default) : undefined) ?? VPX_INPUT_DEFAULTS[action];
       put(action, scancode !== undefined ? [scancode] : fallback === undefined ? [] : free(action, [fallback]), joystick);
     }
   }

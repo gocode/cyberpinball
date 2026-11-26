@@ -45,7 +45,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
-import { buttonKeys, windowsVk, type ButtonsSource } from './buttons';
+import { buttonKeys, coinButton, windowsVk, type ButtonsSource } from './buttons';
 import { centeredDmdBand } from './dmdscreen';
 import { IniDocument } from './ini';
 import type { ButtonId, DmdKind, Rotation } from './model';
@@ -269,7 +269,8 @@ export function joystickKeysFor(source: ButtonsSource, table: Partial<Record<But
   const map = new Map<string, string[]>();
   const game = buttonKeys(source?.buttons);
   for (const [id, keys] of Object.entries(table) as [ButtonId, string[]][]) {
-    const code = game[id];
+    // Une borne sans Crédit 1 (Crédit 2 seul) : son monnayeur envoie la touche de pièce du jeu.
+    const code = game[id] ?? (id === 'credit' ? game[coinButton(game)] : undefined);
     if (isJoystickCode(code)) map.set(code, [...new Set([...(map.get(code) ?? []), ...keys])]);
   }
   return map;

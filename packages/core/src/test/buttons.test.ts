@@ -711,7 +711,9 @@ test('chaque bouton, du jeu et de l’interface, se relève sur une touche du cl
   // Le bouton qui passe (Exit, Retour), une fois relevé, passe un bouton facultatif ; un obligatoire le prend.
   const exit = 'Escape';
   assert.equal(recordKey(GAME_KEYS, { exit }, 'extraBall', exit).skipped, true);
-  assert.equal(recordKey(GAME_KEYS, { exit }, 'credit', exit).taken?.id, 'exit');
+  assert.equal(recordKey(GAME_KEYS, { exit }, 'plunger', exit).taken?.id, 'exit');
+  // Crédit 1 est facultatif (au moins un monnayeur) : il passe comme les autres facultatifs.
+  assert.equal(recordKey(GAME_KEYS, { exit }, 'credit', exit).skipped, true);
 });
 
 test('touches du clavier : le relâchement d’un appui traité arrive toujours (key-input.ts)', () => {

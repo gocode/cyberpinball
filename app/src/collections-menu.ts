@@ -73,8 +73,8 @@ export function createCollectionsItem(host: {
   keysLabel(): string | undefined;
   /** Choisir les boutons des collections : l'écran qui attend les deux appuis ; `back` y ramène. */
   captureKeys(back: () => void): void;
-  /** Table surprise : l'interrupteur d'exclusion de cette collection du tirage de « Toutes les tables ». */
-  surpriseAction?(id: string, refresh: () => void): Action | undefined;
+  /** Table surprise : l'exclusion d'une collection du tirage de « Toutes les tables » ; undefined en mode invité. */
+  surprise?(): { excluded(id: string): boolean; action(id: string, refresh: () => void): Action } | undefined;
 }): ProvidedSystemItem & { openFromWheel(back: () => void, shown: () => void): void } {
   const lib = host.library;
   /**
@@ -102,6 +102,7 @@ export function createCollectionsItem(host: {
     const actions: Action[] = [];
     const sections: Section[] = [];
     let group: string | undefined;
+    const surprise = host.surprise?.();
     for (const c of host.collections.list()) {
       if (c.group !== group || !sections.length) {
         group = c.group;
@@ -120,7 +121,7 @@ export function createCollectionsItem(host: {
             else lib.leave();
           },
         }) - 1;
-      const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail].filter(Boolean).join(' · ') : (c.reason ?? '');
+      const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail, surprise?.excluded(c.id) ? t('hors tirage') : undefined].filter(Boolean).join(' · ') : (c.reason ?? '');
       sections[sections.length - 1]!.rows.push({ text: c.label, detail, icon: c.icon as Row['icon'], tone: !count ? 'quiet' : c.id === current ? 'ok' : undefined, action: index, pick: true });
     }
     const reopen = () => lib.openCustom(build);
@@ -135,6 +136,7 @@ export function createCollectionsItem(host: {
         }),
     });
     if (host.collections.mine().length) actions.push({ label: t('Gérer mes collections…'), detail: t('Renommer, supprimer'), icon: 'edit', run: () => openManage(reopen) });
+    if (surprise) actions.push({ label: t('Exclure du tirage…'), detail: t('Table surprise : les collections dont les tables ne sortent pas dans Toutes les tables'), icon: 'shuffle', run: () => openSurprise(reopen) });
     const keys = host.keysLabel();
     actions.push({
       label: t('Boutons des collections'),
@@ -152,6 +154,41 @@ export function createCollectionsItem(host: {
       actions,
       back,
     };
+  }
+
+  /**
+   * Table surprise (26/11/2026) : toutes les collections, sauf Toutes les tables, sous leurs intertitres,
+   * chacune « Oui » si ses tables ne sortent pas d'un tirage dans Toutes les tables ; Start bascule.
+   */
+  function openSurprise(up: () => void): void {
+    const build = (): Built => {
+      const surprise = host.surprise?.();
+      const actions: Action[] = [];
+      const sections: Section[] = [];
+      let group: string | undefined;
+      for (const c of surprise ? host.collections.list() : []) {
+        if (c.id === 'all') continue;
+        if (c.group !== group || !sections.length) {
+          group = c.group;
+          const title = groupTitle(c.group);
+          sections.push({ ...(title ? { title } : {}), rows: [] });
+        }
+        const toggle = surprise!.action(c.id, () => lib.openCustom(build, index));
+        const index = actions.push({ ...toggle, label: c.label, key: `surprise:${c.id}` }) - 1;
+        const out = surprise!.excluded(c.id);
+        sections[sections.length - 1]!.rows.push({ text: c.label, detail: out ? t('Oui') : t('Non'), icon: c.icon as Row['icon'], tone: out ? 'warning' : undefined, action: index, pick: true });
+      }
+      actions.push({ label: t('Retour'), icon: 'back', run: up });
+      return {
+        heading: t('Exclure du tirage de Toutes les tables'),
+        icon: 'shuffle',
+        lead: t('Table surprise : les tables d’une collection marquée Oui ne sortent pas quand on tire dans Toutes les tables. Tirer dans la collection elle-même reste possible.'),
+        sections,
+        actions,
+        back: up,
+      };
+    };
+    lib.openCustom(build);
   }
 
   /** Mes collections : une ligne chacune ; Start ouvre ce qu'on peut en faire. */
@@ -172,7 +209,7 @@ export function createCollectionsItem(host: {
     const build = (): Built => {
       const m = host.collections.mine().find((x) => x.id === id);
       if (!m) return { heading: t('Mes collections'), sections: [], actions: [{ label: t('Retour'), icon: 'back', run: up }], back: up };
-      const surprise = host.surpriseAction?.(m.id, () => lib.openCustom(build));
+      const surprise = host.surprise?.()?.action(m.id, () => lib.openCustom(build));
       return {
         heading: m.name,
         icon: 'list',

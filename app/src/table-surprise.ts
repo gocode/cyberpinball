@@ -1,6 +1,6 @@
 /** Adaptateur local : les exclusions vivent dans les données du front-end, jamais dans les tables ni leurs .info. */
 import * as path from 'node:path';
-import { readJsonFile, readSurpriseExclusions, surpriseExcluded, toggleSurpriseExclusion, writeFileAtomic, t, type SurpriseCandidate, type SurpriseExclusions, type TableEntry } from '@cyberpinball/core';
+import { readJsonFile, readSurpriseExclusions, surpriseCollectionExclusions, toggleSurpriseExclusion, writeFileAtomic, t, type SurpriseCandidate, type SurpriseExclusions, type TableEntry } from '@cyberpinball/core';
 import type { Action } from './library-types';
 
 export function createSurpriseCatalog(host: {
@@ -8,8 +8,9 @@ export function createSurpriseCatalog(host: {
   guest(): boolean;
   /** Le moteur de la table est installé et accepte ce fichier (contrôle du Start, sans lancer). */
   playable(table: TableEntry): boolean;
-  /** Collections personnelles du joueur, pour les exclusions depuis « Toutes les tables ». */
-  mine(): readonly { id: string; tables: readonly string[] }[];
+  /** Toutes les collections, personnelles et automatiques, pour les exclusions depuis « Toutes les tables » ;
+   *  lues seulement quand une collection est exclue et qu'on tire dans « Toutes les tables ». */
+  collections(): readonly { id: string; tables: readonly string[] }[];
   wheel(table: TableEntry): string | undefined;
   changed(): void;
 }) {
@@ -17,11 +18,13 @@ export function createSurpriseCatalog(host: {
   const read = (): SurpriseExclusions => {
     try { return readSurpriseExclusions(readJsonFile(file)); } catch { return readSurpriseExclusions(undefined); }
   };
-  function excluded(table: TableEntry, drawFrom: string | undefined, exclusions = read()): boolean {
-    return surpriseExcluded(table.id, exclusions, drawFrom, host.mine());
+  /** Les tables hors tirage, pour ce tirage : exclues une à une ou par une de leurs collections. */
+  function out(drawFrom: string | undefined, exclusions: SurpriseExclusions): (id: string) => boolean {
+    const byCollection = drawFrom === 'all' && exclusions.collections.length ? surpriseCollectionExclusions(exclusions, drawFrom, host.collections()) : new Set<string>();
+    return (id) => exclusions.tables.includes(id) || byCollection.has(id);
   }
-  function eligible(table: TableEntry, drawFrom: string | undefined, exclusions = read()): boolean {
-    if (excluded(table, drawFrom, exclusions)) return false;
+  function eligible(table: TableEntry, drawFrom: string | undefined, isOut = out(drawFrom, read())): boolean {
+    if (isOut(table.id)) return false;
     try { return host.playable(table); } catch { return false; }
   }
   function toggle(kind: keyof SurpriseExclusions, id: string): void {
@@ -33,8 +36,8 @@ export function createSurpriseCatalog(host: {
   return {
     eligible,
     candidates(tables: readonly TableEntry[], drawFrom: string | undefined): SurpriseCandidate[] {
-      const exclusions = read();
-      return tables.filter((table) => eligible(table, drawFrom, exclusions)).map((table) => ({ id: table.id, title: table.title, wheel: host.wheel(table) }));
+      const isOut = out(drawFrom, read());
+      return tables.filter((table) => eligible(table, drawFrom, isOut)).map((table) => ({ id: table.id, title: table.title, wheel: host.wheel(table) }));
     },
     /** Gérer la table : interrupteur « Dans le tirage ». */
     tableAction(table: TableEntry, refresh: () => void): Action {
@@ -45,7 +48,12 @@ export function createSurpriseCatalog(host: {
         run: () => { toggle('tables', table.id); refresh(); },
       };
     },
-    /** Gérer mes collections > collection : interrupteur d'exclusion du tirage de « Toutes les tables ». */
+    /** La collection est exclue du tirage de « Toutes les tables » (« hors tirage » dans la liste des collections). */
+    collectionExcluded(id: string): boolean {
+      return read().collections.includes(id);
+    },
+    /** Interrupteur d'exclusion du tirage de « Toutes les tables » : Gérer mes collections > collection, et
+     *  Collections > Exclure du tirage… pour toutes les collections. */
     collectionAction(id: string, refresh: () => void): Action {
       const out = read().collections.includes(id);
       return {

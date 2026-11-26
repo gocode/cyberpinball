@@ -2,7 +2,8 @@
 export interface SurpriseExclusions {
   /** Tables (TableEntry.id) exclues de tout tirage. */
   tables: string[];
-  /** Collections personnelles dont les tables ne sortent pas d'un tirage dans « Toutes les tables ». */
+  /** Collections, personnelles ou automatiques (Favoris, Pinball FX, un fabricant…), dont les tables ne
+   *  sortent pas d'un tirage dans « Toutes les tables ». */
   collections: string[];
 }
 export interface SurpriseCandidate {
@@ -17,11 +18,16 @@ export function readSurpriseExclusions(value: unknown): SurpriseExclusions {
   return { tables: list(record.tables), collections: list(record.collections) };
 }
 /** Exclue si la table l'est elle-même, ou si l'on tire dans « Toutes les tables » et qu'une collection exclue la contient. */
+/** Les tables écartées par leurs collections : seulement pour un tirage dans « Toutes les tables », qui ne
+ *  s'exclut pas elle-même. Calculé une fois par tirage, pas une fois par table. */
+export function surpriseCollectionExclusions(exclusions: SurpriseExclusions, drawFrom: string | undefined,
+  collections: readonly { id: string; tables: readonly string[] }[]): ReadonlySet<string> {
+  if (drawFrom !== 'all' || !exclusions.collections.length) return new Set();
+  return new Set(collections.filter((c) => c.id !== 'all' && exclusions.collections.includes(c.id)).flatMap((c) => c.tables));
+}
 export function surpriseExcluded(tableId: string, exclusions: SurpriseExclusions, drawFrom: string | undefined,
-  mine: readonly { id: string; tables: readonly string[] }[]): boolean {
-  if (exclusions.tables.includes(tableId)) return true;
-  if (drawFrom !== 'all' || !exclusions.collections.length) return false;
-  return mine.some((collection) => exclusions.collections.includes(collection.id) && collection.tables.includes(tableId));
+  collections: readonly { id: string; tables: readonly string[] }[]): boolean {
+  return exclusions.tables.includes(tableId) || surpriseCollectionExclusions(exclusions, drawFrom, collections).has(tableId);
 }
 export function toggleSurpriseExclusion(exclusions: SurpriseExclusions, kind: keyof SurpriseExclusions, id: string): SurpriseExclusions {
   const list = exclusions[kind];

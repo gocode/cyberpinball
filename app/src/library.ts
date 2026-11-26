@@ -760,6 +760,15 @@ export function createLibrary(host: LibraryHost) {
     host.broadcast();
   }
 
+  /**
+   * Le processus va être remplacé par un autre (assistant, relance) : l'ancien écran reste jusqu'à la première
+   * image du nouveau, plusieurs secondes sur une borne lente. Il dit tout de suite que ça s'ouvre et ignore les touches.
+   */
+  function showOpening(message: string): void {
+    busy = message;
+    host.broadcast();
+  }
+
   /** Opération longue : l'écran affiche le message et ignore les touches. */
   async function task(message: string, work: () => Promise<void> | void): Promise<void> {
     busyCount++;
@@ -6835,6 +6844,7 @@ export function createLibrary(host: LibraryHost) {
     remoteMenus,
     openSystemEntry,
     systemPlace,
+    showOpening,
     reopenSystem,
     /** Essais : ouvrir l'écran de la télécommande. */
     openPhoneRemote: () => runAction(remoteMenu?.item.run, leave),

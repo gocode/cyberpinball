@@ -114,7 +114,7 @@ test('relevé des boutons du jeu : « Terminer le relevé » garde la touche aff
     assert.equal(buttons.rightMagna, undefined, 'passé : sans touche');
     assert.equal(buttons.pause, undefined, 'P déjà pris : Pause reste sans touche');
     // Les autres boutons facultatifs gardent leur touche par défaut.
-    for (const b of BUTTONS.filter((b) => !b.required && !['leftMagna', 'rightMagna', 'pause'].includes(b.id)))
+    for (const b of BUTTONS.filter((b) => !b.required && !['credit', 'leftMagna', 'rightMagna', 'pause'].includes(b.id)))
       assert.equal(buttons[b.id], defaults[b.id], b.id);
   });
 });
