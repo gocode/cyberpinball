@@ -110,6 +110,43 @@ export async function rerunAlone(files, { cwd, say = console.log, prefix = 'rela
   return { flaky, failures };
 }
 
+/** Fin d'une sortie illisible : de quoi comprendre sans rouvrir le journal (code, dernières lignes). */
+export function diagnosticIllisible(out, code, log) {
+  const lines = out.split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean);
+  return `code ${code}, ${lines.length} ligne(s) de sortie${log ? ` (journal : ${log})` : ''}. Fin :\n${lines.slice(-12).map((l) => `    ${l.slice(0, 200)}`).join('\n')}`;
+}
+
+/**
+ * Passe `files` (chemins) sous node --test. Quand la série échoue sans qu'aucun fichier soit identifiable
+ * (lanceur de node planté, sortie coupée, « Unable to deserialize cloned data »), elle est refaite une fois en
+ * entier : seul un second échec illisible est rendu, avec son diagnostic, jamais un fichier fictif à blâmer.
+ * Rend { code, out, hung, timedOut, failing, essais, illisible? } ; `illisible` : le diagnostic.
+ * Une série arrêtée au plafond n'est pas refaite (elle prendrait le même temps) : ses fichiers figés sont nommés.
+ * Un second passage vert est noté comme instable du lanceur (registre commun), pas comme un échec.
+ */
+export async function runSerie({ cwd, files, log, genre = 'rapides', timeoutMs, say = () => {} }) {
+  let result;
+  for (let essai = 1; essai <= 2; essai++) {
+    const args = [...NODE_TEST_ARGS, ...reporterArgs(cwd, genre), `--test-timeout=${TEST_TIMEOUT_MS}`, ...files.map((f) => path.relative(cwd, f))];
+    const logFile = essai === 1 ? log : log.replace(/\.txt$/, '-2.txt');
+    const r = await run(process.execPath, args, { cwd, log: logFile, timeoutMs });
+    const failing = r.code === 0 ? [] : [...new Set([...failedFiles(r.out), ...r.hung])];
+    result = { ...r, failing, essais: essai, log: logFile };
+    if (r.code === 0 || failing.length || r.timedOut) break;
+    say(`Sortie illisible (${diagnosticIllisible(r.out, r.code).split('\n')[0]}) : la série est refaite une fois.`);
+  }
+  if (result.code !== 0 && !result.failing.length) result.illisible = diagnosticIllisible(result.out, result.code, result.log);
+  else if (result.code === 0 && result.essais > 1) {
+    try {
+      recordFlaky(['(lanceur de node : sortie illisible)'], currentBranch(cwd), coordinationDir(cwd));
+    } catch {
+      // Registre illisible : la relance verte suffit.
+    }
+    say('La série refaite est verte : sortie illisible du premier passage notée comme instable, non bloquante.');
+  }
+  return result;
+}
+
 /** Lignes utiles d'une sortie en échec : celles qui disent le problème, sans le bruit de npm. */
 export function problemLines(out, max = 15) {
   const lines = out.split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim() && !/^\s*>|^npm (ERR|error)|^\s*at |node:internal/.test(l));
@@ -122,7 +159,7 @@ export function problemLines(out, max = 15) {
  * Tous les contrôles express. Rend { ok, problems: [{ etape, lignes }] } ; écrit les journaux dans
  * <cwd>/tmp. `tests: false` pour s'arrêter avant les tests rapides.
  */
-export async function runControles({ cwd = here, tests = true, say = console.log } = {}) {
+export async function runControles({ cwd = here, tests = true, say = console.log, lecteurs = true } = {}) {
   const tmp = path.join(cwd, 'tmp');
   fs.mkdirSync(tmp, { recursive: true });
   const node = process.execPath;
@@ -151,10 +188,13 @@ export async function runControles({ cwd = here, tests = true, say = console.log
     }
     return results;
   })();
-  const readers = [
-    ['traductions', run(node, [s('traductions.mjs')], { cwd, log: path.join(tmp, 'controles-traductions.txt') })],
-    ['audit de publication', run(node, [s('audit-publication.mjs')], { cwd, log: path.join(tmp, 'controles-audit.txt') })],
-  ];
+  // `lecteurs: false` : seulement la compilation (le train qui cherche quelle branche casse un test, scripts/publication-groupee.mjs).
+  const readers = lecteurs
+    ? [
+        ['traductions', run(node, [s('traductions.mjs')], { cwd, log: path.join(tmp, 'controles-traductions.txt') })],
+        ['audit de publication', run(node, [s('audit-publication.mjs')], { cwd, log: path.join(tmp, 'controles-audit.txt') })],
+      ]
+    : [];
   for (const [etape, { code, out }] of await compile) if (code !== 0) problems.push({ etape, lignes: problemLines(out) });
   for (const [etape, promise] of readers) {
     const { code, out } = await promise;
@@ -165,17 +205,17 @@ export async function runControles({ cwd = here, tests = true, say = console.log
   if (tests && compiled) {
     const fast = collectTests(cwd).filter((t) => !t.slow);
     say(`Contrôles : ${fast.length} fichiers de tests rapides…`);
-    const { code, out, hung } = await run(node, [...NODE_TEST_ARGS, ...reporterArgs(cwd), `--test-timeout=${TEST_TIMEOUT_MS}`, ...fast.map((t) => path.relative(cwd, t.file))], { cwd, log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000 });
+    const { code, out, illisible, failing: files } = await runSerie({ cwd, files: fast.map((t) => t.file), log: path.join(tmp, 'controles-tests.txt'), timeoutMs: 20 * 60_000, say });
     // Un fichier rapide de plus de 60 s fixe la durée de toute la suite : signalé, jamais un échec.
     for (const l of avertissementsLents(lireDurees(cwd)?.fichiers ?? {})) say(l);
     if (code !== 0) {
-      const files = [...new Set([...failedFiles(out), ...hung])];
       if (!files.length) {
-        problems.push({ etape: 'tests rapides', lignes: ['  échec sans fichier identifiable : voir tmp/controles-tests.txt'] });
+        // Même après une seconde passe : jamais un fichier à blâmer, le diagnostic complet à la place.
+        problems.push({ etape: 'tests rapides', illisible: true, lignes: [`  sortie illisible deux fois de suite : ${illisible}`] });
       } else {
         const { failures } = await rerunAlone(files, { cwd, say, prefix: 'controles-relance' });
         if (failures.length) {
-          problems.push({ etape: `tests rapides (${failures.length} fichier(s))`, lignes: failures.flatMap((f) => (f.details.length ? shortReport(f.details, 6) : `  - ${f.file}`).split('\n')) });
+          problems.push({ etape: `tests rapides (${failures.length} fichier(s))`, fichiers: failures.map((f) => f.file), lignes: failures.flatMap((f) => (f.details.length ? shortReport(f.details, 6) : `  - ${f.file}`).split('\n')) });
         } else {
           say(`Contrôles : tests rapides passés (${files.length} instable(s) repassé(s) seul(s)).`);
         }

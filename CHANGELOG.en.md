@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Behind the scenes: prereleases ship more steadily. Each batch of fixes is first tried on its own, and the working version only moves forward when every test passes. If a fix breaks a test, it is set aside with its cause and the others ship without it.
+- Behind the scenes: a test run with unreadable output is redone instead of blocking the release, and the tests that re-read the whole code base run on every check.
 - Applications: an application opened on the playfield now shows the right way up for you, even when the playfield image is on its side: Windows turns the screen for as long as the application is open, then puts it back to its orientation when it closes (button, Edge closed or Cyber Pinball quit).
 - VR: Pimax headsets (Pimax OpenXR runtime) now start. If the runtime refuses something, the error is written to the headset log instead of a silent restart loop every 2 seconds.
 - If the headset companion stops right after launch before you have put the headset on, Cyber Pinball now waits longer and longer before trying again (up to 5 minutes).

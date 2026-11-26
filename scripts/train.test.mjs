@@ -1,6 +1,7 @@
-// Le train de fusion dans un vrai dépôt git d'essai : avance rapide, commit de fusion, conflit ;
-// arbre déjà certifié (pas de tests rapides), fusion et vérification pendant l'envoi, et jamais de
-// publication d'un commit non vérifié (vérification et publication simulées).
+// Le train de fusion dans un vrai dépôt git d'essai : le lot est fusionné et vérifié dans un candidat, proto/ecrans
+// n'avance que s'il est vert ; la branche fautive est cherchée et écartée (refus.json) sans arrêter les autres ;
+// sortie illisible refaite ; conflit ; arbre déjà certifié ; jamais de publication d'un commit non vérifié
+// (vérification, recherche et publication simulées).
 // Test lent (il lance git).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { certifiedBy, enqueueMerge, mergeQueued, publishGrouped, readMergeQueue, unverifiedProblem } from './publication-groupee.mjs';
+import {
+  certifiedBy, enqueueMerge, mergeQueued, publishGrouped, readMergeQueue, readRefus, refusBrief, refusStatus, trainStatus, unverifiedProblem,
+} from './publication-groupee.mjs';
 import { mainBusy, readJson, writeJson } from './coordination.mjs';
 
 function makeRepo() {
@@ -42,32 +45,42 @@ function makeRepo() {
 
 const isAncestor = (main, sha) => spawnSync('git', ['merge-base', '--is-ancestor', sha, 'proto/ecrans'], { cwd: main, windowsHide: true }).status === 0;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const headOf = (cwd) => execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8', windowsHide: true }).trim();
 
 /**
- * Un dépôt d'essai prêt pour le train (dernière préversion publiée), une fausse vérification qui note
- * le commit vérifié et ses tests rapides, et une fausse publication qui fait comme publier.mjs :
- * commit « Version … » (CHANGELOG seul), accord du train sur ce commit, puis envoi.
+ * Un dépôt d'essai prêt pour le train (dernière préversion publiée), une fausse vérification qui note le commit
+ * vérifié (dans le candidat, jamais dans le dossier principal), une fausse recherche et une fausse publication qui fait
+ * comme publier.mjs : commit « Version … » (CHANGELOG seul), accord du train sur ce commit, puis envoi.
+ * Rouge : le fichier cassee.txt est présent dans l'arbre vérifié (échec « rouge.test.mjs »).
  * `envoi(n)` : ce que l'envoi de la n-ième publication attend avant de finir.
  */
-function trainBench({ verdict = () => true, envoi = async () => true, duringVerify = () => {} } = {}) {
+function trainBench({ verdict, envoi = async () => true, duringVerify = () => {}, prepare = () => true } = {}) {
   const repo = makeRepo();
   const { main, git, commit } = repo;
   commit('CHANGELOG.md', '## 0.0.1-essai.1\n', 'Version 0.0.1-essai.1');
   const dir = path.join(main, '.git', 'coordination');
   fs.mkdirSync(path.join(dir, 'certificats'), { recursive: true });
-  // Ce que lit la recherche des branches suspectes d'une suite rouge (scripts/verifier.mjs).
+  // Ce que lit la recherche des branches suspectes d'une suite rouge sans file (scripts/verifier.mjs).
   fs.mkdirSync(path.join(main, 'packages', 'core', 'dist', 'test'), { recursive: true });
   fs.mkdirSync(path.join(main, 'scripts'), { recursive: true });
   const events = [];
   const verifies = [];
+  const rechecks = [];
   const publishes = [];
+  const rouge = (cwd) => fs.existsSync(path.join(cwd, 'cassee.txt'));
   const verify = async (options) => {
-    const sha = git('rev-parse', 'HEAD');
-    verifies.push({ sha, testsRapides: options.testsRapides });
+    const sha = headOf(options.cwd);
+    verifies.push({ sha, cwd: options.cwd, testsRapides: options.testsRapides, mainHead: git('rev-parse', 'HEAD') });
     events.push(`verification ${verifies.length}`);
     duringVerify(verifies.length);
-    const ok = verdict(verifies.length);
-    return ok ? { ok: true, failures: [], flaky: [] } : { ok: false, failures: ['rouge.test.mjs'], flaky: [] };
+    const r = verdict ? verdict(verifies.length, options.cwd) : !rouge(options.cwd);
+    if (r === true) return { ok: true, failures: [], flaky: [] };
+    if (r === 'illisible') return { ok: false, failures: ['(sortie illisible)'], flaky: [], illisible: true };
+    return { ok: false, failures: ['rouge.test.mjs'], flaky: [], details: [{ file: 'rouge.test.mjs', details: [{ name: 'tient', error: 'attendu vert' }] }] };
+  };
+  const recheck = async ({ cwd, failures }) => {
+    rechecks.push({ sha: headOf(cwd), failures });
+    return rouge(cwd) ? ['rouge.test.mjs'] : [];
   };
   const publish = (_main, args, { validate }) => {
     const n = publishes.length + 1;
@@ -89,11 +102,13 @@ function trainBench({ verdict = () => true, envoi = async () => true, duringVeri
     return { freed: Promise.resolve({ frozen, version }), done };
   };
   const said = [];
-  const runTrain = () => publishGrouped({ cwd: main, say: (t) => said.push(t), write: () => {}, deps: { verify, publish, pause: async () => {} } });
-  return { ...repo, dir, events, verifies, publishes, said, runTrain };
+  const runTrain = (options = {}) => publishGrouped({ cwd: main, say: (t) => said.push(t), write: () => {}, deps: { verify, recheck, publish, prepare, pause: async () => {} }, ...options });
+  return { ...repo, dir, events, verifies, rechecks, publishes, said, runTrain };
 }
 
-test('train : arbre déjà certifié, pas de tests rapides ; une branche en file est fusionnée et vérifiée pendant l’envoi', async () => {
+const cleanup = (root) => fs.rmSync(root, { recursive: true, force: true });
+
+test('train : lot vérifié dans le candidat, arbre déjà certifié sans tests rapides ; une branche en file est fusionnée et vérifiée pendant l’envoi', async () => {
   let bench;
   bench = trainBench({
     // L'envoi de la première préversion ne finit qu'une fois la branche arrivée entre-temps fusionnée
@@ -115,12 +130,16 @@ test('train : arbre déjà certifié, pas de tests rapides ; une branche en file
     // Certificat de la branche (avant-fusion.mjs : tous les tests rapides passés sur ce commit).
     writeJson(path.join(dir, 'certificats', 'certifiee.json'), { empreinte: 'x', head: certifiee, base: certifiee, niveau: 'branche', date: new Date().toISOString() });
     assert.deepEqual(certifiedBy(main, dir, certifiee), { branche: 'certifiee', head: certifiee, date: readJson(path.join(dir, 'certificats', 'certifiee.json')).date });
+    const avant = git('rev-parse', 'HEAD');
     enqueueMerge({ branche: 'certifiee', head: certifiee }, dir);
     assert.equal(await runTrain(), 0, bench.said.join('\n'));
     // Lot 1 : avance rapide, arbre certifié : sans tests rapides. Lot 2 : commit de fusion, arbre nouveau : suite complète.
     assert.deepEqual(verifies.map((v) => v.testsRapides), [false, true]);
     assert.equal(verifies[0].sha, certifiee);
     assert.equal(certifiedBy(main, dir, verifies[1].sha), undefined);
+    // La suite tourne dans le candidat, jamais dans le dossier principal ; celui-ci n'avance qu'après elle.
+    assert.ok(verifies.every((v) => v.cwd !== main && v.cwd.includes('train-candidat')));
+    assert.equal(verifies[0].mainHead, avant, 'proto/ecrans n\'a pas bougé pendant la suite du premier lot');
     // Chaque publication porte le commit vérifié, plus son seul commit « Version … ».
     assert.deepEqual(publishes.map((p) => p.head), verifies.map((v) => v.sha));
     assert.ok(publishes.every((p) => !p.problem));
@@ -128,38 +147,171 @@ test('train : arbre déjà certifié, pas de tests rapides ; une branche en file
     assert.deepEqual(events, ['verification 1', 'publication 1', 'verification 2', "fin de l'envoi 1", 'publication 2', "fin de l'envoi 2"]);
     assert.match(git('log', '-1', '--format=%s'), /^Version 0\.0\.1-essai\.3$/);
     assert.deepEqual(readJson(path.join(dir, 'train-etat.json')).etat, 'vert');
+    assert.deepEqual(readMergeQueue(dir), []);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanup(root);
   }
 });
 
-test('train : jamais de publication d’un commit non vérifié (suite rouge, proto/ecrans qui bouge pendant la vérification)', async () => {
-  // Suite rouge : aucune publication.
+test('train : la branche fautive est trouvée sur les préfixes du lot, écartée avec sa cause ; le reste du lot part sans elle', async () => {
+  const bench = trainBench();
+  const { root, main, git, branch, dir, verifies, rechecks, publishes, runTrain } = bench;
+  try {
+    const avant = git('rev-parse', 'HEAD');
+    const a = branch('a', [['a1.txt', 'a\n']]);
+    const b = branch('b', [['cassee.txt', 'x\n']]);
+    const c = branch('c', [['c1.txt', 'c\n']]);
+    for (const [branche, head] of [['a', a], ['b', b], ['c', c]]) enqueueMerge({ branche, head }, dir);
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    // Lot entier rouge, puis le lot sans b, vert et revérifié en entier.
+    assert.equal(verifies.length, 2, bench.said.join('\n'));
+    assert.notEqual(verifies[1].sha, verifies[0].sha);
+    assert.equal(verifies[0].mainHead, avant, 'proto/ecrans n\'a pas avancé sur un lot rouge');
+    // Recherche : le préfixe 0, puis la dichotomie ; seuls les fichiers en échec sont rejoués.
+    assert.ok(rechecks.length >= 2 && rechecks.length <= 3, `${rechecks.length} recherches`);
+    assert.ok(rechecks.every((r) => r.failures.length === 1 && r.failures[0] === 'rouge.test.mjs'));
+    // b écartée, a et c fusionnées et publiées ; b n'est jamais entrée dans proto/ecrans.
+    assert.equal(isAncestor(main, b), false);
+    assert.equal(isAncestor(main, a), true);
+    assert.equal(isAncestor(main, c), true);
+    assert.equal(fs.existsSync(path.join(main, 'cassee.txt')), false);
+    assert.equal(publishes.length, 1);
+    assert.equal(publishes[0].head, verifies[1].sha, 'la publication porte le lot vérifié sans b');
+    const refus = readRefus(dir);
+    assert.deepEqual(refus.map((r) => [r.branche, r.head, r.fichiers, r.lot]), [['b', b, ['rouge.test.mjs'], ['a', 'b', 'c']]]);
+    assert.match(refus[0].message, /attendu vert/);
+    assert.equal(readMergeQueue(dir).find((e) => e.branche === 'b')?.etat, 'refusee');
+    assert.equal(readMergeQueue(dir).find((e) => e.branche === 'a'), undefined);
+    // Visible en tête de npm run fusionner, avec un brief de reprise.
+    assert.match(refusStatus(dir), /REFUSÉES par le train[\s\S]*- b \(commit /);
+    assert.match(refusBrief(refus[0]), /rouge\.test\.mjs/);
+    assert.equal(trainStatus(dir), undefined, 'le train n\'est pas rouge : la branche fautive est écartée');
+    assert.equal(readJson(path.join(dir, 'train-etat.json')).etat, 'vert');
+    // Reconfiée, la branche n'est plus refusée.
+    enqueueMerge({ branche: 'b', head: b }, dir);
+    assert.deepEqual(readRefus(dir), []);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : une seule branche rouge est écartée, proto/ecrans reste intact et rien ne part', async () => {
+  const bench = trainBench();
+  const { root, git, branch, dir, publishes, verifies, runTrain } = bench;
+  try {
+    const avant = git('rev-parse', 'HEAD');
+    enqueueMerge({ branche: 'rouge', head: branch('rouge', [['cassee.txt', 'x\n']]) }, dir);
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(verifies.length, 1);
+    assert.equal(git('rev-parse', 'HEAD'), avant, 'proto/ecrans n\'a pas bougé');
+    assert.equal(publishes.length, 0, 'rien ne part');
+    assert.deepEqual(readRefus(dir).map((r) => r.branche), ['rouge']);
+    assert.equal(trainStatus(dir), undefined);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : un échec déjà présent sur proto/ecrans n\'écarte personne ; le lot avance, la suite reste rouge', async () => {
+  const bench = trainBench();
+  const { root, git, branch, commit, dir, publishes, runTrain } = bench;
+  try {
+    commit('cassee.txt', 'déjà rouge\n', 'rouge avant le lot');
+    const a = branch('a', [['a1.txt', 'a\n']]);
+    enqueueMerge({ branche: 'a', head: a }, dir);
+    assert.equal(await runTrain(), 1, bench.said.join('\n'));
+    assert.deepEqual(readRefus(dir), []);
+    assert.equal(isAncestor(bench.main, a), true, 'le lot avance : il n\'a rien cassé');
+    assert.equal(publishes.length, 0);
+    assert.equal(readJson(path.join(dir, 'train-etat.json')).etat, 'rouge');
+    assert.match(trainStatus(dir), /déjà rouge avant le dernier lot/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : sortie illisible refaite sans rien reprocher à personne ; trois fois de suite, le train s\'arrête et la file reste', async () => {
+  // Illisible deux fois, puis vert : le lot passe.
   {
-    const bench = trainBench({ verdict: () => false });
-    const { root, branch, dir, publishes, verifies, runTrain } = bench;
+    const bench = trainBench({ verdict: (n) => (n < 3 ? 'illisible' : true) });
+    const { root, branch, dir, verifies, publishes, runTrain } = bench;
     try {
-      enqueueMerge({ branche: 'rouge', head: branch('rouge', [['b.txt', 'b\n']]) }, dir);
-      assert.equal(await runTrain(), 1);
-      assert.equal(verifies.length, 1);
-      assert.equal(publishes.length, 0, 'suite rouge : rien ne part');
-      assert.equal(readJson(path.join(dir, 'train-etat.json')).etat, 'rouge');
+      enqueueMerge({ branche: 'a', head: branch('a', [['a1.txt', 'a\n']]) }, dir);
+      assert.equal(await runTrain(), 0, bench.said.join('\n'));
+      assert.equal(verifies.length, 3);
+      assert.equal(publishes.length, 1);
+      assert.deepEqual(readRefus(dir), []);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      cleanup(root);
     }
   }
-  // Un commit arrive sur proto/ecrans pendant la vérification : nouvelle vérification avant de publier.
+  // Toujours illisible : aucun refus, aucune fusion, la file intacte, un diagnostic.
   {
-    let bench;
-    bench = trainBench({ duringVerify: (n) => n === 1 && bench.commit('d.txt', 'd\n', 'commit à la main') });
-    const { root, branch, dir, publishes, verifies, runTrain } = bench;
+    const bench = trainBench({ verdict: () => 'illisible' });
+    const { root, git, branch, dir, publishes, verifies, rechecks, runTrain } = bench;
     try {
-      enqueueMerge({ branche: 'bouge', head: branch('bouge', [['b.txt', 'b\n']]) }, dir);
-      assert.equal(await runTrain(), 0, bench.said.join('\n'));
-      assert.equal(verifies.length, 2, 'revérifié après le commit');
-      assert.deepEqual(publishes.map((p) => p.head), [verifies[1].sha]);
+      const avant = git('rev-parse', 'HEAD');
+      enqueueMerge({ branche: 'a', head: branch('a', [['a1.txt', 'a\n']]) }, dir);
+      assert.equal(await runTrain(), 1);
+      assert.equal(verifies.length, 3);
+      assert.equal(rechecks.length, 0, 'aucune recherche de coupable sur une sortie illisible');
+      assert.equal(publishes.length, 0);
+      assert.equal(git('rev-parse', 'HEAD'), avant);
+      assert.deepEqual(readRefus(dir), []);
+      assert.equal(readMergeQueue(dir)[0].etat, 'en-file');
+      assert.match(trainStatus(dir), /sortie des tests/);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      cleanup(root);
+    }
+  }
+});
+
+test('train : proto/ecrans qui bouge pendant la vérification refait le lot sur le nouveau proto/ecrans avant d\'avancer ou de publier', async () => {
+  let bench;
+  bench = trainBench({ duringVerify: (n) => n === 1 && bench.commit('d.txt', 'd\n', 'commit à la main') });
+  const { root, branch, dir, publishes, verifies, runTrain } = bench;
+  try {
+    const b = branch('bouge', [['b.txt', 'b\n']]);
+    enqueueMerge({ branche: 'bouge', head: b }, dir);
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(verifies.length, 2, 'refait après le commit');
+    assert.equal(isAncestor(bench.main, b), true);
+    assert.deepEqual(publishes.map((p) => p.head), [verifies[1].sha]);
+    assert.equal(fs.existsSync(path.join(bench.main, 'd.txt')), true, 'le commit à la main est gardé');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : un conflit n\'arrête pas le lot ; candidat non préparé : le train s\'arrête sans rien avancer', async () => {
+  {
+    const bench = trainBench();
+    const { root, branch, dir, publishes, runTrain } = bench;
+    try {
+      const un = branch('un', [['a.txt', '2\n']]);
+      const deux = branch('deux', [['a.txt', '3\n']]);
+      enqueueMerge({ branche: 'un', head: un }, dir);
+      enqueueMerge({ branche: 'deux', head: deux }, dir);
+      assert.equal(await runTrain(), 0, bench.said.join('\n'));
+      assert.deepEqual(readMergeQueue(dir).map((e) => [e.branche, e.etat, e.fichiers]), [['deux', 'conflit', ['a.txt']]]);
+      assert.equal(publishes.length, 1);
+      assert.equal(isAncestor(bench.main, un), true);
+    } finally {
+      cleanup(root);
+    }
+  }
+  {
+    const bench = trainBench({ prepare: () => false });
+    const { root, git, branch, dir, publishes, runTrain } = bench;
+    try {
+      const avant = git('rev-parse', 'HEAD');
+      enqueueMerge({ branche: 'a', head: branch('a', [['a1.txt', 'a\n']]) }, dir);
+      assert.equal(await runTrain(), 1);
+      assert.equal(git('rev-parse', 'HEAD'), avant);
+      assert.equal(publishes.length, 0);
+      assert.equal(readMergeQueue(dir)[0].etat, 'en-file');
+    } finally {
+      cleanup(root);
     }
   }
 });
@@ -187,38 +339,31 @@ test('train : le commit envoyé doit être le commit vérifié ou son seul commi
     git('reset', '-q', '--hard', verified);
     assert.match(unverifiedProblem(main, verified, commit('a.txt', 'source changée\n', 'Version 0.0.2')), /n'est pas le commit vérifié/);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanup(root);
   }
 });
 
-test('train : avance rapide, sinon commit de fusion ; un conflit ne fusionne rien et marque la branche', () => {
+test('train : avance rapide, sinon commit de fusion, dans le dossier donné ; un conflit ne fusionne rien et l\'annule', () => {
   const { root, main, git, branch } = makeRepo();
   try {
-    const dir = path.join(main, '.git', 'coordination');
-    fs.mkdirSync(dir);
     const ff = branch('rapide', [['a.txt', '2\n'], ['b.txt', 'b\n']]);
     const autre = branch('autre', [['c.txt', 'c\n']]);
     const conflit = branch('conflit', [['a.txt', '3\n']]);
-    enqueueMerge({ branche: 'rapide', head: ff }, dir);
-    enqueueMerge({ branche: 'autre', head: autre }, dir);
-    enqueueMerge({ branche: 'conflit', head: conflit }, dir);
+    const entries = [['rapide', ff], ['autre', autre], ['conflit', conflit]].map(([branche, head]) => ({ branche, head }));
     const said = [];
-    assert.deepEqual(mergeQueued(main, dir, (t) => said.push(t)), ['rapide', 'autre']);
+    const { merged, conflicts } = mergeQueued(main, entries, (t) => said.push(t));
+    assert.deepEqual(merged.map((m) => m.entry.branche), ['rapide', 'autre']);
     assert.equal(git('rev-parse', 'HEAD~1'), ff, 'la première en avance rapide');
+    assert.equal(merged[0].apres, ff);
+    assert.equal(merged[1].avant, ff);
+    assert.equal(merged[1].apres, git('rev-parse', 'HEAD'));
     assert.equal(git('log', '-1', '--format=%P').split(' ').length, 2, 'la deuxième par un commit de fusion');
     assert.match(git('log', '-1', '--format=%s'), /Merge branch 'autre' into proto\/ecrans/);
-    assert.deepEqual(readMergeQueue(dir).map((e) => [e.branche, e.etat, e.fichiers]), [['conflit', 'conflit', ['a.txt']]]);
-    assert.equal(mainBusy(main), undefined, 'conflit annulé : dossier principal propre, pas de MERGE_HEAD');
+    assert.deepEqual(conflicts.map((c) => [c.entry.branche, c.fichiers]), [['conflit', ['a.txt']]]);
+    assert.equal(mainBusy(main), undefined, 'conflit annulé : arbre propre, pas de MERGE_HEAD');
     assert.equal(fs.readFileSync(path.join(main, 'a.txt'), 'utf8'), '2\n');
-    assert.deepEqual(readJson(path.join(dir, 'fusions.json')).map((f) => f.branche), ['rapide', 'autre']);
     assert.ok(said.some((t) => /Conflit en fusionnant conflit : a\.txt/.test(t)));
-    // Dossier principal occupé : rien ne bouge, la branche attend son tour.
-    const tard = branch('tard', [['d.txt', 'd\n']]);
-    enqueueMerge({ branche: 'tard', head: tard }, dir);
-    fs.writeFileSync(path.join(main, 'a.txt'), 'modifié à la main\n');
-    assert.deepEqual(mergeQueued(main, dir, () => {}), []);
-    assert.equal(readMergeQueue(dir).find((e) => e.branche === 'tard')?.etat, 'en-file');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanup(root);
   }
 });

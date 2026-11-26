@@ -67,6 +67,28 @@ export const FOLDER_GUARDS = [
   { when: /^(interne\/demos\/|packages\/core\/src\/test\/|app\/src\/doublures\/)/, test: 'doublures' },
 ];
 
+/**
+ * Marqueur d'une garde du dépôt : un test qui relit les sources de tout le dépôt (écritures atomiques, lectures
+ * bornées, fenêtres cachées…) sans en citer les fichiers. Une ligne « // garde-depot : … » en tête du fichier
+ * (ou de sa source .ts) la fait passer à CHAQUE vérification de branche, où qu'elle soit rangée : un test est
+ * « lent » dès qu'il contient `spawnSync` même dans une expression régulière, et les gardes rangées avec les tests
+ * lents n'étaient lancées que si la branche touchait un fichier qu'elles citent. Le 26/11/2026, trois branches
+ * ont ainsi atteint le train avec une garde (lecture-bornee, offscreen) rouge, et le train s'est arrêté.
+ * Règle fixée par scripts/verifier.test.mjs.
+ */
+export const GARDE_MARQUEUR = /^\/\/ garde-depot\b/m;
+
+/**
+ * Gardes lourdes connues : relisent les sources mais durent plus d'une demi-minute (Electron, Chromium) ; le
+ * train les passe, pas chaque branche. Une nouvelle garde qui relit le dépôt doit choisir : marqueur, ou cette liste.
+ */
+export const GARDES_LOURDES = ['focus-hors-ecran.test.js', 'icons.test.js', 'saisie-robuste.test.js', 'telecommande.test.js'];
+
+/** Ce test lent relit-il les sources du dépôt (liste git, dossier des sources) ? Heuristique pour la règle des gardes. */
+export function relitLeDepot(source) {
+  return /['"]ls-files['"]|readdirSync\(\s*(?:APP_SRC|SOURCES|RENDERER|path\.join\(REPO)/.test(source ?? '');
+}
+
 /** Les fichiers de test qui importent ou citent un des fichiers changés (noms de base, sans extension). */
 export function testsForChanges(changed, tests, sourceOf) {
   const bases = new Set();
@@ -137,9 +159,10 @@ export function collectTests(root = repo) {
   const slowCore = slowFiles(core, (name) => readIfExists(path.join(testDir, `${name}.js`)));
   // Les tests des scripts importent les scripts eux-mêmes (qui lancent git, tsc…) : seul le test compte.
   const slowScripts = slowFiles(scripts, (name) => readIfExists(path.join(scriptsDir, `${name}.mjs`)), { follow: false });
+  const entry = (name, file, slow, source) => ({ name, file, slow, garde: GARDE_MARQUEUR.test(source() ?? ''), source });
   return [
-    ...core.map((f) => ({ name: f, file: path.join(testDir, f), slow: slowCore.has(f), source: () => readIfExists(path.join(srcTestDir, f.replace(/\.js$/, '.ts'))) })),
-    ...scripts.map((f) => ({ name: f, file: path.join(scriptsDir, f), slow: slowScripts.has(f), source: () => readIfExists(path.join(scriptsDir, f)) })),
+    ...core.map((f) => entry(f, path.join(testDir, f), slowCore.has(f), () => readIfExists(path.join(srcTestDir, f.replace(/\.js$/, '.ts'))))),
+    ...scripts.map((f) => entry(f, path.join(scriptsDir, f), slowScripts.has(f), () => readIfExists(path.join(scriptsDir, f)))),
   ];
 }
 

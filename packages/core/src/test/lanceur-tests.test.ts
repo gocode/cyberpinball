@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // La console des tests ne se mêle pas aux résultats sérialisés de node --test (21/11/2026) : un
 // console.log du code testé, arrivé dans le même morceau qu'un résultat sous charge, faisait échouer
 // le fichier entier sur « Unable to deserialize cloned data » (dedicated-menu). Chaque lancement de
@@ -34,7 +35,7 @@ test('tests lents : Electron installé avant, par vérifier comme par avant-fusi
   const shared = fs.readFileSync(path.join(scripts, 'tests-node.mjs'), 'utf8');
   assert.match(shared, /export function ensureElectron\(cwd, say = console\.log\)/);
   assert.match(fs.readFileSync(path.join(scripts, 'verifier.mjs'), 'utf8'), /if \(slow\) ensureElectron\(repo\);[\s\S]*spawnSync\(process\.execPath, args/, 'vérifier (et les tests touchés de fusionner) : avant de lancer');
-  assert.match(fs.readFileSync(path.join(scripts, 'avant-fusion.mjs'), 'utf8'), /ensureElectron\(cwd, say\);[\s\S]*run\(process\.execPath, \[\.\.\.NODE_TEST_ARGS/);
+  assert.match(fs.readFileSync(path.join(scripts, 'avant-fusion.mjs'), 'utf8'), /ensureElectron\(cwd, say\);[\s\S]*runSerie\(\{ cwd, files: chosen/);
   // Une seule installation, partagée : plus de copie locale.
   for (const f of fs.readdirSync(scripts).filter((n) => n.endsWith('.mjs') && n !== 'tests-node.mjs')) {
     assert.doesNotMatch(fs.readFileSync(path.join(scripts, f), 'utf8'), /function ensureElectron/, f);

@@ -26,11 +26,11 @@ import {
   APRES_TESTS_MS, DUREE_FUSION_MS, REPO, BASE, announce, coordinationDir, currentBranch, expectedSuiteMs, git, lockHolder,
   readDurations, readFlaky, recordDuration, sleep, tryLock, withdraw, workFingerprint, writeCertificate,
 } from './coordination.mjs';
-import { TEST_TIMEOUT_MS, printControles, rerunAlone, run, runControles } from './controles.mjs';
-import { GENRES, avertissementsLents, lireDurees, reporterArgs } from './durees-tests.mjs';
-import { failedFiles, shortReport, totals } from './sortie-tests.mjs';
+import { TEST_TIMEOUT_MS, printControles, rerunAlone, runControles, runSerie } from './controles.mjs';
+import { GENRES, avertissementsLents, lireDurees } from './durees-tests.mjs';
+import { shortReport, totals } from './sortie-tests.mjs';
 import { changedFiles, collectTests, touchedTests } from './verifier.mjs';
-import { NODE_TEST_ARGS, ensureElectron } from './tests-node.mjs';
+import { ensureElectron } from './tests-node.mjs';
 
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const iso = (ms) => new Date(ms).toISOString();
@@ -51,7 +51,10 @@ export function suiteSlots(dir, n = SUITES_SIMULTANEES) {
  */
 export function slowTestsFor(all, { complete, changed = [] }) {
   const slow = all.filter((t) => t.slow);
-  return complete ? slow : touchedTests(changed, slow, all);
+  if (complete) return slow;
+  // Les gardes du dépôt (// garde-depot, scripts/verifier.mjs) passent à chaque branche : touchées ou non.
+  const touched = new Set(touchedTests(changed, slow, all).map((t) => t.name));
+  return slow.filter((t) => t.garde || touched.has(t.name));
 }
 
 /** Chemin d'une suite du train dont l'arbre est déjà certifié vert par une branche (scripts/publication-groupee.mjs). */
@@ -100,57 +103,97 @@ export async function runAvantFusion({ cwd = REPO, say = console.log, complete =
     await sleep(10_000);
   }
   const started = Date.now();
+  // Le travail vérifié est fixé ICI, avant tout contrôle : le certificat porte sur ce commit et cette empreinte, jamais
+  // sur ce que HEAD est devenu à la fin. Un commit ou une intégration de proto/ecrans faits pendant les tests étaient
+  // sinon certifiés sans avoir été vus (audit et tests lus sur l'arbre d'avant), et le train sautait ensuite les tests
+  // rapides sur cette foi (26/11/2026).
+  const verifie = train ? undefined : etatVerifie(cwd);
   note({ etape: 'tests', finPrevue: iso(started + expected + DUREE_FUSION_MS) });
   try {
     const controles = await runControles({ cwd, say, tests: testsRapides });
     printControles(controles, say);
     if (!controles.ok) {
       leave();
-      return { ok: false, failures: controles.problems.map((p) => p.etape), flaky: [], problems: controles.problems };
+      // Fichiers en échec nommés (tests rapides), sinon l'étape : le train en cherche la branche en cause.
+      const illisible = controles.problems.every((p) => p.illisible);
+      return { ok: false, failures: controles.problems.flatMap((p) => (p.fichiers?.length ? p.fichiers : [p.etape])), flaky: [], problems: controles.problems, illisible };
     }
     const chosen = slowTestsFor(collectTests(cwd), { complete, changed: complete ? [] : changedFiles(cwd, BASE) });
     let t = {};
     let failing = [];
-    let unreadable = [];
+    let illisible;
     if (!chosen.length) {
       say('Aucun test lent ne touche cette branche : le train passera la suite complète sur proto/ecrans avant la préversion.');
       recordDuration(Date.now() - started, dir, durations, chemin);
     } else {
       ensureElectron(cwd, say);
-      say(`Tests lents : ${chosen.length} fichier(s)${complete ? '' : ` touché(s) par la branche (${chosen.map((c) => c.name.replace(/\.test\.m?js$/, '')).join(', ')})`}…`);
+      say(`Tests lents : ${chosen.length} fichier(s)${complete ? '' : ` touché(s) par la branche ou gardes du dépôt (${chosen.map((c) => c.name.replace(/\.test\.m?js$/, '')).join(', ')})`}…`);
       const log = path.join(tmp, 'avant-fusion.txt');
-      // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond.
-      const first = await run(process.execPath, [...NODE_TEST_ARGS, ...reporterArgs(cwd, 'lents'), `--test-timeout=${TEST_TIMEOUT_MS}`, ...chosen.map((c) => path.relative(cwd, c.file))], { cwd, log, timeoutMs: Math.max(3 * expected, 20 * 60_000) });
+      // Un test figé échoue à TEST_TIMEOUT_MS ; un lanceur qui ne rend pas la main est arrêté au plafond. Sortie
+      // illisible : la série est refaite une fois (controles.mjs, runSerie), jamais un blâme sans fichier.
+      const first = await runSerie({ cwd, files: chosen.map((c) => c.file), log, genre: 'lents', timeoutMs: Math.max(3 * expected, 20 * 60_000), say });
       if (first.timedOut) say(`Tests lents arrêtés au plafond${first.hung.length ? ` ; figés : ${first.hung.map((f) => path.basename(f)).join(', ')}` : ''}.`);
       else recordDuration(Date.now() - started, dir, durations, chemin);
       for (const l of avertissementsLents(lireDurees(cwd, 'lents')?.fichiers ?? {}, GENRES.lents.seuilMs, 'lents')) say(l);
       t = totals(first.out);
-      failing = first.code === 0 ? [] : [...new Set([...failedFiles(first.out), ...first.hung])];
-      if (first.code !== 0 && !failing.length) failing = ['(sortie illisible : voir tmp/avant-fusion.txt)'];
-      unreadable = failing.filter((f) => !f.endsWith('js'));
+      failing = first.failing;
+      illisible = first.illisible;
     }
     // La place est rendue avant la relance : une autre session peut lancer sa vérification.
     release();
     const { flaky, failures } = await rerunAlone(failing.filter((f) => f.endsWith('js')), { cwd, say, prefix: 'avant-fusion-relance' });
-    for (const file of unreadable) failures.push({ file, details: [] });
+    if (illisible) failures.push({ file: '(sortie illisible)', details: [{ name: 'diagnostic', error: illisible }] });
     if (failures.length) {
       say(`\nÉchecs confirmés (tombés aussi à part) :`);
       for (const f of failures) say(`  ${f.file}\n${shortReport(f.details, 6)}`);
       say(`\nTests lents : ${t.pass ?? '?'} passés, ${failures.length} fichier(s) en échec. Journal : tmp/avant-fusion.txt.`);
       leave();
-      return { ok: false, failures: failures.map((f) => f.file), flaky, details: failures };
+      return { ok: false, failures: failures.map((f) => f.file), flaky, details: failures, illisible: Boolean(illisible) && failures.length === 1 };
     }
     if (!train) {
-      // Certificat seulement pour un travail entièrement commité : l'empreinte ne voit que les commits.
-      if (git(['status', '--porcelain'], cwd)) say('Modifications non commitées : pas de certificat, npm run fusionner refera la vérification après le commit.');
-      else writeCertificate(branche, { empreinte: workFingerprint(cwd), head: git(['rev-parse', 'HEAD'], cwd), base: git(['rev-parse', BASE], cwd), niveau: complete ? 'complete' : 'branche' }, dir);
+      // Certificat seulement pour un travail entièrement commité, resté le même du début à la fin : l'empreinte ne
+      // voit que les commits.
+      const fin = etatVerifie(cwd);
+      if (!verifie.propre) say('Modifications non commitées : pas de certificat, npm run fusionner refera la vérification après le commit.');
+      else if (fin.head !== verifie.head || !fin.propre) say(`Le travail a changé pendant la vérification (${verifie.head.slice(0, 8)} -> ${fin.head.slice(0, 8)}) : pas de certificat, npm run fusionner refera la vérification.`);
+      else writeCertificate(branche, { empreinte: verifie.empreinte, head: verifie.head, base: verifie.base, niveau: complete ? 'complete' : 'branche' }, dir);
       note({ etape: 'testee', finPrevue: iso(Date.now() + APRES_TESTS_MS) });
     }
     say(`\n${complete ? 'Suite complète' : 'Vérification de branche'} : vert (${Math.round((Date.now() - started) / 60_000)} min, ${t.pass ?? 0} tests lents passés${flaky.length ? `, ${flaky.length} instable(s)` : ''}).${train ? '' : ' Suite : npm run fusionner.'}`);
-    return { ok: true, failures: [], flaky };
+    return { ok: true, failures: [], flaky, head: verifie?.head, certifie: Boolean(verifie?.propre) };
   } finally {
     release();
   }
+}
+
+/** Le travail d'une branche à un instant : son commit, son empreinte, la base, et s'il est entièrement commité. */
+export function etatVerifie(cwd) {
+  return { head: git(['rev-parse', 'HEAD'], cwd), empreinte: workFingerprint(cwd), base: git(['rev-parse', BASE], cwd), propre: !git(['status', '--porcelain'], cwd) };
+}
+
+/**
+ * Parmi `failures` (fichiers de test et étapes rendus par runAvantFusion), ceux qui échouent encore dans `cwd` :
+ * c'est la question que pose le train à chaque état intermédiaire de son lot pour trouver la branche en cause. Seuls les
+ * échecs nommés sont rejoués (compilation, traductions et audit sans les tests, puis les fichiers de test en échec,
+ * chacun deux fois s'il tombe : un fichier qui passe à la seconde fois n'accuse personne), jamais la suite.
+ */
+export async function recheckFailures({ cwd, failures, say = () => {} }) {
+  const files = failures.filter((f) => /\.test\.m?js$/.test(f)).map((f) => path.basename(f));
+  const steps = failures.filter((f) => !/\.test\.m?js$/.test(f));
+  const controles = await runControles({ cwd, say: () => {}, tests: false });
+  const still = controles.problems.filter((p) => steps.includes(p.etape)).map((p) => p.etape);
+  // Compilation cassée dans cet état : les tests ne peuvent pas tourner, l'état est en échec.
+  if (controles.problems.some((p) => ['liens-espaces', 'sorties-orphelines', 'compilation'].includes(p.etape))) return [...new Set([...still, ...controles.problems.map((p) => p.etape)])];
+  let wanted = collectTests(cwd).filter((x) => files.includes(x.name));
+  if (wanted.some((x) => x.slow)) ensureElectron(cwd, say);
+  for (let essai = 1; essai <= 2 && wanted.length; essai++) {
+    const r = await runSerie({ cwd, files: wanted.map((x) => x.file), log: path.join(cwd, 'tmp', `recherche-${essai}.txt`), genre: 'lents', timeoutMs: TEST_TIMEOUT_MS + 60_000, say });
+    if (r.code === 0) return [...new Set(still)];
+    const names = r.failing.length ? r.failing.map((x) => path.basename(x)) : wanted.map((x) => x.name);
+    wanted = wanted.filter((x) => names.includes(x.name));
+    if (essai === 2) still.push(...wanted.map((x) => x.name));
+  }
+  return [...new Set(still)];
 }
 
 /** Les instables les plus fréquents, pour qui voudra les corriger. */

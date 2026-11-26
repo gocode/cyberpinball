@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // PowerShell sans les signes d'un logiciel malveillant (powershell.ts). Le 19/11/2026, un antivirus
 // (détection comportementale, « Trojan.Win32.Generic ») a mis l'exécutable de Cyber Pinball en
 // quarantaine au démarrage : il lançait sans fenêtre PowerShell avec un script encodé

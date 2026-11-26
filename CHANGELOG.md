@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Coulisses : les préversions partent plus régulièrement. Chaque lot de corrections est d'abord essayé à part, et la version de travail n'avance que si tous les tests passent. Si une correction fait tomber un test, elle est écartée avec sa cause et les autres partent sans elle.
+- Coulisses : un test qui se lance sur une sortie illisible est refait au lieu de bloquer la livraison, et les tests qui relisent tout le code sont passés à chaque vérification.
 - Applications : une application ouverte sur le playfield s'affiche maintenant à l'endroit pour toi, même quand l'image du playfield est couchée : Windows tourne l'écran le temps de l'application, puis le remet dans son orientation à sa fermeture (bouton, Edge fermé ou Cyber Pinball quitté).
 - VR : les casques Pimax (runtime Pimax OpenXR) démarrent maintenant. Si le runtime refuse quelque chose, l'erreur est écrite dans le journal du casque au lieu d'une relance silencieuse en boucle toutes les 2 secondes.
 - Si le compagnon du casque s'arrête juste après son lancement sans que tu aies porté le casque, Cyber Pinball attend de plus en plus longtemps avant de réessayer (jusqu'à 5 minutes).

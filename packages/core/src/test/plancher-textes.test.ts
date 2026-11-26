@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // Plancher de 20 px pour tout texte, tel qu'on le voit : sur la roue
 // du menu des tables, les noms des petits médaillons, réduits par scale(--s), passaient à 13,6 px
 // sans que rien ne le dise. Le garde-fou de mise en page ne mesurait que les icônes, et le test des

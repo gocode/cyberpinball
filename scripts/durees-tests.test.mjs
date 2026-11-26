@@ -106,7 +106,8 @@ test('durées : les contrôles express branchent le reporter et signalent les fi
   assert.match(args[2], /^--test-reporter=file:.*durees-tests\.mjs$/);
   assert.equal(args[3], `--test-reporter-destination=${path.join(cwd, 'tmp', 'durees-tests-rapides.json')}`);
   const controles = fs.readFileSync(new URL('./controles.mjs', import.meta.url), 'utf8');
-  assert.match(controles, /\.\.\.reporterArgs\(cwd\)/, 'les tests rapides passent par le reporter de durées');
+  assert.match(controles, /\.\.\.reporterArgs\(cwd, genre\)/, 'les séries (rapides par défaut) passent par le reporter de durées');
+  assert.match(controles, /genre = 'rapides'/, 'les tests rapides sont le genre par défaut de la série');
   assert.match(controles, /avertissementsLents\(lireDurees\(cwd\)/, 'les contrôles avertissent des fichiers lents');
 });
 
@@ -130,6 +131,6 @@ test('durées : les tests lents ont leur rapport (tmp/durees-tests-lents.json) e
   assert.equal(avertissementsLents({ 'a.test.js': 70_000 }).length, 2);
   // Branché : la vérification de branche et le train (avant-fusion) passent par le reporter et avertissent.
   const avant = fs.readFileSync(new URL('./avant-fusion.mjs', import.meta.url), 'utf8');
-  assert.match(avant, /\.\.\.reporterArgs\(cwd, 'lents'\)/, 'les tests lents passent par le reporter de durées');
+  assert.match(avant, /genre: 'lents'/, 'les tests lents passent par le reporter de durées (runSerie, genre lents)');
   assert.match(avant, /avertissementsLents\(lireDurees\(cwd, 'lents'\)\?\.fichiers \?\? \{\}, GENRES\.lents\.seuilMs, 'lents'\)/, 'avant-fusion avertit des fichiers lents');
 });

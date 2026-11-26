@@ -11,10 +11,12 @@
 //    (scripts/avant-fusion.mjs). Si une vérification verte porte déjà sur le même travail (certificat),
 //    seulement les contrôles sans tests et les tests touchés.
 // 4. La branche, au commit vérifié, est confiée au train de fusion (scripts/publication-groupee.mjs),
-//    lancé détaché s'il ne tourne pas : il la fusionne dans proto/ecrans, passe la suite complète une
-//    fois pour tout le lot, puis publie la préversion.
-// 5. La session attend la fusion quelques secondes ; si le train est occupé (suite complète ou
-//    fabrication), elle s'arrête sur « en file » : le train fusionnera la branche juste après.
+//    lancé détaché s'il ne tourne pas : il la fusionne dans un candidat avec le reste du lot, passe la
+//    suite complète une fois dessus, n'avance proto/ecrans que si elle est verte, puis publie la
+//    préversion. Si la branche fait tomber le lot, elle est écartée avec sa cause (refus.json) et le
+//    reste du lot part sans elle ; le refus s'affiche en tête de chaque npm run fusionner.
+// 5. La session attend la fusion quelques secondes ; si le train est occupé (suite complète, recherche
+//    ou fabrication), elle s'arrête sur « en file » : le train fusionnera la branche dans le lot suivant.
 //
 // Pourquoi (23/11/2026) : chaque session passait la suite lente complète (11 à 22 min à plusieurs),
 // attendait la fabrication pour fusionner, puis la publication : 25 à 40 min pour une petite
@@ -29,7 +31,7 @@ import {
 import { printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport } from './sortie-tests.mjs';
 import { runAvantFusion } from './avant-fusion.mjs';
-import { dropMerge, enqueueMerge, launchTrain, readMergeQueue, requestLeger, trainHolder, trainStatus } from './publication-groupee.mjs';
+import { dropMerge, enqueueMerge, launchTrain, readMergeQueue, refusBrief, refusStatus, readRefus, requestLeger, trainHolder, trainStatus } from './publication-groupee.mjs';
 
 const iso = (ms) => new Date(ms).toISOString();
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -38,7 +40,11 @@ const ATTENTE_FUSION_MS = 3 * 60_000;
 
 const isAncestor = (sha, ref, cwd) => spawnSync('git', ['merge-base', '--is-ancestor', sha, ref], { cwd, windowsHide: true }).status === 0;
 
-/** Vérifie la branche (intégration de proto/ecrans comprise). Rend true si elle est prête. */
+/**
+ * Vérifie la branche (intégration de proto/ecrans comprise). Rend le commit vérifié (sha), ou false. Ce commit est
+ * celui qui est confié au train : fixé avant les tests, il est relu à la fin ; un commit fait pendant la vérification
+ * n'est jamais confié sans avoir été vu (26/11/2026).
+ */
 async function verifier({ cwd, dir, branche, say }) {
   announce({ branche, etape: 'integration', finPrevue: iso(Date.now() + DUREE_FUSION_MS) }, dir);
   const before = git(['rev-parse', 'HEAD'], cwd);
@@ -69,7 +75,7 @@ async function verifier({ cwd, dir, branche, say }) {
   const head = git(['rev-parse', 'HEAD'], cwd);
   if (cert && cert.head === head) {
     say('Vérification verte sur ce commit même : rien à revérifier.');
-    return true;
+    return head;
   }
   if (cert && cert.empreinte === workFingerprint(cwd)) {
     // Le travail est celui de la vérification verte ; seul proto/ecrans a changé : contrôles sans
@@ -79,7 +85,8 @@ async function verifier({ cwd, dir, branche, say }) {
     printControles(controles, say);
     if (!controles.ok) return false;
     const touched = await run(process.execPath, [path.join(cwd, 'scripts', 'verifier.mjs'), '--sans-build', '--modifies'], { cwd, log: path.join(cwd, 'tmp', 'fusionner-touches.txt'), timeoutMs: 15 * 60_000 });
-    if (touched.code === 0) return true;
+    const stable = () => git(['rev-parse', 'HEAD'], cwd) === head;
+    if (touched.code === 0) return stable() ? head : false;
     // Relance à part des seuls fichiers en échec, jamais une suite complète.
     const failing = [...new Set([...failedFiles(touched.out), ...touched.hung])];
     if (!failing.length) {
@@ -91,11 +98,13 @@ async function verifier({ cwd, dir, branche, say }) {
       say(`Échecs confirmés :\n${failures.map((f) => `  ${f.file}\n${shortReport(f.details, 6)}`).join('\n')}`);
       return false;
     }
-    return true;
+    return stable() ? head : false;
   }
   if (cert) say('Le travail a changé depuis la dernière vérification verte : nouvelle vérification.');
   const result = await runAvantFusion({ cwd, say });
-  return result.ok;
+  if (!result.ok) return false;
+  // Le commit certifié est celui du début de la vérification ; s'il a bougé depuis, rien n'est confié.
+  return git(['rev-parse', 'HEAD'], cwd) === result.head ? result.head : false;
 }
 
 /**
@@ -114,14 +123,20 @@ export async function confier({ dir, main, branche, head, say, publier = true, w
       say(`Conflit avec ce qui vient d'arriver sur ${BASE} : ${(entry.fichiers ?? []).join(', ')}. Rien n'a été fusionné : relance npm run fusionner (il intègre ${BASE}, tu résous, tu commites, tu relances).`);
       return 1;
     }
+    if (entry?.etat === 'refusee') {
+      dropMerge(branche, dir);
+      const refus = readRefus(dir).find((r) => r.branche === branche);
+      say(`Le train a ÉCARTÉ cette branche : sa suite complète tombe avec son travail (le lot sans elle passe). Rien n'a été fusionné.\n${refus ? refusBrief(refus) : (entry.fichiers ?? []).join(', ')}\nCorrige la cause, commite, relance npm run fusionner. Le refus reste affiché en tête de chaque npm run fusionner (et par npm run refus) tant que la branche n'est pas reconfiée.`);
+      return 1;
+    }
     if (entry?.etat === 'erreur') {
       dropMerge(branche, dir);
       say(`Le train n'a pas pu fusionner la branche :\n${entry.message ?? '?'}`);
       return 1;
     }
     if (!entry && isAncestor(head, BASE, main)) {
-      say(`Fusionnée dans ${BASE} (${git(['log', '-1', '--format=%h %s', BASE], main)}).`);
-      say(`Le train passe maintenant la suite complète${publier ? ' puis publie la préversion' : ''} (journal : .git/coordination/train.txt). Un problème sera affiché par la prochaine npm run fusionner. Rien d'autre à faire ici.`);
+      say(`Fusionnée dans ${BASE} (${git(['log', '-1', '--format=%h %s', BASE], main)}), après une suite complète verte sur le lot.`);
+      say(`Le train ${publier ? 'publie maintenant la préversion' : 'a fini (--sans-publier)'} (journal : .git/coordination/train.txt). Un problème sera affiché par la prochaine npm run fusionner. Rien d'autre à faire ici.`);
       return 0;
     }
     if (!entry) {
@@ -145,9 +160,10 @@ export async function confier({ dir, main, branche, head, say, publier = true, w
       // Publication groupée d'avant le train (sans file des fusions) : sa fin, puis le train.
       if (!toldOld) say(`Une publication groupée d'avant le train tourne (processus ${holder.pid}) : j'attends sa fin pour lancer le train.`);
       toldOld = true;
-    } else if (['verification', 'fabrication'].includes(holder.phase) || Date.now() - started > wait) {
+    } else if (['verification', 'recherche', 'fabrication'].includes(holder.phase) || Date.now() - started > wait) {
       const fin = holder.finPrevue ? `, fin prévue vers ${hhmm(holder.finPrevue)}` : '';
-      say(`En file : le train est occupé (${holder.phase === 'verification' ? 'suite complète' : holder.phase === 'fabrication' ? 'fabrication de la préversion' : holder.phase ?? '?'}${fin}). Il fusionnera ${branche} (${head.slice(0, 8)}) juste après${publier ? ', puis la publiera' : ''}. Rien d'autre à faire ici ; ne recommite pas sur cette branche d'ici là (un nouveau commit demande un nouveau npm run fusionner).`);
+      const phase = { verification: 'suite complète du lot en cours', recherche: 'recherche de la branche qui fait tomber le lot', fabrication: 'fabrication de la préversion' }[holder.phase] ?? holder.phase ?? '?';
+      say(`En file : le train est occupé (${phase}${fin}). Il fusionnera ${branche} (${head.slice(0, 8)}) dans le lot suivant, une fois la suite verte${publier ? ', puis la publiera' : ''}. Si le lot tombe à cause de cette branche, elle sera écartée avec sa cause (npm run refus, et en tête de npm run fusionner) ; les autres partent sans elle. Rien d'autre à faire ici ; ne recommite pas sur cette branche d'ici là (un nouveau commit demande un nouveau npm run fusionner).`);
       return 0;
     }
     await sleep(3000);
@@ -177,6 +193,8 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
   }
   const flaky = flakyLine(recentFlaky(dir));
   if (flaky) say(`${flaky}\n`);
+  const refuses = refusStatus(dir);
+  if (refuses) say(`${refuses}\n`);
   const status = trainStatus(dir);
   if (status) say(`${status}\n`);
   const previous = readMergeQueue(dir).find((e) => e.branche === branche);
@@ -185,15 +203,18 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
     return confier({ dir, main, branche, head: previous.head, say, publier });
   }
   if (previous) dropMerge(branche, dir);
+  let head;
   try {
-    const ok = await verifier({ cwd, dir, branche, say });
+    head = await verifier({ cwd, dir, branche, say });
     withdraw(branche, dir);
-    if (!ok) return 1;
+    if (!head) {
+      say('Rien n\'est confié au train : la vérification a échoué, ou le travail a bougé pendant qu\'elle tournait (relance npm run fusionner).');
+      return 1;
+    }
   } catch (error) {
     withdraw(branche, dir);
     throw error;
   }
-  const head = git(['rev-parse', 'HEAD'], cwd);
   if (leger) requestLeger(branche, dir);
   enqueueMerge({ branche, head }, dir);
   say(`Vérifiée : ${branche} (${head.slice(0, 8)}) confiée au train de fusion.`);

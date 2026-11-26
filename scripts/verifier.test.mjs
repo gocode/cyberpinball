@@ -88,6 +88,31 @@ test('verifier : la suite rapide et test:electron se partagent tous les tests, l
   assert.match(train, /deps\.verify \?\? \(async \(options\) => \(await import\('\.\/avant-fusion\.mjs'\)\)\.runAvantFusion\(options\)\)/, 'la vérification du train est runAvantFusion');
   assert.match(train, /await verify\(\{ cwd: main, say, complete: true, train: true, testsRapides: !certified \}\)[\s\S]*publish\(main, args/, 'la suite complète avant la publication');
   assert.match(train, /if \(!result\.ok\) \{[\s\S]*return 1;/, 'suite rouge : pas de préversion');
+  // 26/11/2026 : proto/ecrans n'avance que sur un lot vert, vérifié dans le candidat, jamais l'inverse.
+  assert.match(train, /await verify\(\{ cwd: cand, say, complete: true, train: true, testsRapides: !certified \}\)[\s\S]*if \(result\.ok\) \{[\s\S]*await advance\(/, 'la suite complète sur le candidat avant d\'avancer proto/ecrans');
+  assert.match(train, /const advance = async[\s\S]*writeTrainState[\s\S]*gitRun\(\['merge', '--ff-only', candSha\], main\)/, 'proto/ecrans n\'avance qu\'en avance rapide sur le candidat vert');
+  assert.doesNotMatch(train, /gitRun\(\['merge', '--no-ff'[^\n]*\], main\)/, 'aucune fusion directe dans le dossier principal');
+});
+
+test('gardes du dépôt : les tests qui relisent tout le dépôt passent à chaque vérification de branche (marqueur), ou sont gardes lourdes du train', async () => {
+  const { collectTests, GARDES_LOURDES, relitLeDepot } = await import('./verifier.mjs');
+  const { slowTestsFor } = await import('./avant-fusion.mjs');
+  if (!fs.existsSync(path.join(repo, 'packages', 'core', 'dist', 'test'))) return;
+  const all = collectTests(repo);
+  const byName = new Map(all.map((x) => [x.name, x]));
+  // Chaque garde marquée est choisie même quand la branche ne touche rien : où qu'elle soit rangée (lente ou rapide).
+  const choisis = new Set(slowTestsFor(all, { complete: false, changed: [] }).map((x) => x.name));
+  for (const g of all.filter((x) => x.garde && x.slow)) assert.ok(choisis.has(g.name), `${g.name} : garde marquée, passée à chaque vérification de branche`);
+  // Les gardes qui ont fait tomber le train le 26/11/2026 (marquées, jamais retirées sans décision).
+  for (const name of ['lecture-bornee', 'offscreen', 'docs-texte', 'power', 'powershell-propre', 'demarrage-bloquant', 'lanceur-tests', 'plancher-textes']) {
+    const g = byName.get(`${name}.test.js`);
+    assert.ok(g?.garde, `${name}.test.ts : le marqueur « // garde-depot » en tête de fichier`);
+  }
+  // Une nouvelle garde lente qui relit le dépôt doit choisir : marqueur (légère), ou liste des gardes lourdes (le train).
+  for (const x of all.filter((t) => t.slow && !t.garde)) {
+    if (relitLeDepot(x.source())) assert.ok(GARDES_LOURDES.includes(x.name), `${x.name} relit les sources du dépôt : ajoute « // garde-depot » en tête (si elle est rapide) ou son nom à GARDES_LOURDES (scripts/verifier.mjs)`);
+  }
+  for (const lourde of GARDES_LOURDES) assert.ok(byName.has(lourde), `${lourde} : garde lourde qui n'existe plus, à retirer de GARDES_LOURDES`);
 });
 
 test('vérification de branche : seulement les tests lents que la branche touche ; la suite complète, tous', async () => {

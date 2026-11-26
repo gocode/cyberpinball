@@ -1,22 +1,27 @@
-// Le train de fusion : il fusionne les branches vérifiées, passe la suite complète une fois sur
-// proto/ecrans, puis publie la préversion d'essai. Il tourne détaché des sessions.
+// Le train de fusion : il fusionne les branches vérifiées dans un candidat, passe la suite complète une
+// fois sur lui, avance proto/ecrans s'il est vert, puis publie la préversion d'essai. Il tourne détaché
+// des sessions.
 //   npm run publication-groupee          (lancé d'office, détaché, par npm run fusionner)
-//   npm run publication-groupee -- --sans-publier   (fusions seulement)
+//   npm run publication-groupee -- --sans-publier   (fusions et suite, sans publication)
 //
 // Un tour du train :
-// 1. Fusions : chaque branche de a-fusionner.json (le commit exact que sa session a vérifié) est
-//    fusionnée dans le dossier principal, en avance rapide si possible, sinon par un commit de fusion.
-//    Conflit : rien n'est fusionné, la branche est marquée « conflit » et sa session le lit.
-//    Pendant 2 minutes au plus, il attend les branches annoncées dans la file (scripts/coordination.mjs)
-//    dont la fusion est imminente, pour les emporter dans la même préversion.
-// 2. Suite complète sur proto/ecrans (scripts/avant-fusion.mjs --complete) : contrôles express puis
-//    tous les tests lents. Rouge : pas de préversion ; train-etat.json nomme les échecs et les branches
-//    suspectes, et chaque npm run fusionner l'affiche. La correction arrive par une branche comme une
-//    autre, qui relance le train.
-//    Arbre déjà certifié : si proto/ecrans, après les fusions, a exactement l'arbre d'une branche
-//    vérifiée verte (certificats/, écrits par avant-fusion.mjs après tous les tests rapides), les tests
-//    rapides ne sont pas repassés : compilation, traductions, audit et tous les tests lents seulement.
-//    C'est le cas courant d'une branche seule fusionnée en avance rapide.
+// 1. Le lot : chaque branche de a-fusionner.json (le commit exact que sa session a vérifié) est
+//    fusionnée dans le CANDIDAT (worktree .claude/worktrees/train-candidat, ses propres node_modules),
+//    en avance rapide si possible, sinon par un commit de fusion. Conflit : la branche est marquée
+//    « conflit » et sa session le lit. Pendant 2 minutes au plus, il attend d'abord les branches
+//    annoncées dans la file (scripts/coordination.mjs) dont la fusion est imminente, pour les emporter
+//    dans le même lot.
+// 2. Suite complète sur le candidat (scripts/avant-fusion.mjs --complete) : contrôles express puis tous
+//    les tests lents. proto/ecrans n'avance (avance rapide) QUE si elle est verte : il est toujours vert.
+//    Arbre déjà certifié : si le candidat a exactement l'arbre d'une branche vérifiée verte
+//    (certificats/, écrits par avant-fusion.mjs après tous les tests rapides), les tests rapides ne sont
+//    pas repassés : compilation, traductions, audit et tous les tests lents seulement.
+//    Rouge confirmé (fichier tombé aussi à part) : la branche fautive est cherchée sur les états
+//    successifs du lot, en ne rejouant que les fichiers en échec (dichotomie, scripts/avant-fusion.mjs
+//    recheckFailures). Elle est écartée : refus.json (branche, commit, fichiers, message), lu en tête de
+//    chaque npm run fusionner et par npm run refus ; le reste du lot est refait et revérifié en entier.
+//    Un échec déjà présent sur proto/ecrans sans le lot ne fait écarter personne (état « rouge »).
+//    Une sortie de test illisible est refaite (ILLISIBLE_MAX fois), jamais reprochée à une branche.
 // 3. Publication : `node scripts/publier.mjs --rapide --essai --liberer` ; si le socle a changé
 //    (Electron, exécutable), reprise d'office avec `--leger --essai`. Elle porte toujours le commit
 //    vérifié : HEAD vérifié avant le lancement, et le commit à envoyer (« Version … ») contrôlé par le
@@ -39,6 +44,7 @@
 // Avant (21/11/2026) : une préversion par fusion faisait 63 publications en trois jours.
 
 import { spawn, spawnSync } from 'node:child_process';
+import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -48,24 +54,30 @@ import {
 } from './coordination.mjs';
 import { versionOnlyDiff } from './compilation-faite.mjs';
 import { SANS_TESTS_RAPIDES } from './avant-fusion.mjs';
+import { shortReport } from './sortie-tests.mjs';
 
 export const ATTENTE_MAX_MS = 2 * 60_000;
 export const RETARD_MAX_MS = 60_000;
 /** Le dossier principal occupé (modifications, autre branche) plus longtemps : le train s'arrête. */
 const OCCUPE_MAX_MS = 30 * 60_000;
+/** Recherches de branche fautive par lot, et essais de lecture d'une sortie illisible : au-delà, le train s'arrête (la file reste). */
+export const RECHERCHES_MAX = 5;
+export const ILLISIBLE_MAX = 3;
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 export const LEADER = 'chef-publication.lock';
 const MERGE_QUEUE = 'a-fusionner.json';
 const MERGES = 'fusions.json';
 const STATE = 'train-etat.json';
+const REFUS = 'refus.json';
 export const JOURNAL = 'train.txt';
+export const CANDIDAT_BRANCHE = 'train/candidat';
 
 /** Commits de proto/ecrans pas encore publiés (depuis le dernier « Version … »). */
-export function pendingCommits(cwd) {
-  const last = git(['log', '-1', '--format=%H', '--extended-regexp', '--grep=^Version [0-9]', BASE], cwd);
+export function pendingCommits(cwd, ref = BASE) {
+  const last = git(['log', '-1', '--format=%H', '--extended-regexp', '--grep=^Version [0-9]', ref], cwd);
   if (!last) return 0;
-  return Number(git(['rev-list', '--count', `${last}..${BASE}`], cwd));
+  return Number(git(['rev-list', '--count', `${last}..${ref}`], cwd));
 }
 
 /** Les branches à attendre : fusion prévue dans ATTENTE_MAX_MS, pas en retard de plus de RETARD_MAX_MS. */
@@ -135,6 +147,54 @@ export function readMergeQueue(dir = coordinationDir()) {
 /** La branche, au commit vérifié `head`, confiée au train (remplace une entrée précédente). */
 export function enqueueMerge({ branche, head }, dir = coordinationDir()) {
   withQueueLock(dir, (queue) => ({ queue: [...queue.filter((e) => e.branche !== branche), { branche, head, date: new Date().toISOString(), etat: 'en-file' }] }));
+  // Une branche reconfiée repart à zéro : son refus d'avant ne la désigne plus.
+  clearRefus(branche, dir);
+}
+
+// ---------------------------------------------------------------- refus (branches écartées du train)
+
+/**
+ * Les branches que le train a écartées d'un lot parce que leur travail fait tomber la suite : [{ branche, head, date,
+ * lot, fichiers, etape, message, tentatives }]. Le fichier vit jusqu'à ce que la branche soit reconfiée ou fusionnée :
+ * la refuser ne doit jamais l'effacer en silence (26/11/2026).
+ */
+export function readRefus(dir = coordinationDir()) {
+  const list = readJson(path.join(dir, REFUS), []);
+  return Array.isArray(list) ? list : [];
+}
+
+export function recordRefus(refus, dir = coordinationDir()) {
+  const previous = readRefus(dir).find((r) => r.branche === refus.branche);
+  writeJson(path.join(dir, REFUS), [...readRefus(dir).filter((r) => r.branche !== refus.branche), { tentatives: 1, ...refus, date: new Date().toISOString(), ...(previous ? { tentatives: (previous.tentatives ?? 1) + 1 } : {}) }]);
+}
+
+export function clearRefus(branche, dir = coordinationDir()) {
+  const list = readRefus(dir);
+  if (list.some((r) => r.branche === branche)) writeJson(path.join(dir, REFUS), list.filter((r) => r.branche !== branche));
+}
+
+/** Ce que dit un refus, en quelques lignes : la branche, son commit, les fichiers et le message en cause. */
+export function refusLine(r) {
+  const fichiers = (r.fichiers ?? []).join(', ') || r.etape || '?';
+  return `${r.branche} (commit ${String(r.head).slice(0, 8)}, écartée à ${hhmm(r.date)}${r.tentatives > 1 ? `, ${r.tentatives}e refus` : ''}) : ${fichiers}${r.message ? ` — ${String(r.message).split('\n').filter(Boolean).slice(0, 2).join(' / ').slice(0, 300)}` : ''}`;
+}
+
+/** Le brief prêt à donner à une session pour reprendre une branche refusée. */
+export function refusBrief(r) {
+  return [
+    `La branche ${r.branche} (commit ${r.head}) a été écartée du train de fusion le ${r.date} : sa suite complète est rouge, et les tests suivants échouent avec son travail seulement (le lot sans elle passe) :`,
+    ...(r.fichiers ?? []).map((f) => `  - ${f}`),
+    r.message ? `Message : ${r.message}` : '',
+    r.lot?.length ? `Lot du train : ${r.lot.join(', ')}.` : '',
+    `Reprise : dans le worktree de la branche, relancer le test en cause (node scripts/verifier.mjs <nom du fichier de test>), corriger la cause (pas le test, sauf s'il est faux), commiter, puis npm run fusionner.`,
+  ].filter(Boolean).join('\n');
+}
+
+/** Les refus à lire en tête de chaque npm run fusionner, ou undefined. */
+export function refusStatus(dir = coordinationDir()) {
+  const list = readRefus(dir);
+  if (!list.length) return undefined;
+  return `REFUSÉES par le train (leur travail fait tomber la suite ; elles ne partent pas tant qu'elles ne sont pas corrigées et reconfiées par npm run fusionner) :\n${list.map((r) => `  - ${refusLine(r)}`).join('\n')}\nnpm run refus : détail et brief de reprise.`;
 }
 
 /** Retire l'entrée de la branche (fusionnée, ou conflit lu par sa session). */
@@ -157,33 +217,79 @@ function readText(file) {
 const gitRun = (args, cwd) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true });
 
 /**
- * Fusionne dans le dossier principal les branches en file, dans l'ordre d'arrivée. Rend les branches
- * fusionnées. S'arrête (sans rien perdre) si le dossier principal est occupé : le train le dit.
+ * Fusionne les branches `entries` (le commit exact que chaque session a vérifié) dans l'arbre de `cwd`, dans l'ordre
+ * d'arrivée : en avance rapide si possible, sinon par un commit de fusion. Un conflit annule cette fusion seule.
+ * Rend { merged: [{ entry, avant, apres }], conflicts: [{ entry, fichiers, message, base }] } ; `avant` et `apres` sont
+ * les états successifs du lot : le train y revient pour chercher la branche en cause (« préfixes » du lot).
+ * Le train ne s'en sert que dans son candidat (un worktree à lui) : le dossier principal n'avance qu'une fois ce lot vert
+ * (mergeQueued : ce nom est aussi le repère par lequel launchTrain reconnaît un script qui connaît la file des fusions).
  */
-export function mergeQueued(main, dir, say = console.log) {
+export function mergeQueued(cwd, entries, say = console.log) {
   const merged = [];
-  for (const entry of readMergeQueue(dir).filter((e) => e.etat === 'en-file')) {
-    if (mainBusy(main)) break;
-    const before = git(['rev-parse', 'HEAD'], main);
-    let r = gitRun(['merge', '--ff-only', entry.head], main);
+  const conflicts = [];
+  for (const entry of entries) {
+    const avant = git(['rev-parse', 'HEAD'], cwd);
+    let r = gitRun(['merge', '--ff-only', entry.head], cwd);
     if (r.status !== 0) {
-      r = gitRun(['merge', '--no-ff', '--no-edit', '-m', `Merge branch '${entry.branche}' into ${BASE}`, entry.head], main);
+      r = gitRun(['merge', '--no-ff', '--no-edit', '-m', `Merge branch '${entry.branche}' into ${BASE}`, entry.head], cwd);
       if (r.status !== 0) {
-        const conflits = git(['diff', '--name-only', '--diff-filter=U'], main).split('\n').filter(Boolean);
-        gitRun(['merge', '--abort'], main);
-        markMerge(entry.branche, conflits.length ? { etat: 'conflit', fichiers: conflits, base: before } : { etat: 'erreur', message: `${r.stdout}${r.stderr}`.trim().slice(0, 800) }, dir);
-        say(conflits.length ? `Conflit en fusionnant ${entry.branche} : ${conflits.join(', ')}. Sa session doit relancer npm run fusionner.` : `Fusion de ${entry.branche} impossible : ${`${r.stdout}${r.stderr}`.trim().slice(0, 300)}`);
+        const fichiers = git(['diff', '--name-only', '--diff-filter=U'], cwd).split('\n').filter(Boolean);
+        const message = `${r.stdout}${r.stderr}`.trim().slice(0, 800);
+        gitRun(['merge', '--abort'], cwd);
+        conflicts.push({ entry, fichiers, message, base: avant });
+        say(fichiers.length ? `Conflit en fusionnant ${entry.branche} : ${fichiers.join(', ')}. Sa session doit relancer npm run fusionner.` : `Fusion de ${entry.branche} impossible : ${message.slice(0, 300)}`);
         continue;
       }
     }
-    const after = git(['rev-parse', 'HEAD'], main);
-    const log = readJson(path.join(dir, MERGES), []);
-    writeJson(path.join(dir, MERGES), [...(Array.isArray(log) ? log : []), { branche: entry.branche, head: entry.head, avant: before, apres: after, date: new Date().toISOString() }].slice(-100));
-    dropMerge(entry.branche, dir);
-    say(`Fusionnée : ${entry.branche} (${git(['log', '-1', '--format=%h %s', 'HEAD'], main)}).`);
-    merged.push(entry.branche);
+    merged.push({ entry, avant, apres: git(['rev-parse', 'HEAD'], cwd) });
   }
-  return merged;
+  return { merged, conflicts };
+}
+
+// ---------------------------------------------------------------- le candidat
+
+/** Le worktree où le train fusionne et vérifie un lot, avant que proto/ecrans n'avance. */
+export function candidateDir(main) {
+  return path.join(main, '.claude', 'worktrees', 'train-candidat');
+}
+
+/**
+ * Amène le candidat sur `sha` (il est créé au premier besoin), sans rien garder d'une fusion ou d'un essai précédent.
+ * Le dossier principal reste intact : c'est tout l'intérêt (proto/ecrans ne reçoit jamais un travail non vérifié).
+ */
+export function resetCandidate(main, cand, sha) {
+  gitRun(['worktree', 'prune'], main);
+  if (!fs.existsSync(path.join(cand, '.git'))) {
+    fs.mkdirSync(path.dirname(cand), { recursive: true });
+    const r = gitRun(['worktree', 'add', '-q', '-f', '-B', CANDIDAT_BRANCHE, cand, sha], main);
+    if (r.status !== 0) throw new Error(`candidat impossible à créer : ${`${r.stdout}${r.stderr}`.trim().slice(0, 400)}`);
+    return;
+  }
+  gitRun(['merge', '--abort'], cand);
+  const r = gitRun(['checkout', '-q', '-f', '-B', CANDIDAT_BRANCHE, sha], cand);
+  if (r.status !== 0) throw new Error(`candidat impossible à remettre sur ${sha.slice(0, 8)} : ${`${r.stdout}${r.stderr}`.trim().slice(0, 400)}`);
+  gitRun(['reset', '-q', '--hard', sha], cand);
+  gitRun(['clean', '-fdq'], cand);
+}
+
+/**
+ * Le candidat a ses propres node_modules (jamais ceux du dossier principal : npm ci les efface) ; npm ci ne tourne que
+ * s'ils manquent ou si le lockfile n'est plus celui de leur installation. Rend false si l'installation échoue.
+ */
+export function prepareCandidate(cand, say = () => {}) {
+  const lock = path.join(cand, 'package-lock.json');
+  if (!fs.existsSync(lock)) return true;
+  const hash = crypto.createHash('sha1').update(fs.readFileSync(lock)).digest('hex');
+  const mark = path.join(cand, 'node_modules', '.train-lock');
+  if (readText(mark).trim() === hash) return true;
+  say('Candidat : npm ci (lockfile nouveau ou premier lot)…');
+  const r = spawnSync('npm ci --prefer-offline --no-audit --no-fund', { cwd: cand, shell: true, encoding: 'utf8', windowsHide: true, timeout: 20 * 60_000, maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) {
+    say(`npm ci du candidat a échoué : ${`${r.stdout}${r.stderr}`.trim().slice(-400)}`);
+    return false;
+  }
+  fs.writeFileSync(mark, hash);
+  return true;
 }
 
 // ---------------------------------------------------------------- état du train (vert, rouge)
@@ -251,9 +357,11 @@ async function suspectsFor(failing, main, dir, since) {
 /** Ce qu'une session doit savoir de proto/ecrans (suite rouge), ou undefined. */
 export function trainStatus(dir = coordinationDir()) {
   const s = readTrainState(dir);
+  if (s.etat === 'illisible') return `ATTENTION : le train n'a pas pu lire la sortie des tests (${ILLISIBLE_MAX} essais, depuis ${hhmm(s.date)}) : rien n'est écarté ni fusionné, les branches restent en file. npm run publication-groupee relance le train ; détails : .git/coordination/train.txt.`;
   if (s.etat !== 'rouge') return undefined;
   const suspects = s.suspects?.length ? ` Branche(s) ${s.suspectsCertains ? 'en cause' : 'possibles'} : ${s.suspects.join(', ')}.` : '';
-  return `ATTENTION : la suite complète est rouge sur ${BASE} depuis ${hhmm(s.date)} (commit ${String(s.sha).slice(0, 8)}) : ${(s.echecs ?? []).join(', ')}.${suspects} Aucune préversion ne part avant une correction (une branche qui corrige, puis npm run fusionner). Détails : .git/coordination/train.txt.`;
+  const avant = s.anterieur ? ' Elle était déjà rouge avant le dernier lot : aucune branche n\'est écartée pour cela.' : '';
+  return `ATTENTION : la suite complète est rouge sur ${BASE} depuis ${hhmm(s.date)} (commit ${String(s.sha).slice(0, 8)}) : ${(s.echecs ?? []).join(', ')}.${avant}${suspects} Aucune préversion ne part avant une correction (une branche qui corrige, puis npm run fusionner). Détails : .git/coordination/train.txt.`;
 }
 
 // ---------------------------------------------------------------- lancement détaché
@@ -440,8 +548,11 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
   const leaderFile = path.join(dir, LEADER);
   const retryFile = path.join(dir, 'publication-a-reprendre.json');
   const verify = deps.verify ?? (async (options) => (await import('./avant-fusion.mjs')).runAvantFusion(options));
+  const recheck = deps.recheck ?? (async (options) => (await import('./avant-fusion.mjs')).recheckFailures(options));
+  const prepare = deps.prepare ?? prepareCandidate;
   const publish = deps.publish ?? startPublication;
   const pause = deps.pause ?? sleep;
+  const cand = deps.candidat ?? candidateDir(main);
   const release = tryLock(leaderFile, { branche: 'train', etat: 'attente', phase: 'attente' });
   if (!release) {
     say(`Le train tourne déjà (processus ${trainHolder(dir)?.pid ?? '?'}) : il emportera ces fusions.`);
@@ -452,11 +563,144 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
   // Pendant un envoi, le train attend sans tenir le dossier principal ; la fin prévue est celle de l'envoi.
   let envoi;
   const idle = () => (envoi ? setState('attente', 'attente', { envoi: envoi.version, finPrevue: envoi.finPrevue }) : setState('attente', 'attente', { envoi: undefined }));
-  const mergeNow = () => {
-    setState('publication', 'fusion', { envoi: envoi?.version });
-    const merged = mergeQueued(main, dir, say);
+  const key = (f) => path.basename(String(f));
+
+  /**
+   * Le lot en file : fusionné dans le candidat (un worktree à part), suite complète passée sur lui ; proto/ecrans n'avance
+   * (avance rapide) que si elle est verte, jamais avant. Rouge : la branche fautive est cherchée sur les états
+   * successifs du lot en ne rejouant que les fichiers en échec, écartée (refus.json) et le reste est revérifié en entier.
+   * Rend { rouge, arret } : `rouge` si la suite reste rouge sur proto/ecrans lui-même (déjà rouge avant le lot),
+   * `arret` si le train doit s'arrêter (la file reste intacte).
+   */
+  const integrate = async () => {
+    let illisibles = 0;
+    let recherches = 0;
+    for (let essai = 1; essai <= 4 * RECHERCHES_MAX + ILLISIBLE_MAX; essai++) {
+      // Un refus lu par sa session (ou resté sans lecteur plus de 15 min) sort de la file ; refus.json le garde.
+      for (const e of readMergeQueue(dir)) if (e.etat === 'refusee' && Date.now() - (Date.parse(e.refuseeLe ?? '') || 0) > 15 * 60_000) dropMerge(e.branche, dir);
+      const entries = readMergeQueue(dir).filter((e) => e.etat === 'en-file');
+      if (!entries.length) return {};
+      const base = git(['rev-parse', 'HEAD'], main);
+      setState('publication', 'fusion', { envoi: envoi?.version });
+      resetCandidate(main, cand, base);
+      const { merged, conflicts } = mergeQueued(cand, entries, say);
+      for (const c of conflicts) markMerge(c.entry.branche, c.fichiers.length ? { etat: 'conflit', fichiers: c.fichiers, base: c.base } : { etat: 'erreur', message: c.message }, dir);
+      if (!merged.length) continue;
+      const candSha = git(['rev-parse', 'HEAD'], cand);
+      const noms = merged.map((m) => m.entry.branche);
+      if (!prepare(cand, say)) {
+        say('Train arrêté : le candidat n\'a pas pu être préparé (npm ci). Les branches restent en file ; npm run publication-groupee le relance.');
+        return { arret: true };
+      }
+      const certified = certifiedBy(main, dir, candSha);
+      const chemin = certified ? { chemin: SANS_TESTS_RAPIDES } : undefined;
+      const expected = expectedSuiteMs(readDurations(dir), undefined, chemin);
+      setState('publication', 'verification', { finPrevue: new Date(Date.now() + expected).toISOString(), envoi: envoi?.version });
+      if (certified) say(`Arbre déjà certifié vert par ${certified.branche} (${certified.head.slice(0, 8)}, tous les tests rapides passés) : tests rapides sautés.`);
+      say(`Candidat ${candSha.slice(0, 8)} (${noms.join(', ')} sur ${base.slice(0, 8)}) : suite complète${certified ? ' sans tests rapides' : ''}, fin prévue vers ${hhmm(Date.now() + expected)}${envoi ? `, pendant l'envoi de la ${envoi.version}` : ''}. ${BASE} n'avance qu'une fois elle verte.`);
+      const result = await verify({ cwd: cand, say, complete: true, train: true, testsRapides: !certified });
+      if (result.ok) {
+        const avance = await advance({ merged, base, candSha });
+        if (avance.refaire) continue;
+        return avance;
+      }
+      // Sortie des tests illisible : refaite sans rien reprocher à personne.
+      if (result.illisible) {
+        if (++illisibles < ILLISIBLE_MAX) {
+          say(`Sortie des tests illisible (essai ${illisibles}/${ILLISIBLE_MAX}) : la suite est refaite, aucune branche n'est écartée.`);
+          await pause(30_000);
+          continue;
+        }
+        writeTrainState(dir, { etat: 'illisible', sha: candSha, echecs: result.failures });
+        say(`\n${trainStatus(dir)}`);
+        return { arret: true };
+      }
+      // Échec confirmé : qui l'a causé ?
+      const echecs = [...new Set(result.failures.map(key))];
+      const cache = new Map();
+      /** Parmi les échecs du lot, ceux qui tombent encore sur le préfixe k (k branches fusionnées), jamais la suite entière. */
+      const encore = async (k) => {
+        if (!cache.has(k)) {
+          const sha = k === 0 ? base : merged[k - 1].apres;
+          resetCandidate(main, cand, sha);
+          if (!prepare(cand, say)) throw new Error('candidat non préparé');
+          setState('publication', 'recherche', { envoi: envoi?.version });
+          say(`Recherche : ${k === 0 ? `${BASE} seul` : `lot jusqu'à ${merged[k - 1].entry.branche}`} (${sha.slice(0, 8)}), ${echecs.length} échec(s) rejoué(s).`);
+          cache.set(k, (await recheck({ cwd: cand, failures: echecs, say })).map(key));
+        }
+        return cache.get(k);
+      };
+      const etat = readTrainState(dir);
+      const anterieurs = etat.etat === 'vert' && etat.sha === base ? [] : await encore(0);
+      const restants = echecs.filter((f) => !anterieurs.includes(f));
+      if (!restants.length) {
+        // Rouge avant le lot, identiquement : le lot n'a rien cassé. Il avance, la suite reste rouge (correction à venir).
+        say(`Les échecs (${echecs.join(', ')}) existent déjà sur ${BASE} sans le lot : aucune branche n'est écartée.`);
+        const avance = await advance({ merged, base, candSha, rouge: { echecs, anterieur: true } });
+        if (avance.refaire) continue;
+        return { ...avance, rouge: true };
+      }
+      // Recherche par dichotomie : le préfixe 0 passe (sur ces fichiers), le lot entier tombe ; la première branche dont
+      // l'ajout fait tomber l'un des échecs est la fautive.
+      let lo = 0;
+      let hi = merged.length;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if ((await encore(mid)).some((f) => restants.includes(f))) hi = mid;
+        else lo = mid;
+      }
+      const fautive = merged[hi - 1].entry;
+      const detail = (result.details ?? []).find((d) => restants.includes(key(d.file)));
+      const probleme = (result.problems ?? []).find((p) => restants.includes(p.etape) || (p.fichiers ?? []).some((f) => restants.includes(key(f))));
+      const message = detail ? shortReport(detail.details, 4) : (probleme?.lignes ?? []).slice(0, 6).join('\n');
+      recordRefus({ branche: fautive.branche, head: fautive.head, lot: noms, fichiers: restants, etape: probleme?.etape, message: String(message ?? '').slice(0, 1200) }, dir);
+      markMerge(fautive.branche, { etat: 'refusee', fichiers: restants, message: String(message ?? '').slice(0, 800), refuseeLe: new Date().toISOString() }, dir);
+      say(`\nBranche écartée du lot : ${refusLine(readRefus(dir).find((r) => r.branche === fautive.branche))}. Elle ne part pas ; le reste du lot est refait et revérifié en entier.`);
+      if (++recherches >= RECHERCHES_MAX) {
+        say(`Train arrêté : ${RECHERCHES_MAX} branches écartées de suite dans ce lot. Le reste de la file n'est pas touché ; npm run publication-groupee le relance.`);
+        return { arret: true };
+      }
+    }
+    say('Train arrêté : trop d\'essais sur ce lot. La file reste intacte ; npm run publication-groupee le relance.');
+    return { arret: true };
+  };
+
+  /** Le lot est vert dans le candidat : proto/ecrans avance dessus (avance rapide), et la file est soldée. */
+  const advance = async ({ merged, base, candSha, rouge }) => {
+    setState('publication', 'avance', { envoi: envoi?.version });
+    const waited = Date.now();
+    let last;
+    for (;;) {
+      const busy = mainBusy(main);
+      if (!busy) break;
+      if (!lockHolder(path.join(main, 'release', '.fabrication.lock')) && Date.now() - waited > OCCUPE_MAX_MS) {
+        say(`Train arrêté : ${busy} depuis ${OCCUPE_MAX_MS / 60_000} min, le lot vert ne peut pas avancer ${BASE}. Les branches restent en file ; npm run publication-groupee le relance.`);
+        return { arret: true };
+      }
+      if (busy !== last) say(`Lot vert : j'attends que le dossier principal soit libre (${busy}).`);
+      last = busy;
+      await pause(10_000);
+    }
+    const now = git(['rev-parse', 'HEAD'], main);
+    if (now !== base) {
+      say(`${BASE} a bougé pendant la vérification (${base.slice(0, 8)} -> ${now.slice(0, 8)}) : le lot est refait sur le nouveau ${BASE}.`);
+      return { refaire: true };
+    }
+    writeTrainState(dir, rouge ? { etat: 'rouge', sha: candSha, echecs: rouge.echecs, suspects: [], anterieur: rouge.anterieur } : { etat: 'vert', sha: candSha });
+    const r = gitRun(['merge', '--ff-only', candSha], main);
+    if (r.status !== 0) {
+      say(`Avance de ${BASE} impossible : ${`${r.stdout}${r.stderr}`.trim().slice(0, 300)}. Le lot est refait.`);
+      return { refaire: true };
+    }
+    const log = readJson(path.join(dir, MERGES), []);
+    writeJson(path.join(dir, MERGES), [...(Array.isArray(log) ? log : []), ...merged.map((m) => ({ branche: m.entry.branche, head: m.entry.head, avant: m.avant, apres: m.apres, date: new Date().toISOString() }))].slice(-100));
+    for (const m of merged) {
+      dropMerge(m.entry.branche, dir);
+      clearRefus(m.entry.branche, dir);
+    }
+    say(`${BASE} avancé sur le lot vert : ${merged.map((m) => m.entry.branche).join(', ')} (${git(['log', '-1', '--format=%h %s', 'HEAD'], main)}).`);
     idle();
-    return merged;
+    return {};
   };
 
   /** La fin d'une publication : préversion en ligne, ou échec noté pour la reprise. Rend true si publiée. */
@@ -499,13 +743,13 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
         say('Train arrêté : trop de tours sans publication (proto/ecrans bouge sans cesse). npm run publication-groupee le relance.');
         break;
       }
-      // 1. Fusions, et attente (2 min au plus) des branches sur le point d'arriver. Pendant un envoi
-      // aussi : le dossier principal est rendu, les branches en file n'attendent pas la fin.
+      // 1. Attente (2 min au plus) des branches sur le point d'arriver, puis le lot : fusionné dans le candidat, suite
+      // complète, et proto/ecrans n'avance que si elle est verte. Pendant un envoi aussi : le dossier principal est
+      // rendu, les branches en file n'attendent pas la fin.
       const start = Date.now();
       let last = '';
       let capped = false;
       for (;;) {
-        mergeNow();
         const busy = mainBusy(main);
         const fabrication = lockHolder(path.join(main, 'release', '.fabrication.lock'));
         if (busy && !fabrication && Date.now() - start > OCCUPE_MAX_MS) {
@@ -524,8 +768,21 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
         last = what;
         await pause(10_000);
       }
+      let integration;
+      try {
+        integration = await integrate();
+      } catch (error) {
+        say(`Train arrêté : ${error.message}. Les branches restent en file ; npm run publication-groupee le relance.`);
+        await finishEnvoi();
+        return 1;
+      }
+      if (integration.arret || integration.rouge) {
+        if (integration.rouge) say(`\n${trainStatus(dir)}`);
+        await finishEnvoi();
+        return 1;
+      }
       if (!publier) {
-        say('Fusions faites ; publication non demandée (--sans-publier).');
+        say('Fusions et suite faites ; publication non demandée (--sans-publier).');
         return (await finishEnvoi()) ? 0 : 1;
       }
       const pending = pendingCommits(main);
@@ -563,8 +820,6 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
           writeTrainState(dir, { etat: 'rouge', sha: before, echecs: result.failures, suspects, suspectsCertains: certain, dernierVert: since });
           say(`\n${trainStatus(dir)}`);
           await finishEnvoi();
-          // Les branches arrivées pendant la suite sont fusionnées : la correction pourra les suivre.
-          mergeNow();
           return 1;
         }
         writeTrainState(dir, { etat: 'vert', sha: before });

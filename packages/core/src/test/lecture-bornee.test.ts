@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // Fichiers de taille quelconque : jamais lus d'un bloc (boundedread.ts), et la place disque d'un
 // import dite avant la copie (importspace.ts).
 //

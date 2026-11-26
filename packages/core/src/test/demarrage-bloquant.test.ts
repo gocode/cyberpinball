@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // Démarrage sans blocage : aucun appel qui attend un autre programme (spawnSync, execSync, execFileSync,
 // Atomics.wait) entre le lancement et les premières fenêtres. PinCab, 26/11/2026 : la sonde 3D Vision,
 // synchrone, figeait le processus principal 5 s avant ready ; une minuterie du réseau en est partie avant

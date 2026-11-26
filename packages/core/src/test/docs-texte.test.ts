@@ -1,3 +1,4 @@
+// garde-depot : relit les sources de tout le dépôt ; passée à chaque vérification de branche, où qu'elle soit rangée (scripts/verifier.mjs)
 // Documents publiés (.md suivis par git) : un chemin Windows écrit par un script qui prend
 // « \ » pour un échappement y laisse des traces. « \r », « \f », « \b », « \v » deviennent
 // des caractères de contrôle (`docs\rendu…` coupé par un retour chariot, `docs\images\fr`
