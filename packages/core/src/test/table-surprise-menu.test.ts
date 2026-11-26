@@ -9,10 +9,8 @@ import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
 import { removeTempDir } from './temp-dir';
 import { saveGuestMode } from '../guestmode';
-import type { TableEntry } from '../tables';
-const { surpriseFingerprint } = require(path.join(REPO_ROOT, 'app/dist/table-surprise.js')) as { surpriseFingerprint(table: TableEntry, engine: { files: string[]; identity: string }, checked: { files: string[]; directories: string[] }): string | undefined };
 
-for (const admitted of [false, true]) test(`menu natif isolé : deux flips, ${admitted ? 'lanceur FP simulé et retour' : 'aucune autorisation et message'}`, { timeout: 90_000 }, () => {
+for (const admitted of [false, true]) test(`menu natif isolé : deux flips, ${admitted ? 'lanceur FP simulé et retour' : 'table exclue et message'}`, { timeout: 90_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-surprise-menu-'));
   try {
     const home = path.join(dir, 'home'), root = path.join(dir, 'root');
@@ -21,15 +19,11 @@ for (const admitted of [false, true]) test(`menu natif isolé : deux flips, ${ad
     fs.mkdirSync(path.join(root, 'tables', 'Ocean'), { recursive: true });
     fs.writeFileSync(path.join(root, 'tables', 'Ocean', 'Ocean.fpt'), 'fictional, never launched');
     const fp = path.join(dir, 'fake-fp');
-    if (admitted) {
-      fs.mkdirSync(fp);
-      const exe = path.join(fp, 'Future Pinball.exe'); fs.writeFileSync(exe, 'not a Windows executable');
-      const table = { id: 'Ocean/Ocean.fpt', file: path.join(root, 'tables', 'Ocean', 'Ocean.fpt'), folder: path.join(root, 'tables', 'Ocean'), emulator: 'futurepinball', title: 'Ocean', info: {} } as TableEntry;
-      const checked = { files: [], directories: [] };
-      const verified = surpriseFingerprint(table, { files: [exe], identity: exe }, checked);
-      assert.ok(verified);
-      fs.writeFileSync(path.join(home, 'table-surprise.json'), JSON.stringify({ [table.id]: { audience: 'family', hidden: false, verified, checked } }));
-    }
+    fs.mkdirSync(fp);
+    fs.writeFileSync(path.join(fp, 'Future Pinball.exe'), 'not a Windows executable');
+    // Par défaut, toute table jouable entre dans le tirage ; la seule de la collection, exclue, n'en laisse aucune.
+    const exclusions = JSON.stringify({ tables: admitted ? [] : ['Ocean/Ocean.fpt'], collections: [] });
+    fs.writeFileSync(path.join(home, 'table-surprise.json'), exclusions);
     const audio = path.join(dir, 'audio.json'); fs.writeFileSync(audio, '[]');
     const capture = path.join(dir, 'captures');
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HOME: home, CYBERPINBALL_ROOT: root, CYBERPINBALL_DISPLAYS: SCREENS, CYBERPINBALL_AUDIO_OUTPUTS: audio, CYBERPINBALL_LANGUE: 'fr', CYBERPINBALL_RESEAU: 'off', CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_PARTIE_SIMULEE: '', CYBERPINBALL_PARTIE_MS: '5000', CYBERPINBALL_LOADING_MS: '1', CYBERPINBALL_FUTURE_PINBALL_SIMULE: fp, CYBERPINBALL_CAPTURE: capture, CYBERPINBALL_AUTOPILOT: `KeyQ,hold:KeyA,hold:KeyS,wait:1700,release:KeyA,release:KeyS,${admitted ? 'until:playing,until:menu' : 'KeyQ'}` };
@@ -42,9 +36,9 @@ for (const admitted of [false, true]) test(`menu natif isolé : deux flips, ${ad
     const phase = (name: string) => states.find((s) => s.name === name)?.view.ecrans.playfield.phase;
     assert.equal(phase('01-KeyQ'), 'menu', 'the native wheel is reached before the gesture');
     if (!admitted) {
-      assert.equal(phase('04-wait_1700'), 'message', 'empty permissions produce the native message');
+      assert.equal(phase('04-wait_1700'), 'message', 'the only table is excluded: native message');
       assert.equal(phase('07-KeyQ'), 'menu', 'Exit returns to the native wheel');
-      assert.equal(fs.existsSync(path.join(home, 'table-surprise.json')), false, 'menu use does not grant permission');
+      assert.equal(fs.readFileSync(path.join(home, 'table-surprise.json'), 'utf8'), exclusions, 'the gesture never changes the exclusions');
     } else {
       assert.equal(phase('04-wait_1700'), 'menu', 'the overlay retains the native menu phase');
       assert.equal(phase('07-until_playing'), 'playing', 'the existing launcher reaches simulated play');

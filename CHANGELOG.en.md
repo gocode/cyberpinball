@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Surprise table: every playable table in the displayed collection now takes part in the draw, with nothing to confirm table by table; updating the table or VPX no longer removes it.
+- To leave a table out: its sheet, Manage the table > In the draw: no. To leave a whole personal collection out of the "All tables" draw: System menu > Tables > Collections > Manage my collections > the collection > Exclude from the All tables draw. Drawing from that collection itself remains possible.
+- Pinball FX tables take part in the draw whatever store the game comes from (Steam, Epic…), and Pinball FX3 tables too, just like with Start.
+- Guest mode: the draw uses the imposed collection, minus excluded tables.
+- The wheel no longer moves during the gesture: while both flippers are held, their repeats are ignored.
 - Night mode: an optional button toggles it with one press, in the front-end as well as during a game. It is recorded with the other buttons, in the collapsed "Advanced buttons" section of the summary (System menu > My cabinet > "Cabinet setup" > Buttons); empty by default.
 - Night mode: a direct entry in System menu > My cabinet > "Night mode" opens its settings (screens, sound, LEDs, toys, schedule), without going through "Sound and attract mode".
 - LED effects: ROM-less tables that have their own Sub DOF in the script (Stranger Things, for example) now light the LEDs. Before, their DOF calls did not go through controller.vbs and had no effect. Cyber Pinball's .vbs hooks the listener into the table's Sub DOF without moving any line. The game log says when the script's DOF calls reach no listener.

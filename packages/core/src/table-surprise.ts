@@ -1,21 +1,31 @@
-/** Table surprise : politique fermée par défaut, geste et session indépendants du moteur et du rendu. */
-export type SurpriseAudience = 'family' | 'normal' | 'adult';
-export interface SurprisePermission {
-  audience: SurpriseAudience;
-  hidden: boolean;
-  /** Confirmation locale des prérequis (et des droits pour Zen), liée aux fichiers et au moteur. */
-  verified: string;
-  /** Dépendances relevées à la confirmation, relues par stat sans réanalyser chaque VPX au tirage. */
-  checked?: { files: string[]; directories: string[] };
+/** Table surprise : toutes les tables jouables entrent dans le tirage, sauf celles que le joueur exclut. */
+export interface SurpriseExclusions {
+  /** Tables (TableEntry.id) exclues de tout tirage. */
+  tables: string[];
+  /** Collections personnelles dont les tables ne sortent pas d'un tirage dans « Toutes les tables ». */
+  collections: string[];
 }
 export interface SurpriseCandidate {
   id: string;
   title: string;
   wheel?: string;
 }
-export function surpriseAllowed(permission: SurprisePermission | undefined, fingerprint: string | undefined, guest: boolean): boolean {
-  return Boolean(permission && fingerprint && permission.verified === fingerprint && permission.hidden === false &&
-    (permission.audience === 'family' || (!guest && permission.audience === 'normal')));
+/** Lecture tolérante : un fichier absent, abîmé ou d'un ancien format ne retire aucune table. */
+export function readSurpriseExclusions(value: unknown): SurpriseExclusions {
+  const list = (v: unknown): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.length > 0))] : [];
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return { tables: list(record.tables), collections: list(record.collections) };
+}
+/** Exclue si la table l'est elle-même, ou si l'on tire dans « Toutes les tables » et qu'une collection exclue la contient. */
+export function surpriseExcluded(tableId: string, exclusions: SurpriseExclusions, drawFrom: string | undefined,
+  mine: readonly { id: string; tables: readonly string[] }[]): boolean {
+  if (exclusions.tables.includes(tableId)) return true;
+  if (drawFrom !== 'all' || !exclusions.collections.length) return false;
+  return mine.some((collection) => exclusions.collections.includes(collection.id) && collection.tables.includes(tableId));
+}
+export function toggleSurpriseExclusion(exclusions: SurpriseExclusions, kind: keyof SurpriseExclusions, id: string): SurpriseExclusions {
+  const list = exclusions[kind];
+  return { ...exclusions, [kind]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] };
 }
 /** Un tirage par entrée distincte, indépendant du moteur et de l'ordre du catalogue. */
 export function pickSurprise<T extends SurpriseCandidate>(entries: readonly T[], random: () => number = Math.random): T | undefined {
@@ -59,6 +69,8 @@ export class SurpriseGesture {
   private get time(): SurpriseClock { return this.host.clock ?? clock; }
   private down(keys: readonly string[]): boolean { return keys.some((key) => this.held.has(key)); }
   get released(): boolean { return !this.down(this.host.left()) && !this.down(this.host.right()); }
+  /** Les deux flippers sont tenus : la roue ignore leurs répétitions pendant le geste. */
+  get pair(): boolean { return this.down(this.host.left()) && this.down(this.host.right()); }
   input(code: string, down: boolean): void {
     if (down) {
       if (this.held.has(code)) return;

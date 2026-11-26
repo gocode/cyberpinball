@@ -31,6 +31,8 @@ app.whenReady().then(async () => {
   for (const [width, height, rotation] of [[3840,2160,0],[3840,2160,90],[3840,2160,180],[3840,2160,270],[1920,1080,90]]) {
     win.setContentSize(width, height);
     const result = await win.webContents.executeJavaScript('('+ (async function(width, height, rotation) {
+      // setContentSize est asynchrone : sur une machine chargée, la page garde un moment l'ancienne taille.
+      for (const until = Date.now() + 5000; (innerWidth !== width || innerHeight !== height) && Date.now() < until;) await new Promise(resolve => setTimeout(resolve, 20));
       document.documentElement.dataset.rotation = String(rotation);
       const api = window.CyberTableSurprise;
       api.render({ token: rotation+width, phase: 'spinning', entries: [{id:'a',title:'Galaxy'}, {id:'b',title:'Ocean',wheel:'data:image/png;base64,broken'}], selected:'b',duration:70 });

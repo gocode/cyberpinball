@@ -52,7 +52,7 @@
         const hint = document.createElement('p'); hint.className = 'surprise-hint';
         panel.append(heading, reel, hint); root.replaceChildren(panel);
       }
-      if (view.phase === 'preparing') root.querySelector('.surprise-hint').textContent = t('Vérification des tables autorisées…');
+      if (view.phase === 'preparing') root.querySelector('.surprise-hint').textContent = t('Préparation du tirage…');
       else {
         if (!view.entries.length) return;
         if (!root.querySelector('.surprise-reel').dataset.identity) started = performance.now();

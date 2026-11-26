@@ -31,6 +31,8 @@ export type NewsReach =
   | { kind: 'arena' }
   | { kind: 'level' }
   | { kind: 'jukebox' }
+  /** La roue, et un tirage de la table surprise tout de suite. */
+  | { kind: 'surprise' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' | 'pov' };
 
 export interface NewsItem {
@@ -59,6 +61,24 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    // Table surprise (26/11/2026), contribution d'un joueur sur GitHub ; « Retours et propositions »
+    // (0.1.13) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'table-surprise',
+    date: '2026-11-26',
+    version: '0.2.4',
+    get title() { return t('Table surprise'); },
+    get detail() { return t('Tiens les deux flippers sur la roue : une table de la collection est tirée au hasard.'); },
+    get more() {
+      return [
+        t('Sur la roue, tiens les deux flippers une seconde et demie : les logos des tables défilent comme à la loterie, puis l’une d’elles est tirée. Relâche les deux flippers et la partie démarre ; Exit ou un MagnaSave annule.'),
+        t('Le tirage se fait dans la collection affichée. Une table s’en écarte dans Gérer la table > Dans le tirage ; une de tes collections s’écarte du tirage de « Toutes les tables » dans Gérer mes collections.'),
+      ];
+    },
+    get where() { return t('Sur la roue : les deux flippers tenus'); },
+    reach: { kind: 'surprise' },
+    beta: true,
+  },
   {
     // Animations des LED hors partie (25/11/2026) : « Groupes » (0.1.14) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
@@ -444,21 +464,6 @@ export const NEWS: readonly NewsItem[] = [
     get where() { return t('Menu système › Tables › Ajouter une table › Tables de Pinball FX'); },
     reach: { kind: 'system', id: 'add-table' },
     beta: true,
-  },
-  {
-    id: 'avis-et-propositions',
-    date: '2026-11-16',
-    version: '0.1.13',
-    get title() { return t('Retours et propositions'); },
-    get detail() { return t('Les idées des joueurs, les plus demandées en tête : vote, ou propose la tienne.'); },
-    get more() {
-      return [
-        t('Un tableau public des idées et des problèmes signalés par les joueurs. Vote pour une proposition, ou publie la tienne au clavier à l’écran ou au téléphone : les propositions proches s’affichent pendant que tu écris.'),
-        t('Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.'),
-      ];
-    },
-    get where() { return t('Menu système › Aide et infos › Retours et propositions'); },
-    reach: { kind: 'system', id: 'feedback' },
   },
 ];
 

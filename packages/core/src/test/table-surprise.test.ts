@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LaunchReservation, pickSurprise, surpriseAllowed, SurpriseGesture, SurpriseSession, type SurpriseCandidate, type SurpriseClock, type SurprisePermission } from '../table-surprise';
+import { LaunchReservation, pickSurprise, readSurpriseExclusions, surpriseExcluded, SurpriseGesture, SurpriseSession, toggleSurpriseExclusion, type SurpriseCandidate, type SurpriseClock } from '../table-surprise';
 
 class Clock implements SurpriseClock {
   now = 0;
@@ -68,13 +68,33 @@ for (const keys of [['MagnaL', 'Left', 'Right', 'MagnaR'], ['Left', 'Right', 'Ma
 test('S08 : MagnaSave annule une session déjà déclenchée', async () => {
   const { session, gate } = fixture(); await session.start(); assert.equal(gate.busy, true); session.cancel(); assert.equal(gate.busy, false); assert.equal(session.view(), undefined);
 });
-test('S11 : autorisation explicite, adulte / masquée / inconnue et empreinte périmée exclus', () => {
-  const p: SurprisePermission = { audience: 'family', hidden: false, verified: 'current' };
-  assert.equal(surpriseAllowed(p, 'current', true), true);
-  for (const permission of [undefined, { ...p, audience: 'adult' as const }, { ...p, hidden: true }, { ...p, verified: 'old' }]) assert.equal(surpriseAllowed(permission, 'current', false), false);
-  assert.equal(surpriseAllowed({ ...p, audience: 'normal' }, 'current', true), false);
-  assert.equal(surpriseAllowed({ ...p, audience: 'normal' }, 'current', false), true);
-  assert.equal(surpriseAllowed(p, undefined, false), false);
+test('S11 : tout entre dans le tirage sauf les tables exclues, et les collections exclues depuis Toutes les tables seulement', () => {
+  const none = readSurpriseExclusions(undefined);
+  const mine = [{ id: 'mine:adulte', tables: ['a', 'b'] }, { id: 'mine:famille', tables: ['b', 'c'] }];
+  for (const from of ['all', 'mine:adulte', 'favorites', undefined]) assert.equal(surpriseExcluded('a', none, from, mine), false);
+  const ex = { tables: ['c'], collections: ['mine:adulte'] };
+  assert.equal(surpriseExcluded('c', ex, 'mine:famille', mine), true, 'une table exclue ne sort de nulle part');
+  assert.equal(surpriseExcluded('a', ex, 'all', mine), true);
+  assert.equal(surpriseExcluded('b', ex, 'all', mine), true, 'présente aussi dans une collection non exclue : reste exclue de Toutes les tables');
+  assert.equal(surpriseExcluded('a', ex, 'mine:adulte', mine), false, 'tirer dans la collection exclue elle-même reste possible');
+  assert.equal(surpriseExcluded('b', ex, 'mine:famille', mine), false);
+  assert.equal(surpriseExcluded('a', ex, 'favorites', mine), false);
+});
+test('S11b : lecture tolérante (ancien format, fichier abîmé) et interrupteurs', () => {
+  // Ancien format (autorisations table par table) : aucune exclusion, tout redevient tirable.
+  assert.deepEqual(readSurpriseExclusions({ 'vpx-a': { audience: 'family', hidden: false, verified: 'x' } }), { tables: [], collections: [] });
+  for (const bad of [null, 'x', 3, [], { tables: 'a', collections: [1, null] }]) assert.deepEqual(readSurpriseExclusions(bad), { tables: [], collections: [] });
+  assert.deepEqual(readSurpriseExclusions({ tables: ['a', 'a', '', 2], collections: ['mine:x'] }), { tables: ['a'], collections: ['mine:x'] });
+  let ex = toggleSurpriseExclusion(readSurpriseExclusions(undefined), 'tables', 'a');
+  assert.deepEqual(ex, { tables: ['a'], collections: [] });
+  ex = toggleSurpriseExclusion(toggleSurpriseExclusion(ex, 'collections', 'mine:x'), 'tables', 'a');
+  assert.deepEqual(ex, { tables: [], collections: ['mine:x'] });
+});
+test('S11c : paire tenue, pour figer la roue pendant le geste', () => {
+  const g = gesture(); assert.equal(g.input.pair, false);
+  g.input.input('Left', true); assert.equal(g.input.pair, false);
+  g.input.input('Joy2', true); assert.equal(g.input.pair, true);
+  g.input.input('Left', false); assert.equal(g.input.pair, false);
 });
 test('S16 : zéro, un, bornes du générateur, variantes et moteurs équitables', () => {
   assert.equal(pickSurprise([], () => 0), undefined);

@@ -111,12 +111,13 @@ export const messages: Record<string, string> = {
     'A long press on Exit closes the game and brings you back to the front-end. What Pinball FX does not provide (scores, playing with a friend, virtual reality) stays greyed out on the table’s page, with the reason.',
   'Menu système › Tables › Ajouter une table › Tables de Pinball FX': 'System menu › Tables › Add a table › Pinball FX tables',
 
-  'Les idées des joueurs, les plus demandées en tête : vote, ou propose la tienne.': 'Players’ ideas, the most wanted first: vote, or suggest your own.',
-  'Un tableau public des idées et des problèmes signalés par les joueurs. Vote pour une proposition, ou publie la tienne au clavier à l’écran ou au téléphone : les propositions proches s’affichent pendant que tu écris.':
-    'A public board of the ideas and problems reported by players. Vote for an idea, or post your own with the on-screen keyboard or your phone: similar ideas show up while you type.',
-  'Un problème se signale aussi depuis l’écran d’une partie qui n’a pas pu se dérouler, avec un rapport technique lu par l’équipe seule.':
-    'A problem can also be reported from the screen of a game that could not run, with a technical report read by the team only.',
-  'Menu système › Aide et infos › Retours et propositions': 'System menu › Help and info › Feedback and ideas',
+  // Table surprise (packages/core/src/news.ts) ; le titre est dans table-surprise.ts.
+  'Tiens les deux flippers sur la roue : une table de la collection est tirée au hasard.': 'Hold both flippers on the wheel: a table from the collection is drawn at random.',
+  'Sur la roue, tiens les deux flippers une seconde et demie : les logos des tables défilent comme à la loterie, puis l’une d’elles est tirée. Relâche les deux flippers et la partie démarre ; Exit ou un MagnaSave annule.':
+    'On the wheel, hold both flippers for a second and a half: the table logos spin like a lottery, then one of them is drawn. Release both flippers and the game starts; Exit or a MagnaSave cancels.',
+  'Le tirage se fait dans la collection affichée. Une table s’en écarte dans Gérer la table > Dans le tirage ; une de tes collections s’écarte du tirage de « Toutes les tables » dans Gérer mes collections.':
+    'The draw uses the displayed collection. A table is left out in Manage the table > In the draw; one of your collections is left out of the “All tables” draw in Manage my collections.',
+  'Sur la roue : les deux flippers tenus': 'On the wheel: both flippers held',
 
   'Tape une lettre dans le Menu système : les réglages qui correspondent s’affichent aussitôt.': 'Type a letter in the System menu: the matching settings show up at once.',
   'Le nom d’un réglage, d’une rubrique ou un mot-clé (« logo », « volume », « kinect ») : les résultats suivent chaque lettre, au clavier à l’écran, sur un vrai clavier ou au téléphone.':

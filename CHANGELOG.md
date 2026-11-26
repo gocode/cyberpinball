@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Table surprise : toutes les tables jouables de la collection affichée entrent maintenant dans le tirage, sans rien confirmer table par table ; une mise à jour de la table ou de VPX ne la retire plus.
+- Pour écarter une table : sa fiche, Gérer la table > Dans le tirage : non. Pour écarter toute une collection personnelle du tirage dans « Toutes les tables » : Menu système > Tables > Collections > Gérer mes collections > la collection > Exclure du tirage de Toutes les tables. Tirer dans cette collection elle-même reste possible.
+- Les tables de Pinball FX entrent dans le tirage quelle que soit la boutique du jeu (Steam, Epic…), et celles de Pinball FX3 aussi, comme avec Start.
+- Mode invité : le tirage se fait dans la collection imposée, moins les tables exclues.
+- La roue ne bouge plus pendant le geste : tant que les deux flippers sont tenus, leurs répétitions sont ignorées.
 - Mode nuit : un bouton facultatif le bascule d'un appui, au front-end comme pendant une partie. Il se relève avec les autres boutons, dans la section repliée "Boutons avancés" du récapitulatif (Menu système > Ma borne > "Configuration de la borne" > Boutons) ; vide par défaut.
 - Mode nuit : une entrée directe dans le Menu système > Ma borne > "Mode nuit" ouvre ses réglages (écrans, son, LED, toys, horaire), sans passer par "Son et mode attente".
 - Effets LED : les tables sans ROM qui ont leur propre Sub DOF dans le script (Stranger Things, par exemple) allument désormais les LED. Avant, leurs appels DOF ne passaient pas par controller.vbs et restaient sans effet. Le .vbs de Cyber Pinball branche l'écoute dans la Sub DOF de la table, sans déplacer aucune ligne. Le journal de la partie indique si les appels DOF du script n'atteignent aucune écoute.

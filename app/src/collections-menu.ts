@@ -73,6 +73,8 @@ export function createCollectionsItem(host: {
   keysLabel(): string | undefined;
   /** Choisir les boutons des collections : l'écran qui attend les deux appuis ; `back` y ramène. */
   captureKeys(back: () => void): void;
+  /** Table surprise : l'interrupteur d'exclusion de cette collection du tirage de « Toutes les tables ». */
+  surpriseAction?(id: string, refresh: () => void): Action | undefined;
 }): ProvidedSystemItem & { openFromWheel(back: () => void, shown: () => void): void } {
   const lib = host.library;
   /**
@@ -170,6 +172,7 @@ export function createCollectionsItem(host: {
     const build = (): Built => {
       const m = host.collections.mine().find((x) => x.id === id);
       if (!m) return { heading: t('Mes collections'), sections: [], actions: [{ label: t('Retour'), icon: 'back', run: up }], back: up };
+      const surprise = host.surpriseAction?.(m.id, () => lib.openCustom(build));
       return {
         heading: m.name,
         icon: 'list',
@@ -186,6 +189,7 @@ export function createCollectionsItem(host: {
                 lib.openCustom(build);
               }),
           },
+          ...(surprise ? [surprise] : []),
           {
             label: t('Supprimer la collection'),
             detail: t('Les tables restent sur la borne'),

@@ -421,8 +421,7 @@ import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { LaunchReservation, SurpriseGesture, SurpriseSession, guestUnlockSlots } from '@cyberpinball/core';
-import { createSurpriseCatalog, type SurpriseEngine } from './table-surprise';
-import { hkcuValue } from '@cyberpinball/win-displays';
+import { createSurpriseCatalog } from './table-surprise';
 import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
 import { deleteAccount, eraseAccountFiles } from './account-delete';
@@ -1111,38 +1110,38 @@ function surpriseContext(): string | undefined {
   const collection = collections.exact();
   return JSON.stringify([guest.active, guest.collection, collection?.id, collection?.tables.map((table) => table.id) ?? []]);
 }
-function surpriseEngine(table: TableEntry): SurpriseEngine | undefined {
+/** Les mêmes contrôles que Start avant de lancer, sans rien lancer : moteur présent, fichier accepté. */
+function surprisePlayable(table: TableEntry): boolean {
+  // Hors écran, la partie simulée joue une table VPX sans lire son fichier : Start la lancerait aussi.
+  if (table.emulator === 'vpx' && OFFSCREEN && process.env.CYBERPINBALL_PARTIE_SIMULEE !== undefined) return Boolean(vpxInstall(loc));
   if (table.emulator === 'vpx') {
     const other = otherVpxFor(table.info, readOtherVpx(loc.dataDir));
     const engine = other ?? vpxInstall(loc);
     const format = readVpxFileVersion(table.file);
-    if (!engine?.version || format === undefined || (other && otherVpxRefusal(other, { exists: fs.existsSync(other.exe), display: false, friends: false })) || tableTooNew(format, table.info, vpxInstall(loc)?.version, readOtherVpx(loc.dataDir))) return undefined;
-    return { files: [engine.exe], identity: engine.exe, romDirs: [path.join(table.folder, 'pinmame', 'roms'), path.join(path.dirname(engine.exe), 'VPinMAME', 'roms'), ...(loc.root ? [path.join(loc.root, 'pinmame', 'roms')] : [])] };
+    return Boolean(engine?.version && format !== undefined && !(other && otherVpxRefusal(other, { exists: fs.existsSync(other.exe), display: false, friends: false })) && !tableTooNew(format, table.info, vpxInstall(loc)?.version, readOtherVpx(loc.dataDir)));
   }
   if (table.emulator === 'futurepinball') {
     const engine = detectFuturePinball(loc.dataDir, loc.root);
-    if (!engine || futurePinballPlan(table, { install: engine }).why) return undefined;
-    return { files: [engine.exe, ...(engine.loader ? [engine.loader] : [])], identity: engine.loader ?? engine.exe };
+    return Boolean(engine && !futurePinballPlan(table, { install: engine }).why);
   }
-  if (table.emulator === 'pinballfx') {
-    const engine = detectPinballFx();
-    // Une confirmation de droits ne vaut que pour le compte Steam actif.
-    const account = engine?.store === 'steam' ? hkcuValue('Software\\Valve\\Steam\\ActiveProcess', 'ActiveUser') : undefined;
-    if (engine?.store === 'steam' && typeof account === 'number' && account > 0) return { files: [engine.launcher], identity: JSON.stringify([engine.store, engine.gameDir, engine.launcher, account]) };
-  }
-  return undefined;
+  // Pinball FX dans toutes ses boutiques (Steam, Epic…) et FX3 : la détection du Start.
+  if (table.emulator === 'pinballfx') return table.pinballFxTable !== undefined && Boolean(detectPinballFx());
+  if (table.emulator === 'pinballfx3') return table.pinballFx3Table !== undefined && Boolean(detectPinballFx3(loc.dataDir));
+  return false;
 }
 const surpriseCatalog = createSurpriseCatalog({
-  dataDir: loc.dataDir, guest: () => guest.active, engine: surpriseEngine,
-  wheel: (table) => medias?.wheel(table), library: { openCustom: (build) => library.openCustom(build) },
+  dataDir: loc.dataDir, guest: () => guest.active, playable: surprisePlayable,
+  mine: () => collections.mine(),
+  wheel: (table) => medias?.wheel(table),
   changed: () => { surprise.cancel(); broadcast(); },
 });
 const surprise = new SurpriseSession({
   gate: launchReservation, context: surpriseContext,
-  candidates: async () => surpriseCatalog.candidates(collections.exact()?.tables ?? []),
+  candidates: async () => { const from = collections.exact(); return surpriseCatalog.candidates(from?.tables ?? [], from?.id); },
   recheck: async (id) => {
-    const table = collections.exact()?.tables.find((entry) => entry.id === id);
-    return Boolean(table && surpriseCatalog.eligible(table));
+    const from = collections.exact();
+    const table = from?.tables.find((entry) => entry.id === id);
+    return Boolean(table && surpriseCatalog.eligible(table, from?.id));
   },
   released: () => surpriseGesture.released,
   launch: async (id, reservation) => {
@@ -1151,11 +1150,11 @@ const surprise = new SurpriseSession({
   },
   changed: () => broadcast(),
   empty: () => {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Aucune table éligible'), lines: [t('Cette collection ne contient aucune table autorisée dont les prérequis sont confirmés. Un administrateur peut les vérifier dans Gérer la table > Table surprise.'), t('Start ou Exit : revenir au front-end.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Aucune table à tirer'), lines: [t('Aucune table de cette collection ne peut sortir : son jeu n’est pas installé, ou elle est exclue (Gérer la table > Dans le tirage).'), t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
   },
   failed: () => {
-    state = { ...state, phase: 'message', help: false, message: { title: t('Table surprise interrompue'), lines: [t('Le tirage a été interrompu. Vérifie les prérequis de la table avant de réessayer.'), t('Start ou Exit : revenir au front-end.')] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Table surprise interrompue'), lines: [t('Le tirage a été interrompu. Réessaie, ou choisis la table sur la roue.'), t('Start ou Exit : revenir au front-end.')] } };
     broadcast();
   },
 });
@@ -1545,7 +1544,7 @@ const library = createLibrary({
   menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
   // « Ajouter à une collection… » sur la fiche (library, créée plus bas, n'est lue qu'à l'appel).
   tableCollections: (table, back) => tableCollectionsAction({ collections, library, redraw: () => broadcast() })(table, back),
-  tableSurprise: (table, back) => surpriseCatalog.action(table, back),
+  tableSurprise: (table, refresh) => surpriseCatalog.tableAction(table, refresh),
   favorite: (table, on) => {
     if (!loc.root) return;
     setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
@@ -2922,6 +2921,7 @@ const collectionsItem = createCollectionsItem({
     return keys.previous.length && keys.next.length ? `${keyLabel(keys.previous[0]!)} / ${keyLabel(keys.next[0]!)}` : undefined;
   },
   captureKeys: (back) => startCollectionCapture(back),
+  surpriseAction: (id, refresh) => (guest.active ? undefined : surpriseCatalog.collectionAction(id, refresh)),
 });
 library.provideSystemItem('collections', collectionsItem);
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
@@ -3208,6 +3208,9 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       return localPlay() ? { gone: local } : { run: () => arenaMenu.openHome(back) };
     case 'jukebox':
       return { run: () => openJukebox() };
+    // Table surprise : retour à la roue et tirage aussitôt, comme les deux flippers tenus.
+    case 'surprise':
+      return { run: () => { library.leave(); void surprise.start(); } };
     case 'sheet': {
       const table = tables[state.index];
       if (!table) return { gone: t('Choisis d’abord une table sur la roue') };
@@ -5588,6 +5591,9 @@ function handleKey(input: Input, fromPhone = false): boolean {
       if (wheelPress && input.code !== wheelPress.code) cancelWheelPress();
       // Le rôle du bouton : la même résolution que dans le Juke-box (menuButton).
       const button = menuButton(input.code, KEYS, collectionKeys());
+      // Les deux flippers tenus (geste de la table surprise) : la roue ne bouge plus. Le second appui
+      // a déjà ramené la roue sur sa table ; leurs répétitions sont ignorées jusqu'au relâchement.
+      if ((button === 'previous' || button === 'next') && input.isAutoRepeat && surpriseGesture.pair) return true;
       // Bouton tenu : la roue tourne au plus de 10 tables par seconde ; une répétition écartée ne renvoie rien.
       if ((button === 'previous' || button === 'next') && !wheelRepeat.take(Boolean(input.isAutoRepeat))) return true;
       if (button === 'help') guest.knock('menu.commands') && (state = { ...state, help: !state.help });
@@ -6142,7 +6148,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
   await backups.yieldToGame();
   if (!launchReservation.owns(owner) || (reserved && reservedContext !== surpriseContext())) return undefined;
-  if (reserved && !surpriseCatalog.eligible(table)) return undefined;
+  if (reserved && !surpriseCatalog.eligible(table, collections.exact()?.id)) return undefined;
   const copying = backups.busy();
   if (copying) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au front-end.')] } };
