@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- VR: Pimax headsets (Pimax OpenXR runtime) now start. If the runtime refuses something, the error is written to the headset log instead of a silent restart loop every 2 seconds.
+- If the headset companion stops right after launch before you have put the headset on, Cyber Pinball now waits longer and longer before trying again (up to 5 minutes).
 - Applications: when a site only has a small favicon, its sharing image (og:image) becomes its icon; applications already showing a small favicon look for it the next time the grid opens.
 - Flipper LED effect (tables with a poor DOF configuration): the bar no longer stops abruptly. Solid at the base, in the table's colors, it fades into the dark LEDs through dots spaced further and further apart, before the middle of the strip. This fade shows even when the LEDs are set very low during a game, which a brightness gradient cannot do.
 - On each flipper hit, a small shot breaks away from the bar and travels slowly toward the back of the playfield. Several hits in a row send several shots one after another.

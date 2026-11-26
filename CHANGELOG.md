@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- VR : les casques Pimax (runtime Pimax OpenXR) démarrent maintenant. Si le runtime refuse quelque chose, l'erreur est écrite dans le journal du casque au lieu d'une relance silencieuse en boucle toutes les 2 secondes.
+- Si le compagnon du casque s'arrête juste après son lancement sans que tu aies porté le casque, Cyber Pinball attend de plus en plus longtemps avant de réessayer (jusqu'à 5 minutes).
 - Applications : quand un site n'a qu'un petit favicon, son image de partage (og:image) sert d'icône ; les applications déjà en pastille la cherchent à la prochaine ouverture de la grille.
 - Effet LED des flippers (tables dont la config DOF est pauvre) : la barre ne s'arrête plus net. Pleine à la base, aux couleurs de la table, elle se fond vers les LED éteintes par des points de plus en plus espacés, avant la moitié de la bande. Ce fondu se voit même quand les LED sont réglées très bas en partie, ce qu'un dégradé de luminosité ne permet pas.
 - À chaque coup de flipper, un petit tir se détache de la barre et file lentement vers le fond du plateau. Plusieurs coups d'affilée font plusieurs tirs à la suite.

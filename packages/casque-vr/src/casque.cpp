@@ -1520,6 +1520,7 @@ int main(int argc, char** argv)
    double cadenceSince = 0, copyMax = 0, renderMax = 0, periodMs = 0;
    int framesShown = 0, framesSkipped = 0, imagesReceived = 0;
    ULONGLONG headSaidAt = 0;
+   int exitCode = 0; // non nul : une erreur du runtime, dite au journal (erreur-runtime), pas une sortie voulue
    // Casque éteint, Link coupé ou session perdue : Cyber Pinball rend l'affichage aux écrans du PC (et
    // ferme une partie de VPX restée sans casque). Un casque seulement retiré n'en est pas un.
    auto lost = [&](const std::string& why)
@@ -1801,7 +1802,9 @@ int main(int argc, char** argv)
       }
 
       XrFrameState fs { XR_TYPE_FRAME_STATE };
-      if (const XrResult r = xrWaitFrame_(session, nullptr, &fs); XR_FAILED(r))
+      // Structures d'entrée réelles, jamais nullptr : le runtime Pimax OpenXR les valide (26/11/2026).
+      const XrFrameWaitInfo waitInfo { XR_TYPE_FRAME_WAIT_INFO };
+      if (const XrResult r = xrWaitFrame_(session, &waitInfo, &fs); XR_FAILED(r))
       {
          // En veille, une erreur du runtime (accueil de Link bloqué) ne touche que cette session : VPX
          // garde le casque, la partie continue (essai du 10 novembre 2026, 14:46).
@@ -1814,9 +1817,18 @@ int main(int argc, char** argv)
          }
          else if (r == XR_ERROR_SESSION_LOST || r == XR_ERROR_INSTANCE_LOST || r == XR_ERROR_RUNTIME_FAILURE)
             lost("xrWaitFrame " + hex(r));
+         else if (r != XR_ERROR_SESSION_NOT_RUNNING)
+         {
+            // Tout autre échec est dit et sort en erreur (code 6) : jamais de sortie muette avant la première
+            // image (Pimax : 1 257 relances silencieuses en une séance). Session arrêtée entre-temps : inchangé.
+            say("erreur-runtime xrWaitFrame " + hex(r));
+            exitCode = 6;
+         }
          break;
       }
-      xrBeginFrame_(session, nullptr);
+      const XrFrameBeginInfo beginInfo { XR_TYPE_FRAME_BEGIN_INFO };
+      if (const XrResult rb = xrBeginFrame_(session, &beginInfo); XR_FAILED(rb))
+         say("erreur-runtime xrBeginFrame " + hex(rb));
       const double renderStart = nowMs();
       if (fs.predictedDisplayPeriod > 0)
       {
@@ -2396,5 +2408,5 @@ int main(int argc, char** argv)
    xrDestroySession_(session);
    xrDestroyInstance_(instance);
    say("fini");
-   return 0;
+   return exitCode;
 }

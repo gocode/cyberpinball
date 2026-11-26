@@ -246,3 +246,21 @@ test('fluidité dans le casque : la boucle des images n’attend jamais le GPU, 
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
   assert.match(menu, /\|cadence\|/);
 });
+
+test('compagnon sorti vite sans casque porté : jamais relancé en boucle, raison du runtime écrite (Pimax, 26/11/2026)', () => {
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const menu = source(repo, 'app', 'src', 'casque.ts');
+  // Une sortie rapide, sans port du casque ni arrêt demandé, pose une attente croissante avant la relance et le dit une fois.
+  assert.match(menu, /if \(!stopAsked && !this\.restartNow && !this\.lost && neverWorn && \(code === 0 \|\| code === RUNTIME_ERROR_EXIT\) && Date\.now\(\) - launchedAt < QUICK_EXIT_MS\) \{\s*this\.quickExits\+\+;/);
+  assert.match(menu, /RETRY_MS \* 2 \*\* \(this\.quickExits - 1\)/);
+  assert.match(menu, /this\.retryAt = Math\.max\(this\.retryAt, Date\.now\(\) \+ wait\);/);
+  assert.match(menu, /if \(this\.quickExits === 1\) this\.opts\.log\(/);
+  // Le compagnon : structures d'entrée réelles (jamais nullptr) et aucun échec muet de xrWaitFrame / xrBeginFrame.
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
+  assert.match(cpp, /const XrFrameWaitInfo waitInfo \{ XR_TYPE_FRAME_WAIT_INFO \};/);
+  assert.match(cpp, /xrWaitFrame_\(session, &waitInfo, &fs\)/);
+  assert.match(cpp, /const XrFrameBeginInfo beginInfo \{ XR_TYPE_FRAME_BEGIN_INFO \};/);
+  assert.match(cpp, /say\("erreur-runtime xrWaitFrame " \+ hex\(r\)\);\s*exitCode = 6;/);
+  assert.match(cpp, /say\("erreur-runtime xrBeginFrame " \+ hex\(rb\)\);/);
+  assert.doesNotMatch(cpp, /xr(WaitFrame|BeginFrame)_\(session, nullptr/);
+});

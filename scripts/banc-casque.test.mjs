@@ -532,6 +532,22 @@ test('banc : 23:39 rejoué, ancrage refusé sur le contour périmé, rien d’at
   assert.ok(reste.cm < 2 && reste.deg < 1, JSON.stringify(reste));
 });
 
+// Runtime qui refuse xrWaitFrame (Pimax OpenXR, 26/11/2026 : sortie muette de code 0, relancée toutes les 2 s) :
+// la raison est écrite et le code de sortie n'est pas nul.
+test('banc : xrWaitFrame refusé (validation), raison écrite et sortie en erreur', sauf, async () => {
+  const r = await jouer('0 porte 1\n0 attente-refusee 1', { dureeMs: 3000 });
+  assert.equal(lignes(r, /^erreur-runtime xrWaitFrame 0x/i).length >= 1, true, r.lignes.map((l) => l.ligne).join('\n'));
+  const sortie = lignes(r, /^\(sortie /)[0];
+  assert.ok(sortie, 'le compagnon est sorti');
+  assert.doesNotMatch(sortie.ligne, /^\(sortie 0\)$/, 'code de sortie non nul');
+});
+
+test('banc : le compagnon passe de vraies structures d’entrée à xrWaitFrame et xrBeginFrame (jamais nullptr)', sauf, async () => {
+  const r = await jouer('0 porte 1\n0 info-nulle-refusee 1', { dureeMs: 3000 });
+  assert.equal(lignes(r, /^erreur-runtime/).length, 0, r.lignes.map((l) => l.ligne).join('\n'));
+  assert.ok(trace(r, /^begin$/).length >= 1, 'des images sont commencées');
+});
+
 // Deux bancs en même temps (nuit du 14 novembre 2026, deux sessions sur le même poste) : chacun a son scénario, sa
 // trace et son instant zéro, et n'arrête que ses propres processus (par PID) ; aucun ne voit ni ne gêne l'autre.
 test('banc : deux bancs en même temps, chacun son scénario, aucun ne gêne l’autre', banc, async () => {

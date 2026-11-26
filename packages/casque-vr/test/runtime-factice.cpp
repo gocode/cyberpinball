@@ -41,7 +41,9 @@
 //   sonde-gelee                     LibOVR : les sessions déjà créées ne répondent plus (ovr_GetSessionStatus bloque)
 //   planter                         l'application tombe à son image suivante (code 0xC0000005, comme une violation
 //                                   d'accès dans un module chargé chez elle)
-//   tete-tourne V                   LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
+//   attente-refusee 1|0             xrWaitFrame rend XR_ERROR_VALIDATION_FAILURE (runtime Pimax OpenXR, 26/11/2026)
+//   info-nulle-refusee 1|0          xrWaitFrame et xrBeginFrame refusent une structure d'entrée nulle (idem)
+//   tete-tourne V                LibOVR : la tête tourne sur elle-même à V rad/s (lacet), vitesse donnée comme LibOVR
 //   tete-suivie 1|0                 LibOVR : la tête suivie en position (drapeaux 15) ou en orientation seule (3)
 //   contour-fige 1|0                LibOVR : le contour lu (ovr_GetBoundaryGeometry) figé dans l'espace de suivi du
 //                                   moment, comme un runtime qui recentre l'origine sans le retransformer ; le test
@@ -163,6 +165,8 @@ struct World
    // Instants du scénario (ms) où les sessions LibOVR déjà créées sont coupées (link 0), périmées ou gelées ; -1 : jamais.
    long long ovrCutAt = -1, ovrStaleAt = -1, ovrFrozenAt = -1;
    bool crash = false; // planter : l'application tombe à son image suivante
+   bool waitFails = false; // attente-refusee : xrWaitFrame rend XR_ERROR_VALIDATION_FAILURE (runtime Pimax, 26/11/2026)
+   bool nullInfoRefused = false; // info-nulle-refusee : xrWaitFrame et xrBeginFrame refusent une structure d'entrée nulle
    float headSpin = 0.f; // tete-tourne : rad/s autour de la verticale, depuis headSpinAt (ms du scénario)
    long long headSpinAt = 0;
 };
@@ -436,6 +440,10 @@ void advance(bool silent = false)
          world.ovrFrozenAt = st.ms;
       else if (st.verb == "planter")
          world.crash = !silent;
+      else if (st.verb == "attente-refusee")
+         world.waitFails = num(st, 0) != 0.f;
+      else if (st.verb == "info-nulle-refusee")
+         world.nullInfoRefused = num(st, 0) != 0.f;
       else if (st.verb == "tete-tourne")
       {
          // La rotation déjà faite reste acquise : la tête ne revient pas d'un coup à son cap de départ.
@@ -739,11 +747,17 @@ XrResult XRAPI_CALL pollEvent(XrInstance i, XrEventDataBuffer* out)
    return XR_EVENT_UNAVAILABLE;
 }
 
-XrResult XRAPI_CALL waitFrame(XrSession h, const XrFrameWaitInfo*, XrFrameState* fs)
+XrResult XRAPI_CALL waitFrame(XrSession h, const XrFrameWaitInfo* info, XrFrameState* fs)
 {
    auto* s = reinterpret_cast<Session*>(h);
    {
       std::lock_guard<std::mutex> g(lock);
+      advance();
+      if (world.waitFails || (world.nullInfoRefused && (!info || info->type != XR_TYPE_FRAME_WAIT_INFO)))
+      {
+         trace("xrWaitFrame refuse (validation)");
+         return XR_ERROR_VALIDATION_FAILURE;
+      }
       if (!s->running)
          return XR_ERROR_SESSION_NOT_RUNNING;
    }
@@ -758,9 +772,11 @@ XrResult XRAPI_CALL waitFrame(XrSession h, const XrFrameWaitInfo*, XrFrameState*
    return XR_SUCCESS;
 }
 
-XrResult XRAPI_CALL beginFrame(XrSession h, const XrFrameBeginInfo*)
+XrResult XRAPI_CALL beginFrame(XrSession h, const XrFrameBeginInfo* info)
 {
    auto* s = reinterpret_cast<Session*>(h);
+   if (world.nullInfoRefused && (!info || info->type != XR_TYPE_FRAME_BEGIN_INFO))
+      return XR_ERROR_VALIDATION_FAILURE;
    return s->running ? XR_SUCCESS : XR_ERROR_SESSION_NOT_RUNNING;
 }
 

@@ -23,6 +23,11 @@ const EXE = 'cyberpinball-casque.exe';
  */
 export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() || undefined;
 const RETRY_MS = 15_000;
+/** Un compagnon sorti avant ce délai, sans avoir été porté, a échoué au démarrage ; attente maximale entre deux essais. */
+const QUICK_EXIT_MS = 30_000;
+const RETRY_MAX_MS = 300_000;
+/** Code de sortie du compagnon après « erreur-runtime » (le runtime a refusé un appel) ; les autres codes gardent leur attente fixe. */
+const RUNTIME_ERROR_EXIT = 6;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
 const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|decor|releve|reprise|instantane|porte|casque-perdu|cadence|profondeur|fini)\b/;
@@ -173,6 +178,8 @@ export interface HeadPose {
 export class HeadsetMenu {
   private child: ChildProcessWithoutNullStreams | undefined;
   private retryAt = 0;
+  /** Sorties rapides de suite (sans casque porté) : l'attente avant relance double à chacune. */
+  private quickExits = 0;
   private timer: NodeJS.Timeout | undefined;
   /** Panneaux et teinte de la scène envoyée au compagnon en cours. */
   private panels: HeadsetPanel[] = [];
@@ -705,8 +712,12 @@ export class HeadsetMenu {
     });
     child.stderr.on('data', () => undefined);
     child.on('error', (error) => this.opts.log(`Casque : lancement impossible (${error.message}).`)); // i18n-ignore : journal
+    const launchedAt = Date.now();
     child.on('exit', (code) => {
       const owner = this.cycle.exited(child);
+      // Arrêt demandé (stop) : this.child a déjà été vidé.
+      const stopAsked = this.child !== child;
+      const neverWorn = !this.wornOnce && !this.handingOver;
       if (this.child === child) this.child = undefined;
       // Un autre compagnon est déjà en service : il garde ses écrans, ses textures et son canal ; seules
       // les textures confiées à l'ancien sont rendues.
@@ -730,6 +741,14 @@ export class HeadsetMenu {
       if (this.state === 'shown') this.setState('waiting');
       // Casque absent ou perdu (éteint, Link coupé) : nouvel essai plus tard ; arrêt demandé : rien.
       if (code !== 0 || this.lost) this.retryAt = Date.now() + RETRY_MS;
+      // Sortie rapide, sans jamais avoir été porté ni arrêt demandé : le runtime refuse quelque chose (Pimax,
+      // 26/11/2026 : 1 257 relances en une séance, code 0). Attente croissante, dite une fois au journal.
+      if (!stopAsked && !this.restartNow && !this.lost && neverWorn && (code === 0 || code === RUNTIME_ERROR_EXIT) && Date.now() - launchedAt < QUICK_EXIT_MS) {
+        this.quickExits++;
+        const wait = Math.min(RETRY_MAX_MS, RETRY_MS * 2 ** (this.quickExits - 1));
+        this.retryAt = Math.max(this.retryAt, Date.now() + wait);
+        if (this.quickExits === 1) this.opts.log(`Casque : le compagnon s’est arrêté ${Math.round((Date.now() - launchedAt) / 1000)} s après son lancement (code ${code}), sans casque porté ; nouvel essai dans ${Math.round(wait / 1000)} s, puis de plus en plus espacé.`); // i18n-ignore : journal
+      } else if (!neverWorn) this.quickExits = 0;
       this.lost = false;
       // Session neuve voulue (pièce changée, arrêt par le runtime, fin de partie) : relancée aussitôt.
       if (this.restartNow) {
