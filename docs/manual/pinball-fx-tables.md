@@ -88,3 +88,37 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   A table's script is only read from a `.vpx` (`app/src/vbs.ts`): an entry file has no ROM or PuP-Pack.
   Tests: `pinballfx.test.ts`, `pinballfx-launcher.test.ts` (simulated system), `pinballfx-cabinet.test.ts`, `gamescreens.test.ts`.
   Internal off-screen demonstration with a fake Steam (`CYBERPINBALL_STEAM_SIMULE`).
+
+## Choosing the player count
+
+On a Pinball FX or Pinball FX Midnight table page, choose **Play**.
+Use the left and right flippers to choose **1, 2, 3 or 4 players**, then press **Start**.
+Press **Exit** to return to the table page.
+A keyboard can use the arrow keys, Enter and Escape.
+Players take turns on the same cabinet.
+Hold Exit during a game to close it and return to the Cyber Pinball wheel.
+
+Both games document `Classic` for one player and `Hotseat_2`, `Hotseat_3` and `Hotseat_4` for two to four players.
+In Pinball FX, **Other modes** includes Practice, Pro on Williams and Bally tables, and the four existing single-player challenges.
+Table surprise and other direct launches use Classic.
+[Pinball FX launch options](https://www.pinballfx.com/?page_id=7754) · [Pinball FX Midnight launch options](https://steamcommunity.com/app/2337640/discussions/0/4040354495827792021/?ctp=4)
+
+## Adding Pinball FX Midnight
+
+1. Install Pinball FX Midnight (formerly Pinball M) through Steam and open the game's **Cabinet Support** screen to configure its displays.
+   Cyber Pinball detects the Steam installation, including secondary Steam libraries.
+   Your Midnight display settings stay in the game.
+2. In Cyber Pinball, open **System menu → Tables → Add a table → Pinball FX Midnight tables**.
+   Pick a listed table or choose **Add by table number** and enter the number used by Midnight.
+   The list offers a few known IDs.
+   Steam manages game content and licences.
+   If a table is unavailable to your account, the game may open at its main menu.
+3. Add any media you use for the table through **Game media** and assign the table to your collections.
+   In Guest mode, a locked collection limits which tables can launch.
+   You can use the existing collection exclusions for Table surprise.
+   The selector only changes the current game's launch arguments.
+
+Midnight and Pinball FX have separate entries even if a table number exists in both games.
+Midnight uses `steam.exe -applaunch 2337640 -Table <number> -GameMode <mode>`.
+Its entry file is `.pinballfxmidnight` with `{ "PinballFXMidnight": { "Table": 171 } }`.
+An existing `.pinballfx` entry with a `PinballFXMidnight` key is recognised at its current path.

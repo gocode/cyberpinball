@@ -55,4 +55,3 @@ export function openPinballFxModes(
   base();
   return true;
 }
-
