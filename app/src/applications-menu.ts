@@ -16,6 +16,7 @@ import {
   APP_CATALOG,
   APP_DIM_MS,
   APP_EXIT_HOLD_MS,
+  APP_ICON_MIN,
   DEFAULT_APPS,
   addApplication,
   appInitials,
@@ -134,6 +135,8 @@ export interface ApplicationsMenuHost {
   look(id: string, url: string): Promise<SiteLook>;
   /** Adresse d'une icône gardée (fichier du dossier des icônes) pour la page. */
   iconUrl(file: string): string;
+  /** Plus petit côté d'une icône gardée (storedIconSide) ; undefined : inconnu, elle est laissée. */
+  iconSide?(file: string): number | undefined;
   /** Edge à télécharger (EDGE_DOWNLOAD_URL). */
   edgeDownloadUrl: string;
   log?(line: string): void;
@@ -187,10 +190,14 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
 
   // ---------- Icônes relevées sur les sites ----------
 
-  /** Les applications sans icône : la leur est cherchée sur leur site, une à une, puis la grille se redessine. */
+  /**
+   * Les applications sans icône, ou dont l'icône ne remplit pas sa tuile : la leur est cherchée sur
+   * leur site, une à une, puis la grille se redessine.
+   */
   async function fetchIcons(): Promise<void> {
     for (const a of store.apps) {
-      if (a.icon || asked.has(a.id) || !host.online()) continue;
+      const small = a.icon ? (host.iconSide?.(a.icon) ?? APP_ICON_MIN) < APP_ICON_MIN : false;
+      if ((a.icon && !small) || asked.has(a.id) || !host.online()) continue;
       asked.add(a.id);
       const look = await host.look(a.id, a.url).catch(() => ({}) as SiteLook);
       if (!look.icon && !look.color) continue;

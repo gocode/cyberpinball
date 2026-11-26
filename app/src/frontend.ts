@@ -387,8 +387,9 @@ import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
 import { joystickAxes, onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
 import { createApplicationsMenu } from './applications-menu';
+import { createRootAccess } from './root-access';
 import { createAppsBrowser, watchAppButtons } from './applications-browser';
-import { fetchSiteLook } from './applications-icons';
+import { fetchSiteLook, storedIconSide } from './applications-icons';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
 import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine } from './qualite-vpx';
@@ -427,7 +428,7 @@ import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
-import { LaunchReservation, SurpriseGesture, SurpriseSession, guestUnlockSlots } from '@cyberpinball/core';
+import { FlipperCombo, LaunchReservation, SurpriseGesture, SurpriseSession, guestUnlockSlots } from '@cyberpinball/core';
 import { createSurpriseCatalog } from './table-surprise';
 import { createDofReplace } from './dof-remplacement';
 import { createFriendsMenu } from './friends-menu';
@@ -1178,6 +1179,39 @@ const surpriseGesture = new SurpriseGesture({
   },
   released: () => { void surprise.release(); },
 });
+// Root Access (root-access.ts, 26/11/2026) : le jeu de flipper caché, sur la zone du plateau. La roue
+// l'ouvre par une combinaison de flips (ROOT_ACCESS_SEQUENCE : gauche, droite, deux fois à gauche, deux
+// fois à droite, trois fois à gauche, trois fois à droite), qui la ramène sur sa table. Exit le ferme.
+const rootAccess = createRootAccess({
+  place: () => {
+    const place = playfieldPlace();
+    return place ? { bounds: windowRect(place.zone), rotation: place.rotation } : { bounds: primaryRect(), rotation };
+  },
+  buttons: () => buttons,
+  plungerSensor: () => loadCabinetMemo()?.analog?.plunger,
+  axes: () => joystickAxes(),
+  // Hors écran : aucun vrai bouton n'est lu.
+  keysDown: (vks) => (OFFSCREEN ? [] : keysDown(vks)),
+  watchJoystick: watchJoystickButtons,
+  claimJoystick: (win) => onJoystickInput(win, () => undefined),
+  activity: () => void attract.activity(),
+  closed: () => {
+    rootAccessCombo.reset();
+    void takeForeground();
+    broadcast();
+  },
+  log: (line) => console.log(line),
+});
+const rootAccessCombo = new FlipperCombo({
+  left: () => guestUnlockSlots(buttons).find((slot) => slot.button === 'leftFlipper')!.codes,
+  right: () => guestUnlockSlots(buttons).find((slot) => slot.button === 'rightFlipper')!.codes,
+  allowed: () => state.phase === 'menu' && !playing && !rootAccess.isOpen(),
+  trigger: () => {
+    cancelWheelPress();
+    rootAccess.open();
+  },
+});
+
 function surpriseCancelKey(code: string): boolean {
   return KEYS.exit.includes(code) || guestUnlockSlots(buttons).some((slot) => (slot.button === 'leftMagna' || slot.button === 'rightMagna') && slot.codes.includes(code));
 }
@@ -1661,7 +1695,9 @@ const library = createLibrary({
   // La vue du lecteur YouTube n'est pas dans la capture de sa fenêtre : à part (« en-ligne »).
   captureExtras: async () => {
     const png = await jukeboxPlayer.onlineCapture();
-    return png ? [{ name: 'en-ligne', png }] : [];
+    const game = rootAccess.window();
+    const rootPng = game ? (await game.webContents.capturePage()).toPNG() : undefined;
+    return [...(png ? [{ name: 'en-ligne', png }] : []), ...(rootPng ? [{ name: 'root-access', png: rootPng }] : [])];
   },
 });
 
@@ -4194,6 +4230,7 @@ const applicationsMenu = createApplicationsMenu({
   // net.fetch : la pile réseau de Chromium, qui lit les gros en-têtes de YouTube (applications-icons.ts).
   look: (id, url) => fetchSiteLook(id, url, { dataDir: loc.dataDir, fetch: ((to: string, init?: RequestInit) => net.fetch(to, init)) as typeof fetch, log: (line) => console.log(line) }),
   iconUrl: (file) => mediaUrl(path.join(applicationsIconDir(loc.dataDir), file)),
+  iconSide: (file) => storedIconSide(loc.dataDir, file),
   edgeDownloadUrl: EDGE_DOWNLOAD_URL,
   log: (line) => console.log(line),
 });
@@ -5419,10 +5456,13 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     onKeyInput(win, keyboardChords.down, keyboardChords.up);
     // Le menu ne reprend pas le premier plan pendant une partie, même si Electron le croit
     // encore actif. Les observateurs globaux (Exit, réglages en partie) restent à l'écoute.
-    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)), () => state.phase !== 'playing');
+    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)), () => state.phase !== 'playing' && !rootAccess.isOpen());
     // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
     if (role.id === 'playfield') {
-      win.on('blur', () => surpriseGesture.reset());
+      win.on('blur', () => {
+        surpriseGesture.reset();
+        rootAccessCombo.reset();
+      });
       win.webContents.on('render-process-gone', () => surpriseGesture.reset());
     }
     win.on('close', (event) => {
@@ -5528,6 +5568,8 @@ const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(
  */
 function handleKey(input: Input, fromPhone = false): boolean {
   if (!fromPhone && !input.isAutoRepeat) surpriseGesture.input(input.code, true);
+  // Root Access : la combinaison de flips sur la roue (vrais boutons seulement, sans répétitions).
+  if (!fromPhone && !input.isAutoRepeat) rootAccessCombo.press(input.code);
   if (!fromPhone) {
     cabinetVolume?.windowInput(input);
     nightButton?.windowInput(input);
@@ -6250,8 +6292,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const owner = reserved ?? launchReservation.reserve();
   if (!owner) return undefined;
   const reservedContext = reserved ? surpriseContext() : undefined;
-  // Une application ouverte (Edge) se ferme : la partie prend les écrans.
+  // Une application ouverte (Edge) ou le jeu caché se ferme : la partie prend les écrans.
   applicationsMenu.close();
+  rootAccess.close();
   try {
   // Une partie est celle d'une table, d'où qu'elle parte (roue, fiche, Bibliothèque, groupe, partie
   // entre amis) : la roue passe dessus et quitte le médaillon, pour le chargement comme pour le retour.

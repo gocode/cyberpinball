@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications: when a site only has a small favicon, its sharing image (og:image) becomes its icon; applications already showing a small favicon look for it the next time the grid opens.
+- Flipper LED effect (tables with a poor DOF configuration): the bar no longer stops abruptly. Solid at the base, in the table's colors, it fades into the dark LEDs through dots spaced further and further apart, before the middle of the strip. This fade shows even when the LEDs are set very low during a game, which a brightness gradient cannot do.
+- On each flipper hit, a small shot breaks away from the bar and travels slowly toward the back of the playfield. Several hits in a row send several shots one after another.
+- A secret now hides in the table wheel. It plays with your cabinet's real buttons, flippers and plunger included, even an analog one. It's up to you to find it.
 - Applications: every site now has its icon in the grid, even when it only offers a small favicon (Netflix, Twitch, a Facebook group) or its home page is heavy (YouTube). A favicon too small to fill its tile sits sharp in the middle of the tile, on the site's color; applications still showing initials get their icon the next time the grid opens.
 - Applications: the flippers work like in the Jukebox. A press moves to the previous or next clickable item, which Edge outlines and scrolls into view; held, a flipper rewinds or fast-forwards the video, faster and faster. The MagnaSaves move left and right.
 - End of game: you go straight back to the wheel, on the table you just played. The summary (score, record, XP, ranking position) shows in an extra window, instead of a full screen that held you up. The wheel stays whole and visible: on the cabinet, the window sits above the wheel; on desktop, in the playfield frame next to the wheel.

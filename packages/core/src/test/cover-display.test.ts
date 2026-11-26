@@ -44,6 +44,9 @@ test('chaque module qui crée une fenêtre la fait couvrir son écran par coverD
     'schema-image.ts': [/show: false,/, /webPreferences: \{ offscreen: true/],
     // La webcam de la Vision 3D : page jamais montrée, dans sa propre partition sans réseau.
     'vision3d.ts': [/show: false,\s+width: 320,/, /partition: WEBCAM_PARTITION,/],
+    // Root Access : le jeu caché, posé sur la zone du plateau (qui peut ne couvrir qu'une partie d'un
+    // écran partagé), sans plein écran ; reposé à sa place s'il en est amputé (keepOverlayOnScreen).
+    'root-access.ts': [/\.\.\.place\.bounds,/, /keepOverlayOnScreen\(w, place\.bounds\)/],
   };
   for (const s of creators) {
     if (notScreens[s.file]) for (const re of notScreens[s.file]!) assert.match(s.text, re, `${s.file} : fenêtre qui n'est pas un écran`);

@@ -115,5 +115,6 @@ test('loading keeps Exit input and the ordinary keyboard-focus recovery', () => 
 
 test('the cabinet frontend suspends only its menu subscription while a native game is active', () => {
   const source = fs.readFileSync(path.join(REPO_ROOT, 'app/src/frontend.ts'), 'utf8');
-  assert.match(source, /onJoystickInput\(win,.*\(\) => state\.phase !== 'playing'\);/);
+  // Root Access ouvert sur la roue : ses boutons vont au jeu caché, la roue attend.
+  assert.match(source, /onJoystickInput\(win,.*\(\) => state\.phase !== 'playing' && !rootAccess\.isOpen\(\)\);/);
 });

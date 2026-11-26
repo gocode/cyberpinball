@@ -32,6 +32,11 @@ const REVIEWED = new Set([
   // Volume de la borne au téléphone (26/11/2026) : lu à la réception d'un message « vol » du téléphone,
   // toujours après l'initialisation (un téléphone doit d'abord être accepté).
   'cabinetVolume',
+  // Root Access (26/11/2026) : createRootAccess et FlipperCombo ne lisent aucun rappel à leur création ; la
+  // borne relevée (loadCabinetMemo) et la combinaison ne sont lues qu'à l'ouverture et à la fermeture du jeu,
+  // après un geste sur la roue.
+  'loadCabinetMemo',
+  'rootAccessCombo',
   // Mode débogage (23/11/2026) : lu par le rapport technique (debugReport), seulement quand le joueur en envoie un.
   // Ses propres rappels (vr, windows, table…) lisent des blocs déclarés plus bas : sa première mesure est donc
   // différée (setImmediate dans createDebug) et isolée (une erreur est journalisée, jamais lancée) ; garde plus bas.

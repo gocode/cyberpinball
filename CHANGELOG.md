@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- Applications : quand un site n'a qu'un petit favicon, son image de partage (og:image) sert d'icône ; les applications déjà en pastille la cherchent à la prochaine ouverture de la grille.
+- Effet LED des flippers (tables dont la config DOF est pauvre) : la barre ne s'arrête plus net. Pleine à la base, aux couleurs de la table, elle se fond vers les LED éteintes par des points de plus en plus espacés, avant la moitié de la bande. Ce fondu se voit même quand les LED sont réglées très bas en partie, ce qu'un dégradé de luminosité ne permet pas.
+- À chaque coup de flipper, un petit tir se détache de la barre et file lentement vers le fond du plateau. Plusieurs coups d'affilée font plusieurs tirs à la suite.
+- Un secret se cache désormais dans la roue des tables. Il se joue avec les vrais boutons de ta borne, flippers et lanceur compris, même analogique. À toi de le trouver.
 - Applications : chaque site a son icône dans la grille, même quand il n'offre qu'un petit favicon (Netflix, Twitch, un groupe Facebook) ou que sa page d'accueil est lourde (YouTube). Un favicon trop petit pour remplir sa tuile s'y pose en pastille, net, sur la couleur du site ; les applications restées en initiales récupèrent leur icône à la prochaine ouverture de la grille.
 - Applications : les flippers marchent comme dans le Juke-box. Appuyé, un flipper passe à l'élément cliquable précédent ou suivant, qu'Edge encadre en faisant défiler la page jusqu'à lui ; tenu, il recule ou avance dans la vidéo, de plus en plus vite. Les MagnaSave vont à gauche et à droite.
 - Fin de partie : tu reviens directement sur la roue, sur la table que tu viens de jouer. Le bilan (score, record, XP, place au classement) s'affiche dans une fenêtre en plus, au lieu d'un écran plein qui bloquait la suite. La roue reste entière et visible : sur la borne, la fenêtre se place au-dessus de la roue ; au bureau, dans le cadre du plateau, à côté de la roue.

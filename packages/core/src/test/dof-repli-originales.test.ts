@@ -132,46 +132,69 @@ test('repos : sans événement nouveau, les bandes s’éteignent — chaque eff
   for (const s of settingsOf(rom.content!).filter((x) => !/^G\d+ /.test(x))) assert.ok(effectMs(s) <= DOF_EFFECT_MAX_MS, `ROM : ${s}`);
 });
 
-/**
- * Barre d'un flipper, ses réglages donnés avec leur étendue depuis la base (% de la bande) : luminosité point par
- * point de la base vers le bout de la bande, toutes ses barres allumées. Les calques de libdof se mêlent par
- * transparence (#RRGGBBAA) : 1 - Π(1 - alpha) des barres qui couvrent le point.
- */
-function flipperLight(bars: { size: number; s: string }[]): number[] {
-  const alphaOf = (s: string) => {
-    const hex = /#[0-9A-F]{6}([0-9A-F]{2})?\b/.exec(s)!;
-    return hex[1] ? parseInt(hex[1], 16) / 255 : 1;
-  };
-  return Array.from({ length: 100 }, (_, p) => 1 - bars.filter((b) => b.size > p).reduce((dark, b) => dark * (1 - alphaOf(b.s)), 1));
-}
 /** Fin d'un réglage, fondu de sortie compris (ms). */
 const endMs = (s: string) => effectMs(s) + Number(/\bFD(\d+)\b/.exec(s)?.[1] ?? 0);
-
-/**
- * Invariant de la barre d'un flipper : partie de la base, au plus DOF_FLIPPER_REACH, vive à la base, sa tête
- * s'estompe sans à-coup jusqu'à presque rien (jamais coupée net : essai de la 0.2.4-essai.56), couleurs pleines de
- * la table et de sa teinte voisine, la tête éteinte avant la base.
- */
-function assertFlipperBar(bars: { size: number; s: string }[], label: string) {
-  assert.ok(bars.length >= 3, `${label} : ${bars.length} barre(s)`);
-  for (const b of bars) assert.ok(b.size > 0 && b.size <= DOF_FLIPPER_REACH * 100 && b.size <= 50, `${label} : ${b.s}`);
-  const light = flipperLight(bars);
-  const head = Math.max(...bars.map((b) => b.size));
-  assert.ok(light[0]! >= 0.8, `${label} : base trop pâle (${light[0]!.toFixed(2)})`);
-  assert.ok(light[head - 1]! <= 0.08, `${label} : tête encore vive (${light[head - 1]!.toFixed(2)}), coupée net`);
-  for (let p = 0; p < 99; p++) {
-    assert.ok(light[p + 1]! <= light[p]! + 1e-9, `${label} : la lumière remonte à ${p + 1} %`);
-    assert.ok(light[p]! - light[p + 1]! <= 0.2, `${label} : saut brutal à ${p + 1} % (${light[p]!.toFixed(2)} → ${light[p + 1]!.toFixed(2)})`);
-  }
-  const colors = new Set(bars.map((b) => /#([0-9A-F]{6})/.exec(b.s)![1]!));
-  assert.ok(colors.has('00FF41') && colors.size >= 2, `${label} : couleurs ${[...colors].join(', ')}`);
-  for (const c of colors) assert.ok(Math.max(...rgb(`#${c}`)) >= 0xf0, `${label} : couleur sombre #${c}`);
-  const bySize = [...bars].sort((a, b) => a.size - b.size);
-  for (let i = 1; i < bySize.length; i++) assert.ok(endMs(bySize[i]!.s) <= endMs(bySize[i - 1]!.s), `${label} : la tête s'éteint après la base`);
-  for (const b of bars) assert.ok(effectMs(b.s) <= DOF_EFFECT_MAX_MS, b.s);
+/** Étendue d'un réglage depuis la base du flipper (% de la bande) : le bas d'une verticale, le bord du flipper d'une horizontale. */
+type Base = 'bottom' | 'left' | 'right';
+function extent(s: string, base: Base): { from: number; size: number } {
+  if (base === 'bottom') return { from: 100 - zone(s, 'AT') - zone(s, 'AH'), size: zone(s, 'AH') };
+  if (base === 'left') return { from: zone(s, 'AL'), size: zone(s, 'AW') };
+  return { from: 100 - zone(s, 'AL') - zone(s, 'AW'), size: zone(s, 'AW') };
 }
 
-test('flippers : une barre aux couleurs de la table, du bas de la bande, dont la tête s’estompe en fondu avant la moitié', () => {
+/**
+ * Invariant de l'effet d'un flipper, à tout niveau de luminosité (en partie, libdof ne laisse à une bande baissée
+ * qu'un à quinze niveaux par couleur : un dégradé de luminosité s'y arrête net, essais des 0.2.4-essai.56 et 57).
+ * - La barre part de la base, ne dépasse pas DOF_FLIPPER_REACH, pleine à la base ; sa tête se fond vers les LED
+ *   éteintes par tramage : des points de plus en plus espacés, le dernier fin ; la tête s'éteint avant la base.
+ * - Couleurs opaques et pleines (une transparence partielle s'éteint à faible luminosité), la couleur de la table
+ *   et sa teinte voisine.
+ * - Un seul petit tir : impulsion brève poussée dans un balayage de toute la bande, vers le fond du plateau.
+ */
+function assertFlipperFx(all: string[], base: Base, label: string) {
+  for (const s of all) {
+    for (const hex of s.match(/#[0-9A-F]{6,8}\b/g) ?? []) {
+      assert.ok(hex.length === 7 || hex.endsWith('FF'), `${label} : couleur translucide ${hex}, éteinte à faible luminosité`);
+      assert.ok(Math.max(...rgb(hex)) >= 0xf0, `${label} : couleur sombre ${hex}`);
+    }
+    assert.ok(effectMs(s) <= DOF_EFFECT_MAX_MS, s);
+  }
+  const shots = all.filter((s) => /\bAD[UDLR]\b/.test(s));
+  const bars = all.filter((s) => !shots.includes(s));
+  // Le tir.
+  assert.equal(shots.length, 1, `${label} : un tir`);
+  const shot = shots[0]!;
+  const toward = { bottom: 'U', left: 'R', right: 'L' }[base];
+  assert.ok(/\bAL0 AT0 AW100 AH100\b/.test(shot) && new RegExp(`\\bAD${toward}\\b`).test(shot), `${label} : tir vers le fond : ${shot}`);
+  assert.ok(effectMs(shot) <= 150, `${label} : impulsion trop longue : ${shot}`);
+  const length = (zone(shot, 'AS') * (Number(/ (\d+) L\d+$/.exec(shot)![1]) + Number(/\bFD(\d+)\b/.exec(shot)?.[1] ?? 0))) / 1000;
+  assert.ok(length <= 12, `${label} : tir de ${length} % de la bande, pas discret`);
+  assert.ok(zone(shot, 'AS') <= 150, `${label} : tir trop rapide pour le voir partir`);
+  assert.match(shot, /^E\d+ #00FF41 /, `${label} : tir aux couleurs de la table`);
+  // La barre.
+  const spans = bars.map((s) => ({ s, ...extent(s, base) }));
+  for (const b of spans) assert.ok(b.from >= 0 && b.size > 0 && b.from + b.size <= DOF_FLIPPER_REACH * 100 && b.from + b.size <= 50, `${label} : ${b.s}`);
+  const lit = Array.from({ length: 100 }, (_, p) => spans.some((b) => p >= b.from && p < b.from + b.size));
+  const runs: { from: number; to: number }[] = [];
+  lit.forEach((on, p) => {
+    if (!on) return;
+    const last = runs[runs.length - 1];
+    if (last && last.to === p) last.to = p + 1;
+    else runs.push({ from: p, to: p + 1 });
+  });
+  assert.ok(runs[0]!.from === 0 && runs[0]!.to >= 10, `${label} : base pleine`);
+  assert.ok(runs.length >= 4, `${label} : tête sans tramage (${runs.length} segment(s)), coupée net`);
+  const gaps = runs.slice(1).map((r, i) => r.from - runs[i]!.to);
+  for (let i = 1; i < gaps.length; i++) assert.ok(gaps[i]! >= gaps[i - 1]!, `${label} : points pas de plus en plus espacés : ${gaps.join(', ')}`);
+  assert.ok(gaps[gaps.length - 1]! > gaps[0]!, `${label} : espacement constant, pas de fondu`);
+  assert.ok(runs[runs.length - 1]!.to - runs[runs.length - 1]!.from <= 2, `${label} : tête trop épaisse`);
+  const colors = new Set(bars.map((s) => /#([0-9A-F]{6})/.exec(s)![1]!));
+  assert.ok(colors.has('00FF41') && colors.size >= 2, `${label} : couleurs ${[...colors].join(', ')}`);
+  const byTop = [...spans].sort((a, b) => a.from + a.size - (b.from + b.size));
+  for (let i = 1; i < byTop.length; i++) assert.ok(endMs(byTop[i]!.s) <= endMs(byTop[i - 1]!.s), `${label} : la tête s'éteint après la base`);
+}
+
+test('flippers : barre du bas de la bande, tête fondue par tramage avant la moitié, et un petit tir vers le fond', () => {
   const events = new Map<number, number>([[101, 30], [102, 30], [108, 5]]);
   const classes = new Map([
     [101, { kind: 'flipper' as const, side: 'left' as const }],
@@ -184,21 +207,13 @@ test('flippers : une barre aux couleurs de la table, du bas de la bande, dont la
   assert.equal(cols.length, 4);
   const [speaker, back, bar] = [cols[1]!, cols[2]!, cols[3]!].map((c) => c.split('/'));
   for (const [strip, column] of [['Speaker', speaker!], ['PF Back', back!]] as const) {
-    for (const n of [101, 102]) {
-      const all = column.filter((x) => x.startsWith(`E${n} `));
-      // Bande verticale : chaque barre part du bas (AT + AH = 100).
-      for (const x of all) assert.equal(zone(x, 'AT') + zone(x, 'AH'), 100, x);
-      assertFlipperBar(all.map((s) => ({ size: zone(s, 'AH'), s })), `${strip} E${n}`);
-    }
+    for (const n of [101, 102]) assertFlipperFx(column.filter((x) => x.startsWith(`E${n} `)), 'bottom', `${strip} E${n}`);
   }
-  // Bande horizontale : chaque flipper part de son bord.
-  const left = bar!.filter((x) => x.startsWith('E101 '));
-  const right = bar!.filter((x) => x.startsWith('E102 '));
-  for (const x of left) assert.equal(zone(x, 'AL'), 0, x);
-  for (const x of right) assert.equal(zone(x, 'AL') + zone(x, 'AW'), 100, x);
-  assertFlipperBar(left.map((s) => ({ size: zone(s, 'AW'), s })), 'Bar E101');
-  assertFlipperBar(right.map((s) => ({ size: zone(s, 'AW'), s })), 'Bar E102');
+  // Bande horizontale : chaque flipper part de son bord, son tir file vers l'autre.
+  assertFlipperFx(bar!.filter((x) => x.startsWith('E101 ')), 'left', 'Bar E101');
+  assertFlipperFx(bar!.filter((x) => x.startsWith('E102 ')), 'right', 'Bar E102');
 });
+
 
 /** Réglages de chaque événement, bande par bande. */
 function byEvent(content: string, key: string): Map<string, string[]>[] {

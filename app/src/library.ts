@@ -6686,6 +6686,13 @@ export function createLibrary(host: LibraryHost) {
           for (let n = 0; n < Math.max(1, Number(count) || 1); n++) key(code);
         }
         else if (step.startsWith('release:')) send('keyUp', step.slice(8));
+        // Suite de touches rapide (« keys:ShiftLeft|ShiftRight ») : une combinaison de flips, 120 ms entre deux appuis.
+        else if (step.startsWith('keys:')) {
+          for (const code of step.slice(5).split('|')) {
+            key(code);
+            await delay(120);
+          }
+        }
         else if (/^((Control|Shift|Alt)\+)+\w+$/.test(step)) {
           // Combinaison (« Control+Shift+KeyD ») : le raccourci tel que le clavier l'envoie.
           const parts = step.split('+');

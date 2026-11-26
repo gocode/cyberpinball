@@ -279,7 +279,8 @@ export function cleanColor(value: unknown): string | undefined {
 /** Une icône annoncée par la page, de la meilleure à la moins bonne. */
 export interface IconCandidate {
   url: string;
-  kind: 'manifest' | 'apple' | 'icon' | 'favicon';
+  /** og : l'image de partage (og:image), souvent une bannière ; en dernier recours. */
+  kind: 'manifest' | 'apple' | 'icon' | 'favicon' | 'og';
   /** Côté en pixels annoncé (0 : inconnu). */
   size: number;
 }
@@ -348,6 +349,13 @@ export function readPageFacts(html: string, pageUrl: string): PageFacts {
     else if (rel.includes('icon')) facts.icons.push({ url: href, kind: 'icon', size: largestSize(attr(tag, 'sizes')) || (/\.svg(\?|$)/i.test(href) ? 512 : 0) });
   }
   facts.icons.push({ url: new URL('/favicon.ico', pageUrl).href, kind: 'favicon', size: 0 });
+  // Image de partage : la seule grande image de bien des sites (un groupe, une page sans manifeste).
+  const og = absolute(meta('og:image:secure_url') ?? meta('og:image') ?? meta('og:image:url'), pageUrl);
+  if (og) {
+    const w = Number(meta('og:image:width')) || 0;
+    const h = Number(meta('og:image:height')) || 0;
+    facts.icons.push({ url: og, kind: 'og', size: w && h ? Math.min(w, h) : 0 });
+  }
   return facts;
 }
 
@@ -384,18 +392,20 @@ export const APP_ICON_SMALLEST = 16;
 
 /**
  * Ordre d'essai : manifeste, icône Apple, icônes de la page, favicon ; dans chaque famille, la plus
- * grande d'abord. Une icône annoncée trop petite passe après les autres. Les SVG et les images
+ * grande d'abord. Une icône annoncée trop petite passe après les autres. L'image de partage (og:image)
+ * vient toujours en dernier : une bannière rognée ne vaut pas une vraie icône. Les SVG et les images
  * inscrites dans la page (data:) ne sont pas essayés : la grille ne les garde pas (siteicon.ts).
  */
 export function rankIcons(candidates: readonly IconCandidate[]): IconCandidate[] {
-  const order: Record<IconCandidate['kind'], number> = { manifest: 0, apple: 1, icon: 2, favicon: 3 };
+  const order: Record<IconCandidate['kind'], number> = { manifest: 0, apple: 1, icon: 2, favicon: 3, og: 4 };
   const seen = new Set<string>();
   return candidates
     .filter((c) => !c.url.startsWith('data:') && !/\.svgz?(\?|#|$)/i.test(c.url))
     .filter((c) => !seen.has(c.url) && !!seen.add(c.url))
     .sort((a, b) => {
+      const og = (c: IconCandidate) => (c.kind === 'og' ? 1 : 0);
       const small = (c: IconCandidate) => (c.size > 0 && c.size < APP_ICON_MIN ? 1 : 0);
-      return small(a) - small(b) || order[a.kind] - order[b.kind] || b.size - a.size;
+      return og(a) - og(b) || small(a) - small(b) || order[a.kind] - order[b.kind] || b.size - a.size;
     });
 }
 

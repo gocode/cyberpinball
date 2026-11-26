@@ -314,18 +314,27 @@ function sheen(hex: string, k = 0.55): string {
 
 /** Durée la plus longue d'un effet du repli, attente comprise (ms) : sans événement nouveau, les bandes s'éteignent après. */
 export const DOF_EFFECT_MAX_MS = 600;
-/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais : sa tête s'y éteint en fondu. */
+/** Part de la bande, depuis le bas, que la barre des flippers ne dépasse jamais : sa tête s'y éteint en fondu. */
 export const DOF_FLIPPER_REACH = 0.5;
-/** Marches du dégradé des flippers : autant de barres translucides emboîtées, de la base à la tête. */
-export const DOF_FLIPPER_STEPS = 7;
 
 /**
- * Luminosité visée (0 à 1) de chaque marche de la barre des flippers, de la base à la tête : elle décroît sans
- * à-coup jusqu'à presque rien, pour que la tête s'estompe au lieu de s'arrêter net (essai de la 0.2.4-essai.56 :
- * « s'arrête brutalement à la moitié, c'est moche »).
+ * Tracé de la barre des flippers, en % de la bande depuis la base : un segment plein, puis des points d'un
+ * pour cent de plus en plus espacés jusqu'à DOF_FLIPPER_REACH. Le fondu vers les LED éteintes tient à la
+ * densité des points, pas à leur luminosité (tramage) : en partie, Cyber Pinball baisse les bandes par le
+ * <Brightness> de libdof (dof-niveau.ts), que libdof applique après sa courbe, en (b/100)^2,2 et en tronquant ;
+ * à 11, il ne reste qu'un niveau par couleur, à 28 une quinzaine. Un dégradé de luminosité s'y arrête net
+ * (essais des 0.2.4-essai.56 et 57 : « s'arrête brutalement », « je voudrais qu'elle se fonde ») ; un tramage
+ * se voit à tout niveau.
  */
-export function dofFlipperProfile(steps = DOF_FLIPPER_STEPS): number[] {
-  return Array.from({ length: steps }, (_, j) => Math.pow(1 - (j + 0.5) / steps, 1.3));
+export function dofFlipperPattern(): { from: number; size: number }[] {
+  const solid = 15;
+  const out = [{ from: 0, size: solid }];
+  for (let at = solid, gap = 2; at + gap + 1 <= DOF_FLIPPER_REACH * 100; gap++) {
+    at += gap;
+    out.push({ from: at, size: 1 });
+    at += 1;
+  }
+  return out;
 }
 
 const FULL = 'AL0 AT0 AW100 AH100';
@@ -426,37 +435,36 @@ const ROLE_FX: Partial<Record<DofEventKind, Fx>> = {
 const ROTATION: Fx[] = [rushFx, hitFx, sparkFx, waveFx, drainFx, hitFx];
 /** Lampes des ROM : courtes et partielles, elles clignotent souvent. */
 const LAMP_ROTATION: Fx[] = [hitFx, sparkFx];
-/** Calques réservés à chaque événement (la barre des flippers en superpose DOF_FLIPPER_STEPS). */
-const LAYERS = 8;
+/** Calques réservés à chaque événement (la barre des flippers en superpose une dizaine). */
+const LAYERS = 10;
+/** Tir des flippers : vitesse (% de la bande par seconde) et durée de l'impulsion poussée dans le balayage (ms). */
+export const DOF_FLIPPER_SHOT = { speed: 90, pulse: 60, wait: 60 };
 
 /**
  * Flippers : très légers, ils sont actionnés sans cesse. Une barre aux couleurs de la table qui part du bas de la
- * bande (du bord, côté du flipper, sur une bande horizontale), pleine à la base et dont la tête s'estompe en
- * fondu continu jusqu'à DOF_FLIPPER_REACH, sans bord franc.
+ * bande (du bord, côté du flipper, sur une bande horizontale) : segment plein, base de la teinte voisine, puis
+ * une tête tramée (dofFlipperPattern) qui se fond vers les LED éteintes avant DOF_FLIPPER_REACH. Les points
+ * s'allument de la base vers la tête à quelques ms d'écart (le coup monte), la tête s'éteint la première. Couleurs
+ * opaques : une transparence partielle s'éteint à faible luminosité.
  *
- * libdof n'a pas de dégradé dans l'espace, et un balayage (AS/AD) garde l'éclat de chaque valeur jusqu'au bord de
- * sa zone, où il est coupé net. D'où DOF_FLIPPER_STEPS barres emboîtées depuis la base, chacune en couleur pleine
- * mais translucide (#RRGGBBAA) : les calques de libdof se mêlent par transparence, la base cumule toutes les
- * barres, la tête une seule, presque transparente ; les transparences sont calculées pour suivre
- * dofFlipperProfile. La plus petite, à la base, est de la teinte voisine (dégradé de teinte). Les barres
- * s'allument de la base vers la tête, à quelques ms d'écart (le coup monte), puis la tête s'éteint la première
- * (la lumière redescend en fondu). Une fois, même flipper tenu levé.
+ * Et un petit tir : une impulsion brève poussée dans un balayage de toute la bande (AS/AD), qui se détache de la
+ * barre et file lentement vers le fond du plateau (le haut de la bande, le bord opposé d'une horizontale).
+ * libdof garde chaque impulsion dans le balayage : plusieurs coups d'affilée font plusieurs tirs à la suite.
+ * Une fois par coup, même flipper tenu levé.
  */
 function flipperBar(trigger: string, color: string, layer: number, vertical: boolean, side: 'left' | 'right' | 'center'): string[] {
-  const reach = DOF_FLIPPER_REACH * 100;
   const fromRight = !vertical && side === 'right';
-  const area = (size: number) => (vertical ? `AL0 AW100 AT${100 - size} AH${size}` : fromRight ? `AT0 AH100 AL${100 - size} AW${size}` : `AT0 AH100 AL0 AW${size}`);
-  const target = dofFlipperProfile();
-  const n = target.length;
-  // Barre k (de 0, la base, à n - 1, la tête) : couvre les marches 0 à k. Luminosité de la marche j une fois
-  // toutes allumées : 1 - Π(1 - alpha des barres k ≥ j) ; on la fait égale à target[j], de la tête vers la base.
-  const alpha = target.map((t, j) => (j === n - 1 ? t : 1 - (1 - t) / (1 - target[j + 1]!)));
-  return alpha.map((a, k) => {
-    const hex = k === 0 ? dofGradientPartner(color) : color;
-    const aa = Math.max(1, Math.min(255, Math.round(a * 255))).toString(16).toUpperCase().padStart(2, '0');
-    const rest = n - 1 - k;
-    return `${trigger} ${hex}${aa} ${area(Math.round((reach * (k + 1)) / n))} FU40 FD${120 + rest * 20}${k ? ` W${k * 14}` : ''} ${70 + rest * 15} L${layer + k}`;
-  });
+  const area = (from: number, size: number) =>
+    vertical ? `AL0 AW100 AT${100 - from - size} AH${size}` : fromRight ? `AT0 AH100 AL${100 - from - size} AW${size}` : `AT0 AH100 AL${from} AW${size}`;
+  const dir = vertical ? 'U' : fromRight ? 'L' : 'R';
+  const [solid, ...dots] = dofFlipperPattern();
+  const shot = DOF_FLIPPER_SHOT;
+  return [
+    `${trigger} ${color} ${area(solid!.from, solid!.size)} FU30 FD180 150 L${layer}`,
+    `${trigger} ${dofGradientPartner(color)} ${area(0, Math.round(solid!.size / 3))} FD200 160 L${layer + 1}`,
+    ...dots.map((d, k) => `${trigger} ${color} ${area(d.from, d.size)} FU30 FD${120 - k * 10} W${12 + k * 10} ${120 - k * 12} L${layer + 2 + k}`),
+    `${trigger} ${color} ${FULL} AS${shot.speed} AD${dir} FU20 FD50 W${shot.wait} ${shot.pulse} L${layer + LAYERS - 1}`,
+  ];
 }
 
 /**

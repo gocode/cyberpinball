@@ -18,6 +18,7 @@ import {
   readIconImage,
   readManifest,
   readPageFacts,
+  readWholeFile,
   writeFileAtomic,
   type IconCandidate,
   type IconImage,
@@ -43,6 +44,21 @@ const ICON_MAX = 2_000_000;
 const TRIES = 6;
 /** Un navigateur ordinaire : certains sites ne donnent leur vraie page qu'à lui. */
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'; // i18n-ignore : en-tête HTTP
+
+/**
+ * Plus petit côté d'une icône gardée (fichier du dossier des icônes), undefined si illisible : une
+ * icône plus petite que la tuile est relue une fois par session (un site a pu gagner une icône, ou
+ * une source nouvelle comme og:image la trouver).
+ */
+export function storedIconSide(dataDir: string, file: string): number | undefined {
+  try {
+    // Icône écrite au plus ICON_MAX octets (fetchSiteLook) : au-delà, fichier étranger, illisible.
+    const image = readIconImage(readWholeFile(path.join(applicationsIconDir(dataDir), path.basename(file)), ICON_MAX));
+    return image ? Math.min(image.width, image.height) : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Relève le nom, la couleur et l'icône du site `url` ; l'icône est écrite sous `<id>.<ext>`. Jamais d'erreur : ce qui manque reste absent. */
 export async function fetchSiteLook(id: string, url: string, opts: SiteLookOptions): Promise<SiteLook> {
@@ -78,7 +94,10 @@ export async function fetchSiteLook(id: string, url: string, opts: SiteLookOptio
   }
   // La plus grande icône gardée ; la recherche s'arrête à la première qui remplit la tuile.
   let best: { image: IconImage; kind: IconCandidate['kind'] } | undefined;
-  for (const c of rankIcons(candidates).slice(0, TRIES)) {
+  // L'image de partage est toujours essayée, après les autres, quand aucune ne remplit la tuile.
+  const ranked = rankIcons(candidates);
+  const tries = [...ranked.filter((c) => c.kind !== 'og').slice(0, TRIES), ...ranked.filter((c) => c.kind === 'og').slice(0, 1)];
+  for (const c of tries) {
     try {
       const r = await request(c.url);
       if (!r.ok) continue;

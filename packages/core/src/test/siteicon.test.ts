@@ -170,6 +170,80 @@ test('aucune image lisible : pas d’icône (les initiales), sans erreur', async
   assert.equal(look.icon, undefined);
 });
 
+/** PNG rectangulaire (bannière de partage). */
+function banner(width: number, height: number): Buffer {
+  const data = Buffer.alloc(width * height * 4, 255);
+  return encodePng({ width, height, data });
+}
+
+test('og:image : en dernier, mais gardée quand le site n’a qu’un petit favicon', async () => {
+  const { fetchSiteLook } = require(path.join(APP_DIST, 'applications-icons.js'));
+  const dataDir = tmp();
+  const html = '<head><meta property="og:image" content="/partage.png"><meta property="og:image:width" content="400"><meta property="og:image:height" content="210"></head>';
+  const look = await fetchSiteLook('groupe', 'https://exemple.test/', {
+    dataDir,
+    fetch: fakeSite({ '/': ['text/html', html], '/favicon.ico': ['image/x-icon', ico([{ size: 32, data: png(32) }])], '/partage.png': ['image/png', banner(400, 210)] }),
+  });
+  assert.equal(look.icon, 'groupe.png');
+  assert.equal(readIconImage(fs.readFileSync(path.join(dataDir, 'applications-icones', 'groupe.png')))?.height, 210);
+});
+
+test('og:image jamais essayée devant une vraie icône qui remplit la tuile, toujours après les autres', async () => {
+  const { fetchSiteLook } = require(path.join(APP_DIST, 'applications-icons.js'));
+  const asked: string[] = [];
+  const site = fakeSite({ '/': ['text/html', '<head><meta property="og:image" content="/partage.png"><link rel="apple-touch-icon" href="/touch.png"></head>'], '/touch.png': ['image/png', png(180)], '/partage.png': ['image/png', banner(400, 210)] });
+  const look = await fetchSiteLook('vrai', 'https://exemple.test/', {
+    dataDir: tmp(),
+    fetch: ((to: string, init?: RequestInit) => (asked.push(new URL(to).pathname), site(to, init))) as typeof fetch,
+  });
+  assert.equal(look.icon, 'vrai.png');
+  assert.ok(!asked.includes('/partage.png'), asked.join(' '));
+  // Huit icônes annoncées : og:image reste la dernière, même annoncée immense.
+  const many = [...Array(8)].map((_, i) => ({ url: `https://exemple.test/i${i}.png`, kind: 'icon' as const, size: 16 }));
+  const ranked = rankIcons([{ url: 'https://exemple.test/partage.png', kind: 'og', size: 1200 }, ...many]);
+  assert.equal(ranked.at(-1)?.kind, 'og');
+});
+
+test('une icône gardée plus petite que la tuile est relue une fois ; une grande, jamais', async () => {
+  const { createApplicationsMenu } = require(path.join(APP_DIST, 'applications-menu.js'));
+  const { storedIconSide } = require(path.join(APP_DIST, 'applications-icons.js'));
+  const core = require('..');
+  const dataDir = tmp();
+  const iconDir = core.applicationsIconDir(dataDir);
+  fs.mkdirSync(iconDir, { recursive: true });
+  fs.writeFileSync(path.join(iconDir, 'petite.png'), png(32));
+  fs.writeFileSync(path.join(iconDir, 'grande.png'), png(192));
+  assert.equal(storedIconSide(dataDir, 'petite.png'), 32);
+  assert.equal(storedIconSide(dataDir, 'absente.png'), undefined);
+  let store = core.defaultApplications('2026-11-20T10:00:00.000Z');
+  store = { apps: store.apps.map((a: { id: string }, i: number) => ({ ...a, icon: i === 0 ? 'petite.png' : 'grande.png' })) };
+  core.saveApplications(dataDir, store);
+  const looked: string[] = [];
+  const host = {
+    dataDir,
+    library: { openCustom: () => undefined, openPrompt: () => undefined, openNotice: () => undefined, changed: () => undefined },
+    keys: () => ({ previous: ['ArrowLeft'], next: ['ArrowRight'], confirm: ['Enter'], exit: ['Escape'] }),
+    zoneKeys: () => [],
+    screen: () => ({ x: 0, y: 0, width: 1920, height: 1080 }),
+    fronton: () => true,
+    browser: { browser: () => undefined, open: () => undefined, current: () => undefined },
+    buttons: { keys: () => ({}), watch: () => () => undefined },
+    takeForeground: () => undefined,
+    openExternal: () => undefined,
+    online: () => true,
+    look: async (id: string) => (looked.push(id), {}),
+    iconUrl: (file: string) => `media://${file}`,
+    iconSide: (file: string) => storedIconSide(dataDir, file),
+    edgeDownloadUrl: 'https://exemple.example.com/edge',
+  };
+  const menu = createApplicationsMenu(host);
+  menu.open(() => undefined);
+  await new Promise((r) => setTimeout(r, 50));
+  menu.open(() => undefined);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual(looked, [store.apps[0].id]);
+});
+
 test('le front-end relève les icônes avec le fetch de Chromium (gros en-têtes de YouTube)', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
   const line = src.split(/\r?\n/).find((l) => l.includes('fetchSiteLook('));

@@ -326,8 +326,9 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
     .filter((f) => f.endsWith('.ts'))
     .filter((f) => /setAlwaysOnTop\(\s*true|alwaysOnTop:\s*true/.test(fs.readFileSync(path.join(SOURCES, f), 'utf8')));
   // remote-pointer.ts : le pointeur du téléphone, rattaché à la fenêtre « Récupérer » (fermé avec
-  // elle) et, comme toute fenêtre au premier plan, fermé par closeTopmostWindows.
-  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts', 'in-game-menu.ts', 'remote-pointer.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  // elle) et, comme toute fenêtre au premier plan, fermé par closeTopmostWindows. root-access.ts : le
+  // jeu caché, posé sur la roue, fermé au lancement d'une partie (et par closeTopmostWindows).
+  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts', 'in-game-menu.ts', 'remote-pointer.ts', 'root-access.ts'],'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
   // Seule exception : le témoin de l'enregistrement d'une partie, voulu au-dessus de VPX. Il ne couvre
   // qu'un coin du plateau (420 × 72 pour 1080 px), naît après closeTopmostWindows, ignore la souris,
   // n'apparaît pas dans la capture, et disparaît à la fin de l'enregistrement.
