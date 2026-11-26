@@ -33,6 +33,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
     count: 7,
     how: 'pages des sites (will-download, downloadURL ; « Télécharger cette image » du clic droit, qui part de la page comme ses liens ; les mêmes, et « Télécharger cette vidéo », demandés par le téléphone qui pilote la page, phone-remote.ts) : chaque téléchargement entre dans la file (events.track), repris par siteTransport (createInterruptedDownload) ; fetchImage : vignettes des résultats, aperçus, pas un téléchargement',
   },
+  'app/src/applications-icons.ts': { count: 1, how: 'page d’accueil et icône d’un site ajouté aux Applications (quelques Ko, l’icône gardée dans le dossier des applications) : relevé du nom, de la couleur et de l’icône, pas un téléchargement demandé' },
   'app/src/friend-content.ts': { count: 1, how: 'fichier d’un ami : fetchFile, appelé par le transport des amis de la file (download-sources.ts)' },
   'app/src/jukebox-library.ts': { count: 1, how: 'miniature d’un morceau YouTube à l’import du Juke-box (i.ytimg.com, quelques ko, gardée dans juke-box\\miniatures) : un aperçu, pas un téléchargement demandé' },
   'app/src/media-convert.ts': { count: 8, how: 'conversion dans le rendu (images, sons, encodage Opus de la musique des ROM, avatar, vidéos du DMD réduites, miniatures des logos de la roue), protocole local /in et /out : rien ne vient du réseau' },

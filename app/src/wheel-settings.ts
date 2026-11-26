@@ -93,7 +93,7 @@ const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.
  * Lignes de l'écran, dans l'ordre : un sous-écran revient sur sa ligne par son rang, tiré
  * d'ici (une ligne ajoutée ne décale pas les retours).
  */
-export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community', 'arena', 'collectionsMedallion'] as const;
+export const WHEEL_SETTINGS_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'applications', 'community', 'arena', 'collectionsMedallion'] as const;
 type Row = (typeof WHEEL_SETTINGS_ROWS)[number];
 const row = (key: Row) => WHEEL_SETTINGS_ROWS.indexOf(key);
 
@@ -157,10 +157,18 @@ export function createWheelSettings(host: WheelSettingsHost): ProvidedSystemItem
         icon: 'jukebox',
         run: () => set({ jukebox: !v.jukebox }),
       },
+      applications: {
+        label: v.applications ? t('Applications dans la roue : affichées') : t('Applications dans la roue : masquées'),
+        detail: v.applications
+          ? t('Le médaillon Applications suit le Juke-box : Netflix, YouTube et tes sites en plein écran sur la borne (Start : le masquer)')
+          : t('Sans le médaillon, tes applications ne s’ouvrent plus depuis la roue ; elles restent enregistrées (Start : afficher le médaillon)'),
+        icon: 'layout',
+        run: () => set({ applications: !v.applications }),
+      },
       community: {
         label: v.community ? t('Communauté dans la roue : affichée') : t('Communauté dans la roue : masquée'),
         detail: v.community
-          ? t('Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)')
+          ? t('Le médaillon Communauté suit le Juke-box et les Applications en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)')
           : t('La communauté reste dans Menu système › Communauté (Start : afficher le médaillon)'),
         icon: 'friends',
         run: () => set({ community: !v.community }),

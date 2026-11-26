@@ -67,7 +67,19 @@ export interface CabinetVolume {
   windowInput(input: Input): void;
   /** Le son est coupé : la pastille le rappelle (retour au menu, démarrage). */
   remindIfMuted(): void;
+  /**
+   * Le téléphone (phone-remote.ts) : Volume −, Volume + ou Muet comme les boutons de la borne (la
+   * pastille le montre), ou la simple lecture ; le niveau qui en résulte, undefined sans sortie lisible.
+   */
+  remote(command: 'up' | 'down' | 'mute' | 'read'): RemoteVolumeState | undefined;
   stop(): void;
+}
+
+/** Ce que le téléphone montre du volume : la première sortie mène, comme pour la pastille. */
+export interface RemoteVolumeState {
+  /** 0 à 100. */
+  percent: number;
+  muted: boolean;
 }
 
 /** Volume simulé des essais : une sortie, 50 %. */
@@ -154,18 +166,19 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
     }
   }
 
-  function apply(command: VolumeCommand, c: { keys: CabinetButtons; outputs: string[] }): void {
+  function apply(command: VolumeCommand, c: { keys: CabinetButtons; outputs: string[] }): OutputVolume[] | undefined {
     const now = readSafe(c.outputs);
-    if (!now.length) return;
+    if (!now.length) return undefined;
     if (command === 'down') beforeDown = now;
     const next = volumeAfter(now, command, command === 'hold' ? beforeDown : undefined);
     try {
       writeVolumes(next);
     } catch (error) {
       opts.log(`Volume de la borne : réglage refusé par Windows (${(error as Error).message}).`); // i18n-ignore : journal
-      return;
+      return now;
     }
     show(next, command, c.keys);
+    return next;
   }
 
   function show(outputs: OutputVolume[], command: VolumeCommand | 'windows' | 'reminder', keys: CabinetButtons): void {
@@ -239,6 +252,12 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
       const c = config();
       const now = readSafe(c.outputs);
       if (now[0]?.muted) show(now, 'reminder', c.keys);
+    },
+    remote(command) {
+      const c = config();
+      const outputs = command === 'read' ? readSafe(c.outputs) : apply(command, c);
+      const lead = outputs?.[0];
+      return lead ? { percent: Math.round(lead.level * 100), muted: lead.muted } : undefined;
     },
     stop() {
       clearInterval(timer);

@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { prepareClassicPov } from './vpx-launch-compat';
 import { findWheelTable } from './wheel-table';
 import * as path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, powerMonitor, session, webContents, type Input, type Rectangle, type WebContents } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, net, powerMonitor, screen as electronScreen, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
   otherVpxFor,
   otherVpxLabel,
@@ -315,6 +315,9 @@ import {
   medallionWheelMove,
   type Medallion,
   JUKEBOX_WHEEL_KEY,
+  APPLICATIONS_WHEEL_KEY,
+  applicationsIconDir,
+  EDGE_DOWNLOAD_URL,
   COMMUNITY_WHEEL_KEY,
   ARENA_WHEEL_KEY,
   COLLECTIONS_WHEEL_KEY,
@@ -383,6 +386,9 @@ import { RomFirstBoot } from './rom-first-boot';
 import { RomMusic } from './rom-music';
 import { onKeyInput } from './key-input';
 import { joystickAxes, onJoystickInput, retryJoysticks, watchJoystickButtons } from './joystick-input';
+import { createApplicationsMenu } from './applications-menu';
+import { createAppsBrowser, watchAppButtons } from './applications-browser';
+import { fetchSiteLook } from './applications-icons';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
 import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine } from './qualite-vpx';
@@ -577,8 +583,8 @@ function menuKeys(): [string, string][] {
  */
 function menuFooter(): [string, string?][] {
   const magna = collectionKeys();
-  // Médaillons Communauté, Arène et Collections : Start ouvre l'accueil, l'écran de l'Arène, ou la liste des collections.
-  if (onCommunity() || onArena() || onCollections())
+  // Médaillons Applications, Communauté, Arène et Collections : Start ouvre la grille, l'accueil, l'écran de l'Arène, ou la liste des collections.
+  if (onApplications() || onCommunity() || onArena() || onCollections())
     return [
       [t('Flippers : choisir')],
       ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
@@ -1317,6 +1323,8 @@ const phoneRemote = createPhoneRemote({
   mode: () => phoneRemoteMode(process.env),
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
   fromSources: !app.isPackaged,
+  // Le volume de la borne au téléphone : le même réglage que ses boutons de volume (cabinet-volume.ts).
+  volume: (command) => cabinetVolume?.remote(command),
 });
 // Retours des joueurs (feedback-service.ts) : propositions publiques, votes, rapports privés chiffrés.
 // La clé du joueur (réseau des amis) signe les propositions et les votes : une voix par borne.
@@ -1778,18 +1786,32 @@ function onCollections(): boolean {
   return collectionsShown() && state.medallion === 'collections' && !attractTable();
 }
 
-/** Un médaillon (Juke-box, Communauté, Arène, Collections) est choisi : rien de ce qui parle d'une table ne s'applique. */
+/**
+ * Le médaillon Applications est dans la roue (réglage « Applications dans la roue ») ; jamais en mode
+ * invité : un site ouvert sort de ce que le propriétaire a permis (comptes, achats).
+ */
+function applicationsShown(): boolean {
+  return mediaSettings.applications && !guest.active;
+}
+
+/** Le médaillon Applications est choisi dans la roue. */
+function onApplications(): boolean {
+  return applicationsShown() && state.medallion === 'applications' && !attractTable();
+}
+
+/** Un médaillon (Juke-box, Applications, Communauté, Arène, Collections) est choisi : rien de ce qui parle d'une table ne s'applique. */
 function onMedallion(): boolean {
-  return onJukebox() || onCommunity() || onArena() || onCollections();
+  return onJukebox() || onApplications() || onCommunity() || onArena() || onCollections();
 }
 
 /**
- * Les médaillons en tête de la roue, dans l'ordre : le Juke-box, la Communauté, l'Arène (21/11/2026),
- * puis les Collections (le plus près des tables).
+ * Les médaillons en tête de la roue, dans l'ordre : le Juke-box, les Applications (26/11/2026), la
+ * Communauté, l'Arène (21/11/2026), puis les Collections (le plus près des tables).
  */
 function wheelLeads(): Medallion[] {
   return [
     ...(jukeboxShown() ? (['jukebox'] as const) : []),
+    ...(applicationsShown() ? (['applications'] as const) : []),
     ...(communityShown() ? (['community'] as const) : []),
     ...(arenaShown() ? (['arena'] as const) : []),
     ...(collectionsShown() ? (['collections'] as const) : []),
@@ -1797,7 +1819,7 @@ function wheelLeads(): Medallion[] {
 }
 
 function selectedMedallion(): Medallion | undefined {
-  return onJukebox() ? 'jukebox' : onCommunity() ? 'community' : onArena() ? 'arena' : onCollections() ? 'collections' : undefined;
+  return onJukebox() ? 'jukebox' : onApplications() ? 'applications' : onCommunity() ? 'community' : onArena() ? 'arena' : onCollections() ? 'collections' : undefined;
 }
 
 /**
@@ -1865,6 +1887,20 @@ function openArena(): void {
   if (!guest.knock('menu.system')) return;
   cancelWheelPress();
   arenaMenu.openHome(() => library.leave());
+  broadcast();
+}
+
+/** Ce que le menu dit du médaillon Applications : combien la borne en a. */
+function applicationsCard() {
+  const c = applicationsMenu.card();
+  return { title: c.title, subtitle: c.subtitle, applications: true, favorite: false, plays: 0 };
+}
+
+/** Start sur le médaillon Applications : la grille (applications-menu.ts) ; Exit revient à la roue. */
+function openApplications(): void {
+  if (guest.active) return;
+  cancelWheelPress();
+  applicationsMenu.open(() => library.leave());
   broadcast();
 }
 
@@ -2187,6 +2223,7 @@ function wheelEntries(media = false): MenuEntries {
   const items: MenuEntry[] = [];
   const leads = wheelLeads();
   if (leads.includes('jukebox')) items.push({ ...toRemoteEntry({ label: t('Juke-box'), detail: jukeboxCard().subtitle, icon: 'jukebox' }), pick: () => remotePickJukebox() });
+  if (leads.includes('applications')) items.push({ ...toRemoteEntry({ label: t('Applications'), detail: applicationsCard().subtitle, icon: 'layout' }), pick: () => remotePickApplications() });
   if (leads.includes('community')) items.push({ ...toRemoteEntry({ label: t('Communauté'), detail: communityCard().subtitle, icon: 'friends' }), pick: () => remotePickCommunity() });
   if (leads.includes('arena')) items.push({ ...toRemoteEntry({ label: t('Arène'), detail: arenaCard().subtitle, icon: 'trophy' }), pick: () => remotePickArena() });
   if (leads.includes('collections')) items.push({ ...toRemoteEntry({ label: t('Collections'), detail: collectionsCard().subtitle, icon: 'star' }), pick: () => remotePickCollections() });
@@ -2334,6 +2371,16 @@ function remotePickCommunity(): void {
   if (onCommunity()) return void openCommunity();
   if (!guest.knock('menu.choose')) return;
   state = { ...state, medallion: 'community' };
+  playUiSound('solenoid');
+  broadcast();
+}
+
+/** Le médaillon Applications touché au téléphone : choisi, ou, déjà choisi, ouvert (la grille, à la borne). */
+function remotePickApplications(): void {
+  if (!remoteWakes() || state.phase !== 'menu' || !applicationsShown()) return;
+  if (onApplications()) return void openApplications();
+  if (!guest.knock('menu.choose')) return;
+  state = { ...state, medallion: 'applications' };
   playUiSound('solenoid');
   broadcast();
 }
@@ -3220,6 +3267,8 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       return localPlay() ? { gone: local } : { run: () => arenaMenu.openHome(back) };
     case 'jukebox':
       return { run: () => openJukebox() };
+    case 'applications':
+      return mediaSettings.applications ? { run: () => applicationsMenu.open(back) } : { gone: t('Indisponible : Applications masquées dans la roue (Réglages de la roue)') };
     // Table surprise : retour à la roue et tirage aussitôt, comme les deux flippers tenus.
     case 'surprise':
       return { run: () => { library.leave(); void surprise.start(); } };
@@ -4108,6 +4157,49 @@ const arenaMenu = createArenaMenu({
   navKeys: () => KEYS,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
 });
+// Applications (applications-menu.ts, 26/11/2026) : le médaillon après le Juke-box, la grille des sites
+// ouverts dans Edge sur un écran de la borne. Le playfield n'est pas tourné pour l'application : une
+// rotation d'écran pendant qu'Edge est ouvert replacerait les voiles et les fenêtres (screen-guard.ts).
+const applicationsMenu = createApplicationsMenu({
+  dataDir: loc.dataDir,
+  library,
+  keys: () => KEYS,
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
+  // Les écrans relevés sont en pixels physiques ; sans playfield relevé, l'écran principal du front-end.
+  screen: (where) => {
+    const d = menuAssignments[where];
+    if (d) return { ...d.bounds };
+    if (where !== 'playfield') return undefined;
+    return OFFSCREEN ? primaryRect() : electronScreen.dipToScreenRect(null, primaryRect());
+  },
+  fronton: () => Boolean(menuAssignments.backglass),
+  browser: createAppsBrowser({ dataDir: loc.dataDir, log: (line) => console.log(line) }),
+  buttons: {
+    keys: () => buttons ?? {},
+    watch: (input) =>
+      watchAppButtons({
+        ...input,
+        // Hors écran : aucun vrai bouton n'est lu.
+        keysDown: (vks) => (OFFSCREEN ? [] : keysDown(vks)),
+        watchJoystick: watchJoystickButtons,
+        browserHasFocus: () => !BrowserWindow.getFocusedWindow(),
+      }),
+  },
+  phone: {
+    attachExternal: (target) => phoneRemote.attachExternal(target),
+    detachExternal: (target) => phoneRemote.detachExternal(target),
+    pending: () => phoneRemote.pending(),
+    accept: () => phoneRemote.accept(),
+    refuse: () => phoneRemote.refuse(),
+  },
+  takeForeground: () => void takeForeground(),
+  openExternal: (url) => void shell.openExternal(url),
+  online: () => net.isOnline(),
+  look: (id, url) => fetchSiteLook(id, url, { dataDir: loc.dataDir, measure: (data) => nativeImage.createFromBuffer(data).getSize(), log: (line) => console.log(line) }),
+  iconUrl: (file) => mediaUrl(path.join(applicationsIconDir(loc.dataDir), file)),
+  edgeDownloadUrl: EDGE_DOWNLOAD_URL,
+  log: (line) => console.log(line),
+});
 // Retour de partie (game-return.ts, 21/11/2026) : après une partie qui apporte du neuf, le score, les XP,
 // le joueur dépassé et la suite ; avant le moment des badges, qui l'attend.
 const gameReturn = createGameReturn({
@@ -4770,6 +4862,7 @@ export function startFrontend(): void {
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       // Clic sur la table au centre : comme Start (la fiche, ou la partie en « jouer directement ») ; le médaillon Juke-box : le lecteur.
       if (action.offset === 0 && onJukebox()) return void openJukebox();
+      if (action.offset === 0 && onApplications()) return void openApplications();
       if (action.offset === 0 && onCommunity()) return void openCommunity();
       if (action.offset === 0 && onArena()) return void openArena();
       if (action.offset === 0 && onCollections()) return void openCollectionsMedallion();
@@ -4872,10 +4965,13 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   // Les avatars des joueurs (avatar.ts) et les miniatures de la roue se lisent aussi par le protocole des médias.
-  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir), wheelThumbs!.dir]);
+  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir), wheelThumbs!.dir, applicationsIconDir(loc.dataDir)]);
   // Morceaux du Juke-box lus hors du processus principal (jukebox-media-server.ts).
   startJukeboxMedia({ log: (line) => console.log(line) });
-  app.on('will-quit', () => stopJukeboxMedia());
+  app.on('will-quit', () => {
+    stopJukeboxMedia();
+    applicationsMenu.close();
+  });
 
   // Média ajouté, remplacé ou supprimé, table ajoutée, renommée ou supprimée, par
   // n'importe quel chemin (Cyber Pinball ou à la main) : relu et renvoyé aux fenêtres.
@@ -5620,6 +5716,10 @@ function handleKey(input: Input, fromPhone = false): boolean {
         // Médaillon Communauté : Start ouvre l'accueil.
         if (!input.isAutoRepeat) openCommunity();
         return true;
+      } else if (button === 'confirm' && onApplications()) {
+        // Médaillon Applications : Start ouvre la grille.
+        if (!input.isAutoRepeat) openApplications();
+        return true;
       } else if (button === 'confirm' && onArena()) {
         // Médaillon Arène : Start ouvre son écran à onglets.
         if (!input.isAutoRepeat) openArena();
@@ -6147,6 +6247,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const owner = reserved ?? launchReservation.reserve();
   if (!owner) return undefined;
   const reservedContext = reserved ? surpriseContext() : undefined;
+  // Une application ouverte (Edge) se ferme : la partie prend les écrans.
+  applicationsMenu.close();
   try {
   // Une partie est celle d'une table, d'où qu'elle parte (roue, fiche, Bibliothèque, groupe, partie
   // entre amis) : la roue passe dessus et quitte le médaillon, pour le chargement comme pour le retour.
@@ -7789,7 +7891,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     'medallion' in p
       ? p.medallion === 'jukebox'
         ? { offset: p.offset, key: JUKEBOX_WHEEL_KEY, title: t('Juke-box'), jukebox: true }
-        : p.medallion === 'community'
+        : p.medallion === 'applications'
+          ? { offset: p.offset, key: APPLICATIONS_WHEEL_KEY, title: t('Applications'), applications: true }
+          : p.medallion === 'community'
           ? { offset: p.offset, key: COMMUNITY_WHEEL_KEY, title: t('Communauté'), community: true }
           : p.medallion === 'arena'
             ? { offset: p.offset, key: ARENA_WHEEL_KEY, title: t('Arène'), arena: true }
@@ -7815,7 +7919,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     help: state.help,
     count: ring.count,
     position: ring.position,
-    table: !shown && onJukebox() ? jukeboxCard() : !shown && onCommunity() ? communityCard() : !shown && onArena() ? arenaCard() : !shown && onCollections() ? collectionsCard() : table ? describe(table, !shown) : undefined,
+    table: !shown && onJukebox() ? jukeboxCard() : !shown && onApplications() ? applicationsCard() : !shown && onCommunity() ? communityCard() : !shown && onArena() ? arenaCard() : !shown && onCollections() ? collectionsCard() : table ? describe(table, !shown) : undefined,
     neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
     // sa zone ne bouge jamais). La liste des collections ne paraît plus par-dessus la roue : le médaillon Collections l'ouvre.
@@ -7901,6 +8005,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     community: state.phase === 'menu' && !state.help && onCommunity() ? { poster: communityMenu.poster() } : undefined,
     // Arène : son affiche (arena.js) : jauge du niveau, tableau des records à points, qui joue en ce moment.
     arena: state.phase === 'menu' && !state.help && onArena() ? { poster: arenaMenu.poster() } : undefined,
+    // Applications : l'affiche du médaillon choisi (applications.js, même mise en page que la Communauté).
+    applications: state.phase === 'menu' && !state.help && onApplications() ? { poster: applicationsMenu.poster() } : undefined,
     // Collections : l'affiche du médaillon choisi, de même (même mise en page, community.js).
     collectionsMedallion: state.phase === 'menu' && !state.help && onCollections() ? { poster: collectionsPoster(collections) } : undefined,
     gameKeys: gameKeys(buttons, tilt),

@@ -262,9 +262,10 @@ function fillWheelItem(item, n) {
   // medaillons-vivants.js) sous l'anneau chromé commun ; l'image fixe du générateur (medaillons.cjs)
   // faute de canevas. Les deux ont la classe community (taille et place du médaillon dessiné).
   // L'Arène (21/11/2026) de même : « Coupe », la coupe verte et ses confettis.
-  if (n.community || n.arena || n.collectionsMedallion) {
-    const kind = n.community ? 'communaute' : n.arena ? 'arene' : 'collections';
-    const alt = n.community ? t('Communauté') : n.arena ? t('Arène') : t('Collections');
+  // Les Applications (26/11/2026) : « Zapping », l'écran et ses tuiles.
+  if (n.community || n.arena || n.applications || n.collectionsMedallion) {
+    const kind = n.community ? 'communaute' : n.arena ? 'arene' : n.applications ? 'applications' : 'collections';
+    const alt = n.community ? t('Communauté') : n.arena ? t('Arène') : n.applications ? t('Applications') : t('Collections');
     if (window.CyberMedaillons) tilt.replaceChildren(...CyberMedaillons.wheelNodes(kind, alt));
     else {
       const img = el('img', 'wheel-img');
@@ -748,8 +749,8 @@ function menuPanel(s) {
   else if (newTitle) titleArrive(v);
   if (wheelView && !wheelView.onLanded) wheelView.onLanded = () => titleOnLanding();
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
-  v.node.classList.toggle('community-chosen', Boolean(s.table.community || s.table.arena || s.table.collectionsMedallion));
-  // Médaillon Juke-box, Communauté, Arène ou Collections choisi au bureau : son affiche dans le cadre du fronton du menu.
+  v.node.classList.toggle('community-chosen', Boolean(s.table.community || s.table.arena || s.table.applications || s.table.collectionsMedallion));
+  // Médaillon Juke-box, Communauté, Arène, Applications ou Collections choisi au bureau : son affiche dans le cadre du fronton du menu.
   const deskFront = style && document.documentElement.classList.contains('menu-desktop');
   const front =
     deskFront && s.jukebox?.wheel && window.CyberJukebox
@@ -758,9 +759,11 @@ function menuPanel(s) {
         ? CyberCommunity.backglassPoster(s)
         : deskFront && s.arena?.poster && window.CyberArena
           ? CyberArena.backglassPoster(s)
-          : deskFront && s.collectionsMedallion?.poster && window.CyberCollections
-            ? CyberCollections.backglassPoster(s)
-            : undefined;
+          : deskFront && s.applications?.poster && window.CyberApplications
+            ? CyberApplications.backglassPoster(s)
+            : deskFront && s.collectionsMedallion?.poster && window.CyberCollections
+              ? CyberCollections.backglassPoster(s)
+              : undefined;
   // La même affiche reste en place (ses animations continuent) ; une autre la remplace.
   const shown = v.backglass.querySelector(':scope > .jb-wheel-fronton'); // i18n-ignore : sélecteur CSS
   if (shown !== front) {
@@ -1349,6 +1352,8 @@ function drawPlayfield(s) {
   else if (s.phase === 'menu' && s.community?.poster && window.CyberCommunity) nodes.push(CyberCommunity.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Médaillon Arène choisi : la sienne (arena.js), son tableau à points.
   else if (s.phase === 'menu' && s.arena?.poster && window.CyberArena) nodes.push(CyberArena.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
+  // Médaillon Applications choisi : la sienne (applications.js, même mise en page que la Communauté).
+  else if (s.phase === 'menu' && s.applications?.poster && window.CyberApplications) nodes.push(CyberApplications.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Médaillon Collections choisi : la sienne, même mise en page (community.js).
   else if (s.phase === 'menu' && s.collectionsMedallion?.poster && window.CyberCollections) nodes.push(CyberCollections.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
@@ -1836,7 +1841,9 @@ function renderZones(s, burst = false) {
     const communityZone = Boolean(window.CyberCommunity?.zone(z.node, z.role, s));
     const arenaZone = Boolean(window.CyberArena?.zone(z.node, z.role, s));
     const collectionsZone = Boolean(window.CyberCollections?.zone(z.node, z.role, s));
-    if (jukeboxZone || communityZone || arenaZone || collectionsZone) {
+    // Applications : l'affiche du médaillon au fronton ; l'écran ouvert, la grille au fronton et le nom au DMD.
+    const appsZone = Boolean(window.CyberApplications?.zone(z.node, z.role, s));
+    if (jukeboxZone || communityZone || arenaZone || collectionsZone || appsZone) {
       z.layer.show(undefined);
       z.layer.setActive(false);
       continue;
@@ -1996,7 +2003,7 @@ function renderIntro(s) {
 
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
 function backgroundVisible(s) {
-  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel && !s.community?.poster && !s.arena?.poster && !s.collectionsMedallion?.poster;
+  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel && !s.community?.poster && !s.arena?.poster && !s.applications?.poster && !s.collectionsMedallion?.poster;
 }
 
 // ---------- Horaire de la borne (arcadehours.ts, frontend.css) ----------

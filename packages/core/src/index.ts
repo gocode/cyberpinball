@@ -229,6 +229,7 @@ export * from './friendpresence';
 export * from './badges';
 export * from './levels';
 export * from './arena';
+export * from './applications';
 export * from './communityhome';
 export * from './account';
 export * from './localplay';

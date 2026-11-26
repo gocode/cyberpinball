@@ -18,6 +18,7 @@ import {
   edgeExePaths,
   edgeLoginArgs,
   edgeReadArgs,
+  edgeScreenArgs,
   isGoogleDomain,
   isYoutubeAccountDomain,
   netscapeCookies,
@@ -28,6 +29,7 @@ import {
   type CdpCookie,
   type CookieRecord,
 } from '../youtube-account';
+import { appBrowserArgs } from '../applications';
 
 setLanguage('fr');
 
@@ -63,6 +65,22 @@ test('Edge : la connexion sans port de débogage, sur l’écran demandé ; la l
   assert.ok(read.includes('--remote-debugging-address=127.0.0.1'));
   assert.equal(read.at(-1), 'about:blank');
   assert.equal(EDGE_PROFILE_DIR, 'edge-youtube');
+});
+
+// Invariant : toute fenêtre d'Edge ouverte sur la borne (connexion du Juke-box, Applications) est en
+// plein écran sur l'écran demandé, sans barre de titre ni de statut.
+test('Edge : connexion du Juke-box et Applications en plein écran sur l’écran demandé', () => {
+  const at = { x: -1080.4, y: 0, width: 1080, height: 1919.6 };
+  const screen = edgeScreenArgs(at);
+  assert.ok(screen.includes('--start-fullscreen'));
+  const windows = {
+    'connexion du Juke-box': edgeLoginArgs('D:\\Borne\\data\\edge-youtube', at),
+    Applications: appBrowserArgs('D:\\Borne\\data\\edge-apps', at, 'https://www.example.com/'),
+  };
+  for (const [name, args] of Object.entries(windows)) {
+    for (const a of screen) assert.ok(args.includes(a), `${name} : ${a} manque`);
+    assert.ok(args.some((a) => a.startsWith('--app=')), `${name} : fenêtre d'application attendue`);
+  }
 });
 
 test('Edge : port de lecture relu dans DevToolsActivePort, refusé s’il est illisible', () => {

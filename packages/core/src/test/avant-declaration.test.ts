@@ -29,6 +29,9 @@ const REVIEWED = new Set([
   // geste et à la session après démarrage ; le banc du vrai menu et les tests de constructeur le vérifient.
   'surprise',
   'surpriseGesture',
+  // Volume de la borne au téléphone (26/11/2026) : lu à la réception d'un message « vol » du téléphone,
+  // toujours après l'initialisation (un téléphone doit d'abord être accepté).
+  'cabinetVolume',
   // Mode débogage (23/11/2026) : lu par le rapport technique (debugReport), seulement quand le joueur en envoie un.
   // Ses propres rappels (vr, windows, table…) lisent des blocs déclarés plus bas : sa première mesure est donc
   // différée (setImmediate dans createDebug) et isolée (une erreur est journalisée, jamais lancée) ; garde plus bas.

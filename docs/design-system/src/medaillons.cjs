@@ -32,9 +32,10 @@ const SMALL = 512;
  *   juke-box   : « Onde », trois fils Soie autour du rond à la note ;
  *   communaute : « Montée », le bonhomme vert dans le rond, des bulles d'emojis qui montent ;
  *   collections : « Éclat », l’étoile verte des favoris dans le rond, des petites étoiles qui en partent ;
- *   arene      : « Coupe », la coupe verte dans le rond, des confettis violets, bleus et verts qui tombent.
+ *   arene      : « Coupe », la coupe verte dans le rond, des confettis violets, bleus et verts qui tombent ;
+ *   applications : « Zapping », l'écran vert dans le rond, un cadre vert qui glisse d'une tuile d'application à l'autre autour.
  */
-const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }, { name: 'arene' }, { name: 'collections' }];
+const MEDAILLONS = [{ name: 'juke-box' }, { name: 'communaute' }, { name: 'arene' }, { name: 'collections' }, { name: 'applications' }];
 
 const page = (ring, items) => `
 (async () => {

@@ -286,6 +286,7 @@ function setState(next, extra = {}) {
   if (next !== 'paired') {
     hideKeys();
     closeSheet();
+    volumeShow(false);
   }
   syncLayout();
 }
@@ -1384,6 +1385,9 @@ function handle(m) {
     case 'jukebox':
     case 'jb-time':
       jukeboxMessage(m);
+      break;
+    case 'volume':
+      volumeMessage(m);
       break;
     case 'up-ready':
       uploadReady(m);

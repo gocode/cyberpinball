@@ -60,7 +60,7 @@ export function edgeExePaths(env: Record<string, string | undefined>): string[] 
 }
 
 /** Réglages communs : pas d'accueil, pas de synchronisation, pas de connexion implicite au compte Microsoft de Windows. */
-const QUIET = ['--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-features=msImplicitSignin,msEdgeSidebarV2,msShoppingExp,msUndersideButton', '--no-service-autorun'];
+export const EDGE_QUIET_ARGS: readonly string[] = ['--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-features=msImplicitSignin,msEdgeSidebarV2,msShoppingExp,msUndersideButton', '--no-service-autorun'];
 
 export interface ScreenRect {
   x: number;
@@ -70,22 +70,29 @@ export interface ScreenRect {
 }
 
 /**
- * Edge visible pour la connexion : fenêtre d'application (sans barre d'adresse ni onglets), posée
- * d'emblée sur l'écran voulu (pixels physiques du bureau). Aucun port de débogage.
+ * Edge visible sur un écran de la borne : posé d'emblée sur l'écran voulu (pixels physiques du
+ * bureau) et en plein écran, sans barre de titre ni de statut. Toute fenêtre d'Edge ouverte par
+ * Cyber Pinball (connexion du Juke-box, Applications) passe par là (youtube-account.test.ts).
  */
-export function edgeLoginArgs(profile: string, at: ScreenRect, url = YOUTUBE_LOGIN_URL): string[] {
+export function edgeScreenArgs(at: ScreenRect): string[] {
   return [
-    `--user-data-dir=${profile}`,
-    ...QUIET,
     `--window-position=${Math.round(at.x)},${Math.round(at.y)}`,
     `--window-size=${Math.max(1, Math.round(at.width))},${Math.max(1, Math.round(at.height))}`,
-    `--app=${url}`,
+    '--start-fullscreen',
   ];
+}
+
+/**
+ * Edge visible pour la connexion : fenêtre d'application (sans barre d'adresse ni onglets) en plein
+ * écran sur l'écran voulu. Aucun port de débogage.
+ */
+export function edgeLoginArgs(profile: string, at: ScreenRect, url = YOUTUBE_LOGIN_URL): string[] {
+  return [`--user-data-dir=${profile}`, ...EDGE_QUIET_ARGS, ...edgeScreenArgs(at), `--app=${url}`];
 }
 
 /** Edge sans fenêtre, sur le même profil, pour relire ses cookies ; port choisi par Edge (DevToolsActivePort). */
 export function edgeReadArgs(profile: string): string[] {
-  return ['--headless=new', `--user-data-dir=${profile}`, ...QUIET, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', 'about:blank'];
+  return ['--headless=new', `--user-data-dir=${profile}`, ...EDGE_QUIET_ARGS, '--remote-debugging-port=0', '--remote-debugging-address=127.0.0.1', 'about:blank'];
 }
 
 /** Contenu de <profil>\DevToolsActivePort : le port, puis le chemin du point d'entrée du navigateur. */

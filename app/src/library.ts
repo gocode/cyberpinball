@@ -6183,6 +6183,8 @@ export function createLibrary(host: LibraryHost) {
       scoreboard: built.scoreboard,
       // Écran à onglets et à cartes (hub-screen.ts) : il se dessine en entier (app/renderer/hub.js).
       hub: built.hub,
+      // Rubrique Applications : la grille, la fiche et les commandes (app/renderer/applications.js).
+      apps: built.apps,
       newsPage: built.newsPage,
       // Calibrage des lunettes 3D (anaglyph-menu.ts) : les deux visages et la consigne.
       anaglyph: built.anaglyph,

@@ -99,12 +99,23 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const side = [0, 1, 2, 3].map((i) => local[(i - q + 4) % 4]);
     return { left: c.left + side[3], right: c.right - side[1], top: c.top + side[0], bottom: c.bottom - side[2] };
   };
+  // Texte réservé aux lecteurs d'écran (boîte d'un pixel rognée, clip: rect(0 0 0 0)) : il n'est pas
+  // affiché, donc ni coupé ni chevauchant (le « Connecté » de la page du téléphone, 26/11/2026).
+  const screenReaderOnly = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      if (/^rect\(0px,? 0px,? 0px,? 0px\)$/.test(s.clip) || s.clipPath === 'inset(50%)') return true;
+      const r = e.getBoundingClientRect();
+      if (r.width <= 1 && r.height <= 1 && [s.overflowX, s.overflowY].every((o) => o === 'hidden' || o === 'clip')) return true;
+    }
+    return false;
+  };
   const boxes = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n; (n = walker.nextNode()); ) {
     if (!n.textContent.trim()) continue;
     const el = n.parentElement;
-    if (!el || !shown(el)) continue;
+    if (!el || !shown(el) || screenReaderOnly(el)) continue;
     const range = document.createRange();
     range.selectNodeContents(n);
     // La boîte d'un texte va de l'ascendante à la descendante de la police (environ

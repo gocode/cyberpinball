@@ -358,6 +358,13 @@ test('champ repris : le texte entier part (« set »), borné, sans caractère d
   assert.deepEqual(parsePhoneMessage({ t: 'search', s: 4, query: 'neon abyss', engine: '../x' }), { t: 'search', s: 4, query: 'neon abyss' }, 'moteur inconnu : celui de la page');
 });
 
+test('volume de la borne (« vol ») : les boutons de volume et la relecture, rien d’autre', () => {
+  for (const c of ['up', 'down', 'mute', 'read']) assert.deepEqual(parsePhoneMessage({ t: 'vol', s: 5, c }), { t: 'vol', s: 5, c }, c);
+  assert.equal(parsePhoneMessage({ t: 'vol', s: 5, c: 'max' }), undefined, 'commande inconnue');
+  assert.equal(parsePhoneMessage({ t: 'vol', s: 5 }), undefined, 'sans commande');
+  assert.equal(parsePhoneMessage({ t: 'vol', s: 5, c: 0.9 }), undefined, 'pas de niveau imposé');
+});
+
 test('pointeur : la vitesse lissée efface les à-coups des gestes livrés par paquets', () => {
   // Un même glissé régulier, mesuré par paquets irréguliers (8 ms, puis 40 ms) : la vitesse lissée varie bien moins.
   const gestures = [

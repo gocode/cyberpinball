@@ -1,0 +1,599 @@
+/* Rubrique Applications (26/11/2026), d'après les maquettes validées.
+   Le fronton est dessiné pour 1920 × 1080, le playfield pour 1080 × 1920 : --u est un pixel de la maquette,
+   rapporté à la place réelle (la zone du fronton, l'écran du playfield ou le cadre du bureau). */
+
+.ap-fronton {
+  --u: min(100cqw / 1920, 100cqh / 1080);
+  display: flex;
+  flex-direction: column;
+  gap: calc(36 * var(--u));
+  padding: calc(56 * var(--u)) calc(72 * var(--u)) calc(44 * var(--u));
+  background: radial-gradient(ellipse at 85% 8%, #102d2a80, transparent 55%), var(--void);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.lib-apps.ap-playfield {
+  --u: min(100cqw / 1080, 100cqh / 1920);
+  gap: calc(34 * var(--u));
+  padding: calc(56 * var(--u)) calc(56 * var(--u)) calc(44 * var(--u));
+  background: radial-gradient(ellipse at 85% 8%, #102d2a80, transparent 55%), var(--void);
+  overflow: hidden;
+}
+
+/* Au bureau, le cadre du plateau est plus large que haut : la maquette du bureau (grille de 4). */
+.lib-apps.ap-playfield.ap-desktop {
+  --u: min(100cqw / 1400, 100cqh / 1000);
+}
+
+/* L'écran s'assombrit après 30 s sans geste : un voile fixe dont seule l'opacité change
+   (un filtre qui glisse se repeint à chaque image). */
+.ap-fronton {
+  position: relative;
+}
+
+.ap-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+.ap-screen.ap-dim::after {
+  opacity: 0.65;
+}
+
+/* ---------- En-tête ---------- */
+
+.ap-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: calc(24 * var(--u));
+  flex: none;
+}
+
+.ap-head > :last-child {
+  justify-self: end;
+}
+
+.ap-brand {
+  font-size: calc(22 * var(--u));
+  letter-spacing: 0.32em;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.ap-brand b {
+  color: var(--ink);
+}
+
+/* Au playfield, la marque du front-end est déjà en haut de l'écran : sa place reste, vide, pour
+   garder le titre au centre. */
+.ap-playfield .ap-brand {
+  visibility: hidden;
+}
+
+.ap-where-title {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  font-size: calc(24 * var(--u));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ap-where-icon {
+  font-size: calc(30 * var(--u));
+}
+
+.ap-status {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+  font-size: calc(22 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.ap-dot {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 10px #8be23a80;
+  flex: none;
+}
+
+.ap-dot.ap-off {
+  background: var(--warning);
+  box-shadow: none;
+}
+
+.ap-muted {
+  color: var(--ink-muted);
+}
+
+/* ---------- Icône d'une application : celle du site, ou la tuile composée ---------- */
+
+.ap-icon {
+  --ap-size: 150;
+  position: relative;
+  flex: none;
+  width: calc(var(--ap-size) * var(--u));
+  height: calc(var(--ap-size) * var(--u));
+  border-radius: 26%;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  overflow: hidden;
+  box-shadow: 0 10px 26px #0009, inset 0 0 0 1px #ffffff26;
+  line-height: 1;
+}
+
+.ap-icon.has-image {
+  background: #0b1a17;
+}
+
+.ap-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ap-icon.gen {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ap-c) 45%, #07110f), #07110f);
+  box-shadow: inset 0 0 0 calc(3 * var(--u)) var(--ap-c), 0 10px 26px #0009;
+  color: color-mix(in srgb, var(--ap-c) 60%, #fff);
+}
+
+.ap-initials {
+  font-size: calc(var(--ap-size) * var(--u) * 0.4);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ap-icon.ap-off {
+  filter: saturate(0.15) brightness(0.6);
+}
+
+/* ---------- Grille ---------- */
+
+.ap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(32 * var(--u));
+  align-content: start;
+  flex: 1;
+  min-height: 0;
+}
+
+.ap-solo .ap-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ap-desktop.ap-solo .ap-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ap-tile {
+  position: relative;
+  height: calc(322 * var(--u));
+  min-width: 0;
+  padding: 0 calc(24 * var(--u));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(12 * var(--u));
+  background: linear-gradient(180deg, #0b1a17, #07110f);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(16 * var(--u));
+  cursor: pointer;
+}
+
+.ap-tile::after {
+  content: '';
+  position: absolute;
+  left: calc(24 * var(--u));
+  right: calc(24 * var(--u));
+  bottom: 0;
+  height: calc(4 * var(--u));
+  border-radius: 4px 4px 0 0;
+  background: var(--ap-c);
+  opacity: 0.55;
+}
+
+.ap-tile.add::after,
+.ap-tile.ap-off::after {
+  display: none;
+}
+
+.ap-name {
+  max-width: 100%;
+  margin: 0;
+  font-size: calc(32 * var(--u));
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 2px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ap-tile-where {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10 * var(--u));
+  max-width: 100%;
+  font-size: calc(22 * var(--u));
+  line-height: 1.3;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.ap-tile-where-icon {
+  flex: none;
+  font-size: calc(22 * var(--u));
+}
+
+.ap-tile.ap-focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 2px var(--signal), 0 0 36px #8be23a2e;
+  background: linear-gradient(180deg, #10230f, #07110f);
+}
+
+.ap-tile.ap-focus .ap-name {
+  color: var(--signal);
+}
+
+.ap-tile.add {
+  border-style: dashed;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.ap-plus {
+  width: calc(150 * var(--u));
+  height: calc(150 * var(--u));
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+}
+
+.ap-plus-big {
+  width: calc(260 * var(--u));
+  height: calc(260 * var(--u));
+  border: 2px dashed var(--line-strong);
+  border-radius: 26%;
+}
+
+.ap-plus-icon {
+  font-size: calc(64 * var(--u));
+  color: var(--signal);
+}
+
+.ap-tile.ap-off .ap-name {
+  color: var(--ink-muted);
+}
+
+.ap-tile.ap-off .ap-tile-where {
+  color: var(--warning);
+}
+
+.ap-tile.local .ap-tile-where {
+  color: var(--meta);
+}
+
+/* ---------- Commandes ---------- */
+
+.ap-cmds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: calc(16 * var(--u)) calc(24 * var(--u));
+  border-top: 1px solid var(--line-strong);
+  padding-top: calc(18 * var(--u));
+  flex: none;
+}
+
+.ap-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+  font-size: calc(22 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.ap-key {
+  display: inline-block;
+  padding: calc(4 * var(--u)) calc(12 * var(--u));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(6 * var(--u));
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: calc(20 * var(--u));
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.ap-keys {
+  display: grid;
+  grid-template-columns: calc(330 * var(--u)) minmax(0, 1fr);
+  align-items: stretch;
+  flex: none;
+}
+
+.ap-keys > div {
+  display: flex;
+  align-items: center;
+  min-height: calc(76 * var(--u));
+  border-bottom: 1px solid var(--line);
+  gap: calc(14 * var(--u));
+}
+
+.ap-keys > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.ap-keys .ap-key {
+  font-size: calc(22 * var(--u));
+  padding: calc(5 * var(--u)) calc(14 * var(--u));
+}
+
+.ap-keys-act {
+  font-size: calc(26 * var(--u));
+  flex-direction: column;
+  align-items: flex-start !important;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ap-keys-act small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: calc(20 * var(--u));
+  line-height: 1.3;
+}
+
+/* ---------- Playfield : la rubrique et la fiche ---------- */
+
+.ap-rubric {
+  display: flex;
+  align-items: center;
+  gap: calc(28 * var(--u));
+  flex: none;
+}
+
+.ap-disc {
+  width: calc(112 * var(--u));
+  height: calc(112 * var(--u));
+  flex: none;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+}
+
+.ap-disc-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ap-rubric-copy h2 {
+  margin: 0;
+  font-size: calc(44 * var(--u));
+  font-weight: 600;
+}
+
+.ap-rubric-copy p {
+  margin: calc(4 * var(--u)) 0 0;
+  font-size: calc(24 * var(--u));
+}
+
+.ap-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: calc(26 * var(--u));
+  padding: calc(40 * var(--u)) calc(48 * var(--u)) calc(28 * var(--u));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(14 * var(--u));
+  background: linear-gradient(180deg, #0b1a17, #07110f);
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+
+.ap-hero-name {
+  max-width: 100%;
+  margin: 0;
+  font-size: calc(72 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ap-hero-detail {
+  font-size: calc(28 * var(--u));
+  max-width: 80%;
+}
+
+.ap-pager {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
+}
+
+.ap-pager i {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  border-radius: 50%;
+  background: #24504a;
+}
+
+.ap-pager i.ap-on {
+  background: var(--signal);
+}
+
+.ap-pager i.add-page {
+  width: auto;
+  height: auto;
+  background: transparent;
+  font-style: normal;
+  font-size: calc(22 * var(--u));
+  line-height: 1;
+  color: var(--ink-muted);
+}
+
+.ap-pager i.add-page.ap-on {
+  color: var(--signal);
+}
+
+.ap-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  border-top: 1px solid var(--line-strong);
+}
+
+.ap-facts > * {
+  min-height: calc(66 * var(--u));
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  font-size: calc(26 * var(--u));
+}
+
+.ap-facts > dt {
+  color: var(--ink-muted);
+  gap: calc(12 * var(--u));
+  font-size: calc(22 * var(--u));
+  letter-spacing: 0.04em;
+}
+
+.ap-facts > dd {
+  margin: 0;
+  padding-left: calc(28 * var(--u));
+  justify-content: flex-end;
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+  line-height: calc(66 * var(--u));
+}
+
+.ap-fact-icon {
+  font-size: calc(26 * var(--u));
+}
+
+/* ---------- Application ouverte ---------- */
+
+.ap-now {
+  display: flex;
+  align-items: center;
+  gap: calc(56 * var(--u));
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+
+.ap-now-small {
+  flex: none;
+  justify-content: flex-start;
+  gap: calc(32 * var(--u));
+  padding: calc(28 * var(--u));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(14 * var(--u));
+  background: linear-gradient(180deg, #0b1a17, #07110f);
+}
+
+.ap-now-copy {
+  min-width: 0;
+}
+
+.ap-eyebrow {
+  margin: 0;
+  font-size: calc(24 * var(--u));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+  font-weight: 600;
+}
+
+.ap-now-name {
+  margin: calc(8 * var(--u)) 0;
+  font-size: calc(88 * var(--u));
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ap-now-small .ap-now-name {
+  font-size: calc(56 * var(--u));
+}
+
+.ap-now-copy .ap-muted {
+  margin: 0;
+  font-size: calc(26 * var(--u));
+}
+
+.ap-section-title {
+  margin: 0;
+  font-size: calc(22 * var(--u));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.ap-dim-note,
+.ap-remote-note {
+  margin: 0;
+  font-size: calc(22 * var(--u));
+  line-height: 1.4;
+}
+
+/* ---------- Bandeau hors ligne ---------- */
+
+.ap-banner {
+  display: flex;
+  align-items: center;
+  gap: calc(18 * var(--u));
+  padding: calc(18 * var(--u)) calc(24 * var(--u));
+  border: 1px solid var(--warning-line, var(--warning));
+  background: #211b0c;
+  border-radius: calc(8 * var(--u));
+  font-size: calc(24 * var(--u));
+  flex: none;
+}
+
+.ap-banner-icon {
+  color: var(--warning);
+  font-size: calc(32 * var(--u));
+  flex: none;
+}
+
+/* Le QR du téléphone : la barre de library.js, à sa place en pied. */
+.lib-apps > .ap-remote {
+  flex: none;
+  margin-top: auto;
+}

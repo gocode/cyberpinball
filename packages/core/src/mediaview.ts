@@ -596,6 +596,12 @@ export interface MenuMediaSettings {
    */
   jukebox: boolean;
   /**
+   * Médaillon Applications en tête de chaque collection, juste après le Juke-box (applications-menu.ts,
+   * décidé le 26/11/2026 : Netflix et les autres sites en plein écran) : montré par défaut, masquable
+   * (Tables > Roue) ; jamais en mode invité.
+   */
+  applications: boolean;
+  /**
    * Médaillon Communauté en tête de chaque collection, après le Juke-box (community-menu.ts, décidé
    * le 12/11/2026) : montré par défaut, masquable (Tables > Roue) ; jamais en mode invité.
    */
@@ -662,6 +668,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   tableColor: true,
   wheelMotion: 'selected',
   jukebox: true,
+  applications: true,
   community: true,
   arena: true,
   collectionsMedallion: true,
@@ -710,6 +717,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
     wheelMotion: WHEEL_MOTIONS.includes(r.wheelMotion as WheelMotion) ? (r.wheelMotion as WheelMotion) : d.wheelMotion,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
+    applications: typeof r.applications === 'boolean' ? r.applications : d.applications,
     community: typeof r.community === 'boolean' ? r.community : d.community,
     arena: typeof r.arena === 'boolean' ? r.arena : d.arena,
     collectionsMedallion: typeof r.collectionsMedallion === 'boolean' ? r.collectionsMedallion : d.collectionsMedallion,

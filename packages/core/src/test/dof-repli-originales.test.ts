@@ -98,7 +98,7 @@ function effectMs(setting: string): number {
   return wait + numbers[0]!;
 }
 /** Jetons qu'un réglage du repli peut porter : tout autre ferait rejeter le réglage par libdof (TableConfigSetting). */
-const TOKEN = /^(?:#[0-9A-F]{6}|A[LTWH]\d+|AS\d+|AD[UDLR]|APS\d+|APD\d+|APC#[0-9A-F]{6}|AF(?:DEN|MIN|MAX|FADE)\d+|F[UD]?\d+|W\d+|L\d+|INVERT|\d+)$/;
+const TOKEN = /^(?:#[0-9A-F]{6}(?:[0-9A-F]{2})?|A[LTWH]\d+|AS\d+|AD[UDLR]|APS\d+|APD\d+|APC#[0-9A-F]{6}|AF(?:DEN|MIN|MAX|FADE)\d+|F[UD]?\d+|W\d+|L\d+|INVERT|\d+)$/;
 /** Composantes d'une couleur #RRGGBB. */
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const settingsOf = (content: string) =>
@@ -132,7 +132,46 @@ test('repos : sans événement nouveau, les bandes s’éteignent — chaque eff
   for (const s of settingsOf(rom.content!).filter((x) => !/^G\d+ /.test(x))) assert.ok(effectMs(s) <= DOF_EFFECT_MAX_MS, `ROM : ${s}`);
 });
 
-test('flippers : une petite barre aux couleurs de la table, du bas de la bande, jamais au-delà de la moitié', () => {
+/**
+ * Barre d'un flipper, ses réglages donnés avec leur étendue depuis la base (% de la bande) : luminosité point par
+ * point de la base vers le bout de la bande, toutes ses barres allumées. Les calques de libdof se mêlent par
+ * transparence (#RRGGBBAA) : 1 - Π(1 - alpha) des barres qui couvrent le point.
+ */
+function flipperLight(bars: { size: number; s: string }[]): number[] {
+  const alphaOf = (s: string) => {
+    const hex = /#[0-9A-F]{6}([0-9A-F]{2})?\b/.exec(s)!;
+    return hex[1] ? parseInt(hex[1], 16) / 255 : 1;
+  };
+  return Array.from({ length: 100 }, (_, p) => 1 - bars.filter((b) => b.size > p).reduce((dark, b) => dark * (1 - alphaOf(b.s)), 1));
+}
+/** Fin d'un réglage, fondu de sortie compris (ms). */
+const endMs = (s: string) => effectMs(s) + Number(/\bFD(\d+)\b/.exec(s)?.[1] ?? 0);
+
+/**
+ * Invariant de la barre d'un flipper : partie de la base, au plus DOF_FLIPPER_REACH, vive à la base, sa tête
+ * s'estompe sans à-coup jusqu'à presque rien (jamais coupée net : essai de la 0.2.4-essai.56), couleurs pleines de
+ * la table et de sa teinte voisine, la tête éteinte avant la base.
+ */
+function assertFlipperBar(bars: { size: number; s: string }[], label: string) {
+  assert.ok(bars.length >= 3, `${label} : ${bars.length} barre(s)`);
+  for (const b of bars) assert.ok(b.size > 0 && b.size <= DOF_FLIPPER_REACH * 100 && b.size <= 50, `${label} : ${b.s}`);
+  const light = flipperLight(bars);
+  const head = Math.max(...bars.map((b) => b.size));
+  assert.ok(light[0]! >= 0.8, `${label} : base trop pâle (${light[0]!.toFixed(2)})`);
+  assert.ok(light[head - 1]! <= 0.08, `${label} : tête encore vive (${light[head - 1]!.toFixed(2)}), coupée net`);
+  for (let p = 0; p < 99; p++) {
+    assert.ok(light[p + 1]! <= light[p]! + 1e-9, `${label} : la lumière remonte à ${p + 1} %`);
+    assert.ok(light[p]! - light[p + 1]! <= 0.2, `${label} : saut brutal à ${p + 1} % (${light[p]!.toFixed(2)} → ${light[p + 1]!.toFixed(2)})`);
+  }
+  const colors = new Set(bars.map((b) => /#([0-9A-F]{6})/.exec(b.s)![1]!));
+  assert.ok(colors.has('00FF41') && colors.size >= 2, `${label} : couleurs ${[...colors].join(', ')}`);
+  for (const c of colors) assert.ok(Math.max(...rgb(`#${c}`)) >= 0xf0, `${label} : couleur sombre #${c}`);
+  const bySize = [...bars].sort((a, b) => a.size - b.size);
+  for (let i = 1; i < bySize.length; i++) assert.ok(endMs(bySize[i]!.s) <= endMs(bySize[i - 1]!.s), `${label} : la tête s'éteint après la base`);
+  for (const b of bars) assert.ok(effectMs(b.s) <= DOF_EFFECT_MAX_MS, b.s);
+}
+
+test('flippers : une barre aux couleurs de la table, du bas de la bande, dont la tête s’estompe en fondu avant la moitié', () => {
   const events = new Map<number, number>([[101, 30], [102, 30], [108, 5]]);
   const classes = new Map([
     [101, { kind: 'flipper' as const, side: 'left' as const }],
@@ -147,23 +186,18 @@ test('flippers : une petite barre aux couleurs de la table, du bas de la bande, 
   for (const [strip, column] of [['Speaker', speaker!], ['PF Back', back!]] as const) {
     for (const n of [101, 102]) {
       const all = column.filter((x) => x.startsWith(`E${n} `));
-      const s = all[0]!;
-      assert.ok(s, `${strip} E${n}`);
-      // Bande verticale : du bas (AT + AH = 100), au plus la moitié, en montant.
-      for (const x of all) assert.ok(zone(x, 'AT') + zone(x, 'AH') === 100 && zone(x, 'AH') <= 50, x);
-      assert.ok(zone(s, 'AH') === Math.round(DOF_FLIPPER_REACH * 100), s);
-      assert.ok(/\bADU\b/.test(s), s);
-      // Couleur principale de la table, pleine (visible sur une bande à 11 % de luminosité), base de sa teinte voisine.
-      assert.match(s, /^E\d+ #00FF41 /);
-      assert.ok(all.length >= 2 && new Set(all.map((x) => x.split(' ')[1])).size >= 2, `dégradé : ${all.join(' / ')}`);
-      for (const x of all) assert.ok(effectMs(x) <= DOF_EFFECT_MAX_MS);
+      // Bande verticale : chaque barre part du bas (AT + AH = 100).
+      for (const x of all) assert.equal(zone(x, 'AT') + zone(x, 'AH'), 100, x);
+      assertFlipperBar(all.map((s) => ({ size: zone(s, 'AH'), s })), `${strip} E${n}`);
     }
   }
-  // Bande horizontale : chaque flipper part de son bord, au plus la moitié de la largeur.
-  const left = bar!.find((x) => x.startsWith('E101 '))!;
-  const right = bar!.find((x) => x.startsWith('E102 '))!;
-  assert.ok(zone(left, 'AL') === 0 && zone(left, 'AW') <= 50 && /\bADR\b/.test(left), left);
-  assert.ok(zone(right, 'AL') + zone(right, 'AW') === 100 && zone(right, 'AW') <= 50 && /\bADL\b/.test(right), right);
+  // Bande horizontale : chaque flipper part de son bord.
+  const left = bar!.filter((x) => x.startsWith('E101 '));
+  const right = bar!.filter((x) => x.startsWith('E102 '));
+  for (const x of left) assert.equal(zone(x, 'AL'), 0, x);
+  for (const x of right) assert.equal(zone(x, 'AL') + zone(x, 'AW'), 100, x);
+  assertFlipperBar(left.map((s) => ({ size: zone(s, 'AW'), s })), 'Bar E101');
+  assertFlipperBar(right.map((s) => ({ size: zone(s, 'AW'), s })), 'Bar E102');
 });
 
 /** Réglages de chaque événement, bande par bande. */

@@ -515,6 +515,11 @@ export type PhoneMessage =
    * `fraction` : l'endroit du morceau (0 à 1). La borne vérifie tout.
    */
   | { t: 'jb'; s: number; op: RemoteJukeboxOp; key?: string; fraction?: number }
+  /**
+   * Volume de la borne (le son de Windows, comme ses boutons Volume −, Volume + et Muet) : une
+   * commande, ou « read » pour le seul niveau. Dans tous les modes : menu, partie, applications.
+   */
+  | { t: 'vol'; s: number; c: RemoteVolumeCommand }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -537,6 +542,10 @@ export type RemoteInstantAct = (typeof REMOTE_INSTANT_ACTS)[number];
 /** Commandes du Juke-box au téléphone. */
 export const REMOTE_JUKEBOX_OPS = ['open', 'row', 'play', 'up', 'pause', 'shuffle', 'repeat', 'seek', 'next', 'prev', 'manage', 'exit'] as const;
 export type RemoteJukeboxOp = (typeof REMOTE_JUKEBOX_OPS)[number];
+
+/** Commandes du volume de la borne au téléphone ; « read » ne change rien. */
+export const REMOTE_VOLUME_COMMANDS = ['up', 'down', 'mute', 'read'] as const;
+export type RemoteVolumeCommand = (typeof REMOTE_VOLUME_COMMANDS)[number];
 
 const finite = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
 /** Un fil de la Communauté au téléphone : la clé d'un ami, ou « g: » et l'identifiant d'un groupe privé (groups.ts). */
@@ -630,6 +639,8 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       if (m.fraction !== undefined && fraction === undefined) return undefined;
       return { t: 'jb', s, op: m.op as RemoteJukeboxOp, ...(key ? { key } : {}), ...(fraction !== undefined ? { fraction } : {}) };
     }
+    case 'vol':
+      return (REMOTE_VOLUME_COMMANDS as readonly unknown[]).includes(m.c) ? { t: 'vol', s, c: m.c as RemoteVolumeCommand } : undefined;
     case 'chat-open':
       if (m.key === undefined || m.key === null) return { t: 'chat-open', s };
       return isChatKey(m.key) ? { t: 'chat-open', s, key: m.key } : undefined;

@@ -71,8 +71,8 @@ export const messages: Record<string, string> = {
   // Médaillon de la roue (Tables > Roue)
   'Communauté dans la roue : affichée': 'Community on the wheel: shown',
   'Communauté dans la roue : masquée': 'Community on the wheel: hidden',
-  'Le médaillon Communauté suit le Juke-box en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)':
-    'The Community medallion follows the Juke-box at the head of each collection: players online, messages, leaderboards (Start: hide it)',
+  'Le médaillon Communauté suit le Juke-box et les Applications en tête de chaque collection : joueurs en ligne, messages, classements (Start : le masquer)':
+    'The Community medallion follows the Juke-box and Applications at the head of each collection: players online, messages, leaderboards (Start: hide it)',
   'La communauté reste dans Menu système › Communauté (Start : afficher le médaillon)': 'The community stays in System menu › Community (Start: show the medallion)',
   // L'affiche du médaillon (plateau, fronton), comme celle du Juke-box
   'Le flipper se joue à plusieurs': 'Pinball is better together',

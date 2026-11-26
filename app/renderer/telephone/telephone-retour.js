@@ -8,6 +8,7 @@
 //
 // Où revenir, dans l'ordre (le premier qui s'applique) :
 // - une feuille ouverte (menu ⋮, réactions…) : elle se ferme ;
+// - la réglette du volume ouverte : elle se replie ;
 // - un fil, un profil, une page plein écran, le lecteur du Juke-box : le retour de la barre du haut ;
 // - une rubrique ouverte dans la vue Menus : la rubrique parente ;
 // - une playlist ouverte dans le Juke-box : la liste des playlists ;
@@ -36,6 +37,7 @@ function retourShown(el) {
 function retourTarget() {
   const body = document.body;
   if (!document.getElementById('sheet').hidden) return () => closeSheet();
+  if (!document.getElementById('volume').hidden) return () => volumeShow(false);
   if (body.dataset.state !== 'paired') return undefined;
   if (body.dataset.mode === 'browser') {
     const back = document.getElementById('nav-back');
@@ -110,7 +112,7 @@ const retourObserver = new MutationObserver(() => {
   });
 });
 retourObserver.observe(document.body, { attributes: true, attributeFilter: ['data-view', 'data-mode', 'data-state'] });
-for (const id of ['sheet', 'top-back', 'menus-up', 'jb-up', 'nav-back']) {
+for (const id of ['sheet', 'volume', 'top-back', 'menus-up', 'jb-up', 'nav-back']) {
   retourObserver.observe(document.getElementById(id), { attributes: true, attributeFilter: ['hidden', 'disabled'] });
 }
 retourObserver.observe(document.getElementById('entries-list'), { childList: true });

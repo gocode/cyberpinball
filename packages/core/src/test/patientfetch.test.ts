@@ -159,6 +159,7 @@ const TOTAL_TIMEOUT_ALLOWED: Record<string, { count: number; how: string }> = {
   'app/src/solo-score-watch.ts': { count: 1, how: 'inspector de VPX, sur la machine même : relevé de 800 ms répété chaque seconde' },
   'app/src/table-rules.ts': { count: 1, how: 'vignette YouTube : quelques Ko, abandonnée sans dommage' },
   'app/src/jukebox-library.ts': { count: 1, how: 'vignette YouTube : quelques Ko, abandonnée sans dommage' },
+  'app/src/applications-icons.ts': { count: 1, how: 'page d’accueil et icône d’un site ajouté aux Applications : quelques Ko, abandonnés sans dommage (initiales à la place)' },
 };
 
 test('aucun texte lu sous un délai total : chaque AbortSignal.timeout restant a sa raison', () => {

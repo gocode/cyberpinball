@@ -1,5 +1,6 @@
-// LED qui suivent la musique du Juke-box : sans son, rien ; les graves montent depuis le bas de la bande
-// (quel que soit le câblage) ; les aigus éclairent le haut ; la luminosité réglée n'est jamais dépassée.
+// LED qui suivent la musique du Juke-box : sans son, rien ; une barre qui monte et descend avec le
+// rythme depuis le bas de la bande (quel que soit le câblage), même sur un son saturé ; un dégradé de
+// couleurs ; la luminosité réglée n'est jamais dépassée.
 
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -7,12 +8,26 @@ import { DEFAULT_LED_ANIMATIONS, LED_LEVEL_CHOICES, LED_MUSIC_STALE_MS, LedJukeb
 
 const BANDS = 24;
 const N = 20;
+const FRAME = 40;
 /** Même bande câblée du haut vers le bas, ou du bas vers le haut : la musique doit y monter pareil. */
 const WIRINGS: LedGrid[] = [
   { width: 1, height: N, arrangement: 'LeftRightTopDown' },
   { width: 1, height: N, arrangement: 'LeftRightBottomUp' },
 ];
-const levels = (bass: number, mid: number, high: number): number[] => Array.from({ length: BANDS }, (_, i) => (i < 6 ? bass : i < 16 ? mid : high));
+const spectrum = (bass: number, mid: number, high: number): number[] => Array.from({ length: BANDS }, (_, i) => (i < 6 ? bass : i < 16 ? mid : high));
+
+/** Joue un signal (niveaux en fonction du temps), une image tous les 40 ms ; rend la hauteur de barre de chaque image. */
+function play(music: LedJukeboxMusic, signal: (ms: number) => number[], from: number, ms: number, palette?: string[]): { end: number; heights: number[] } {
+  const heights: number[] = [];
+  let t = from;
+  for (; t <= from + ms; t += FRAME) {
+    music.feed(signal(t), t, palette);
+    music.step(t);
+    heights.push(music.bar.height);
+  }
+  return { end: t, heights };
+}
+const spread = (v: number[]): number => Math.max(...v) - Math.min(...v);
 /** Lumière (somme des canaux) de chaque LED, rangée du bas (0) vers le haut (N - 1) selon ledStripPosition. */
 function bottomUp(music: LedJukeboxMusic, grid: LedGrid, brightness = 100): number[] {
   const bytes = music.render(grid, brightness);
@@ -20,15 +35,16 @@ function bottomUp(music: LedJukeboxMusic, grid: LedGrid, brightness = 100): numb
   for (let k = 0; k < N; k++) out[Math.round(ledStripPosition(grid, k) * (N - 1))] = bytes[k * 3]! + bytes[k * 3 + 1]! + bytes[k * 3 + 2]!;
   return out;
 }
-/** Joue `ms` de musique constante, une image tous les 40 ms. */
-function play(music: LedJukeboxMusic, input: number[], from: number, ms: number): number {
-  let t = from;
-  for (; t <= from + ms; t += 40) {
-    music.feed(input, t);
-    music.step(t);
-  }
-  return t;
+/** Couleur (3 canaux) de la LED à la position `i` (0 : le pied) d'une bande. */
+function rgbAt(music: LedJukeboxMusic, grid: LedGrid, i: number): number[] {
+  const bytes = music.render(grid, 100);
+  for (let k = 0; k < N; k++) if (Math.round(ledStripPosition(grid, k) * (N - 1)) === i) return [bytes[k * 3]!, bytes[k * 3 + 1]!, bytes[k * 3 + 2]!];
+  return [0, 0, 0];
 }
+/** Coups de grosse caisse : les graves alternent fort et faible toutes les 300 ms, le reste est soutenu. */
+const kick = (ms: number): number[] => spectrum(Math.floor(ms / 300) % 2 ? 0.25 : 0.95, 0.5, 0.4);
+/** Un son saturé : tout est à fond, avec seulement un petit battement (0,82 à 1) toutes les 250 ms. */
+const saturated = (ms: number): number[] => spectrum(...([Math.floor(ms / 250) % 2 ? 0.82 : 1, Math.floor(ms / 250) % 2 ? 0.84 : 1, 0.98] as [number, number, number]));
 
 test('réglage : les LED suivent la musique par défaut, un réglage enregistré est respecté', () => {
   assert.equal(DEFAULT_LED_ANIMATIONS.jukeboxMusic, true);
@@ -41,67 +57,98 @@ test('sans son : bandes éteintes, avant toute musique comme sous le bruit de fo
   for (const grid of WIRINGS) {
     const music = new LedJukeboxMusic();
     assert.ok(music.render(grid, 100).every((b) => b === 0), 'rien avant la première image');
-    play(music, levels(0, 0, 0), 0, 1000);
+    play(music, () => spectrum(0, 0, 0), 0, 1500);
     assert.ok(music.render(grid, 100).every((b) => b === 0), 'silence');
-    play(music, levels(0.06, 0.05, 0.07), 1000, 1000);
+    play(music, () => spectrum(0.05, 0.04, 0.05), 1500, 1500);
     assert.ok(music.render(grid, 100).every((b) => b === 0), 'bruit sous le seuil');
-    assert.equal(music.active(2000), true, 'les niveaux arrivent encore');
+    assert.equal(music.active(3000), true, 'les niveaux arrivent encore');
   }
 });
 
-test('les graves montent du bas de la bande, quel que soit le câblage', () => {
+test('la barre monte et descend avec le rythme, et monte depuis le bas quel que soit le câblage', () => {
   for (const grid of WIRINGS) {
     const music = new LedJukeboxMusic();
-    play(music, levels(0.5, 0, 0), 0, 1500);
+    const { end } = play(music, kick, 0, 6000);
+    const { heights } = play(music, kick, end, 2400);
+    assert.ok(spread(heights) > 0.25, `la barre bouge avec les coups (course ${spread(heights).toFixed(2)})`);
+    // Sur un coup (graves à fond) la barre est haute, entre deux coups elle retombe.
+    let t = end;
+    while (Math.floor(t / 300) % 2 !== 0) t += FRAME; // début d'un coup
+    const hit = play(music, kick, t, 240);
     const col = bottomUp(music, grid);
     assert.ok(col[0]! > 0, 'le pied est allumé');
-    assert.ok(col[0]! >= col[Math.floor(N / 2)]!, 'plus fort au pied qu’au milieu');
-    assert.equal(col[N - 1], 0, 'le haut reste éteint pour des graves moyens');
-    for (let i = 1; i < N; i++) assert.ok(col[i]! <= col[i - 1]!, 'décroît vers le haut');
-    // Plus de graves : la lumière monte plus haut.
-    const high = (c: number[]) => c.filter((v) => v > 0).length;
-    const before = high(col);
-    play(music, levels(0.95, 0, 0), 1500, 1500);
-    assert.ok(high(bottomUp(music, grid)) > before, 'des graves plus forts montent plus haut');
+    assert.ok(col[0]! >= col[N - 1]!, 'plus vif au pied qu’en haut');
+    const lit = col.filter((v) => v > 0).length;
+    const gap = play(music, kick, hit.end, 330);
+    const lower = bottomUp(music, grid).filter((v) => v > 0).length;
+    assert.ok(Math.max(...hit.heights) > Math.min(...gap.heights) + 0.2, 'haute sur le coup, plus basse après');
+    assert.ok(lit >= lower, 'moins de LED allumées une fois retombée');
   }
-  // Les deux câblages donnent la même image une fois remise dans le sens du bas vers le haut.
-  const a = new LedJukeboxMusic();
-  const b = new LedJukeboxMusic();
-  play(a, levels(0.7, 0.3, 0.2), 0, 1500);
-  play(b, levels(0.7, 0.3, 0.2), 0, 1500);
-  // (au tramage près : l'arrondi dépend du rang de la LED, d'où ±3 sur la somme des trois canaux)
-  const [ca, cb] = [bottomUp(a, WIRINGS[0]!), bottomUp(b, WIRINGS[1]!)];
-  ca.forEach((v, i) => assert.ok(Math.abs(v - cb[i]!) <= 3, `LED ${i} : ${v} contre ${cb[i]}`));
 });
 
-test('les aigus éclairent le haut, pas le pied', () => {
+test('un son saturé fait quand même varier la barre avec le rythme', () => {
   const music = new LedJukeboxMusic();
-  play(music, levels(0, 0, 0.9), 0, 1500);
-  const col = bottomUp(music, WIRINGS[0]!);
-  assert.equal(col[0], 0);
-  assert.ok(col[N - 1]! > 0);
+  const { end } = play(music, saturated, 0, 8000);
+  const { heights } = play(music, saturated, end, 3000);
+  assert.ok(spread(heights) > 0.3, `course de la barre sur un son saturé : ${spread(heights).toFixed(2)}`);
+  assert.ok(Math.min(...heights) < 0.85, 'elle ne reste pas collée au plafond');
 });
 
-test('couleurs : la pochette quand on la connaît, le vert Cyber Pinball sinon', () => {
-  const grid = WIRINGS[1]!;
-  const green = new LedJukeboxMusic();
-  play(green, levels(0.8, 0, 0), 0, 1500);
-  const g = green.render(grid, 100);
-  assert.ok(g[1]! > g[0]! && g[1]! > g[2]!, 'vert par défaut');
-  const red = new LedJukeboxMusic();
-  let t = 0;
-  for (; t <= 1500; t += 40) {
-    red.feed(levels(0.8, 0, 0), t, ['#c01020']);
-    red.step(t);
+test('un niveau constant et fort ne fait pas clignoter : la barre reste stable, à mi-course', () => {
+  const music = new LedJukeboxMusic();
+  const { end } = play(music, () => spectrum(1, 1, 1), 0, 8000);
+  const { heights } = play(music, () => spectrum(1, 1, 1), end, 2000);
+  assert.ok(spread(heights) < 0.05, `stable (course ${spread(heights).toFixed(3)})`);
+  assert.ok(Math.max(...heights) < 0.9, 'pas pleine : il reste de la marge pour le rythme');
+  assert.ok(Math.min(...heights) > 0.3, 'mais bien allumée');
+});
+
+test('les aigus font vivre le haut, même au-dessus de la barre', () => {
+  const music = new LedJukeboxMusic();
+  const pulse = (ms: number) => spectrum(0.1, 0.1, Math.floor(ms / 200) % 2 ? 0.2 : 0.9);
+  play(music, pulse, 0, 4000);
+  const tops: number[] = [];
+  let t = 4000;
+  for (let i = 0; i < 40; i++, t += FRAME) {
+    play(music, pulse, t, 0);
+    tops.push(bottomUp(music, WIRINGS[0]!)[N - 1]!);
   }
-  const r = red.render(grid, 100);
-  assert.ok(r[0]! > r[1]! && r[0]! > r[2]!, 'rouge de la pochette');
+  assert.ok(spread(tops) > 30, `le haut de la bande bouge (course ${spread(tops)})`);
+});
+
+test('la crête se détache de la barre quand elle retombe', () => {
+  const music = new LedJukeboxMusic();
+  const { end } = play(music, kick, 0, 6000);
+  let t = end;
+  let found = false;
+  for (let i = 0; i < 60 && !found; i++, t += FRAME) {
+    music.feed(kick(t), t);
+    music.step(t);
+    if (music.bar.peak - music.bar.height > 0.15) found = true;
+  }
+  assert.ok(found, 'la crête reste au-dessus de la barre un instant');
+});
+
+test('couleurs : un dégradé (arc-en-ciel du DMD sans pochette, ses teintes avec), jamais une seule couleur', () => {
+  const grid = WIRINGS[1]!;
+  const rainbow = new LedJukeboxMusic();
+  play(rainbow, () => spectrum(1, 1, 1), 0, 4000);
+  const foot = rgbAt(rainbow, grid, 1);
+  const top = rgbAt(rainbow, grid, N - 2);
+  const dominant = (c: number[]) => c.indexOf(Math.max(...c));
+  assert.notEqual(dominant(foot), dominant(top), 'le pied et le haut n’ont pas la même teinte');
+  const cover = new LedJukeboxMusic();
+  play(cover, () => spectrum(1, 1, 1), 0, 4000, ['#c01020', '#2040c0', '#20c040']);
+  const c0 = rgbAt(cover, grid, 1);
+  const c1 = rgbAt(cover, grid, N - 2);
+  assert.ok(c0[0]! > c0[2]!, 'le pied prend le rouge de la pochette');
+  assert.ok(c1[1]! > c1[0]!, 'le haut prend son vert');
 });
 
 test('luminosité : jamais au-delà du cran réglé, à pleine musique comme à chaque cran', () => {
   for (const level of LED_LEVEL_CHOICES) {
     const music = new LedJukeboxMusic();
-    play(music, levels(1, 1, 1), 0, 1500);
+    play(music, kick, 0, 5000);
     const bytes = music.render(WIRINGS[0]!, level);
     const cap = Math.ceil(255 * ledLevelGain(level));
     assert.ok(Math.max(...bytes) <= cap, `cran ${level} % : ${Math.max(...bytes)} > ${cap}`);
@@ -109,32 +156,17 @@ test('luminosité : jamais au-delà du cran réglé, à pleine musique comme à 
   }
 });
 
-test('plus de niveaux : la musique rend les bandes à l’ambiance après s’être éteinte en douceur', () => {
+test('plus de niveaux : les lumières s’éteignent en douceur, puis la musique rend les bandes à l’ambiance', () => {
   const music = new LedJukeboxMusic();
-  const t = play(music, levels(0.9, 0.5, 0.5), 0, 1500);
-  assert.equal(music.active(t), true);
-  // Le morceau s'arrête : plus de niveaux. Les lumières retombent sans coupure sèche, puis la musique se retire.
-  const stopped = t + LED_MUSIC_STALE_MS + 1;
+  const { end } = play(music, kick, 0, 5000);
+  assert.equal(music.active(end), true);
+  const stopped = end + LED_MUSIC_STALE_MS + 1;
   assert.equal(music.fresh(stopped), false);
-  music.step(stopped - 40);
+  music.step(stopped - FRAME);
   music.step(stopped);
   assert.ok(music.render(WIRINGS[0]!, 100).some((b) => b > 0), 'encore une lueur juste après l’arrêt');
   let u = stopped;
-  for (; u < stopped + 3000; u += 40) music.step(u);
+  for (; u < stopped + 4000; u += FRAME) music.step(u);
   assert.equal(music.active(u), false);
   assert.ok(music.render(WIRINGS[0]!, 100).every((b) => b === 0));
-});
-
-test('pas de clignotement perpétuel : une basse stable donne une image stable', () => {
-  const music = new LedJukeboxMusic();
-  let t = play(music, levels(0.6, 0.3, 0.2), 0, 1500);
-  const first = Array.from(music.render(WIRINGS[0]!, 100));
-  for (let i = 0; i < 20; i++) {
-    t += 40;
-    music.feed(levels(0.6, 0.3, 0.2), t);
-    music.step(t);
-  }
-  const later = Array.from(music.render(WIRINGS[0]!, 100));
-  const drift = first.reduce((s, v, i) => s + Math.abs(v - later[i]!), 0);
-  assert.ok(drift < 6, `image stable (écart ${drift})`);
 });

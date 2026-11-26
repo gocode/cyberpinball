@@ -35,8 +35,9 @@ test('menu système : « Roue » est dans Tables, à côté des Collections', ()
   assert.equal(entries.indexOf('wheel'), entries.indexOf('collections') + 1);
 });
 
-// L'Arène (21/11/2026) entre la Communauté et les Collections, comme leurs médaillons dans la roue.
-const WHEEL_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'community', 'arena', 'collectionsMedallion'];
+// L'Arène (21/11/2026) entre la Communauté et les Collections, comme leurs médaillons dans la roue ;
+// les Applications (26/11/2026) entre le Juke-box et la Communauté.
+const WHEEL_ROWS = ['menuLayout', 'tableOrder', 'startTable', 'wheelStart', 'wheelMotion', 'tableColor', 'jukebox', 'applications', 'community', 'arena', 'collectionsMedallion'];
 
 test('écran Roue : tous les réglages de la roue, et eux seuls ; plus aucun dans « Médias, son et attente »', () => {
   const { WHEEL_SETTINGS_ROWS } = require(path.join(REPO_ROOT, 'app', 'dist', 'wheel-settings.js')) as { WHEEL_SETTINGS_ROWS: readonly string[] };

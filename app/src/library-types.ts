@@ -6,6 +6,7 @@ import type { PhoneRemote, RemoteBar } from './phone-remote';
 import { type RemoteWording } from './phone-remote-menu';
 import { type ScoreboardView } from './scoreboard-menu';
 import type { HubView } from './hub-screen';
+import type { AppsView } from './applications-menu';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import type { RomVolumeView } from './rom-volume';
@@ -557,6 +558,11 @@ export interface Built {
    * sections et de la colonne des actions (app/renderer/hub.js) ; ses onglets et ses cartes sont les actions.
    */
   hub?: HubView;
+  /**
+   * Rubrique Applications (applications-menu.ts) : la grille au fronton, la fiche, les commandes et le QR
+   * au playfield (app/renderer/applications.js), à la place de l'en-tête, des sections et des actions.
+   */
+  apps?: AppsView;
   /** Clic direct dans la barre d’onglets, indépendant du parcours des flippers. */
   selectHubTab?: (tab: string) => void;
   /**

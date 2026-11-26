@@ -31,6 +31,8 @@ export type NewsReach =
   | { kind: 'arena' }
   | { kind: 'level' }
   | { kind: 'jukebox' }
+  /** La grille des Applications. */
+  | { kind: 'applications' }
   /** La roue, et un tirage de la table surprise tout de suite. */
   | { kind: 'surprise' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' | 'pov' };
@@ -61,6 +63,24 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    // Applications (26/11/2026) : « Pinball FX sur la roue » (0.1.13) sort de la liste pour la garder
+    // à 24. Date à poser au jour de la version finale.
+    id: 'applications',
+    date: '2026-11-26',
+    version: '0.2.4',
+    get title() { return t('Applications'); },
+    get detail() { return t('Netflix, YouTube, Spotify ou ton serveur de la maison, en plein écran sur la borne.'); },
+    get more() {
+      return [
+        t('Le médaillon suit le Juke-box. Start ouvre la grille au fronton, avec la fiche de l’application au playfield ; les flippers choisissent, Start ouvre, Start tenu ou un MagnaSave ouvre ses réglages.'),
+        t('Le site s’ouvre en plein écran dans Microsoft Edge et ton compte y reste connecté. Les boutons de la borne le pilotent, ton téléphone sert de pavé tactile et de clavier, Exit tenu le ferme.'),
+      ];
+    },
+    get where() { return t('Sur la roue : le médaillon Applications'); },
+    reach: { kind: 'applications' },
+    beta: true,
+  },
   {
     // Table surprise (26/11/2026), contribution d'un joueur sur GitHub ; « Retours et propositions »
     // (0.1.13) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
@@ -448,22 +468,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Parties en direct'); },
     reach: { kind: 'community', door: 'instant' },
-  },
-  {
-    id: 'pinball-fx',
-    date: '2026-11-16',
-    version: '0.1.13',
-    get title() { return t('Pinball FX sur la roue'); },
-    get detail() { return t('Tes tables Pinball FX, achetées sur Steam ou Epic, à côté de tes tables VPX.'); },
-    get more() {
-      return [
-        t('Choisis les tables que tu possèdes : elles rejoignent la roue avec leurs médias, tes collections, tes favoris et tes statistiques.'),
-        t('Un appui long sur Exit ferme le jeu et ramène au front-end. Ce que Pinball FX ne fournit pas (scores, partie avec un ami, réalité virtuelle) reste grisé sur la fiche, avec la raison.'),
-      ];
-    },
-    get where() { return t('Menu système › Tables › Ajouter une table › Tables de Pinball FX'); },
-    reach: { kind: 'system', id: 'add-table' },
-    beta: true,
   },
 ];
 

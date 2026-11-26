@@ -87,8 +87,8 @@ const FIND_TIMEOUT_MS = 20_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Gestes réels, par win-displays (chargé à la demande : koffi n'existe que sous Windows). */
-function realWindows(): EdgeWindowOps {
+/** Gestes réels, par win-displays (chargé à la demande : koffi n'existe que sous Windows). Repris par applications-browser.ts. */
+export function edgeWindowOps(): EdgeWindowOps {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const w = require('@cyberpinball/win-displays') as typeof import('@cyberpinball/win-displays');
   type Win = import('@cyberpinball/win-displays').WindowInfo;
@@ -112,7 +112,7 @@ function realWindows(): EdgeWindowOps {
 export function createEdgeLogin(opts: EdgeLoginOptions) {
   const log = opts.log ?? (() => undefined);
   const profile = path.join(opts.dataDir, EDGE_PROFILE_DIR);
-  const ops = () => (opts.windows ??= realWindows());
+  const ops = () => (opts.windows ??= edgeWindowOps());
   let session: { child: ChildProcess } | undefined;
   /** Une seule lecture à la fois (deux Edge sur un profil : le second passe la main au premier). */
   let reading: Promise<CookieRecord[]> | undefined;

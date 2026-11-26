@@ -2,6 +2,13 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties en direct, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  // Applications (26/11/2026)
+  'Netflix, YouTube, Spotify ou ton serveur de la maison, en plein écran sur la borne.': 'Netflix, YouTube, Spotify or your home server, full screen on the cabinet.',
+  'Le médaillon suit le Juke-box. Start ouvre la grille au fronton, avec la fiche de l’application au playfield ; les flippers choisissent, Start ouvre, Start tenu ou un MagnaSave ouvre ses réglages.':
+    'The medallion follows the Juke-box. Start opens the grid on the backglass, with the application’s card on the playfield; the flippers pick, Start opens, Start held or a MagnaSave opens its settings.',
+  'Le site s’ouvre en plein écran dans Microsoft Edge et ton compte y reste connecté. Les boutons de la borne le pilotent, ton téléphone sert de pavé tactile et de clavier, Exit tenu le ferme.':
+    'The site opens full screen in Microsoft Edge and your account stays signed in. The cabinet buttons control it, your phone acts as a touchpad and keyboard, Exit held closes it.',
+  'Sur la roue : le médaillon Applications': 'On the wheel: the Applications medallion',
   'Animations des LED': 'LED animations',
   'Tes LED adressables s’animent aux couleurs de la table choisie, et se taisent quand une partie démarre.': 'Your addressable LEDs come alive in the colours of the chosen table, and go quiet when a game starts.',
   'Dans les écrans de la borne et à la roue, tes bandes de LED adressables montrent une ambiance douce, aux couleurs de la table choisie. Chaque changement de table lance un balayage dans le sens du défilement, et l’ouverture d’une fiche une pulsation.': 'In the menus and at the wheel, your addressable LED strips show a soft mood, in the colours of the chosen table. Each change of table starts a sweep in the direction of the scroll, and opening a table sheet a pulse.',
@@ -102,14 +109,6 @@ export const messages: Record<string, string> = {
   'Communauté › Parties en direct': 'Community › Live games',
 
   'Communauté › Groupes': 'Community › Groups',
-
-  'Pinball FX sur la roue': 'Pinball FX on the wheel',
-  'Tes tables Pinball FX, achetées sur Steam ou Epic, à côté de tes tables VPX.': 'Your Pinball FX tables, bought on Steam or Epic, next to your VPX tables.',
-  'Choisis les tables que tu possèdes : elles rejoignent la roue avec leurs médias, tes collections, tes favoris et tes statistiques.':
-    'Pick the tables you own: they join the wheel with their media, your collections, your favourites and your statistics.',
-  'Un appui long sur Exit ferme le jeu et ramène au front-end. Ce que Pinball FX ne fournit pas (scores, partie avec un ami, réalité virtuelle) reste grisé sur la fiche, avec la raison.':
-    'A long press on Exit closes the game and brings you back to the front-end. What Pinball FX does not provide (scores, playing with a friend, virtual reality) stays greyed out on the table’s page, with the reason.',
-  'Menu système › Tables › Ajouter une table › Tables de Pinball FX': 'System menu › Tables › Add a table › Pinball FX tables',
 
   // Table surprise (packages/core/src/news.ts) ; le titre est dans table-surprise.ts.
   'Tiens les deux flippers sur la roue : une table de la collection est tirée au hasard.': 'Hold both flippers on the wheel: a table from the collection is drawn at random.',

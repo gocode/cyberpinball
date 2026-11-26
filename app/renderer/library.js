@@ -54,6 +54,14 @@ function renderLibrary(v) {
     forgetInfoCard();
     return o;
   }
+  // Rubrique Applications (applications-menu.ts) : la fiche, les commandes et le QR (applications.js).
+  if (v.apps && window.CyberApplications) {
+    keepTextCatcher(false);
+    const o = CyberApplications.render(v, (node, index) => actOn(node, { type: 'activate', index }), v.remote ? renderRemote(v.remote) : undefined);
+    forgetMediaNodes();
+    forgetInfoCard();
+    return o;
+  }
   // Rang des lignes, pour leur arrivée en cascade (library.css, .lib-arrive) ; plafonné : une longue liste ne traîne pas.
   let rank = 0;
   // Page d'un guide du jeu : elle prend la place de l'en-tête (guide.css).

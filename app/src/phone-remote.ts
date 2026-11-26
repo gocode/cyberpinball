@@ -110,6 +110,7 @@ import {
   type FirewallState,
   type JukeboxPlayerView,
   type RemoteJukeboxOp,
+  type RemoteVolumeCommand,
   type RemoteGroupAct,
   type RemoteInstantAct,
   type RemotePage,
@@ -561,6 +562,11 @@ export interface PhoneRemoteOptions {
    * téléphones gardés, et leur donne l'entrée stable de leur raccourci. Seulement sur le vrai réseau local.
    */
   relay?: Pick<PhoneRelay, 'update' | 'url' | 'state'>;
+  /**
+   * Volume de la borne (cabinet-volume.ts) : une commande du téléphone, ou la simple lecture ; le
+   * niveau qui en résulte, undefined sans sortie audio lisible.
+   */
+  volume?(command: RemoteVolumeCommand): { percent: number; muted: boolean } | undefined;
 }
 
 /**
@@ -582,6 +588,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-niveau.js': 'telephone/telephone-niveau.js',
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   '/telephone-retour.js': 'telephone/telephone-retour.js',
+  '/telephone-volume.js': 'telephone/telephone-volume.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',
   // Les badges officiels (CyberLevels.badgeSvg), dessinés au téléphone comme à la borne (profil d'un joueur).
@@ -1949,6 +1956,17 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (message.t === 'grid') {
       wantsMedia = message.on;
       pushEntries();
+      return;
+    }
+    // Volume de la borne : dans tous les modes (menu, partie, applications) ; le niveau repart aussitôt.
+    if (message.t === 'vol') {
+      let level: { percent: number; muted: boolean } | undefined;
+      try {
+        level = opts.volume?.(message.c);
+      } catch (error) {
+        journalIncident('Télécommande : volume de la borne illisible', error); // i18n-ignore : journal
+      }
+      sendTo(link, level ? { t: 'volume', percent: level.percent, muted: level.muted } : { t: 'volume', none: t('Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.') });
       return;
     }
     // Juke-box : une commande du lecteur, vérifiée par la borne ; ce qui change part aussitôt.

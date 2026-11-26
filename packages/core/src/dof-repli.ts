@@ -314,8 +314,19 @@ function sheen(hex: string, k = 0.55): string {
 
 /** Durée la plus longue d'un effet du repli, attente comprise (ms) : sans événement nouveau, les bandes s'éteignent après. */
 export const DOF_EFFECT_MAX_MS = 600;
-/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais. */
-export const DOF_FLIPPER_REACH = 0.35;
+/** Part de la bande, depuis le bas, que l'effet des flippers ne dépasse jamais : sa tête s'y éteint en fondu. */
+export const DOF_FLIPPER_REACH = 0.5;
+/** Marches du dégradé des flippers : autant de barres translucides emboîtées, de la base à la tête. */
+export const DOF_FLIPPER_STEPS = 7;
+
+/**
+ * Luminosité visée (0 à 1) de chaque marche de la barre des flippers, de la base à la tête : elle décroît sans
+ * à-coup jusqu'à presque rien, pour que la tête s'estompe au lieu de s'arrêter net (essai de la 0.2.4-essai.56 :
+ * « s'arrête brutalement à la moitié, c'est moche »).
+ */
+export function dofFlipperProfile(steps = DOF_FLIPPER_STEPS): number[] {
+  return Array.from({ length: steps }, (_, j) => Math.pow(1 - (j + 0.5) / steps, 1.3));
+}
 
 const FULL = 'AL0 AT0 AW100 AH100';
 const WHITE = '#FFFFFF';
@@ -415,22 +426,37 @@ const ROLE_FX: Partial<Record<DofEventKind, Fx>> = {
 const ROTATION: Fx[] = [rushFx, hitFx, sparkFx, waveFx, drainFx, hitFx];
 /** Lampes des ROM : courtes et partielles, elles clignotent souvent. */
 const LAMP_ROTATION: Fx[] = [hitFx, sparkFx];
-/** Calques réservés à chaque événement (les effets en superposent jusqu'à quatre). */
-const LAYERS = 5;
+/** Calques réservés à chaque événement (la barre des flippers en superpose DOF_FLIPPER_STEPS). */
+const LAYERS = 8;
 
 /**
- * Flippers : très légers, ils sont actionnés sans cesse. Une petite barre aux couleurs de la table qui part du
- * bas de la bande (du bord, côté du flipper, sur une bande horizontale) et monte un peu, jamais au-delà de
- * DOF_FLIPPER_REACH ; sa base de la teinte voisine, pour le dégradé ; une fois, même flipper tenu levé. Couleur
- * pleine : la légèreté tient à la taille de la barre, pas à sa luminosité (dofVivid).
+ * Flippers : très légers, ils sont actionnés sans cesse. Une barre aux couleurs de la table qui part du bas de la
+ * bande (du bord, côté du flipper, sur une bande horizontale), pleine à la base et dont la tête s'estompe en
+ * fondu continu jusqu'à DOF_FLIPPER_REACH, sans bord franc.
+ *
+ * libdof n'a pas de dégradé dans l'espace, et un balayage (AS/AD) garde l'éclat de chaque valeur jusqu'au bord de
+ * sa zone, où il est coupé net. D'où DOF_FLIPPER_STEPS barres emboîtées depuis la base, chacune en couleur pleine
+ * mais translucide (#RRGGBBAA) : les calques de libdof se mêlent par transparence, la base cumule toutes les
+ * barres, la tête une seule, presque transparente ; les transparences sont calculées pour suivre
+ * dofFlipperProfile. La plus petite, à la base, est de la teinte voisine (dégradé de teinte). Les barres
+ * s'allument de la base vers la tête, à quelques ms d'écart (le coup monte), puis la tête s'éteint la première
+ * (la lumière redescend en fondu). Une fois, même flipper tenu levé.
  */
 function flipperBar(trigger: string, color: string, layer: number, vertical: boolean, side: 'left' | 'right' | 'center'): string[] {
-  const reach = Math.round(DOF_FLIPPER_REACH * 100);
-  const base = Math.round(reach / 3);
+  const reach = DOF_FLIPPER_REACH * 100;
   const fromRight = !vertical && side === 'right';
   const area = (size: number) => (vertical ? `AL0 AW100 AT${100 - size} AH${size}` : fromRight ? `AT0 AH100 AL${100 - size} AW${size}` : `AT0 AH100 AL0 AW${size}`);
-  const dir = vertical ? 'U' : fromRight ? 'L' : 'R';
-  return [`${trigger} ${color} ${area(reach)} AD${dir} AS450 FD160 130 L${layer}`, `${trigger} ${dofGradientPartner(color)} ${area(base)} FD180 110 L${layer + 1}`];
+  const target = dofFlipperProfile();
+  const n = target.length;
+  // Barre k (de 0, la base, à n - 1, la tête) : couvre les marches 0 à k. Luminosité de la marche j une fois
+  // toutes allumées : 1 - Π(1 - alpha des barres k ≥ j) ; on la fait égale à target[j], de la tête vers la base.
+  const alpha = target.map((t, j) => (j === n - 1 ? t : 1 - (1 - t) / (1 - target[j + 1]!)));
+  return alpha.map((a, k) => {
+    const hex = k === 0 ? dofGradientPartner(color) : color;
+    const aa = Math.max(1, Math.min(255, Math.round(a * 255))).toString(16).toUpperCase().padStart(2, '0');
+    const rest = n - 1 - k;
+    return `${trigger} ${hex}${aa} ${area(Math.round((reach * (k + 1)) / n))} FU40 FD${120 + rest * 20}${k ? ` W${k * 14}` : ''} ${70 + rest * 15} L${layer + k}`;
+  });
 }
 
 /**

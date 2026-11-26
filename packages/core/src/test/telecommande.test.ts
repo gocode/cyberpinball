@@ -128,6 +128,37 @@ ${run.stderr}`;
   }
 });
 
+test('volume de la borne au téléphone : réglette, Volume + et − (tenu), Muet, en partie, sans sortie audio, retour d’Android, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 200_000 }, () => {
+  // interne/demos/demo-telephone-volume.cjs : la vraie page du téléphone hors écran ; le volume de la
+  // borne simulé avec son vrai calcul (volumeAfter), le son de Windows jamais touché.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telephone-volume-'));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.CYBERPINBALL_A_L_ECRAN;
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-volume.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 180_000, cwd: REPO_ROOT });
+    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
+    assert.equal(run.status, 0, result);
+    assert.doesNotMatch(result, /ÉCHEC/, result);
+    for (const step of [
+      'au menu : le bouton du volume est dans la barre du haut',
+      'la réglette montre le niveau de la borne (50 %)',
+      'Volume + : 55 %, comme le bouton de la borne',
+      'Volume + tenu : l’appui se répète tant que le doigt reste',
+      'le doigt levé, la répétition s’arrête',
+      'Muet : « Son coupé », comme la pastille de la borne',
+      'le retour d’Android replie la réglette',
+      'pendant une partie : Volume − baisse le son du flipper',
+      'sans sortie audio : la réglette dit pourquoi',
+      'petit Android (320 × 568) : la barre du haut et la réglette tiennent dans la largeur',
+      'garde-fou de mise en page',
+    ])
+      assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
+  } finally {
+    removeTempDir(dir);
+  }
+});
+
 test('accès direct aux menus depuis le téléphone : l’écran de la borne à toucher, tous les menus, la roue, le mode invité, une partie, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 290_000 }, () => {
   // interne/demos/demo-telephone-menus.cjs : la vraie gestion des tables hors écran, la vraie page du
   // téléphone ; la vue Écran (entrées touchées, repère qui suit les flippers), la vue Menus (une

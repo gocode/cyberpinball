@@ -38,6 +38,8 @@ import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_USABLE, DMD_WIDTH, blankDots, dr
 
 /** Clé du médaillon dans la roue (les tables y ont leur fichier). */
 export const JUKEBOX_WHEEL_KEY = 'juke-box:medaillon';
+/** Clé du médaillon Applications dans la roue (applications-menu.ts). */
+export const APPLICATIONS_WHEEL_KEY = 'applications:medaillon';
 /** Clé du médaillon Communauté dans la roue (community-menu.ts). */
 export const COMMUNITY_WHEEL_KEY = 'communaute:medaillon';
 /** Clé du médaillon Arène dans la roue (arena-menu.ts). */
@@ -96,10 +98,12 @@ export function jukeboxWheel(w: JukeboxWheelInput): JukeboxWheel {
 /**
  * Médaillons de Cyber Pinball en tête de la roue (Juke-box, puis Communauté : décidé le 12/11/2026,
  * community-menu.ts ; puis Collections, le 13/11/2026, collections-menu.ts, le plus près des tables ;
- * l'Arène entre la Communauté et les Collections, le 21/11/2026, arena-menu.ts), chacun sur le gabarit chromé commun. La roue d'une collection les compte avant
+ * l'Arène entre la Communauté et les Collections, le 21/11/2026, arena-menu.ts ; les Applications juste
+ * après le Juke-box, le 26/11/2026, applications-menu.ts : les deux médaillons de ce qui se regarde et
+ * s'écoute), chacun sur le gabarit chromé commun. La roue d'une collection les compte avant
  * ses tables ; le choix est sur un médaillon (`selected`) ou sur une table (`at`).
  */
-export type Medallion = 'jukebox' | 'community' | 'arena' | 'collections';
+export type Medallion = 'jukebox' | 'applications' | 'community' | 'arena' | 'collections';
 
 export interface MedallionWheelInput {
   tables: number;

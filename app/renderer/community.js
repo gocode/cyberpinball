@@ -287,4 +287,6 @@
   // Le fronton garde la mise en page des affiches du Juke-box ; le plateau a la sienne.
   window.CyberCommunity = { ...community, wheelPoster: communityWheelPoster };
   window.CyberCollections = kit('collections', (s) => s.collectionsMedallion);
+  // La même affiche pour un autre médaillon (les Applications, applications.js).
+  window.CyberPosterKit = kit;
 })();

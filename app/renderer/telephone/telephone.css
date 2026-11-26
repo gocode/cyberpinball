@@ -117,6 +117,130 @@ button {
   display: none;
 }
 
+/* Le volume de la borne : dans tous les modes, une fois la liaison acceptée (telephone-volume.js). */
+.top-volume {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.top-volume[aria-expanded='true'] {
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+
+body:not([data-state='paired']) .top-volume {
+  display: none;
+}
+
+/* La réglette sous la barre du haut : Volume −, le niveau (jauge et pourcentage), Volume +, Muet. */
+.volume {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface-raised);
+}
+
+.volume[hidden] {
+  display: none;
+}
+
+.volume-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 24px;
+  touch-action: none;
+}
+
+.volume-btn:active:not(:disabled) {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+
+.volume-btn:disabled {
+  opacity: 0.4;
+}
+
+.volume-mute[aria-pressed='true'] {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.volume-level {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.volume-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--surface-sunken);
+}
+
+.volume-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 5px;
+  background: var(--signal);
+  transition: width 120ms ease-out;
+}
+
+.volume.muted .volume-fill {
+  background: var(--line-strong);
+}
+
+.volume-value {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.volume.muted .volume-value {
+  color: var(--warning);
+}
+
+.volume-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.volume-note[hidden] {
+  display: none;
+}
+
 /* Au navigateur : la barre d'outils en bas a déjà Clavier et Plus. */
 body[data-mode='browser'] .top-more,
 body:not([data-state='paired']) .top-more {
@@ -705,7 +829,8 @@ body[data-view='page'] .views {
   font-size: 12px;
   font-weight: 400;
   font-stretch: 85%;
-  line-height: 14px;
+  /* Au moins 1,2 : la ligne masquée par la limite ne déborde pas sous la dernière gardée (garde-fou). */
+  line-height: 15px;
 }
 
 /* --- Communauté : Messages, Amis, Scores --- */

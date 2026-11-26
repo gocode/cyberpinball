@@ -472,12 +472,128 @@
     volume(c);
   }
 
+  // ---------- Applications : « Écran » ----------
+
+  /*
+   * « Zapping » (choisi le 26/11/2026 sur la planche des médaillons, avec l'icône « Écran ») : douze
+   * tuiles d'applications posées autour du rond, violettes, bleues et vertes, une sur quatre avec sa
+   * lecture. Un cadre vert glisse de l'une à l'autre comme la sélection à la télécommande, et la tuile
+   * choisie s'allume ; le seul mouvement est ce glissement, sans pulsation.
+   */
+  const ZAP_STEP = 1.1;
+  const ZAP_MOVE = 0.35;
+  const ZAP_COLS = [VIOLET, META, SIGNAL];
+  /** Les tuiles de la grille de pas 44 qui tombent entre les rayons 80 et 105, dans l'ordre du tour. */
+  const ZAP_RING = (() => {
+    const r = [];
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        const d = Math.hypot(i, j) * 44;
+        if (d > 80 && d < 105) r.push([150 + i * 44, 150 + j * 44]);
+      }
+    }
+    return r.sort((a, b) => Math.atan2(a[1] - 150, a[0] - 150) - Math.atan2(b[1] - 150, b[0] - 150));
+  })();
+
+  function roundedRect(c, x, y, w, h, r) {
+    if (c.roundRect) c.roundRect(x, y, w, h, r);
+    else c.rect(x, y, w, h);
+  }
+
+  function zapTile(c, x, y, col, a, glyph) {
+    const s = 30;
+    c.save();
+    c.globalAlpha = a;
+    c.fillStyle = rgba(col, 0.88);
+    c.beginPath();
+    roundedRect(c, x - s / 2, y - s / 2, s, s, s * 0.24);
+    if (glyph) {
+      c.moveTo(x - s * 0.14, y - s * 0.2);
+      c.lineTo(x - s * 0.14, y + s * 0.2);
+      c.lineTo(x + s * 0.22, y);
+      c.closePath();
+    }
+    c.fill('evenodd');
+    c.restore();
+  }
+
+  function zapping(c, t, k) {
+    const n = ZAP_RING.length;
+    const step = Math.floor(t / ZAP_STEP);
+    const u = ease(clamp((t - step * ZAP_STEP) / ZAP_MOVE));
+    const to = ((step % n) + n) % n;
+    const from = (to + n - 1) % n;
+    ZAP_RING.forEach(([x, y], j) => {
+      const lit = j === to ? u : j === from ? 1 - u : 0;
+      zapTile(c, x, y, ZAP_COLS[j % 3], 0.3 + 0.6 * lit, j % 4 === 1);
+    });
+    const [x0, y0] = ZAP_RING[from];
+    const [x1, y1] = ZAP_RING[to];
+    const x = x0 + (x1 - x0) * u;
+    const y = y0 + (y1 - y0) * u;
+    c.save();
+    c.strokeStyle = '#8be23a';
+    c.lineWidth = 2.5;
+    c.shadowColor = 'rgba(139,226,58,.7)';
+    c.shadowBlur = 8 * k;
+    c.beginPath();
+    roundedRect(c, x - 19, y - 19, 38, 38, 10);
+    c.stroke();
+    c.restore();
+  }
+
+  /*
+   * Icône (maquettes validées le 26/11/2026, « Oui, code-la ») : dans le rond commun, un écran au liseré
+   * vert signal et ses six tuiles (la première allumée en vert, les autres en sarcelle éteinte), et son pied.
+   */
+  function screenIcon(c, k) {
+    const s = 0.95;
+    c.save();
+    c.translate(150 - 50 * s, 150 - 50 * s);
+    c.scale(s, s);
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    c.save();
+    c.shadowColor = 'rgba(139,226,58,.5)';
+    c.shadowBlur = 12 * k;
+    c.fillStyle = '#081514';
+    c.strokeStyle = '#8be23a';
+    c.lineWidth = 4;
+    c.beginPath();
+    roundedRect(c, 6, 14, 88, 60, 8);
+    c.fill();
+    c.stroke();
+    c.restore();
+    for (let i = 0; i < 6; i++) {
+      c.fillStyle = i === 0 ? '#8be23a' : 'rgba(113,155,155,.55)';
+      c.beginPath();
+      roundedRect(c, 16 + 24 * (i % 3), 23 + 23 * Math.floor(i / 3), 20, 18, 4);
+      c.fill();
+    }
+    c.strokeStyle = 'rgba(160,190,188,.8)';
+    c.lineWidth = 5;
+    c.beginPath();
+    c.moveTo(38, 86);
+    c.lineTo(62, 86);
+    c.stroke();
+    c.restore();
+  }
+
+  function ecran(c, t, k) {
+    disc(c);
+    zapping(c, t, k);
+    label(c, k, 0.45);
+    screenIcon(c, k);
+    volume(c);
+  }
+
   /** Les intérieurs, et l'instant de leur première image (la plus parlante, montrée à l'arrêt). */
   const KINDS = {
     'juke-box': { draw: onde, t0: 1.1 },
     communaute: { draw: montee, t0: 4 },
     arene: { draw: coupe, t0: 4 },
     collections: { draw: eclat, t0: 1.6 },
+    applications: { draw: ecran, t0: 1.6 },
   };
 
   /** Un intérieur dans un carré de px × px (le disque de rayon 147 le remplit). */

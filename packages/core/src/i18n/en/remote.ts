@@ -323,4 +323,11 @@ export const messages: Record<string, string> = {
   "Activité récente : {n} non lues": "Recent activity: {n} unread",
   "La borne envoie l’activité récente…": "The cabinet is sending the recent activity…",
   "Ouvrir": "Open",
+  // app/renderer/telephone/telephone-volume.js et app/src/phone-remote.ts (volume de la borne au téléphone)
+  "Volume de la borne": "Cabinet volume",
+  "Baisser le son": "Volume down",
+  "Monter le son": "Volume up",
+  "Couper le son": "Mute",
+  "Rétablir le son": "Unmute",
+  "Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.": "The cabinet sound can't be adjusted from here: no audio output found.",
 };
