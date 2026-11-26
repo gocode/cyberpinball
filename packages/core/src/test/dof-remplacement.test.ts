@@ -1,6 +1,8 @@
 // Remplacement du DOF d'une table (dof-remplacement.ts), 26/11/2026 : une config communautaire qui allume
-// toutes les bandes d'une seule couleur. Une table en remplacement ne garde aucune sortie de bande
-// de la config du configtool, garde ses autres toys, et l'option coupée rend exactement l'état d'avant.
+// toutes les bandes d'une seule couleur (The Matrix). Avec l'option, les bandes suivent exactement le moteur
+// « Effets LED sans DOF » de Cyber Pinball, ROM ou pas : bandes et contrôleur en sommeil dans Cabinet.xml
+// (libdof n'ouvre pas leur port, aucune sortie LED de DOF active), les autres toys restent à DOF, le moteur
+// prend le port, et tout est rendu octet pour octet à la fin.
 
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -8,35 +10,40 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import {
-  DOF_FALLBACK_NUMBER,
   dofReplaceOf,
-  dofRomLines,
-  dofRomStripEffects,
-  hasSuspendedStripOutputs,
+  dofSleepSummary,
+  hasDofSleep,
   ledsFromCabinet,
-  libdofEquivalents,
-  parseDofIni,
-  planDofFallback,
+  libdofCabinet,
   planLedWrite,
   readDofSetup,
   refreshDofFallback,
   restoreDofReplacement,
-  restoreStripOutputs,
-  suspendStripOutputs,
+  restoreDofSleep,
+  sleepDofStrips,
   withDofReplace,
   type CabinetLeds,
 } from '../index';
 
-const area = 'AL0 AT0 AW100 AH100';
-const COLORS = '[Colors DOF]\r\nRed=#ff0000ff\r\nBlue=#0000ffff\r\nYellow=#ffff00ff\r\n';
-/** Config du configtool : riche pour mbash (tout en jaune, à la Matrix), pauvre pour mm. */
-const INI30 = [COLORS, '[Config DOF]', `mbash,${Array.from({ length: 8 }, (_, i) => `S${i + 1} Yellow ${area} 200`).join('/')},${Array.from({ length: 8 }, (_, i) => `L${i + 10} Yellow ${area} 150`).join('/')}`, `mm,S9 Red ${area} 300,0`].join('\r\n');
-/** Contacteurs et bobines de la même ROM : des toys qui ne sont pas des bandes. */
-const INI51 = ['[Config DOF]', 'mbash,S1,S2,W15', 'mm,S9,S10'].join('\r\n');
-const NAMES = ['PF Left', 'PF Right'];
-const STRIPS = NAMES.map((name) => ({ name, width: 1, height: 60 }));
-const LIBRARY = ['mbash', 'mm_109b'];
+const APP = path.resolve(__dirname, '../../../../app');
+interface ReplaceModule {
+  createDofReplace(host: Record<string, unknown>): {
+    isOn(table: unknown): boolean;
+    beforeGame(table: unknown, listening: boolean): boolean;
+    afterGame(): void;
+    tableAction(table: unknown, refresh: () => void): { run(): void } | undefined;
+  };
+}
+interface TapModule {
+  openTap(exe: string): { file: string; env: Record<string, string> } | undefined;
+  startTap(deps: unknown, exe: string, mode?: unknown, table?: string, about?: unknown, options?: unknown): { stop(): void; ownsLeds(): boolean } | undefined;
+}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const replaceModule = require(path.join(APP, 'dist', 'dof-remplacement.js')) as ReplaceModule;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tap = require(path.join(APP, 'dist', 'dof-evenements-jeu.js')) as TapModule;
 
+const NAMES = ['PF Left', 'PF Right'];
 const leds = (): CabinetLeds => ({
   controller: 'TeensyStripController',
   port: 'COM7',
@@ -46,7 +53,7 @@ const leds = (): CabinetLeds => ({
   ],
 });
 
-/** LedWizEquivalent 51 d'un contrôleur de toys, ajouté au Cabinet.xml écrit par Cyber Pinball. */
+/** Contacteurs d'un autre contrôleur (Pinscape, LedWizEquivalent 51) : des toys qui ne sont pas des bandes. */
 const CONTACTORS = [
   '    <LedWizEquivalent>',
   '      <Name>LedWizEquivalent 51</Name>',
@@ -64,6 +71,19 @@ const CONTACTORS = [
   '    </LedWizEquivalent>',
 ];
 
+/** Borne d'essai : Cabinet.xml écrit par Cyber Pinball (Teensy, deux bandes, LedWizEquivalent 30), les contacteurs ajoutés, le repli 99. */
+function cabinetDir(): { dir: string; cabinetFile: string } {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-dof-remplacement-'));
+  fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), '[Colors DOF]\r\nRed=#ff0000ff\r\n[Config DOF]\r\nmm,S9 Red AL0 AT0 AW100 AH100 300,0\r\n');
+  for (const f of planLedWrite(dir, leds()).files) fs.writeFileSync(f.file, f.content);
+  const cabinetFile = path.join(dir, 'Cabinet.xml');
+  const written = fs.readFileSync(cabinetFile, 'utf8');
+  const eol = written.includes('\r\n') ? '\r\n' : '\n';
+  fs.writeFileSync(cabinetFile, written.replace(/([ \t]*<\/Toys>)/, `${CONTACTORS.join(eol)}${eol}$1`));
+  refreshDofFallback(readDofSetup(dir), ['mm_109b'], { enabled: true });
+  return { dir, cabinetFile };
+}
+
 test('Remplacement DOF : choix gardé dans le .info de la table, retiré sans laisser de trace', () => {
   const info = { Info: { Title: 'The Matrix' }, CyberPinball: { vpx: 'autre' } };
   assert.equal(dofReplaceOf(info), false);
@@ -74,106 +94,173 @@ test('Remplacement DOF : choix gardé dans le .info de la table, retiré sans la
   assert.deepEqual(withDofReplace(withDofReplace({ Info: {} }, true), false), { Info: {} }, 'pas de CyberPinball vide');
 });
 
-test('Remplacement DOF : sorties des bandes en sommeil, rendues octet pour octet, le repli et les autres toys intacts', () => {
-  const name = 'Strip -- A&amp;B';
-  const xml = [
-    '<Cabinet><Toys>',
-    '<LedWizEquivalent><Name>LedWizEquivalent 30</Name><Outputs>',
-    `<LedWizEquivalentOutput><OutputName>${name}</OutputName><LedWizEquivalentOutputNumber>1</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>`,
-    '<LedWizEquivalentOutput><OutputName>Undercab RGB</OutputName><LedWizEquivalentOutputNumber>4</LedWizEquivalentOutputNumber></LedWizEquivalentOutput>',
-    '</Outputs><LedWizNumber>30</LedWizNumber></LedWizEquivalent>',
-    `<LedWizEquivalent><Name>LedWizEquivalent ${DOF_FALLBACK_NUMBER}</Name><Outputs><LedWizEquivalentOutput><OutputName>${name}</OutputName><LedWizEquivalentOutputNumber>1</LedWizEquivalentOutputNumber></LedWizEquivalentOutput></Outputs><LedWizNumber>${DOF_FALLBACK_NUMBER}</LedWizNumber></LedWizEquivalent>`,
-    '</Toys></Cabinet>',
-  ].join('\r\n');
-  const s = suspendStripOutputs(xml, ['Strip -- A&B']);
-  assert.deepEqual(s.suspended, [{ equivalent: 30, output: 1, name: 'Strip -- A&B' }]);
-  assert.ok(hasSuspendedStripOutputs(s.xml));
-  assert.ok(!/<!--(?:(?!-->)[\s\S])*--(?!>)/.test(s.xml.replace(/<!-- Cyber Pinball/g, '<!-- X')), 'pas de « -- » dans un commentaire');
-  const seen = libdofEquivalents(s.xml);
-  assert.deepEqual(seen.find((e) => e.number === 30)!.outputs.map((o) => o.name), ['Undercab RGB'], 'libdof ne voit plus la bande');
-  assert.deepEqual(seen.find((e) => e.number === DOF_FALLBACK_NUMBER)!.outputs.map((o) => o.name), ['Strip -- A&B'], 'le repli la vise toujours');
-  assert.equal(restoreStripOutputs(s.xml), xml, 'rendu exact');
-  assert.equal(suspendStripOutputs(s.xml, ['Strip -- A&B']).xml, s.xml, 'idempotent');
-  assert.equal(suspendStripOutputs(s.xml, []).xml, xml, 'aucune bande : tout rendu');
-});
-
-test('Remplacement DOF : une ROM à config riche reçoit quand même les effets de Cyber Pinball', () => {
-  const configs = [parseDofIni(INI30, 30), parseDofIni(INI51, 51)];
-  const equivalents = [
-    { number: 30, outputs: [{ number: 1, name: 'PF Left' }, { number: 4, name: 'PF Right' }] },
-    { number: 51, outputs: [{ number: 1, name: 'Contactor 1' }] },
-    { number: DOF_FALLBACK_NUMBER, outputs: [{ number: 1, name: 'PF Left' }, { number: 4, name: 'PF Right' }] },
-  ];
-  const plain = planDofFallback({ configs, equivalents, strips: STRIPS, roms: LIBRARY });
-  assert.deepEqual(plain.rich, ['mbash']);
-  const replaced = planDofFallback({ configs, equivalents, strips: STRIPS, roms: LIBRARY, replace: ['mbash'] });
-  assert.deepEqual(replaced.added.find((a) => a.rom === 'mbash'), { rom: 'mbash', key: 'mbash', before: 16, replaced: true });
-  assert.ok(replaced.added.some((a) => a.rom === 'mm_109b' && !a.replaced), 'les ROM pauvres restent complétées');
-  const line = replaced.content!.split(/\r?\n/).find((l) => l.startsWith('mbash,'))!;
-  for (const t of ['S1 ', 'W15 ', 'L10 ']) assert.ok(line.includes(t), `signal ${t} de la ROM repris`);
-  assert.ok(new Set(line.match(/#[0-9A-F]{6}/g)).size >= 4, 'plusieurs couleurs, pas tout en jaune');
-  // Même clé : libdof garde la ligne de chaque ini, toys compris.
-  const after = [...configs, parseDofIni(replaced.content!, DOF_FALLBACK_NUMBER)];
-  assert.deepEqual(dofRomLines(after, 'mbash').lines.map((l) => l.number), [30, 51, DOF_FALLBACK_NUMBER]);
-  // Option globale coupée : seulement la table en remplacement.
-  const only = planDofFallback({ configs, equivalents, strips: STRIPS, roms: LIBRARY, replace: ['mbash'], complete: false });
-  assert.deepEqual(only.added.map((a) => a.rom), ['mbash']);
-});
-
-test('Remplacement DOF : au lancement, aucune sortie de bande de la config d’origine, toys gardés ; coupé, état d’avant exact', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-dof-remplacement-'));
+test('Remplacement DOF : bandes et Teensy en sommeil, aucune sortie LED de DOF active, autres toys gardés, rendu octet pour octet', () => {
+  const { dir, cabinetFile } = cabinetDir();
   try {
-    fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), INI30);
-    fs.writeFileSync(path.join(dir, 'directoutputconfig51.ini'), INI51);
-    for (const f of planLedWrite(dir, leds()).files) fs.writeFileSync(f.file, f.content);
-    const cabinetFile = path.join(dir, 'Cabinet.xml');
-    const written = fs.readFileSync(cabinetFile, 'utf8');
-    const eol = written.includes('\r\n') ? '\r\n' : '\n';
-    fs.writeFileSync(cabinetFile, written.replace(/([ \t]*<\/Toys>)/, `${CONTACTORS.join(eol)}${eol}$1`));
-    const iniFile = path.join(dir, `directoutputconfig${DOF_FALLBACK_NUMBER}.ini`);
-    const community = [parseDofIni(INI30, 30), parseDofIni(INI51, 51)];
+    const before = fs.readFileSync(cabinetFile, 'utf8');
+    const awake = libdofCabinet(before);
+    assert.deepEqual(awake.controllers, ['Teensy']);
+    assert.deepEqual(awake.strips, NAMES);
+    assert.ok(awake.equivalents.find((e) => e.number === 99)?.outputs.length, 'le repli 99 vise les bandes');
 
-    // Partie d'une autre table : état de référence.
-    refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: true });
-    const cabinetBefore = fs.readFileSync(cabinetFile, 'utf8');
-    const iniBefore = fs.readFileSync(iniFile, 'latin1');
-    assert.ok(dofRomStripEffects(community, libdofEquivalents(cabinetBefore), NAMES, 'mbash') >= 16, 'config d’origine sur les bandes');
-
-    // Partie de mbash en remplacement.
-    const r = refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: true, replace: ['mbash'] });
-    assert.equal(r.cabinetUpdated, true);
-    assert.deepEqual(r.suspended.map((s) => `${s.equivalent}:${s.name}`).sort(), ['30:PF Left', '30:PF Right']);
-    const cabinetNow = fs.readFileSync(cabinetFile, 'utf8');
-    const seen = libdofEquivalents(cabinetNow);
-    assert.equal(dofRomStripEffects(community, seen, NAMES, 'mbash'), 0, 'aucune sortie de bande de la config d’origine');
-    assert.deepEqual(seen.find((e) => e.number === 51)!.outputs.map((o) => o.name), ['Contactor 1', 'Knocker -- B&W'], 'les autres toys restent');
-    const ini = parseDofIni(fs.readFileSync(iniFile, 'latin1'), DOF_FALLBACK_NUMBER);
-    assert.ok(dofRomStripEffects([...community, ini], seen, NAMES, 'mbash') >= 8, 'les bandes suivent Cyber Pinball');
-    assert.deepEqual(dofRomLines([...community, ini], 'mbash').lines.map((l) => l.number), [30, 51, DOF_FALLBACK_NUMBER], 'lignes des toys lues');
-    // Cyber Pinball lit toujours les sorties rendues : l'éditeur des bandes ne voit rien.
-    const setup = readDofSetup(dir);
-    assert.deepEqual(ledsFromCabinet(setup.cabinet!)!.strips.map((s) => s.dofOutput), [1, 4]);
-    assert.ok(setup.cabinet!.equivalents.find((e) => e.number === 30)!.outputs.length === 2);
-
-    // Fin de partie : sorties rendues.
+    const s = sleepDofStrips(before, NAMES);
+    assert.equal(s.refused, undefined);
+    assert.deepEqual(s.controllers, [{ type: 'TeensyStripController', name: 'Teensy', port: 'COM7' }]);
+    assert.deepEqual(s.strips, NAMES);
+    assert.match(dofSleepSummary(s), /^contrôleur Teensy \(TeensyStripController, COM7\), bandes PF Left, PF Right, 4 sortie\(s\) LedWiz \(30:1, 30:4, 99:1, 99:4\)$/);
+    // Invariants : libdof ne voit ni le contrôleur (son port reste à Cyber Pinball), ni les bandes, ni une sortie qui les vise.
+    const live = libdofCabinet(s.xml);
+    assert.deepEqual(live.controllers, [], 'port des bandes jamais ouvert par libdof');
+    assert.deepEqual(live.strips, []);
+    for (const e of live.equivalents) for (const o of e.outputs) assert.ok(!NAMES.includes(o.name), `LedWizEquivalent ${e.number} vise encore ${o.name}`);
+    assert.deepEqual(live.equivalents.find((e) => e.number === 51)?.outputs.map((o) => o.name), ['Contactor 1', 'Knocker -- B&W'], 'les autres toys restent à DOF');
+    assert.ok(!/<!--(?:(?!-->)[\s\S])*--(?!>)/.test(s.xml.replace(/<!-- Cyber Pinball/g, '<!-- X')), 'pas de « -- » dans un commentaire');
+    // Rendu exact, sommeil idempotent.
+    assert.ok(hasDofSleep(s.xml));
+    assert.equal(restoreDofSleep(s.xml), before, 'rendu octet pour octet');
+    assert.equal(sleepDofStrips(s.xml, NAMES).xml, s.xml, 'idempotent');
+    // Cyber Pinball (éditeur des bandes, moteur) lit toujours Cabinet.xml rendu : il trouve le port et les bandes.
+    fs.writeFileSync(cabinetFile, s.xml);
+    const seen = ledsFromCabinet(readDofSetup(dir).cabinet!)!;
+    assert.equal(seen.port, 'COM7');
+    assert.deepEqual(seen.strips.map((x) => x.name), NAMES);
+    // Partie d'une autre table : le repli rend tout avant de s'écrire.
+    refreshDofFallback(readDofSetup(dir), ['mm_109b'], { enabled: true });
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
+    fs.writeFileSync(cabinetFile, s.xml);
     assert.equal(restoreDofReplacement(cabinetFile), true);
-    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), cabinetBefore);
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
     assert.equal(restoreDofReplacement(cabinetFile), false, 'rien à rendre');
-
-    // Partie interrompue (sorties encore en sommeil), puis option coupée : état d'avant, octet pour octet.
-    refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: true, replace: ['mbash'] });
-    assert.ok(hasSuspendedStripOutputs(fs.readFileSync(cabinetFile, 'utf8')));
-    refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: true });
-    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), cabinetBefore);
-    assert.equal(fs.readFileSync(iniFile, 'latin1'), iniBefore);
-
-    // Option des ROM pauvres coupée : le remplacement marche seul, et se défait seul.
-    refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: false, replace: ['mbash'] });
-    assert.ok(/^mbash,/m.test(fs.readFileSync(iniFile, 'latin1')) && !/^mm,/m.test(fs.readFileSync(iniFile, 'latin1')));
-    refreshDofFallback(readDofSetup(dir), LIBRARY, { enabled: false });
-    assert.equal(fs.existsSync(iniFile), false);
-    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), cabinetBefore);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('Remplacement DOF : refusé (rien en sommeil) si le contrôleur des bandes pilote aussi un autre toy', () => {
+  const { dir, cabinetFile } = cabinetDir();
+  try {
+    const before = fs.readFileSync(cabinetFile, 'utf8');
+    const shared = before.replace(/([ \t]*<\/Toys>)/, '    <RGBAToy>\r\n      <Name>Undercab</Name>\r\n      <OutputNameRed>Teensy.01</OutputNameRed>\r\n    </RGBAToy>\r\n$1');
+    const s = sleepDofStrips(shared, NAMES);
+    assert.match(s.refused ?? '', /RGBAToy "Undercab" also uses Teensy\.01/);
+    assert.equal(s.xml, shared, 'rien en sommeil');
+    assert.match(sleepDofStrips(before, ['Inconnue']).refused ?? '', /no LedStrip toy named Inconnue/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Remplacement DOF : au lancement, moteur Cyber Pinball actif sur le port des bandes ; fin de partie et option coupée rendent tout', async () => {
+  const { dir, cabinetFile } = cabinetDir();
+  const vpx = path.join(dir, 'vpx');
+  fs.mkdirSync(path.join(vpx, 'scripts'), { recursive: true });
+  fs.writeFileSync(path.join(vpx, 'scripts', 'controller.vbs'), 'Sub DOF(DOFevent, State)\r\n\tIf B2SOn Then\r\n\tEnd If\r\nEnd Sub\r\n', 'latin1');
+  const exe = path.join(vpx, 'VPinballX64.exe');
+  try {
+    const before = fs.readFileSync(cabinetFile, 'utf8');
+    const infoFile = path.join(dir, 'Matrix.info');
+    fs.writeFileSync(infoFile, JSON.stringify(withDofReplace({ Info: { Title: 'The Matrix' } }, true)));
+    const table = { id: 'matrix', emulator: 'vpx', infoFile };
+    const other = { id: 'autre', emulator: 'vpx', infoFile: path.join(dir, 'Autre.info') };
+    const logs: string[] = [];
+    const replace = replaceModule.createDofReplace({ tablesDir: () => undefined, dof: () => readDofSetup(dir), changed: () => undefined, log: (l: string) => logs.push(l) });
+
+    assert.equal(replace.beforeGame(table, true), true);
+    assert.ok(logs.some((l) => /^\[dof\] remplacement : moteur Cyber Pinball actif \/ en sommeil : contrôleur Teensy \(TeensyStripController, COM7\), bandes PF Left, PF Right/.test(l)), logs.join('\n'));
+    const live = libdofCabinet(fs.readFileSync(cabinetFile, 'utf8'));
+    assert.deepEqual([live.controllers, live.strips], [[], []], 'aucune sortie LED de DOF active');
+
+    // Le moteur « Effets LED sans DOF » prend les bandes (lues dans Cabinet.xml rendu) et garde le port.
+    const calls: string[] = [];
+    const service = {
+      gameStarted: async () => void calls.push('port rendu'),
+      gameReleased: () => void calls.push('port repris'),
+      configure: (l: CabinetLeds) => void calls.push(`configure ${l.port} ${l.strips.map((s) => s.name).join('+')}`),
+      start: async () => void calls.push('start'),
+      setFrame: () => undefined,
+      blackout: () => undefined,
+      stop: async () => undefined,
+    };
+    const deps = { dataDir: dir, leds: () => ledsFromCabinet(readDofSetup(dir).cabinet!), service, log: () => undefined };
+    const opened = tap.openTap(exe);
+    assert.ok(opened);
+    const game = tap.startTap(deps, exe, { kind: 'generique' }, path.join(dir, 'Matrix.vpx'), {}, { tap: opened, takeBack: true });
+    assert.ok(game);
+    assert.equal(game.ownsLeds(), true, 'le port des bandes est à Cyber Pinball');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(calls, ['port rendu', 'port repris', 'configure COM7 PF Left+PF Right', 'start']);
+    game.stop();
+
+    // Fin de partie : tout rendu, octet pour octet.
+    replace.afterGame();
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
+    // Partie interrompue, puis partie d'une autre table : rendu avant elle.
+    assert.equal(replace.beforeGame(table, true), true);
+    assert.equal(replace.beforeGame(other, true), false);
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
+    // Option coupée dans « Gérer la table » : rendu tout de suite, plus de remplacement.
+    assert.equal(replace.beforeGame(table, true), true);
+    replace.tableAction(table, () => undefined)!.run();
+    assert.equal(replace.isOn(table), false);
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
+    // Écoute DOF de VPX impossible : la table garde son DOF, le journal dit pourquoi.
+    fs.writeFileSync(infoFile, JSON.stringify(withDofReplace({}, true)));
+    assert.equal(replace.beforeGame(table, false), false);
+    assert.ok(logs.some((l) => /remplacement : impossible \(écoute DOF de VPX non posée\)/.test(l)));
+    assert.equal(fs.readFileSync(cabinetFile, 'utf8'), before);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Le lancement d'une partie (frontend.ts) route une table en remplacement vers le moteur, ROM ou pas.
+test('Remplacement DOF : la partie d’une table en remplacement va au moteur Cyber Pinball, pas à DOF', () => {
+  const src = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  assert.match(src, /const replaced = ledGame \? dofReplace\.beforeGame\(table, Boolean\(ledTap\)\) : false;/);
+  assert.match(src, /const dofMode: DofTapMode \| undefined = replaced \? \{ kind: 'generique' \}/);
+  assert.match(src, /if \(replaced\) return void console\.log\(/, 'PinMAME ne reprend pas les bandes en cours de partie');
+  assert.match(src, /if \(!replaced && simulated === undefined && !displayMode && !otherVpx && romsOf\(table\)\.length\) refreshRomFallback\(table\);/, 'le repli ne réveille pas les bandes');
+});
+
+// Preuve sur la vraie libdof de VPX (poste de développement) : Cabinet.xml en sommeil, elle charge la config
+// sans erreur, garde les contacteurs, et ne touche jamais au port du Teensy (COM250, absent).
+const REAL_DLL = 'D:/CyberPinball/emulators/vpx/current/plugins/dof/dof64.dll'; // i18n-ignore : chemin du poste de développement
+interface RelayModule {
+  startDofRelay(job: Record<string, string>, log: (line: string) => void, script?: string): { begin(): void; stop(): void; done: Promise<number | null> };
+}
+async function libdofLog(sleep: boolean): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const relayModule = require(path.join(APP, 'dist', 'dof-relais.js')) as RelayModule;
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-libdof-remplacement-')) + path.sep;
+  const config = path.join(base, 'directoutputconfig');
+  fs.mkdirSync(config);
+  try {
+    for (const f of planLedWrite(config, { ...leds(), port: 'COM250' }).files) fs.writeFileSync(f.file, f.content);
+    const cabinetFile = path.join(config, 'Cabinet.xml');
+    const written = fs.readFileSync(cabinetFile, 'utf8').replace('<AutoConfigEnabled>true', '<AutoConfigEnabled>false');
+    fs.writeFileSync(cabinetFile, sleep ? sleepDofStrips(written, NAMES).xml : written);
+    fs.writeFileSync(path.join(config, 'GlobalConfig_B2SServer.xml'), `<?xml version="1.0"?>\r\n<GlobalConfig>\r\n<IniFilesPath>${config}</IniFilesPath>\r\n<CabinetConfigFilePattern>${cabinetFile}</CabinetConfigFilePattern>\r\n</GlobalConfig>\r\n`);
+    fs.writeFileSync(path.join(config, 'directoutputconfig30.ini'), '[Colors DOF]\r\nYellow=#ffff00ff\r\n[Config DOF]\r\nmbash,S1 Yellow AL0 AT0 AW100 AH100 200,0,0,S2 Yellow AL0 AT0 AW100 AH100 200\r\n');
+    const tapFile = path.join(base, 'evenements.txt');
+    fs.writeFileSync(tapFile, '');
+    const lines: string[] = [];
+    const relay = relayModule.startDofRelay({ dll: REAL_DLL, base, table: path.join(base, 'Essai.vpx'), rom: 'mbash', tap: tapFile }, (l) => lines.push(l), path.join(APP, 'dist', 'relais-dof.js'));
+    relay.begin();
+    for (let i = 0; i < 100 && !lines.some((l) => / prêt\.$/.test(l)); i++) await new Promise((r) => setTimeout(r, 50));
+    relay.stop();
+    assert.equal(await relay.done, 0, `sortie propre :\n${lines.join('\n')}`);
+    return lines.join('\n');
+  } finally {
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+}
+
+test('Remplacement DOF : la vraie libdof lit Cabinet.xml en sommeil sans erreur et n’ouvre pas le port des bandes', { skip: !fs.existsSync(REAL_DLL) && 'pas de VPX sur ce poste' }, async () => {
+  const awake = await libdofLog(false);
+  const asleep = await libdofLog(true);
+  assert.match(awake, /Loaded output controller: Teensy/, 'éveillé : libdof charge le Teensy');
+  assert.match(asleep, /0 output controller definitions and 2 toy definitions loaded/, 'en sommeil : ni contrôleur ni bandes, les deux LedWizEquivalent restent');
+  assert.doesNotMatch(asleep, /COM250|Teensy/i, 'en sommeil : libdof ne voit ni le Teensy ni son port');
+  assert.match(asleep, /Config for RomName mbash exists/);
+  assert.doesNotMatch(asleep, /could not|exception|invalid|unknown|warning/i);
 });

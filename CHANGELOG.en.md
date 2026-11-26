@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- "Cyber Pinball LED effects" (Manage the table) now really works: during the game, your LED strips play Cyber Pinball's effects (gradients, comet on launch, the table's colors), just like a table without DOF, instead of staying on DOF. This also applies to ROM tables. Other toys (solenoids, contactors, motors) stay on DOF, and everything goes back exactly as it was at the end of the game or when you turn the option off.
 - New Applications medallion on the wheel, right after the Juke-box: Netflix, YouTube, Twitch, Spotify, your channels, your radio or software in your home (Plex, Home Assistant…) open full screen on the backglass or the playfield, in Microsoft Edge. You sign in to your account the first time and it stays on the cabinet.
 - Start on the medallion opens the grid, on the backglass; the playfield shows the chosen application's card, the controls and the phone QR code. Without a backglass, the grid takes the card's place. The flippers pick, Start opens, Start held 1 s or a MagnaSave opens the application's settings, Exit goes back to the wheel.
 - While an application is open, the cabinet buttons control it (flippers, MagnaSave, Start, plunger) and Exit held 1 s closes it; the phone acts as a D-pad, touchpad and keyboard to sign in or search for a title. The front-end screen dims after 30 seconds without input.

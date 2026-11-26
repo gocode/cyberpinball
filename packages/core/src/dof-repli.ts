@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import type { DofSetup } from './dof';
-import { hasSuspendedStripOutputs, restoreStripOutputs, suspendStripOutputs, type SuspendedOutput } from './dof-remplacement';
+import { hasDofSleep, restoreDofSleep } from './dof-remplacement';
 import type { DofEventClass, DofEventKind } from './dof-evenements-script';
 
 /** Numéro de l'ini et du LedWizEquivalent du repli (libre dans le configtool : 1–94, 120+). */
@@ -552,20 +552,12 @@ export interface DofFallbackInput {
   events?: (rom: string) => DofScriptEvents | undefined;
   /** Rôle des événements de ce script (classifyDofScript) : flippers, éclairage général… */
   classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined;
-  /**
-   * ROM dont les bandes ne suivent que le repli (dof-remplacement.ts) : une ligne pour elles, config riche
-   * ou pas, faite de tous leurs signaux.
-   */
-  replace?: string[];
-  /** Compléter les ROM pauvres (option « Effets LED ajoutés aux tables à ROM ») ; false : seulement `replace`. */
-  complete?: boolean;
 }
 
 export interface DofFallbackPlan {
   /** Contenu de directoutputconfig99.ini ; undefined : rien à ajouter (le fichier est à retirer). */
   content?: string;
-  /** `replaced` : ROM en remplacement, ses effets d'origine sur les bandes neutralisés. */
-  added: { rom: string; key: string; before: number; replaced?: true }[];
+  added: { rom: string; key: string; before: number }[];
   /** ROM laissées telles quelles : leur config a déjà assez d'effets sur les bandes. */
   rich: string[];
 }
@@ -595,13 +587,8 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
   const poorBelow = dofPoorBelow(input.strips.length);
   type Original = { events: string[]; share: number; total: number; classes?: ReadonlyMap<number, DofEventClass> };
   const keys = new Map<string, { rom: string; before: number; triggers: string[]; original?: Original }>();
-  const replace = new Set((input.replace ?? []).filter(Boolean).map((r) => r.toLowerCase()));
-  const roms = [...new Set([...(input.replace ?? []), ...input.roms].filter(Boolean))];
-  // ROM en remplacement d'abord : une ROM complétée qui partage sa clé ne lui prend pas sa ligne.
-  roms.sort((a, b) => Number(replace.has(b.toLowerCase())) - Number(replace.has(a.toLowerCase())) || a.localeCompare(b));
+  const roms = [...new Set(input.roms.filter(Boolean))].sort((a, b) => a.localeCompare(b));
   for (const rom of roms) {
-    const replaced = replace.has(rom.toLowerCase());
-    if (!replaced && input.complete === false) continue;
     const sent = input.events?.(rom);
     const classes = sent?.size ? input.classes?.(rom) : undefined;
     const events = sent?.size ? dofPlayEvents(sent, classes) : undefined;
@@ -615,16 +602,15 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
       // Table originale : jugée sur les événements que son script envoie vraiment, pas sur ceux que la config prévoit.
       const cov = dofOriginalCoverage(input.configs, input.equivalents, stripNames, rom, events);
       before = cov.covered.size;
-      if (!replaced && cov.share >= DOF_ORIGINAL_COVERED) {
+      if (cov.share >= DOF_ORIGINAL_COVERED) {
         plan.rich.push(rom);
         continue;
       }
-      // En remplacement, les effets d'origine ne comptent plus : tous les événements du script, les plus appelés d'abord.
-      const wanted = [...events].filter(([n]) => replaced || !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+      const wanted = [...events].filter(([n]) => !cov.covered.has(n)).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
       original = { events: wanted.slice(0, ORIGINAL_MAX).map(([n]) => `E${n}`), share: cov.share, total: events.size, ...(classes ? { classes } : {}) };
     } else {
       before = dofRomStripEffects(input.configs, input.equivalents, stripNames, rom);
-      if (!replaced && before >= poorBelow) {
+      if (before >= poorBelow) {
         plan.rich.push(rom);
         continue;
       }
@@ -634,7 +620,7 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
     const key = lines[0]?.key ?? rom;
     if (keys.has(key.toLowerCase())) continue;
     keys.set(key.toLowerCase(), { rom, before, triggers: dofRomTriggers(input.configs, rom), ...(original ? { original } : {}) });
-    plan.added.push({ rom, key, before, ...(replaced ? { replaced: true as const } : {}) });
+    plan.added.push({ rom, key, before });
   }
   if (!plan.added.length) return plan;
   const configLines: string[] = [];
@@ -656,8 +642,7 @@ export function planDofFallback(input: DofFallbackInput): DofFallbackPlan {
       n += 3;
     });
     configLines.push(`${a.key},${columns.join(',')}`);
-    if (a.replaced) comments.push(`# ${a.rom}: replaces the ${a.before} LED strip effect(s) of its DOF configuration (chosen for this table), ${info.original ? info.original.events.length : triggers.hits.length + triggers.gi.length} per strip; its other toys keep their configuration.`); // i18n-ignore : fichier lu par DOF
-    else if (info.original) comments.push(`# ${a.rom}: ${a.before} of the ${info.original.total} DOF events of the table script followed on the LED strips (${Math.round(info.original.share * 100)} % of its calls), ${info.original.events.length} added per strip.`); // i18n-ignore : fichier lu par DOF
+    if (info.original) comments.push(`# ${a.rom}: ${a.before} of the ${info.original.total} DOF events of the table script followed on the LED strips (${Math.round(info.original.share * 100)} % of its calls), ${info.original.events.length} added per strip.`); // i18n-ignore : fichier lu par DOF
     else comments.push(`# ${a.rom}: ${a.before} LED strip effect(s) in the configuration, ${triggers.hits.length + triggers.gi.length} added per strip.`); // i18n-ignore : fichier lu par DOF
   }
   plan.content = [
@@ -718,10 +703,8 @@ export interface DofFallbackResult {
   /** Ce qui a changé sur le disque. */
   wrote: boolean;
   removed: boolean;
-  /** Cabinet.xml complété du LedWizEquivalent du repli, ou sorties des bandes mises en sommeil ou rendues. */
+  /** Cabinet.xml complété du LedWizEquivalent du repli, ou bandes en sommeil d'une partie en remplacement rendues. */
   cabinetUpdated: boolean;
-  /** Sorties des bandes du configtool en sommeil pour cette partie (remplacement, dof-remplacement.ts). */
-  suspended: SuspendedOutput[];
   /** Pourquoi rien n'a pu être écrit (Cabinet.xml ou ini 99 écrits à la main). */
   refused?: string;
   plan?: DofFallbackPlan;
@@ -739,11 +722,8 @@ function readText(file: string, encoding: BufferEncoding = 'latin1'): string | u
  * Remet le repli à jour pour ces ROM : complète le Cabinet.xml de Cyber Pinball du LedWizEquivalent 99,
  * écrit directoutputconfig99.ini dans le dossier des ini de libdof (seulement s'il change), ou le retire
  * quand il n'y a rien à ajouter ou que le joueur a coupé l'option. Un fichier sans la marque de Cyber
- * Pinball n'est jamais touché.
- *
- * `replace` : ROM de la table lancée dont les bandes suivent les effets de Cyber Pinball à la place de
- * la config DOF (dof-remplacement.ts), même option coupée ; leurs sorties de bandes du configtool sont
- * mises en sommeil dans Cabinet.xml pour cette partie, et rendues à toute autre remise à jour.
+ * Pinball n'est jamais touché. Des bandes restées en sommeil (partie en remplacement interrompue,
+ * dof-remplacement.ts) sont rendues avant tout.
  */
 export function refreshDofFallback(
   setup: DofSetup,
@@ -753,11 +733,9 @@ export function refreshDofFallback(
     palette?: (rom: string) => string[] | undefined;
     events?: (rom: string) => DofScriptEvents | undefined;
     classes?: (rom: string) => ReadonlyMap<number, DofEventClass> | undefined;
-    replace?: string[];
   },
 ): DofFallbackResult {
-  const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false, suspended: [] };
-  const replace = (opts.replace ?? []).filter(Boolean);
+  const result: DofFallbackResult = { wrote: false, removed: false, cabinetUpdated: false };
   const cabinet = setup.cabinet;
   // Sorties en sommeil d'une partie précédente : rendues avant tout, quoi qu'il arrive ensuite.
   const wake = () => {
@@ -783,7 +761,7 @@ export function refreshDofFallback(
     }
     return result;
   };
-  if ((!opts.enabled && !replace.length) || !cabinet?.strips.length) return remove();
+  if (!opts.enabled || !cabinet?.strips.length) return remove();
   const stripNames = cabinet.strips.map((s) => s.name);
   const cabinetText = readText(cabinet.file, 'utf8');
   if (cabinetText === undefined) return remove();
@@ -803,23 +781,19 @@ export function refreshDofFallback(
     ...(opts.palette ? { palette: opts.palette } : {}),
     ...(opts.events ? { events: opts.events } : {}),
     ...(opts.classes ? { classes: opts.classes } : {}),
-    ...(replace.length ? { replace } : {}),
-    complete: opts.enabled,
   });
   result.plan = plan;
   if (!plan.content) return remove();
-  // Cabinet.xml voulu : LedWizEquivalent du repli, sorties des bandes du configtool en sommeil si la table lancée les remplace.
-  const withFallback = withFallbackEquivalent(restoreStripOutputs(cabinetText), stripNames);
-  const suspension = suspendStripOutputs(withFallback, plan.added.some((a) => a.replaced) ? stripNames : []);
-  if (suspension.xml !== cabinetText) {
+  // Cabinet.xml voulu : LedWizEquivalent du repli, bandes d'une partie en remplacement rendues.
+  const wanted = withFallbackEquivalent(restoreDofSleep(cabinetText), stripNames);
+  if (wanted !== cabinetText) {
     if (!cabinet.owned) {
       result.refused = `${path.basename(cabinet.file)}: hand-written, no LedWizEquivalent ${DOF_FALLBACK_NUMBER} for the fallback effects.`; // i18n-ignore : journal
       return remove();
     }
-    writeFileAtomic(cabinet.file, suspension.xml);
+    writeFileAtomic(cabinet.file, wanted);
     result.cabinetUpdated = true;
   }
-  result.suspended = suspension.suspended;
   if (existing !== plan.content) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, plan.content, 'latin1');
@@ -829,14 +803,14 @@ export function refreshDofFallback(
 }
 
 /**
- * Rend les sorties des bandes mises en sommeil pour une partie en remplacement (fin de partie, ou avant
- * toute autre partie) ; true si Cabinet.xml a changé. Ne touche qu'aux commentaires marqués par Cyber Pinball.
+ * Rend les bandes mises en sommeil pour une partie en remplacement (fin de partie, ou avant toute autre
+ * partie) ; true si Cabinet.xml a changé. Ne touche qu'aux commentaires marqués par Cyber Pinball.
  */
 export function restoreDofReplacement(cabinetFile: string): boolean {
   const text = readText(cabinetFile, 'utf8');
-  if (text === undefined || !hasSuspendedStripOutputs(text)) return false;
+  if (text === undefined || !hasDofSleep(text)) return false;
   try {
-    writeFileAtomic(cabinetFile, restoreStripOutputs(text));
+    writeFileAtomic(cabinetFile, restoreDofSleep(text));
     return true;
   } catch {
     return false; // fichier tenu : rendu à la prochaine remise à jour

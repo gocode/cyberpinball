@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- "Effets LED de Cyber Pinball" (Gérer la table) marche maintenant vraiment : pendant la partie, tes bandes de LED jouent les effets de Cyber Pinball (dégradés, comète au lancer, couleurs de la table), comme pour une table sans DOF, au lieu de rester sur le DOF. Ça vaut aussi pour une table à ROM. Les autres toys (bobines, contacteurs, moteurs) restent sur le DOF, et tout revient exactement comme avant à la fin de la partie ou quand tu coupes l'option.
 - Nouveau médaillon Applications dans la roue, juste après le Juke-box : Netflix, YouTube, Twitch, Spotify, tes chaînes, ta radio ou un logiciel de ta maison (Plex, Home Assistant…) s'ouvrent en plein écran sur le fronton ou sur le playfield, dans Microsoft Edge. La connexion à ton compte se fait à la première ouverture et reste sur la borne.
 - Start sur le médaillon ouvre la grille, au fronton ; le playfield montre la fiche de l'application choisie, les commandes et le QR du téléphone. Sans fronton, la grille prend la place de la fiche. Les flippers choisissent, Start ouvre, Start tenu 1 s ou un MagnaSave ouvre les réglages de l'application, Exit revient à la roue.
 - Pendant l'application, les boutons de la borne la pilotent (flippers, MagnaSave, Start, lanceur) et Exit tenu 1 s la ferme ; le téléphone sert de croix, de pavé tactile et de clavier pour te connecter ou chercher un titre. L'écran du front-end s'assombrit après 30 secondes sans geste.

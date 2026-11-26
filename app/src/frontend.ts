@@ -516,7 +516,7 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createLedService } from './led-live';
-import { capDofLeds, loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame } from './dof-evenements-jeu';
+import { capDofLeds, loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame, type DofTapMode } from './dof-evenements-jeu';
 import { ledsHaveRom, rememberPinmame, rememberedPinmame, watchPinmame } from './led-rom';
 import { installationHintsIfKnown } from './installation-hints';
 import { createLedAnimations } from './led-animations';
@@ -1478,16 +1478,12 @@ function refreshRomFallback(table: TableEntry, original?: string): void {
     const p = dofScenePalette(tint, tints?.current()?.leds);
     const colors = [p.primary, p.accent, p.secondary].map((c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`);
     const playedSet = new Set(played.map((r) => r.toLowerCase()));
-    const replace = dofReplace.isOn(table);
     const result = refreshDofFallback(setup, [...libraryRomsMemo.roms, ...played], {
       enabled: loadEventSettings(loc.dataDir).romFallback !== false,
       ...(tint ? { palette: (rom: string) => (playedSet.has(rom.toLowerCase()) ? colors : undefined) } : {}),
       ...(original && events?.size ? { events: (rom: string) => (rom.toLowerCase() === original.toLowerCase() ? events : undefined), classes: () => classes } : {}),
-      // « Effets LED de Cyber Pinball » choisi pour la table (dof-remplacement.ts) : ses bandes ne suivent que le repli.
-      ...(replace ? { replace: played } : {}),
     });
     if (result.refused) console.warn(`[dof] repli : ${result.refused}`);
-    if (replace) console.log(`[dof] remplacement : ${played.join(', ')} ; ${result.suspended.length} sortie(s) de bandes du configtool en sommeil pour cette partie.`); // i18n-ignore : journal
     if (result.wrote || result.removed || result.cabinetUpdated) {
       const added = result.plan?.added.filter((a) => playedSet.has(a.rom.toLowerCase())) ?? [];
       console.log(`[dof] repli ${result.removed ? 'retiré' : 'écrit'} (${result.file}) : ${result.plan?.added.length ?? 0} ROM complétée(s), ${result.plan?.rich.length ?? 0} laissée(s) ; table lancée : ${added.map((a) => `${a.rom} (${a.before} effet(s) d'origine)`).join(', ') || 'config riche'}.`);
@@ -6653,21 +6649,29 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Jamais dans le casque : ses variables (roomEnv) et celles de l'écoute ne se croisent donc pas.
   const hasRom = hasRomOf(table);
   const ledGame = simulated === undefined && !displayMode && !otherVpx && !vrGame;
-  const dofMode = ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table) }) : undefined;
   const ledAbout = () => ({ script: tableScriptText(table), ...(tints?.current()?.color ? { color: tints.current()!.color } : {}), ...(tints?.current()?.leds?.length ? { colors: tints.current()!.leds! } : {}) });
-  // Au journal, le mode LED de chaque partie (25/11/2026 : une table à ROM jouée en effets sans ROM, sans trace).
-  if (ledGame && hasRom) console.log(`LED de la partie : DOF de VPX (ROM ${romsOf(table).join(', ') || 'au nom inconnu'}).`); // i18n-ignore : journal
-  else if (ledGame && !dofMode) console.log('LED de la partie : aucun effet (table sans ROM ; effets sans ROM coupés, ou pas de bandes décrites).'); // i18n-ignore : journal
+  // Bandes restées en sommeil (partie en remplacement interrompue) : rendues avant toute lecture de Cabinet.xml.
+  if (simulated === undefined) dofReplace.afterGame();
   // Le fichier d'écoute de toute partie aux LED, table à ROM comprise : si PinMAME n'y démarre pas, la partie
   // passe aux effets sans ROM sur ce fichier (led-rom.ts).
   const ledTap = ledGame ? openTap(install.exe) : undefined;
   // Avant que libdof ne lise Cabinet.xml (ROM, relais, casque compris) : le plafond des effets en partie sur ses bandes.
   if (simulated === undefined && capDofLeds(readDof(loc)?.cabinet, loc.dataDir, (line) => console.log(line))) dofSetupMemo = undefined;
+  // « Effets LED de Cyber Pinball » choisi pour la table (dof-remplacement.ts) : bandes et contrôleur en sommeil
+  // dans Cabinet.xml, le moteur sans DOF les prend pour la partie, ROM ou pas ; les autres toys restent à DOF.
+  const replaced = ledGame ? dofReplace.beforeGame(table, Boolean(ledTap)) : false;
+  if (replaced) dofSetupMemo = undefined;
+  const dofMode: DofTapMode | undefined = replaced ? { kind: 'generique' } : ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table) }) : undefined;
+  // Au journal, le mode LED de chaque partie (25/11/2026 : une table à ROM jouée en effets sans ROM, sans trace).
+  if (replaced) console.log(`LED de la partie : effets de Cyber Pinball à la place du DOF de la table (${hasRom ? `ROM ${romsOf(table).join(', ') || 'au nom inconnu'}` : 'sans ROM'}).`); // i18n-ignore : journal
+  else if (ledGame && hasRom) console.log(`LED de la partie : DOF de VPX (ROM ${romsOf(table).join(', ') || 'au nom inconnu'}).`); // i18n-ignore : journal
+  else if (ledGame && !dofMode) console.log('LED de la partie : aucun effet (table sans ROM ; effets sans ROM coupés, ou pas de bandes décrites).'); // i18n-ignore : journal
   // Avant que libdof ne lise sa config : le repli complète celle d'une table originale qui suit peu ses événements.
   if (dofMode?.kind === 'relais' && ledTap) refreshRomFallback(table, dofMode.rom);
-  let dofTap = dofMode && ledTap ? startTap(dofTapDeps, install.exe, dofMode, played.file, ledAbout(), { tap: ledTap }) : undefined;
+  // Remplacement : le port a pu être rendu à DOF au chargement (broadcast) : le moteur le reprend.
+  let dofTap = dofMode && ledTap ? startTap(dofTapDeps, install.exe, dofMode, played.file, ledAbout(), { tap: ledTap, ...(replaced ? { takeBack: true } : {}) }) : undefined;
   gameLeds = simulated === undefined ? (dofTap ?? 'dof') : undefined;
-  if (simulated === undefined && !displayMode && !otherVpx && romsOf(table).length) refreshRomFallback(table);
+  if (!replaced && simulated === undefined && !displayMode && !otherVpx && romsOf(table).length) refreshRomFallback(table);
   const dofTapEnv = ledTap ? { env: ledTap.env } : {};
   // vpinball.log dit si PinMAME a vraiment démarré : une table crue à ROM qui ne le lance pas passe aux effets
   // sans ROM, une table crue sans ROM qui le lance rend le port à DOF ; le constat est gardé pour la table.
@@ -6679,6 +6683,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         onVerdict: (pinmame) => {
           if (pinmame === hasRom || gameLeds === undefined) return;
           rememberPinmame(loc.dataDir, table.file, pinmame);
+          // Remplacement : le moteur de Cyber Pinball garde les bandes, que PinMAME tourne ou non.
+          if (replaced) return void console.log(`LED de la partie : PinMAME ${pinmame ? 'a démarré' : "n'a pas démarré"} (vpinball.log) ; remplacement : le moteur Cyber Pinball garde les bandes.`); // i18n-ignore : journal
           if (!pinmame) {
             const mode = tapMode(dofTapDeps, { hasRom: false, b2sName: b2sNameOf(table) });
             console.log(`LED de la partie : PinMAME n'a pas démarré (vpinball.log), table retenue sans ROM pour les LED : ${mode ? (mode.kind === 'relais' ? 'relais vers libdof' : 'effets sans ROM') : 'aucun effet (effets sans ROM coupés, ou pas de bandes décrites)'}.`); // i18n-ignore : journal
