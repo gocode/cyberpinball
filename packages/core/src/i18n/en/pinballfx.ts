@@ -3,6 +3,16 @@
 // Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
   // app/src/frontend.ts
+  'Mode de jeu': 'Game mode',
+  '1 joueur': '1 player',
+  '{count} joueurs': '{count} players',
+  'Autres modes': 'Other modes',
+  'Entraînement': 'Practice',
+  'Défi · Billes limitées': 'Challenge · Limited balls',
+  'Défi · Temps limité': 'Challenge · Time limit',
+  'Défi · Distance limitée': 'Challenge · Distance limit',
+  'Défi · Coups de flipper limités': 'Challenge · Limited flips',
+  'Retour au choix des joueurs': 'Back to player selection',
   'Le cadrage d’une table de {game} se règle dans le jeu (mode borne).': 'A {game} table’s framing is set in the game (cabinet mode).',
   'La fiche de cette table ne dit pas quelle table de {game} ouvrir.': 'This table’s entry doesn’t say which {game} table to open.',
   '{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».': '{game} isn’t installed on this PC. System menu > Tables > Add a table > "Install {game}".',

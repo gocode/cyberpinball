@@ -83,6 +83,7 @@ import {
   zenFromPinballFx,
   zenFromPinballFx3,
   zenTableOfEntry,
+  type PinballFxGameMode,
   pinballFxVpsImage,
   pickNamedMedia,
   parseSizeText,
@@ -308,6 +309,7 @@ import { vpxCorrigeInPlace } from './vpx-corrige';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { openPinballFxStore, zenSetup, type ZenSetup } from './pinballfx-install';
+import { openPinballFxModes } from './pinballfx-modes';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
@@ -2608,6 +2610,8 @@ export function createLibrary(host: LibraryHost) {
         const s = screen as Extract<Screen, { kind: 'notice' }>;
         return { heading: s.heading, sections: [{ rows: s.lines.map((text) => ({ text })) }], actions: [{ label: t('Continuer'), run: s.then }], back: s.then };
       }
+      case 'pinballFxModes':
+        return screen!.build();
       case 'custom':
         return (screen as Extract<Screen, { kind: 'custom' }>).build();
       case 'prompt': {
@@ -2807,6 +2811,12 @@ export function createLibrary(host: LibraryHost) {
     const watch = manage.filter((a) => a.tone === 'warning').map((a) => a.label);
     // Côté joueurs (table-social.ts) : « Sur cette table » à la place des fichiers, qui restent dans « Gérer la table… ».
     const social = host.tableSocial && !localPlay() ? kept('joueurs', () => host.tableSocial!(table, () => openSheet(table))) : undefined;
+    const launch = (fxGameMode?: PinballFxGameMode) => {
+      screen = undefined;
+      sheetReturn = undefined;
+      sheetManage = undefined;
+      host.play(table, fxGameMode);
+    };
     const actions: SheetAction[] = [
       ...missing,
       ...(social?.first.map((a): SheetAction => ({ ...a, door: 'sheet.instant' })) ?? []),
@@ -2816,11 +2826,9 @@ export function createLibrary(host: LibraryHost) {
         icon: 'play',
         door: 'sheet.play',
         run: () => {
-          screen = undefined;
-          sheetReturn = undefined;
-          sheetManage = undefined;
-          host.play(table);
+          if (!openPinballFxModes(table, launch, (build) => go({ kind: 'pinballFxModes', build, file: table.file }), openSheet)) launch();
         },
+        runFromPhone: () => launch(),
       },
       // « Jouer ensemble… » regroupe ami et partie en direct (table-social.ts) ; sans lui, les deux entrées d'avant.
       ...(social
@@ -5592,11 +5600,9 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Touches et souris ----------
 
-  function handleKey(input: Input): boolean {
+  function handleKey(input: Input, fromPhone = false): boolean {
     if (!screen) return false;
     if (busy) return true;
-    const KEYS = host.keys();
-    const is = (group: string[]) => group.includes(input.code);
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       // Toute touche d'une saisie est un geste : sa validation pose le message qui suit (gesture-flash.ts).
       userGesture();
@@ -5616,6 +5622,10 @@ export function createLibrary(host: LibraryHost) {
       }
     }
     const built = build();
+    const pickingPlayers = screen.kind === 'pinballFxModes';
+    const KEYS = (pickingPlayers ? host.playerModeKeys?.() : undefined) ?? host.keys();
+    const is = (group: string[]) => group.includes(input.code);
+    if (pickingPlayers && (fromPhone || (input.isAutoRepeat && is(KEYS.confirm)))) return true;
     // Déplacer la sélection ou faire défiler n'est pas un geste : le message de l'écran reste (gesture-flash.ts).
     const navigation = is(KEYS.previous) || is(KEYS.next) || input.code === CONFIG_KEY || (host.zoneKeys?.() ?? []).includes(input.code) || PAGE_KEYS[input.code] !== undefined;
     if (built.keys && !navigation) userGesture();
@@ -5674,7 +5684,8 @@ export function createLibrary(host: LibraryHost) {
         userGesture();
         if (built.actions[cursor]?.run === built.back) expectBack();
         const before = screen;
-        afterRun(runAction(built.actions[cursor]?.run, built.back), before);
+        const selected = built.actions[cursor];
+        afterRun(runAction(fromPhone ? selected?.runFromPhone ?? selected?.run : selected?.run, built.back), before);
       }
     }
     // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
@@ -5694,7 +5705,7 @@ export function createLibrary(host: LibraryHost) {
       reading.active = false;
       userGesture();
       const before = screen;
-      afterRun(runAction(hit.run, built.back), before);
+      afterRun(runAction(fromPhone ? hit.runFromPhone ?? hit.run : hit.run, built.back), before);
     }
     host.broadcast();
     return true;
@@ -6021,7 +6032,7 @@ export function createLibrary(host: LibraryHost) {
     } else e.armed = true;
   }
 
-  function handleAction(action: UiAction): void {
+  function handleAction(action: UiAction, fromPhone = false): void {
     // Mesure du texte : même pendant une opération, sinon elle serait perdue (le rendu ne la renvoie qu'au changement).
     if (action.type === 'reading') {
       if (!screen) return;
@@ -6044,7 +6055,7 @@ export function createLibrary(host: LibraryHost) {
       else startImport(action.paths, 'copy');
       return;
     }
-    if (!screen) return;
+    if (!screen || (fromPhone && screen.kind === 'pinballFxModes')) return;
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       userGesture();
       pressKey(screen, action.index);
@@ -6109,7 +6120,8 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
       if (built.actions[index]!.run === built.back) expectBack();
       const before = screen;
-      afterRun(runAction(built.actions[index]!.run, built.back), before);
+      const selected = built.actions[index]!;
+      afterRun(runAction(fromPhone ? selected.runFromPhone ?? selected.run : selected.run, built.back), before);
     }
   }
 
@@ -6417,7 +6429,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** En tête de la page du téléphone : l'écran affiché et ce qui y est choisi. */
   function remoteScreen(): { title: string; item?: string } | undefined {
-    if (!screen) return undefined;
+    if (!screen || screen.kind === 'pinballFxModes') return undefined;
     const built = build();
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return { title: built.heading, item: screen.editor.label };
     const ids = actionIds(built.actions);
@@ -6432,7 +6444,7 @@ export function createLibrary(host: LibraryHost) {
    * Une liste de choix du clavier à l'écran (fabricant) y est aussi ; une opération en cours, rien.
    */
   function remoteEntries(): MenuEntries | undefined {
-    if (!screen) return undefined;
+    if (!screen || screen.kind === 'pinballFxModes') return undefined;
     const built = build();
     const icon = built.icon ?? (TABLE_SCREENS.includes(screen.kind) ? undefined : section);
     if (busy) return { kind: 'busy', title: built.heading, ...(icon ? { icon } : {}), items: [], current: -1, note: busy };
@@ -6493,8 +6505,8 @@ export function createLibrary(host: LibraryHost) {
           // Une page hors de la borne (« Nous suivre ») : le téléphone l'ouvre lui-même.
           ...(a.link ? { link: a.link } : {}),
           // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
-          pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
-          focus: () => handleAction({ type: 'focus', index, id: ids[index] }),
+          pick: () => handleAction({ type: 'activate', index, id: ids[index] }, true),
+          focus: () => handleAction({ type: 'focus', index, id: ids[index] }, true),
         };
       }),
       current: followCursor(ids, cursor, screen, anchor),

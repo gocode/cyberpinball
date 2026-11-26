@@ -180,7 +180,7 @@ test('accès direct : mêmes portes que la borne, rien ne se déverrouille du t�
   assert.match(frontend, /function remoteOpen\(id: string\): void \{\s*const target = remoteMenuTarget\(id\);\s*if \(!target\)/);
   assert.match(frontend, /if \(!guest\.allows\('menu\.system'\)\) return void console\.log/);
   // Les entrées d'un écran : celles que la borne montre (déjà filtrées par les portes), par le chemin d'un clic.
-  assert.match(library, /pick: \(\) => handleAction\(\{ type: 'activate', index, id: ids\[index\] \}\)/);
+  assert.match(library, /pick: \(\) => handleAction\(\{ type: 'activate', index, id: ids\[index\] \}, true\)/);
   assert.match(library, /const built = build\(\);\s*const icon = built\.icon/);
   // La roue : les portes de la roue (choisir, puis la fiche ou Jouer par wheelConfirm).
   assert.match(frontend, /function remotePickTable\([\s\S]*?wheelConfirm\(tables\[index\]!, !wheelPlays\(\)\)[\s\S]*?if \(!guest\.knock\('menu\.choose'\)\) return;/);

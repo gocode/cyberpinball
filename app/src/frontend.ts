@@ -63,6 +63,7 @@ import {
   joystickButton,
   keyLabel,
   interfaceKeys,
+  navigationKeys,
   collectionKeys as cabinetCollectionKeys,
   menuButton,
   zoneSwitchKeys,
@@ -115,6 +116,7 @@ import {
   FRAMING_STYLE_KEYS,
   ownedId,
   pinballFxCommand,
+  type PinballFxGameMode,
   pinballFx3DirectFailureHint,
   pinballFx3FirstRunMessage,
   pinballFx3OrientationChange,
@@ -1520,9 +1522,9 @@ const library = createLibrary({
   reload: (file) => reloadTables(file),
   enter: () => (state = { ...state, phase: 'library', help: false, message: undefined }),
   leave: () => (state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() }),
-  play: (table) => {
+  play: (table, fxGameMode) => {
     // Sans opérateur, la partie s'arrête seule après 10 s, ou CYBERPINBALL_PARTIE_MS (et ne compte pas dans les statistiques).
-    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
+    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined, undefined, { fxGameMode });
   },
   // Jouer et enregistrer : la même partie, l'enregistrement armé ; son écran s'ouvre au retour.
   playAndRecord: (table, settings) => {
@@ -1571,6 +1573,7 @@ const library = createLibrary({
   framing: () => framingHost,
   quit: () => void quit(),
   keys: () => KEYS,
+  playerModeKeys: () => navigationKeys({ buttons }),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   windows: () => windows,
   landscape: () => playfieldLandscape(),
@@ -5503,7 +5506,7 @@ function handleKey(input: Input, fromPhone = false): boolean {
     case 'playing':
       return true;
     case 'library':
-      return library.handleKey(input);
+      return library.handleKey(input, fromPhone);
     // Juke-box : flippers, Start, MagnaSave, Exit (jukebox-player.ts), qui redessine lui-même.
     case 'jukebox':
       return jukeboxPlayer.handleKey(input);
@@ -5775,7 +5778,7 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
  * scores lus dans la ROM) : le jeu règle lui-même ses écrans et son DMD dans son mode borne. La partie compte dans les
  * statistiques de la table ; son score n'est pas lisible, ni tableau ni classement.
  */
-async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined, firstRunSeen = false): Promise<PlayReport | undefined> {
+async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefined, mode: 'display' | undefined, simulated: string | undefined, firstRunSeen = false, fxGameMode?: PinballFxGameMode): Promise<PlayReport | undefined> {
   // Pinball FX ou Pinball FX3 (17/11/2026) : même partie, chacun sa détection et sa commande.
   // Future Pinball (19/11/2026) aussi : sa détection, sa commande et ses messages dans futurepinball-play.ts.
   const fp = table.emulator === 'futurepinball' ? futurePinballPlan(table, { simulated, mode, install: simulated === undefined ? detectFuturePinball(loc.dataDir, loc.root) : undefined }) : undefined;
@@ -5973,7 +5976,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const command: { file: string; args: string[]; cwd?: string; bam?: true } | undefined = fp
     ? fp.command
     : fx && table.pinballFxTable !== undefined
-      ? pinballFxCommand(fx, table.pinballFxTable)
+      ? pinballFxCommand(fx, table.pinballFxTable, fxGameMode)
       : fx3 && table.pinballFx3Table !== undefined
         ? pinballFx3LaunchCommand(fx3, table.pinballFx3Table)
         : undefined;
@@ -6132,7 +6135,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}, reserved?: symbol, firstRunSeen = false): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate; fxGameMode?: PinballFxGameMode } = {}, reserved?: symbol, firstRunSeen = false): Promise<PlayReport | undefined> {
   if (surprise.busy || state.phase === 'loading' || state.phase === 'playing') return undefined;
   if (reserved && !launchReservation.owns(reserved)) return undefined;
   const owner = reserved ?? launchReservation.reserve();
@@ -6204,7 +6207,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
   // Table de Future Pinball : la même partie, sa commande à lui (futurepinball-play.ts).
-  if (isZenEmulator(table.emulator) || table.emulator === 'futurepinball') return await playPinballFx(table, autoStopAfterMs, mode, simulated, firstRunSeen);
+  if (isZenEmulator(table.emulator) || table.emulator === 'futurepinball') return await playPinballFx(table, autoStopAfterMs, mode, simulated, firstRunSeen, hooks.fxGameMode);
   if (!install) return undefined;
   const otherRefused = otherVpx && otherVpxRefusal(otherVpx, { exists: simulated !== undefined || fs.existsSync(otherVpx.exe), display: mode === 'display', friends: Boolean(hooks.double) });
   if (otherRefused) {
