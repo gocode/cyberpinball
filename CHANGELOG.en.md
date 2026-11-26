@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Surprise table (beta, contributed by lechable472-cloud): on the wheel, hold both flippers for 1.5 seconds to draw a random table from the active collection, with a logo lottery on the playfield; the game starts when you release both flippers. Exit or a MagnaSave cancels.
+- Only tables you have allowed take part in the draw: table sheet, Manage table > Surprise table. Guest mode only draws tables marked family-friendly.
+- During a game, joystick buttons no longer go to the front-end, so it no longer takes the foreground back from VPX.
 - LEDs: a table is no longer treated as a ROM table just because its script calls VPinMAME; it needs its ROM name and the ROM file on the cabinet. Original tables that copy that code without a ROM (Stranger Things, for example) get their no-ROM effects back instead of dark LEDs.
 - LEDs: during the game, Cyber Pinball checks the VPX log to confirm that PinMAME really started. If not, the game switches to the no-ROM effects; conversely, a table that starts PinMAME hands the LEDs back to DOF. The finding is remembered for the table until its file changes.
 - LEDs (original tables relayed to DOF: The Matrix, City Hunter, JP's Space Cadet…): the script's DOF pulses, which are nearly all of their effects, finally reach DOF. They were lost, hence nearly silent LEDs.

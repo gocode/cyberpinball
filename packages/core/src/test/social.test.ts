@@ -89,7 +89,7 @@ test('annuaire : le profil le plus récent l’emporte, recherche sans accents, 
   const now = new Date();
   let dir = mergeDirectory([], [signProfile(alexis), signProfile(alexia), signProfile(eloise), signProfile(me)], { self: me.key.publicKey, now });
   assert.equal(dir.length, 3, 'sa propre clé n’entre pas');
-  const renamed = setName({ ...alexis, nameAt: new Date(now.getTime() + 1000).toISOString() }, 'Juju')!;
+  const renamed = setName(alexis, 'Juju', new Date(now.getTime() + 1000))!;
   dir = mergeDirectory(dir, [signProfile(renamed)], { self: me.key.publicKey, now });
   dir = mergeDirectory(dir, [signProfile(alexis)], { self: me.key.publicKey, now });
   assert.equal(dir.find((d) => d.profile.key === alexis.key.publicKey)!.profile.name, 'Juju', 'un profil plus ancien ne revient pas');

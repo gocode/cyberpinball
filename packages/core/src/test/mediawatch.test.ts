@@ -80,7 +80,10 @@ test('guet des dossiers : un logo posé dans medias\\ prévient le menu, une raf
     fs.appendFileSync(wheel, Buffer.alloc(16));
     const first = await nextChange(seen, 0);
     assert.ok(first, 'le guet a vu le logo');
-    assert.deepEqual([...first], ['medias']);
+    assert.ok(first.has('medias'), 'la modification du logo redemande les médias');
+    // Windows peut aussi notifier le dossier parent sans extension : le guet demande alors,
+    // par précaution, un inventaire des tables dans la même rafale.
+    assert.ok([...first].every((change) => change === 'medias' || (process.platform === 'win32' && change === 'tables')));
     await wait(300);
     assert.equal(seen.length, 1, 'une rafale, un seul appel');
 

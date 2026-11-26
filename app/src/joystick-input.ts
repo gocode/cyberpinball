@@ -39,7 +39,7 @@ export type JoystickStatus =
 type Listener = (input: Input) => void;
 
 /** Fenêtres qui reçoivent les boutons, par ordre d'inscription. */
-const listeners = new Map<BrowserWindow, Listener>();
+const listeners = new Map<BrowserWindow, { listener: Listener; accepts: () => boolean }>();
 let reader: JoystickReader | undefined;
 let status: JoystickStatus = { state: 'off' };
 let timer: NodeJS.Timeout | undefined;
@@ -49,10 +49,11 @@ const held = new Map<string, number>();
 
 /**
  * Remet à `listener` les boutons du joystick appuyés et relâchés pendant que `win` a le
- * focus, sous la forme d'un Input de before-input-event (keyDown, keyUp).
+ * focus, sous la forme d'un Input de before-input-event (keyDown, keyUp). `accepts` peut
+ * suspendre une fenêtre sans couper les observateurs globaux (Exit, réglages en partie).
  */
-export function onJoystickInput(win: BrowserWindow, listener: Listener): void {
-  listeners.set(win, listener);
+export function onJoystickInput(win: BrowserWindow, listener: Listener, accepts: () => boolean = () => true): void {
+  listeners.set(win, { listener, accepts });
   win.once('closed', () => listeners.delete(win));
   start();
 }
@@ -204,9 +205,9 @@ function open(): void {
 /** Fenêtre qui reçoit les boutons : celle qui a le focus ; hors écran, la dernière affichée. */
 function target(): BrowserWindow | undefined {
   const focused = BrowserWindow.getFocusedWindow();
-  if (focused && listeners.has(focused)) return focused;
+  if (focused && listeners.has(focused)) return listeners.get(focused)!.accepts() ? focused : undefined;
   if (!OFFSCREEN) return undefined;
-  return [...listeners.keys()].reverse().find((w) => !w.isDestroyed() && isShown(w));
+  return [...listeners.keys()].reverse().find((w) => !w.isDestroyed() && isShown(w) && listeners.get(w)!.accepts());
 }
 
 function send(code: string, type: 'keyDown' | 'keyUp', isAutoRepeat = false): void {
@@ -214,7 +215,7 @@ function send(code: string, type: 'keyDown' | 'keyUp', isAutoRepeat = false): vo
   if (!win) return;
   // Le clavier va là où vont les boutons du joystick.
   if (type === 'keyDown' && !isAutoRepeat) keyboardFollows(win, `le bouton ${code} du joystick allait à Cyber Pinball`); // i18n-ignore : console
-  listeners.get(win)!({ type, code, key: '', isAutoRepeat, shift: false, control: false, alt: false, meta: false } as Input);
+  listeners.get(win)!.listener({ type, code, key: '', isAutoRepeat, shift: false, control: false, alt: false, meta: false } as Input);
 }
 
 function tick(): void {

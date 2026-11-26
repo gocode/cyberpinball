@@ -1,0 +1,17 @@
+/* Même repère logique que le plateau, y compris sa zone et ses quatre orientations. */
+#table-surprise { position: fixed; z-index: 90; top: calc(var(--pf-y, 0) * 100vh); left: calc(var(--pf-x, 0) * 100vw); width: calc(var(--pf-w, 1) * 100vw); height: calc(var(--pf-h, 1) * 100vh); container-type: size; background: #030610ed; display: grid; place-items: center; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+#table-surprise[hidden] { display: none; }
+html[data-rotation='90'] #table-surprise,
+html[data-rotation='180'] #table-surprise,
+html[data-rotation='270'] #table-surprise { top: calc((var(--pf-y, 0) + var(--pf-h, 1) / 2) * 100vh); left: calc((var(--pf-x, 0) + var(--pf-w, 1) / 2) * 100vw); width: var(--turned-width); height: var(--turned-height); transform: translate(-50%, -50%) rotate(var(--turned)); }
+.surprise-panel { width: 92%; text-align: center; color: var(--ink); padding: 4cqw 0; border-block: 1px solid var(--signal); }
+.surprise-panel h1 { font-size: clamp(1.5rem, 6cqw, 4.5rem); margin: 0 0 4cqh; }
+.surprise-reel { height: 35cqh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: 2cqw; align-items: center; overflow: hidden; }
+.surprise-item { min-width: 0; opacity: .35; transform: scale(.75); display: flex; flex-direction: column; justify-content: center; align-items: center; max-height: 100%; }
+.surprise-item.surprise-chosen { opacity: 1; transform: none; animation: surprise-arrive 120ms ease-out; }
+@keyframes surprise-arrive { from { transform: translateY(-8%); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .surprise-item.surprise-chosen { animation: none; } }
+.surprise-item img { max-width: 100%; max-height: 25cqh; object-fit: contain; }
+.surprise-title { font-size: clamp(1.125rem, 4cqw, 3rem); overflow-wrap: anywhere; padding: 1cqh; }
+.surprise-title.surprise-with-logo { font-size: clamp(.875rem, 2cqw, 1.75rem); }
+.surprise-hint { font-size: clamp(.875rem, 2.8cqw, 2rem); margin: 4cqh 3cqw 0; }

@@ -418,6 +418,9 @@ import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { collectionsPoster, createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
+import { LaunchReservation, SurpriseGesture, SurpriseSession, guestUnlockSlots } from '@cyberpinball/core';
+import { createSurpriseCatalog, type SurpriseEngine } from './table-surprise';
+import { hkcuValue } from '@cyberpinball/win-displays';
 import { createFriendsMenu } from './friends-menu';
 import { createChatService } from './chat-service';
 import { deleteAccount, eraseAccountFiles } from './account-delete';
@@ -680,6 +683,7 @@ function cancelWheelPress(): void {
 
 /** Start sur la roue : la fiche (réglage par défaut), ou la partie de la table choisie. */
 function wheelConfirm(table: TableEntry, sheet: boolean): void {
+  if (surprise.busy || launchReservation.busy) return;
   cancelWheelPress();
   if (sheet) {
     if (guest.knock('menu.sheet')) library.openSheet(table);
@@ -1098,6 +1102,76 @@ const collections = createCollectionsMenu({
   redraw: () => broadcast(),
 });
 
+const launchReservation = new LaunchReservation();
+function surpriseContext(): string | undefined {
+  if (state.phase !== 'menu' || state.help || closing || desktop.active || attract.active || levelMomentAt || vrFront.controllerWizard || vrFront.calibration) return undefined;
+  const collection = collections.exact();
+  return JSON.stringify([guest.active, guest.collection, collection?.id, collection?.tables.map((table) => table.id) ?? []]);
+}
+function surpriseEngine(table: TableEntry): SurpriseEngine | undefined {
+  if (table.emulator === 'vpx') {
+    const other = otherVpxFor(table.info, readOtherVpx(loc.dataDir));
+    const engine = other ?? vpxInstall(loc);
+    const format = readVpxFileVersion(table.file);
+    if (!engine?.version || format === undefined || (other && otherVpxRefusal(other, { exists: fs.existsSync(other.exe), display: false, friends: false })) || tableTooNew(format, table.info, vpxInstall(loc)?.version, readOtherVpx(loc.dataDir))) return undefined;
+    return { files: [engine.exe], identity: engine.exe, romDirs: [path.join(table.folder, 'pinmame', 'roms'), path.join(path.dirname(engine.exe), 'VPinMAME', 'roms'), ...(loc.root ? [path.join(loc.root, 'pinmame', 'roms')] : [])] };
+  }
+  if (table.emulator === 'futurepinball') {
+    const engine = detectFuturePinball(loc.dataDir, loc.root);
+    if (!engine || futurePinballPlan(table, { install: engine }).why) return undefined;
+    return { files: [engine.exe, ...(engine.loader ? [engine.loader] : [])], identity: engine.loader ?? engine.exe };
+  }
+  if (table.emulator === 'pinballfx') {
+    const engine = detectPinballFx();
+    // Une confirmation de droits ne vaut que pour le compte Steam actif.
+    const account = engine?.store === 'steam' ? hkcuValue('Software\\Valve\\Steam\\ActiveProcess', 'ActiveUser') : undefined;
+    if (engine?.store === 'steam' && typeof account === 'number' && account > 0) return { files: [engine.launcher], identity: JSON.stringify([engine.store, engine.gameDir, engine.launcher, account]) };
+  }
+  return undefined;
+}
+const surpriseCatalog = createSurpriseCatalog({
+  dataDir: loc.dataDir, guest: () => guest.active, engine: surpriseEngine,
+  wheel: (table) => medias?.wheel(table), library: { openCustom: (build) => library.openCustom(build) },
+  changed: () => { surprise.cancel(); broadcast(); },
+});
+const surprise = new SurpriseSession({
+  gate: launchReservation, context: surpriseContext,
+  candidates: async () => surpriseCatalog.candidates(collections.exact()?.tables ?? []),
+  recheck: async (id) => {
+    const table = collections.exact()?.tables.find((entry) => entry.id === id);
+    return Boolean(table && surpriseCatalog.eligible(table));
+  },
+  released: () => surpriseGesture.released,
+  launch: async (id, reservation) => {
+    const table = collections.exact()?.tables.find((entry) => entry.id === id);
+    if (table) await play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined, undefined, {}, reservation);
+  },
+  changed: () => broadcast(),
+  empty: () => {
+    state = { ...state, phase: 'message', help: false, message: { title: t('Aucune table éligible'), lines: [t('Cette collection ne contient aucune table autorisée dont les prérequis sont confirmés. Un administrateur peut les vérifier dans Gérer la table > Table surprise.'), t('Start ou Exit : revenir au front-end.')] } };
+    broadcast();
+  },
+  failed: () => {
+    state = { ...state, phase: 'message', help: false, message: { title: t('Table surprise interrompue'), lines: [t('Le tirage a été interrompu. Vérifie les prérequis de la table avant de réessayer.'), t('Start ou Exit : revenir au front-end.')] } };
+    broadcast();
+  },
+});
+const surpriseGesture = new SurpriseGesture({
+  left: () => guestUnlockSlots(buttons).find((slot) => slot.button === 'leftFlipper')!.codes,
+  right: () => guestUnlockSlots(buttons).find((slot) => slot.button === 'rightFlipper')!.codes,
+  magna: () => guestUnlockSlots(buttons).filter((slot) => slot.button === 'leftMagna' || slot.button === 'rightMagna').flatMap((slot) => slot.codes),
+  allowed: () => Boolean(surpriseContext()),
+  trigger: () => { cancelWheelPress(); void surprise.start(); },
+  cancel: (reason) => {
+    surprise.cancel();
+    if (reason === 'magna' || (reason === 'reset' && state.phase === 'menu')) launchReservation.cancelPending();
+  },
+  released: () => { void surprise.release(); },
+});
+function surpriseCancelKey(code: string): boolean {
+  return KEYS.exit.includes(code) || guestUnlockSlots(buttons).some((slot) => (slot.button === 'leftMagna' || slot.button === 'rightMagna') && slot.codes.includes(code));
+}
+
 /**
  * Disposition du menu sur le playfield : au bureau (zone en largeur, vue du joueur) ou en borne
  * (en hauteur), comme le rendu la choisit (frontend.js, syncMenuShape).
@@ -1463,6 +1537,7 @@ const library = createLibrary({
   menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
   // « Ajouter à une collection… » sur la fiche (library, créée plus bas, n'est lue qu'à l'appel).
   tableCollections: (table, back) => tableCollectionsAction({ collections, library, redraw: () => broadcast() })(table, back),
+  tableSurprise: (table, back) => surpriseCatalog.action(table, back),
   favorite: (table, on) => {
     if (!loc.root) return;
     setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
@@ -2010,6 +2085,7 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
 
 /** Un toucher sur la liste du téléphone : comme un clic à la borne, il met d'abord fin au mode attente (et à l'ouverture). */
 function remoteWakes(): boolean {
+  if (surprise.busy || (state.phase === 'menu' && launchReservation.busy)) return false;
   const noticed = hours.activity();
   if (attract.activity() || noticed) {
     leaveAttract();
@@ -2031,6 +2107,7 @@ function remotePress(b: 'confirm' | 'exit'): void {
 /** L'écran que montre la borne, pour la liste du téléphone. */
 function remoteEntries(media = false): MenuEntries {
   const none = (title: string, note: string): MenuEntries => ({ kind: 'none', title, items: [], current: -1, note });
+  if (surprise.busy) return none(t('Table surprise'), t('Tirage en cours · Exit : annuler'));
   if (state.phase === 'loading') return none(remoteScreen().title, t('La partie se charge.'));
   if (state.phase === 'playing') return inGameEntries();
   if (state.phase === 'library') return library.remoteEntries() ?? none(t('Menu système'), '');
@@ -4576,9 +4653,13 @@ export function startFrontend(): void {
     if (state.phase === 'intro') return void leaveIntro();
     // Réveil d'un clic dans le vide (souris-roue.js) : rien d'autre à faire quand l'écran ne dormait plus.
     if (action.type === 'wake') return;
+    if (surprise.busy || (state.phase === 'menu' && launchReservation.busy)) {
+      if (action.type === 'key' && surpriseCancelKey(action.code)) { surprise.cancel(); launchReservation.cancelPending(); }
+      return;
+    }
     // Clic sur « Start : jouer » de la roue : un clic n'a pas de durée, il joue tout de suite.
     if (action.type === 'key' && state.phase === 'menu' && !state.help && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index] && !onMedallion()) wheelConfirm(tables[state.index]!, false), broadcast();
-    else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
+    else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input, true);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
     // Pastille des téléchargements.
@@ -5068,6 +5149,7 @@ function noTables(): Message {
 
 /** Relit les tables après un ajout, une réparation ou une suppression, en gardant la sélection. */
 function reloadTables(selectFile?: string): void {
+  surpriseGesture.reset();
   const current = tables[state.index]?.file;
   tables = scanOrdered();
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
@@ -5202,10 +5284,16 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     // Relâchements compris (combinaison du mode invité) : onKeyInput les fait arriver (key-input.ts).
     // Ctrl et Maj d'un raccourci (Ctrl+Maj+D…) n'y agissent pas en MagnaSave ni en flipper (keyboardChords).
     onKeyInput(win, keyboardChords.down, keyboardChords.up);
-    // Boutons d'un joystick (Pinscape…) : comme des touches.
-    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)));
+    // Le menu ne reprend pas le premier plan pendant une partie, même si Electron le croit
+    // encore actif. Les observateurs globaux (Exit, réglages en partie) restent à l'écoute.
+    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)), () => state.phase !== 'playing');
     // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
+    if (role.id === 'playfield') {
+      win.on('blur', () => surpriseGesture.reset());
+      win.webContents.on('render-process-gone', () => surpriseGesture.reset());
+    }
     win.on('close', (event) => {
+      if (role.id === 'playfield') surpriseGesture.reset();
       if (!closing && !guest.knock('window.close')) event.preventDefault();
     });
     win.on('query-session-end', () => (closing = true));
@@ -5283,6 +5371,7 @@ function handleKeyUp(input: Input, fromPhone = false): void {
   if (!fromPhone) {
     cabinetVolume?.windowInput(input);
     guest.input(input.code, false, unlockListening());
+    surpriseGesture.input(input.code, false);
   }
   // Roue en « jouer directement » : Start relâché tôt lance la partie (au téléphone aussi).
   releaseWheelStart(input.code);
@@ -5304,6 +5393,7 @@ const keyboardChords = createModifierChords<Input>({ down: (input) => handleKey(
  * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
  */
 function handleKey(input: Input, fromPhone = false): boolean {
+  if (!fromPhone && !input.isAutoRepeat) surpriseGesture.input(input.code, true);
   if (!fromPhone) cabinetVolume?.windowInput(input);
   // Le moment d'un badge ou d'un niveau : une touche le ferme (pas dans la première seconde et
   // demie : un bouton encore tenu au retour de la partie ne l'efface pas avant qu'on l'ait vu).
@@ -5315,6 +5405,10 @@ function handleKey(input: Input, fromPhone = false): boolean {
   // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre. Le
   // téléphone n'y entre pas : on ne déverrouille le mode invité qu'à la borne.
   if (!fromPhone && guest.input(input.code, true, unlockListening())) return true;
+  if (surprise.busy || (state.phase === 'menu' && launchReservation.busy)) {
+    if (surpriseCancelKey(input.code)) { surprise.cancel(); launchReservation.cancelPending(); }
+    return true;
+  }
   if (input.control && input.code === 'KeyQ') return guest.knock('shortcut.quit') ? quit() : true;
   // Extinction, veille ou redémarrage en cours : plus rien ne se choisit.
   if (state.phase === 'message' && state.message?.action === 'power') return true;
@@ -5688,7 +5782,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   if (beforeLaunch) {
     if (firstRun) console.log(`${zenName} (${table.id}) : jamais ouvert sur ce PC (${fx3!.gameDir} sans réglages), mode borne à activer dans le jeu ; Start l'ouvre quand même.`); // i18n-ignore : journal
     else console.log(`${zenName} (${table.id}) : orientation du mode borne à changer depuis 0.2.2-essai.10 (${beforeLaunch.lines[1]}) ; message montré une fois.`); // i18n-ignore : journal
-    pendingPlay = { frontends: [], play: () => playPinballFx(table, autoStopAfterMs, mode, simulated, true) };
+    pendingPlay = { frontends: [], play: () => play(table, autoStopAfterMs, mode, {}, undefined, true) };
     state = { ...state, phase: 'message', help: false, message: { ...beforeLaunch, action: 'zenFirstRun' } };
     broadcast();
     return undefined;
@@ -5998,7 +6092,13 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}, reserved?: symbol, firstRunSeen = false): Promise<PlayReport | undefined> {
+  if (surprise.busy || state.phase === 'loading' || state.phase === 'playing') return undefined;
+  if (reserved && !launchReservation.owns(reserved)) return undefined;
+  const owner = reserved ?? launchReservation.reserve();
+  if (!owner) return undefined;
+  const reservedContext = reserved ? surpriseContext() : undefined;
+  try {
   // Une partie est celle d'une table, d'où qu'elle parte (roue, fiche, Bibliothèque, groupe, partie
   // entre amis) : la roue passe dessus et quitte le médaillon, pour le chargement comme pour le retour.
   pointAtTable(table);
@@ -6010,6 +6110,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une sauvegarde automatique cède la place (elle reprendra au prochain moment libre) ; une sauvegarde
   // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
   await backups.yieldToGame();
+  if (!launchReservation.owns(owner) || (reserved && reservedContext !== surpriseContext())) return undefined;
+  if (reserved && !surpriseCatalog.eligible(table)) return undefined;
   const copying = backups.busy();
   if (copying) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au front-end.')] } };
@@ -6062,7 +6164,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // Table de Pinball FX : sa propre partie, sans rien de ce qui est propre à VPX (pinballfx.ts).
   // Table de Future Pinball : la même partie, sa commande à lui (futurepinball-play.ts).
-  if (isZenEmulator(table.emulator) || table.emulator === 'futurepinball') return playPinballFx(table, autoStopAfterMs, mode, simulated);
+  if (isZenEmulator(table.emulator) || table.emulator === 'futurepinball') return await playPinballFx(table, autoStopAfterMs, mode, simulated, firstRunSeen);
   if (!install) return undefined;
   const otherRefused = otherVpx && otherVpxRefusal(otherVpx, { exists: simulated !== undefined || fs.existsSync(otherVpx.exe), display: mode === 'display', friends: Boolean(hooks.double) });
   if (otherRefused) {
@@ -6743,6 +6845,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // autres) : ses résultats, pas encore vus, s'ouvrent au retour ; la notification l'a annoncé.
   else if (!hooks.double && state.phase === 'menu' && friendsMenu.live.unseenResults()) friendsMenu.live.open(() => library.leave());
   return { result, focusReturned, entered, ...(live ? { live } : {}) };
+  } catch (error) {
+    // Une préparation annulée ne revient pas plus tard avec un ancien message d'erreur.
+    if (reserved && !launchReservation.owns(owner)) return undefined;
+    throw error;
+  } finally { launchReservation.release(owner); }
 }
 
 /**
@@ -7567,6 +7674,7 @@ function showBanner(said: StoredText, note?: SystemItemId): void {
 }
 
 function quit(): boolean {
+  surpriseGesture.reset();
   closing = true;
   app.quit();
   return true;
@@ -7670,6 +7778,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     intro: state.phase === 'intro' ? introFor(role) : undefined,
     // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
+    surprise: role === 'playfield' ? surprise.view() : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && m && table ? m.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // La carte « Objectif » (loading-objective.ts) : le rendu ne la pose que sur l'écran de repli ou dans l'encart du bureau, jamais sur un média du joueur.
@@ -8189,6 +8298,8 @@ function ledContext() {
 }
 
 function broadcast(): void {
+  surprise.refresh();
+  if (!surpriseContext()) surpriseGesture.reset();
   // Retour d'une partie, de quelque jeu que ce soit : une recherche de mise à jour, pour que la
   // pastille soit là quand on revient à la roue (updates-menu.ts, au plus une toutes les 5 min).
   if (broadcastPhase === 'playing' && state.phase !== 'playing') updates.checkSoon();
@@ -8222,7 +8333,7 @@ function broadcast(): void {
   syncLiveDmd();
   jukeboxPlayer.syncDmd((state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging());
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
-  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
+  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active && !surprise.busy);
   if (!attract.active) attractIndex = undefined;
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));

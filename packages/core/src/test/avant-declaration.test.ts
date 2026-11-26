@@ -25,6 +25,10 @@ import { fakeMenuTarget } from './doublures';
  * une partie), jamais pendant l'initialisation.
  */
 const REVIEWED = new Set([
+  // Table surprise : les constructeurs ne lisent aucun rappel. Ces fermetures ne servent qu'au
+  // geste et à la session après démarrage ; le banc du vrai menu et les tests de constructeur le vérifient.
+  'surprise',
+  'surpriseGesture',
   // Mode débogage (23/11/2026) : lu par le rapport technique (debugReport), seulement quand le joueur en envoie un.
   // Ses propres rappels (vr, windows, table…) lisent des blocs déclarés plus bas : sa première mesure est donc
   // différée (setImmediate dans createDebug) et isolée (une erreur est journalisée, jamais lancée) ; garde plus bas.

@@ -28,10 +28,13 @@ test('pointAtTable : le rang de la table, et plus aucun médaillon choisi', () =
   assert.match(fn, /medallion: undefined/);
 });
 
-test('play() passe la roue sur sa table avant toute autre chose (chargement, refus, retour)', () => {
+test('play() réserve le lancement puis passe la roue sur sa table avant les prérequis et le chargement', () => {
   const fn = body('async function play(table: TableEntry');
-  const first = fn.split(/\r?\n/).slice(1).find((l) => l.trim() && !l.trim().startsWith('//'));
-  assert.equal(first?.trim(), 'pointAtTable(table);', 'première instruction de play() : un return plus haut garderait le médaillon');
+  const reserve = fn.indexOf('launchReservation.reserve()');
+  const select = fn.indexOf('pointAtTable(table);');
+  assert.ok(reserve >= 0 && reserve < select, 'une demande concurrente ne change pas la table du lancement déjà réservé');
+  assert.ok(select < fn.indexOf('const otherVpx'), 'les refus du moteur se rapportent à la table choisie, sans médaillon');
+  assert.ok(select < fn.indexOf('await backups.yieldToGame()'), 'la table est choisie avant le premier await');
 });
 
 test('un changement de rang de table qui garde le médaillon le dit sur sa ligne', () => {

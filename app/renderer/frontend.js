@@ -2196,6 +2196,7 @@ window.cyber.onState((s) => {
   liveDmd?.holder.classList.toggle('jukebox', s.phase === 'jukebox');
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);
+  window.CyberTableSurprise?.render(s.surprise);
   // Horaire : voile de nuit et préavis d'arrêt, levés pendant la partie et pour l'écran noir de l'arrêt.
   const powering = s.phase === 'message' && s.message?.action === 'power';
   syncNight(powering ? { ...s, night: 0 } : s);
