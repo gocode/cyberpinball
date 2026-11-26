@@ -391,7 +391,9 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     if (ratio < 1.19) problems.add('interligne trop serré (' + ratio.toFixed(2) + ') pour des lignes limitées : ' + label(el));
   }
   // Voile décoratif (data-veil) dessiné au-dessus d'un texte : le texte est là mais
-  // assombri. Le voile, sans pointeur, est rendu « touchable » le temps de la mesure.
+  // assombri. Le voile, sans pointeur, est rendu « touchable » le temps de la mesure ; le
+  // texte aussi : dans une couche passive (pointer-events: none, carte de retour de partie),
+  // il manquait à la pile et son ancêtre body, sous tout voile, le faisait croire recouvert.
   const veils = [...document.querySelectorAll('[data-veil]')];
   if (veils.length) {
     const saved = veils.map((v) => v.style.pointerEvents);
@@ -400,9 +402,12 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       if (veils.some((v) => v.contains(el))) return;
       const s = seen[i];
       if (s.right - s.left <= T || s.bottom - s.top <= T) return;
+      const own = el.style.pointerEvents;
+      el.style.pointerEvents = 'auto';
       const stack = document.elementsFromPoint((s.left + s.right) / 2, (s.top + s.bottom) / 2);
+      el.style.pointerEvents = own;
       const veil = stack.findIndex((e) => veils.includes(e));
-      const text = stack.findIndex((e) => e === el || el.contains(e) || e.contains(el));
+      const text = stack.findIndex((e) => e === el || el.contains(e));
       if (veil >= 0 && text >= 0 && veil < text) problems.add('sous un voile : ' + label(el));
     });
     veils.forEach((v, i) => (v.style.pointerEvents = saved[i]));

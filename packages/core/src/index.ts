@@ -115,6 +115,7 @@ export * from './coexistence';
 export * from './medias';
 export * from './b2simage';
 export * from './png';
+export * from './siteicon';
 export * from './mediaerrors';
 export * from './errorlog';
 export * from './front-policy';

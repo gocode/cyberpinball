@@ -33,8 +33,6 @@ export const messages: Record<string, string> = {
   // app/src/game-return.ts
   '{rank}ᵉ du jour': '#{rank} today',
   '{rank}ᵉ de tout temps': '#{rank} all time',
-  'Un mot à {name}': 'A word to {name}',
-  'Une phrase toute prête, envoyée dans ta conversation.': 'A ready-made phrase, sent to your conversation.',
   'Ton score': 'Your score',
   '+{n}': '+{n}',
   'Ton record d’avant : {n}': 'Your previous record: {n}',
@@ -50,9 +48,6 @@ export const messages: Record<string, string> = {
   'Tu es premier : garde ta place': 'You are first: keep your place',
   'Classement du jour': 'Today’s ranking',
   'Classement de tout temps': 'All-time ranking',
-  'Encore {gap} pour passer {name}': '{gap} more to pass {name}',
-  'Et maintenant ?': 'What next?',
-  'Rejouer': 'Play again',
   'PARTIE TERMINÉE': 'GAME OVER',
   'Version classée': 'Ranked version',
   'Ta place : {place}': 'Your place: {place}',
@@ -60,5 +55,5 @@ export const messages: Record<string, string> = {
   'Tableau de la table': 'Table scoreboard',
   '· {n} XP avant le niveau {next}': '· {n} XP before level {next}',
   '{what} +{n}': '{what} +{n}',
-  'Flippers : choisir · Start : valider · Exit : retour aux tables': 'Flippers: choose · Start: confirm · Exit: back to the tables',
+  'Start : rejouer · Flippers : changer de table · Exit : fermer': 'Start: play again · Flippers: change table · Exit: close',
 };

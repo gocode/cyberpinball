@@ -2154,6 +2154,35 @@ function wheelBurst(s) {
   return burst;
 }
 
+/** La partie dont le bilan est dessiné (sa clé) : la fenêtre n'est refaite, et son entrée rejouée, qu'à la suivante. */
+let gameReturnKey;
+
+/**
+ * Le bilan de la dernière partie posé sur la roue (app/src/game-return.ts, fin de hub.css) : le
+ * contenu d'un écran hub (CyberHub), dans une fenêtre en plus, la roue entière à côté. Aucun bilan : la
+ * fenêtre part. game-return-desk : au bureau, la fenêtre prend le cadre du plateau (menu-desktop reste
+ * à frontend.css, une classe par feuille).
+ */
+function renderGameReturn(view) {
+  const host = document.getElementById('game-return');
+  if (!host) return;
+  if (!view || !window.CyberHub) {
+    host.hidden = true;
+    host.replaceChildren();
+    gameReturnKey = undefined;
+    return;
+  }
+  host.hidden = false;
+  host.classList.toggle('game-return-desk', document.documentElement.classList.contains('menu-desktop'));
+  if (gameReturnKey === view.key && host.firstChild) return;
+  gameReturnKey = view.key;
+  const card = CyberHub.render({ hub: view.hub, hint: view.hint, order: [] }, true);
+  card.classList.add('game-return-card');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-label', view.hub.title);
+  host.replaceChildren(card);
+}
+
 window.cyber.onState((s) => {
   lastState = s;
   // Avant tout média : cet état fait-il partie d'une rafale d'appuis dans la roue ?
@@ -2186,6 +2215,8 @@ window.cyber.onState((s) => {
     background.setVolume(s.sound?.video ?? 0);
     // Badge reçu, niveau qui monte : le moment, au retour sur l'écran des tables (niveau.js).
     window.CyberLevels?.moment(s.levelMoment);
+    // Le bilan de la dernière partie : une fenêtre posée sur la roue, qu'un geste ferme (game-return.ts).
+    renderGameReturn(s.gameReturn);
   }
   // Fond de partie dès que la fenêtre de jeu de VPX s'affiche ; avant, au chargement, chaque
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).

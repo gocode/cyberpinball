@@ -57,6 +57,7 @@ body {
 #root,
 #cinema,
 #stop,
+#game-return,
 #level-moment {
   position: fixed;
   left: calc(var(--pf-x, 0) * 100vw);
@@ -100,6 +101,9 @@ html[data-rotation='270'] #cinema,
 html[data-rotation='90'] #stop,
 html[data-rotation='180'] #stop,
 html[data-rotation='270'] #stop,
+html[data-rotation='90'] #game-return,
+html[data-rotation='180'] #game-return,
+html[data-rotation='270'] #game-return,
 html[data-rotation='90'] #level-moment,
 html[data-rotation='180'] #level-moment,
 html[data-rotation='270'] #level-moment {

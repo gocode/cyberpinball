@@ -116,7 +116,7 @@ export interface ApplicationsMenuHost {
   /** Boutons de la borne pendant une application (watchAppButtons). */
   buttons: {
     keys(): Readonly<CabinetButtons>;
-    watch(input: { keys: Readonly<CabinetButtons>; key(key: AppKey): void; quit(): void; intercept(button: string): boolean; activity(): void }): () => void;
+    watch(input: { keys: Readonly<CabinetButtons>; key(key: AppKey, lift?: number): void; quit(): void; intercept(button: string): boolean; activity(): void }): () => void;
   };
   phone?: {
     attachExternal(target: ExternalTarget): void;
@@ -246,8 +246,8 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
         where: a.screen === 'playfield' ? t('Ouverte sur le playfield') : t('Ouverte sur le fronton'),
         buttonsTitle: t('Boutons de la borne'),
         buttons: [
-          { key: t('Flippers'), text: t('Gauche, droite'), small: t('En lecture : reculer, avancer') },
-          { key: t('MagnaSave'), text: t('Haut, bas') },
+          { key: t('Flippers'), text: t('Élément précédent, suivant'), small: t('Tenus : reculer, avancer') },
+          { key: t('MagnaSave'), text: t('Gauche, droite') },
           { key: t('Start'), text: t('OK') },
           { key: t('Lancer la bille'), text: t('Lecture, pause') },
           { key: t('Exit'), text: t('Retour') },
@@ -414,7 +414,8 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
     phone?.attachExternal(external);
     const stopButtons = host.buttons.watch({
       keys: host.buttons.keys(),
-      key: (key) => session.key(key),
+      // Flipper gauche appuyé : Maj+Tab, l'élément précédent.
+      key: (key, lift) => (key === 'TabBack' ? session.key('Tab', { shift: true }) : session.key(key, lift === undefined ? undefined : { lift })),
       quit: () => session.finish(),
       // Un téléphone attend d'être accepté (codes comparés à l'écran) : Start accepte, Exit refuse.
       intercept: (button) => {

@@ -147,7 +147,16 @@
   object-fit: cover;
 }
 
-.ap-icon.gen {
+/* Favicon du site trop petit pour la tuile (32 ou 64 px) : posé en pastille sur la tuile composée. */
+.ap-icon.has-image.ap-mini img {
+  width: 46%;
+  height: 46%;
+  object-fit: contain;
+  filter: drop-shadow(0 calc(4 * var(--u)) calc(10 * var(--u)) #0008);
+}
+
+.ap-icon.gen,
+.ap-icon.has-image.ap-mini {
   background: linear-gradient(160deg, color-mix(in srgb, var(--ap-c) 45%, #07110f), #07110f);
   box-shadow: inset 0 0 0 calc(3 * var(--u)) var(--ap-c), 0 10px 26px #0009;
   color: color-mix(in srgb, var(--ap-c) 60%, #fff);

@@ -27,6 +27,8 @@ export interface KeyMods {
   shift?: boolean;
   ctrl?: boolean;
   alt?: boolean;
+  /** Touche tenue (Maj d'un flipper d'encodeur) relâchée le temps de la frappe, puis remise. */
+  lift?: number;
 }
 
 /** Gestes de fenêtre et d'entrée (win-displays), remplaçables pour les essais. */
@@ -102,7 +104,11 @@ export function edgeWindowOps(): EdgeWindowOps {
     front: (win) => void w.bringToFront(win as Win),
     close: (win) => w.closeWindow(win as Win),
     type: (text) => void w.typeText(text),
-    key: (vk, mods) => void w.pressKey(vk, mods),
+    key: (vk, mods) => {
+      if (mods?.lift !== undefined) w.setKeyDown(mods.lift, false);
+      w.pressKey(vk, mods);
+      if (mods?.lift !== undefined) w.setKeyDown(mods.lift, true);
+    },
     pointer: (x, y) => void w.setCursorPosition(x, y),
     click: (button, count) => void w.mouseClick(button, count),
     wheel: (dx, dy) => void w.mouseWheel(dx, dy),

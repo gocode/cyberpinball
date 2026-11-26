@@ -256,11 +256,9 @@ test('retour de partie : du neuf seulement pour un record battu ou un joueur dé
 });
 
 interface ReturnBuilt {
-  actions: { key?: string; run: () => void }[];
-  keys?: (i: { code: string }) => boolean;
-  back: () => void;
-  hint?: string;
-  hub: { tabs: unknown[]; band?: { fresh?: number; lines: string[] }; sections: { title?: string; cards: { title: string; eyebrow?: string; aside?: string; buttons?: { label: string; action?: number; off?: string }[] }[] }[] };
+  key: number;
+  hint: string;
+  hub: { tabs: unknown[]; band?: { fresh?: number; lines: string[] }; sections: { title?: string; cards: { title: string; eyebrow?: string; aside?: string; buttons?: unknown[] }[] }[] };
 }
 
 interface GameReturnLike {
@@ -268,22 +266,22 @@ interface GameReturnLike {
   report(f: unknown): boolean;
   release(): void;
   holding(): boolean;
+  showing(): boolean;
+  view(): ReturnBuilt | undefined;
+  key(kind: 'start' | 'exit' | 'other'): boolean;
+  dismiss(why: string): void;
 }
 
-function gameReturn(over: { friend?: boolean; now?: () => number; mine?: number; board?: { rank: number; score: number; initials?: string; at?: string }[] } = {}) {
+function gameReturn(over: { now?: () => number; mine?: number; board?: { rank: number; score: number; initials?: string; at?: string }[] } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createGameReturn } = require(path.join(REPO_ROOT, 'app', 'dist', 'game-return.js')) as { createGameReturn(host: unknown): GameReturnLike };
   const lea = score(LEA, 'Léa', 9_450_000, 120);
   const mine = score(ME, 'Kiko', over.mine ?? 9_712_450, 5);
-  let opened: { build: () => ReturnBuilt; at?: number } | undefined;
   const events: string[] = [];
   let clock = NOW.getTime();
   const r = createGameReturn({
-    library: { openCustom: (build: () => ReturnBuilt, at?: number) => (opened = { build, ...(at !== undefined ? { at } : {}) }), leave: () => events.push('roue') },
     daily: { input: () => input([...base(), lea, mine]), face: (h: { key: string; name: string }) => ({ key: h.key, name: h.name, initials: 'L', hue: 0 }), unavailable: () => undefined },
-    friends: { isFriend: () => over.friend === true, send: (_k: string, text: string) => (events.push(`mot : ${text}`), true) },
     play: (t: { title: string }) => events.push(`rejouer ${t.title}`),
-    zoneKeys: () => [],
     ...(over.board ? { board: () => over.board } : {}),
     canOpen: () => true,
     log: () => undefined,
@@ -291,19 +289,19 @@ function gameReturn(over: { friend?: boolean; now?: () => number; mine?: number;
   });
   const table = { title: 'Attack from Mars', file: 'afm.vpx' };
   const facts = (best: number | undefined, previousBest?: number) => ({ table, version: { board: AFM }, since: new Date(NOW.getTime() - 15 * 60_000), report: { gains: [{ kind: 'game' as const, xp: 10, at: NOW.toISOString() }, { kind: 'play' as const, xp: 12, at: NOW.toISOString(), value: 12 }], from: 1000, to: 1022, best, ...(previousBest ? { previousBest } : {}) } });
-  return { r, events, facts, built: () => opened?.build(), at: () => opened?.at, tick: (ms: number) => (clock += ms) };
+  return { r, events, facts, built: () => r.view(), tick: (ms: number) => (clock += ms) };
 }
 
-test('retour de partie : un écran après toute partie au score connu, avec le classement ou le tableau de la table', () => {
-  // Aucun score relevé : pas d'écran, le moment des badges passe.
+test('retour de partie : une carte sur la roue après toute partie au score connu, avec le classement ou le tableau de la table', () => {
+  // Aucun score relevé : pas de carte, le moment des badges passe.
   const nothing = gameReturn();
   nothing.r.expect();
   assert.equal(nothing.r.holding(), true, 'le moment des badges attend le bilan');
   assert.equal(nothing.r.report(nothing.facts(undefined)), false);
-  assert.equal(nothing.built(), undefined, 'aucun écran');
+  assert.equal(nothing.built(), undefined, 'aucune carte');
   assert.equal(nothing.r.holding(), false, 'le moment des badges passe');
 
-  // Rien de neuf (sous mon record, personne de dépassé) : l'écran s'ouvre avec la place et le prochain.
+  // Rien de neuf (sous mon record, personne de dépassé) : la carte s'ouvre avec la place et le prochain.
   const plain = gameReturn({ mine: 9_000_000 });
   assert.equal(plain.r.report(plain.facts(9_000_000, 9_800_000)), true);
   const ranked = plain.built()!.hub.sections;
@@ -316,7 +314,7 @@ test('retour de partie : un écran après toute partie au score connu, avec le c
   const at = new Date(NOW.getTime() - 60_000).toISOString();
   const board = [{ rank: 1, score: 90_000_000, initials: 'ABC' }, { rank: 2, score: 74_800_050, initials: 'JUL', at }];
   const original = gameReturn({ board });
-  assert.equal(original.r.report({ ...original.facts(74_800_050), version: undefined }), true, 'un premier score ouvre l’écran');
+  assert.equal(original.r.report({ ...original.facts(74_800_050), version: undefined }), true, 'un premier score ouvre la carte');
   const lines = original.built()!.hub.sections.find((s) => s.title === 'Tableau de la table')!.cards;
   assert.deepEqual(lines.map((c) => [c.title, c.eyebrow]), [['1. ABC', undefined], ['2. JUL', 'Ta partie']]);
 
@@ -336,28 +334,53 @@ test('retour de partie : un écran après toute partie au score connu, avec le c
   assert.ok(b.hub.band!.fresh! > 0, 'la part gagnée en clair sur la barre');
   assert.deepEqual(b.hub.band!.lines, ['Partie menée au bout +10', 'Partie de 12 min +12'], 'le détail du barème');
   for (const absent of ['Ligue', 'Mission', 'Défier']) assert.ok(!JSON.stringify(b.hub).includes(absent), `ni ${absent}`);
-  const end = b.hub.sections.at(-1)!.cards[0]!;
-  assert.deepEqual(end.buttons!.map((x) => [x.label, x.off]), [['Rejouer', undefined], ['Un mot à Léa', 'Entre amis seulement'], ['Retour aux tables', undefined]]);
-  assert.equal(b.actions[h.at()!]?.key, 'end:replay', 'le curseur sur « Rejouer »');
-  // Un bouton encore tenu en sortant de la partie ne passe pas l'écran ; ensuite, Exit le passe d'un appui.
-  assert.equal(b.keys!({ code: 'Enter' }), true);
-  h.tick(2000);
-  assert.equal(h.built()!.keys!({ code: 'Enter' }), false);
-  h.built()!.back();
-  assert.deepEqual(h.events, ['roue']);
-  h.built()!.actions.find((a) => a.key === 'end:replay')!.run();
-  assert.equal(h.events.at(-1), 'rejouer Attack from Mars');
+  // Une carte à lire, pas un écran à parcourir : aucun bouton, les commandes en pied.
+  assert.ok(b.hub.sections.every((s) => s.cards.every((c) => !c.buttons)), 'aucun bouton sur la carte');
+  assert.equal(b.hint, 'Start : rejouer · Flippers : changer de table · Exit : fermer');
 });
 
-test('retour de partie : « Un mot à Léa » envoie une phrase préparée à une amie', () => {
-  const h = gameReturn({ friend: true });
-  h.r.report(h.facts(9_712_450, 9_000_000));
-  h.built()!.actions.find((a) => a.key === 'end:word')!.run();
-  const phrases = h.built()!;
-  phrases.actions[0]!.run();
-  assert.match(h.events.at(-1)!, /^mot : /);
-  const end = h.built()!.hub.sections.at(-1)!.cards[0]!;
-  assert.deepEqual(end.buttons![1], { label: 'Un mot à Léa', off: 'Envoyé' }, 'une fois envoyé, grisé');
+test('retour de partie : le premier geste ferme la carte pour de bon', () => {
+  // Un bouton encore tenu en sortant de la partie : la touche est prise, la carte reste.
+  const held = gameReturn();
+  held.r.report(held.facts(9_712_450, 9_000_000));
+  assert.equal(held.r.key('other'), true, 'un flipper tenu ne fait rien');
+  assert.equal(held.r.showing(), true);
+  // Ensuite, un flipper ferme la carte et passe à la roue (la touche n'est pas prise) ; elle ne revient pas.
+  held.tick(2000);
+  assert.equal(held.r.key('other'), false, 'le flipper fait aussi tourner la roue');
+  assert.equal(held.r.showing(), false);
+  assert.equal(held.built(), undefined, 'fermée pour de bon, même en revenant sur la table');
+  assert.equal(held.r.key('other'), false, 'plus de carte : les touches vont à la roue');
+
+  // Exit ferme seulement.
+  const exit = gameReturn();
+  exit.r.report(exit.facts(9_712_450, 9_000_000));
+  exit.tick(2000);
+  assert.equal(exit.r.key('exit'), true);
+  assert.equal(exit.r.showing(), false);
+  assert.deepEqual(exit.events, []);
+
+  // Start relance la table de la partie.
+  const start = gameReturn();
+  start.r.report(start.facts(9_712_450, 9_000_000));
+  start.tick(2000);
+  assert.equal(start.r.key('start'), true);
+  assert.deepEqual(start.events, ['rejouer Attack from Mars']);
+  assert.equal(start.r.showing(), false);
+
+  // La roue quittée sans touche (partie lancée, autre écran) : fermée aussi.
+  const gone = gameReturn();
+  gone.r.report(gone.facts(9_712_450, 9_000_000));
+  gone.r.dismiss('roue quittée');
+  assert.equal(gone.built(), undefined);
+
+  // Deux cartes ouvertes à la même milliseconde ont des clés différentes : le rendu, qui garde la carte
+  // tant que sa clé ne change pas, montre bien la seconde.
+  const one = gameReturn({ now: () => NOW.getTime() });
+  const two = gameReturn({ now: () => NOW.getTime() });
+  one.r.report(one.facts(9_712_450, 9_000_000));
+  two.r.report(two.facts(9_712_450, 9_000_000));
+  assert.notEqual(one.built()!.key, two.built()!.key);
 });
 
 // ---------- Câblage ----------
@@ -370,4 +393,11 @@ test('frontend : les scores relayés, la notification, l’Activité, l’Arène
   assert.match(main, /action\.type === 'place-taken'/, 'un clic sur la notification');
   assert.match(main, /!gameReturn\.holding\(\)/, 'le moment des badges attend le retour de partie');
   assert.match(main, /gameReturn\.expect\(\)/);
+  // La carte du bilan sur la roue : dessinée sur le plateau, fermée par la première touche et par un clic,
+  // et fermée pour de bon quand la roue est quittée.
+  assert.match(main, /gameReturn: gameReturnView\(\)/, 'la carte dans l’état du plateau');
+  assert.match(main, /if \(gameReturnShowing\(\)\) \{[\s\S]{0,300}gameReturn\.key\(kind\)/, 'la première touche la ferme');
+  assert.match(main, /gameReturnShowing\(\)\) \{\s*gameReturn\.dismiss\('un clic'\)/, 'un clic la ferme');
+  assert.match(main, /if \(!gameReturnPlace\(\)\) \{\s*gameReturn\.dismiss\('roue quittée'\)/, 'la roue quittée la ferme');
+  assert.doesNotMatch(main, /createGameReturn\(\{\s*library/, 'plus d’écran ouvert dans le front-end');
 });

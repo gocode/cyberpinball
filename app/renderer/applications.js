@@ -46,6 +46,8 @@
         box.classList.add('gen');
         box.replaceChildren(el('span', 'ap-initials', face.initials));
       });
+      // Un favicon trop petit pour remplir la tuile (APP_ICON_MIN du cœur) : en pastille sur la tuile composée, net plutôt qu'agrandi flou.
+      img.addEventListener('load', () => box.classList.toggle('ap-mini', Math.min(img.naturalWidth, img.naturalHeight) < 96));
       box.append(img);
     } else box.append(el('span', 'ap-initials', face.initials));
     return box;

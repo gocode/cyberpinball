@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { prepareClassicPov } from './vpx-launch-compat';
 import { findWheelTable } from './wheel-table';
 import * as path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, nativeImage, net, powerMonitor, screen as electronScreen, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, net,powerMonitor, screen as electronScreen, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
   otherVpxFor,
   otherVpxLabel,
@@ -450,7 +450,7 @@ import { createDailyTables } from './daily-tables';
 import { createPlaceTaken } from './place-taken';
 import { createGameReturn } from './game-return';
 import { createChallengeService } from './challenge-service';
-import { createChallengesMenu, challengeTableOf, type ChallengeCandidate } from './challenges-menu';
+import { createChallengesMenu, type ChallengeCandidate } from './challenges-menu';
 import { createDailyTablesMenu } from './daily-tables-menu';
 import { createTableSocial } from './table-social';
 import { loadingObjective, type LoadingObjectiveView } from './loading-objective';
@@ -4191,24 +4191,18 @@ const applicationsMenu = createApplicationsMenu({
   takeForeground: () => void takeForeground(),
   openExternal: (url) => void shell.openExternal(url),
   online: () => net.isOnline(),
-  look: (id, url) => fetchSiteLook(id, url, { dataDir: loc.dataDir, measure: (data) => nativeImage.createFromBuffer(data).getSize(), log: (line) => console.log(line) }),
+  // net.fetch : la pile réseau de Chromium, qui lit les gros en-têtes de YouTube (applications-icons.ts).
+  look: (id, url) => fetchSiteLook(id, url, { dataDir: loc.dataDir, fetch: ((to: string, init?: RequestInit) => net.fetch(to, init)) as typeof fetch, log: (line) => console.log(line) }),
   iconUrl: (file) => mediaUrl(path.join(applicationsIconDir(loc.dataDir), file)),
   edgeDownloadUrl: EDGE_DOWNLOAD_URL,
   log: (line) => console.log(line),
 });
-// Retour de partie (game-return.ts, 21/11/2026) : après une partie qui apporte du neuf, le score, les XP,
-// le joueur dépassé et la suite ; avant le moment des badges, qui l'attend.
+// Retour de partie (game-return.ts, 21/11/2026 ; carte sur la roue depuis le 26/11/2026) : après une
+// partie au score connu, le score, les XP et le classement dans une fenêtre posée sur la roue, après le
+// moment des badges ; le premier geste la ferme (gameReturnKey).
 const gameReturn = createGameReturn({
-  library,
   daily: dailyTables,
-  friends: {
-    isFriend: (key) => socialNet.state().friends.some((f) => f.key === key),
-    send: (key, text) => chatService.send(key, text),
-  },
   play: (table) => playFromNotice(table),
-  // « Défier {nom} » : le joueur dépassé, avec le score de cette partie, sur sa version exacte.
-  challenge: (rival, f, reopen) => challengesMenu.button({ key: rival.key, name: rival.name, ...(rival.country ? { country: rival.country } : {}) }, f.version ? challengeTableOf(f.version, presenceTable(f.table).title, presenceTable(f.table).vpsId) : undefined, f.report.best, 'game', 'challenge', reopen),
-  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   // Sans classement publié pour la version (table originale…) : le tableau de la table sur la borne.
   board: (table) => tableScores.board(table, 'all').lines,
   canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
@@ -4773,6 +4767,11 @@ export function startFrontend(): void {
     if (attract.activity() || noticed) return void leaveAttract();
     // Un clic pendant l'ouverture affiche la roue, comme un bouton.
     if (state.phase === 'intro') return void leaveIntro();
+    // Le bilan posé sur la roue (game-return.ts) : un clic le ferme, et fait aussi ce qu'il fait sur la roue.
+    if (action.type !== 'focus' && gameReturnShowing()) {
+      gameReturn.dismiss('un clic'); // i18n-ignore : journal
+      broadcast();
+    }
     // Réveil d'un clic dans le vide (souris-roue.js) : rien d'autre à faire quand l'écran ne dormait plus.
     if (action.type === 'wake') return;
     if (surprise.busy || (state.phase === 'menu' && launchReservation.busy)) {
@@ -5538,6 +5537,14 @@ function handleKey(input: Input, fromPhone = false): boolean {
   if (levelMomentAt && state.phase === 'menu' && levelTracker.pending()) {
     if (Date.now() - levelMomentAt > 1500) levelTracker.seen();
     return true;
+  }
+  // Le bilan de la partie posé sur la roue (game-return.ts) : le premier geste le ferme. Start relance la
+  // table de la partie, Exit ferme seulement ; les flippers et les autres touches agissent aussi sur la roue.
+  if (gameReturnShowing()) {
+    const kind = KEYS.confirm.includes(input.code) ? 'start' : KEYS.exit.includes(input.code) ? 'exit' : 'other';
+    const taken = gameReturn.key(kind);
+    broadcast();
+    if (taken) return true;
   }
   const is = (group: string[]) => group.includes(input.code);
   // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre. Le
@@ -7976,7 +7983,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // (jamais en mode invité ; la file décide seule du reste : menu-notices.ts).
     ...(role === 'playfield' ? menuCorner() : {}),
     // Badge reçu, niveau qui monte : le moment, au retour sur l'écran des tables (level-tracker.ts, niveau.js).
-    ...(role === 'playfield' ? { levelMoment: levelMomentView() } : {}),
+    ...(role === 'playfield' ? { levelMoment: levelMomentView(), gameReturn: gameReturnView() } : {}),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     // Ses crédits en une ligne discrète, au-dessus de l'invite (réglage « Crédits de la table » du mode attente).
@@ -8094,9 +8101,32 @@ let levelMomentAt: number | undefined;
 let levelMomentKey: string | undefined;
 
 /** Le moment d'un badge ou d'un niveau est à l'écran (levelMomentView), sans effet de bord : soundView le lit aussi. */
-// Le retour de partie passe avant : le moment attend son bilan (game-return.ts), puis la roue.
+// Le moment attend le bilan de la partie (game-return.ts), se montre, puis la carte du bilan.
 function levelMomentShowing(): boolean {
   return !!levelTracker.pending() && !localPlay() && state.phase === 'menu' && !attract.active && !guest.active && !gameReturn.holding();
+}
+
+/** La roue seule à l'écran : là où le bilan d'une partie se pose (game-return.ts). */
+function gameReturnPlace(): boolean {
+  return state.phase === 'menu' && !playing && !attract.active && !guest.active && !localPlay() && !library.isActive() && !desktop.active;
+}
+
+/** La carte du bilan est à l'écran (sans effet de bord) : le moment des badges passe avant elle. */
+function gameReturnShowing(): boolean {
+  return gameReturn.showing() && gameReturnPlace() && !levelMomentShowing();
+}
+
+/**
+ * La carte du bilan à dessiner sur le plateau. La roue quittée (partie lancée, autre écran, mode attente,
+ * bureau) : la carte est fermée pour de bon, elle ne revient pas au retour sur la roue.
+ */
+function gameReturnView() {
+  if (!gameReturn.showing()) return undefined;
+  if (!gameReturnPlace()) {
+    gameReturn.dismiss('roue quittée'); // i18n-ignore : journal
+    return undefined;
+  }
+  return levelMomentShowing() ? undefined : gameReturn.view();
 }
 
 /**

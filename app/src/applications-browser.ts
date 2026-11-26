@@ -1,8 +1,8 @@
 // Applications (26/11/2026) : ouvrir un site dans un vrai Microsoft Edge (packages/core/src/applications.ts
 // dit pourquoi), en fenêtre d'application plein écran sur l'écran voulu, avec son profil à lui ; Chrome
 // seulement si Edge a été désinstallé. Ici aussi : les boutons de la borne relayés à Edge pendant qu'il a
-// la main (flippers ←→, MagnaSave ↑↓, Start Entrée, lanceur Espace, Exit Échap ; Exit tenu une seconde
-// ferme l'application).
+// la main (flippers : élément précédent, suivant, tenus reculer et avancer comme dans le Juke-box ; MagnaSave ←→, Start
+// Entrée, lanceur Espace, Exit Échap ; Exit tenu une seconde ferme l'application).
 //
 // Sans electron : les essais chargent ce module tel quel, avec de faux gestes de fenêtre et de touches.
 
@@ -11,17 +11,24 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   APP_EXIT_HOLD_MS,
+  APP_SEEK_KEYS,
   EDGE_APPS_PROFILE_DIR,
+  JUKEBOX_SEEK_EVERY_MS,
+  JUKEBOX_SEEK_HOLD_MS,
   appBrowserArgs,
   appButtonKey,
+  appSeekKeyCount,
   chromeExePaths,
   edgeExePaths,
+  isModifierVk,
+  seekPressStep,
   windowsVk,
   type AppButton,
   type AppEntry,
   type AppKey,
   type CabinetButtons,
   type ScreenRect,
+  type SeekPress,
 } from '@cyberpinball/core';
 import { edgeWindowOps, type EdgeKey, type EdgeWindowOps, type KeyMods } from './edge-login';
 
@@ -171,8 +178,10 @@ export interface AppButtonsInput {
   watchJoystick(listener: (code: string, down: boolean) => void): () => void;
   /** Vrai quand le navigateur a la main (aucune fenêtre de Cyber Pinball active). */
   browserHasFocus(): boolean;
-  /** Une touche pour le navigateur. */
-  key(key: AppKey): void;
+  /** Une touche pour le navigateur ; `lift` : touche tenue (Maj d'un flipper) relâchée le temps de la frappe. */
+  key(key: AppKey, lift?: number): void;
+  /** Maintenant, en millisecondes (essais : une horloge à la main). */
+  now?(): number;
   /** Exit tenu : fermer l'application. */
   quit(): void;
   /** Un bouton relâché, avant d'être relayé : vrai s'il est pris ailleurs (un téléphone à accepter). */
@@ -184,25 +193,55 @@ export interface AppButtonsInput {
 
 const APP_BUTTONS: readonly AppButton[] = ['leftFlipper', 'rightFlipper', 'leftMagna', 'rightMagna', 'start', 'plunger', 'exit'];
 
+/** Après une flèche frappée Maj relâché, ce temps où un relâché vu n'est pas cru (Maj remis aussitôt). */
+const LIFT_QUIET_MS = 60;
+
 /**
  * Relaie les boutons de la borne au navigateur tant qu'il a la main. Un bouton agit au relâché, pour
  * qu'un Maj ou un Ctrl d'encodeur encore tenu ne se mêle pas à la touche envoyée ; une touche qu'Edge
- * reçoit déjà d'un encodeur (Entrée, Échap, flèches) n'est pas renvoyée. Exit tenu APP_EXIT_HOLD_MS
- * ferme l'application, même quand Cyber Pinball a repris la main. Rend de quoi arrêter.
+ * reçoit déjà d'un encodeur (Entrée, Échap, flèches) n'est pas renvoyée. Un flipper suit le Juke-box
+ * (seekPressStep) : appuyé, il passe à l'élément voisin (Tab) ; tenu, il recule ou avance dans la vidéo. Exit tenu
+ * APP_EXIT_HOLD_MS ferme l'application, même quand Cyber Pinball a repris la main. Rend de quoi arrêter.
  */
 export function watchAppButtons(input: AppButtonsInput): () => void {
+  const now = input.now ?? Date.now;
   const codes = APP_BUTTONS.map((b) => [b, input.keys[b]] as const).filter((e): e is readonly [AppButton, string] => Boolean(e[1]));
+  const vkOf = new Map<AppButton, number>();
   const vks = codes.flatMap(([b, c]) => {
     const vk = c.startsWith('SDLJoy_') ? undefined : windowsVk(c);
+    if (vk !== undefined) vkOf.set(b, vk);
     return vk === undefined ? [] : [[b, vk] as const];
   });
   const joy = new Map(codes.filter(([, c]) => c.startsWith('SDLJoy_')).map(([b, c]) => [c, b]));
   const held = new Set<AppButton>();
   let exitTimer: ReturnType<typeof setTimeout> | undefined;
   let exitFired = false;
+  // Flippers tenus : l'appui (seekPressStep) et sa cadence.
+  const presses = new Map<AppButton, SeekPress>();
+  const seekTimers = new Map<AppButton, ReturnType<typeof setTimeout>>();
+  const quietUntil = new Map<AppButton, number>();
+
+  function stopSeek(button: AppButton): void {
+    clearTimeout(seekTimers.get(button));
+    seekTimers.delete(button);
+  }
+
+  function seekTick(button: AppButton & keyof typeof APP_SEEK_KEYS): void {
+    const step = seekPressStep(presses.get(button), 'tick', now(), button === 'leftFlipper' ? -1 : 1, true);
+    presses.set(button, step.press);
+    seekTimers.set(button, setTimeout(() => seekTick(button), JUKEBOX_SEEK_EVERY_MS));
+    if (!step.action || !('seek' in step.action) || !input.browserHasFocus()) return;
+    // Un Maj d'encodeur encore tenu ferait Maj+→ : relâché le temps des flèches.
+    const vk = vkOf.get(button);
+    const lift = vk !== undefined && isModifierVk(vk) ? vk : undefined;
+    for (let i = appSeekKeyCount(step.action.seek); i > 0; i--) input.key(APP_SEEK_KEYS[button], lift);
+    if (lift !== undefined) quietUntil.set(button, now() + LIFT_QUIET_MS);
+  }
 
   function change(button: AppButton, down: boolean): void {
     if (down === held.has(button)) return;
+    // Le Maj relâché le temps d'une flèche n'est pas le flipper relâché.
+    if (!down && now() < (quietUntil.get(button) ?? 0)) return;
     input.activity?.();
     if (down) {
       held.add(button);
@@ -213,12 +252,23 @@ export function watchAppButtons(input: AppButtonsInput): () => void {
           input.quit();
         }, APP_EXIT_HOLD_MS);
       }
+      if (isSeekButton(button) && appButtonKey(button, input.keys[button] ?? '')) {
+        presses.set(button, seekPressStep(undefined, 'down', now(), button === 'leftFlipper' ? -1 : 1, true).press);
+        seekTimers.set(button, setTimeout(() => seekTick(button), JUKEBOX_SEEK_HOLD_MS + 5));
+      }
       return;
     }
     held.delete(button);
     if (button === 'exit') {
       clearTimeout(exitTimer);
       if (exitFired) return;
+    }
+    if (isSeekButton(button) && presses.has(button)) {
+      const step = seekPressStep(presses.get(button), 'up', now(), button === 'leftFlipper' ? -1 : 1, true);
+      presses.delete(button);
+      stopSeek(button);
+      quietUntil.delete(button);
+      if (!step.action) return; // tenu : l'avance a déjà eu lieu
     }
     if (input.intercept?.(button)) return;
     if (!input.browserHasFocus()) return;
@@ -240,6 +290,11 @@ export function watchAppButtons(input: AppButtonsInput): () => void {
   return () => {
     clearInterval(timer);
     clearTimeout(exitTimer);
+    for (const b of [...seekTimers.keys()]) stopSeek(b);
     stopJoy?.();
   };
+}
+
+function isSeekButton(button: AppButton): button is AppButton & keyof typeof APP_SEEK_KEYS {
+  return button in APP_SEEK_KEYS;
 }

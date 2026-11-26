@@ -1424,3 +1424,182 @@
 .hub-rank-flag, .hub-rank-icon { width:1.4em; height:1.1em; object-fit:contain; }
 
 .hub-card-medal > span { width:100%; height:100%; }
+
+/*
+ * Bilan d'une partie posé sur la roue (app/src/game-return.ts, 26/11/2026) : une fenêtre en plus sur la
+ * roue, qui reste entière, visible et à portée des flippers ; le premier geste ferme la fenêtre. Pas de
+ * voile : on est revenu sur la roue, la fenêtre ne la recouvre pas. En borne, au-dessus de la roue (sous
+ * la marque) ; au bureau, sur le cadre 9:16 du plateau, à gauche (cotes de #media-bg, frontend.css), la
+ * roue et ses informations à droite. Le contenu est celui d'un écran hub en colonne (hub.js, plus haut
+ * dans cette feuille), resserré ici. #game-return a la place et la rotation du moment des badges
+ * (frontend.css) ; ses unités (--u) suivent sa zone.
+ */
+#game-return {
+  /* La souris passe à travers : un clic va à la roue, et ferme la carte (frontend.ts). */
+  pointer-events: none;
+}
+
+#game-return[hidden] {
+  display: none;
+}
+
+#game-return > .lib-hub.game-return-card {
+  /* Borne : sous la marque (170 de voile en tête), au-dessus de la roue et de son voile de pied (510). */
+  position: absolute;
+  inset: auto;
+  left: 50%;
+  top: calc(150 * var(--u));
+  width: min(calc(100cqw - 12cqmin), calc(920 * var(--u)));
+  height: auto;
+  max-height: calc(100cqh - 150 * var(--u) - 540 * var(--u));
+  translate: -50% 0;
+  /*
+   * En colonne souple, pas en grille : une grille de hauteur automatique ne réduit pas sa ligne 1fr
+   * sous max-height, le pied sortait de la carte. Ici le corps cède la place et défile.
+   */
+  display: flex;
+  flex-direction: column;
+  --pad-top: calc(26 * var(--u));
+  --pad-side: calc(32 * var(--u));
+  gap: calc(20 * var(--u));
+  border: calc(2 * var(--u)) solid var(--line-strong);
+  border-radius: calc(28 * var(--u));
+  background: var(--fond-ambiance);
+  background-color: var(--surface);
+  /* Une ombre portée large, jamais coupée : rien autour ne masque ce qui déborde. */
+  box-shadow:
+    0 calc(24 * var(--u)) calc(80 * var(--u)) rgba(0, 0, 0, 0.7),
+    0 0 0 calc(1 * var(--u)) rgba(139, 226, 58, 0.12);
+  animation: game-return-in 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+#game-return > .lib-hub.game-return-card > * {
+  flex: none;
+}
+
+#game-return > .lib-hub.game-return-card > .hub-body {
+  flex: 1 1 auto;
+}
+
+/* Une fenêtre, pas un écran : titre et médaillon plus petits que ceux d'un écran hub. */
+#game-return > .lib-hub.game-return-card .hub-head > .hub-logo {
+  width: calc(96 * var(--u));
+  height: calc(96 * var(--u));
+}
+
+#game-return > .lib-hub.game-return-card .hub-title {
+  font-size: calc(54 * var(--u));
+}
+
+/*
+ * Bureau : la fenêtre remplit tout le cadre du mini playfield (left 80, top 92, 531 × 944, arrondi 5,
+ * comme #media-bg et .loading-fallback.in-frame, frontend.css), la roue libre à droite. Ni bord, ni
+ * ombre, ni arrondi à elle : le chant du cadre l'entoure déjà ; une fenêtre arrondie posée dedans
+ * doublait les contours (26/11/2026).
+ */
+#game-return.game-return-desk > .lib-hub.game-return-card {
+  left: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  width: calc(531 * var(--u));
+  height: calc(944 * var(--u));
+  max-height: none;
+  translate: none;
+  border: 0;
+  border-radius: calc(5 * var(--u));
+  box-shadow: none;
+  overflow: hidden;
+  animation-name: game-return-fade;
+  --pad-top: calc(24 * var(--u));
+  --pad-side: calc(24 * var(--u));
+  gap: calc(18 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-head > .hub-logo {
+  width: calc(64 * var(--u));
+  height: calc(64 * var(--u));
+}
+
+/* Le titre sur une ligne : à 40, « PARTIE TERMINÉE » se coupait en deux dans le cadre. */
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-title {
+  font-size: calc(34 * var(--u));
+  white-space: nowrap;
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-facts {
+  font-size: calc(22 * var(--u));
+  column-gap: calc(16 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band {
+  gap: calc(6 * var(--u)) calc(16 * var(--u));
+  padding: calc(12 * var(--u)) calc(16 * var(--u)) calc(12 * var(--u)) calc(12 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band-n {
+  width: calc(80 * var(--u));
+  height: calc(80 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band-n strong {
+  font-size: calc(40 * var(--u));
+}
+
+/* Le palier, puis ce qu'il manque dessous : côte à côte, « 333 XP avant le niveau 13 » tenait en trois lignes. */
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band-top {
+  flex-direction: column;
+  align-items: start;
+  gap: calc(2 * var(--u));
+  font-size: calc(22 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band-tier {
+  font-size: calc(24 * var(--u));
+}
+
+/* Le détail des gains (le total +XP reste) : dans le cadre 9:16, sa place va au classement, entier. */
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-band-lines {
+  display: none;
+}
+
+/* La carte du record sans son icône : la place va au score et à son écart. */
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-card.hub-layout-hero {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: calc(18 * var(--u)) calc(20 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-card.hub-layout-hero .hub-card-ic {
+  display: none;
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-body {
+  gap: calc(26 * var(--u));
+}
+
+#game-return.game-return-desk > .lib-hub.game-return-card .hub-foot {
+  gap: calc(6 * var(--u)) calc(18 * var(--u));
+  font-size: calc(20 * var(--u));
+}
+
+@keyframes game-return-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(30 * var(--u))) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Dans le cadre, elle apparaît sur place : un glissement la ferait déborder du chant. */
+@keyframes game-return-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #game-return > .lib-hub.game-return-card {
+    animation: none;
+  }
+}

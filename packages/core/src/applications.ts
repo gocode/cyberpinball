@@ -373,36 +373,30 @@ export function readManifest(json: unknown, manifestUrl: string): { name?: strin
   };
 }
 
-/** Côté minimal d'une icône pour la grille (tuile de 150 px) ; en dessous, la tuile composée garde le favicon en pastille. */
+/**
+ * Côté d'une icône qui remplit sa tuile (tuile de 150 px). En dessous, c'est le favicon d'un site qui
+ * n'a rien de plus grand (Netflix 64 px, Twitch 32 px) : il est gardé quand même, et la grille le pose
+ * en pastille sur la tuile composée plutôt que de l'agrandir flou (applications.js, ap-mini).
+ */
 export const APP_ICON_MIN = 96;
+/** Le plus petit favicon gardé ; en dessous, les initiales. */
+export const APP_ICON_SMALLEST = 16;
 
 /**
  * Ordre d'essai : manifeste, icône Apple, icônes de la page, favicon ; dans chaque famille, la plus
- * grande d'abord. Une icône annoncée trop petite passe après les autres.
+ * grande d'abord. Une icône annoncée trop petite passe après les autres. Les SVG et les images
+ * inscrites dans la page (data:) ne sont pas essayés : la grille ne les garde pas (siteicon.ts).
  */
 export function rankIcons(candidates: readonly IconCandidate[]): IconCandidate[] {
   const order: Record<IconCandidate['kind'], number> = { manifest: 0, apple: 1, icon: 2, favicon: 3 };
   const seen = new Set<string>();
   return candidates
+    .filter((c) => !c.url.startsWith('data:') && !/\.svgz?(\?|#|$)/i.test(c.url))
     .filter((c) => !seen.has(c.url) && !!seen.add(c.url))
     .sort((a, b) => {
       const small = (c: IconCandidate) => (c.size > 0 && c.size < APP_ICON_MIN ? 1 : 0);
       return small(a) - small(b) || order[a.kind] - order[b.kind] || b.size - a.size;
     });
-}
-
-/**
- * Extension d'une icône d'après son type, ou undefined si ce n'est pas une image que la grille sait
- * montrer : celles que le protocole des médias sert (png, jpg, webp, gif). Un SVG ou un .ico passe
- * son tour ; sans autre icône, la tuile composée.
- */
-export function iconExtension(contentType: string | undefined, url: string): string | undefined {
-  const type = (contentType ?? '').toLowerCase().split(';')[0]!.trim();
-  const byType: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
-  if (byType[type]) return byType[type];
-  if (type.startsWith('image/')) return undefined;
-  const ext = /\.(png|jpe?g|webp|gif)(\?|#|$)/i.exec(url)?.[1]?.toLowerCase();
-  return ext === 'jpeg' ? 'jpg' : ext;
 }
 
 // ---------------------------------------------------------------------------
@@ -549,20 +543,45 @@ export function portraitTurn(edge: FlipperEdge, current: Rotation): Rotation | u
 // ---------------------------------------------------------------------------
 // Boutons de la borne pendant une application
 
-/** Touche d'Edge que Cyber Pinball envoie pour un bouton. */
-export type AppKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Space' | 'Escape';
+/** Touche d'Edge qu'un bouton envoie (TabBack : Maj+Tab). */
+export type AppKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Space' | 'Escape' | 'Tab' | 'TabBack';
 
-/** Les boutons relayés à Edge, et leur touche : flippers ←→, MagnaSave ↑↓, Start Entrée, lanceur Espace, Exit Échap (retour). */
+/**
+ * Les boutons relayés à Edge, comme dans le Juke-box (26/11/2026) : un flipper appuyé passe à
+ * l'élément cliquable précédent ou suivant (Maj+Tab, Tab : Edge l'encadre et fait défiler la page
+ * jusqu'à lui), tenu il recule ou avance dans la vidéo (APP_SEEK_KEYS) ; MagnaSave ←→, Start
+ * Entrée, lanceur Espace, Exit Échap (retour).
+ */
 export const APP_BUTTON_KEYS = {
-  leftFlipper: 'ArrowLeft',
-  rightFlipper: 'ArrowRight',
-  leftMagna: 'ArrowUp',
-  rightMagna: 'ArrowDown',
+  leftFlipper: 'TabBack',
+  rightFlipper: 'Tab',
+  leftMagna: 'ArrowLeft',
+  rightMagna: 'ArrowRight',
   start: 'Enter',
   plunger: 'Space',
   exit: 'Escape',
 } as const satisfies Record<string, AppKey>;
 export type AppButton = keyof typeof APP_BUTTON_KEYS;
+
+/**
+ * Flipper tenu : la flèche qui recule ou avance dans la vidéo (YouTube : 5 s par flèche), envoyée au
+ * rythme du Juke-box (seekPressStep) ; plusieurs flèches par pas quand le pas grandit (10 s, 30 s).
+ */
+export const APP_SEEK_KEYS = { leftFlipper: 'ArrowLeft', rightFlipper: 'ArrowRight' } as const satisfies Partial<Record<AppButton, AppKey>>;
+export const APP_SEEK_SECONDS_PER_KEY = 5;
+
+/** Flèches à envoyer pour un pas d'avance de `seconds` (signé) : au moins une. */
+export function appSeekKeyCount(seconds: number): number {
+  return Math.max(1, Math.round(Math.abs(seconds) / APP_SEEK_SECONDS_PER_KEY));
+}
+
+/**
+ * Touche de modification (Maj, Ctrl, Alt, gauche ou droite) : tenue par un flipper d'encodeur, elle se
+ * mêlerait aux flèches de l'avance (Maj+→) ; on la relâche le temps de la frappe.
+ */
+export function isModifierVk(vk: number): boolean {
+  return (vk >= 0x10 && vk <= 0x12) || (vk >= 0xa0 && vk <= 0xa5);
+}
 
 /** Exit tenu ce temps : l'application se ferme et la roue revient. */
 export const APP_EXIT_HOLD_MS = 1000;

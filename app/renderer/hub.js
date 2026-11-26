@@ -392,15 +392,19 @@
 
   let rendered;
 
-  /** L'écran entier (renderLibrary le renvoie à la place de l'écran de menu). */
-  function render(v) {
+  /**
+   * L'écran entier (renderLibrary le renvoie à la place de l'écran de menu). `apart` : une vue dessinée
+   * ailleurs (le bilan d'une partie posé sur la roue, frontend.js), qui ne reprend ni ne garde l'écran du menu ;
+   * une fenêtre étroite, en colonne même au bureau (elle y prend le cadre du plateau, à côté de la roue).
+   */
+  function render(v, apart = false) {
     const h = v.hub;
-    const desk = document.documentElement.classList.contains('menu-desktop');
+    const desk = !apart && document.documentElement.classList.contains('menu-desktop');
     // Un rafraîchissement entre l’appui et le relâchement ne doit pas retirer le bouton du document.
-    const same = rendered?.root.isConnected && rendered.medallion === h.medallion;
+    const same = !apart && rendered?.root.isConnected && rendered.medallion === h.medallion;
     const o = same ? rendered.root : el('section');
     const bar = same ? rendered.bar : el('nav');
-    rendered = { root: o, medallion: h.medallion, bar };
+    if (!apart) rendered = { root: o, medallion: h.medallion, bar };
     o.className = `lib lib-hub${desk ? ' hub-desk' : ''}${h.inside ? ' hub-inside' : ''}${h.person ? ' hub-profile' : ''}`;
     o.dataset.navOrder = (v.order ?? []).join(',');
     const top = [];
