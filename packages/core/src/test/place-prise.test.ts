@@ -272,7 +272,7 @@ interface GameReturnLike {
   dismiss(why: string): void;
 }
 
-function gameReturn(over: { now?: () => number; mine?: number; board?: { rank: number; score: number; initials?: string; at?: string }[] } = {}) {
+function gameReturn(over: { now?: () => number; mine?: number; tableAllowed?: () => boolean; board?: { rank: number; score: number; initials?: string; at?: string }[] } = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createGameReturn } = require(path.join(REPO_ROOT, 'app', 'dist', 'game-return.js')) as { createGameReturn(host: unknown): GameReturnLike };
   const lea = score(LEA, 'Léa', 9_450_000, 120);
@@ -284,6 +284,7 @@ function gameReturn(over: { now?: () => number; mine?: number; board?: { rank: n
     play: (t: { title: string }) => events.push(`rejouer ${t.title}`),
     ...(over.board ? { board: () => over.board } : {}),
     canOpen: () => true,
+    tableAllowed: over.tableAllowed,
     log: () => undefined,
     now: over.now ?? (() => clock),
   });
@@ -381,6 +382,22 @@ test('retour de partie : le premier geste ferme la carte pour de bon', () => {
   one.r.report(one.facts(9_712_450, 9_000_000));
   two.r.report(two.facts(9_712_450, 9_000_000));
   assert.notEqual(one.built()!.key, two.built()!.key);
+});
+
+test('retour de partie : le verrouillage parental retire définitivement la carte et empêche sa relance', () => {
+  let authorized = false;
+  const h = gameReturn({ tableAllowed: () => authorized });
+  const report = h.facts(5_000);
+  assert.equal(h.r.report(report), false);
+  authorized = true;
+  assert.equal(h.r.report(report), true);
+  assert.ok(h.built());
+  authorized = false;
+  assert.equal(h.r.key('start'), false);
+  assert.deepEqual(h.events, []);
+  assert.equal(h.built(), undefined);
+  authorized = true;
+  assert.equal(h.r.showing(), false);
 });
 
 // ---------- Câblage ----------

@@ -4369,6 +4369,7 @@ const gameReturn = createGameReturn({
   play: (table) => playFromNotice(table),
   // Sans classement publié pour la version (table originale…) : le tableau de la table sur la borne.
   board: (table) => tableScores.board(table, 'all').lines,
+  tableAllowed: mediaTableAllowed,
   canOpen: () => state.phase === 'menu' && !playing && !attract.active && !socialClosed() && !library.isActive(),
   log: (line) => console.log(line),
 });
@@ -8303,7 +8304,7 @@ function gameReturnPlace(): boolean {
   return state.phase === 'menu' && !playing && !attract.active && !guest.active && !localPlay() && !library.isActive() && !desktop.active;
 }
 
-/** La carte du bilan est à l'écran (sans effet de bord) : le moment des badges passe avant elle. */
+/** La carte du bilan est à l'écran tant que la table le permet ; le moment des badges passe avant elle. */
 function gameReturnShowing(): boolean {
   return gameReturn.showing() && gameReturnPlace() && !levelMomentShowing();
 }
