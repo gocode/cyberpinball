@@ -570,6 +570,35 @@ export interface AppPortrait {
 }
 
 /**
+ * Rectangle du bureau après un quart de tour. Relevés sur la borne le 26/11/2026 : juste après le
+ * changement, Windows donne déjà la nouvelle rotation mais encore les dimensions d'avant (3840 × 2160
+ * lus pour un écran devenu 2160 × 3840) ; Edge était alors posé en paysage sur un écran en portrait, et le
+ * pavé tactile du téléphone ne couvrait qu'une bande du haut. Quand le relevé n'a pas échangé la
+ * largeur et la hauteur d'un quart de tour, on les échange (même coin haut gauche).
+ */
+export function rectAfterTurn(before: ObservedDisplay, observed: ScreenRect, to: Rotation): ScreenRect {
+  const quarter = (to - before.rotation + 360) % 180 !== 0;
+  const stale = observed.width === before.bounds.width && observed.height === before.bounds.height;
+  if (!quarter || !stale || before.bounds.width === before.bounds.height) return { ...observed };
+  return { x: observed.x, y: observed.y, width: before.bounds.height, height: before.bounds.width };
+}
+
+/** Écart toléré (pixels) entre le rectangle voulu et celui qu'a la fenêtre une fois posée. */
+export const PLACEMENT_TOLERANCE_PX = 16;
+
+/**
+ * Constat à journaliser quand la fenêtre posée n'a pas le rectangle voulu (le pavé du téléphone et la
+ * capture suivent le rectangle réel de la fenêtre : un écart les fait déborder ou rétrécir) ;
+ * undefined quand tout concorde.
+ */
+export function placementProblem(wanted: ScreenRect, actual: ScreenRect | undefined): string | undefined {
+  const size = (r: ScreenRect) => `${Math.round(r.width)} × ${Math.round(r.height)} en ${Math.round(r.x)}, ${Math.round(r.y)}`;
+  if (!actual) return 'fenêtre disparue avant le contrôle de sa position'; // i18n-ignore : journal
+  const off = [wanted.x - actual.x, wanted.y - actual.y, wanted.width - actual.width, wanted.height - actual.height].some((d) => Math.abs(d) > PLACEMENT_TOLERANCE_PX);
+  return off ? `fenêtre de ${size(actual)} au lieu de ${size(wanted)}` : undefined; // i18n-ignore : journal
+}
+
+/**
  * Application ouverte sur le playfield (26/11/2026) : Windows tourne l'écran pour que le bord du joueur
  * soit en bas (portraitTurn), le temps de l'application, par la rotation de session des parties
  * (SessionOrientation.lend : origine notée avant, reprise après un plantage, rendue à la sortie).
@@ -591,7 +620,7 @@ export function turnPlayfieldForApp(input: AppPortraitInput): AppPortrait | unde
     input.log?.(lent.giveBack());
     return undefined;
   }
-  return { rect: { ...turned.bounds }, leave: () => {
+  return { rect: rectAfterTurn(display, turned.bounds, to), leave: () => {
     const report = lent.giveBack();
     input.log?.(report);
     return report;

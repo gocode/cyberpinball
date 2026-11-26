@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications on the playfield (TikTok in portrait): the phone touch pad now covers the whole screen instead of a strip at the top. Windows still reports the old dimensions right after turning the screen, so Edge was placed in landscape on a screen that had become portrait. The rectangle is now recomputed, and the log reports a badly placed window.
 - Behind the scenes: a fix set aside from a release because it broke a test is picked up again automatically once the rest has changed and its tests pass; after a few tries it stays flagged until someone fixes it.
 - Phone remote: a "Pad" / "Mirror" button for Edge windows (Applications section, Jukebox YouTube sign-in). In "Mirror", you see on your phone the site shown on the cabinet screen: tap an image to click, swipe to scroll, long press to right-click. The touch pad is still the default. Protected videos (Netflix, Prime Video, Disney+) stay black in the mirror.
 - Behind the scenes: prereleases ship more steadily. Each batch of fixes is first tried on its own, and the working version only moves forward when every test passes. If a fix breaks a test, it is set aside with its cause and the others ship without it.

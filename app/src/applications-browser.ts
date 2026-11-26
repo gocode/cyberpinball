@@ -21,6 +21,7 @@ import {
   chromeExePaths,
   edgeExePaths,
   isModifierVk,
+  placementProblem,
   seekPressStep,
   windowsVk,
   type AppButton,
@@ -37,6 +38,8 @@ const VK: Record<EdgeKey, number> = { Enter: 0x0d, Tab: 0x09, Backspace: 0x08, A
 const VK_A = 0x41;
 const FIND_TIMEOUT_MS = 20_000;
 const CLOSE_GRACE_MS = 10_000;
+/** Délai laissé à Edge pour se mettre en plein écran avant de contrôler sa position. */
+const PLACEMENT_CHECK_MS = 2000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -120,6 +123,13 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
       }
       ops().place(win, at);
       ops().front(win);
+      // Le pavé du téléphone et le miroir suivent le rectangle réel de la fenêtre : on contrôle qu'il est celui voulu.
+      const placed = win;
+      setTimeout(() => {
+        if (child.exitCode !== null) return;
+        const problem = placementProblem(at, ops().rect(placed));
+        if (problem) log(`Applications : ${app.name} mal placée, ${problem}`); // i18n-ignore : journal
+      }, PLACEMENT_CHECK_MS).unref?.();
       return true;
     })();
     const ready = (): boolean => {

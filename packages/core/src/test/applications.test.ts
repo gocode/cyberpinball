@@ -22,7 +22,9 @@ import {
   loadApplications,
   markOpened,
   normalizeAppUrl,
+  placementProblem,
   portraitTurn,
+  rectAfterTurn,
   sameSite,
   saveApplications,
   turnPlayfieldForApp,
@@ -385,6 +387,33 @@ test('playfield : l’orientation de jeu revient (pas celle de Windows), une seu
   assert.equal(sim.rotation(), 90, 'l’orientation de jeu, pas celle de Windows (0°)');
   portrait.leave();
   assert.equal(sim.rotation(), 90);
+});
+
+test('playfield : relevé de Windows pas encore à jour après le quart de tour (borne du 26/11/2026), le rectangle est tourné quand même', () => {
+  // 3840 × 2160 relu après le passage de 180° à 270° : Edge était posé en paysage sur un écran devenu portrait.
+  const sim = simulatedPlayfield({ flipperEdge: 'left' });
+  const staleDisplays = () => sim.displays().map((d) => ({ ...d, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }));
+  const portrait = turnPlayfieldForApp({ session: sim.session, cabinet: sim.cabinet, displays: staleDisplays });
+  assert.ok(portrait);
+  assert.equal(sim.rotation(), 270);
+  assert.deepEqual(portrait.rect, { x: 0, y: 0, width: 1080, height: 1920 }, 'largeur et hauteur échangées malgré le relevé périmé');
+});
+
+test('rectAfterTurn : échange seulement après un quart de tour dont le relevé n’a pas bougé', () => {
+  const before = { ...devPcDisplays()[3]!, rotation: 180 as Rotation, bounds: { x: 0, y: 0, width: 3840, height: 2160 } };
+  assert.deepEqual(rectAfterTurn(before, { x: 0, y: 0, width: 3840, height: 2160 }, 270), { x: 0, y: 0, width: 2160, height: 3840 });
+  assert.deepEqual(rectAfterTurn(before, { x: 0, y: 0, width: 2160, height: 3840 }, 270), { x: 0, y: 0, width: 2160, height: 3840 }, 'relevé à jour : gardé tel quel');
+  assert.deepEqual(rectAfterTurn(before, { x: 0, y: 0, width: 3840, height: 2160 }, 0), { x: 0, y: 0, width: 3840, height: 2160 }, 'demi-tour : mêmes dimensions');
+  const square = { ...before, bounds: { x: 0, y: 0, width: 2000, height: 2000 } };
+  assert.deepEqual(rectAfterTurn(square, { x: 5, y: 6, width: 2000, height: 2000 }, 90), { x: 5, y: 6, width: 2000, height: 2000 });
+});
+
+test('placementProblem : un écart de position ou de taille se dit, un écart minime non', () => {
+  const wanted = { x: 0, y: 0, width: 2160, height: 3840 };
+  assert.equal(placementProblem(wanted, { x: 0, y: 0, width: 2160, height: 3840 }), undefined);
+  assert.equal(placementProblem(wanted, { x: 0, y: 0, width: 2150, height: 3840 }), undefined, 'bordure');
+  assert.match(placementProblem(wanted, { x: 0, y: 0, width: 3840, height: 2160 }) ?? '', /3840 × 2160 en 0, 0 au lieu de 2160 × 3840 en 0, 0/);
+  assert.ok(placementProblem(wanted, undefined));
 });
 
 test('playfield : Cyber Pinball quitté ou planté pendant l’application, l’écran retrouve son orientation', () => {
