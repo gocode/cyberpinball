@@ -10,7 +10,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
-  certifiedBy, enqueueMerge, mergeQueued, publishGrouped, readMergeQueue, readRefus, refusBrief, refusStatus, trainStatus, unverifiedProblem,
+  REPRISES_MAX, certifiedBy, decisionReprise, enqueueMerge, mergeQueued, publishGrouped, readMergeQueue, readRefus, refusBrief, refusStatus, trainStatus, unverifiedProblem,
 } from './publication-groupee.mjs';
 import { mainBusy, readJson, writeJson } from './coordination.mjs';
 
@@ -67,7 +67,8 @@ function trainBench({ verdict, envoi = async () => true, duringVerify = () => {}
   const verifies = [];
   const rechecks = [];
   const publishes = [];
-  const rouge = (cwd) => fs.existsSync(path.join(cwd, 'cassee.txt'));
+  // repare.txt : un commit de proto/ecrans qui répare ce que la branche cassait (réparation venue d'ailleurs).
+  const rouge = (cwd) => fs.existsSync(path.join(cwd, 'cassee.txt')) && !fs.existsSync(path.join(cwd, 'repare.txt'));
   const verify = async (options) => {
     const sha = headOf(options.cwd);
     verifies.push({ sha, cwd: options.cwd, testsRapides: options.testsRapides, mainHead: git('rev-parse', 'HEAD') });
@@ -207,6 +208,73 @@ test('train : une seule branche rouge est écartée, proto/ecrans reste intact e
     assert.equal(publishes.length, 0, 'rien ne part');
     assert.deepEqual(readRefus(dir).map((r) => r.branche), ['rouge']);
     assert.equal(trainStatus(dir), undefined);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : une branche refusée est reprise quand proto/ecrans a changé et que ses échecs passent dessus ; elle part avec le lot', async () => {
+  const bench = trainBench();
+  const { root, git, branch, commit, dir, rechecks, publishes, runTrain } = bench;
+  try {
+    const b = branch('b', [['cassee.txt', 'x\n']]);
+    enqueueMerge({ branche: 'b', head: b }, dir);
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.deepEqual(readRefus(dir).map((r) => r.branche), ['b']);
+    const apresRefus = rechecks.length;
+    // Rien n'a changé sur proto/ecrans : pas de reprise (une préversion seule ne compte pas non plus).
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(rechecks.length, apresRefus, 'pas de contrôle tant que proto/ecrans n\'a pas changé');
+    assert.equal(isAncestor(bench.main, b), false);
+    // Une réparation arrive sur proto/ecrans : la branche est reprise, vérifiée dans le lot, fusionnée et publiée.
+    commit('repare.txt', 'ok\n', 'répare ce que b cassait');
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(rechecks.length, apresRefus + 1, 'un seul contrôle rapide : ses fichiers en échec, sur proto/ecrans + la branche');
+    assert.deepEqual(rechecks.at(-1).failures, ['rouge.test.mjs']);
+    assert.equal(isAncestor(bench.main, b), true, 'la branche reprise est entrée dans proto/ecrans');
+    assert.deepEqual(readRefus(dir), [], 'fusionnée : plus de refus');
+    assert.deepEqual(readMergeQueue(dir), []);
+    assert.equal(publishes.length, 1);
+    assert.match(bench.said.join('\n'), /Reprise de b : ses échecs passent[^\n]*elle repart dans le lot/);
+    assert.match(git('log', '-1', '--format=%s'), /^Version /);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('train : une branche refusée est reprise ou signalée, jamais oubliée ; reprises plafonnées, puis refus et brief restent affichés', async () => {
+  const bench = trainBench();
+  const { root, branch, commit, dir, rechecks, runTrain } = bench;
+  try {
+    const b = branch('b', [['cassee.txt', 'x\n']]);
+    enqueueMerge({ branche: 'b', head: b }, dir);
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    const r0 = readRefus(dir)[0];
+    assert.equal(r0.reprises, 0);
+    // Les décisions possibles, toutes tournées vers une reprise ou un signalement.
+    assert.equal(decisionReprise(r0, { utile: r0.utile }), 'attendre');
+    assert.equal(decisionReprise(r0, { utile: 'autre' }), 'controler');
+    assert.equal(decisionReprise(r0, { utile: 'autre', enFile: true }), 'en-file');
+    assert.equal(decisionReprise(r0, { utile: 'autre', existe: false }), 'disparue');
+    assert.equal(decisionReprise({ ...r0, reprises: REPRISES_MAX }, { utile: 'autre' }), 'epuisee');
+    // Toujours rouge : chaque changement de proto/ecrans refait un contrôle (et un seul), jusqu'au plafond.
+    for (let i = 1; i <= REPRISES_MAX; i++) {
+      const avant = rechecks.length;
+      commit(`n${i}.txt`, `${i}\n`, `autre travail ${i}`);
+      assert.equal(await runTrain(), 0, bench.said.join('\n'));
+      assert.equal(rechecks.length, avant + 1, `contrôle ${i}`);
+      assert.equal(readRefus(dir)[0].reprises, i);
+      assert.match(refusStatus(dir), new RegExp(`reprise automatique à chaque changement de proto/ecrans \\(${i}/${REPRISES_MAX}\\)|épuisées`));
+    }
+    // Plafond atteint : plus de contrôle automatique, mais le refus reste là, en tête, avec son brief ; jamais effacé.
+    const avant = rechecks.length;
+    commit('apres.txt', 'x\n', 'encore du travail');
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(rechecks.length, avant, 'reprises épuisées : le train ne refait plus de contrôle');
+    assert.deepEqual(readRefus(dir).map((r) => r.branche), ['b']);
+    assert.match(refusStatus(dir), new RegExp(`b \\(commit [0-9a-f]{8}[^)]*reprises automatiques épuisées \\(${REPRISES_MAX}/${REPRISES_MAX}\\) : une session doit la corriger`));
+    assert.match(refusBrief(readRefus(dir)[0]), /rouge\.test\.mjs/);
+    assert.equal(isAncestor(bench.main, b), false);
   } finally {
     cleanup(root);
   }

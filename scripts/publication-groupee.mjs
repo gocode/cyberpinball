@@ -63,6 +63,8 @@ const OCCUPE_MAX_MS = 30 * 60_000;
 /** Recherches de branche fautive par lot, et essais de lecture d'une sortie illisible : au-delà, le train s'arrête (la file reste). */
 export const RECHERCHES_MAX = 5;
 export const ILLISIBLE_MAX = 3;
+/** Reprises automatiques d'une branche refusée (contrôle ou retour dans un lot) ; au-delà, une session doit la corriger. */
+export const REPRISES_MAX = 4;
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 export const LEADER = 'chef-publication.lock';
@@ -145,10 +147,11 @@ export function readMergeQueue(dir = coordinationDir()) {
 }
 
 /** La branche, au commit vérifié `head`, confiée au train (remplace une entrée précédente). */
-export function enqueueMerge({ branche, head }, dir = coordinationDir()) {
+export function enqueueMerge({ branche, head }, dir = coordinationDir(), { garderRefus = false } = {}) {
   withQueueLock(dir, (queue) => ({ queue: [...queue.filter((e) => e.branche !== branche), { branche, head, date: new Date().toISOString(), etat: 'en-file' }] }));
-  // Une branche reconfiée repart à zéro : son refus d'avant ne la désigne plus.
-  clearRefus(branche, dir);
+  // Une branche reconfiée par sa session repart à zéro : son refus d'avant ne la désigne plus. La reprise du train, elle,
+  // garde le refus (et son compte de reprises) jusqu'à ce que la branche soit fusionnée.
+  if (!garderRefus) clearRefus(branche, dir);
 }
 
 // ---------------------------------------------------------------- refus (branches écartées du train)
@@ -165,7 +168,31 @@ export function readRefus(dir = coordinationDir()) {
 
 export function recordRefus(refus, dir = coordinationDir()) {
   const previous = readRefus(dir).find((r) => r.branche === refus.branche);
-  writeJson(path.join(dir, REFUS), [...readRefus(dir).filter((r) => r.branche !== refus.branche), { tentatives: 1, ...refus, date: new Date().toISOString(), ...(previous ? { tentatives: (previous.tentatives ?? 1) + 1 } : {}) }]);
+  writeJson(path.join(dir, REFUS), [...readRefus(dir).filter((r) => r.branche !== refus.branche), { tentatives: 1, ...refus, date: new Date().toISOString(), reprises: previous?.reprises ?? 0, ...(previous ? { tentatives: (previous.tentatives ?? 1) + 1 } : {}) }]);
+}
+
+/** Met à jour des champs d'un refus (base du dernier contrôle, nombre de reprises). */
+export function majRefus(branche, fields, dir = coordinationDir()) {
+  writeJson(path.join(dir, REFUS), readRefus(dir).map((r) => (r.branche === branche ? { ...r, ...fields } : r)));
+}
+
+/**
+ * Que faire d'une branche refusée à ce tour du train ? Jamais « rien, pour toujours » : elle est reprise ('controler'), elle
+ * attend que proto/ecrans change ('attendre'), elle est déjà repartie ('en-file'), ou elle est signalée à une session
+ * ('epuisee' : reprises automatiques épuisées ; 'disparue' : son commit n'existe plus). Les deux derniers restent affichés en tête
+ * de chaque npm run fusionner avec le brief de reprise (npm run refus).
+ */
+export function decisionReprise(r, { utile, existe = true, enFile = false }) {
+  if (enFile) return 'en-file';
+  if (!existe) return 'disparue';
+  if ((r.reprises ?? 0) >= REPRISES_MAX) return 'epuisee';
+  if (r.utile && r.utile === utile) return 'attendre';
+  return 'controler';
+}
+
+/** Le dernier commit de proto/ecrans qui n'est pas un commit « Version … » : une préversion ne change aucun test, elle ne déclenche pas de reprise. */
+export function dernierCommitUtile(cwd) {
+  return git(['log', '-1', '--format=%H', '--extended-regexp', '--grep=^Version [0-9]', '--invert-grep', 'HEAD'], cwd);
 }
 
 export function clearRefus(branche, dir = coordinationDir()) {
@@ -176,7 +203,10 @@ export function clearRefus(branche, dir = coordinationDir()) {
 /** Ce que dit un refus, en quelques lignes : la branche, son commit, les fichiers et le message en cause. */
 export function refusLine(r) {
   const fichiers = (r.fichiers ?? []).join(', ') || r.etape || '?';
-  return `${r.branche} (commit ${String(r.head).slice(0, 8)}, écartée à ${hhmm(r.date)}${r.tentatives > 1 ? `, ${r.tentatives}e refus` : ''}) : ${fichiers}${r.message ? ` — ${String(r.message).split('\n').filter(Boolean).slice(0, 2).join(' / ').slice(0, 300)}` : ''}`;
+  const reprises = (r.reprises ?? 0) >= REPRISES_MAX
+    ? `, reprises automatiques épuisées (${r.reprises}/${REPRISES_MAX}) : une session doit la corriger`
+    : `, reprise automatique à chaque changement de ${BASE} (${r.reprises ?? 0}/${REPRISES_MAX})`;
+  return `${r.branche} (commit ${String(r.head).slice(0, 8)}, écartée à ${hhmm(r.date)}${r.tentatives > 1 ? `, ${r.tentatives}e refus` : ''}${reprises}) : ${fichiers}${r.message ? ` — ${String(r.message).split('\n').filter(Boolean).slice(0, 2).join(' / ').slice(0, 300)}` : ''}`;
 }
 
 /** Le brief prêt à donner à une session pour reprendre une branche refusée. */
@@ -194,7 +224,7 @@ export function refusBrief(r) {
 export function refusStatus(dir = coordinationDir()) {
   const list = readRefus(dir);
   if (!list.length) return undefined;
-  return `REFUSÉES par le train (leur travail fait tomber la suite ; elles ne partent pas tant qu'elles ne sont pas corrigées et reconfiées par npm run fusionner) :\n${list.map((r) => `  - ${refusLine(r)}`).join('\n')}\nnpm run refus : détail et brief de reprise.`;
+  return `REFUSÉES par le train (leur travail fait tomber la suite). Le train les reprend seul : à chaque changement de ${BASE}, si leurs fichiers en échec passent sur ${BASE} + la branche, elles repartent dans le lot suivant. Une branche aux reprises épuisées attend une session qui la corrige, puis npm run fusionner :\n${list.map((r) => `  - ${refusLine(r)}`).join('\n')}\nnpm run refus : détail et brief de reprise.`;
 }
 
 /** Retire l'entrée de la branche (fusionnée, ou conflit lu par sa session). */
@@ -572,10 +602,50 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
    * Rend { rouge, arret } : `rouge` si la suite reste rouge sur proto/ecrans lui-même (déjà rouge avant le lot),
    * `arret` si le train doit s'arrêter (la file reste intacte).
    */
+  /**
+   * Les branches refusées d'un lot précédent sont reprises : seulement si proto/ecrans a changé depuis leur dernier contrôle
+   * (ce qui les faisait tomber peut être réparé) ET si leurs fichiers en échec passent sur proto/ecrans + la branche (contrôle
+   * rapide, dans le candidat). Alors elles repartent en file, avec leur compte de reprises ; sinon elles restent refusées et
+   * visibles. REPRISES_MAX contrôles ou retours par branche : au-delà, une session doit la corriger (brief : npm run refus).
+   */
+  const refusesCeTour = new Set();
+  const reprendre = async () => {
+    for (const r of readRefus(dir)) {
+      // Écartée par ce train même : la recherche vient de la rejouer sur les états du lot ; la reprise attend le prochain train.
+      if (refusesCeTour.has(r.branche)) continue;
+      const base = git(['rev-parse', 'HEAD'], main);
+      const utile = dernierCommitUtile(main);
+      const enFile = readMergeQueue(dir).some((e) => e.branche === r.branche && e.etat === 'en-file');
+      const existe = gitRun(['cat-file', '-e', `${r.head}^{commit}`], main).status === 0;
+      if (decisionReprise(r, { utile, existe, enFile }) !== 'controler') continue;
+      const essai = (r.reprises ?? 0) + 1;
+      resetCandidate(main, cand, base);
+      const { merged } = mergeQueued(cand, [{ branche: r.branche, head: r.head }], () => {});
+      let encore = [];
+      if (merged.length) {
+        if (!prepare(cand, say)) throw new Error('candidat non préparé');
+        setState('publication', 'recherche', { envoi: envoi?.version });
+        say(`Reprise de ${r.branche} (essai ${essai}/${REPRISES_MAX}) : ${(r.fichiers ?? []).join(', ') || 'contrôles'} rejoué(s) sur ${BASE} (${base.slice(0, 8)}) + la branche.`);
+        encore = (await recheck({ cwd: cand, failures: r.fichiers ?? [], say })).map(key);
+      }
+      if (!merged.length || encore.length) {
+        majRefus(r.branche, { utile, reprises: essai, controleLe: new Date().toISOString() }, dir);
+        say(merged.length
+          ? `Reprise de ${r.branche} : ${encore.join(', ')} tombe encore sur ${BASE} + la branche ; elle reste refusée (essai ${essai}/${REPRISES_MAX}).`
+          : `Reprise de ${r.branche} : elle ne se fusionne plus sans conflit avec ${BASE} ; elle reste refusée, sa session doit la remettre à jour (essai ${essai}/${REPRISES_MAX}).`);
+        continue;
+      }
+      enqueueMerge({ branche: r.branche, head: r.head }, dir, { garderRefus: true });
+      majRefus(r.branche, { utile, reprises: essai, repriseLe: new Date().toISOString() }, dir);
+      say(`Reprise de ${r.branche} : ses échecs passent sur ${BASE} + la branche ; elle repart dans le lot.`);
+    }
+  };
+
   const integrate = async () => {
     let illisibles = 0;
     let recherches = 0;
     for (let essai = 1; essai <= 4 * RECHERCHES_MAX + ILLISIBLE_MAX; essai++) {
+      await reprendre();
       // Un refus lu par sa session (ou resté sans lecteur plus de 15 min) sort de la file ; refus.json le garde.
       for (const e of readMergeQueue(dir)) if (e.etat === 'refusee' && Date.now() - (Date.parse(e.refuseeLe ?? '') || 0) > 15 * 60_000) dropMerge(e.branche, dir);
       const entries = readMergeQueue(dir).filter((e) => e.etat === 'en-file');
@@ -653,7 +723,8 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
       const detail = (result.details ?? []).find((d) => restants.includes(key(d.file)));
       const probleme = (result.problems ?? []).find((p) => restants.includes(p.etape) || (p.fichiers ?? []).some((f) => restants.includes(key(f))));
       const message = detail ? shortReport(detail.details, 4) : (probleme?.lignes ?? []).slice(0, 6).join('\n');
-      recordRefus({ branche: fautive.branche, head: fautive.head, lot: noms, fichiers: restants, etape: probleme?.etape, message: String(message ?? '').slice(0, 1200) }, dir);
+      recordRefus({ branche: fautive.branche, head: fautive.head, utile: dernierCommitUtile(main), lot: noms, fichiers: restants, etape: probleme?.etape, message: String(message ?? '').slice(0, 1200) }, dir);
+      refusesCeTour.add(fautive.branche);
       markMerge(fautive.branche, { etat: 'refusee', fichiers: restants, message: String(message ?? '').slice(0, 800), refuseeLe: new Date().toISOString() }, dir);
       say(`\nBranche écartée du lot : ${refusLine(readRefus(dir).find((r) => r.branche === fautive.branche))}. Elle ne part pas ; le reste du lot est refait et revérifié en entier.`);
       if (++recherches >= RECHERCHES_MAX) {
