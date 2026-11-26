@@ -63,8 +63,13 @@ test('musique de fond : discrète, en boucle, coupée en essai hors écran', () 
   const game = read('app', 'renderer', 'root-access', 'game.js');
   assert.match(game, /new Audio\('musique\.mp3'\)/);
   assert.match(game, /\.loop = true/);
-  const volume = /MUSIC_VOLUME = ([0-9.]+)/.exec(game);
-  assert.ok(volume && Number(volume[1]) > 0 && Number(volume[1]) <= 0.25, 'volume de fond');
+  // Le volume suit les réglages de la roue (musique, sons de l'interface), la musique restant un peu en retrait.
+  const part = /MUSIC_SHARE = ([0-9.]+)/.exec(game);
+  assert.ok(part && Number(part[1]) > 0 && Number(part[1]) <= 0.8, 'musique en retrait des bruitages');
+  assert.match(game, /params\.get\('vm'\)|params\.has\('vm'\)/);
+  assert.match(read('app', 'renderer', 'root-access', 'fx.js'), /get\('vs'\)/);
+  assert.match(read('app', 'src', 'root-access.ts'), /vm: clamp\(v\.music\), vs: clamp\(v\.sounds\)/);
+  assert.match(read('app', 'src', 'frontend.ts'), /volumes: \(\) => \(\{ music: mediaSettings\.musicVolume, sounds: mediaSettings\.uiSoundsVolume \}\)/);
   assert.match(game, /get\('musique'\) === '0'/);
   const main = read('app', 'src', 'root-access.ts');
   assert.match(main, /musique: OFFSCREEN \? '0' : '1'/);

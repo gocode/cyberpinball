@@ -31,10 +31,14 @@
 
   // ---------- Musique de fond ----------
 
-  // Une boucle (musique.mp3) très en retrait : elle comble le silence sans se mêler aux bruitages (master 0,22
-  // de fx.js) ni lasser. Entrée en fondu, arrêtée avec la fenêtre. Dans Cyber Pinball, `musique=0` la coupe
+  // Une boucle (musique.mp3) en retrait : elle comble le silence sans se mêler aux bruitages (fx.js) ni lasser.
+  // Entrée en fondu, arrêtée avec la fenêtre. Dans Cyber Pinball, `musique=0` la coupe
   // (essais hors écran : aucun son) ; seule, la page la lance au premier geste (politique de lecture du navigateur).
-  const MUSIC_VOLUME = 0.18;
+  // Le volume suit le réglage « Volume de la musique » de la roue (paramètre `vm`, 0 à 100), un peu en retrait
+  // des bruitages ; seule, la page prend la valeur par défaut de la roue (60 %).
+  const MUSIC_SHARE = 0.6;
+  const VM = Number(params.get('vm'));
+  const MUSIC_VOLUME = Math.min(1, Math.max(0, (params.has('vm') && Number.isFinite(VM) ? VM : 60) / 100)) * MUSIC_SHARE;
   const MUSIC_FADE_MS = 2500;
   const musique = new Audio('musique.mp3');
   musique.loop = true;

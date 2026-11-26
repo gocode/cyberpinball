@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Root Access: the background music and the sound effects follow the volumes set in the wheel (music, interface sounds) and are much louder than before.
 - PuP-Packs: the PuP plugin of the patched VPX ("patched Cyber Pinball 8") now follows the one of the VPX development version. Videos on a PuP screen that is not displayed (DMD, topper) now end on time, the queue moves on, the background music starts, and the pack's sounds no longer overlap. The plugin of released VPX versions kept these videos frozen, so the rest of the pack never came.
 - PuP-Packs: like in PinUP Player, a table that declares a playlist again from its script now changes its order and rest time. On Stranger Things 4, callouts and sounds of the same playlist were skipped for 30 seconds.
 - Root Access: a lost ball keeps falling into the floor below at the same speed instead of going back to the plunger; the backglass and DMD now show the game display even when the Jukebox was selected in the wheel; the background music is a little louder.

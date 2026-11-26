@@ -35,6 +35,8 @@ export interface RootAccessDeps {
   changed(): void;
   /** Un événement du jeu (flip, bumper, cible, sortie d'étage, bille perdue…) : les LED de la borne l'animent. */
   signal?(signal: RootAccessSignal, arg?: string | number): void;
+  /** Volumes réglés dans la roue (0 à 100) : musique, sons de l'interface (bruitages du jeu). */
+  volumes?(): { music: number; sounds: number };
   /** Le jeu fermé : la roue reprend la main. */
   closed(): void;
   log(line: string): void;
@@ -49,6 +51,13 @@ export interface RootAccess {
   status(): RootAccessStatus | undefined;
   /** La fenêtre du jeu (essais). */
   window(): BrowserWindow | undefined;
+}
+
+/** Volumes de la roue en paramètres de la page du jeu (`vm` musique, `vs` bruitages), bornés à 0–100. */
+function volumeQuery(v: { music: number; sounds: number } | undefined): Record<string, string> {
+  if (!v) return {};
+  const clamp = (n: number) => String(Math.round(Math.min(100, Math.max(0, Number.isFinite(n) ? n : 0))));
+  return { vm: clamp(v.music), vs: clamp(v.sounds) };
 }
 
 /** Lecture des boutons : plus souvent que l'image (60 Hz), un lâcher du lanceur dure 20 à 30 ms. */
@@ -130,7 +139,7 @@ export function createRootAccess(deps: RootAccessDeps): RootAccess {
       deps.log('Root Access : fermé.'); // i18n-ignore : journal
       deps.closed();
     });
-    void w.loadFile(path.join(__dirname, '..', 'renderer', 'root-access', 'index.html'), { query: { rot: String(place.rotation), musique: OFFSCREEN ? '0' : '1' } });
+    void w.loadFile(path.join(__dirname, '..', 'renderer', 'root-access', 'index.html'), { query: { rot: String(place.rotation), musique: OFFSCREEN ? '0' : '1', ...volumeQuery(deps.volumes?.()) } });
     deps.changed();
     deps.log(`Root Access : ouvert sur le plateau (${place.bounds.width}×${place.bounds.height}, rotation ${place.rotation}°).`); // i18n-ignore : journal
     return true;

@@ -24,7 +24,10 @@
       if (!ac) {
         try {
           ac = new AudioContext();
-          master = ac.createGain(); master.gain.value = 0.22; master.connect(ac.destination);
+          // Niveau des bruitages : le réglage « sons de l'interface » de la roue (paramètre `vs`, 0 à 100, 50 par défaut).
+          const reglage = new URLSearchParams(location.search).get('vs');
+          const vs = reglage !== null && Number.isFinite(Number(reglage)) ? Math.min(100, Math.max(0, Number(reglage))) : 50;
+          master = ac.createGain(); master.gain.value = 0.55 * (vs / 50); master.connect(ac.destination);
           noise = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
           const d = noise.getChannelData(0);
           let s = 12345;

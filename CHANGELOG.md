@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Root Access : la musique de fond et les bruitages suivent les volumes réglés dans la roue (musique, sons de l'interface) et sont nettement plus forts qu'avant.
 - PuP-Packs : le plugin PuP de VPX corrigé (« patched Cyber Pinball 8 ») reprend celui de la version de développement de VPX. Les vidéos d'un écran PuP qui n'est pas affiché (DMD, topper) se terminent maintenant à l'heure, la file d'attente avance, la musique de fond démarre, et les sons du pack ne se superposent plus. Le plugin des versions publiées de VPX gardait ces vidéos figées : la suite du pack ne venait jamais.
 - PuP-Packs : comme dans PinUP Player, une table qui redéclare une playlist depuis son script en change maintenant l'ordre et le temps de repos. Sur Stranger Things 4, les annonces et les sons d'une même playlist étaient sautés pendant 30 secondes.
 - Root Access : une bille perdue poursuit sa chute dans l'étage du dessous, avec la même vitesse, au lieu de repasser par le lanceur ; le fronton et le DMD montrent bien l'affichage du jeu même quand le Juke-box était sélectionné dans la roue ; la musique de fond est un peu plus forte.

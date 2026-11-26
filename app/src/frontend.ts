@@ -1201,6 +1201,7 @@ const rootAccess = createRootAccess({
   claimJoystick: (win) => onJoystickInput(win, () => undefined),
   activity: () => void attract.activity(),
   changed: () => broadcast(),
+  volumes: () => ({ music: mediaSettings.musicVolume, sounds: mediaSettings.uiSoundsVolume }),
   signal: (signal, arg) => rootAccessLeds.signal(signal, Date.now(), arg),
   closed: () => {
     rootAccessCombo.reset();
