@@ -133,7 +133,17 @@ export const messages: Record<string, string> = {
   'La partie n’a pas pu se dérouler': 'The game couldn’t run',
   'mémoire de VPX abîmée (corruption du tas)': 'VPX memory damaged (heap corruption)',
   'accès mémoire interdit': 'forbidden memory access',
-  'dépassement de pile détecté': 'stack buffer overrun detected',
+  'arrêt d’urgence demandé par VPX ou l’un de ses plugins': 'emergency stop requested by VPX or one of its plugins',
+  'VPX s’est arrêté ({exit}) {seconds} s après avoir démarré le PuP-Pack de la table, avant la fin de la partie.': 'VPX stopped ({exit}) {seconds} s after starting the table’s PuP-Pack, before the game ended.',
+  'VPX s’est arrêté ({exit}) dans son plugin PuP, qui joue le PuP-Pack de la table.': 'VPX stopped ({exit}) in its PuP plugin, which plays the table’s PuP-Pack.',
+  'Start : rejouer sans le PuP-Pack': 'Start: play again without the PuP-Pack',
+  'Le PuP-Pack n’a pas pu être rangé à part': 'The PuP-Pack could not be set aside',
+  'Module en faute, d’après Windows : {module}.': 'Faulty module, according to Windows: {module}.',
+  'Start : essayer sans le PuP-Pack. Il est rangé à part, pas effacé : « Réactiver le PuP-Pack », dans « Parties du jeu », le remet tel quel.':
+    'Start: try without the PuP-Pack. It is set aside, not deleted: “Re-enable the PuP-Pack”, in “Game parts”, puts it back as it was.',
+  'Rien ne manque pour jouer : une autre partie peut se dérouler sans cet arrêt. Le rapport aidera à trouver ce qui, dans ce PuP-Pack, arrête VPX.':
+    'Nothing is missing to play: another game can run without this stop. The report will help find what, in this PuP-Pack, stops VPX.',
+  'VPX s’est arrêté au démarrage du PuP-Pack': 'VPX stopped when the PuP-Pack started',
   'pile de VPX épuisée': 'VPX stack exhausted',
   'mémoire insuffisante': 'out of memory',
   'point d’arrêt atteint': 'breakpoint reached',

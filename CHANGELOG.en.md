@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- PuP-Packs: VPX no longer stops when a PuP-Pack starts if one of its DMD capture images has a number that is too large. The Avengers (Pro) closed this way on the first DMD frame. The PuP plugin of the patched VPX ("patched Cyber Pinball 9") skips these images and reads the others. If it can read none, the pack plays without its DMD triggers.
+- VPX stopping: when VPX stops right after the PuP-Pack starts, Cyber Pinball says so and offers to play the table again without its PuP-Pack (Start), which it then puts aside. "Re-enable the PuP-Pack", in "Game parts", puts it back as it was.
+- Reports: when VPX stops without leaving a crash report, the report attaches the Windows event that names the faulting module (for example the PuP plugin), and the stop screen mentions it.
 - Applications: a thin strip in the application's colour runs along the top of the screen while a page is loading, so you can tell whether your click started a page or did nothing.
 - The strip goes out as soon as the page has loaded, ignores ads and embedded players, and does not light up for a very short load.
 - To know this, Edge opens a debugging pipe reserved for Cyber Pinball (no port, nothing listens on your machine), for applications only; signing in to Google stays free of debugging.

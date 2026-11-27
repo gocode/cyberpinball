@@ -8,6 +8,7 @@
 // introuvable, code de sortie de Windows connu.
 
 import { t } from './i18n';
+import { describeWindowsFault, isPupPluginModule, type WindowsFault } from './windowsfault';
 
 /** Erreur du script de la table, telle que VPX l'écrit dans vpinball.log (Player::OnScriptError). */
 export interface VpxScriptError {
@@ -108,7 +109,9 @@ export function scriptErrorsJournal(table: string, lines: readonly string[], scr
 const EXIT_NAMES: Record<number, () => string> = {
   0xc0000374: () => t('mémoire de VPX abîmée (corruption du tas)'),
   0xc0000005: () => t('accès mémoire interdit'),
-  0xc0000409: () => t('dépassement de pile détecté'),
+  // STATUS_STACK_BUFFER_OVERRUN : nom historique, mais c'est le code de tout arrêt d'urgence (__fastfail), dont
+  // abort() du runtime C++ sur une exception que personne n'attrape (The Avengers Pro, PuP-Pack, 27/11/2026).
+  0xc0000409: () => t('arrêt d’urgence demandé par VPX ou l’un de ses plugins'),
   0xc00000fd: () => t('pile de VPX épuisée'),
   0xc0000017: () => t('mémoire insuffisante'),
   0x80000003: () => t('point d’arrêt atteint'),
@@ -172,6 +175,36 @@ export function vpxShutdownCrash(lines: readonly string[], exitCode: number | nu
  */
 export const DOF_UNLOAD_FIXED_IN = 6;
 
+/** Au plus ce temps entre « PUP Manager start » et la dernière ligne du journal : l'arrêt suit le démarrage du PuP-Pack. */
+export const PUP_START_CRASH_SECONDS = 15;
+
+/** Heure d'une ligne de vpinball.log (« 2026-11-27 23:06:09.535 INFO … »), en secondes ; undefined sans heure. */
+function logSeconds(line: string): number | undefined {
+  const m = /^\d{4}-\d\d-\d\d (\d\d):(\d\d):(\d\d(?:\.\d+)?)\s/.exec(line);
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : undefined;
+}
+
+/**
+ * VPX planté juste après avoir démarré le PuP-Pack de la table (rapports du 27/11/2026, The Avengers Pro,
+ * PuP-Pack avs_170, joueur et PinCab : 0xC0000409 0,4 s après « PUP Manager start », module fautif
+ * plugin-pup64.dll). Reconnu par le module fautif que Windows a noté (windowsfault.ts), sinon par le
+ * journal : « PUP Manager start », puis au plus PUP_START_CRASH_SECONDS avant sa fin, sans fermeture de
+ * la partie. Rend les secondes écoulées depuis ce démarrage (undefined quand seul le module le dit).
+ */
+export function vpxPupStartCrash(lines: readonly string[], exitCode: number | null | undefined, fault?: WindowsFault): { afterSeconds?: number } | undefined {
+  if (exitCode === null || exitCode === undefined || vpxMissingLibrary(exitCode) || !EXIT_NAMES[exitCode >>> 0]) return undefined;
+  if (lines.some((l) => /\bClosing player\b/.test(l))) return undefined;
+  // Windows nomme un autre plugin (DOF démarre dans la même seconde que le PuP-Pack) : ce n'est pas le PuP-Pack.
+  if (fault && /^plugin-.*\.dll$/i.test(fault.module) && !isPupPluginModule(fault.module)) return undefined;
+  const start =lines.findLastIndex((l) => /\bPUP Manager start\b/.test(l));
+  const startAt = start >= 0 ? logSeconds(lines[start]!) : undefined;
+  const lastAt = lines.map(logSeconds).findLast((s) => s !== undefined);
+  // Une partie passée minuit : l'écart reste positif.
+  const after = startAt !== undefined && lastAt !== undefined ? (lastAt - startAt + 86400) % 86400 : undefined;
+  if (after !== undefined && after <= PUP_START_CRASH_SECONDS) return { afterSeconds: Math.round(after * 10) / 10 };
+  return isPupPluginModule(fault?.module) ? {} : undefined;
+}
+
 /** Ce que le lanceur sait du lancement, en plus du journal et du code de sortie. */
 export interface VpxLaunchFacts {
   /** VPX a écrit son journal pendant ce lancement (launcher.ts) ; faux : arrêté avant. Absent : inconnu. */
@@ -180,6 +213,10 @@ export interface VpxLaunchFacts {
   changedFiles?: readonly string[];
   /** Série du VPX corrigé de Cyber Pinball en place pendant la partie (vpxCorrigeInPlace) ; absent : VPX officiel ou autre. */
   vpxPatch?: number;
+  /** Ce que Windows a noté de l'arrêt (événement « Application Error », windowsfault.ts) : le module fautif. */
+  fault?: WindowsFault;
+  /** La table a un PuP-Pack actif (pupdisabled.ts) : « Essayer sans le PuP-Pack » a un sens. */
+  pupActive?: boolean;
 }
 
 /**
@@ -215,6 +252,8 @@ export interface VpxFailureDiagnosis {
   scriptError?: VpxScriptError;
   /** Arrêté au démarrage, avant son journal (vpxStartupCrash) : la panne est celle de VPX, toutes tables. */
   startup?: true;
+  /** Arrêté juste après le démarrage du PuP-Pack, actif (vpxPupStartCrash) : Start propose de jouer sans lui. */
+  withoutPup?: true;
 }
 
 /**
@@ -259,7 +298,28 @@ export function diagnoseVpxFailure(
     return {
       title: t('VPX a planté en se fermant'),
       lines,
-      journal: `VPX arrêté en se fermant, après la partie (${file}) : ${exit}${cause}.`, // i18n-ignore : journal
+      journal: `VPX arrêté en se fermant, après la partie (${file}) : ${exit}${cause}${faultNote(launch.fault)}.`, // i18n-ignore : journal
+    };
+  }
+  // Planté juste après le démarrage du PuP-Pack : Start propose de jouer sans lui (rangé à part, rendu tel quel).
+  const pup = !error ? vpxPupStartCrash(logTail, exitCode, launch.fault) : undefined;
+  if (pup && exit) {
+    const lines = [
+      pup.afterSeconds !== undefined
+        ? t('VPX s’est arrêté ({exit}) {seconds} s après avoir démarré le PuP-Pack de la table, avant la fin de la partie.', { exit, seconds: pup.afterSeconds })
+        : t('VPX s’est arrêté ({exit}) dans son plugin PuP, qui joue le PuP-Pack de la table.', { exit }),
+    ];
+    if (launch.fault) lines.push(t('Module en faute, d’après Windows : {module}.', { module: launch.fault.module }));
+    lines.push(
+      launch.pupActive
+        ? t('Start : essayer sans le PuP-Pack. Il est rangé à part, pas effacé : « Réactiver le PuP-Pack », dans « Parties du jeu », le remet tel quel.')
+        : t('Rien ne manque pour jouer : une autre partie peut se dérouler sans cet arrêt. Le rapport aidera à trouver ce qui, dans ce PuP-Pack, arrête VPX.'),
+    );
+    return {
+      title: t('VPX s’est arrêté au démarrage du PuP-Pack'),
+      lines,
+      journal: `VPX arrêté au démarrage du PuP-Pack (${file}) : ${exit}${pup.afterSeconds !== undefined ? `, ${pup.afterSeconds} s après « PUP Manager start »` : ''}${faultNote(launch.fault)}.`, // i18n-ignore : journal
+      ...(launch.pupActive && { withoutPup: true as const }),
     };
   }
   const lines: string[] = [];
@@ -296,7 +356,12 @@ export function diagnoseVpxFailure(
   return {
     title: error ? t('Le script de la table s’est arrêté') : t('VPX s’est arrêté pendant la partie'),
     lines,
-    journal: `VPX arrêté (${file}) : ${journal.join(' ; ')}.`, // i18n-ignore : journal
+    journal: `VPX arrêté (${file}) : ${journal.join(' ; ')}${faultNote(launch.fault)}.`, // i18n-ignore : journal
     ...(error ? { scriptError: error } : {}),
   };
+}
+
+/** « ; module fautif : plugin-pup64.dll (…) » pour la ligne du journal ; vide quand Windows n'a rien noté. */
+function faultNote(fault: WindowsFault | undefined): string {
+  return fault ? ` ; module fautif (Windows) : ${describeWindowsFault(fault)}` : ''; // i18n-ignore : journal
 }

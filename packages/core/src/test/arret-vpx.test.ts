@@ -191,7 +191,8 @@ test('écran d’échec : arrêt reconnu = vraie raison, Start rejoue (ou ouvre 
   const front = frontendSource();
   assert.match(front, /const known = repaired \? undefined : diagnoseVpxFailure\(result\.logTail, result\.exitCode,/);
   // Arrêté en démarrant, fichiers de VPX modifiés : Start les remet (vpx-fichiers-modifies.test.ts) ; sinon rejouer.
-  assert.match(front, /const action: Message\['action'\] = known\.startup && changedFiles\.length \? 'install-vpx' : live \? 'live' : 'replay';/);
+  // Arrêté au démarrage du PuP-Pack, actif : Start rejoue sans lui (arret-pup.test.ts).
+  assert.match(front, /const action: Message\['action'\] = known\.startup && changedFiles\.length \? 'install-vpx' : live \? 'live' : known\.withoutPup \? 'no-pup' : 'replay';/);
   assert.match(front, /return \{ title: known\.title, lines, action, table: table\.file, report: failureReport\(result, table, known\.title, known\.startup\) \};/);
   assert.match(front, /explain\(result, table, repaired, Boolean\(double\), changedFiles, vpxPatch\)/);
   assert.match(front, /state\.message\?\.action === 'replay' && is\(KEYS\.confirm\)/);

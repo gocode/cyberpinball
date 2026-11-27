@@ -767,7 +767,7 @@ export interface Message {
    */
   report?: { about: string; table: string; signature: string; consent?: boolean; notified?: boolean };
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'zenFirstRun' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'zenFirstRun' | 'journey' | 'replay' | 'live' | 'no-pup' | 'power' | 'orientation';
   /**
    * Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'), ou la
    * relance quand rien ne manque (action 'replay' : le script de la table ou VPX s'est arrêté).
@@ -812,6 +812,7 @@ const MESSAGE_DOORS: Record<NonNullable<Message['action']>, GuestDoor> = {
   journey: 'message.journey',
   replay: 'message.replay',
   live: 'message.live',
+  'no-pup': 'message.no-pup',
   power: 'message.power',
   orientation: 'message.orientation',
 };
@@ -5786,6 +5787,20 @@ function handleKey(input: Input, fromPhone = false): boolean {
         }
         break;
       }
+      // VPX arrêté au démarrage du PuP-Pack (vpxPupStartCrash) : Start range le PuP-Pack à part, sans
+      // rien effacer (« Réactiver le PuP-Pack » le remet), et relance la table.
+      if (state.message?.action === 'no-pup' && is(KEYS.confirm)) {
+        const again = tables.find((x) => x.file === state.message?.table);
+        state = { ...state, phase: 'menu', message: undefined };
+        if (!again) break;
+        const done = library.setPup(again, false);
+        if (!done.ok) {
+          state = { ...state, phase: 'message', message: { title: t('Le PuP-Pack n’a pas pu être rangé à part'), lines: [done.text] } };
+          return true;
+        }
+        void play(again);
+        return true;
+      }
       // VPX arrêté pendant une partie entre amis : Start ouvre la partie (les autres continuent, les résultats y arrivent).
       if (state.message?.action === 'live' && is(KEYS.confirm)) {
         state = { ...state, phase: 'menu', message: undefined };
@@ -7761,6 +7776,8 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
     ...(result.logWritten !== undefined && { logWritten: result.logWritten }),
     changedFiles,
     ...(vpxPatch !== undefined && { vpxPatch }),
+    ...(result.fault && { fault: result.fault }),
+    pupActive: library.pupActive(table),
   });
   if (known) {
     console.log(known.journal);
@@ -7769,7 +7786,8 @@ function explain(result: LaunchResult, table: TableEntry, repaired?: string, liv
     lines.push(...result.notices);
     if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
     // VPX arrêté en démarrant, ses fichiers modifiés : Start les remet (startVpxInstall).
-    const action: Message['action'] = known.startup && changedFiles.length ? 'install-vpx' : live ? 'live' : 'replay';
+    // Arrêt au démarrage du PuP-Pack : Start rejoue sans lui.
+    const action: Message['action'] = known.startup && changedFiles.length ? 'install-vpx' : live ? 'live' : known.withoutPup ? 'no-pup' : 'replay';
     return { title: known.title, lines, action, table: table.file, report: failureReport(result, table, known.title, known.startup) };
   }
   const lines = [result.message ?? t('Erreur inconnue.')];

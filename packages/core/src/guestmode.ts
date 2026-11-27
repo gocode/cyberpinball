@@ -51,6 +51,7 @@ export const GUEST_DOORS = {
   'message.journey': false, // Ce qu’il manque pour jouer, après une partie échouée
   'message.replay': true, // Rejouer la table, après un arrêt de VPX dû au script de la table (rien ne manque)
   'message.live': false, // Ouvrir la partie entre amis, après un arrêt de VPX pendant celle-ci
+  'message.no-pup': false, // Ranger le PuP-Pack à part et rejouer, après un arrêt de VPX au démarrage du PuP-Pack
   'message.orientation': false, // Rendre à Windows l’orientation du bureau qu’une version précédente avait changée
   // Fiche d'une table (app/src/library.ts, buildSheet)
   'sheet.play': true, // Jouer

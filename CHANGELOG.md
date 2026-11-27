@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- PuP-Packs : VPX ne s'arrête plus au démarrage d'un PuP-Pack dont une image de capture du DMD porte un numéro trop grand. The Avengers (Pro) se fermait ainsi dès la première image du DMD. Le plugin PuP de VPX corrigé ("patched Cyber Pinball 9") ignore ces images et lit les autres. S'il ne peut rien lire, le pack joue sans ses déclencheurs DMD.
+- Arrêt de VPX : quand VPX s'arrête juste après le démarrage du PuP-Pack, Cyber Pinball le dit et propose de rejouer la table sans son PuP-Pack (Start), qu'il range alors à part. "Réactiver le PuP-Pack", dans "Parties du jeu", le remet tel quel.
+- Rapports : quand VPX s'arrête sans laisser de rapport de plantage, le rapport joint l'événement de Windows qui nomme le module fautif (par exemple le plugin PuP), et l'écran d'arrêt le cite.
 - Applications : un liseré fin, de la couleur de l'application, court en haut de l'écran tant qu'une page charge. Tu vois ainsi si ton clic a lancé une page ou s'il n'a rien fait.
 - Le liseré s'éteint dès que la page est chargée, ignore les publicités et lecteurs intégrés, et ne s'allume pas pour un chargement très court.
 - Pour le savoir, Edge ouvre un tube de débogage réservé à Cyber Pinball (aucun port, rien n'écoute sur ta machine), seulement pour les applications ; la connexion à Google reste sans débogage.

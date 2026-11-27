@@ -6,8 +6,8 @@ Cyber Pinball installs Visual Pinball X 10.8.1-5436 from its official archive, t
 Other plugins and libraries stay those of the official archive.
 Another VPX (trial version, VPX installed by the user) is never touched.
 
-Current patch set: "patched Cyber Pinball 8".
-The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-8`.
+Current patch set: "patched Cyber Pinball 9".
+The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-9`.
 
 ## Patches
 
@@ -17,6 +17,7 @@ The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on 
 - `06-nvidia-3d-vision.patch` (Cyber Pinball, November 2026): NVIDIA 3D Vision shutter glasses, with a GeForce card and an NVIDIA driver up to 452.06. A new setting, `[Player] Stereo3DNvidiaDirect`, used with "Side by Side" stereo, switches the NVIDIA driver to its direct mode (NVAPI) before the Direct3D 11 device is created. BGFX renders both views side by side, each at the full screen width, into an offscreen target; on each frame, each view is drawn to the stereo backbuffer of an exclusive fullscreen swapchain after selecting the eye with `NvAPI_Stereo_SetActiveEye`. If anything is missing (driver, stereo disabled, playfield not on the main display), VPX logs why and falls back to plain side by side rendering. Without the setting, nothing changes.
 - `07-pup-amont-bdbccaf30.patch` (PuP plugin, patch set 8): the PuP plugin of VPX at commit [bdbccaf30](https://github.com/vpinball/vpinball/commit/bdbccaf30) (November 2026), built for the plugin interface of 5436. The 5436 plugin only advanced videos while their screen was drawn: on a PuP screen that is not displayed (DMD, topper), a video never ended, the queue stayed stuck and the background music never came. The upstream plugin keeps media up to date on its own clock, plays the packs' sounds (`PlaySSF`, sound bank) without overlapping them, and includes lock free label decoding (former patch 03). The 5436 plugin headers do not change (the other plugins are those of the official archive): a small file, `Compat5436.h`, supplies the few newer helpers the plugin uses, and the in game DMD overlays (DMDOverlay, PagedUI), absent from 5436, are left out.
 - `08-pup-playlistadd-met-a-jour.patch` (PuP plugin, patch set 8, applied after 07): like PinUP Player, `playlistadd` on a playlist already declared in `playlists.pup` updates its order (shuffled or alphabetical) and its rest time instead of being ignored. Stranger Things 4 declares every playlist with 30 rest seconds and sets them to 0 from its script: callouts and sounds of the same playlist were skipped for 30 seconds.
+- `09-pup-pupcapture-sans-plantage.patch` (PuP plugin, patch set 9, applied after 07): libpupdmd reads the number of each `PupCapture/<number>.bmp` capture with `std::stoi`, which throws past 2147483647, and narrows every path to the ANSI code page, which throws on other names. Thrown on a plugin thread, the exception ended VPX (0xC0000409) on the first DMD frame: The Avengers Pro ships `PupCapture/12341241234.bmp`. The plugin catches it, reads the readable captures again from a temporary copy, and failing that plays the pack without its DMD triggers.
 
 - `correctifs-libdof/` (DOF library, patch set 6): the libdof of 5436 (commit `eef645d9`) with a backport of libdof commits [0383246](https://github.com/vpinball/libdof/commit/03832462f10d19b1795e2292646193ca39e51fbd) and [c79bcff](https://github.com/vpinball/libdof/commit/c79bcff5be61e3c10022d2e6fa25f207e038bc53) (its `FinishUpdaterThread` part). While unloading, 5436 shut a DudesCab board down a second time, after it was really closed, and VPX crashed while closing (0xC0000005). The DudesCab destructor no longer runs the shutdown again, and a controller's output thread is always waited for instead of being abandoned. The library interface (`include/DOF/DOF.h`) does not change: the official `plugin-dof64.dll` loads it as is.
 
@@ -33,4 +34,4 @@ The PuP plugin links against the DLLs of the official archive (SDL_image, SDL_tt
 ## License
 
 VPX is distributed under GPLv3+ (and a MAME-derived license for part of the files), see the attached `LICENSE` file; libdof under its own license, attached as `plugins/dof/LICENSE-libdof`.
-The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-8
+The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-9

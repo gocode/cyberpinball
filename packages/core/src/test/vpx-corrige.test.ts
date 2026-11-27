@@ -216,6 +216,43 @@ test('correctif 08 (série 8) : playlistadd sur une playlist déjà déclarée l
   assert.ok(fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort().indexOf('08-pup-playlistadd-met-a-jour.patch') > fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort().indexOf('07-pup-amont-bdbccaf30.patch'));
 });
 
+test('correctif 09 (série 9) : une exception de libpupdmd sur PupCapture ne termine plus VPX', () => {
+  // PinCab, 26/11/2026 : The Avengers Pro (avs_170) livre PupCapture/12341241234.bmp ; libpupdmd lit ce numéro avec
+  // std::stoi, qui lève out_of_range sur un fil du plugin : VPX s'arrêtait en 0xC0000409 (plugin-pup64+0x7c4f5) à la
+  // première image du DMD. Toute exception de la lecture est attrapée, et la lecture reprise sur les captures lisibles.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  const diff = fs.readFileSync(path.join(dir, '09-pup-pupcapture-sans-plantage.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 9\)/);
+  const touched = [...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]!);
+  assert.deepEqual(touched, ['plugins/pup/PUPManager.cpp'], 'rien d’autre que le plugin PuP');
+  const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1)).join('\n');
+  // Chaque appel de Load est dans un try, et toute exception (de la bibliothèque standard ou non) est attrapée.
+  const loads = [...added.matchAll(/m_dmd->Load\(/g)].length;
+  assert.equal(loads, 2, 'la lecture du pack, puis celle des captures lisibles');
+  // Le code tel qu'il est après le correctif (contexte et ajouts) : une accolade peut être une ligne de contexte.
+  const after = diff.split('\n').filter((l) => /^[ +]/.test(l) && !l.startsWith('+++')).map((l) => l.slice(1)).join('\n');
+  assert.match(after, /try\s*\{\s*m_dmd = newDmd\(\);\s*m_dmdTriggerDataLoaded = m_dmd->Load\([^;]*;\s*\}\s*catch \(const std::exception& e\)\s*\{[^}]*\}\s*catch \(\.\.\.\)/, 'la lecture du pack');
+  assert.match(after, /try\s*\{[^}]*ReadableCaptureCopy\([^}]*m_dmd->Load\([^}]*\}\s*catch \(\.\.\.\)/, 'la lecture des captures lisibles');
+  // Les captures gardées sont celles que libpupdmd sait lire : même motif, numéro dans un int, nom dans la page de code.
+  assert.match(added, /std::regex pattern\(R"\(\(\\d\+\)\\\.bmp\)", std::regex_constants::icase\)/);
+  assert.match(added, /digits\.size\(\) > 10 \|\| \(digits\.size\(\) == 10 && digits > "2147483647"\)/);
+  assert.match(added, /entry\.path\(\)\.filename\(\)\.string\(\)/);
+  assert.match(added, /temp_directory_path\(ec\)/, 'la copie va dans le dossier temporaire, jamais dans le pack du joueur');
+  assert.doesNotMatch(added, /remove_all\(capture|remove\(entry/, 'aucune capture du pack n’est supprimée');
+  const sorted = fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort();
+  assert.ok(sorted.indexOf('09-pup-pupcapture-sans-plantage.patch') > sorted.indexOf('07-pup-amont-bdbccaf30.patch'), 'appliqué après le 07, dont il modifie le code');
+});
+
+test('la série livrée est celle du correctif le plus récent', () => {
+  // Le journal de VPX, ses rapports et l'adresse des sources publiées disent la série : un nouveau correctif la fait monter.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  const series = fs.readdirSync(dir).filter((f) => f.endsWith('.patch'))
+    .flatMap((f) => [...fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/patched Cyber Pinball (\d+)\)/g)].map((m) => Number(m[1])));
+  assert.ok(series.length, 'les correctifs disent leur série');
+  assert.equal(Math.max(...series), (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
+});
+
 test('série 6, bibliothèque DOF : posée à côté du plugin-dof64.dll officiel, qui n’est jamais touché', () => {
   // Rapports du 19/11 et du 23/11/2026 (bornes à DudesCab) : VPX plantait en se fermant, pendant le déchargement de DOF.
   const DOF = path.join('plugins', 'dof', 'dof64.dll');

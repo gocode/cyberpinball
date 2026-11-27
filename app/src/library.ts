@@ -7046,6 +7046,13 @@ export function createLibrary(host: LibraryHost) {
     recordingResult: (outcome: RecordingOutcome) => recording.result(outcome),
     /** Ce qu'il manque pour jouer : parcours d'une table (fiche, partie échouée, médecin). */
     openJourney: (file: string) => journeyUi.open(file),
+    /** La table joue avec un PuP-Pack qu'on peut ranger à part (son propre dossier, au moins un pack actif). */
+    pupActive: (table: TableEntry): boolean => {
+      const view = readPupSwitchView(table);
+      return !view.blocked && view.sw.active.length > 0;
+    },
+    /** Range le PuP-Pack de la table à part (false) ou le remet (true) : le même geste que « Parties du jeu ». */
+    setPup: (table: TableEntry, enable: boolean) => setPupEnabled(table, enable),
     /** Médias reçus d'un ami : ceux de la table s'ouvrent, ces fichiers dans le brouillon (library-medias.ts). */
     openMediasWith: medias.openWith,
     /**

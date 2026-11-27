@@ -15,7 +15,8 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { classifyVpxWindow, DIALOG_CLASS, t, VR_PREVIEW_TITLE, VPX_HUNG_EXIT_CODE } from '@cyberpinball/core';
+import { classifyVpxWindow, DIALOG_CLASS, t, vpxExitName, vpxMissingLibrary, VR_PREVIEW_TITLE, VPX_HUNG_EXIT_CODE, type WindowsFault } from '@cyberpinball/core';
+import { readWindowsFault } from './windows-fault';
 import {
   allowAnyForeground,
   bringToFront,
@@ -69,6 +70,12 @@ export interface LaunchResult {
   logPath?: string;
   /** Le crash.txt que VPX a écrit à côté de la table en plantant (pile d'appels, modules), pour le rapport. */
   crashReport?: string;
+  /**
+   * Planté sans crash.txt : ce que Windows a noté de l'arrêt (événement « Application Error »), dont le
+   * module fautif (windows-fault.ts). Un arrêt d'urgence (0xC0000409) ne passe pas par le gestionnaire
+   * de plantage de VPX : sans cette note, le rapport ne disait pas quel module était en faute.
+   */
+  fault?: WindowsFault;
 }
 
 /** Taille gardée du crash.txt de VPX : sa pile et ses modules tiennent en quelques dizaines de Ko. */
@@ -286,7 +293,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         failure = 'crash';
         message = t("VPX s'est terminé avec le code {code}.", { code: exitCode });
       }
-      resolve({
+      const result: LaunchResult = {
         ok: !failure,
         failure,
         message,
@@ -299,7 +306,13 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         logWritten,
         logPath: path.join(opts.vpxPrefDir, 'vpinball.log'),
         ...(crashReport && { crashReport }),
-      });
+      };
+      // Planté sur un code de plantage sans crash.txt : le module fautif, d'après Windows (2 s au plus).
+      if (failure === 'crash' && !crashReport && vpxExitName(exitCode) && !vpxMissingLibrary(exitCode)) {
+        readWindowsFault(opts.exe, t0)
+          .catch(() => undefined)
+          .then((fault) => resolve(fault ? { ...result, fault } : result));
+      } else resolve(result);
     };
     child.on('exit', (code) => finish(code));
     child.on('error', (error) => {

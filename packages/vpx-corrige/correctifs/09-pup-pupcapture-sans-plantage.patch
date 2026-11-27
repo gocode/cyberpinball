@@ -1,0 +1,130 @@
+diff --git a/plugins/pup/PUPManager.cpp b/plugins/pup/PUPManager.cpp
+index cb25fdf..71b6dc9 100644
+--- a/plugins/pup/PUPManager.cpp
++++ b/plugins/pup/PUPManager.cpp
+@@ -15,6 +15,7 @@
+ 
+ #include <filesystem>
+ #include <fstream>
++#include <regex>
+ 
+ namespace PUP {
+ 
+@@ -613,6 +614,52 @@ PUPFont* PUPManager::GetFont(const string& szFont)
+    return nullptr;
+ }
+ 
++// Modified by Cyber Pinball, 2026-11-27 (patched Cyber Pinball 9): libpupdmd reads the trigger id of every
++// PupCapture file matching (\d+)\.bmp with std::stoi, which throws std::out_of_range past 2147483647, and narrows
++// every path to the ANSI code page, which throws on other names. Thrown on a plugin thread, either ended VPX with
++// 0xC0000409 when the first DMD frame arrived: The Avengers Pro (avs_170) ships PupCapture/12341241234.bmp.
++// Copies the captures libpupdmd can read to a temporary <copy>/PupCapture and returns <copy>, or an empty path.
++static std::filesystem::path ReadableCaptureCopy(const std::filesystem::path& packPath, const string& romName)
++{
++   std::error_code ec;
++   const std::filesystem::path capture = find_case_insensitive_directory_path(packPath / "PupCapture");
++   if (capture.empty())
++      return {};
++   const std::filesystem::path copy = std::filesystem::temp_directory_path(ec) / "cpvpx-pupcapture" / (romName.empty() ? "pack"s : romName);
++   std::filesystem::remove_all(copy, ec);
++   if (!std::filesystem::create_directories(copy / "PupCapture", ec))
++      return {};
++   const std::regex pattern(R"((\d+)\.bmp)", std::regex_constants::icase);
++   unsigned int kept = 0, skipped = 0;
++   for (const auto& entry : std::filesystem::directory_iterator(capture, ec))
++   {
++      string name;
++      try
++      {
++         name = entry.path().filename().string(); // what libpupdmd does, throws on names outside the ANSI code page
++      }
++      catch (...)
++      {
++         skipped++;
++         continue;
++      }
++      std::smatch matches;
++      if (!std::regex_search(name, matches, pattern))
++         continue;
++      string digits = matches[1].str();
++      digits.erase(0, (std::min)(digits.find_first_not_of('0'), digits.size() - 1));
++      if (digits.size() > 10 || (digits.size() == 10 && digits > "2147483647"))
++      {
++         skipped++;
++         continue;
++      }
++      if (std::filesystem::copy_file(entry.path(), copy / "PupCapture" / entry.path().filename(), std::filesystem::copy_options::overwrite_existing, ec))
++         kept++;
++   }
++   LOGI(std::format("PupCapture: {} capture(s) kept, {} capture(s) skipped because libpupdmd cannot read their name", kept, skipped));
++   return kept ? copy : std::filesystem::path();
++}
++
+ int PUPManager::ProcessDmdFrame(const DisplaySrcId& src, const uint8_t* frame)
+ {
+    // Unsupported frame format ?
+@@ -622,16 +669,55 @@ int PUPManager::ProcessDmdFrame(const DisplaySrcId& src, const uint8_t* frame)
+    // Lazily loads DMD capture until we have a DMD and its format
+    if (m_dmd == nullptr)
+    {
+-      m_dmd = std::make_unique<PUPDMD::DMD>();
+-      m_dmd->SetLogCallback(
+-         [](const char* format, va_list args, const void* userData)
++      const auto newDmd = [this]()
++      {
++         auto dmd = std::make_unique<PUPDMD::DMD>();
++         dmd->SetLogCallback(
++            [](const char* format, va_list args, const void* userData)
++            {
++               char buffer[1024];
++               vsnprintf(buffer, sizeof(buffer), format, args);
++               LOGD(buffer);
++            },
++            this);
++         return dmd;
++      };
++      const uint8_t bitDepth = src.identifyFormat == CTLPI_DISPLAY_ID_FORMAT_BITPLANE2 ? 2 : 4;
++      // Modified by Cyber Pinball, 2026-11-27 (patched Cyber Pinball 9): an exception thrown by libpupdmd no longer ends
++      // VPX. The load is retried on the captures it can read; failing that, the pack plays without DMD triggers.
++      string failure;
++      try
++      {
++         m_dmd = newDmd();
++         m_dmdTriggerDataLoaded = m_dmd->Load(PluginStrings::PathToNative(m_szPath).c_str(), "", bitDepth);
++      }
++      catch (const std::exception& e)
++      {
++         failure = e.what();
++      }
++      catch (...)
++      {
++         failure = "unknown exception"s;
++      }
++      if (!failure.empty())
++      {
++         LOGE(std::format("PupCapture of '{}' could not be read by libpupdmd ({}), retrying with the captures it can read", m_szRomName, failure));
++         m_dmd = newDmd();
++         m_dmdTriggerDataLoaded = false;
++         try
+          {
+-            char buffer[1024];
+-            vsnprintf(buffer, sizeof(buffer), format, args);
+-            LOGD(buffer);
+-         },
+-         this);
+-      m_dmdTriggerDataLoaded = m_dmd->Load(PluginStrings::PathToNative(m_szPath).c_str(), "", src.identifyFormat == CTLPI_DISPLAY_ID_FORMAT_BITPLANE2 ? 2 : 4);
++            const std::filesystem::path copy = ReadableCaptureCopy(m_szPath, m_szRomName);
++            if (!copy.empty())
++               m_dmdTriggerDataLoaded = m_dmd->Load(PluginStrings::PathToNative(copy).c_str(), "", bitDepth);
++         }
++         catch (...)
++         {
++            m_dmd = newDmd();
++            m_dmdTriggerDataLoaded = false;
++         }
++         if (!m_dmdTriggerDataLoaded)
++            LOGE(std::format("PupCapture of '{}' is unreadable, the pack plays without its DMD triggers", m_szRomName));
++      }
+       memset(m_idFrame.data(), 0, m_idFrame.size());
+    }
+ 

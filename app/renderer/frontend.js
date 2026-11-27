@@ -1431,6 +1431,7 @@ function drawPlayfield(s) {
     // Partie échouée : Start mène au parcours « Ce qu'il manque pour jouer » (clic compris).
     else if (s.message.action === 'journey') cover.append(footer([[t('Start : voir ce qu’il manque pour jouer'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
     // Arrêt reconnu (script de la table, VPX fermé) : rien ne manque, Start relance la table, ou ouvre la partie entre amis.
+    else if (s.message.action === 'no-pup') cover.append(footer([[t('Start : rejouer sans le PuP-Pack'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
     else if (s.message.action === 'replay') cover.append(footer([[t('Start : rejouer la table'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
     else if (s.message.action === 'live') cover.append(footer([[t('Start : voir la partie entre amis'), s.nav.confirm], [t('Exit : revenir au front-end'), s.nav.exit], ...report]));
     else if (!s.message.action) cover.append(footer([[t('Revenir au front-end'), s.nav.exit], ...report]));
