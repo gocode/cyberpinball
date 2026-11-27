@@ -6,8 +6,8 @@
 //   les événements : tous les effets du configtool, sur tout le matériel. Le port des LED est rendu à
 //   libdof avant qu'elle s'initialise. Allumé par défaut, coupé par le réglage « originals ».
 // - générique : sinon, et si le joueur l'a voulu, le pilote des LED (led-live.ts) joue les effets de
-//   dof-scene.ts sur les bandes décrites : événements du script (rôle lu dans le script), boutons de la
-//   borne et lanceur analogique. Le port série des LED reste alors à Cyber Pinball pour cette partie.
+//   dof-scene.ts sur les bandes décrites : événements du script (rôle lu dans le script), bobines de la
+//   ROM (core.vbs, dof-pinmame.ts), sons de la table, boutons de la borne et lanceur analogique. Le port série des LED reste alors à Cyber Pinball pour cette partie.
 // Un relais impossible, qui ne s'initialise pas ou qui s'arrête en cours de partie passe au profil générique
 // (s'il est voulu) : la table n'est jamais muette pour une panne du relais. Une table crue « à ROM » dont
 // PinMAME ne démarre pas y passe aussi, en cours de partie (led-rom.ts, frontend.ts).
@@ -22,9 +22,14 @@ import {
   LED_LEVEL_SCALE,
   ledLevelFromLinear,
   ledLevelGain,
+  PINMAME_TAP_SUFFIX,
   addDofTap,
+  addPinmameTap,
   applyDofLedLevel,
   classifyDofScript,
+  classifyRomSolenoids,
+  createEventMerger,
+  parsePinmameChunk,
   dofLedLevelSummary,
   createDofScene,
   createLaunchDetector,
@@ -149,12 +154,12 @@ export function zoneTarget(leds: CabinetLeds, zone: DofZone): string {
   return (re && leds.strips.find((s) => re.test(s.name))?.name) || LED_ALL;
 }
 
-/** Retouche controller.vbs de VPX (copie d'origine gardée à côté, une seule fois) ; false si l'écoute n'a pas pu être posée. */
-export function installTap(vpxExe: string): boolean {
+/** Retouche un script de VPX (copie d'origine gardée à côté, une seule fois) ; false si l'écoute n'a pas pu être posée. */
+function patchVpxScript(vpxExe: string, name: string, patch: (text: string) => string | undefined): boolean {
   try {
-    const file = path.join(path.dirname(vpxExe), 'scripts', 'controller.vbs');
+    const file = path.join(path.dirname(vpxExe), 'scripts', name);
     const text = fs.readFileSync(file, 'latin1');
-    const patched = addDofTap(text);
+    const patched = patch(text);
     if (patched === undefined) return false;
     if (patched !== text) {
       if (!fs.existsSync(file + BACKUP)) fs.writeFileSync(file + BACKUP, text, 'latin1');
@@ -164,6 +169,16 @@ export function installTap(vpxExe: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Retouche controller.vbs de VPX (copie d'origine gardée à côté, une seule fois) ; false si l'écoute n'a pas pu être posée. */
+export function installTap(vpxExe: string): boolean {
+  return patchVpxScript(vpxExe, 'controller.vbs', addDofTap);
+}
+
+/** Retouche core.vbs de VPX : écoute des bobines de PinMAME (dof-pinmame.ts) ; false si elle n'a pas pu être posée. */
+export function installPinmameTap(vpxExe: string): boolean {
+  return patchVpxScript(vpxExe, 'core.vbs', addPinmameTap);
 }
 
 export interface DofTapGame {
@@ -178,6 +193,14 @@ export interface DofTapGame {
 export interface DofTapFile {
   file: string;
   env: Record<string, string>;
+  /** L'écoute des bobines de PinMAME est posée dans core.vbs (fichier `file` + PINMAME_TAP_SUFFIX). */
+  pinmame?: boolean;
+}
+
+/** Efface le fichier d'écoute d'une partie et celui des bobines de PinMAME. */
+function dropTapFiles(file: string): void {
+  fs.rmSync(file, { force: true });
+  fs.rmSync(file + PINMAME_TAP_SUFFIX, { force: true });
 }
 
 /** Nouveau fichier d'écoute, vide, pour une partie. */
@@ -193,9 +216,10 @@ function tapFile(): string {
  */
 export function openTap(vpxExe: string): DofTapFile | undefined {
   if (!installTap(vpxExe)) return undefined;
+  const pinmame = installPinmameTap(vpxExe);
   try {
     const file = tapFile();
-    return { file, env: { [DOF_TAP_ENV]: file } };
+    return { file, env: { [DOF_TAP_ENV]: file }, pinmame };
   } catch {
     return undefined;
   }
@@ -266,7 +290,7 @@ function startRelayGame(deps: DofTapDeps, vpxExe: string, rom: string, table: st
       relay.stop();
       generic?.stop();
       // Le relais lit encore la fin du fichier : effacé quand il est sorti.
-      void relay.done.finally(() => fs.rmSync(tap.file, { force: true }));
+      void relay.done.finally(() => dropTapFiles(tap.file));
     },
   };
 }
@@ -312,16 +336,17 @@ export interface StartTapOptions {
  * les LED du profil générique (sans attendre : le lancement de VPX ne patiente jamais). undefined : rien à faire.
  * Relais impossible ou en échec : profil générique à la place, s'il est voulu.
  *
- * Profil générique : chaque événement DOF du script prend le rôle que lui donne le script de la table
- * (classifyDofScript), les boutons de la borne (flippers, lanceur, Start) et la tirette du lanceur
- * analogique ont leur effet même si le script n'appelle pas DOF, et les bandes reçoivent une image par
- * 1/30 s (dof-scene.ts) aux couleurs de la table.
+ * Profil générique : toutes les sources, toujours, sans doublon (createEventMerger) : chaque événement DOF du
+ * script prend le rôle que lui donne le script de la table (classifyDofScript), chaque bobine de la ROM celui
+ * de son SolCallback (classifyRomSolenoids, dof-pinmame.ts), chaque son de la table celui de son nom ; les
+ * boutons de la borne (flippers, lanceur, Start) et la tirette du lanceur analogique ont leur effet, et les
+ * bandes reçoivent une image par 1/30 s (dof-scene.ts) aux couleurs de la table.
  */
 export function startTap(deps: DofTapDeps, vpxExe: string, mode: DofTapMode = { kind: 'generique' }, table = '', about: DofTapTable = {}, options: StartTapOptions = {}): DofTapGame | undefined {
   const tap = options.tap ?? openTap(vpxExe);
   if (!tap) return undefined;
   const drop = () => {
-    if (!options.tap) fs.rmSync(tap.file, { force: true });
+    if (!options.tap) dropTapFiles(tap.file);
   };
   let takeBack = options.takeBack === true;
   if (mode.kind === 'relais') {
@@ -368,17 +393,27 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   } catch {
     classes = undefined;
   }
-  const soundsPlay = scriptCallsNoDof(about.script);
+  // Bobines de la ROM (table à ROM jouée avec les effets de Cyber Pinball) : leur rôle, lu dans les SolCallback du script.
+  let solenoids: Map<number, DofEventClass> = new Map();
+  try {
+    solenoids = about.script ? classifyRomSolenoids(about.script) : new Map();
+  } catch {
+    solenoids = new Map();
+  }
   const strips = leds.strips.map((s) => ({ name: s.name, width: s.width, height: s.height, arrangement: s.arrangement }));
   // Bilan de la partie, au journal à l'arrêt : de quoi voir après coup si les bandes sont restées allumées
   // et quels événements sont arrivés (retour d'essai du 25/11/2026 : « reste tout le temps allumé »).
   const seen = new Map<string, number>();
+  // Événements par source, au bilan : de quoi voir après coup quelle écoute est restée muette.
+  const sources = { dof: 0, pinmame: 0, sons: 0 };
   let frames = 0;
   let litFrames = 0;
   const play = (c: DofEventClass, on: boolean) => {
     if (on) seen.set(c.kind, (seen.get(c.kind) ?? 0) + 1);
     return on ? scene.trigger(c.kind, c.side, Date.now()) : scene.release(c.kind, c.side, Date.now());
   };
+  // Appel DOF, bobine et son qui disent la même chose au même instant : un seul effet.
+  const fresh = createEventMerger();
   // Animation de départ : la partie qui s'ouvre montre ses bandes tout de suite, sans attendre un bouton ni
   // un événement du script (une table sans DOF restait noire jusqu'à Start). Pas au repli en cours de partie.
   if (!how.fromEnd) {
@@ -392,43 +427,75 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
     play(BUTTON_EVENTS[button], down);
   });
   const launched = createLaunchDetector();
-  // Repli en cours de partie : ce que le relais a déjà reçu n'est pas rejoué d'un coup.
-  let offset = 0;
-  if (how.fromEnd) {
-    try {
-      offset = fs.statSync(file).size;
-    } catch {
-      offset = 0;
+  // Les deux fichiers de la partie : appels DOF et sons (controller.vbs), bobines de PinMAME (core.vbs).
+  const readers = [file, file + PINMAME_TAP_SUFFIX].map((name) => {
+    // Repli en cours de partie : ce que le relais a déjà reçu n'est pas rejoué d'un coup.
+    let offset = 0;
+    if (how.fromEnd) {
+      try {
+        offset = fs.statSync(name).size;
+      } catch {
+        offset = 0;
+      }
     }
-  }
-  let rest = '';
+    let rest = '';
+    /** Les lignes complètes arrivées depuis le dernier tour. */
+    return (parse: (chunk: string) => string) => {
+      try {
+        const size = fs.statSync(name).size;
+        if (size <= offset) return;
+        const fd = fs.openSync(name, 'r');
+        const buf = Buffer.alloc(size - offset);
+        fs.readSync(fd, buf, 0, buf.length, offset);
+        fs.closeSync(fd);
+        offset = size;
+        rest = parse(rest + buf.toString('latin1'));
+      } catch {
+        // Fichier pas encore là ou en cours d'écriture : au prochain tour.
+      }
+    };
+  });
   let lastFrame = 0;
   const poll = setInterval(() => {
     const now = Date.now();
     const pull = deps.plungerPull?.();
     if (pull !== undefined && launched(pull, now)) play(BUTTON_EVENTS.plunger, true);
-    try {
-      const size = fs.statSync(file).size;
-      if (size > offset) {
-        const fd = fs.openSync(file, 'r');
-        const buf = Buffer.alloc(size - offset);
-        fs.readSync(fd, buf, 0, buf.length, offset);
-        fs.closeSync(fd);
-        offset = size;
-        const { events, sounds, rest: tail } = parseTapChunk(rest + buf.toString('latin1'));
-        rest = tail;
-        for (const ev of events) play(dofEventClass(classes, ev.number), ev.state >= 1);
-        // Sons de la table : seule source d'événements d'un script sans appel DOF. Une table qui parle DOF a ses
-        // événements, les sons feraient double emploi.
-        if (soundsPlay) {
-          for (const s of sounds) {
-            const c = dofSoundClass(s.sound, s.effect);
-            if (c) play(c, true);
-          }
-        }
+    // Toutes les sources, toujours (27/11/2026, Apollo 13 : avec un seul appel DOF, pour les flippers, les sons
+    // étaient ignorés, et les bobines de la ROM n'étaient pas écoutées : 121 événements sur 126 étaient des flippers).
+    // D'abord les appels DOF et les bobines, puis les sons, qui ne font que compléter.
+    let sounds: ReturnType<typeof parseTapChunk>['sounds'] = [];
+    readers[0]!((chunk) => {
+      const parsed = parseTapChunk(chunk);
+      for (const ev of parsed.events) {
+        const c = dofEventClass(classes, ev.number);
+        const on = ev.state >= 1;
+        if (on && !fresh(c.kind, 'dof', ev.at)) continue;
+        if (on) sources.dof++;
+        play(c, on);
       }
-    } catch {
-      // Fichier pas encore là ou en cours d'écriture : au prochain tour.
+      sounds = parsed.sounds;
+      return parsed.rest;
+    });
+    readers[1]!((chunk) => {
+      const parsed = parsePinmameChunk(chunk);
+      for (const s of parsed.solenoids) {
+        const c = solenoids.get(s.number);
+        // Bobine sans callback dans le script : rien ne bouge sur la table. Flippers : les boutons de la borne les montrent.
+        if (!c || c.kind === 'flipper') continue;
+        const on = s.state >= 1;
+        // Seuls les flashers durent ; une autre bobine qui retombe ne dit rien de plus.
+        if (!on && !c.held) continue;
+        if (on && !fresh(c.kind, 'pinmame', s.at)) continue;
+        if (on) sources.pinmame++;
+        play(c, on);
+      }
+      return parsed.rest;
+    });
+    for (const s of sounds) {
+      const c = dofSoundClass(s.sound, s.effect);
+      if (!c || !fresh(c.kind, 'son', s.at)) continue;
+      sources.sons++;
+      play(c, true);
     }
     // Une image par 1/30 s au plus (le pilote n'en envoie pas plus).
     if (now - lastFrame >= 33) {
@@ -445,18 +512,22 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   }, 15);
   const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
   const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
-  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}${soundsPlay ? ', sons de la table' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
+  const solKnown = [...solenoids.values()].filter((c) => c.kind !== 'other').length;
+  const pinmameNote = solenoids.size ? `, ${solenoids.size} bobine(s) PinMAME dont ${solKnown} reconnue(s)${tap.pinmame === false ? ' (écoute de core.vbs impossible : bobines muettes)' : ''}` : ''; // i18n-ignore : journal
+  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${pinmameNote}${deps.watchButtons ? ', boutons de la borne' : ''}, sons de la table), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
   logTapReach(deps, about.script);
   return {
     stop() {
       if (stopped) return;
       stopped = true;
       clearInterval(poll);
-      deps.log(ledGameSummary(seen, frames, litFrames));
+      deps.log(`${ledGameSummary(seen, frames, litFrames)} Sources : ${sources.dof} appel(s) DOF, ${sources.pinmame} bobine(s) PinMAME, ${sources.sons} son(s).`); // i18n-ignore : journal
+      // Table à ROM dont aucune bobine n'est arrivée : écoute de core.vbs absente ou contournée (core.vbs propre à la table).
+      if (solenoids.size && !sources.pinmame && frames > 300) deps.log('Effets LED sans DOF : aucune bobine PinMAME reçue alors que le script en déclare : core.vbs non retouché, ou propre à la table.'); // i18n-ignore : journal
       stopButtons?.();
       deps.service.blackout();
       void deps.service.stop();
-      fs.rmSync(file, { force: true });
+      dropTapFiles(file);
     },
   };
 }

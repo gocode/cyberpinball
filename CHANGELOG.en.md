@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs: with Cyber Pinball's effects, a ROM table now drives your strips on everything that happens in play (ejects, knocker, flashers, ramps, ball served, autoplunger), read from the ROM's solenoids. Before, only the flippers lit up.
+- LEDs: the table's sounds (slingshots, bumpers, targets…) always count, even when its script only calls DOF for the flippers; the same event coming from two sources plays only once.
+- Window mirror on the phone (Applications, YouTube sign-in): finger scrolling is more responsive. The picture of the result arrives right after a tap or a swipe and stays fast while the page coasts, instead of waiting for the resting pace: you see what your gesture did without having to repeat it.
+- Mirror: the finger placed on the window is lifted shortly after its last move, not in the same millisecond, so the page keeps the swipe's momentum.
 - Pinball FX on a cabinet: during the game, the backglass screen shows the table's backglass, displayed by the game itself, like other games. Cyber Pinball gives it the table's backglass image (Table_<number>.png) and turns on its backglass window on your backglass screen. A table without a backglass image keeps Cyber Pinball's, never a file path.
 - Pinball FX and Pinball FX Midnight: on the player count choice, your Confirm button now confirms too, and your Back button returns to the table page, like Start and Exit. On a cabinet where Confirm and Back are other buttons (the MagnaSave, for example), only Start confirmed.
 - Tables taken over from PinUP Popper, PinballY or a VPX folder: their original framing is now kept whatever the way they were added (folder, archive, drag and drop), not only from the installation takeover screen.

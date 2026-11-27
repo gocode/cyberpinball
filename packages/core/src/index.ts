@@ -83,6 +83,7 @@ export * from './dof-repli';
 export * from './dof-remplacement';
 export * from './dof-niveau';
 export * from './dof-evenements-script';
+export * from './dof-pinmame';
 export * from './dof-scene';
 export * from './led-live';
 export * from './led-animations';

@@ -163,13 +163,74 @@ test('effets sans ROM : table sans appel DOF, les sons de la table (slingshot, b
   assert.ok(bump.left > 100 && bump.right > 100, `bumper : ${JSON.stringify(bump)}`);
   game.stop();
 
-  // Un script qui appelle DOF a ses propres événements : les sons feraient double emploi.
-  const other = tap.startTap(deps, exe, { kind: 'generique' }, '', { script: 'Sub Bumper1_Hit : DOF 107, DOFPulse : End Sub', color: '#ff0000' });
+  // 27/11/2026, Apollo 13 : un script qui n'appelle DOF que pour une partie des événements (ici le bumper) garde
+  // les sons de tout le reste ; le son du bumper joué avec son appel DOF ne double pas l'effet.
+  // Le pilote de la partie précédente finit de s'arrêter avant la suivante.
+  await wait(300);
+  const logs: string[] = [];
+  const other = tap.startTap({ ...deps, log: (line: string) => logs.push(line) }, exe, { kind: 'generique' }, '', { script: 'Sub Bumper1_Hit : DOF 107, DOFPulse : End Sub', color: '#ff0000' });
   assert.ok(other);
   await shown(1900);
   fs.appendFileSync(other.env[DOF_TAP_ENV]!, 'S,1,Sling_L3,2.0\r\n');
-  assert.deepEqual(await shown(150), { left: 0, right: 0 }, 'script avec DOF : sons ignorés');
+  const withDof = await shown(80);
+  assert.ok(withDof.left > withDof.right + 100, `script avec DOF : le son du slingshot allume quand même : ${JSON.stringify(withDof)}`);
+  await shown(1200);
+  fs.appendFileSync(other.env[DOF_TAP_ENV]!, 'E,107,1,5.0\r\nS,1,Bumpers_Top_2,5.01\r\nE,107,0,5.02\r\n');
+  await shown(150);
   other.stop();
+  const summary = logs.find((l) => l.includes('fin de partie')) ?? '';
+  assert.match(summary, /bumper 1\b/, `appel DOF et son du même bumper : un seul effet (${summary})`);
+  assert.match(summary, /1 appel\(s\) DOF, 0 bobine\(s\) PinMAME, 1 son\(s\)/, summary);
+  await wait(20);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// 27/11/2026, Apollo 13 (table à ROM, effets de Cyber Pinball à la place de DOF) : seuls les flippers s'allumaient.
+test('effets de Cyber Pinball sur une table à ROM : les bobines de PinMAME allument les bandes', async () => {
+  const { dir, exe } = setup();
+  const core = path.join(dir, 'vpx', 'scripts', 'core.vbs');
+  fs.writeFileSync(core, 'Sub PinMAMETimer_Timer\r\n\tFor ii = 0 To UBound(ChgSol)\r\n\tNext\r\nEnd Sub\r\n', 'latin1');
+  tap.saveEventSettings(dir, { enabled: true, intensity: 100 });
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100, scale: LED_LEVEL_SCALE }));
+  const service = driver.createLedService({ simulated: true, manual: true });
+  const tall = (name: string, output: number): LedStripSpec => ({ ...strip(name, output), height: 10 });
+  const leds: CabinetLeds = { ...LEDS, strips: [tall('Gauche', 1), tall('Droite', 2)] };
+  const logs: string[] = [];
+  const deps = { dataDir: dir, leds: () => leds, service, log: (line: string) => logs.push(line) };
+  const SCRIPT = 'SolCallback(3) = "SolRightEject"\r\nSolCallback(15) = "SolLFlipperd"\r\nSolCallback(25) = "SolFLamp1"\r\nPlaySound SoundFXDOF("",101,DOFOn,DOFFlippers)\r\n';
+  const game = tap.startTap(deps, exe, { kind: 'generique' }, '', { script: SCRIPT, color: '#ff0000' });
+  assert.ok(game, 'écoute posée');
+  assert.ok(fs.readFileSync(core, 'latin1').includes('CyberPinball_SolTap ChgSol(ii, 0), ChgSol(ii, 1)'), 'écoute des bobines posée dans core.vbs');
+  assert.ok(fs.existsSync(core + '.cyberpinball-avant'), 'copie d’origine de core.vbs gardée');
+  const sol = game.env[DOF_TAP_ENV]! + '.pinmame';
+  const shown = async (ms = 80) => {
+    await wait(ms);
+    await service.step();
+    const sum = (o: number) => [...service.simulation!.device.shownOutput(o, 10)].reduce((s, v) => s + v, 0);
+    return { left: sum(0), right: sum(1) };
+  };
+  await shown(1900);
+  assert.deepEqual(await shown(), { left: 0, right: 0 }, 'noir au repos');
+  // Bobine du flipper (les boutons le montrent déjà) et bobine sans callback : rien.
+  fs.appendFileSync(sol, 'P,15,1,1.0\r\nP,15,0,1.05\r\nP,40,1,1.1\r\n');
+  assert.deepEqual(await shown(150), { left: 0, right: 0 }, 'flipper et bobine inconnue : pas d’effet');
+  // Éjection à droite.
+  fs.appendFileSync(sol, 'P,3,1,2.0\r\nP,3,0,2.05\r\n');
+  const eject = await shown(80);
+  assert.ok(eject.right > eject.left + 100, `éjection à droite : ${JSON.stringify(eject)}`);
+  await shown(1500);
+  // Flasher : allumé tant que la bobine est alimentée, éteint après.
+  fs.appendFileSync(sol, 'P,25,1,4.0\r\n');
+  await shown(80);
+  const on = await shown(300);
+  assert.ok(on.left > 100 && on.right > 100, `flasher tenu : ${JSON.stringify(on)}`);
+  fs.appendFileSync(sol, 'P,25,0,4.5\r\n');
+  await shown(400);
+  assert.deepEqual(await shown(), { left: 0, right: 0 }, 'flasher éteint');
+  game.stop();
+  assert.ok(logs.some((l) => /3 bobine\(s\) PinMAME dont 3 reconnue\(s\)/.test(l)), logs.join('\n'));
+  assert.ok(logs.some((l) => /2 bobine\(s\) PinMAME/.test(l) && l.includes('fin de partie')), logs.join('\n'));
+  assert.ok(!fs.existsSync(sol), 'fichier des bobines effacé');
   await wait(20);
   fs.rmSync(dir, { recursive: true, force: true });
 });

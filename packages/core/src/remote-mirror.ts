@@ -115,6 +115,16 @@ export const MIRROR_LEVELS: readonly { scale: number; quality: number }[] = [
 /** De 4 à 8 images par seconde : le délai le plus court entre deux captures, et le plus long. */
 export const MIRROR_FAST_MS = 125;
 export const MIRROR_SLOW_MS = 250;
+/**
+ * Pendant et juste après un geste (appui, glissement), la borne capture sans attendre le rythme de repos : 16 images
+ * par seconde au mieux, pendant 1,5 s après le dernier geste (le temps de l'élan d'un glissement). Le doigt voit
+ * ainsi tout de suite ce que son geste a fait, au lieu de le refaire parce que l'image est en retard. Une liaison
+ * lente (niveau d'image allégé) garde son rythme : la lui imposer ne ferait qu'allonger l'attente des accusés.
+ */
+export const MIRROR_ACTIVE_MS = 1500;
+export const MIRROR_ACTIVE_INTERVAL_MS = 60;
+/** Doigt injecté : délai entre son dernier déplacement et sa levée, pour que la page mesure une vitesse (l'élan du glissement). */
+export const MIRROR_TOUCH_LIFT_MS = 20;
 /** Aller-retour (envoi de l'image, accusé du téléphone) au-delà duquel on allège, et en deçà duquel on peut remonter. */
 export const MIRROR_RTT_SLOW = 400;
 export const MIRROR_RTT_FAST = 150;

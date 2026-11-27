@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- LED : avec les effets de Cyber Pinball, une table à ROM anime enfin tes bandes sur tout ce qui se passe en jeu (éjections, knocker, flashers, rampes, bille servie, lanceur automatique), lu dans les bobines de la ROM. Avant, seuls les flippers s'allumaient.
+- LED : les sons de la table (slingshots, bumpers, cibles…) comptent toujours, même quand son script n'appelle DOF que pour les flippers ; un même événement donné par deux sources ne joue qu'une fois.
+- Miroir de la fenêtre au téléphone (Applications, connexion YouTube) : le défilement au doigt est plus réactif. L'image du résultat arrive tout de suite après un appui ou un glissement et reste rapide le temps de l'élan, au lieu d'attendre le rythme de repos : tu vois ce que ton geste a fait sans avoir à le refaire.
+- Miroir : le doigt posé sur la fenêtre est levé juste après son dernier déplacement, pas dans la même milliseconde, pour que la page garde l'élan du glissement.
 - Pinball FX sur une borne : pendant la partie, l'écran du fronton montre le fronton de la table, affiché par le jeu lui-même, comme pour les autres jeux. Cyber Pinball lui donne l'image de fronton de la table (Table_<numéro>.png) et allume sa fenêtre du fronton sur ton écran du fronton. Une table sans image de fronton garde celui de Cyber Pinball, jamais un chemin de fichier.
 - Pinball FX et Pinball FX Midnight : au choix du nombre de joueurs, ton bouton Valider valide aussi, et ton bouton Retour revient à la fiche, comme Start et Exit. Sur une borne où Valider et Retour sont d'autres boutons (les MagnaSave, par exemple), seul Start validait.
 - Tables reprises de PinUP Popper, PinballY ou d'un dossier de VPX : leur cadrage d'origine est maintenant gardé, quel que soit le chemin de l'ajout (dossier, archive, glisser-déposer), pas seulement depuis l'écran de reprise d'une installation.

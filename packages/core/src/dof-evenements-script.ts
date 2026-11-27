@@ -98,10 +98,24 @@ export function dofSideOf(text: string): DofSide | undefined {
   return undefined;
 }
 
-function kindOf(text: string): DofEventKind | undefined {
+/** Le rôle que nomme un texte du script (nom de Sub, de son, de constante) : le premier mot-clé qui répond. */
+export function dofKindOf(text: string): DofEventKind | undefined {
   if (!text) return undefined;
   for (const [kind, re] of KEYWORDS) if (re.test(text)) return kind;
   return undefined;
+}
+const kindOf = dofKindOf;
+
+/** Les constantes numériques du script (`Const dofJackpot = 150, sKicker = 5`), nom en minuscules. */
+export function scriptConstants(script: string): Map<string, number> {
+  const consts = new Map<string, number>();
+  for (const m of script.matchAll(/\bConst\s+([^\r\n:']+)/gi)) {
+    for (const part of m[1]!.split(',')) {
+      const c = /^\s*(\w+)\s*=\s*(\d{1,4})\s*$/.exec(part);
+      if (c) consts.set(c[1]!.toLowerCase(), Number(c[2]));
+    }
+  }
+  return consts;
 }
 
 /** Une ligne sans commentaire (l'apostrophe hors chaîne, ou Rem). */
@@ -143,13 +157,7 @@ const STATE_OFF = /^(?:dofoff|0|false)$/i;
  * ne dit le rôle est « other » (un petit effet quand même : il se passe quelque chose à chaque événement).
  */
 export function classifyDofScript(script: string): Map<number, DofEventClass> {
-  const consts = new Map<string, number>();
-  for (const m of script.matchAll(/\bConst\s+([^\r\n:']+)/gi)) {
-    for (const part of m[1]!.split(',')) {
-      const c = /^\s*(\w+)\s*=\s*(\d{1,4})\s*$/.exec(part);
-      if (c) consts.set(c[1]!.toLowerCase(), Number(c[2]));
-    }
-  }
+  const consts = scriptConstants(script);
   const votes = new Map<number, Map<string, number>>();
   const states = new Map<number, { on: boolean; off: boolean }>();
   let sub = '';

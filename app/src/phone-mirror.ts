@@ -13,7 +13,7 @@
 //    une capture d'écran de la fenêtre (desktopCapturer) ;
 //  - une image noire (vidéo protégée : Netflix, Prime, Disney+) est envoyée telle quelle.
 
-import { mirrorAdapt, mirrorFit, mirrorPoint, mirrorWheel, MIRROR_LEVELS, MIRROR_ZOOM_STEPS_MAX, type MirrorMessage, type MirrorPace, type MirrorRect } from '@cyberpinball/core';
+import { mirrorAdapt, mirrorFit, mirrorPoint, mirrorWheel, MIRROR_ACTIVE_INTERVAL_MS, MIRROR_ACTIVE_MS, MIRROR_LEVELS, MIRROR_TOUCH_LIFT_MS, MIRROR_ZOOM_STEPS_MAX, type MirrorMessage, type MirrorPace, type MirrorRect } from '@cyberpinball/core';
 
 /** Une image capturée : le JPEG et sa taille réelle. */
 export interface MirrorShot {
@@ -96,6 +96,8 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
   let noticed = false;
   /** Début de la dernière capture : le rythme (4 à 8 images par seconde) se compte d'un début à l'autre. */
   let startedAt = 0;
+  /** Jusqu'à cette heure (1,5 s après le dernier geste), la capture suit le rythme rapide du geste (voir MIRROR_ACTIVE_MS). */
+  let activeUntil = 0;
   /**
    * Glissement en cours. `touch` : un doigt est posé dans la fenêtre à (x, y) (injection tactile) ; sinon le
    * glissement passe par la molette. Une page qui attend un vrai glissement (TikTok au rendu mobile) ne
@@ -113,6 +115,8 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
         messages: number;
         moved: { x: number; y: number };
         refused: number;
+        /** Le doigt a fini son glissement ; sa levée attend MIRROR_TOUCH_LIFT_MS après son dernier déplacement. */
+        ending?: boolean;
       }
     | undefined;
 
@@ -146,6 +150,17 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       cancelTimer = undefined;
       void pump();
     });
+  };
+
+  /**
+   * Un geste vient d'arriver : l'image qui le montrera ne doit pas attendre le rythme de repos (4 à 8 images par
+   * seconde, le doigt croit que son geste n'a rien fait et le refait). La prochaine capture part tout de suite
+   * (au rythme rapide), et les suivantes restent rapides le temps de l'élan.
+   */
+  const gestured = () => {
+    activeUntil = now() + MIRROR_ACTIVE_MS;
+    if (!on || inFlight || capturing || pace.level >= 2) return;
+    schedule(MIRROR_ACTIVE_INTERVAL_MS - (now() - startedAt));
   };
 
   async function pump(): Promise<void> {
@@ -236,7 +251,8 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       const next = mirrorAdapt(pace, rtt);
       pace = { level: next.level, fast: next.fast };
       intervalMs = next.intervalMs;
-      schedule(intervalMs - (now() - startedAt));
+      const wait = now() < activeUntil && next.level < 2 ? Math.min(intervalMs, MIRROR_ACTIVE_INTERVAL_MS) : intervalMs;
+      schedule(wait - (now() - startedAt));
     },
     tap(m) {
       if (!on || !host.live()) return;
@@ -245,12 +261,15 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       const p = mirrorPoint(rect, m.fx, m.fy);
       host.pointer(p.x, p.y);
       host.click(m.button, m.count);
+      gestured();
     },
     scroll(m) {
       if (!on || !host.live()) return;
       const rect = host.rect();
       if (!rect) return;
       const p = mirrorPoint(rect, m.fx, m.fy);
+      // Le glissement précédent attend encore la levée de son doigt : il la reçoit d'abord, le nouveau repart d'un doigt neuf.
+      if (drag?.ending) endDrag();
       // Début de glissement : un doigt si la fenêtre en veut un, sinon la molette pour tout le glissement.
       if (!drag) {
         if (m.end && m.dx === 0 && m.dy === 0) return;
@@ -258,6 +277,7 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
         drag = { touch: down, x: p.x, y: p.y, from: p, window: { width: Math.round(rect.width), height: Math.round(rect.height) }, messages: 0, moved: { x: 0, y: 0 }, refused: !down && host.touch ? 1 : 0 };
       }
       const d = drag;
+      gestured();
       d.messages++;
       // Un glissement dont la fin ne vient pas (liaison coupée) se termine après un silence, doigt levé s'il y en a un.
       d.cancel?.();
@@ -278,14 +298,22 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       const bottom = Math.round(rect.y) + Math.max(1, Math.round(rect.height)) - 1;
       const x = Math.min(right, Math.max(Math.round(rect.x), d.x + Math.round(m.dx * rect.width)));
       const y = Math.min(bottom, Math.max(Math.round(rect.y), d.y + Math.round(m.dy * rect.height)));
+      let moved = false;
       if (x !== d.x || y !== d.y || !m.end) {
         d.moved.x += x - d.x;
         d.moved.y += y - d.y;
         d.x = x;
         d.y = y;
         if (!host.touch?.('move', x, y)) d.refused++;
+        moved = true;
       }
-      if (m.end) endDrag();
+      if (!m.end) return;
+      if (!moved) return endDrag();
+      // Déplacement et levée à la même milliseconde : la page ne mesure aucune vitesse et le glissement s'arrête net, sans
+      // élan (on le refait). La levée suit donc le dernier déplacement d'un court délai.
+      d.ending = true;
+      d.cancel?.();
+      d.cancel = after(MIRROR_TOUCH_LIFT_MS, endDrag);
     },
     zoom(m) {
       if (!on || !host.live() || !host.rect()) return;

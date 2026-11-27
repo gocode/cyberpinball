@@ -11,6 +11,9 @@ import { test } from 'node:test';
 import * as vm from 'node:vm';
 import { appBrowserArgs } from '../applications';
 import {
+  MIRROR_ACTIVE_INTERVAL_MS,
+  MIRROR_ACTIVE_MS,
+  MIRROR_TOUCH_LIFT_MS,
   MIRROR_BOX_MAX,
   MIRROR_ZOOM_STEPS_MAX,
   MIRROR_EDGE_MAX,
@@ -459,6 +462,7 @@ test('site au rendu mobile : le glissement est un vrai doigt (pose, déplacement
   r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.8, dx: 0, dy: -0.1 });
   r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.8, dx: 0, dy: -0.3 });
   r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.8, dx: 0, dy: 0, end: true });
+  // Le doigt est levé sur place (aucun déplacement de plus : pas d'attente).
   assert.deepEqual(r.state.touches, [['down', 600, 690], ['move', 600, 610], ['move', 600, 370], ['up', 600, 370]]);
   assert.deepEqual(r.state.wheels, [], 'pas de molette en plus du doigt');
   assert.deepEqual(r.state.pointer, [], 'le pointeur de la souris ne bouge pas');
@@ -466,7 +470,63 @@ test('site au rendu mobile : le glissement est un vrai doigt (pose, déplacement
   r.state.touches.length = 0;
   r.mirror.scroll({ t: 'mscroll', s: 4, fx: 0.9, fy: 0.1, dx: 0.5, dy: -0.5 });
   r.mirror.scroll({ t: 'mscroll', s: 5, fx: 0.9, fy: 0.1, dx: 0, dy: 0, end: true });
+  await r.advance(MIRROR_TOUCH_LIFT_MS);
   assert.deepEqual(r.state.touches, [['down', 1000, 130], ['move', 1099, 50], ['up', 1099, 50]]);
+});
+
+test('glissement tactile : la levée suit le dernier déplacement d\'un court délai (la page mesure une vitesse, donc un élan)', async () => {
+  const r = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 }, touch: 'ok' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.8, dx: 0, dy: -0.1 });
+  // Dernier déplacement et fin dans le même message : le déplacement part, la levée attend.
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.8, dx: 0, dy: -0.2, end: true });
+  assert.deepEqual(r.state.touches.map((x) => x[0]), ['down', 'move', 'move'], 'pas encore levé');
+  assert.deepEqual(r.state.logs, [], 'pas de ligne de journal avant la levée');
+  await r.advance(MIRROR_TOUCH_LIFT_MS - 1);
+  assert.equal(r.state.touches.length, 3);
+  await r.advance(1);
+  assert.deepEqual(r.state.touches.map((x) => x[0]), ['down', 'move', 'move', 'up']);
+  assert.equal(r.state.logs.length, 1);
+  // Un nouveau glissement pendant l'attente : l'ancien doigt est levé d'abord, le nouveau repart d'un doigt neuf.
+  r.state.touches.length = 0;
+  r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.5, dx: 0, dy: -0.1, end: true });
+  r.mirror.scroll({ t: 'mscroll', s: 4, fx: 0.2, fy: 0.5, dx: 0, dy: -0.1 });
+  assert.deepEqual(r.state.touches.map((x) => x[0]), ['down', 'move', 'up', 'down', 'move']);
+  await r.advance(MIRROR_TOUCH_LIFT_MS);
+  assert.equal(r.state.touches.filter((x) => x[0] === 'up').length, 1, 'le second doigt n\'est pas levé par la minuterie du premier');
+});
+
+test('miroir : un geste fait capturer tout de suite, puis à rythme rapide le temps de l\'élan, puis le rythme de repos revient', async () => {
+  const r = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 } });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  // Au repos : 8 images par seconde au mieux (125 ms).
+  r.mirror.ack(1);
+  await r.advance(MIRROR_ACTIVE_INTERVAL_MS + 1);
+  assert.equal(r.state.captures.length, 1, 'au repos, pas de capture avant 125 ms');
+  await r.advance(125);
+  assert.equal(r.state.captures.length, 2);
+  r.mirror.ack(2);
+  // Un appui : la capture suivante part au rythme rapide.
+  r.mirror.tap({ t: 'tap', s: 1, fx: 0.5, fy: 0.5, button: 'left', count: 1 });
+  const before = r.state.captures.length;
+  await r.advance(MIRROR_ACTIVE_INTERVAL_MS);
+  assert.equal(r.state.captures.length, before + 1, 'image du résultat de l\'appui sans attendre 125 ms');
+  // Les accusés suivants gardent le rythme rapide pendant 1,5 s…
+  r.mirror.ack(r.frames().length);
+  await r.advance(MIRROR_ACTIVE_INTERVAL_MS);
+  assert.equal(r.state.captures.length, before + 2);
+  // …puis plus : le rythme de repos revient.
+  await r.advance(MIRROR_ACTIVE_MS + 200);
+  r.mirror.ack(r.frames().length);
+  await r.advance(0); // la dernière capture date d'il y a longtemps : la suivante part aussitôt
+  r.mirror.ack(r.frames().length);
+  const idle = r.state.captures.length;
+  await r.advance(MIRROR_ACTIVE_INTERVAL_MS + 1);
+  assert.equal(r.state.captures.length, idle, 'retour au rythme de repos');
+  await r.advance(125);
+  assert.equal(r.state.captures.length, idle + 1);
 });
 
 test('glissement tactile : un doigt resté posé est levé après un silence, et à l\'arrêt du miroir', async () => {
@@ -505,6 +565,7 @@ test('journal : une ligne par glissement dit le mode, le départ, le nombre de m
   r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.8, dx: 0, dy: -0.3 });
   assert.deepEqual(r.state.logs, [], 'pas de ligne tant que le doigt est posé');
   r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.8, dx: 0, dy: 0, end: true });
+  await r.advance(MIRROR_TOUCH_LIFT_MS);
   assert.equal(r.state.logs.length, 1);
   assert.match(r.state.logs[0]!, /glissement au doigt \(injection tactile\) parti de \(600, 690\) dans une fenêtre de 1000 × 800, 3 message\(s\), 0 × -320 px$/);
   // Mode molette : la ligne le dit, et le téléphone sans doigt levé est clos après le silence.
