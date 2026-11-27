@@ -335,6 +335,74 @@ test('menu : appui isolé sur une table déjà mesurée, sa teinte part tout de 
   }
 });
 
+// 27/11/2026 : la teinte d'une table jamais vue se mesurait au moment de la montrer ; le DMD et les LED
+// tardaient au changement de jeu. Le cache sur disque se remplit maintenant d'avance, en tâche de fond.
+test('menu : la collection est mesurée d’avance au repos, de la table montrée vers les autres ; une table connue se montre en rafale sans l’attente entière', async (t) => {
+  interface Subject {
+    key: string;
+    files: readonly string[];
+  }
+  interface Tints {
+    follow(subject: Subject | undefined): void;
+    current(): TableTint | undefined;
+    warm(plan: { count: number; subjectAt(i: number): Subject | undefined; start(): number; idle(): boolean } | undefined): void;
+    dispose(): void;
+  }
+  type Converter = { mediaFrames(file: string): Promise<{ width: number; height: number; images: RgbaImage[] }> };
+  const { TableTints, KNOWN_SETTLE_MS } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-tint.js')) as {
+    TableTints: new (opts: { dataDir: string; settleMs?: number; onChange(): void; converter(): Converter }) => Tints;
+    KNOWN_SETTLE_MS: number;
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teintes-chauffe-'));
+  try {
+    const images: Record<string, RgbaImage> = { bleu: solid('#2a5bd7'), rose: solid('#e0509a'), vert: solid('#2ad75b') };
+    const subjects: Subject[] = ['bleu', 'rose', 'vert', 'bleu2'].map((name) => {
+      const file = path.join(dir, `${name}-backglass.png`);
+      fs.writeFileSync(file, name);
+      return { key: name, files: [file] };
+    });
+    const measured: string[] = [];
+    const tints = new TableTints({
+      dataDir: dir,
+      settleMs: 400,
+      onChange() {},
+      converter: () => ({
+        mediaFrames: async (file: string) => {
+          measured.push(path.basename(file).split('-')[0]!);
+          return { width: 40, height: 20, images: [images[path.basename(file).split('-')[0]!.replace('2', '')]!] };
+        },
+      }),
+    });
+    const wait = fakeClock(t);
+    let idle = false;
+    let start = 2;
+    tints.warm({ count: subjects.length, subjectAt: (i) => subjects[i], start: () => start, idle: () => idle });
+    // Partie en cours : rien n'est mesuré.
+    for (let i = 0; i < 10; i++) await wait(1000);
+    assert.deepEqual(measured, [], 'rien pendant une partie');
+    idle = true;
+    for (let i = 0; i < 40; i++) await wait(1000);
+    assert.equal(measured.length, 4, 'toute la collection est mesurée');
+    assert.equal(measured[0], 'vert', 'on part de la table montrée');
+    // Le cache sur disque est rempli : un autre menu ne mesure plus rien.
+    const again = new TableTints({ dataDir: dir, settleMs: 400, onChange() {}, converter: () => ({ mediaFrames: async () => assert.fail('mesuré deux fois') }) });
+    again.warm({ count: subjects.length, subjectAt: (i) => subjects[i], start: () => 0, idle: () => true });
+    for (let i = 0; i < 10; i++) await wait(1000);
+    // Table connue en rafale : montrée après KNOWN_SETTLE_MS, pas après SETTLE_MS.
+    tints.follow(subjects[0]);
+    assert.ok(tints.current(), 'appui isolé : tout de suite');
+    tints.follow(subjects[1]);
+    assert.ok(hueDistance(tints.current()!.hue, lch('#2a5bd7')[2]) < 5, 'en rafale, la teinte d’avant reste d’abord');
+    await wait(KNOWN_SETTLE_MS + 5);
+    assert.ok(hueDistance(tints.current()!.hue, lch('#e0509a')[2]) < 5, 'puis la nouvelle, sans attendre toute l’attente');
+    assert.equal(measured.length, 4, 'aucune mesure en plus');
+    tints.dispose();
+    again.dispose();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('menu : les points du DMD prennent d’abord la couleur du média de l’écran du DMD, l’ambiance celle du fronton (12/11/2026)', async (t) => {
   interface Tints {
     follow(subject: { key: string; files: readonly string[]; dmdFiles?: readonly string[] } | undefined): void;

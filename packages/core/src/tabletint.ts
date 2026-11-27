@@ -39,10 +39,16 @@ export const TINT_LIGHTNESS = 0.75;
 /** Chroma OKLCH de la teinte d'ambiance : assez pour se distinguer de la sarcelle, jamais criarde. */
 export const TINT_CHROMA_MIN = 0.09;
 export const TINT_CHROMA_MAX = 0.15;
-/** Clarté et chroma des points du DMD quand il prend la couleur de la table. */
-export const TINT_DMD_LIGHTNESS = 0.8;
-export const TINT_DMD_CHROMA_MIN = 0.12;
-export const TINT_DMD_CHROMA_MAX = 0.2;
+/**
+ * Points du DMD quand il prend la couleur de la table : chroma voulue (la mesurée × TINT_DMD_BOOST, entre MIN et MAX) et
+ * clarté de LIGHTNESS_MAX vers LIGHTNESS_MIN, la plus claire qui permet cette chroma (vividHex). 27/11/2026 : à clarté
+ * fixe (0,8), le bleu, le rouge et le violet sortaient en pastel (saturation 30 à 46 %) ; le coup de peps est là.
+ */
+export const TINT_DMD_LIGHTNESS = 0.82;
+export const TINT_DMD_LIGHTNESS_MIN = 0.62;
+export const TINT_DMD_BOOST = 1.7;
+export const TINT_DMD_CHROMA_MIN = 0.16;
+export const TINT_DMD_CHROMA_MAX = 0.3;
 
 /** Écart de teinte (degrés OKLCH) en deçà duquel une teinte passerait pour le vert signal. */
 export const SIGNAL_DISTANCE = 35;
@@ -146,6 +152,25 @@ export function oklchToHex(L: number, C: number, h: number): string {
   return `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * Couleur la plus franche pour une teinte : de `lMax` vers `lMin` (pas de 0,02), la première clarté où la chroma
+ * voulue tient dans sRGB ; sinon celle qui en garde le plus. La clarté ne baisse que si la teinte l'exige (un bleu ou
+ * un rouge ne sont francs que plus sombres qu'un jaune), jamais sous `lMin`.
+ */
+export function vividHex(lMax: number, lMin: number, chroma: number, hue: number): string {
+  let best = oklchToHex(lMax, chroma, hue);
+  let bestChroma = rgbToOklch(...hexToRgb(best))[1];
+  for (let L = lMax; L >= lMin - 1e-9 && bestChroma < chroma * 0.97; L -= 0.02) {
+    const hex = oklchToHex(L, chroma, hue);
+    const got = rgbToOklch(...hexToRgb(hex))[1];
+    if (got > bestChroma + 1e-4) {
+      best = hex;
+      bestChroma = got;
+    }
+  }
+  return best;
+}
+
 /** Écart entre deux teintes, en degrés (0 à 180). */
 export function hueDistance(a: number, b: number): number {
   const d = Math.abs(((a - b) % 360) + 360) % 360;
@@ -239,9 +264,11 @@ export const LED_PALETTE_SEPARATION = 40;
 /** Une couleur secondaire n'entre dans la palette que si elle pèse au moins cette part de la principale. */
 export const LED_PALETTE_MIN_RATIO = 0.12;
 /** Clarté et chroma OKLCH des couleurs des LED : franches, une LED délavée paraît blanche. */
-export const LED_PALETTE_LIGHTNESS = 0.72;
-export const LED_PALETTE_CHROMA_MIN = 0.12;
-export const LED_PALETTE_CHROMA_MAX = 0.26;
+export const LED_PALETTE_LIGHTNESS = 0.8;
+export const LED_PALETTE_LIGHTNESS_MIN = 0.6;
+export const LED_PALETTE_BOOST = 1.8;
+export const LED_PALETTE_CHROMA_MIN = 0.16;
+export const LED_PALETTE_CHROMA_MAX = 0.3;
 
 /**
  * Couleurs dominantes d'un visuel pour les LED (#rrggbb), de la plus présente à la moins présente :
@@ -271,7 +298,7 @@ export function measureLedPalette(images: readonly RgbaImage[], max = LED_PALETT
     colors.push(around);
   }
   if (!colors.length || colors[0]!.chroma < MIN_MEAN_CHROMA) return [];
-  return colors.map((c) => oklchToHex(LED_PALETTE_LIGHTNESS, clamp(c.chroma * 1.4, LED_PALETTE_CHROMA_MIN, LED_PALETTE_CHROMA_MAX), c.hue));
+  return colors.map((c) => vividHex(LED_PALETTE_LIGHTNESS, LED_PALETTE_LIGHTNESS_MIN, clamp(c.chroma * LED_PALETTE_BOOST, LED_PALETTE_CHROMA_MIN, LED_PALETTE_CHROMA_MAX), c.hue));
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +321,7 @@ export function correctTint(measure: TintMeasure): TableTint | 'signal' {
   const hue = awayFromSignal(measure.hue);
   if (hue === 'signal') return 'signal';
   const color = oklchToHex(TINT_LIGHTNESS, clamp(measure.chroma, TINT_CHROMA_MIN, TINT_CHROMA_MAX), hue);
-  let dmd = oklchToHex(TINT_DMD_LIGHTNESS, clamp(measure.chroma * 1.3, TINT_DMD_CHROMA_MIN, TINT_DMD_CHROMA_MAX), hue);
+  let dmd = vividHex(TINT_DMD_LIGHTNESS, TINT_DMD_LIGHTNESS_MIN, clamp(measure.chroma * TINT_DMD_BOOST, TINT_DMD_CHROMA_MIN, TINT_DMD_CHROMA_MAX), hue);
   // Garde-fou : la clarté imposée suffit toujours ; une couleur illisible prendrait celle d'ambiance.
   if (!dmdColorReadable(dmd)) dmd = color;
   return { color, dmd, hue: Math.round(hue * 10) / 10, measured: Math.round(measure.hue * 10) / 10 };
@@ -379,8 +406,8 @@ export const TINT_MAX_ALPHA_UNDER_TEXT = 0.25;
 // Cache sur disque : une mesure par fichier de média
 
 /** Change quand la mesure ou les corrections changent : les teintes plus anciennes sont refaites. */
-/** 2 : les couleurs des LED (leds) s'ajoutent à chaque mesure ; les anciennes sont refaites. */
-export const TINT_CACHE_VERSION = 2;
+/** 2 : les couleurs des LED (leds) s'ajoutent à chaque mesure. 3 : couleurs du DMD et des LED plus franches (27/11/2026). */
+export const TINT_CACHE_VERSION = 3;
 
 /** <données>\cache\teintes-tables.json */
 export function tintCacheFile(dataDir: string): string {

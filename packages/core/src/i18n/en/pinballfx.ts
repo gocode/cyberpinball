@@ -159,6 +159,8 @@ export const messages: Record<string, string> = {
     '{game} has never been opened here: its cabinet mode isn’t turned on. Without it, the game opens on its home screen, in landscape, and not on the table.',
   'Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Ferme ensuite le jeu (Exit tenu) et relance la table.':
     'In the game: cabinet icon next to the profile, "Activate", then the playfield rotation and the backglass and DMD screens. Cyber Pinball can’t do it for you: these settings are encrypted. Then close the game (hold Exit) and start the table again.',
+  'Orientation à saisir dans {game} : {rotation}° (celle qui met les flippers du bon côté, d’après la configuration de la borne). Le DMD et le fronton, Cyber Pinball les replace lui-même sur leurs écrans après le lancement : leurs positions saisies dans le jeu n’ont pas à être exactes.':
+    'Orientation to enter in {game}: {rotation}° (the one that puts the flippers on the right side, from the cabinet setup). Cyber Pinball moves the DMD and the backglass onto their screens itself after launch: the positions entered in the game don’t have to be exact.',
   'Seules Fish Tales et Sorcerer’s Lair sont gratuites : les autres tables ne s’ouvrent que si elles sont achetées sur ce compte Steam, sinon le jeu reste sur son écran d’accueil.':
     'Only Fish Tales and Sorcerer’s Lair are free: the other tables only open if they are bought on this Steam account, otherwise the game stays on its home screen.',
   'Start : ouvrir {game} · Exit : revenir au front-end': 'Start: open {game} · Exit: back to the menu',

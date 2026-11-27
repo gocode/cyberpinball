@@ -28,6 +28,7 @@ export * from './pinballfx-midnight';
 export * from './pinballfx3';
 export * from './pinballfx3-backglass';
 export * from './pinballfx3-cabinet';
+export * from './pinballfx3-windows';
 export * from './pinballfx3-folder';
 export * from './zen-media';
 export * from './pinballfx-cabinet';

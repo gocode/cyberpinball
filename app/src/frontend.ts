@@ -122,8 +122,10 @@ import {
   zenEntryKey,
   type PinballFxGameMode,
   pinballFx3DirectFailureHint,
+  createFx3PlacementWatch,
   pinballFx3FirstRunMessage,
   pinballFx3OrientationChange,
+  pinballFx3OrientationOnWindows,
   takePinballFx3OrientationNotice,
   playsOnWindowsOrientation,
   resolveMedia,
@@ -517,7 +519,7 @@ import { createNewsMenu } from './news-menu';
 import { createSystemSearch } from './system-search-menu';
 import { demoCharter, seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
-import { TableTints } from './table-tint';
+import { TableTints, type TintSubject } from './table-tint';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start-relaunch';
@@ -6012,12 +6014,12 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   // Pinball FX3 jamais ouvert sur ce PC : son mode borne n'y est pas activé, il s'ouvrirait sur son
   // écran d'accueil. Dit avant de lancer (ses réglages sont chiffrés : rien à écrire, pinballfx3-cabinet.ts).
-  const firstRun = fx3 && table.pinballFx3Table !== undefined && !firstRunSeen && !autoStopAfterMs ? pinballFx3FirstRunMessage(fx3.gameDir, table.pinballFx3Table) : undefined;
+  const fx3Cabinet = fx3 && !firstRunSeen && !autoStopAfterMs ? loadCabinet(loc.dataDir) : undefined;
+  const fx3Edge = fx3Cabinet?.playfield?.flipperEdge;
+  const firstRun = fx3 && table.pinballFx3Table !== undefined && !firstRunSeen && !autoStopAfterMs ? pinballFx3FirstRunMessage(fx3.gameDir, table.pinballFx3Table, fx3Edge ? pinballFx3OrientationOnWindows(fx3Edge, fx3Cabinet?.playfield?.windowsRotation, playfieldOrigin()) : undefined) : undefined;
   // FX3 déjà lancé par Cyber Pinball quand il démarrait sur l'orientation de la session (avant
   // 0.2.2-essai.10) : une fois par borne, l'ancienne et la nouvelle orientation à saisir. Le témoin
   // est posé dès la première partie de FX3, même sans rien à dire (jeu jamais ouvert compris).
-  const fx3Cabinet = fx3 && !firstRunSeen && !autoStopAfterMs ? loadCabinet(loc.dataDir) : undefined;
-  const fx3Edge = fx3Cabinet?.playfield?.flipperEdge;
   const orientationNotice =
     fx3 && !firstRunSeen && !autoStopAfterMs
       ? takePinballFx3OrientationNotice(
@@ -6227,6 +6229,26 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           if (placed) console.log(`${zenName} (${table.id}) : DMD virtuel de dmdext posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
         }, 1000)
       : undefined;
+  // Pinball FX3 en mode borne : ses fenêtres du DMD et du fronton posées sur les écrans de ces rôles
+  // (pinballfx3-windows.ts ; PinCab, 27/11/2026 : elles s'ouvraient décalées). Relues au passage suivant,
+  // et signalées au journal si le jeu les remet ailleurs.
+  const fx3PlacementWatch =
+    simulated === undefined && command && fx3
+      ? (() => {
+          const watch = createFx3PlacementWatch();
+          return setInterval(() => {
+            watch.tick(
+              listWindows((w) => w.visible && w.className === 'PxWindowClass'),
+              (role) => roleRects.find((r) => r.role === role)?.rect,
+              setWindowBounds,
+              {
+                placed: (role, to) => console.log(`${zenName} (${table.id}) : fenêtre ${role === 'dmd' ? 'du DMD' : 'du fronton'} posée sur son écran (${to.x}, ${to.y}, ${to.width} × ${to.height}).`), // i18n-ignore : journal
+                resisted: (role, wanted, actual) => console.log(`${zenName} (${table.id}) : diagnostic : le jeu remet la fenêtre ${role === 'dmd' ? 'du DMD' : 'du fronton'} ailleurs (voulu ${wanted.x}, ${wanted.y}, ${wanted.width} × ${wanted.height} ; relevé ${actual.x}, ${actual.y}, ${actual.width} × ${actual.height}) ; je la laisse.`), // i18n-ignore : journal
+              },
+            );
+          }, 1000);
+        })()
+      : undefined;
   const game =
     simulated !== undefined || !command
       ? simulateVpx({ onPlaying, onForeground })
@@ -6252,6 +6274,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const result = await game.done;
   if (dmdMirrorWatch) clearInterval(dmdMirrorWatch);
   if (virtualDmdWatch) clearInterval(virtualDmdWatch);
+  if (fx3PlacementWatch) clearInterval(fx3PlacementWatch);
   dmdMirror?.stop();
   const pupClosed = fp && simulated === undefined ? closePupStartedDuringGame(pupBefore, pupPlayerPids()) : [];
   if (pupClosed.length) console.log(`${zenName} (${table.id}) : PinUP Player lancé par la table, fermé avec la partie (processus ${pupClosed.join(', ')}).`); // i18n-ignore : journal
@@ -8610,15 +8633,50 @@ function menuDmdColor(): string {
  */
 function followTint(): void {
   if (!tints) return;
-  const used = mediaSettings.tableColor || mediaSettings.dmdColor === DMD_TABLE_COLOR;
-  const table = used && medias ? screensSubject() : undefined;
+  warmTints();
+  const table = tintUsed() && medias ? screensSubject() : undefined;
   if (!table || !medias) return tints.follow(undefined);
-  const backglass = medias.roleMedia(table, 'backglass').url;
-  const playfield = medias.roleMedia(table, 'playfield').url;
-  const urls = [backglass, playfield, medias.wheel(table)];
-  const dmdUrl = mediaSettings.dmdColor === DMD_TABLE_COLOR ? medias.roleMedia(table, 'dmd').url : undefined;
+  tints.follow(tintSubjectOf(table));
+}
+
+/** La couleur de la table sert-elle quelque part (ambiance, points du DMD, LED) ? Sinon rien n'est mesuré. */
+function tintUsed(): boolean {
+  return mediaSettings.tableColor || mediaSettings.dmdColor === DMD_TABLE_COLOR;
+}
+
+/** Ce que la teinte d'une table lit : ses médias dans l'ordre fronton, plateau, roue ; l'écran du DMD ; les visuels des LED. */
+function tintSubjectOf(table: TableEntry): TintSubject {
+  const backglass = medias!.roleMedia(table, 'backglass').url;
+  const playfield = medias!.roleMedia(table, 'playfield').url;
+  const urls = [backglass, playfield, medias!.wheel(table)];
+  const dmdUrl = mediaSettings.dmdColor === DMD_TABLE_COLOR ? medias!.roleMedia(table, 'dmd').url : undefined;
   const paths = (list: readonly (string | undefined)[]) => list.map((u) => (u ? mediaPathFromUrl(u) : undefined)).filter((f): f is string => Boolean(f));
-  tints.follow({ key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]), ledFiles: paths([backglass, playfield]) });
+  return { key: JSON.stringify([table.file, ...urls, dmdUrl]), files: paths(urls), dmdFiles: paths([dmdUrl]), ledFiles: paths([backglass, playfield]) };
+}
+
+/**
+ * Teintes de toute la collection mesurées d'avance, en tâche de fond, en partant de la table montrée (table-tint.ts,
+ * warm) : au changement de jeu sur la roue, la couleur du DMD et des LED est déjà connue. Relancé quand la collection
+ * ou le réglage de la couleur change ; arrêté (undefined) quand la couleur ne sert plus.
+ */
+let tintsWarmedFor = '';
+function warmTints(): void {
+  if (!tints) return;
+  const used = tintUsed() && medias && !OFFSCREEN;
+  const key = used ? `${tables.length}|${tables[0]?.file ?? ''}|${mediaSettings.tableColor}|${mediaSettings.dmdColor === DMD_TABLE_COLOR}` : '';
+  if (key === tintsWarmedFor) return;
+  tintsWarmedFor = key;
+  if (!used) return tints.warm(undefined);
+  const list = tables;
+  tints.warm({
+    count: list.length,
+    subjectAt: (i) => {
+      const table = list[i];
+      return table && guestTableAllowed(table) ? tintSubjectOf(table) : undefined;
+    },
+    start: () => Math.min(state.index, list.length - 1),
+    idle: () => state.phase !== 'playing' && state.phase !== 'loading',
+  });
 }
 
 /** Ce que les animations des LED ont besoin de savoir de l'écran : la table choisie, la fiche ouverte, sa teinte. */

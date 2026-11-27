@@ -16,6 +16,10 @@
 // Appui isolé sur une table dont la teinte est déjà connue (en mémoire ou dans le cache) : elle est
 // montrée aussitôt, dans l'état que l'on envoie, et son fondu part avec celui des médias (21/11/2026 :
 // attendre SETTLE_MS la décalait en plein atterrissage de la roue, et coûtait un envoi de plus).
+// En rafale, une table déjà connue n'attend que KNOWN_SETTLE_MS (rien à mesurer).
+//
+// Préchauffage (warm) : toute la collection est mesurée d'avance, au repos, en partant de la table
+// montrée ; la teinte est connue avant qu'on arrive sur la table (27/11/2026).
 
 import * as path from 'node:path';
 import { cachedTint, mediaKind, mergeLedPalettes, recordLeds, storeTint, tintCacheEntries, tintCacheFile, tintCacheKey, tintRecord, VIDEO_FRAME_TIMES, type TableTint, type TintRecord } from '@cyberpinball/core';
@@ -23,8 +27,30 @@ import type { Converter } from './media-convert';
 
 /** Attente après le dernier changement de table avant de chercher sa teinte. */
 export const SETTLE_MS = 260;
+/**
+ * Attente, en rafale, avant de montrer la teinte d'une table déjà mesurée : rien à calculer, il ne reste
+ * qu'à éviter un changement de couleur à chaque cran (27/11/2026 : SETTLE_MS entier retardait les LED et le DMD).
+ */
+export const KNOWN_SETTLE_MS = 110;
 /** Largeur des images mesurées : assez pour la teinte dominante, rien pour le processeur. */
 const SAMPLE_WIDTH = 64;
+/** Préchauffage : calme exigé (sans changement de table) avant chaque mesure de fond. */
+const WARM_QUIET_MS = 1500;
+/** Préchauffage : nouvelle tentative quand l'écran n'est pas au repos (défilement, partie, mesure en cours). */
+const WARM_BUSY_MS = 1000;
+/** Préchauffage : pause entre deux tables, pour laisser la main au convertisseur et au processeur. */
+const WARM_GAP_MS = 250;
+/** Préchauffage : tables déjà chaudes examinées par tour, sans bloquer le processus principal. */
+const WARM_LOOK = 25;
+
+/** Collection à préchauffer : ses tables, celle que montre l'écran (on part de là) et le repos de l'application. */
+export interface WarmPlan {
+  count: number;
+  subjectAt(index: number): TintSubject | undefined;
+  start(): number;
+  /** Faux pendant une partie ou son chargement : rien n'est mesuré. */
+  idle(): boolean;
+}
 
 export interface TableTintsOptions {
   dataDir: string;
@@ -76,6 +102,12 @@ export class TableTints {
   private lastFollow = -Infinity;
   /** Cache sur disque, lu une fois : la teinte d'une table déjà mesurée se trouve sans relire le fichier à chaque appui. */
   private disk?: Record<string, TintRecord>;
+  private warmPlan?: WarmPlan;
+  private warmDone = new Set<number>();
+  private warmTimer?: NodeJS.Timeout;
+  private warmBusy = false;
+  private warmGen = 0;
+  private gate: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly opts: TableTintsOptions) {
     this.cacheFile = tintCacheFile(opts.dataDir);
@@ -107,12 +139,18 @@ export class TableTints {
       // Plus de table (menu système, réglages, couleur coupée) : la sarcelle, sans attendre.
       return this.settle(undefined);
     }
-    if (isolated) {
-      const known = this.knownTint(subject);
-      if (known !== UNKNOWN) {
+    const known = this.knownTint(subject);
+    if (known !== UNKNOWN) {
+      if (isolated) {
         this.shown = known;
         return;
       }
+      // Rafale, table déjà mesurée : pas de mesure à attendre, seulement l'arrêt du défilement, plus court.
+      this.timer = setTimeout(() => {
+        this.timer = undefined;
+        if (run === this.run) this.settle(known);
+      }, Math.min(settleMs, KNOWN_SETTLE_MS));
+      return;
     }
     this.timer = setTimeout(() => {
       this.timer = undefined;
@@ -123,8 +161,89 @@ export class TableTints {
 
   dispose(): void {
     clearTimeout(this.timer);
+    clearTimeout(this.warmTimer);
+    this.warmPlan = undefined;
+    this.warmGen++;
     this.run++;
     this.queued = undefined;
+  }
+
+  /**
+   * Préchauffage (27/11/2026 : la teinte d'une table jamais vue se mesurait au moment de la montrer, et les LED
+   * comme le DMD tardaient) : les médias de toute la collection sont mesurés en tâche de fond, en partant de la
+   * table montrée et en s'éloignant, une table à la fois, seulement au repos (ni défilement, ni partie). Chaque
+   * mesure va au cache sur disque : au prochain démarrage, tout est déjà connu. `undefined` arrête le travail
+   * (couleur coupée, autre collection).
+   */
+  warm(plan: WarmPlan | undefined): void {
+    clearTimeout(this.warmTimer);
+    this.warmTimer = undefined;
+    this.warmGen++;
+    this.warmPlan = plan;
+    this.warmDone = new Set();
+    if (plan) this.pumpWarm(WARM_BUSY_MS);
+  }
+
+  private pumpWarm(delay: number): void {
+    if (!this.warmPlan || this.warmTimer || this.warmBusy) return;
+    this.warmTimer = setTimeout(() => {
+      this.warmTimer = undefined;
+      void this.warmNext();
+    }, delay);
+  }
+
+  private async warmNext(): Promise<void> {
+    const plan = this.warmPlan;
+    if (!plan || this.warmBusy) return;
+    const now = (this.opts.now ?? Date.now)();
+    // Écran en mouvement, mesure demandée par l'écran, partie : plus tard.
+    if (!plan.idle() || this.timer || this.queued || this.resolving || now - this.lastFollow < WARM_QUIET_MS) return this.pumpWarm(WARM_BUSY_MS);
+    const gen = this.warmGen;
+    this.warmBusy = true;
+    let more = true;
+    try {
+      const next = this.nextToWarm(plan);
+      if (!next) {
+        this.warmPlan = undefined; // tout est chaud
+        more = false;
+      } else if (next !== 'again') {
+        const run = this.run;
+        await this.resolveSubject(next.subject, run);
+        // Un changement de table a interrompu la mesure : cette table sera reprise plus tard.
+        if (run === this.run && gen === this.warmGen) this.warmDone.add(next.index);
+      }
+    } catch (error) {
+      console.log(`Couleur de la table (préchauffage) : ${(error as Error).message}`); // i18n-ignore : journal
+    } finally {
+      this.warmBusy = false;
+    }
+    if (more && gen === this.warmGen) this.pumpWarm(WARM_GAP_MS);
+  }
+
+  /** Table non préchauffée la plus proche de celle que montre l'écran ; 'again' : d'autres à examiner. */
+  private nextToWarm(plan: WarmPlan): { index: number; subject: TintSubject } | 'again' | undefined {
+    const start = Math.min(Math.max(plan.start(), 0), Math.max(plan.count - 1, 0));
+    let looked = 0;
+    for (let d = 0; d < plan.count; d++) {
+      for (const index of d === 0 ? [start] : [start + d, start - d]) {
+        if (index < 0 || index >= plan.count || this.warmDone.has(index)) continue;
+        if (++looked > WARM_LOOK) return 'again';
+        const subject = plan.subjectAt(index);
+        if (!subject || this.knownTint(subject) !== UNKNOWN) {
+          this.warmDone.add(index);
+          continue;
+        }
+        return { index, subject };
+      }
+    }
+    return undefined;
+  }
+
+  /** Les mesures passent une à une : celle de l'écran n'attend, au plus, que la mesure de fond en cours. */
+  private exclusive<T>(job: () => Promise<T>): Promise<T> {
+    const result = this.gate.then(job, job);
+    this.gate = result.catch(() => undefined);
+    return result;
   }
 
   /** Une seule mesure active ; pendant son attente, seule la dernière table reste à traiter. */
@@ -245,11 +364,16 @@ export class TableTints {
     const kind = mediaKind(file);
     if (kind !== 'image' && kind !== 'video') return undefined;
     try {
-      const got = await this.opts.converter().mediaFrames(file, kind === 'video' ? VIDEO_FRAME_TIMES : [0], SAMPLE_WIDTH);
-      const record = tintRecord(got.images);
-      this.memo.set(id, record);
-      storeTint(this.cacheFile, file, record);
-      return record;
+      return await this.exclusive(async () => {
+        // Mesuré pendant l'attente (écran et préchauffage demandent le même média) : rien à refaire.
+        const done = this.memo.get(id);
+        if (done) return done;
+        const got = await this.opts.converter().mediaFrames(file, kind === 'video' ? VIDEO_FRAME_TIMES : [0], SAMPLE_WIDTH);
+        const record = tintRecord(got.images);
+        this.memo.set(id, record);
+        storeTint(this.cacheFile, file, record);
+        return record;
+      });
     } catch (error) {
       // Une panne du décodeur ne condamne pas le fichier sur disque. Reprise après une minute,
       // ou aussitôt si sa taille/date change ; pas de nouvelle tentative à chaque survol.

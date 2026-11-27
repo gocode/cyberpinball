@@ -68,15 +68,18 @@ export function pinballFx3PurchaseLine(name: string): string | undefined {
  * est pas activé, le jeu s'ouvrira sur son écran d'accueil. Start l'ouvre quand même (pour activer
  * le mode borne), Exit revient au front-end. undefined : rien à dire.
  */
-export function pinballFx3FirstRunMessage(gameDir: string, name: string): { title: string; lines: string[] } | undefined {
+export function pinballFx3FirstRunMessage(gameDir: string, name: string, orientation?: Rotation): { title: string; lines: string[] } | undefined {
   if (!pinballFx3NeverOpened(gameDir)) return undefined;
   const game = 'Pinball FX3';
   const purchase = pinballFx3PurchaseLine(name);
+  // `orientation` : celle de la borne (pinballFx3Orientation) ; sans bord de flippers enregistré, pas de ligne.
+  const rotation = orientation !== undefined ? t('Orientation à saisir dans {game} : {rotation}° (celle qui met les flippers du bon côté, d’après la configuration de la borne). Le DMD et le fronton, Cyber Pinball les replace lui-même sur leurs écrans après le lancement : leurs positions saisies dans le jeu n’ont pas à être exactes.', { game, rotation: orientation }) : undefined;
   return {
     title: t('Première ouverture de {game} sur ce PC', { game }),
     lines: [
       t('{game} n’a encore jamais été ouvert ici : son mode borne n’y est pas activé. Sans lui, le jeu s’ouvre sur son écran d’accueil, en paysage, et pas sur la table.', { game }),
       t('Dans le jeu : icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD. Cyber Pinball ne peut pas le faire à sa place : ces réglages sont chiffrés. Ferme ensuite le jeu (Exit tenu) et relance la table.'),
+      ...(rotation ? [rotation] : []),
       ...(purchase ? [purchase] : []),
       t('Start : ouvrir {game} · Exit : revenir au front-end', { game }),
     ],
@@ -109,8 +112,18 @@ export interface PinballFx3OrientationChange {
 export function pinballFx3OrientationChange(flipperEdge: FlipperEdge, windowsRotation: Rotation | undefined, origin: Rotation | undefined): PinballFx3OrientationChange | undefined {
   if (windowsRotation === undefined || origin === undefined || windowsRotation === origin) return undefined;
   const before = pinballFx3Orientation(flipperEdge);
-  const after = pinballFx3Orientation(edgeAfterRotation(flipperEdge, rotationDelta(origin, windowsRotation)));
+  const after = pinballFx3OrientationOnWindows(flipperEdge, windowsRotation, origin);
   return before === after ? undefined : { before, after };
+}
+
+/**
+ * Orientation à saisir dans FX3 aujourd'hui : celle de l'image de Windows (`origin`), sur laquelle il
+ * démarre, pour des flippers enregistrés au bord `flipperEdge` de l'image de la session
+ * (`windowsRotation`). Sans l'une des deux, l'image de la session est celle de Windows.
+ */
+export function pinballFx3OrientationOnWindows(flipperEdge: FlipperEdge, windowsRotation: Rotation | undefined, origin: Rotation | undefined): Rotation {
+  if (windowsRotation === undefined || origin === undefined) return pinballFx3Orientation(flipperEdge);
+  return pinballFx3Orientation(edgeAfterRotation(flipperEdge, rotationDelta(origin, windowsRotation)));
 }
 
 /** Témoin, dans le dossier des données : l'avertissement du changement d'orientation de FX3 est passé. */
