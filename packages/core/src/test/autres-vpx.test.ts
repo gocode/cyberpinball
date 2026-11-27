@@ -29,7 +29,7 @@ import {
 } from '../autres-vpx';
 import { programsDuringGame } from '../coexistence';
 import { setLanguage } from '../i18n';
-import { findInstallation, listInstallationTables } from '../installation';
+import { findInstallation, listInstallationTables, POPPER_EMULATOR_COLUMNS, POPPER_GAME_COLUMNS, popperScriptExe } from '../installation';
 import { NEWS } from '../news';
 import { peFileVersion } from '../vc-runtime';
 import { frontendSource } from './frontend-source';
@@ -146,10 +146,11 @@ test('PinUP Popper : l’exécutable de chaque table d’après son émulateur e
   write(path.join(old, 'VPinballX.exe'), fakeExe('10.7.4.433'));
   for (const name of ['Habituelle', 'En GL', 'Script maison', 'Ancienne', 'Inconnue de Popper']) write(path.join(tables, `${name}.vpx`));
   const db = new DatabaseSync(write(path.join(vp, 'PinUPSystem', 'PUPDatabase.db'), ''));
-  db.exec('create table Emulators (EMUID integer, EmuName text, DirGames text, DirMedia text, DirRoms text, GamesExt text, DirEmulator text)');
+  // Le schéma d'un vrai PUPDatabase.db : le dossier de l'émulateur est EmuLaunchDir ([DIREMU] du script de lancement).
+  db.exec('create table Emulators (EMUID integer, EmuName text, DirGames text, DirMedia text, DirRoms text, GamesExt text, EmuLaunchDir text, LaunchScript text)');
   db.exec('create table Games (GameID integer, EMUID integer, GameName text, GameFileName text, ROM text, ALTEXE text)');
-  db.prepare('insert into Emulators values (1, ?, ?, ?, ?, ?, ?)').run('Visual Pinball X', tables, path.join(vp, 'POPMedia'), '', 'vpx', vpx);
-  db.prepare('insert into Emulators values (2, ?, ?, ?, ?, ?, ?)').run('Visual Pinball 10.7', tables, path.join(vp, 'POPMedia'), '', 'vpx', old);
+  db.prepare('insert into Emulators values (1, ?, ?, ?, ?, ?, ?, ?)').run('Visual Pinball X', tables, path.join(vp, 'POPMedia'), '', 'vpx', vpx, '');
+  db.prepare('insert into Emulators values (2, ?, ?, ?, ?, ?, ?, ?)').run('Visual Pinball 10.7', tables, path.join(vp, 'POPMedia'), '', 'vpx', old, '');
   db.prepare('insert into Games values (1, 1, ?, ?, null, null)').run('Habituelle', 'Habituelle.vpx');
   db.prepare('insert into Games values (2, 1, ?, ?, null, ?)').run('En GL', 'En GL.vpx', 'VPinballX_GL64');
   db.prepare('insert into Games values (3, 1, ?, ?, null, ?)').run('Script maison', 'Script maison.vpx', 'VPX 10.6');
@@ -173,6 +174,81 @@ test('PinUP Popper : l’exécutable de chaque table d’après son émulateur e
   );
   assert.equal(popperGameExe('relatif\\dossier', ''), undefined);
   assert.equal(popperGameExe(vpx, '..\\VisualPinball107\\VPinballX.exe'), undefined);
+});
+
+// Le script de lancement des émulateurs d'une installation PinUP Popper d'origine (abrégé).
+const POPPER_SCRIPT = (exe: string) =>
+  [
+    '@echo off',
+    'rem START "" "C:\\vPinball\\PinUPSystem\\PinUPCapture.exe" ij_l7 0 0 0',
+    'START "" "[STARTDIR]Launch\\VPXSTARTER.exe" 30 10 60 "Visual Pinball Player" 2',
+    'cd /d "[DIREMU]"',
+    'SET FSMODE=DisableTrueFullScreen',
+    `SET VPXEXE=${exe}`,
+    'if NOT "[ALTEXE]"=="" (SET VPXEXE=[ALTEXE] )',
+    'START /min "" %VPXEXE% -%FSMODE% -minimized -play "[GAMEFULLNAME]"',
+  ].join('\r\n');
+
+test('PinUP Popper d’origine : deux émulateurs dans le même dossier, chacun son VPX d’après son script de lancement', () => {
+  const root = tmp();
+  const vp = path.join(root, 'vPinball');
+  const vpx = path.join(vp, 'VisualPinball');
+  const tables = path.join(vpx, 'Tables');
+  write(path.join(vpx, 'VPinballX64.exe'), fakeExe('10.8.0.2058'));
+  write(path.join(vpx, 'VPinballX.exe'), fakeExe('10.8.0.2058'));
+  write(path.join(vpx, 'VPinballX107_64bit.exe'), fakeExe('10.7.4.0'));
+  for (const name of ['CityHunter', 'Indiana', 'Sur le disque seulement']) write(path.join(tables, name, `${name}.vpx`));
+  const db = new DatabaseSync(write(path.join(vp, 'PinUPSystem', 'PUPDatabase.db'), ''));
+  // Colonnes telles qu'un vrai PUPDatabase.db les nomme (relevé d'une installation de PinUP Popper).
+  db.exec(
+    'create table Emulators (EMUID integer, EmuName text, Description text, DirGames text, DirMedia text, EmuDisplay text, Visible integer, DirRoms text, EmuLaunchDir text, HideScreens integer, GamesExt text, LaunchScript text, PostScript text)',
+  );
+  db.exec('create table Games (GameID integer, EMUID integer, GameName text, GameFileName text, ROM text, ALTEXE text)');
+  const emu = db.prepare('insert into Emulators (EMUID, EmuName, EmuDisplay, DirGames, DirMedia, DirRoms, EmuLaunchDir, GamesExt, LaunchScript) values (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  emu.run(1, 'Visual Pinball X', 'Visual Pinball X - 10.7', tables, path.join(vp, 'POPMedia'), '', vpx, 'vpx', POPPER_SCRIPT('VPinballX107_64bit.exe'));
+  emu.run(7, 'Visual Pinball X', 'Visual Pinball X - 10.8.0', tables, path.join(vp, 'POPMedia'), '', vpx, 'vpx', POPPER_SCRIPT('VPinballX.exe'));
+  db.prepare('insert into Games values (74, 7, ?, ?, null, null)').run('CityHunter', 'CityHunter\\CityHunter.vpx');
+  db.prepare('insert into Games values (7, 1, ?, ?, null, null)').run('Indiana', 'Indiana\\Indiana.vpx');
+  db.close();
+
+  const layout = findInstallation(tables)!;
+  assert.ok(layout, 'installation reconnue');
+  const exeOf = (title: string) => listInstallationTables(layout).find((x) => x.title === title)?.vpxExe;
+  assert.equal(exeOf('CityHunter'), path.join(vpx, 'VPinballX.exe'), 'émulateur 10.8.0 : le VPinballX.exe de son script');
+  assert.equal(exeOf('Indiana'), path.join(vpx, 'VPinballX107_64bit.exe'), 'émulateur 10.7 : jamais le VPX 10.8 du même dossier');
+  assert.equal(exeOf('Sur le disque seulement'), path.join(vpx, 'VPinballX64.exe'));
+});
+
+test('script de lancement de Popper : l’exécutable lancé sans ALTEXE', () => {
+  assert.equal(popperScriptExe(POPPER_SCRIPT('VPinballX107_64bit.exe')), 'VPinballX107_64bit.exe');
+  assert.equal(popperScriptExe('set "VPXEXE=VPinballX_GL64"'), 'VPinballX_GL64.exe');
+  assert.equal(popperScriptExe('rem SET VPXEXE=VPinballX106.exe\r\nSTART "" "[DIREMU]\\VPinballX64.exe" -play "[GAMEFULLNAME]"'), 'VPinballX64.exe');
+  assert.equal(popperScriptExe('SET VPXEXE=%MONVPX%'), undefined);
+  assert.equal(popperScriptExe('SET VPXEXE=C:\\Ailleurs\\VPinballX.exe'), undefined);
+  assert.equal(popperScriptExe(''), undefined);
+  assert.equal(popperScriptExe(null), undefined);
+});
+
+test('lecture de la base de Popper : chaque colonne lue existe dans un vrai PUPDatabase.db', () => {
+  // Relevé du schéma d'une installation de PinUP Popper (pragma table_info). DirEmulator n'y est pas : lu à sa
+  // place, il laissait toutes les tables de Popper sans VPX connu, donc sans cadrage d'origine repris.
+  const real = {
+    Emulators: 'EMUID, EmuName, Description, DirGames, DirMedia, EmuDisplay, Visible, DirRoms, EmuLaunchDir, HideScreens, GamesExt, ImageExt, VideoExt, EscapeKeyCode, LaunchScript, PostScript, KeepDisplays, ProcessName, WinTitle, SkipScan, emuVolume, DirGamesShare, DirRomsShare, DirMediaShare, CanPause, CoreFile, HelpScript, AutoScanStartup, IgnoreFileScan, SafeLaunch, SafeReturn',
+    Games: 'GameID, EMUID, GameName, GameFileName, ROM, ALTEXE',
+  };
+  const has = (table: keyof typeof real, column: string) => real[table].split(', ').some((c) => c.toLowerCase() === column.toLowerCase());
+  for (const c of POPPER_EMULATOR_COLUMNS) assert.ok(has('Emulators', c), `Emulators.${c}`);
+  for (const c of POPPER_GAME_COLUMNS) assert.ok(has('Games', c), `Games.${c}`);
+  // La requête ne lit que ces colonnes (DirEmulator seulement en repli, jamais seul).
+  const source = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'core', 'src', 'installation.ts'), 'utf8');
+  const read = [...source.matchAll(/col\((emuCols|gameCols), '(\w+)'\)/g)].map((m) => [m[1]!, m[2]!] as const);
+  assert.ok(read.length > 0);
+  for (const [table, column] of read) {
+    if (column === 'DirEmulator') continue;
+    const list: readonly string[] = table === 'emuCols' ? POPPER_EMULATOR_COLUMNS : POPPER_GAME_COLUMNS;
+    assert.ok(list.includes(column), `${column} lu mais absent de la liste des colonnes de Popper`);
+  }
+  assert.match(source, /launchDir\?\.trim\(\) \|\| e\?\.emulatorDir/);
 });
 
 test('une partie refusée avec un autre VPX : introuvable, réglage de l’affichage, partie entre amis', () => {

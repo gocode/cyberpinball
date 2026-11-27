@@ -84,7 +84,16 @@ export interface OriginCatchUpRecord {
   /** restored : cadrage d'origine rendu ; same : déjà le même ; kept : choisi par le joueur ; refused : ne s'applique pas ; none : pas d'origine. */
   result: 'restored' | 'same' | 'kept' | 'refused' | 'none';
   detail?: string;
+  /** Version de la recherche de l'origine qui a produit ce résultat (absente : la première). */
+  v?: number;
 }
+
+/**
+ * Version de la recherche de l'origine. 2 : le VPX de chaque table de PinUP Popper lu dans EmuLaunchDir et le script
+ * de lancement (avant, une colonne qu'aucune vraie base n'a : aucune table de Popper n'avait de VPX connu). Un
+ * résultat « pas d'origine » ou « ne s'applique pas » d'une version plus ancienne est refait une fois.
+ */
+export const ORIGIN_FINDER_VERSION = 2;
 
 const CATCHUP_FILE = 'cadrage-origine-rattrapage.json';
 
@@ -101,16 +110,21 @@ function loadCatchUp(dataDir: string): Record<string, OriginCatchUpRecord> {
   }
 }
 
-/** Le rattrapage déjà fait pour cette table, s'il l'a été. */
+/**
+ * Le rattrapage déjà fait pour cette table, s'il l'a été. Un « pas d'origine » ou « ne s'applique pas » trouvé par
+ * une recherche plus ancienne que ORIGIN_FINDER_VERSION ne compte pas : la table est reprise.
+ */
 export function originCatchUpOf(dataDir: string, tableFile: string): OriginCatchUpRecord | undefined {
-  return loadCatchUp(dataDir)[keyOf(tableFile)];
+  const record = loadCatchUp(dataDir)[keyOf(tableFile)];
+  if (record && (record.result === 'none' || record.result === 'refused') && (record.v ?? 1) < ORIGIN_FINDER_VERSION) return undefined;
+  return record;
 }
 
 /** Note le rattrapage de ces tables (une écriture pour toutes). */
 export function rememberOriginCatchUp(dataDir: string, records: { file: string; record: OriginCatchUpRecord }[]): void {
   if (!records.length) return;
   const all = loadCatchUp(dataDir);
-  for (const r of records) all[keyOf(r.file)] = r.record;
+  for (const r of records) all[keyOf(r.file)] = { ...r.record, v: ORIGIN_FINDER_VERSION };
   fs.mkdirSync(dataDir, { recursive: true });
   writeFileAtomic(path.join(dataDir, CATCHUP_FILE), JSON.stringify(all, null, 2) + '\n');
 }

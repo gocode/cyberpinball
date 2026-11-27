@@ -17,7 +17,7 @@ import { framingHistory, rememberFraming, restoreFramingOps } from '../framing-h
 import { applyOps } from '../fileops';
 import { IniDocument } from '../ini';
 import { originFramingOf, planOriginFraming, type OriginVpx } from '../origin-framing';
-import { mergeOriginFraming, originCatchUpOf, sameFraming } from '../origin-framing-catchup';
+import { mergeOriginFraming, originCatchUpOf, ORIGIN_FINDER_VERSION, sameFraming } from '../origin-framing-catchup';
 import { readInfo, scanTables } from '../tables';
 import { devPcDisplays, vpxWithScript } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
@@ -176,4 +176,27 @@ test('mergeOriginFraming : seules la vue et les clés du cadrage changent', () =
   assert.equal(doc.get('Player', 'ScreenPlayerZ'), undefined);
   assert.equal(doc.get('TableOverride', 'ViewCabRotation'), '270.000000');
   assert.equal(mergeOriginFraming(undefined, ''), '');
+});
+
+test('rattrapage : une table notée « pas d’origine » par l’ancienne recherche (base de Popper mal lue) est reprise une fois', () => {
+  const s = setup(COPY_INI, POPPER_INI);
+  try {
+    const key = path.resolve(s.entry().file).toLowerCase();
+    // Ce qu'avait laissé la 0.2.4-essai.91 : la table de Popper sans VPX connu, donc « none », sans version.
+    fs.writeFileSync(path.join(s.dataDir, 'cadrage-origine-rattrapage.json'), JSON.stringify({ [key]: { at: '2026-11-27T19:50:24.076Z', result: 'none' } }));
+    assert.equal(originCatchUpOf(s.dataDir, s.entry().file), undefined, 'ancien « none » : à refaire');
+    const result = s.run();
+    assert.equal(result.restored.length, 1);
+    const record = originCatchUpOf(s.dataDir, s.entry().file)!;
+    assert.equal(record.result, 'restored');
+    assert.equal(record.v, ORIGIN_FINDER_VERSION);
+    // Une seule fois : un « none » de la recherche actuelle reste acquis.
+    fs.writeFileSync(path.join(s.dataDir, 'cadrage-origine-rattrapage.json'), JSON.stringify({ [key]: { at: '2026-11-27T21:00:00.000Z', result: 'none', v: ORIGIN_FINDER_VERSION } }));
+    assert.equal(originCatchUpOf(s.dataDir, s.entry().file)?.result, 'none');
+    // Un cadrage choisi (kept) ou rendu (restored) par l'ancienne recherche n'est jamais refait.
+    fs.writeFileSync(path.join(s.dataDir, 'cadrage-origine-rattrapage.json'), JSON.stringify({ [key]: { at: '2026-11-27T19:50:24.076Z', result: 'kept' } }));
+    assert.equal(originCatchUpOf(s.dataDir, s.entry().file)?.result, 'kept');
+  } finally {
+    s.done();
+  }
 });

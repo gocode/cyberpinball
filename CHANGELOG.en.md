@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Tables taken over from PinUP Popper: the VPX that played each table is now found correctly (its emulator's folder and launch script, 10.7 or 10.8). Without it, Popper's framing was kept for no table Popper knew, neither when added nor in the catch-up.
+- Tables taken over from Popper that the previous catch-up left aside get back, once, their Popper framing, unless you chose one in Cyber Pinball. The previous framing stays in the history: "Point of view" > "Restore the previous framing" puts it back.
 - What's new: a line introduces Pinball FX Midnight (a different Zen Studios game from Pinball FX); "Try it" opens the "Pinball FX Midnight tables" screen.
 - Diagnostic: when a table plays without its music or without its UltraDMD folder, Cyber Pinball now looks for them by itself in your old Visual Pinball (its "Music" and "Tables" folders) and offers to copy them to the table in one tap, replacing nothing. If it cannot find them, "Choose the folder…" copies them from the place you point to, and the text says exactly which name is expected and where it came from.
 - Adding a table: a folder that gathers different games (the Tables folder of an old installation, for example) now gives one table per game. Before, all its .vpx files ended up in a single table folder, under the title of one of them.

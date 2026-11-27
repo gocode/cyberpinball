@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Tables reprises de PinUP Popper : le VPX qui jouait chaque table est maintenant bien retrouvé (dossier et script de lancement de son émulateur, 10.7 ou 10.8). Sans lui, le cadrage de Popper n'était repris pour aucune table connue de Popper, ni à l'ajout ni au rattrapage.
+- Les tables reprises de Popper que le rattrapage précédent avait laissées de côté retrouvent une fois leur cadrage de Popper, sauf si tu en as choisi un dans Cyber Pinball. Le cadrage d'avant reste dans l'historique : « Point de vue » > « Rétablir le cadrage précédent » le remet.
 - Nouveautés : une ligne présente Pinball FX Midnight (un autre jeu de Zen Studios que Pinball FX) ; "Essayer" ouvre l'écran "Tables de Pinball FX Midnight".
 - Diagnostic : quand une table joue sans sa musique ou sans son dossier UltraDMD, Cyber Pinball les cherche tout seul dans ton ancien Visual Pinball (dossiers « Music » et « Tables ») et propose de les copier chez la table d'un geste, sans rien remplacer. S'il ne les trouve pas, « Choisir le dossier… » les copie depuis l'endroit que tu désignes, et le texte dit précisément le nom attendu et d'où il vient.
 - Ajout d'une table : un dossier qui rassemble des jeux différents (le dossier Tables d'une ancienne installation, par exemple) donne une table par jeu. Avant, tous ses .vpx finissaient dans un seul dossier de table, sous le titre de l'un d'eux.

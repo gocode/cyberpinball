@@ -975,8 +975,40 @@ interface PopperFacts {
   mediaDirs: string[];
   romDirs: string[];
   games: CatalogEntry[];
-  /** The usual executable of the folder of each Visual Pinball emulator (DirEmulator). */
+  /** The executable each Visual Pinball emulator launches (its folder EmuLaunchDir, its launch script). */
   vpxExes: string[];
+}
+
+/**
+ * Columns of PinUP Popper's tables that are read here, as a real PUPDatabase.db names them. The emulator folder is
+ * EmuLaunchDir (the [DIREMU] of its launch script); DirEmulator is only an older or alternative name. A test checks
+ * every column the query reads against this list, so a name that no real database has cannot come back.
+ */
+export const POPPER_EMULATOR_COLUMNS = ['EMUID', 'EmuName', 'DirGames', 'DirMedia', 'DirRoms', 'GamesExt', 'EmuLaunchDir', 'LaunchScript'] as const;
+export const POPPER_GAME_COLUMNS = ['GameID', 'EMUID', 'GameName', 'GameFileName', 'ROM', 'ALTEXE'] as const;
+
+/**
+ * The executable a Popper launch script starts when the table has no ALTEXE: its `SET VPXEXE=…` (Popper's stock
+ * scripts), otherwise the first VPinballX*.exe it names outside comments. A bare file name of the emulator folder;
+ * undefined when the script names none (a custom script: the folder's usual executable is taken).
+ */
+export function popperScriptExe(script: string | null | undefined): string | undefined {
+  if (!script) return undefined;
+  const lines = script.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^(rem\b|::)/i.test(l));
+  const bare = (value: string | undefined) => {
+    const name = value?.trim().replace(/^"|"$/g, '').trim();
+    if (!name || name.includes('[') || name.includes('%') || /[\\/]/.test(name)) return undefined;
+    return /\.exe$/i.test(name) ? name : `${name}.exe`;
+  };
+  for (const line of lines) {
+    const set = /^set\s+"?vpxexe\s*=\s*([^"]*?)"?\s*$/i.exec(line);
+    if (set) return bare(set[1]);
+  }
+  for (const line of lines) {
+    const named = /\b(vpinballx[\w.-]*\.exe)\b/i.exec(line);
+    if (named) return bare(named[1]);
+  }
+  return undefined;
 }
 
 /** Read-only reading of the Popper database; undefined if it is missing or cannot be read (Popper open, damaged database). */
@@ -993,9 +1025,12 @@ export function readPopper(file: string): PopperFacts | undefined {
     const col = (cols: Set<string>, name: string) => (cols.has(name.toLowerCase()) ? name : 'NULL');
     const emus = db
       .prepare(
-        `select EMUID as id, EmuName as name, ${col(emuCols, 'DirGames')} as games, ${col(emuCols, 'DirMedia')} as media, ${col(emuCols, 'DirRoms')} as roms, ${col(emuCols, 'GamesExt')} as ext, ${col(emuCols, 'DirEmulator')} as emulator from Emulators`,
+        `select EMUID as id, EmuName as name, ${col(emuCols, 'DirGames')} as games, ${col(emuCols, 'DirMedia')} as media, ${col(emuCols, 'DirRoms')} as roms, ${col(emuCols, 'GamesExt')} as ext, ${col(emuCols, 'EmuLaunchDir')} as launchDir, ${col(emuCols, 'DirEmulator')} as emulatorDir, ${col(emuCols, 'LaunchScript')} as script from Emulators`,
       )
-      .all() as { id: number; name: string | null; games: string | null; media: string | null; roms: string | null; ext: string | null; emulator: string | null }[];
+      .all() as { id: number; name: string | null; games: string | null; media: string | null; roms: string | null; ext: string | null; launchDir: string | null; emulatorDir: string | null; script: string | null }[];
+    // The folder the launch script runs VPX from ([DIREMU]), and the executable it starts without ALTEXE.
+    const emulatorOf = (e: (typeof emus)[number] | undefined) => (e?.launchDir?.trim() || e?.emulatorDir?.trim() || undefined);
+    const exeOf = (e: (typeof emus)[number] | undefined, alt: string | null | undefined) => popperGameExe(emulatorOf(e), alt, popperScriptExe(e?.script));
     const vp = emus.filter((e) => /vpx/i.test(e.ext ?? '') || /visual\s*pinball|vpinball/i.test(e.name ?? ''));
     if (!vp.length) return { tableDirs: [], mediaDirs: [], romDirs: [], games: [], vpxExes: [] };
     const ids = vp.map((e) => e.id);
@@ -1010,7 +1045,7 @@ export function readPopper(file: string): PopperFacts | undefined {
       const dir = emu?.games ?? '';
       const file = path.isAbsolute(r.file) ? r.file : dir ? path.join(dir, r.file) : undefined;
       const playlists = lists ? lists.filter((l) => l.games.has(r.id)).map((l) => l.name) : undefined;
-      const vpxExe = popperGameExe(emu?.emulator, r.alt);
+      const vpxExe = exeOf(emu, r.alt);
       games.push({
         ...(file ? { file } : {}),
         stem: path.basename(r.file, path.extname(r.file)),
@@ -1022,7 +1057,7 @@ export function readPopper(file: string): PopperFacts | undefined {
     }
     const dirs = (key: 'games' | 'media' | 'roms') => unique(vp.map((e) => e[key]?.trim()).filter((d): d is string => Boolean(d) && path.isAbsolute(d!)));
     // The executables named by an ALTEXE count too: a table played in 10.8.0 under the usual emulator.
-    const vpxExes = unique([...vp.map((e) => popperGameExe(e.emulator, undefined)), ...games.map((g) => g.vpxExe)]);
+    const vpxExes = unique([...vp.map((e) => exeOf(e, undefined)), ...games.map((g) => g.vpxExe)]);
     return { tableDirs: dirs('games'), mediaDirs: dirs('media'), romDirs: dirs('roms'), games, vpxExes };
   } catch {
     return undefined;

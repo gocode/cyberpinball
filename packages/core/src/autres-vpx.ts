@@ -270,10 +270,11 @@ export function vpxExesIn(dir: string): string[] {
 
 /**
  * L'exécutable avec lequel PinUP Popper lance une table : son ALTEXE (un nom de fichier du dossier de
- * l'émulateur, avec ou sans .exe), sinon l'exécutable habituel de ce dossier. Un ALTEXE qui ne nomme aucun
- * fichier du dossier est propre au script de lancement de cette installation : undefined, rien n'est deviné.
+ * l'émulateur, avec ou sans .exe), sinon celui que nomme le script de lancement de l'émulateur (`scriptExe`),
+ * sinon l'exécutable habituel de ce dossier. Un ALTEXE qui ne nomme aucun fichier du dossier est propre au script
+ * de lancement de cette installation : undefined, rien n'est deviné.
  */
-export function popperGameExe(emulatorDir: string | null | undefined, altExe: string | null | undefined): string | undefined {
+export function popperGameExe(emulatorDir: string | null | undefined, altExe: string | null | undefined, scriptExe?: string): string | undefined {
   const dir = emulatorDir?.trim();
   if (!dir || !path.isAbsolute(dir)) return undefined;
   const alt = altExe?.trim();
@@ -288,6 +289,14 @@ export function popperGameExe(emulatorDir: string | null | undefined, altExe: st
       }
     }
     return undefined;
+  }
+  if (scriptExe && path.basename(scriptExe) === scriptExe) {
+    const file = path.join(dir, scriptExe);
+    try {
+      if (fs.statSync(file).isFile()) return file;
+    } catch {
+      // Le script nomme un fichier absent : l'exécutable habituel du dossier.
+    }
   }
   return vpxExesIn(dir)[0];
 }
