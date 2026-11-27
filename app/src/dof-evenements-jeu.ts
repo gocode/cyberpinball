@@ -29,6 +29,7 @@ import {
   createDofScene,
   createLaunchDetector,
   dofEventClass,
+  dofSoundClass,
   dofScenePalette,
   dofTapReach,
   parseTapChunk,
@@ -367,6 +368,7 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   } catch {
     classes = undefined;
   }
+  const soundsPlay = scriptCallsNoDof(about.script);
   const strips = leds.strips.map((s) => ({ name: s.name, width: s.width, height: s.height, arrangement: s.arrangement }));
   // Bilan de la partie, au journal à l'arrêt : de quoi voir après coup si les bandes sont restées allumées
   // et quels événements sont arrivés (retour d'essai du 25/11/2026 : « reste tout le temps allumé »).
@@ -413,9 +415,17 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
         fs.readSync(fd, buf, 0, buf.length, offset);
         fs.closeSync(fd);
         offset = size;
-        const { events, rest: tail } = parseTapChunk(rest + buf.toString('latin1'));
+        const { events, sounds, rest: tail } = parseTapChunk(rest + buf.toString('latin1'));
         rest = tail;
         for (const ev of events) play(dofEventClass(classes, ev.number), ev.state >= 1);
+        // Sons de la table : seule source d'événements d'un script sans appel DOF. Une table qui parle DOF a ses
+        // événements, les sons feraient double emploi.
+        if (soundsPlay) {
+          for (const s of sounds) {
+            const c = dofSoundClass(s.sound, s.effect);
+            if (c) play(c, true);
+          }
+        }
       }
     } catch {
       // Fichier pas encore là ou en cours d'écriture : au prochain tour.
@@ -435,7 +445,7 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   }, 15);
   const known = classes ? [...classes.values()].filter((c) => c.kind !== 'other').length : 0;
   const hex = (c: readonly number[]) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
-  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
+  deps.log(`Effets LED sans DOF : écoute des événements de la table (${classes?.size ?? 0} dans le script, ${known} reconnus${deps.watchButtons ? ', boutons de la borne' : ''}${soundsPlay ? ', sons de la table' : ''}), couleurs ${hex(palette.primary)} ${hex(palette.secondary)} ${hex(palette.accent)}, gain de luminosité ${(gain * 100).toFixed(1)} % de la lumière.`); // i18n-ignore : journal
   logTapReach(deps, about.script);
   return {
     stop() {

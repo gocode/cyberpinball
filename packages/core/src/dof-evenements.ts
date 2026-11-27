@@ -42,23 +42,63 @@ function tapSubLines(name: string): string[] {
   ];
 }
 
+/** Écoute des sons : `Function SoundFX(son, jouet)` de controller.vbs la reçoit, d'où « S,jouet,son,secondes » dans le fichier. */
+export const DOF_SOUND_SUB = 'CyberPinball_SoundTap';
+
 /**
- * controller.vbs avec l'écoute : un appel en tête de `Sub DOF` et de `Sub DOFALT`, et la Sub qui écrit
- * « E,numéro,état,secondes » (Timer : secondes depuis minuit) ajoutée à la fin. Idempotent. undefined si
- * `Sub DOF` n'est plus là (un autre controller.vbs : on n'y touche pas).
+ * La Sub qui écrit « S,jouet,son,secondes » : le son que joue la table (« Sling_L3 », « Bumpers_Top_2 ») dit ce qui
+ * vient d'arriver, pour une table dont le script n'appelle jamais DOF (Agentic : 4 jouets DOF, aucun appel).
+ * Elle partage le fichier de `CyberPinball_DofTap`. Ni flippers (jouet 7 : les boutons les couvrent), ni le même son
+ * répété en moins de 50 ms.
+ */
+function soundSubLines(): string[] {
+  const file = `${TAP_SUB}File`;
+  const ready = `${TAP_SUB}Ready`;
+  return [
+    `Dim ${DOF_SOUND_SUB}Last, ${DOF_SOUND_SUB}At`,
+    `Sub ${DOF_SOUND_SUB}(snd, fx)`,
+    '\tOn Error Resume Next',
+    '\tIf fx = 7 Then Exit Sub',
+    '\tDim t : t = Timer',
+    `\tIf ${DOF_SOUND_SUB}Last = snd And t >= ${DOF_SOUND_SUB}At And t - ${DOF_SOUND_SUB}At < 0.05 Then Exit Sub`,
+    `\t${DOF_SOUND_SUB}Last = snd : ${DOF_SOUND_SUB}At = t`,
+    `\tIf ${ready} = "" Then`,
+    `\t\t${ready} = "no"`,
+    '\t\tDim p : p = CreateObject("WScript." & "Shell").Environment("Process").Item("' + DOF_TAP_ENV + '")',
+    `\t\tIf p <> "" Then Set ${file} = CreateObject("Scripting.FileSystemObject").OpenTextFile(p, 8, True) : If Err.Number = 0 Then ${ready} = "yes"`,
+    '\tEnd If',
+    `\tIf ${ready} = "yes" Then ${file}.WriteLine "S," & CLng(fx) & "," & Replace(Replace(Replace(CStr(snd), ",", "_"), vbCr, "_"), vbLf, "_") & "," & Replace(CStr(Round(t, 3)), ",", ".")`,
+    'End Sub',
+  ];
+}
+
+/**
+ * controller.vbs avec l'écoute : un appel en tête de `Sub DOF` et de `Sub DOFALT` (et de `Function SoundFX`, s'il y
+ * en a une), et les Sub qui écrivent « E,numéro,état,secondes » (Timer : secondes depuis minuit) et « S,jouet,son,
+ * secondes » ajoutées à la fin. Idempotent ; un controller.vbs retouché par une version sans l'écoute des sons est
+ * refait depuis son état d'origine. undefined si `Sub DOF` n'est plus là (un autre controller.vbs : on n'y touche pas).
  */
 export function addDofTap(text: string): string | undefined {
-  if (text.includes(DOF_TAP_MARK)) return text;
+  if (text.includes(DOF_TAP_MARK)) {
+    if (text.includes(`Sub ${DOF_SOUND_SUB}(`) || !/^\s*(?:Public\s+)?Function\s+SoundFX\s*\(/im.test(text)) return text;
+    return addDofTap(removeDofTap(text)) ?? text;
+  }
   const eol = /\r\n/.test(text) ? '\r\n' : '\n';
   let found = 0;
+  let sound = false;
   const lines = text.split(/\r?\n/).flatMap((line) => {
+    const fx = /^\s*(?:Public\s+)?Function\s+SoundFX\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)\s*$/i.exec(line);
+    if (fx) {
+      sound = true;
+      return [line, ['\tOn Error Resume Next', ': ' + DOF_SOUND_SUB + ' ' + fx[1] + ', ' + fx[2], ': On Error Goto 0', DOF_TAP_MARK].join(' ')];
+    }
     const head = /^\s*(?:Public\s+)?Sub\s+(DOF|DOFALT)\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)\s*$/i.exec(line);
     if (!head) return [line];
     found++;
     return [line, ['\tOn Error Resume Next', ': ' + TAP_SUB + ' ' + head[2] + ', ' + head[3], ': On Error Goto 0', DOF_TAP_MARK].join(' ')];
   });
   if (!found || !lines.some((l) => /^\s*(?:Public\s+)?Sub\s+DOF\s*\(/i.test(l))) return undefined;
-  const body = [DOF_TAP_MARK + ': copy of the DOF events for Cyber Pinball (variable ' + DOF_TAP_ENV + ')', ...tapSubLines(TAP_SUB)];
+  const body = [DOF_TAP_MARK + ': copy of the DOF events for Cyber Pinball (variable ' + DOF_TAP_ENV + ')', ...tapSubLines(TAP_SUB), ...(sound ? soundSubLines() : [])];
   const out = lines.join(eol);
   return out + (/\r?\n$/.test(out) ? '' : eol) + body.join(eol) + eol;
 }
@@ -171,15 +211,37 @@ export function parseTapLine(line: string): DofEvent | undefined {
   return m ? { number: Number(m[1]), state: Number(m[2]), at: Number(m[3]) } : undefined;
 }
 
-/** Les événements d'un morceau de fichier ; `rest` : fin sans saut de ligne, à rejoindre au morceau suivant. */
-export function parseTapChunk(chunk: string): { events: DofEvent[]; rest: string } {
+/** Un son joué par la table (SoundFX de controller.vbs) : jouet DOF (1 contacteurs, 2 knocker, 8 cibles…) et nom du son. */
+export interface DofSound {
+  effect: number;
+  sound: string;
+  at: number;
+}
+
+/** Une ligne « S,jouet,son,secondes » ; undefined si elle est incomplète ou étrangère. */
+export function parseSoundLine(line: string): DofSound | undefined {
+  const m = /^S,(\d{1,3}),([^,]{0,80}),(\d+(?:\.\d+)?)$/.exec(line.trim());
+  return m ? { effect: Number(m[1]), sound: m[2]!, at: Number(m[3]) } : undefined;
+}
+
+/**
+ * Les événements et les sons d'un morceau de fichier ; `rest` : fin sans saut de ligne, à rejoindre au morceau
+ * suivant.
+ */
+export function parseTapChunk(chunk: string): { events: DofEvent[]; sounds: DofSound[]; rest: string } {
   const cut = chunk.lastIndexOf('\n');
   const complete = cut < 0 ? '' : chunk.slice(0, cut);
-  const events = complete.split(/\r?\n/).flatMap((l) => {
+  const events: DofEvent[] = [];
+  const sounds: DofSound[] = [];
+  for (const l of complete.split(/\r?\n/)) {
     const e = parseTapLine(l);
-    return e ? [e] : [];
-  });
-  return { events, rest: cut < 0 ? chunk : chunk.slice(cut + 1) };
+    if (e) events.push(e);
+    else {
+      const s = parseSoundLine(l);
+      if (s) sounds.push(s);
+    }
+  }
+  return { events, sounds, rest: cut < 0 ? chunk : chunk.slice(cut + 1) };
 }
 
 export type DofZone = 'left' | 'right' | 'center' | 'all';

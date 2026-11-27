@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- LED : une table originale dont le script n'appelle jamais DOF (Agentic) allume maintenant les bandes aussi pour ses slingshots, bumpers, cibles, soucoupes et récompenses, d'après les sons qu'elle joue, et plus seulement pour les flippers et le lanceur.
 - Pinball FX Midnight (anciennement Pinball M) est pris en charge sur Steam : Cyber Pinball retrouve l'installation, y compris dans une bibliothèque Steam secondaire, et lance ses tables depuis la roue. Menu système > Tables > Ajouter une table > "Tables de Pinball FX Midnight" propose quelques tables connues et "Ajouter par numéro de table" accepte les autres ; Steam gère l'accès aux tables. Les écrans et le DMD se règlent dans le menu "Cabinet Support" du jeu.
 - Pinball FX et Pinball FX Midnight : après Jouer sur la fiche d'une table, choisis 1 à 4 joueurs avec les flippers et Start (Exit revient à la fiche). Pinball FX garde aussi l'entraînement, le mode Pro des tables Williams et Bally et ses quatre défis dans "Autres modes". Le téléphone, Table surprise et les lancements directs restent en un joueur.
 - Mode invité : une collection verrouillée décide seule des tables visibles et jouables, même vide ; une collection introuvable ne montre aucune table.

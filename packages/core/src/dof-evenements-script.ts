@@ -212,6 +212,27 @@ export function classifyDofScript(script: string): Map<number, DofEventClass> {
   return out;
 }
 
+/** Jouet DOF (SoundFX, controller.vbs) d'un son dont le nom ne dit rien : knocker, carillons, cibles. */
+const SOUND_TOYS: Readonly<Record<number, DofEventKind>> = { 2: 'award', 3: 'rollover', 4: 'rollover', 8: 'target', 9: 'target' };
+/**
+ * Rôles qu'un son ne donne pas aux bandes : les flippers et le lanceur ont déjà les boutons de la borne (et la
+ * tirette analogique), le reste n'est pas un événement de jeu.
+ */
+const SOUND_SKIPPED: ReadonlySet<DofEventKind> = new Set(['flipper', 'launch', 'gi', 'mech', 'other']);
+
+/**
+ * Ce que dit le son que la table joue (SoundFX de controller.vbs) : « Sling_L3 » est un slingshot gauche,
+ * « Bumpers_Top_2 » un bumper, « Target_Hit_6 » une cible, « Knocker_1 » une récompense. Pour une table dont le
+ * script n'appelle jamais DOF, seule source d'événements en dehors des boutons (Agentic). undefined : un bruit
+ * (bille qui roule, caoutchouc, métal) ou un son de flipper, sans effet sur les bandes.
+ */
+export function dofSoundClass(sound: string, effect: number): DofEventClass | undefined {
+  if (effect === 7) return undefined;
+  const kind = kindOf(sound) ?? SOUND_TOYS[effect];
+  if (!kind || SOUND_SKIPPED.has(kind)) return undefined;
+  return { kind, side: dofSideOf(sound) ?? 'center' };
+}
+
 /** La classe d'un événement reçu : lue dans le script, sinon les numéros communs, sinon « other ». */
 export function dofEventClass(classes: ReadonlyMap<number, DofEventClass> | undefined, number: number): DofEventClass {
   return classes?.get(number) ?? STANDARD[number] ?? { kind: 'other', side: 'center' };

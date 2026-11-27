@@ -125,6 +125,55 @@ test('table originale dont le script n’appelle aucun DOF : effets sans ROM, ja
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('effets sans ROM : table sans appel DOF, les sons de la table (slingshot, bumper) allument les bandes ; avec DOF, ils sont ignorés', async () => {
+  const { dir, exe } = setup();
+  const ctrl = path.join(dir, 'vpx', 'scripts', 'controller.vbs');
+  fs.writeFileSync(ctrl, `${CONTROLLER}Function SoundFX (Sound, Effect)\r\n\tSoundFX = Sound\r\nEnd Function\r\n`, 'latin1');
+  tap.saveEventSettings(dir, { enabled: true, intensity: 100 });
+  fs.writeFileSync(path.join(dir, 'led-animations.json'), JSON.stringify({ brightness: 100, scale: LED_LEVEL_SCALE }));
+  const service = driver.createLedService({ simulated: true, manual: true });
+  const tall = (name: string, output: number): LedStripSpec => ({ ...strip(name, output), height: 10 });
+  const leds: CabinetLeds = { ...LEDS, strips: [tall('Gauche', 1), tall('Droite', 2)] };
+  const deps = { dataDir: dir, leds: () => leds, service, log: () => undefined };
+  const NO_DOF = 'Const cGameName = "agentic"\r\nExecuteGlobal CyberPinball_TextFile("controller.vbs")\r\nPlaySoundAtLevelStatic SoundFX("Sling_L1",DOFContactors), 1, 1\r\n';
+  const game = tap.startTap(deps, exe, { kind: 'generique' }, '', { script: NO_DOF, color: '#ff0000' });
+  assert.ok(game, 'écoute posée');
+  assert.ok(fs.readFileSync(ctrl, 'latin1').includes('Sub CyberPinball_SoundTap('), 'écoute des sons posée');
+  const file = game.env[DOF_TAP_ENV]!;
+  const shown = async (ms = 80) => {
+    await wait(ms);
+    await service.step();
+    const sum = (o: number) => [...service.simulation!.device.shownOutput(o, 10)].reduce((s, v) => s + v, 0);
+    return { left: sum(0), right: sum(1) };
+  };
+  await shown(1900);
+  const ambient = await shown();
+  assert.deepEqual(ambient, { left: 0, right: 0 }, 'noir au repos');
+  // Son de flipper (jouet 7) et bruit sans rôle : rien.
+  fs.appendFileSync(file, 'S,7,Flipper_L01,1.0\r\nS,1,Ball_Rolling,1.1\r\n');
+  assert.deepEqual(await shown(150), ambient, 'flipper et bruit : pas d’effet');
+  // Slingshot gauche : effet à gauche.
+  fs.appendFileSync(file, 'S,1,Sling_L3,2.0\r\n');
+  const sling = await shown(80);
+  assert.ok(sling.left > sling.right + 100, `slingshot gauche : ${JSON.stringify(sling)}`);
+  await shown(1200);
+  // Bumper : au centre, donc des deux côtés.
+  fs.appendFileSync(file, 'S,1,Bumpers_Top_2,3.0\r\n');
+  const bump = await shown(60);
+  assert.ok(bump.left > 100 && bump.right > 100, `bumper : ${JSON.stringify(bump)}`);
+  game.stop();
+
+  // Un script qui appelle DOF a ses propres événements : les sons feraient double emploi.
+  const other = tap.startTap(deps, exe, { kind: 'generique' }, '', { script: 'Sub Bumper1_Hit : DOF 107, DOFPulse : End Sub', color: '#ff0000' });
+  assert.ok(other);
+  await shown(1900);
+  fs.appendFileSync(other.env[DOF_TAP_ENV]!, 'S,1,Sling_L3,2.0\r\n');
+  assert.deepEqual(await shown(150), { left: 0, right: 0 }, 'script avec DOF : sons ignorés');
+  other.stop();
+  await wait(20);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('effets sans ROM : bandes de gauche et de droite trouvées par leur nom, sinon toutes', () => {
   assert.equal(tap.zoneTarget(LEDS, 'left'), 'Gauche');
   assert.equal(tap.zoneTarget(LEDS, 'right'), 'Droite');
