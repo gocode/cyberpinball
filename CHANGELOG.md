@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Diagnostic : quand une table joue sans sa musique ou sans son dossier UltraDMD, Cyber Pinball les cherche tout seul dans ton ancien Visual Pinball (dossiers « Music » et « Tables ») et propose de les copier chez la table d'un geste, sans rien remplacer. S'il ne les trouve pas, « Choisir le dossier… » les copie depuis l'endroit que tu désignes, et le texte dit précisément le nom attendu et d'où il vient.
+- Ajout d'une table : un dossier qui rassemble des jeux différents (le dossier Tables d'une ancienne installation, par exemple) donne une table par jeu. Avant, tous ses .vpx finissaient dans un seul dossier de table, sous le titre de l'un d'eux.
 - LED : avec les effets de Cyber Pinball, une table à ROM anime enfin tes bandes sur tout ce qui se passe en jeu (éjections, knocker, flashers, rampes, bille servie, lanceur automatique), lu dans les bobines de la ROM. Avant, seuls les flippers s'allumaient.
 - LED : les sons de la table (slingshots, bumpers, cibles…) comptent toujours, même quand son script n'appelle DOF que pour les flippers ; un même événement donné par deux sources ne joue qu'une fois.
 - Miroir de la fenêtre au téléphone (Applications, connexion YouTube) : le défilement au doigt est plus réactif. L'image du résultat arrive tout de suite après un appui ou un glissement et reste rapide le temps de l'élan, au lieu d'attendre le rythme de repos : tu vois ce que ton geste a fait sans avoir à le refaire.

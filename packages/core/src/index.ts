@@ -61,6 +61,7 @@ export * from './preview-outside';
 export { hasOwnCabinetView } from './tableview';
 export * from './tablecontents';
 export * from './doctor';
+export * from './legacy-assets';
 export * from './playable';
 export * from './tableimport';
 export * from './installation';

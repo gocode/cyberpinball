@@ -10,6 +10,7 @@ import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { flexAssets, musicNotFound, mutedAudioSettings } from './vpxgamelog';
+import { dmdFolderNames, findLegacyFolder, legacyBaseDirs, legacyCopyOps, planLegacyMusic } from './legacy-assets';
 import { slowTableFinding } from './slowtable';
 import { scriptRuntimeFinding } from './scriptdiagnosis';
 import { flexPrewarmFor, type FlexPrewarm } from './flexprewarm';
@@ -210,6 +211,11 @@ export interface Finding {
   detail: string;
   fix?: Fix;
   /**
+   * Nothing found to copy: the screen offers to choose the folder by hand (system folder picker); its content is
+   * copied to `dest` (name = the folder VPX expects, to find it again inside a bigger folder the player picked).
+   */
+  pick?: { label: string; title: string; name: string; dest: string; file?: boolean };
+  /**
    * Low-key information: nothing to do in Cyber Pinball (proportions of a media, no backglass).
    * The Diagnostic view and the check of an added table show it apart, at the bottom ("À savoir"
    * (Good to know)), without "Ignorer" (Ignore): it does not clutter the findings to fix.
@@ -289,6 +295,11 @@ export interface DoctorContext {
   otherPackNames?: string[];
   /** ROM library (<root folder>\pinmame\roms); absent, the links are not checked. */
   romLibrary?: string;
+  /**
+   * Dossiers d'une ancienne installation de Visual Pinball où chercher la musique et le dossier UltraDMD qui
+   * manquent (legacy-assets.ts) ; absent, la liste habituelle des disques C: D: E:.
+   */
+  legacyBases?: string[];
   /**
    * Media playback errors recorded by the display; absent, they
    * are read from <logsDir>\medias-erreurs.json (mediaerrors.ts).
@@ -793,7 +804,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push(...dmdColorFindings(folder, ctx.script, ctx));
     }
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
-      const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame, ctx.tablesDir);
+      const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame, ctx.tablesDir, legacyRoots(ctx));
       if (finding) findings.push(finding);
       // DMD videos decoded in full at each scene by the FlexDMD plugin (dmdvideos.ts): the game freezes.
       const videos = finding ? undefined : heavyDmdVideosFinding(folder, ctx.script.dmdFolder);
@@ -880,9 +891,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (ctx.vpxLog) {
     const runtime = scriptRuntimeFinding(entry.file, ctx.vpxLog);
     if (runtime) findings.push(runtime);
-    const music = musicNotFoundFinding(entry, ctx.vpxLog);
+    const music = musicNotFoundFinding(entry, ctx.vpxLog, legacyRoots(ctx));
     if (music) findings.push(music);
-    const images = dmdImagesMissingFinding(entry, ctx.vpxLog);
+    const images = dmdImagesMissingFinding(entry, ctx.vpxLog, legacyRoots(ctx));
     if (images) findings.push(images);
   }
 
@@ -1066,6 +1077,11 @@ function tableAudioMutedFinding(tableFile: string): Finding | undefined {
 }
 
 /** Lines of the VPX log for the last game of this table (from its loading to the next loading). */
+/** Where to look for music and DMD folders that are missing: old installations on this PC, then the other tables of the library. */
+function legacyRoots(ctx: DoctorContext): string[] {
+  return [...(ctx.legacyBases ?? legacyBaseDirs()), ctx.tablesDir];
+}
+
 function tableLogSession(entry: TableEntry, log: string): string[] | undefined {
   const lines = log.split(/\r?\n/);
   const loads = lines.map((l, i) => ({ i, file: /LoadGameFromFilename (.+)$/.exec(l)?.[1]?.trim() })).filter((x) => x.file);
@@ -1079,20 +1095,36 @@ function tableLogSession(entry: TableEntry, log: string): string[] | undefined {
  * Music that VPX did not find during the last game ("Failed to stream music: <name>"): it looks for it in the
  * table's "music" folder, then in VPX's. The table plays without it.
  */
-function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefined {
+function musicNotFoundFinding(entry: TableEntry, log: string, legacyBases: string[]): Finding | undefined {
   const session = tableLogSession(entry, log);
   const names = session ? musicNotFound(session) : [];
   if (!names.length) return undefined;
   const where = path.join(path.dirname(entry.file), 'music');
-  return {
+  const plan = planLegacyMusic(names, path.dirname(entry.file), legacyBases);
+  const base = t('À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ».', {
+    names: names.map((n) => `« ${n} »`).join(', '),
+    where,
+  });
+  const first = plan.notFound[0];
+  const finding: Finding = {
     code: 'musicMissing',
     severity: 'warning',
     title: tn(names.length, 'Musique introuvable', 'Musiques introuvables'),
-    detail: t('À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mets-la dans le dossier d’import puis « Ajouter une table ».', {
-      names: names.map((n) => `« ${n} »`).join(', '),
-      where,
-    }),
+    detail: base,
   };
+  if (plan.found.length) {
+    const from = [...new Set(plan.found.map((f) => path.dirname(f.from)))].join(', ');
+    finding.detail = `${base} ${t('Cyber Pinball l’a retrouvée dans « {from} », ton ancien Visual Pinball : il peut la copier dans le dossier « music » de la table (rien n’est remplacé).', { from })}`;
+    finding.fix = { label: t('Copier la musique trouvée dans {from}', { from }), ops: legacyCopyOps(plan.found) };
+  } else {
+    finding.detail = `${base} ${t('Cyber Pinball l’a cherchée sur ce PC sans la trouver. Elle se trouvait dans le dossier « Music » de ton ancien Visual Pinball ; choisis le dossier « {name} » (ou ce dossier « Music »), il sera copié dans le dossier « music » de la table.', { name: first?.name ?? '' })}`;
+  }
+  if (first) {
+    finding.pick = first.isFolder
+      ? { label: t('Choisir le dossier « {name} »…', { name: first.name }), title: t('Choisis le dossier « {name} »', { name: first.name }), name: first.name, dest: first.to }
+      : { label: t('Choisir le dossier qui contient « {name} »…', { name: first.name }), title: t('Choisis le dossier qui contient « {name} »', { name: first.name }), name: first.name, dest: first.to, file: true };
+  }
+  return finding;
 }
 
 /**
@@ -1100,7 +1132,7 @@ function musicNotFoundFinding(entry: TableEntry, log: string): Finding | undefin
  * images ("Asset not loaded", "Failed to resolve asset"). The DMD shows only their texts, in its colour.
  * Noted on 19/11/2026: Goldorak, "Goldorak.UltraDMD\black.jpg" missing, orange DMD.
  */
-function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | undefined {
+function dmdImagesMissingFinding(entry: TableEntry, log: string, legacyBases: string[]): Finding | undefined {
   const session = tableLogSession(entry, log);
   if (!session) return undefined;
   const assets = flexAssets(session);
@@ -1123,17 +1155,27 @@ function dmdImagesMissingFinding(entry: TableEntry, log: string): Finding | unde
     };
   }
   const names = [...new Set(missing.map((f) => path.basename(f)))];
-  const folder = path.basename(path.dirname(missing[0]!));
-  return {
+  const folderPath = path.dirname(missing[0]!);
+  const folder = path.basename(folderPath);
+  const legacy = findLegacyFolder(dmdFolderNames(folder), legacyBases, { exclude: folderPath, contains: names });
+  const finding: Finding = {
     code: 'dmdImagesMissing',
     severity: 'warning',
     title: tn(names.length, 'Image du DMD absente', 'Images du DMD absentes'),
-    detail: tn(names.length, 'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».', 'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».', {
+    detail: tn(names.length, 'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes.', 'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes.', {
       n: names.length,
       folder,
       list: names.slice(0, 3).map((n) => `« ${n} »`).join(', ') + (names.length > 3 ? '…' : ''),
     }),
   };
+  if (legacy && !samePathCI(legacy, folderPath)) {
+    finding.detail += ` ${t('Cyber Pinball a retrouvé le dossier complet dans « {from} », ton ancien Visual Pinball : il peut compléter celui de la table (rien n’est remplacé).', { from: legacy })}`;
+    finding.fix = { label: t('Compléter « {folder} » avec celui trouvé dans {from}', { folder, from: path.dirname(legacy) }), ops: legacyCopyOps([{ from: legacy, to: folderPath }]) };
+  } else {
+    finding.detail += ` ${t('Ce dossier se trouvait dans le dossier « Tables » de ton ancien Visual Pinball, à côté du fichier de la table : choisis-le, il complétera celui de la table (rien n’est remplacé).')}`;
+    finding.pick = { label: t('Choisir le dossier « {folder} »…', { folder }), title: t('Choisis le dossier « {folder} »', { folder }), name: folder, dest: folderPath };
+  }
+  return finding;
 }
 
 function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElsewhere = false): Finding | undefined {
@@ -3698,7 +3740,7 @@ function checkRomCopy(file: string, library: string): Finding[] {
  * plugins/flexdmd/actors/Image.cpp): that DMD stays empty, and a script that does not expect
  * it stops on "Type incompatible" (Type mismatch) (VPW's Goonies).
  */
-function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean, tablesDir: string): Finding | undefined {
+function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean, tablesDir: string, legacyBases: string[]): Finding | undefined {
   const dirs = readDirents(folder).filter((d) => d.isDirectory()).map((d) => d.name);
   if (dirs.some((d) => d.toLowerCase() === dmdFolder.toLowerCase())) return undefined;
   const intro = [
@@ -3745,11 +3787,23 @@ function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean,
       },
     };
   }
+  const dest = path.join(folder, dmdFolder);
+  const legacy = findLegacyFolder(dmdFolderNames(dmdFolder), legacyBases, { exclude: folder });
+  if (legacy) {
+    return {
+      code: 'dmdFolderMissing',
+      severity: 'warning',
+      title: t('Dossier « {folder} » absent', { folder: dmdFolder }),
+      detail: `${intro} ${t('Il est dans « {from} », ton ancien Visual Pinball : Cyber Pinball peut le copier dans le dossier de la table (rien n’est remplacé).', { from: legacy })}`,
+      fix: { label: t('Copier « {folder} » trouvé dans {from}', { folder: dmdFolder, from: path.dirname(legacy) }), ops: legacyCopyOps([{ from: legacy, to: dest }]) },
+    };
+  }
   return {
     code: 'dmdFolderMissing',
     severity: 'warning',
     title: t('Dossier « {folder} » absent', { folder: dmdFolder }),
-    detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mets-le dans le dossier d’import puis « Ajouter une table ».')}`,
+    detail: `${intro} ${t('Cyber Pinball l’a cherché sur ce PC sans le trouver. Il se trouvait dans le dossier « Tables » de ton ancien Visual Pinball, à côté du fichier de la table : choisis-le, il sera copié dans le dossier de la table.')}`,
+    pick: { label: t('Choisir le dossier « {folder} »…', { folder: dmdFolder }), title: t('Choisis le dossier « {folder} »', { folder: dmdFolder }), name: dmdFolder, dest },
   };
 }
 

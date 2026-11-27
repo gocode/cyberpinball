@@ -549,7 +549,7 @@ function titleKey(name: string): string {
 }
 
 /** Two versions of the same game: same title start, on at least 5 letters and half of the shorter one. */
-function sameGame(a: string, b: string): boolean {
+export function sameGame(a: string, b: string): boolean {
   if (a === b) return true;
   let n = 0;
   while (n < a.length && n < b.length && a[n] === b[n]) n++;

@@ -19,7 +19,7 @@ export type FileOp =
    * Copy; link: large files that do not change (hardlink.ts) become hard links
    * on the same volume (no extra space, the original intact), copied elsewhere.
    */
-  | { op: 'copy'; from: string; to: string; link?: boolean }
+  | { op: 'copy'; from: string; to: string; link?: boolean; /** Never replaces a file already there: only what is missing is copied. */ keep?: boolean }
   | { op: 'trash'; path: string }
   | { op: 'delete'; path: string }
   /**
@@ -74,7 +74,8 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
         transfer(op.from, op.to, ctx, true, false);
         break;
       case 'copy':
-        transfer(op.from, op.to, ctx, false, op.link ?? false);
+        if (op.keep) copyMissing(op.from, op.to);
+        else transfer(op.from, op.to, ctx, false, op.link ?? false);
         break;
       case 'trash':
         moveToTrash(op.path, ctx);
@@ -138,6 +139,18 @@ function copyToTrash(target: string, ctx: OpContext): string {
  * Moves or copies. A folder that arrives on an existing folder is merged
  * file by file; a file already present at the destination goes to the trash.
  */
+/** Copies what is missing at `to`; a file already there is left as it is (neither replaced nor sent to the trash). */
+function copyMissing(from: string, to: string): void {
+  if (fs.statSync(from).isDirectory()) {
+    fs.mkdirSync(to, { recursive: true });
+    for (const name of fs.readdirSync(from)) copyMissing(path.join(from, name), path.join(to, name));
+    return;
+  }
+  if (fs.existsSync(to)) return;
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  copyTree(from, to, { overwrite: false });
+}
+
 function transfer(from: string, to: string, ctx: OpContext, move: boolean, link: boolean): void {
   const fromIsDir = fs.statSync(from).isDirectory();
   if (fs.existsSync(to) && !samePath(from, to)) {

@@ -44,7 +44,7 @@ import { parseTableName, readInfo, type TableInfoFile } from './tables';
 import { mergeFavorite } from './collections';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
 import { IMPORTED_ALIAS_COMMENT, readTableAliases, tableAliasFile, withAlias, type AliasLine } from './romalias';
-import type { CompanionReport } from './installation';
+import { sameGame, type CompanionReport } from './installation';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
 import { buildScriptPatch, readScriptPatch } from './scriptpatch';
 import { compatFixesApplicable, compatFixesFound } from './scriptcompat';
@@ -652,14 +652,21 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   walk(src.path, [], start);
 }
 
-/** The .vpx files of a same game (same title, or same package) make up a single table. */
+/**
+ * The .vpx files of a same game (same title, or same package and the same game) make up a single table.
+ * A package (folder, archive) holds the versions of one table, but it can also be a whole collection
+ * (a Tables folder of an old installation, dropped as is): there, only the .vpx that are versions of
+ * one another, or of the package's own name, go together. Otherwise 37 different games ended up in
+ * one table folder, under the title of one of them.
+ */
 function groupGames(vpx: Item[], items: Item[], packages: { name: string; isPack: boolean }[], opts: PlanOptions): Game[] {
-  const groups: Item[][] = [];
+  let groups: Item[][] = [];
   for (const item of vpx) {
-    const key = vpxKey(item);
-    const group = groups.find((g) => g.some((o) => vpxKey(o) === key || (o.pkg === item.pkg && packages[item.pkg]!.isPack)));
-    if (group) group.push(item);
-    else groups.push([item]);
+    const related = (o: Item) => vpxKey(o) === vpxKey(item) || (o.pkg === item.pkg && packages[item.pkg]!.isPack && versionsOfOneGame(o, item, packages[item.pkg]!.name));
+    const matching = groups.filter((g) => g.some(related));
+    // Merged when it links several groups (A ~ B, B ~ C): the order of the files changes nothing.
+    groups = groups.filter((g) => !matching.includes(g));
+    groups.push([...matching.flat(), item]);
   }
   const games = groups.map((group) => describeGame(group, items, packages, opts));
   // Existing tables: an addition (ROM alone, PuP videos...) may be intended for them.
@@ -685,6 +692,14 @@ function groupGames(vpx: Item[], items: Item[], packages: { name: string; isPack
 
 function vpxKey(item: Item): string {
   return nameKey(parseTableName(path.basename(item.path, path.extname(item.path))).title);
+}
+
+/** Two .vpx of a same package are versions of one game: similar titles, or both like the name of the package. */
+function versionsOfOneGame(a: Item, b: Item, packName: string): boolean {
+  const [ka, kb] = [vpxKey(a), vpxKey(b)];
+  if (sameGame(ka, kb)) return true;
+  const pack = nameKey(parseTableName(packName.replace(/\.(zip|7z|rar)$/i, '')).title);
+  return pack.length >= 5 && sameGame(ka, pack) && sameGame(kb, pack);
 }
 
 function describeGame(vpx: Item[], items: Item[], packages: { name: string; isPack: boolean }[], opts: PlanOptions): Game {

@@ -17,10 +17,6 @@ export const messages: Record<string, string> = {
   'À la dernière partie, le DMD n’a pas su lire {list} dans « {folder} » : le fichier est là, mais son format ne passe pas (image abîmée, ou enregistrée sous un autre format que son extension).':
     'During the last game, the DMD could not read {list} in “{folder}”: the file is there, but its format does not work (damaged image, or saved in another format than its extension).',
   'Images du DMD absentes': 'DMD images missing',
-  'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».':
-    'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
-  'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes. Ce dossier est fourni avec la table d’origine ; reprends-le en entier, puis « Ajouter une table ».':
-    'During the last game, the DMD did not find {n} images in “{folder}” ({list}): it only shows its texts. This folder comes with the original table; take it again in full, then “Add a table”.',
   'La musique de la table passe par ce pack ({list}) : sans elle, la table est muette. Ses vidéos et sa musique sont souvent un téléchargement à part du pack ; reprends-le en entier.':
     'The table’s music comes from this pack ({list}): without it, the table is silent. Its videos and music are often a separate download from the pack; take it again in full.',
   'Script arrêté par le fronton B2S de VPX': 'Script stopped by VPX’s B2S backglass',
@@ -44,8 +40,6 @@ export const messages: Record<string, string> = {
   'Rendre le son à cette table': 'Give this table its sound back',
   'Musique introuvable': 'Music not found',
   'Musiques introuvables': 'Music files not found',
-  'À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ». Elle est fournie avec la table d’origine ; mets-la dans le dossier d’import puis « Ajouter une table ».':
-    'During the last game, VPX did not find {names}: it looks for the table’s music in “{where}”. It comes with the original table; put it in the import folder, then “Add a table”.',
   'VPX range chaque table dans son dossier, avec sa ROM, son backglass et ses vidéos. Celle-ci est en vrac dans {dir}.': 'VPX keeps each table in its own folder, with its ROM, backglass and videos. This one sits loose in {dir}.',
   'Déplacer ses {n} fichiers dans « {folder} »': 'Move its {n} files to “{folder}”',
   'Déplacer la table dans « {folder} »': 'Move the table to “{folder}”',
@@ -459,7 +453,6 @@ export const messages: Record<string, string> = {
   'Ranger ces {n} fichiers dans « {folder} »': 'Move these {n} files to “{folder}”',
   'Ranger ce fichier dans « {folder} »': 'Move this file to “{folder}”',
   'Dossier « {folder} » absent': '“{folder}” folder missing',
-  'Ce dossier est fourni avec la table d’origine ; mets-le dans le dossier d’import puis « Ajouter une table ».': 'This folder comes with the original table; put it in the import folder, then “Add a table”.',
   // packages/core/src/tableimport.ts
   'Je ne sais pas à quelle table il appartient : il reste où il est.': 'I can’t tell which table it belongs to: it stays where it is.',
   'bibliothèque': 'library',
@@ -842,4 +835,44 @@ export const messages: Record<string, string> = {
   'Chaque cadrage rendu sur cette table par VPX, au choix': 'Each framing rendered on this table by VPX, to choose from',
   'Récupérer un POV de la communauté : {label}': 'Get a community POV: {label}',
   'Le cadrage de la borne, un autre pour cette table seule, ou un POV de la communauté.': 'The cabinet framing, another one for this table only, or a community POV.',
+  'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes.':
+    'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts.',
+  'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes.':
+    'During the last game, the DMD did not find {n} images in “{folder}” ({list}): it only shows its texts.',
+  'À la dernière partie, VPX n’a pas trouvé {names} : il cherche la musique de la table dans « {where} ».':
+    'During the last game, VPX did not find {names}: it looks for the table’s music in “{where}”.',
+  'Cyber Pinball l’a retrouvée dans « {from} », ton ancien Visual Pinball : il peut la copier dans le dossier « music » de la table (rien n’est remplacé).':
+    'Cyber Pinball found it in “{from}”, your old Visual Pinball: it can copy it to the table’s “music” folder (nothing is replaced).',
+  'Copier la musique trouvée dans {from}':
+    'Copy the music found in {from}',
+  'Cyber Pinball l’a cherchée sur ce PC sans la trouver. Elle se trouvait dans le dossier « Music » de ton ancien Visual Pinball ; choisis le dossier « {name} » (ou ce dossier « Music »), il sera copié dans le dossier « music » de la table.':
+    'Cyber Pinball looked for it on this PC without finding it. It was in the “Music” folder of your old Visual Pinball: choose the “{name}” folder (or that “Music” folder), it will be copied to the table’s “music” folder.',
+  'Choisir le dossier « {name} »…':
+    'Choose the “{name}” folder…',
+  'Choisis le dossier « {name} »':
+    'Choose the “{name}” folder',
+  'Choisir le dossier qui contient « {name} »…':
+    'Choose the folder that contains “{name}”…',
+  'Choisis le dossier qui contient « {name} »':
+    'Choose the folder that contains “{name}”',
+  'Cyber Pinball a retrouvé le dossier complet dans « {from} », ton ancien Visual Pinball : il peut compléter celui de la table (rien n’est remplacé).':
+    'Cyber Pinball found the complete folder in “{from}”, your old Visual Pinball: it can complete the table’s one (nothing is replaced).',
+  'Compléter « {folder} » avec celui trouvé dans {from}':
+    'Complete “{folder}” with the one found in {from}',
+  'Ce dossier se trouvait dans le dossier « Tables » de ton ancien Visual Pinball, à côté du fichier de la table : choisis-le, il complétera celui de la table (rien n’est remplacé).':
+    'This folder was in the “Tables” folder of your old Visual Pinball, next to the table file: choose it, it will complete the table’s one (nothing is replaced).',
+  'Choisir le dossier « {folder} »…':
+    'Choose the “{folder}” folder…',
+  'Choisis le dossier « {folder} »':
+    'Choose the “{folder}” folder',
+  'Il est dans « {from} », ton ancien Visual Pinball : Cyber Pinball peut le copier dans le dossier de la table (rien n’est remplacé).':
+    'It is in “{from}”, your old Visual Pinball: Cyber Pinball can copy it to the table’s folder (nothing is replaced).',
+  'Copier « {folder} » trouvé dans {from}':
+    'Copy the “{folder}” found in {from}',
+  'Cyber Pinball l’a cherché sur ce PC sans le trouver. Il se trouvait dans le dossier « Tables » de ton ancien Visual Pinball, à côté du fichier de la table : choisis-le, il sera copié dans le dossier de la table.':
+    'Cyber Pinball looked for it on this PC without finding it. It was in the “Tables” folder of your old Visual Pinball, next to the table file: choose it, it will be copied to the table’s folder.',
+  'Copié dans le dossier de la table':
+    'Copied to the table’s folder',
+  'Rien à copier : « {name} » n’est pas dans le dossier choisi.':
+    'Nothing to copy: “{name}” is not in the chosen folder.',
 };

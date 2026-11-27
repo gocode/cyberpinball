@@ -292,6 +292,7 @@ import {
   loadFeedbackState,
   fileErrorText,
   isFileLocked,
+  legacyPickOps,
   rememberFraming,
   rememberOriginCatchUp,
 } from '@cyberpinball/core';
@@ -3506,6 +3507,12 @@ export function createLibrary(host: LibraryHost) {
         row.action = actions.length;
         actions.push({ label: f.fix.label, detail: t('Réparer'), tone: f.severity, run: () => repair(s, [f]) });
       }
+      // Rien trouvé sur le PC : la joueuse désigne elle-même le dossier (musique, UltraDMD de l'ancien Visual Pinball).
+      if (f.pick) {
+        const pick = f.pick;
+        const index = actions.push({ label: pick.label, detail: t('Copié dans le dossier de la table'), tone: f.severity, run: () => void pickAndCopy(s, pick) }) - 1;
+        if (!f.fix) row.action = index;
+      }
       return row;
     });
     const fixable = findings.filter((f) => f.fix);
@@ -3576,6 +3583,25 @@ export function createLibrary(host: LibraryHost) {
     if (!table) return;
     const infoFile = infoFileFor(table, tablesDir());
     writeFileAtomic(infoFile, JSON.stringify(setFindingIgnored(readInfo(infoFile), code, ignored), null, 2) + '\n');
+    reloadTables(table.file);
+    void analyse();
+  }
+
+  /** « Choisir le dossier… » : copie le dossier choisi (ou son sous-dossier du bon nom) chez la table, sans rien remplacer. */
+  async function pickAndCopy(s: Extract<Screen, { kind: 'doctor' }>, pick: NonNullable<Finding['pick']>): Promise<void> {
+    const chosen = (await pickNative('folder', pick.title))?.[0];
+    if (!chosen) return;
+    const table = find(s.file);
+    if (!table) return;
+    const trashDir = trashDirFor(layout()!.trash, `Diagnostic ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
+    const ops = legacyPickOps(chosen, pick);
+    if (!ops.length) {
+      s.log.push(t('Rien à copier : « {name} » n’est pas dans le dossier choisi.', { name: pick.name }));
+      void analyse();
+      return;
+    }
+    applyOps(ops, { trashDir });
+    s.log.push(pick.label);
     reloadTables(table.file);
     void analyse();
   }
