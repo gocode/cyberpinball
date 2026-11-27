@@ -2236,17 +2236,23 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       const media = packFileFixes(info.root, facts?.pup ? played : undefined);
       if (media.renames.length || media.trimmed.length) findings.push(packFileNamesFinding(pack, info.root, media));
       else {
-        const missing = missingPackFiles(info.root);
+        const missing = missingPackFiles(info.root, facts?.pup ? played : undefined);
         if (missing.length) {
+          // Information only: in play the plugin just skips the media (a blank, no crash). No cause is claimed.
           findings.push({
             code: 'pupFilesMissing',
             severity: 'info',
-            title: tn(missing.length, 'Fichier du PuP-Pack absent', 'Fichiers du PuP-Pack absents'),
-            detail: tn(missing.length, 'pupvideos\\{pack} nomme {list}, absent du pack : ce qu’il devait montrer ne se verra pas.', 'pupvideos\\{pack} nomme {n} fichiers absents du pack ({list}) : ce qu’ils devaient montrer ne se verra pas.', {
-              pack,
-              n: missing.length,
-              list: missing.slice(0, 3).map(quote).join(', ') + (missing.length > 3 ? '…' : ''),
-            }),
+            title: tn(missing.length, 'Média attendu par le PuP-Pack, absent', 'Médias attendus par le PuP-Pack, absents'),
+            detail: tn(
+              missing.length,
+              'pupvideos\\{pack} attend {list}, qui manque : en jeu, le plugin saute ce média (un blanc, sans plantage). Causes possibles : média fourni à part par l’auteur du pack (musique sous droits, topper), pack d’une autre version que la table, installation incomplète.',
+              'pupvideos\\{pack} attend {n} médias qui manquent ({list}) : en jeu, le plugin saute ces médias (un blanc, sans plantage). Causes possibles : médias fournis à part par l’auteur du pack (musique sous droits, topper), pack d’une autre version que la table, installation incomplète.',
+              {
+                pack,
+                n: missing.length,
+                list: missing.slice(0, 3).map(quote).join(', ') + (missing.length > 3 ? '…' : ''),
+              },
+            ),
           });
         }
       }

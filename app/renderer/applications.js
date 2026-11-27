@@ -30,9 +30,16 @@
     return node;
   }
 
+  /**
+   * Icônes déjà lues, par adresse : true si trop petite pour la tuile. La grille se redessine à chaque
+   * déplacement (nouvelle <img>) : sans cette mémoire, un favicon de 64 px (Netflix) paraissait grand le
+   * temps de son chargement, puis se réduisait en pastille, à chaque case parcourue.
+   */
+  const mini = new Map();
+
   /** L'icône relevée sur le site, ou la tuile composée : initiales sur la couleur de l'application. */
   function appIcon(face, size, extra = '') {
-    const box = el('div', `ap-icon${face.icon ? ' has-image' : ' gen'}${extra ? ` ${extra}` : ''}`);
+    const box = el('div', `ap-icon${face.icon ? ' has-image' : ' gen'}${extra ? ` ${extra}` : ''}${face.icon && mini.get(face.icon) ? ' ap-mini' : ''}`);
     box.style.setProperty('--ap-c', face.color);
     box.style.setProperty('--ap-size', String(size));
     if (face.icon) {
@@ -47,7 +54,11 @@
         box.replaceChildren(el('span', 'ap-initials', face.initials));
       });
       // Un favicon trop petit pour remplir la tuile (APP_ICON_MIN du cœur) : en pastille sur la tuile composée, net plutôt qu'agrandi flou.
-      img.addEventListener('load', () => box.classList.toggle('ap-mini', Math.min(img.naturalWidth, img.naturalHeight) < 96));
+      img.addEventListener('load', () => {
+        const small = Math.min(img.naturalWidth, img.naturalHeight) < 96;
+        mini.set(face.icon, small);
+        box.classList.toggle('ap-mini', small);
+      });
       box.append(img);
     } else box.append(el('span', 'ap-initials', face.initials));
     return box;

@@ -39,7 +39,7 @@ export const FEEDBACK_KEYS = {
 
 export const PROPOSAL_KINDS = ['bug', 'improvement', 'feature'] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
-export const PROPOSAL_STATUSES = ['new', 'review', 'planned', 'progress', 'done', 'declined'] as const;
+export const PROPOSAL_STATUSES = ['new', 'review', 'planned', 'progress', 'preview', 'done', 'declined'] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 export const PROPOSAL_TITLE_MIN = 4;
 export const PROPOSAL_TITLE_MAX = 90;
@@ -105,8 +105,8 @@ export const PROPOSAL_KIND_VIEW: Record<ProposalKind, { icon: IconName; readonly
 /**
  * L'aspect d'un état, pour que chacun se reconnaisse d'un coup d'œil (19/11/2026 : tous écrits pareil,
  * on ne les distinguait pas) : sa propre icône, sa couleur, et un contour tant que l'équipe ne s'est pas
- * engagée, un fond plein dès qu'elle l'est (prévue, en développement, faite) ; « Pas retenue » en
- * pointillés éteints. Deux états n'ont jamais le même aspect (feedback-etats.test.ts).
+ * engagée, un fond plein dès qu'elle l'est (prévue, en développement, faite) ; « En préversion » (faite,
+ * à essayer) en contour vert, entre les deux ; « Pas retenue » en pointillés éteints. Deux états n'ont jamais le même aspect (feedback-etats.test.ts).
  */
 export interface ProposalStatusView {
   readonly label: string;
@@ -122,6 +122,8 @@ export const PROPOSAL_STATUS_VIEW: Record<ProposalStatus, ProposalStatusView> = 
   review: { get label() { return t('À l’étude'); }, get meaning() { return t('L’équipe l’examine'); }, icon: 'eye', tone: 'info', fill: 'outline' },
   planned: { get label() { return t('Prévue'); }, get meaning() { return t('Retenue : elle arrivera dans une prochaine version'); }, icon: 'calendar', tone: 'info', fill: 'solid' },
   progress: { get label() { return t('En développement'); }, get meaning() { return t('L’équipe y travaille en ce moment'); }, icon: 'gear', tone: 'warning', fill: 'solid' },
+  // Faite mais pas encore dans la version finale (27/11/2026) : le joueur peut déjà l'essayer en préversion.
+  preview: { get label() { return t('En préversion'); }, get meaning() { return t('Disponible en préversion : tu peux l’essayer avant la version finale'); }, icon: 'flask', tone: 'ok', fill: 'outline' },
   done: { get label() { return t('Faite'); }, get meaning() { return t('Disponible dans Cyber Pinball'); }, icon: 'check', tone: 'ok', fill: 'solid' },
   declined: { get label() { return t('Pas retenue'); }, get meaning() { return t('L’équipe ne prévoit pas de la faire'); }, icon: 'close', tone: 'quiet', fill: 'dashed' },
 };

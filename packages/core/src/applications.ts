@@ -39,14 +39,17 @@ export interface AppEntry {
   screen: AppScreen;
   /**
    * Affichage mobile : le navigateur se présente comme un téléphone (en-tête User-Agent mobile) et le site
-   * rend sa version mobile, souvent la mieux adaptée à un écran de borne (TikTok, YouTube…). Absent : oui ;
-   * seul « non » s'écrit (appMobile).
+   * rend sa version mobile, souvent la mieux adaptée à un écran de borne (TikTok, YouTube…). Absent : oui
+   * sur le playfield (écran vertical), non sur le fronton (écran large) ; le choix fait à la main s'écrit,
+   * dans un sens comme dans l'autre (appMobile).
    */
   mobile?: boolean;
   /** Teinte de la tuile composée (#rrggbb), et du halo de l'icône. */
   color: string;
   /** Fichier de l'icône relevée sur le site, dans APPLICATIONS_ICON_DIR ; absent : tuile composée. */
   icon?: string;
+  /** Dernière recherche de l'icône sur le site (ISO) : sans elle, un site muet serait relu à chaque démarrage (appIconDue). */
+  iconChecked?: string;
   added: string;
   /** Dernière ouverture : les dernières ouvertes passent en tête de la grille. */
   opened?: string;
@@ -397,6 +400,21 @@ export function readManifest(json: unknown, manifestUrl: string): { name?: strin
 export const APP_ICON_MIN = 96;
 /** Le plus petit favicon gardé ; en dessous, les initiales. */
 export const APP_ICON_SMALLEST = 16;
+/** Une icône trouvée mais petite (Netflix, Twitch) est cherchée de nouveau au plus une fois par semaine ; un site sans icône, une fois par jour. */
+export const APP_ICON_RECHECK_SMALL_MS = 7 * 24 * 3600 * 1000;
+export const APP_ICON_RECHECK_NONE_MS = 24 * 3600 * 1000;
+
+/**
+ * Faut-il (re)chercher l'icône de cette application sur son site ? Jamais quand l'icône remplit la
+ * tuile, et jamais plus d'une fois par délai (sinon, un site qui n'a pas mieux serait relu, page,
+ * manifeste et sept images, à chaque démarrage de la borne).
+ */
+export function appIconDue(app: Pick<AppEntry, 'icon' | 'iconChecked'>, side: number | undefined, nowMs: number): boolean {
+  if (app.icon && (side ?? APP_ICON_MIN) >= APP_ICON_MIN) return false;
+  const checked = app.iconChecked ? Date.parse(app.iconChecked) : NaN;
+  if (!Number.isFinite(checked)) return true;
+  return nowMs - checked >= (app.icon ? APP_ICON_RECHECK_SMALL_MS : APP_ICON_RECHECK_NONE_MS);
+}
 
 /**
  * Ordre d'essai : manifeste, icône Apple, icônes de la page, favicon ; dans chaque famille, la plus
@@ -452,10 +470,11 @@ function cleanApp(v: unknown): AppEntry | undefined {
     name: name.slice(0, 40),
     url,
     screen: APP_SCREENS.includes(r.screen as AppScreen) ? (r.screen as AppScreen) : 'backglass',
-    ...(r.mobile === false ? { mobile: false } : {}),
+    ...(typeof r.mobile === 'boolean' ? { mobile: r.mobile } : {}),
     color: cleanColor(r.color) ?? appColorFor(name),
     // Un nom de fichier seul : jamais un chemin qui sortirait du dossier des icônes.
     ...(icon && /^[a-z0-9-]+\.(png|jpg|webp|gif)$/.test(icon) ? { icon } : {}),
+    ...(Number.isFinite(Date.parse(str(r.iconChecked) ?? '')) ? { iconChecked: str(r.iconChecked) } : {}),
     added: str(r.added) ?? new Date(0).toISOString(),
     ...(str(r.opened) ? { opened: str(r.opened) } : {}),
   };
@@ -535,9 +554,13 @@ export const EDGE_DOWNLOAD_URL = 'https://www.microsoft.com/edge/download';
  */
 export const APP_MOBILE_USER_AGENT = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 EdgA/131.0.0.0';
 
-/** L'application s'affiche-t-elle en version mobile ? Oui tant que « non » n'a pas été choisi. */
-export function appMobile(app: Pick<AppEntry, 'mobile'>): boolean {
-  return app.mobile !== false;
+/**
+ * L'application s'affiche-t-elle en version mobile ? Le choix fait à la main l'emporte ; sans choix, oui
+ * sur le playfield (un écran vertical, comme un téléphone) et non sur le fronton (un écran large, où la
+ * version mobile s'étire et où certains sites, Netflix en tête, proposent d'installer leur application).
+ */
+export function appMobile(app: Pick<AppEntry, 'mobile' | 'screen'>): boolean {
+  return app.mobile ?? app.screen === 'playfield';
 }
 
 /**

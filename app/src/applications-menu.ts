@@ -16,9 +16,9 @@ import {
   APP_CATALOG,
   APP_DIM_MS,
   APP_EXIT_HOLD_MS,
-  APP_ICON_MIN,
   DEFAULT_APPS,
   addApplication,
+  appIconDue,
   appInitials,
   appMobile,
   appScreenLabel,
@@ -197,15 +197,14 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
    */
   async function fetchIcons(): Promise<void> {
     for (const a of store.apps) {
-      const small = a.icon ? (host.iconSide?.(a.icon) ?? APP_ICON_MIN) < APP_ICON_MIN : false;
-      if ((a.icon && !small) || asked.has(a.id) || !host.online()) continue;
+      if (asked.has(a.id) || !appIconDue(a, a.icon ? host.iconSide?.(a.icon) : undefined, now().getTime()) || !host.online()) continue;
       asked.add(a.id);
       const look = await host.look(a.id, a.url).catch(() => ({}) as SiteLook);
-      if (!look.icon && !look.color) continue;
       const known = DEFAULT_APPS.some((d) => d.id === a.id) || catalogApp(a.id);
-      // Couleur du catalogue gardée (choisie à la main) ; celle du site pour une adresse ajoutée.
-      save(updateApplication(store, a.id, { ...(look.icon ? { icon: look.icon } : {}), ...(!known && look.color ? { color: look.color } : {}) }));
-      host.library.changed();
+      // Couleur du catalogue gardée (choisie à la main) ; celle du site pour une adresse ajoutée. La date
+      // de la recherche s'écrit toujours : un site muet n'est pas relu avant le délai (appIconDue).
+      save(updateApplication(store, a.id, { iconChecked: now().toISOString(), ...(look.icon ? { icon: look.icon } : {}), ...(!known && look.color ? { color: look.color } : {}) }));
+      if (look.icon || look.color) host.library.changed();
     }
   }
 
@@ -283,9 +282,10 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
     else openAdd();
   }
 
-  function settingsOfCurrent(): void {
+  /** `held` : Start est encore appuyé (l'ouverture vient de son maintien d'une seconde). */
+  function settingsOfCurrent(held = false): void {
     const app = apps()[Math.min(at, apps().length)];
-    if (app) openSettings(app.id);
+    if (app) openSettings(app.id, held);
     else openAdd();
   }
 
@@ -311,7 +311,7 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
             if (input.isAutoRepeat || startDown) return true;
             startDown = setTimeout(() => {
               startDown = undefined;
-              settingsOfCurrent();
+              settingsOfCurrent(true);
             }, APP_EXIT_HOLD_MS);
             return true;
           }
@@ -559,7 +559,21 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
 
   // ---------- Réglages d'une application ----------
 
-  function openSettings(id: string): void {
+  function openSettings(id: string, startHeld = false): void {
+    // Start tenu 1 s a ouvert cet écran : tant qu'il n'est pas relâché, ses répétitions (ou son relâchement)
+    // ne valident rien, sinon la première ligne (Écran) bascule toute seule. Une autre touche (flipper)
+    // prouve que le bouton est lâché, même si son relâchement s'est perdu.
+    let waitRelease = startHeld;
+    const keys = (input: { type?: string; code: string }): boolean => {
+      if (!waitRelease) return false;
+      const confirm = host.keys().confirm.includes(input.code);
+      if (confirm) {
+        if (input.type === 'keyUp') waitRelease = false;
+        return true;
+      }
+      if (input.type === 'keyDown') waitRelease = false;
+      return false;
+    };
     const build = (): Built => {
       const a = store.apps.find((e) => e.id === id);
       if (!a) return { heading: t('Applications'), sections: [], actions: [{ label: t('Retour aux applications'), icon: 'back', key: 'back', run: showGrid }], back: showGrid };
@@ -628,6 +642,8 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
           },
           { label: t('Retour aux applications'), icon: 'back', key: 'back', run: showGrid },
         ],
+        keysUp: true,
+        keys,
         back: showGrid,
       };
     };

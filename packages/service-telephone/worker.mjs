@@ -170,7 +170,7 @@ export const ADMIN_PREFIX = 'cyberpinball:retours-admin:v1\n';
 /** Clé publique Ed25519 de l'administrateur (hexadécimal). env.ADMIN_PUBLIC_KEY la remplace s'il est réglé. */
 export const ADMIN_PUBLIC_KEY = '9039d503e01125f2db79014217d9c044b354b2be1741ff8eb69383ee5af2d1e1';
 export const KINDS = ['bug', 'improvement', 'feature'];
-export const STATUSES = ['new', 'review', 'planned', 'progress', 'done', 'declined'];
+export const STATUSES = ['new', 'review', 'planned', 'progress', 'preview', 'done', 'declined'];
 export const LANGS = ['fr', 'en'];
 export const TITLE_MIN = 4;
 export const TITLE_MAX = 90;

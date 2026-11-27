@@ -16,6 +16,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatList, tn } from './i18n';
+import { fileIsAbsent, NOT_A_PLAYLIST, pupScriptCalls } from './pup-medias-absents';
 import { isJunkName, PUP_FILES } from './puppack';
 
 /** Nature d'un fichier d'après ses premiers octets. */
@@ -67,7 +68,7 @@ export interface PackFileFixes {
 }
 
 /** Dossiers du pack qui ne sont pas des playlists. */
-const NOT_PLAYLIST = /^(pupcapture|fonts)$|option/i;
+const NOT_PLAYLIST = NOT_A_PLAYLIST;
 
 /**
  * Ce qu'il faut renommer dans le pack (playlists : sous-dossiers de la racine, et leurs fichiers),
@@ -278,7 +279,7 @@ function freeName(name: string, taken: Set<string>): string {
  * (déclencheurs actifs, fichiers de fond des écrans) : « playlist\fichier ». Comme le plugin, sans
  * tenir compte de la casse, le nom lu tel quel (en ASCII, la seule lecture sûre).
  */
-export function missingPackFiles(root: string): string[] {
+export function missingPackFiles(root: string, script?: string): string[] {
   const missing = new Set<string>();
   const entries = readDirents(root);
   const playlistFiles = (playlist: string) => {
@@ -305,8 +306,15 @@ export function missingPackFiles(root: string): string[] {
       const wanted = field(columns.file);
       if (!playlist || !wanted) continue;
       const files = playlistFiles(playlist);
-      if (files && !files.has(wanted.toLowerCase())) missing.add(`${playlist}\\${wanted}`);
+      if (files && fileIsAbsent(files, wanted)) missing.add(`${playlist}\\${wanted}`);
     }
+  }
+  // Le script : un fichier nommé en toutes lettres dans un dossier de playlist qui existe (un dossier
+  // absent relève des playlists vides).
+  for (const call of pupScriptCalls(script)) {
+    if (!call.file || NOT_PLAYLIST.test(call.folder.trim())) continue;
+    const files = playlistFiles(call.folder.trim());
+    if (files && fileIsAbsent(files, call.file)) missing.add(`${call.folder.trim()}\\${call.file}`);
   }
   return [...missing];
 }
@@ -356,7 +364,10 @@ export function emptyPlayedPlaylists(root: string, script?: string): string[] {
       // Liste illisible : aucune playlist du script ne compte.
     }
   }
-  for (const m of (script ?? '').matchAll(/playlistplay(?:ex)?\s*\(?\s*[^,\n]+,\s*"([^"]+)"/gi)) if (declared.has(m[1]!.trim().toLowerCase())) add(m[1]!);
+  // playlistadd : le script déclare lui-même la playlist, déclarée ou non par le pack. Options inactives ignorées.
+  for (const call of pupScriptCalls(script)) {
+    if (!call.dynamicFile && (call.kind === 'add' || declared.has(call.folder.trim().toLowerCase())) && !NOT_PLAYLIST.test(call.folder.trim())) add(call.folder);
+  }
   const media = (name: string) => listFiles(path.join(root, name)).filter((f) => !isJunkName(path.basename(f)));
   // Pack sans un seul média (configuration seule, médias jamais copiés) : pas « incomplet », il n'est pas
   // installé ; ce constat ne parle que d'un pack dont il manque une partie.

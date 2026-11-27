@@ -100,7 +100,7 @@ for (const lang of ['fr', 'en'] as const) {
         assert.ok(!(row?.badges ?? []).includes(view.label), `${s} : l'état répété dans les badges`);
       });
       assert.equal(rows[2]?.badges?.length, 1, 'le vote reste dans son badge');
-      if (lang === 'en') assert.deepEqual(rows.map((r) => r.status?.text), ['New', 'Under review', 'Planned', 'In development', 'Done', 'Not planned']);
+      if (lang === 'en') assert.deepEqual(rows.map((r) => r.status?.text), ['New', 'Under review', 'Planned', 'In development', 'In pre-release', 'Done', 'Not planned']);
 
       // La fiche de la proposition « Prévue » : la même pastille, et ce que l'état veut dire.
       shown!().actions.find((a) => a.key === 'feedback:prop000002')!.run();

@@ -14,6 +14,7 @@ import {
   addApplication,
   APP_MOBILE_USER_AGENT,
   appBrowserArgs,
+  appIconDue,
   appIdFor,
   appMobile,
   appInitials,
@@ -174,6 +175,11 @@ interface MenuOptions {
   apps?: AppEntry[];
   portrait?: () => { rect: unknown; leave(): unknown } | undefined;
   screen?: (where: string) => unknown;
+  /** Une borne en ligne : le relevé des icônes tourne (look est alors le faux site). */
+  online?: boolean;
+  look?: (id: string, url: string) => Promise<unknown>;
+  /** Un dossier de données déjà utilisé (un autre démarrage de la borne). */
+  dataDir?: string;
 }
 
 function makeMenu(options: MenuOptions = {}) {
@@ -186,7 +192,7 @@ function makeMenu(options: MenuOptions = {}) {
   let foreground = 0;
   let backs = 0;
   const host = {
-    dataDir: tmp(),
+    dataDir: options.dataDir ?? tmp(),
     library: {
       openCustom: (build: () => Built) => screens.push(build),
       openPrompt: () => undefined,
@@ -211,8 +217,8 @@ function makeMenu(options: MenuOptions = {}) {
     buttons: { keys: () => ({}), watch: () => () => undefined },
     takeForeground: () => foreground++,
     openExternal: () => undefined,
-    online: () => false,
-    look: async () => ({}),
+    online: () => options.online ?? false,
+    look: options.look ?? (async () => ({})),
     iconUrl: (file: string) => `media://${file}`,
     edgeDownloadUrl: 'https://exemple.example.com/edge',
   };
@@ -286,6 +292,70 @@ test('Start tenu une seconde, ou un MagnaSave, ouvre les réglages de l’applic
   const m2 = makeMenu();
   assert.equal(m2.top().keys(key('keyDown', 'ShiftLeft')), true);
   assert.equal(m2.top().subheading, 'Réglages');
+});
+
+test('Start encore tenu à l’arrivée sur les réglages : ses répétitions ne valident pas la ligne Écran avant son relâchement', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const m = makeMenu();
+  m.top().keys(key('keyDown', 'Enter'));
+  t.mock.timers.tick(1000);
+  const settings = m.top();
+  assert.equal(settings.subheading, 'Réglages');
+  assert.ok(settings.keysUp, 'les réglages reçoivent le relâché de Start');
+  assert.equal(settings.actions[0].key, 'screen', 'la ligne Écran est la première : celle que Start tenu validerait');
+  // Le bouton est toujours enfoncé : les répétitions sont prises (la bibliothèque n'exécute aucune ligne).
+  assert.equal(m.top().keys({ ...key('keyDown', 'Enter'), isAutoRepeat: true }), true);
+  assert.equal(m.top().keys({ ...key('keyDown', 'Enter'), isAutoRepeat: true }), true);
+  // Le relâchement est pris aussi, puis Start redevient un appui comme un autre : la bibliothèque valide la ligne.
+  assert.equal(m.top().keys(key('keyUp', 'Enter')), true);
+  assert.equal(m.top().keys(key('keyDown', 'Enter')), false);
+
+  // Un flipper prouve que Start est lâché, même si son relâchement s'est perdu (fenêtre qui perd le focus).
+  const m2 = makeMenu();
+  m2.top().keys(key('keyDown', 'Enter'));
+  t.mock.timers.tick(1000);
+  assert.equal(m2.top().keys(key('keyDown', 'Enter')), true);
+  assert.equal(m2.top().keys(key('keyDown', 'ArrowRight')), false, 'le flipper navigue');
+  assert.equal(m2.top().keys(key('keyDown', 'Enter')), false);
+
+  // Ouvert par MagnaSave : Start n'est pas tenu, son premier appui valide aussitôt.
+  const m3 = makeMenu();
+  m3.top().keys(key('keyDown', 'ShiftLeft'));
+  assert.equal(m3.top().subheading, 'Réglages');
+  assert.equal(m3.top().keys(key('keyDown', 'Enter')), false);
+});
+
+test('icône trop petite ou introuvable : cherchée au plus une fois par délai, et le relevé en note la date (jamais de relecture à chaque démarrage)', async () => {
+  const day = 24 * 3600 * 1000;
+  const now = Date.parse('2026-11-27T12:00:00Z');
+  const iso = (ago: number) => new Date(now - ago).toISOString();
+  assert.equal(appIconDue({}, undefined, now), true, 'jamais cherchée');
+  assert.equal(appIconDue({ icon: 'a.png' }, 150, now), false, 'elle remplit la tuile');
+  assert.equal(appIconDue({ icon: 'a.png' }, undefined, now), false, 'illisible : laissée');
+  assert.equal(appIconDue({ icon: 'a.png', iconChecked: iso(0) }, 64, now), false, 'petite, cherchée à l’instant');
+  assert.equal(appIconDue({ icon: 'a.png', iconChecked: iso(6 * day) }, 64, now), false);
+  assert.equal(appIconDue({ icon: 'a.png', iconChecked: iso(8 * day) }, 64, now), true, 'petite : une fois par semaine');
+  assert.equal(appIconDue({ iconChecked: iso(2 * 3600 * 1000) }, undefined, now), false, 'sans icône : pas deux fois dans la journée');
+  assert.equal(appIconDue({ iconChecked: iso(2 * day) }, undefined, now), true);
+  assert.equal(appIconDue({ iconChecked: 'pas une date' }, undefined, now), true);
+
+  // Le menu : un site muet est interrogé une fois, la date s'écrit, et rouvrir la grille ne relit rien.
+  const dir = tmp();
+  const looks: string[] = [];
+  const menu = makeMenu({ apps: defaultApplications().apps, online: true, look: async (id: string) => (looks.push(id), {}), dataDir: dir });
+  await settle();
+  const first = looks.length;
+  assert.ok(first > 0 && first <= defaultApplications().apps.length, 'chaque application sans icône, une fois');
+  const saved = loadApplications(dir);
+  assert.ok(saved.apps.every((a) => a.iconChecked), 'la date de la recherche est écrite');
+  menu.menu.open(() => undefined);
+  await settle();
+  assert.equal(looks.length, first, 'la grille rouverte ne relit rien');
+  // Un autre démarrage de la borne, le lendemain même : toujours rien avant le délai.
+  const again = makeMenu({ online: true, look: async (id: string) => (looks.push(id), {}), dataDir: dir });
+  await settle();
+  assert.equal(looks.length, first, 'au démarrage suivant, rien avant le délai');
+  void again;
 });
 
 test('fermée par le front-end (partie, sortie) : ni premier plan ni grille', async () => {
@@ -462,27 +532,37 @@ test('frontend.ts : médaillon juste après le Juke-box, icônes servies, applic
   assert.match(menuHost, /portrait: \(\) => orientationForApp\(\)/);
 });
 
-test('affichage mobile : oui par défaut, seul « non » s\'écrit, et l\'en-tête User-Agent mobile part avec Edge', () => {
+test('affichage mobile : oui sur le playfield, non sur le fronton sans choix ; le choix s\'écrit dans les deux sens ; l\'en-tête User-Agent mobile part avec Edge', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-mobile-'));
   after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const base = { id: 'ok', name: 'Fictive', url: 'https://fictive.example.com/', screen: 'backglass' as const, color: '#112233', added: 'x' };
-  // Une liste écrite avant l'option : oui.
-  saveApplications(dir, { apps: [base, { ...base, id: 'non', url: 'https://non.example.com/', mobile: false }, { ...base, id: 'oui', url: 'https://oui.example.com/', mobile: true }] });
+  // Une liste écrite avant l'option : le défaut suit l'écran (Netflix au fronton ne propose plus d'installer son application).
+  saveApplications(dir, {
+    apps: [
+      base,
+      { ...base, id: 'sur-playfield', url: 'https://playfield.example.com/', screen: 'playfield' as const },
+      { ...base, id: 'non', url: 'https://non.example.com/', screen: 'playfield' as const, mobile: false },
+      { ...base, id: 'oui', url: 'https://oui.example.com/', mobile: true },
+    ],
+  });
   const loaded = loadApplications(dir);
-  saveApplications(dir, loaded);
-  const raw = fs.readFileSync(path.join(dir, 'applications.json'), 'utf8');
-  assert.equal(raw.includes('"mobile": true'), false, 'oui n\'est jamais écrit : c\'est l\'absence de choix');
-  assert.equal(raw.includes('"mobile": false'), true, 'non s\'écrit');
-  assert.deepEqual(loaded.apps.map((a) => appMobile(a)), [true, false, true]);
-  // Le réglage : non, puis oui de nouveau (le champ disparaît).
-  const off = updateApplication(loaded, 'ok', { mobile: false });
-  assert.equal(appMobile(off.apps[0]!), false);
-  const on = updateApplication(off, 'ok', { mobile: true });
+  assert.deepEqual(loaded.apps.map((a) => appMobile(a)), [false, true, false, true]);
+  assert.equal('mobile' in loaded.apps[0]!, false, 'sans choix, rien n\'est écrit : le défaut suit l\'écran');
+  // Le choix à la main résiste au changement d'écran, dans les deux sens.
+  const moved = updateApplication(loaded, 'oui', { screen: 'playfield' });
+  assert.equal(appMobile(moved.apps[3]!), true);
+  assert.equal(appMobile(updateApplication(loaded, 'non', { screen: 'backglass' }).apps[2]!), false);
+  assert.equal(appMobile(updateApplication(loaded, 'ok', { screen: 'playfield' }).apps[0]!), true, 'sans choix : l\'écran décide');
+  // Le réglage : oui sur le fronton s'écrit (il n'est plus le défaut), non sur le playfield aussi.
+  const on = updateApplication(loaded, 'ok', { mobile: true });
   assert.equal(appMobile(on.apps[0]!), true);
-  assert.equal('mobile' in on.apps[0]!, false);
-  // Les applications ajoutées sont en affichage mobile.
+  assert.equal(on.apps[0]!.mobile, true);
+  assert.equal(updateApplication(loaded, 'sur-playfield', { mobile: false }).apps[1]!.mobile, false);
+  // Les applications ajoutées suivent l'écran choisi : fronton par défaut, donc affichage ordinateur.
   const added = addApplication({ apps: [] }, { name: 'Neuve', url: 'https://neuve.example.com/' });
-  assert.ok(added.ok && appMobile(added.app));
+  assert.ok(added.ok && !appMobile(added.app));
+  const addedPlayfield = addApplication({ apps: [] }, { name: 'Neuve', url: 'https://neuve.example.com/', screen: 'playfield' });
+  assert.ok(addedPlayfield.ok && appMobile(addedPlayfield.app));
   // Les arguments d'Edge : l'en-tête mobile seulement quand l'option est active.
   const at = { x: 0, y: 0, width: 1920, height: 1080 };
   assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes(`--user-agent=${APP_MOBILE_USER_AGENT}`));
