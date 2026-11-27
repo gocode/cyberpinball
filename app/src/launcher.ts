@@ -144,6 +144,8 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const handled = new Set<bigint>();
   /** Formulaires d'options de la table validés (OK pressé), par HWND, et quand. */
   const optionsPressed = new Map<bigint, number>();
+  /** Le journal ne note qu'une fois par partie que l'aide de débogage a été fermée. */
+  let debugCancelNoted = false;
 
   const stop = () => {
     const target = player ?? visibleWindowsOf(child.pid ?? -1).find((w) => GAME_TITLES.includes(w.title));
@@ -166,6 +168,21 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
           controls,
         });
         if (verdict.kind === 'game') continue;
+        if (verdict.kind === 'cancel') {
+          // Aide de débogage de core.vbs : Annuler, sans effet sur la table ; le joueur n'en est prévenu qu'une fois.
+          const pressed = optionsPressed.get(w.handle);
+          if (pressed === undefined) {
+            const cancel = controls?.find((c) => c.id === verdict.cancelId);
+            if (cancel && pressDialogButton(w, cancel)) {
+              optionsPressed.set(w.handle, Date.now());
+              if (!debugCancelNoted) {
+                debugCancelNoted = true;
+                notices.push(verdict.notice);
+              }
+              continue;
+            }
+          } else if (Date.now() - pressed < OPTIONS_CLOSE_MS) continue;
+        }
         if (verdict.kind === 'options' || verdict.kind === 'information') {
           // Options de la table au démarrage, ou simple message du script : validés tels quels (OK), la
           // partie continue. Sans réponse, VPX attendrait toujours ; arrêtée, la table reposerait la question
@@ -180,7 +197,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
             }
           } else if (Date.now() - pressed < OPTIONS_CLOSE_MS) continue;
         }
-        if (verdict.kind === 'dialog' || verdict.kind === 'options' || verdict.kind === 'information') {
+        if (verdict.kind === 'dialog' || verdict.kind === 'options' || verdict.kind === 'information' || verdict.kind === 'cancel') {
           // Une boîte de dialogue de VPX (question, erreur, ROM introuvable…) bloquerait
           // la borne : on rapporte son texte et on arrête la partie.
           failure = 'dialog';

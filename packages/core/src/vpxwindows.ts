@@ -59,6 +59,11 @@ export type VpxWindowVerdict =
    * qu'on le lise. Validé par `okId`, la partie continue ; `message` est noté au journal (`notice`).
    */
   | { kind: 'information'; okId: number; message: string; notice: string }
+  /**
+   * Aide de débogage de core.vbs ouverte par une touche pressée en partie (Extra Ball : vpmAddBall ; F12 : volume de
+   * VPinMAME) : Annuler, sans effet sur la table, pressé par `cancelId`. Jamais Oui ni Non à la place du joueur.
+   */
+  | { kind: 'cancel'; cancelId: number; notice: string }
   /** Boîte bloquante (question, erreur) : la partie est arrêtée avec ce message. */
   | { kind: 'dialog'; message: string }
   /** Autre fenêtre : laissée telle quelle, signalée. */
@@ -124,6 +129,22 @@ function scriptMessageOk(title: string, controls: readonly ObservedControl[]): O
   return pushes.length === 1 && /^&?ok$/i.test(pushes[0]!.text.trim()) ? pushes[0] : undefined;
 }
 
+const IDCANCEL = 2;
+const VPM_ADD_BALL = /Click YES to Add a ball to the Trough/i;
+const VPM_VOLUME = /Enter desired VPinMAME Volume Level/i;
+
+/**
+ * Questions d'aide de core.vbs (relevées dans VPX 10.8.1-5436, scripts/core.vbs), posées quand le joueur presse la touche
+ * d'une action de débogage : vpmAddBall (Extra Ball, Oui/Non/Annuler : seul Annuler laisse la table intacte) et VPMVol
+ * (F12, saisie du volume : Annuler rend une chaîne vide, le script sort). Reconnues à leur texte ET à un bouton Annuler.
+ * Laissées telles quelles : F1 (aide des touches, un seul OK : déjà validée), F6 (options, déjà validées par OK) et toute
+ * autre question, qui reste fatale.
+ */
+function debugCancelButton(body: string, controls: readonly ObservedControl[]): ObservedControl | undefined {
+  if (!VPM_ADD_BALL.test(body) && !VPM_VOLUME.test(body)) return undefined;
+  return controls.find((c) => isButton(c) && c.id === IDCANCEL && /^&?(annuler|cancel)$/i.test(c.text.trim()));
+}
+
 function setting(key: string): string {
   const s = VPX_PLAY_SETTINGS.find((p) => p.key === key)!;
   return `[${s.section}] ${s.key} = ${s.value}`;
@@ -176,6 +197,17 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
       kind: 'options',
       okId: ok.id,
       notice: t('Fenêtre d’options de la table « {title} » validée telle quelle (bouton OK) : la partie continue avec ses choix enregistrés.', { title: name }),
+    };
+  }
+
+  const cancel = debugCancelButton(body, w.controls ?? []);
+  if (cancel) {
+    return {
+      kind: 'cancel',
+      cancelId: cancel.id,
+      notice: t(
+        "Un bouton de la manette a ouvert l'aide de débogage des tables à ROM (Extra Ball ou F12) : Cyber Pinball l'a fermée par Annuler, la partie continue. Évite de lier Extra Ball à un bouton voisin des flippers.",
+      ),
     };
   }
 

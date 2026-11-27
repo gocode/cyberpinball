@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- A controller button bound to Extra Ball (or the F12 key) no longer stops the game: it opened the `core.vbs` debug helper of ROM tables ("Click YES to Add a ball to the Trough…"), which Cyber Pinball treated as a fatal error. It is now closed with Cancel, with no effect on the table, and a log line tells you what happened. Other table questions stay fatal, and Cyber Pinball never answers Yes or No for you.
 - Remote, cabinet browser: the bottom bar is now icons only (Back, Forward, Keyboard, More, Close), lower, with their name as a tooltip and for screen readers.
 - Remote: the Pad / Mirror switch becomes an icon button in the bottom bar, green while the mirror is shown; the row it used to take is gone.
 - Remote: single-line header, smaller margins and gaps, and the screen's safe areas are now respected on the left and right too; the pad gains about 50 pixels of height and the mirror about 115.

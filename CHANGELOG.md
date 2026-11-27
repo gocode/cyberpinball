@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Un bouton de manette lié à Extra Ball (ou la touche F12) n'arrête plus la partie : il ouvrait l'aide de débogage des tables à ROM de `core.vbs` ("Click YES to Add a ball to the Trough…"), que Cyber Pinball traitait comme une erreur fatale. Elle est maintenant fermée par Annuler, sans effet sur la table, et une ligne du journal t'explique ce qui s'est passé. Les autres questions des tables restent fatales, et Cyber Pinball ne répond jamais Oui ni Non à ta place.
 - Télécommande, navigateur de la borne : la barre du bas n'a plus que des icônes (Retour, Avancer, Clavier, Plus, Fermer), plus basses, avec leur nom en infobulle et pour les lecteurs d'écran.
 - Télécommande : la bascule Pavé / Miroir devient un bouton-icône de la barre du bas, vert quand le miroir est montré ; la ligne qui lui était réservée disparaît.
 - Télécommande : en-tête sur une seule ligne, marges et écarts réduits, zones sûres de l'écran respectées à gauche et à droite aussi ; le pavé gagne environ 50 pixels de hauteur et le miroir environ 115.

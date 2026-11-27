@@ -56,6 +56,25 @@ test('questions, boîtes de VPX et boîtes illisibles restent fatales', () => {
   assert.equal(classifyVpxWindow(input).kind, 'dialog');
 });
 
+// 27/11/2026 : Extra Ball lié à RB d'une manette Xbox ouvrait la question de vpmAddBall (core.vbs) en pleine partie,
+// et Cyber Pinball arrêtait la partie. Annuler est neutre pour la table ; Oui et Non ne sont jamais répondus.
+test("l'aide de débogage de core.vbs (Extra Ball, F12) est fermée par Annuler, la partie continue", () => {
+  // Dans une MsgBox, Annuler porte le numéro IDCANCEL (2) : ici le deuxième bouton de msgBox() porte donc le n° 2.
+  const w = msgBox('Click YES to Add a ball to the Trough, NO Removes a ball from the Trough', ['&Oui', 'Annuler', '&Non']);
+  const verdict = classifyVpxWindow(w);
+  assert.equal(verdict.kind, 'cancel');
+  assert.equal(verdict.kind === 'cancel' && verdict.cancelId, 2);
+  assert.match(verdict.kind === 'cancel' ? verdict.notice : '', /Extra Ball/);
+  // Sans bouton Annuler n° 2 (Oui/Non seul), pas de réponse à la place du joueur : fatale.
+  assert.equal(classifyVpxWindow(msgBox('Click YES to Add a ball to the Trough', ['&Oui', '&Non'])).kind, 'dialog');
+  // F12 : saisie du volume, Annuler rend une chaîne vide et le script sort.
+  const volume = msgBox('Enter desired VPinMAME Volume Level (-32 to 0)', ['OK', 'Annuler'], 'VPinMAME Volume');
+  volume.controls.push({ className: 'Edit', id: 3, style: 0x50810080, text: '-3' });
+  assert.equal(classifyVpxWindow(volume).kind, 'cancel');
+  // Une autre question Oui/Non/Annuler reste fatale.
+  assert.equal(classifyVpxWindow(msgBox('Enregistrer ?', ['&Oui', 'Annuler', '&Non'])).kind, 'dialog');
+});
+
 /** Le chargement UltraDMD que des centaines de tables recopient. */
 const ULTRADMD = [
   'Option Explicit',
