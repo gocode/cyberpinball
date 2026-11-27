@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Branch merging: the end-of-branch command waits for the real outcome (merged then published, conflict, rejection, failed publication) instead of stopping at "In queue"; a blockage is no longer ignored.
+- Branch merging: a changes note deleted by a publication and then edited by the branch is resolved automatically; the branch's new points are kept in a "-suite" note.
+- Branch merging: a conflict left unread is retried as soon as the main branch changes, and branches blocked for over an hour are shown at the top of the merge command.
 - Fewer game stops while the antivirus scans a table script: timers described by a text (Guardians of the Galaxy, Game of Thrones…) are compiled only once, and those written as is in the table are compiled all at once while it loads, instead of one scan at every deadline.
 - Same for commands a table keeps in a text before running them (Guardians of the Galaxy's `Execute qCmd`, at every scene): the diagnosis spots them ("Script that stops the game at every command it runs") and the copy of the script VPX plays compiles them once. The table is never modified, and a text that depends on the procedure running it is still run as before.
 - A script adapted by a previous version of Cyber Pinball is rewritten automatically before the game with the current fixes, instead of being taken for a script from elsewhere.

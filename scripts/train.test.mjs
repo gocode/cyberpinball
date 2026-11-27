@@ -384,6 +384,22 @@ test('train : un conflit n\'arrête pas le lot ; candidat non préparé : le tra
   }
 });
 
+test('train : un conflit resté sans lecteur est retenté quand proto/ecrans a changé (27/11/2026)', async () => {
+  const bench = trainBench();
+  const { root, branch, dir, publishes, runTrain } = bench;
+  try {
+    const a = branch('a', [['a1.txt', 'a\n']]);
+    enqueueMerge({ branche: 'a', head: a }, dir);
+    // Marquée en conflit sur une ancienne base, sans que sa session l'ait lu : plus aucun conflit réel.
+    writeJson(path.join(dir, 'a-fusionner.json'), readMergeQueue(dir).map((e) => ({ ...e, etat: 'conflit', fichiers: ['a.txt'], surBase: 'ancienne-base' })));
+    assert.equal(await runTrain(), 0, bench.said.join('\n'));
+    assert.equal(isAncestor(bench.main, a), true, 'retentée puis fusionnée');
+    assert.equal(publishes.length, 1);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('train : le commit envoyé doit être le commit vérifié ou son seul commit de version', () => {
   const { root, main, git, commit } = makeRepo();
   try {

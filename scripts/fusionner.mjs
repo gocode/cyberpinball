@@ -15,8 +15,10 @@
 //    suite complète une fois dessus, n'avance proto/ecrans que si elle est verte, puis publie la
 //    préversion. Si la branche fait tomber le lot, elle est écartée avec sa cause (refus.json) et le
 //    reste du lot part sans elle ; le refus s'affiche en tête de chaque npm run fusionner.
-// 5. La session attend la fusion quelques secondes ; si le train est occupé (suite complète, recherche
-//    ou fabrication), elle s'arrête sur « en file » : le train fusionnera la branche dans le lot suivant.
+// 5. La commande attend le vrai résultat (jusqu'à 2 h) : fusionnée puis publiée (code 0), ou conflit, refus,
+//    erreur, publication en échec (code 1). Lancée en arrière-plan, elle réveille la session à sa fin :
+//    plus aucun blocage ne reste ignoré. Une note changements/*.md supprimée par une publication et retouchée
+//    par la branche est résolue seule (scripts/conflit-notes.mjs).
 //
 // Pourquoi (23/11/2026) : chaque session passait la suite lente complète (11 à 22 min à plusieurs),
 // attendait la fabrication pour fusionner, puis la publication : 25 à 40 min pour une petite
@@ -31,12 +33,15 @@ import {
 import { printControles, rerunAlone, run, runControles } from './controles.mjs';
 import { failedFiles, shortReport } from './sortie-tests.mjs';
 import { runAvantFusion } from './avant-fusion.mjs';
-import { dropMerge, enqueueMerge, launchTrain, readMergeQueue, refusBrief, refusStatus, readRefus, requestLeger, trainHolder, trainStatus } from './publication-groupee.mjs';
+import { resoudreNotesSupprimees } from './conflit-notes.mjs';
+import { bloqueesStatus, dropMerge, enqueueMerge, launchTrain, readMergeQueue, readTrainState, refusBrief, refusStatus, readRefus, requestLeger, trainHolder, trainStatus } from './publication-groupee.mjs';
 
 const iso = (ms) => new Date(ms).toISOString();
 const hhmm = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 /** Attente de la fusion par le train quand il est libre ; au-delà, la session s'arrête sur « en file ». */
 const ATTENTE_FUSION_MS = 3 * 60_000;
+/** Durée maximale du suivi (file, fusion, publication) : au-delà, le processus rend la main en le disant. */
+const SUIVI_MAX_MS = 120 * 60_000;
 
 const isAncestor = (sha, ref, cwd) => spawnSync('git', ['merge-base', '--is-ancestor', sha, ref], { cwd, windowsHide: true }).status === 0;
 
@@ -49,7 +54,7 @@ async function verifier({ cwd, dir, branche, say }) {
   announce({ branche, etape: 'integration', finPrevue: iso(Date.now() + DUREE_FUSION_MS) }, dir);
   const before = git(['rev-parse', 'HEAD'], cwd);
   const merge = await run('git', ['merge', '--no-edit', BASE], { cwd });
-  if (merge.code !== 0) {
+  if (merge.code !== 0 && !resoudreNotesSupprimees(cwd, { say }).resolu) {
     const conflicts = git(['diff', '--name-only', '--diff-filter=U'], cwd);
     say(`Conflit en intégrant ${BASE} :\n${conflicts.split('\n').map((f) => `  - ${f}`).join('\n')}\nRésous, commite (git commit --no-edit), puis relance npm run fusionner.`);
     return false;
@@ -111,11 +116,14 @@ async function verifier({ cwd, dir, branche, say }) {
  * La branche est en file : le train est lancé s'il ne tourne pas, puis la session attend la fusion,
  * tant que le train est libre et au plus ATTENTE_FUSION_MS. Rend le code de sortie.
  */
-export async function confier({ dir, main, branche, head, say, publier = true, wait = ATTENTE_FUSION_MS }) {
+export async function confier({ dir, main, branche, head, say, publier = true, wait = ATTENTE_FUSION_MS, suivi = SUIVI_MAX_MS, pas = 3000 }) {
   const started = Date.now();
   let launches = 0;
   let lastLaunch = 0;
   let toldOld = false;
+  let toldQueue = false;
+  let lastNews = started;
+  let fusionneeA = 0;
   for (;;) {
     const entry = readMergeQueue(dir).find((e) => e.branche === branche);
     if (entry?.etat === 'conflit') {
@@ -135,8 +143,26 @@ export async function confier({ dir, main, branche, head, say, publier = true, w
       return 1;
     }
     if (!entry && isAncestor(head, BASE, main)) {
-      say(`Fusionnée dans ${BASE} (${git(['log', '-1', '--format=%h %s', BASE], main)}), après une suite complète verte sur le lot.`);
-      say(`Le train ${publier ? 'publie maintenant la préversion' : 'a fini (--sans-publier)'} (journal : .git/coordination/train.txt). Un problème sera affiché par la prochaine npm run fusionner. Rien d'autre à faire ici.`);
+      if (!fusionneeA) {
+        fusionneeA = Date.now();
+        say(`Fusionnée dans ${BASE} (${git(['log', '-1', '--format=%h %s', BASE], main)}), après une suite complète verte sur le lot.`);
+        if (!publier) {
+          say('Le train a fini (--sans-publier). Rien d\'autre à faire ici.');
+          return 0;
+        }
+        say('J\'attends la fin de la publication de la préversion pour te dire si elle est en ligne (journal : .git/coordination/train.txt).');
+      }
+      // Le suivi va jusqu'au bout : fusionnée ne suffit pas, la branche n'est utile que publiée (27/11/2026).
+      if (trainHolder(dir) && Date.now() - started < suivi) {
+        await sleep(pas);
+        continue;
+      }
+      const etat = readTrainState(dir);
+      if (etat.publication === 'echec' && Date.parse(etat.date) >= fusionneeA - 60_000) {
+        say(`La publication de la préversion a ÉCHOUÉ après la fusion de ${branche} (la branche, elle, est bien dans ${BASE}). Lance npm run publication-groupee depuis le dossier principal ; journal : .git/coordination/train.txt.`);
+        return 1;
+      }
+      say(trainHolder(dir) ? `Le train tourne encore après ${Math.round(suivi / 60_000)} min : la branche est fusionnée, je n'attends pas plus (journal : .git/coordination/train.txt).` : 'Le train a fini : la préversion contenant cette branche est publiée. Rien d\'autre à faire ici.');
       return 0;
     }
     if (!entry) {
@@ -163,10 +189,21 @@ export async function confier({ dir, main, branche, head, say, publier = true, w
     } else if (['verification', 'recherche', 'fabrication'].includes(holder.phase) || Date.now() - started > wait) {
       const fin = holder.finPrevue ? `, fin prévue vers ${hhmm(holder.finPrevue)}` : '';
       const phase = { verification: 'suite complète du lot en cours', recherche: 'recherche de la branche qui fait tomber le lot', fabrication: 'fabrication de la préversion' }[holder.phase] ?? holder.phase ?? '?';
-      say(`En file : le train est occupé (${phase}${fin}). Il fusionnera ${branche} (${head.slice(0, 8)}) dans le lot suivant, une fois la suite verte${publier ? ', puis la publiera' : ''}. Si le lot tombe à cause de cette branche, elle sera écartée avec sa cause (npm run refus, et en tête de npm run fusionner) ; les autres partent sans elle. Rien d'autre à faire ici ; ne recommite pas sur cette branche d'ici là (un nouveau commit demande un nouveau npm run fusionner).`);
-      return 0;
+      // Le processus reste là jusqu'au vrai résultat (fusionnée et publiée, conflit, refus, erreur) : lancé en arrière-plan,
+      // il réveille la session à sa fin. Avant : « En file », code 0, et personne n'apprenait un blocage (27/11/2026).
+      if (!toldQueue) {
+        toldQueue = true;
+        say(`En file : le train est occupé (${phase}${fin}). Il fusionnera ${branche} (${head.slice(0, 8)}) dans le lot suivant, une fois la suite verte${publier ? ', puis la publiera' : ''}. Si le lot tombe à cause de cette branche, elle sera écartée avec sa cause ; les autres partent sans elle. J'attends le résultat ici et je le dirai : ne recommite pas sur cette branche d'ici là.`);
+      } else if (Date.now() - lastNews > 10 * 60_000) {
+        lastNews = Date.now();
+        say(`Toujours en file (${phase}${fin}).`);
+      }
+      if (Date.now() - started > suivi) {
+        say(`En file depuis ${Math.round(suivi / 60_000)} min : j'arrête d'attendre. Le train garde la branche ; vérifie .git/coordination/train.txt, ou relance npm run fusionner.`);
+        return 0;
+      }
     }
-    await sleep(3000);
+    await sleep(pas);
   }
 }
 
@@ -195,6 +232,8 @@ export async function fusionner({ cwd = REPO, say = console.log, leger = false, 
   if (flaky) say(`${flaky}\n`);
   const refuses = refusStatus(dir);
   if (refuses) say(`${refuses}\n`);
+  const bloquees = bloqueesStatus(dir);
+  if (bloquees) say(`${bloquees}\n`);
   const status = trainStatus(dir);
   if (status) say(`${status}\n`);
   const previous = readMergeQueue(dir).find((e) => e.branche === branche);

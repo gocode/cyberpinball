@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Fusion des branches : la commande de fin de branche attend le vrai résultat (fusionnée puis publiée, conflit, refus, publication en échec) au lieu de s'arrêter sur "En file" ; un blocage n'est plus ignoré.
+- Fusion des branches : une note de changements supprimée par une publication puis retouchée par la branche se résout seule ; les points nouveaux de la branche sont gardés dans une note "-suite".
+- Fusion des branches : un conflit laissé sans lecteur est retenté dès que la branche principale change, et les branches bloquées depuis plus d'une heure sont affichées en tête de la commande de fusion.
 - Moins d'arrêts de la partie quand l'antivirus analyse le script d'une table : les minuteries décrites par un texte (Guardians of the Galaxy, Game of Thrones…) sont compilées une seule fois, et celles écrites telles quelles dans la table le sont d'un seul coup au chargement, au lieu d'une analyse à chaque échéance.
 - Même chose pour les commandes qu'une table range dans un texte avant de les exécuter (`Execute qCmd` de Guardians of the Galaxy, à chaque scène) : le diagnostic les repère ("Script qui arrête la partie à chaque commande exécutée") et la copie du script que joue VPX les compile une fois. La table n'est jamais modifiée, et un texte qui dépend de la procédure qui l'exécute reste exécuté comme avant.
 - Un script adapté par une version précédente de Cyber Pinball est refait d'office avant la partie avec les correctifs d'aujourd'hui, au lieu d'être pris pour un script venu d'ailleurs.

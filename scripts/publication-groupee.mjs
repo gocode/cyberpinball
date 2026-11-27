@@ -55,6 +55,7 @@ import {
 import { versionOnlyDiff } from './compilation-faite.mjs';
 import { SANS_TESTS_RAPIDES } from './avant-fusion.mjs';
 import { shortReport } from './sortie-tests.mjs';
+import { resoudreNotesSupprimees } from './conflit-notes.mjs';
 
 export const ATTENTE_MAX_MS = 2 * 60_000;
 export const RETARD_MAX_MS = 60_000;
@@ -227,6 +228,17 @@ export function refusStatus(dir = coordinationDir()) {
   return `REFUSÉES par le train (leur travail fait tomber la suite). Le train les reprend seul : à chaque changement de ${BASE}, si leurs fichiers en échec passent sur ${BASE} + la branche, elles repartent dans le lot suivant. Une branche aux reprises épuisées attend une session qui la corrige, puis npm run fusionner :\n${list.map((r) => `  - ${refusLine(r)}`).join('\n')}\nnpm run refus : détail et brief de reprise.`;
 }
 
+/**
+ * Les branches restées en conflit ou en erreur dans la file depuis plus de `delaiMs` (1 h) sans que leur session les ait
+ * reprises : leur travail est bloqué et personne ne le sait. Affichées en tête de chaque npm run fusionner.
+ */
+export function bloqueesStatus(dir = coordinationDir(), { delaiMs = 60 * 60_000, now = Date.now() } = {}) {
+  const list = readMergeQueue(dir).filter((e) => (e.etat === 'conflit' || e.etat === 'erreur') && now - (Date.parse(e.date ?? '') || now) > delaiMs);
+  if (!list.length) return undefined;
+  const ligne = (e) => `  - ${e.branche} (commit ${String(e.head).slice(0, 8)}, confiée à ${hhmm(e.date)}) : ${e.etat === 'conflit' ? `conflit sur ${(e.fichiers ?? []).join(', ') || '?'}` : `erreur ${String(e.message ?? '?').split('\n')[0].slice(0, 160)}`}`;
+  return `BLOQUÉES dans la file du train, sans session pour les reprendre (leurs améliorations n'arrivent pas) : une session doit les mettre à jour et relancer npm run fusionner (le train retente seul les conflits quand ${BASE} change) :\n${list.map(ligne).join('\n')}`;
+}
+
 /** Retire l'entrée de la branche (fusionnée, ou conflit lu par sa session). */
 export function dropMerge(branche, dir = coordinationDir()) {
   withQueueLock(dir, (queue) => ({ queue: queue.filter((e) => e.branche !== branche) }));
@@ -262,6 +274,8 @@ export function mergeQueued(cwd, entries, say = console.log) {
     let r = gitRun(['merge', '--ff-only', entry.head], cwd);
     if (r.status !== 0) {
       r = gitRun(['merge', '--no-ff', '--no-edit', '-m', `Merge branch '${entry.branche}' into ${BASE}`, entry.head], cwd);
+      // Une note changements/*.md supprimée par une publication et retouchée par la branche : résolue seule (27/11/2026).
+      if (r.status !== 0 && resoudreNotesSupprimees(cwd, { say }).resolu) r = { status: 0 };
       if (r.status !== 0) {
         const fichiers = git(['diff', '--name-only', '--diff-filter=U'], cwd).split('\n').filter(Boolean);
         const message = `${r.stdout}${r.stderr}`.trim().slice(0, 800);
@@ -648,13 +662,16 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
       await reprendre();
       // Un refus lu par sa session (ou resté sans lecteur plus de 15 min) sort de la file ; refus.json le garde.
       for (const e of readMergeQueue(dir)) if (e.etat === 'refusee' && Date.now() - (Date.parse(e.refuseeLe ?? '') || 0) > 15 * 60_000) dropMerge(e.branche, dir);
+      const base = git(['rev-parse', 'HEAD'], main);
+      // Un conflit que sa session n'a pas lu (elle a fini) est retenté dès que proto/ecrans a bougé : il a pu disparaître
+      // (27/11/2026 : un conflit sur une note laissé 17 h sans lecteur). Un conflit qui revient est marqué sur la nouvelle base.
+      for (const e of readMergeQueue(dir)) if (e.etat === 'conflit' && e.surBase !== base) markMerge(e.branche, { etat: 'en-file', fichiers: undefined, surBase: undefined }, dir);
       const entries = readMergeQueue(dir).filter((e) => e.etat === 'en-file');
       if (!entries.length) return {};
-      const base = git(['rev-parse', 'HEAD'], main);
       setState('publication', 'fusion', { envoi: envoi?.version });
       resetCandidate(main, cand, base);
       const { merged, conflicts } = mergeQueued(cand, entries, say);
-      for (const c of conflicts) markMerge(c.entry.branche, c.fichiers.length ? { etat: 'conflit', fichiers: c.fichiers, base: c.base } : { etat: 'erreur', message: c.message }, dir);
+      for (const c of conflicts) markMerge(c.entry.branche, c.fichiers.length ? { etat: 'conflit', fichiers: c.fichiers, base: c.base, surBase: base } : { etat: 'erreur', message: c.message }, dir);
       if (!merged.length) continue;
       const candSha = git(['rev-parse', 'HEAD'], cand);
       const noms = merged.map((m) => m.entry.branche);
