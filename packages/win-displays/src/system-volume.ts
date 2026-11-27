@@ -16,6 +16,13 @@ export interface EndpointVolume {
   muted: boolean;
 }
 
+/**
+ * Quelles sorties lire : `configured` (celles qu'on nomme, sinon la sortie par défaut) ou `all` : celles
+ * qu'on nomme, la sortie par défaut de Windows (où jouent Edge, les applications, le système) et toute
+ * sortie active où un programme joue en ce moment (une application peut avoir sa sortie propre).
+ */
+export type EndpointScope = 'configured' | 'all';
+
 const CLSCTX_ALL = 0x17;
 const COINIT_APARTMENTTHREADED = 0x2;
 const E_RENDER = 0;
@@ -23,10 +30,21 @@ const E_CONSOLE = 0;
 const CLSID_MMDEVICE_ENUMERATOR = 'BCDE0395-E52F-467C-8E3D-C4579291692E';
 const IID_IMMDEVICE_ENUMERATOR = 'A95664D2-9614-4F35-A746-DE8DB63617E6';
 const IID_IAUDIO_ENDPOINT_VOLUME = '5CDF2C82-841E-4546-9722-0CF74078229A';
+const IID_IAUDIO_SESSION_MANAGER2 = '77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F';
+const DEVICE_STATE_ACTIVE = 1;
+/** AudioSessionStateActive : le programme joue. */
+const SESSION_ACTIVE = 1;
 
 // Indices dans la table de méthodes (IUnknown : 0 QueryInterface, 1 AddRef, 2 Release).
 const RELEASE = 2;
+const ENUM_ENUM_ENDPOINTS = 3;
 const ENUM_GET_DEFAULT = 4;
+const COLLECTION_GET_COUNT = 3;
+const COLLECTION_ITEM = 4;
+const MANAGER2_GET_SESSION_ENUMERATOR = 5;
+const SESSION_ENUM_GET_COUNT = 3;
+const SESSION_ENUM_GET_SESSION = 4;
+const SESSION_GET_STATE = 3;
 const ENUM_GET_DEVICE = 5;
 const DEVICE_ACTIVATE = 3;
 const DEVICE_GET_ID = 5;
@@ -43,6 +61,12 @@ interface Api {
     release: koffi.TypeObject;
     getDefault: koffi.TypeObject;
     getDevice: koffi.TypeObject;
+    enumEndpoints: koffi.TypeObject;
+    getCount: koffi.TypeObject;
+    item: koffi.TypeObject;
+    getSessionEnumerator: koffi.TypeObject;
+    getSession: koffi.TypeObject;
+    getState: koffi.TypeObject;
     activate: koffi.TypeObject;
     getId: koffi.TypeObject;
     getScalar: koffi.TypeObject;
@@ -66,6 +90,12 @@ function loadApi(): Api {
       release: koffi.proto('uint32_t __stdcall CP_Release(void *self)'),
       getDefault: koffi.proto('int32_t __stdcall CP_GetDefaultAudioEndpoint(void *self, int flow, int role, _Out_ void **device)'),
       getDevice: koffi.proto('int32_t __stdcall CP_GetDevice(void *self, str16 id, _Out_ void **device)'),
+      enumEndpoints: koffi.proto('int32_t __stdcall CP_EnumAudioEndpoints(void *self, int flow, uint32_t mask, _Out_ void **collection)'),
+      getCount: koffi.proto('int32_t __stdcall CP_GetCount(void *self, _Out_ uint32_t *count)'),
+      item: koffi.proto('int32_t __stdcall CP_Item(void *self, uint32_t index, _Out_ void **device)'),
+      getSessionEnumerator: koffi.proto('int32_t __stdcall CP_GetSessionEnumerator(void *self, _Out_ void **sessions)'),
+      getSession: koffi.proto('int32_t __stdcall CP_GetSession(void *self, int index, _Out_ void **session)'),
+      getState: koffi.proto('int32_t __stdcall CP_GetState(void *self, _Out_ int *state)'),
       activate: koffi.proto('int32_t __stdcall CP_Activate(void *self, CP_GUID *iid, uint32_t ctx, void *params, _Out_ void **out)'),
       getId: koffi.proto('int32_t __stdcall CP_GetId(void *self, _Out_ void **id)'),
       getScalar: koffi.proto('int32_t __stdcall CP_GetMasterVolumeLevelScalar(void *self, _Out_ float *level)'),
@@ -108,19 +138,22 @@ function withEnumerator<T>(use: (w: Api, enumerator: unknown) => T): T {
   }
 }
 
+/** L'identifiant (IMMDevice::GetId) d'une sortie. */
+function deviceId(w: Api, dev: unknown): string {
+  const text: unknown[] = [null];
+  check(call(dev, DEVICE_GET_ID, w.proto.getId, text), 'IMMDevice::GetId');
+  const id = koffi.decode(text[0], 'char16_t', -1) as string;
+  w.CoTaskMemFree(text[0]);
+  return id;
+}
+
 /** La sortie `id` (sans identifiant : la sortie par défaut), son identifiant et son réglage ; undefined si elle n'est pas active. */
 function withVolume<T>(w: Api, enumerator: unknown, id: string | undefined, use: (volume: unknown, id: string) => T): T | undefined {
   const dev: unknown[] = [null];
   const hr = id ? call(enumerator, ENUM_GET_DEVICE, w.proto.getDevice, id, dev) : call(enumerator, ENUM_GET_DEFAULT, w.proto.getDefault, E_RENDER, E_CONSOLE, dev);
   if (hr < 0 || !dev[0]) return undefined;
   try {
-    let endpoint = id;
-    if (!endpoint) {
-      const text: unknown[] = [null];
-      check(call(dev[0], DEVICE_GET_ID, w.proto.getId, text), 'IMMDevice::GetId');
-      endpoint = koffi.decode(text[0], 'char16_t', -1) as string;
-      w.CoTaskMemFree(text[0]);
-    }
+    const endpoint = id ?? deviceId(w, dev[0]);
     const vol: unknown[] = [null];
     // Sortie débranchée ou désactivée : Activate échoue, elle est passée.
     if (call(dev[0], DEVICE_ACTIVATE, w.proto.activate, guid(IID_IAUDIO_ENDPOINT_VOLUME), CLSCTX_ALL, null, vol) < 0 || !vol[0]) return undefined;
@@ -134,11 +167,70 @@ function withVolume<T>(w: Api, enumerator: unknown, id: string | undefined, use:
   }
 }
 
+/** Un programme joue-t-il sur cette sortie ? Une erreur de lecture des sessions compte pour « non ». */
+function isPlaying(w: Api, dev: unknown): boolean {
+  const manager: unknown[] = [null];
+  if (call(dev, DEVICE_ACTIVATE, w.proto.activate, guid(IID_IAUDIO_SESSION_MANAGER2), CLSCTX_ALL, null, manager) < 0 || !manager[0]) return false;
+  try {
+    const list: unknown[] = [null];
+    if (call(manager[0], MANAGER2_GET_SESSION_ENUMERATOR, w.proto.getSessionEnumerator, list) < 0 || !list[0]) return false;
+    try {
+      const count = [0];
+      if (call(list[0], SESSION_ENUM_GET_COUNT, w.proto.getCount, count) < 0) return false;
+      for (let i = 0; i < count[0]!; i++) {
+        const session: unknown[] = [null];
+        if (call(list[0], SESSION_ENUM_GET_SESSION, w.proto.getSession, i, session) < 0 || !session[0]) continue;
+        try {
+          const state = [0];
+          if (call(session[0], SESSION_GET_STATE, w.proto.getState, state) >= 0 && state[0] === SESSION_ACTIVE) return true;
+        } finally {
+          call(session[0], RELEASE, w.proto.release);
+        }
+      }
+      return false;
+    } finally {
+      call(list[0], RELEASE, w.proto.release);
+    }
+  } finally {
+    call(manager[0], RELEASE, w.proto.release);
+  }
+}
+
+/** Identifiants des sorties actives où un programme joue en ce moment (Edge, une application, le jeu…). */
+function playingIds(w: Api, enumerator: unknown): string[] {
+  const collection: unknown[] = [null];
+  if (call(enumerator, ENUM_ENUM_ENDPOINTS, w.proto.enumEndpoints, E_RENDER, DEVICE_STATE_ACTIVE, collection) < 0 || !collection[0]) return [];
+  try {
+    const count = [0];
+    if (call(collection[0], COLLECTION_GET_COUNT, w.proto.getCount, count) < 0) return [];
+    const ids: string[] = [];
+    for (let i = 0; i < count[0]!; i++) {
+      const dev: unknown[] = [null];
+      if (call(collection[0], COLLECTION_ITEM, w.proto.item, i, dev) < 0 || !dev[0]) continue;
+      try {
+        if (isPlaying(w, dev[0])) ids.push(deviceId(w, dev[0]));
+      } finally {
+        call(dev[0], RELEASE, w.proto.release);
+      }
+    }
+    return ids;
+  } finally {
+    call(collection[0], RELEASE, w.proto.release);
+  }
+}
+
+/** Sorties où un programme joue en ce moment (vide si Windows ne le dit pas). */
+export function playingEndpoints(): string[] {
+  return withEnumerator((w, enumerator) => playingIds(w, enumerator));
+}
+
 /**
  * Réglage des sorties `ids` (identifiants IMMDevice::GetId), dans cet ordre, celles qui sont
- * actives ; sans identifiant (ou aucune active), la sortie par défaut de Windows.
+ * actives ; sans identifiant (ou aucune active), la sortie par défaut de Windows. Avec `all`, la
+ * sortie par défaut et les sorties où un programme joue suivent, sans doublon : ce que règle le
+ * volume doit être ce qu'on entend, pas seulement les sorties de la configuration.
  */
-export function readEndpointVolumes(ids: readonly string[] = []): EndpointVolume[] {
+export function readEndpointVolumes(ids: readonly string[] = [], scope: EndpointScope = 'configured'): EndpointVolume[] {
   return withEnumerator((w, enumerator) => {
     const read = (id: string | undefined) =>
       withVolume(w, enumerator, id, (vol, endpoint) => {
@@ -149,9 +241,16 @@ export function readEndpointVolumes(ids: readonly string[] = []): EndpointVolume
         return { id: endpoint, level: level[0]!, muted: muted[0] !== 0 };
       });
     const found = ids.map(read).filter((v): v is EndpointVolume => Boolean(v));
-    if (found.length) return found;
-    const fallback = read(undefined);
-    return fallback ? [fallback] : [];
+    if (scope === 'configured') {
+      if (found.length) return found;
+      const fallback = read(undefined);
+      return fallback ? [fallback] : [];
+    }
+    for (const id of [undefined, ...playingIds(w, enumerator)]) {
+      const v = read(id);
+      if (v && !found.some((f) => f.id === v.id)) found.push(v);
+    }
+    return found;
   });
 }
 

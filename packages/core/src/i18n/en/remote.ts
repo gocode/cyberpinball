@@ -338,4 +338,7 @@ export const messages: Record<string, string> = {
   "Couper le son": "Mute",
   "Rétablir le son": "Unmute",
   "Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.": "The cabinet sound can't be adjusted from here: no audio output found.",
+  "Le son de la borne ne se règle pas d’ici : Windows ne répond pas ({raison}).": "The cabinet sound can't be adjusted from here: Windows is not answering ({raison}).",
+  "Windows a refusé le réglage du volume : {raison}": "Windows refused the volume change: {raison}",
+  "Windows n’a pas pris le réglage sur {n} sortie(s) audio sur {total} : le volume peut ne pas changer partout.": "Windows did not apply the change on {n} of {total} audio output(s): the volume may not change everywhere.",
 };

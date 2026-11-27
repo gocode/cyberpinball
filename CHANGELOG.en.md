@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Remote: the volume now also controls the sound of Edge and of the apps opened at the cabinet. It only set the outputs chosen in the "Sound" step (backglass, playfield), while Edge plays on the Windows default output, which can be another one, so the volume bar and Mute did nothing. The volume now follows, by the same amount, the default output and any output where a program is playing.
+- Remote: the volume slider now says why the sound does not change (Windows not answering, no audio output, or an output that did not take the setting) instead of staying silent.
 - What's new: searching the System menu and the LED animations each get a schematic illustration that reads well in the timeline thumbnail (the search one was cropped to an empty strip).
 - Remote, cabinet browser: the touchpad now reminds you, under its hints, that you can switch to the mirror (the screen icon in the bottom bar); the reminder only shows when the mirror is available.
 - Applications: the cabinet's browser (Edge) now opens every site at 200% zoom, so text is readable on the large playfield screen. New "Page zoom" setting in each application's settings (hold Start for 1 s on its tile): Start steps from 100% to 300% (100, 125, 150, 175, 200, 250, 300), and the choice is remembered per application. The phone mirror is unaffected.

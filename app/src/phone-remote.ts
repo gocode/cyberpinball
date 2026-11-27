@@ -144,6 +144,7 @@ import type { RemoteLevel } from './level-menu';
 import type { RemoteActivity } from './activity-menu';
 import type { RemotePageView } from './phone-pages';
 import { journalIncident } from './uncaught';
+import type { RemoteVolumeState } from './cabinet-volume';
 import { createPhoneMirror, type MirrorShot } from './phone-mirror';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
@@ -567,9 +568,9 @@ export interface PhoneRemoteOptions {
   relay?: Pick<PhoneRelay, 'update' | 'url' | 'state'>;
   /**
    * Volume de la borne (cabinet-volume.ts) : une commande du téléphone, ou la simple lecture ; le
-   * niveau qui en résulte, undefined sans sortie audio lisible.
+   * niveau qui en résulte, ou la raison pour laquelle il ne se règle pas (`none`).
    */
-  volume?(command: RemoteVolumeCommand): { percent: number; muted: boolean } | undefined;
+  volume?(command: RemoteVolumeCommand): RemoteVolumeState;
 }
 
 /**
@@ -2001,13 +2002,15 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
     // Volume de la borne : dans tous les modes (menu, partie, applications) ; le niveau repart aussitôt.
     if (message.t === 'vol') {
-      let level: { percent: number; muted: boolean } | undefined;
+      let state: RemoteVolumeState = { none: t('Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.') };
       try {
-        level = opts.volume?.(message.c);
+        state = opts.volume?.(message.c) ?? state;
       } catch (error) {
         journalIncident('Télécommande : volume de la borne illisible', error); // i18n-ignore : journal
+        state = { none: t('Le son de la borne ne se règle pas d’ici : Windows ne répond pas ({raison}).', { raison: (error as Error).message }) };
       }
-      sendTo(link, level ? { t: 'volume', percent: level.percent, muted: level.muted } : { t: 'volume', none: t('Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.') });
+      // La réglette dit toujours pourquoi : `none` (rien à régler) ou `note` (réglé, avec un bémol).
+      sendTo(link, 'none' in state ? { t: 'volume', none: state.none } : { t: 'volume', percent: state.percent, muted: state.muted, ...(state.note ? { note: state.note } : {}) });
       return;
     }
     // Juke-box : une commande du lecteur, vérifiée par la borne ; ce qui change part aussitôt.

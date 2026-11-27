@@ -91,13 +91,15 @@ function volumeRender() {
   volEl('volume-mute').setAttribute('aria-label', muted ? t('Rétablir le son') : t('Couper le son'));
   volEl('volume-mute').setAttribute('aria-pressed', String(muted));
   for (const id of ['volume-minus', 'volume-plus', 'volume-mute']) volEl(id).disabled = none;
-  volEl('volume-note').hidden = !none;
-  volEl('volume-note').textContent = none ? v.none : '';
+  // La réglette dit toujours pourquoi le son ne bouge pas : rien à régler (none), ou réglé avec un bémol (note).
+  const note = none ? v.none : v?.note || '';
+  volEl('volume-note').hidden = !note;
+  volEl('volume-note').textContent = note;
 }
 
 /** Message « volume » de la borne. */
 function volumeMessage(m) {
-  volumeLevel = typeof m.none === 'string' ? { none: m.none } : { percent: Math.max(0, Math.min(100, Number(m.percent) || 0)), muted: m.muted === true };
+  volumeLevel = typeof m.none === 'string' ? { none: m.none } : { percent: Math.max(0, Math.min(100, Number(m.percent) || 0)), muted: m.muted === true, note: typeof m.note === 'string' ? m.note : '' };
   volumeRender();
 }
 

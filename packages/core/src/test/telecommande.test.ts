@@ -150,6 +150,13 @@ test('volume de la borne au téléphone : réglette, Volume + et − (tenu), Mue
       'le retour d’Android replie la réglette',
       'pendant une partie : Volume − baisse le son du flipper',
       'sans sortie audio : la réglette dit pourquoi',
+      'sans sortie audio : les boutons sont grisés',
+      'réglé avec un bémol : la réglette dit que Windows n’a pas pris le réglage partout',
+      'avec le bémol, les boutons restent utilisables',
+      'la note disparaît quand le réglage a pris partout',
+      'au navigateur : le bouton du volume est dans la barre du haut',
+      'au navigateur : toucher le haut-parleur ouvre la réglette',
+      'au navigateur : Volume − arrive à la borne',
       'petit Android (320 × 568) : la barre du haut et la réglette tiennent dans la largeur',
       'garde-fou de mise en page',
     ])

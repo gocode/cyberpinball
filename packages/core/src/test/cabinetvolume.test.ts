@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
+import * as path from 'node:path';
 import { test } from 'node:test';
 import { BUTTONS, DEFAULT_BUTTONS, buttonInfo, gameKeys, recordButton, vpxVolumeSettings } from '../buttons';
-import { MUTE_HOLD_MS, VOLUME_BADGE_SIZE, VolumeButtons, gameNoticeBounds, volumeAfter, volumeOutputIds, volumeView, type OutputVolume, type VolumeButton } from '../index';
+import { MUTE_HOLD_MS, VOLUME_BADGE_SIZE, VolumeButtons, gameNoticeBounds, volumeAfter, unappliedOutputs, volumeOutputIds, volumeView, type OutputVolume, type VolumeButton } from '../index';
 import { IniDocument } from '../ini';
 import { planVpxSync } from '../sync';
 import type { Cabinet, CabinetButtons } from '../model';
 import { toPhysicalScreen } from '../fingerprint';
 import { devPcDisplays, emptyCabinet } from './fixtures';
+import { REPO_ROOT } from './i18n-scan';
 
 const one = (level: number, muted = false): OutputVolume[] => [{ id: 'a', level, muted }];
 const levels = (outputs: OutputVolume[]) => outputs.map((o) => o.level);
@@ -139,4 +141,55 @@ test('VPX : un bouton de joystick de volume écrit avant est retiré, une manett
     settings.map((s) => `${s.key}=${s.value}`),
     ['Mapping.VolumeDown=' + mine, 'Mapping.VolumeUp=Key;0'],
   );
+});
+
+test('volume : les sorties où Windows n’a pas pris le réglage sont repérées (la réglette du téléphone le dit)', () => {
+  const wanted: OutputVolume[] = [
+    { id: 'fronton', level: 0.55, muted: false },
+    { id: 'defaut', level: 0.55, muted: false },
+  ];
+  assert.deepEqual(unappliedOutputs(wanted, wanted), [], 'tout a pris');
+  assert.deepEqual(unappliedOutputs(wanted, [{ id: 'fronton', level: 0.5502, muted: false }, { id: 'defaut', level: 0.54, muted: false }]), [], 'un flottant ou un pas de 1 % de Windows n’est pas un refus');
+  assert.deepEqual(
+    unappliedOutputs(wanted, [{ id: 'fronton', level: 0.55, muted: false }, { id: 'defaut', level: 1, muted: false }]).map((o) => o.id),
+    ['defaut'],
+    'un pilote qui plafonne ou verrouille son niveau',
+  );
+  assert.deepEqual(
+    unappliedOutputs([{ id: 'fronton', level: 0.2, muted: true }], [{ id: 'fronton', level: 0.2, muted: false }]).map((o) => o.id),
+    ['fronton'],
+    'son non coupé alors qu’il devait l’être',
+  );
+  assert.deepEqual(unappliedOutputs(wanted, [{ id: 'fronton', level: 0.55, muted: false }]).map((o) => o.id), ['defaut'], 'sortie disparue entre l’écriture et la relecture');
+});
+
+test('volume : un seul calcul règle toutes les sorties (celle de la configuration et la sortie par défaut d’Edge), le même écart et le même Muet', () => {
+  // Edge joue sur la sortie par défaut de Windows, pas forcément sur celle du fronton : toutes suivent.
+  const outputs: OutputVolume[] = [
+    { id: 'fronton', level: 0.5, muted: false },
+    { id: 'defaut', level: 0.8, muted: false },
+  ];
+  assert.deepEqual(levels(volumeAfter(outputs, 'down')), [0.45, 0.75]);
+  assert.deepEqual(volumeAfter(outputs, 'mute').map((o) => o.muted), [true, true]);
+});
+
+test('volume Windows (Core Audio) : la sortie par défaut est reprise avec celles où un programme joue, sans doublon ; la lecture ne change rien', { skip: process.platform === 'win32' ? false : 'Windows seulement' }, () => {
+  const win = require(path.join(REPO_ROOT, 'packages', 'win-displays', 'dist', 'index.js')) as {
+    readEndpointVolumes(ids?: string[], scope?: 'configured' | 'all'): OutputVolume[];
+    playingEndpoints(): string[];
+  };
+  let configured: OutputVolume[] = [];
+  try {
+    configured = win.readEndpointVolumes([]);
+  } catch {
+    // Poste sans service audio (agent de build) : rien à vérifier.
+  }
+  if (!configured.length) return;
+  const all = win.readEndpointVolumes([], 'all');
+  assert.equal(all[0]!.id, configured[0]!.id, 'sans sortie nommée, la sortie par défaut mène');
+  assert.equal(new Set(all.map((o) => o.id)).size, all.length, 'aucune sortie en double');
+  const playing = win.playingEndpoints();
+  for (const id of playing) assert.ok(all.some((o) => o.id === id), `la sortie où un programme joue (${id}) est réglée aussi`);
+  const named = win.readEndpointVolumes([configured[0]!.id], 'all');
+  assert.equal(named[0]!.id, configured[0]!.id, 'une sortie nommée passe devant');
 });

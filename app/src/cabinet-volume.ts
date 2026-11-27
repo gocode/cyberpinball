@@ -25,6 +25,8 @@ import {
   WINDOWS_VOLUME_KEYS,
   buttonKeys,
   gameNoticeBounds,
+  t,
+  unappliedOutputs,
   volumeAfter,
   volumeLogLine,
   volumeView,
@@ -71,23 +73,35 @@ export interface CabinetVolume {
    * Le téléphone (phone-remote.ts) : Volume −, Volume + ou Muet comme les boutons de la borne (la
    * pastille le montre), ou la simple lecture ; le niveau qui en résulte, undefined sans sortie lisible.
    */
-  remote(command: 'up' | 'down' | 'mute' | 'read'): RemoteVolumeState | undefined;
+  remote(command: 'up' | 'down' | 'mute' | 'read'): RemoteVolumeState;
   stop(): void;
 }
 
-/** Ce que le téléphone montre du volume : la première sortie mène, comme pour la pastille. */
-export interface RemoteVolumeState {
-  /** 0 à 100. */
-  percent: number;
-  muted: boolean;
-}
+/**
+ * Ce que le téléphone montre du volume : la première sortie mène, comme pour la pastille. `none` : le
+ * volume ne peut pas être réglé, et pourquoi (la réglette l'écrit). `note` : réglé, mais avec un
+ * bémol à dire (Windows n'a pas pris le réglage sur une sortie).
+ */
+export type RemoteVolumeState =
+  | {
+      /** 0 à 100. */
+      percent: number;
+      muted: boolean;
+      note?: string;
+    }
+  | { none: string };
 
 /** Volume simulé des essais : une sortie, 50 %. */
 const simulated: OutputVolume[] = [{ id: 'essai', level: 0.5, muted: false }];
 
+/**
+ * Les sorties de la configuration d'abord, puis la sortie par défaut de Windows et toute sortie où un
+ * programme joue : Edge et les applications ouvertes à la borne jouent sur la sortie par défaut, qui
+ * n'est pas forcément celle du fronton ou du plateau choisie à l'étape « Son ».
+ */
 export function readVolumes(ids: string[]): OutputVolume[] {
   if (OFFSCREEN) return simulated.map((o) => ({ ...o }));
-  return readEndpointVolumes(ids);
+  return readEndpointVolumes(ids, 'all');
 }
 
 export function writeVolumes(outputs: OutputVolume[]): void {
@@ -112,6 +126,8 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
   let latest: object | undefined;
   let hideTimer: NodeJS.Timeout | undefined;
   let failed = false;
+  /** Pourquoi la dernière lecture du son de Windows a échoué (dit au téléphone), undefined si elle a réussi. */
+  let readError: string | undefined;
   const captured = new Set<string>();
 
   function config() {
@@ -158,15 +174,24 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
 
   function readSafe(ids: string[]): OutputVolume[] {
     try {
-      return readVolumes(ids);
+      const read = readVolumes(ids);
+      readError = undefined;
+      return read;
     } catch (error) {
-      if (!failed) opts.log(`Volume de la borne : son de Windows illisible (${(error as Error).message}).`); // i18n-ignore : journal
+      readError = (error as Error).message;
+      if (!failed) opts.log(`Volume de la borne : son de Windows illisible (${readError}).`); // i18n-ignore : journal
       failed = true;
       return [];
     }
   }
 
-  function apply(command: VolumeCommand, c: { keys: CabinetButtons; outputs: string[] }): OutputVolume[] | undefined {
+  /** Le réglage appliqué, et ce qu'il faut en dire au téléphone si Windows ne l'a pas pris partout. */
+  interface Applied {
+    outputs: OutputVolume[];
+    note?: string;
+  }
+
+  function apply(command: VolumeCommand, c: { keys: CabinetButtons; outputs: string[] }): Applied | undefined {
     const now = readSafe(c.outputs);
     if (!now.length) return undefined;
     if (command === 'down') beforeDown = now;
@@ -175,10 +200,13 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
       writeVolumes(next);
     } catch (error) {
       opts.log(`Volume de la borne : réglage refusé par Windows (${(error as Error).message}).`); // i18n-ignore : journal
-      return now;
+      return { outputs: now, note: t('Windows a refusé le réglage du volume : {raison}', { raison: (error as Error).message }) };
     }
+    // Relecture : un pilote qui plafonne ou une sortie disparue ne doivent pas laisser une réglette qui ne fait rien.
+    const missed = unappliedOutputs(next, readSafe(c.outputs));
+    if (missed.length) opts.log(`Volume de la borne : Windows n'a pas pris le réglage sur ${missed.length}/${next.length} sortie(s) (${missed.map((o) => o.id).join(', ')}).`); // i18n-ignore : journal
     show(next, command, c.keys);
-    return next;
+    return { outputs: next, ...(missed.length ? { note: t('Windows n’a pas pris le réglage sur {n} sortie(s) audio sur {total} : le volume peut ne pas changer partout.', { n: missed.length, total: next.length }) } : {}) };
   }
 
   function show(outputs: OutputVolume[], command: VolumeCommand | 'windows' | 'reminder', keys: CabinetButtons): void {
@@ -255,9 +283,12 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
     },
     remote(command) {
       const c = config();
-      const outputs = command === 'read' ? readSafe(c.outputs) : apply(command, c);
-      const lead = outputs?.[0];
-      return lead ? { percent: Math.round(lead.level * 100), muted: lead.muted } : undefined;
+      const applied: Applied | undefined = command === 'read' ? { outputs: readSafe(c.outputs) } : apply(command, c);
+      const lead = applied?.outputs[0];
+      if (lead) return { percent: Math.round(lead.level * 100), muted: lead.muted, ...(applied.note ? { note: applied.note } : {}) };
+      return {
+        none: readError ? t('Le son de la borne ne se règle pas d’ici : Windows ne répond pas ({raison}).', { raison: readError }) : t('Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.'),
+      };
     },
     stop() {
       clearInterval(timer);

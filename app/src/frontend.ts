@@ -1388,7 +1388,7 @@ const phoneRemote = createPhoneRemote({
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
   fromSources: !app.isPackaged,
   // Le volume de la borne au téléphone : le même réglage que ses boutons de volume (cabinet-volume.ts).
-  volume: (command) => cabinetVolume?.remote(command),
+  volume: (command) => cabinetVolume?.remote(command) ?? { none: t('Le son de la borne ne se règle pas d’ici : aucune sortie audio trouvée.') },
 });
 // Retours des joueurs (feedback-service.ts) : propositions publiques, votes, rapports privés chiffrés.
 // La clé du joueur (réseau des amis) signe les propositions et les votes : une voix par borne.

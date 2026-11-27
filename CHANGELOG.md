@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Télécommande : le volume règle aussi le son d'Edge et des applications ouvertes à la borne. Il ne réglait que les sorties choisies à l'étape "Son" (fronton, plateau) ; Edge joue sur la sortie par défaut de Windows, qui peut être une autre, d'où une barre de son et un Muet sans effet. Le volume suit maintenant, du même écart, la sortie par défaut et toute sortie où un programme joue.
+- Télécommande : la réglette du volume dit pourquoi le son ne bouge pas (Windows ne répond pas, aucune sortie audio, ou réglage non pris par une sortie) au lieu de rester muette.
 - Nouveautés : la recherche dans le Menu système et les animations des LED ont chacune une illustration schématique, lisible dans la vignette de la chronologie (celle de la recherche était rognée en bande vide).
 - Télécommande, navigateur de la borne : le pavé tactile rappelle, sous ses consignes, qu'on peut passer au miroir (icône écran de la barre du bas) ; le rappel n'apparaît que lorsque le miroir est possible.
 - Applications : le navigateur de la borne (Edge) ouvre désormais chaque site à 200 % de zoom, pour que les textes se lisent sur le grand écran du playfield. Nouveau réglage « Zoom de la page » dans les réglages de chaque application (Start maintenu 1 s sur sa tuile) : Start passe de 100 % à 300 % par pas (100, 125, 150, 175, 200, 250, 300) ; le choix se retient pour l'application. Le miroir du téléphone n'est pas touché.

@@ -109,6 +109,18 @@ export function volumeOutputIds(audio: CabinetAudio | undefined): string[] {
   return [...new Set([audio.roles.backglass, audio.roles.playfield].filter((id): id is string => Boolean(id)))];
 }
 
+/**
+ * Sorties où Windows n'a pas pris le réglage demandé : une relecture juste après l'écriture ne rend
+ * pas le niveau ou l'état muet voulu (pilote qui plafonne, sortie disparue, réglage verrouillé). Sert
+ * au téléphone à dire pourquoi le volume ne bouge pas, au lieu d'une réglette qui ne fait rien.
+ */
+export function unappliedOutputs(wanted: readonly OutputVolume[], actual: readonly OutputVolume[]): OutputVolume[] {
+  return wanted.filter((w) => {
+    const got = actual.find((a) => a.id === w.id);
+    return !got || got.muted !== w.muted || Math.abs(got.level - w.level) > 0.02;
+  });
+}
+
 /** Taille de la pastille vue du joueur, sur un plateau de 1 080 px de petit côté, au milieu du haut du plateau. */
 export const VOLUME_BADGE_SIZE = { width: 600, height: 104, margin: 28 } as const;
 
