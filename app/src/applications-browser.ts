@@ -18,6 +18,7 @@ import {
   appBrowserArgs,
   appMobile,
   appZoom,
+  blockEdgeTranslate,
   appButtonKey,
   appSeekKeyCount,
   chromeExePaths,
@@ -116,6 +117,7 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
     if (!found) return undefined;
     current?.finish();
     fs.mkdirSync(profile, { recursive: true });
+    blockEdgeTranslate(profile);
     // Edge est l'application elle-même : sa fenêtre doit se voir.
     const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app), appZoom(app))], { stdio: 'ignore' }); // fenêtre voulue
     child.once('error', () => undefined);

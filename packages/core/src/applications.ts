@@ -618,6 +618,38 @@ export function appBrowserArgs(profile: string, at: ScreenRect, url: string, mob
   ];
 }
 
+/**
+ * Préférences d'un profil d'Edge où la traduction est refusée (« Proposer de traduire les pages » décoché),
+ * à écrire avant chaque lancement : second verrou après --disable-features, qui change de nom d'une version
+ * d'Edge à l'autre. Le reste du fichier est gardé ; un fichier illisible est repris à neuf.
+ */
+export function withoutTranslatePrefs(current: unknown): Record<string, unknown> {
+  const prefs: Record<string, unknown> = current && typeof current === 'object' && !Array.isArray(current) ? { ...(current as Record<string, unknown>) } : {};
+  const translate = prefs.translate && typeof prefs.translate === 'object' ? (prefs.translate as Record<string, unknown>) : {};
+  prefs.translate = { ...translate, enabled: false };
+  return prefs;
+}
+
+/** Écrit ces préférences dans <profil>\Default\Preferences ; sans effet (et sans erreur) si le fichier ne s'écrit pas. */
+export function blockEdgeTranslate(profile: string): boolean {
+  try {
+    const file = path.join(profile, 'Default', 'Preferences');
+    let current: unknown;
+    try {
+      current = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      current = undefined;
+    }
+    const next = withoutTranslatePrefs(current);
+    if (JSON.stringify(current) === JSON.stringify(next)) return true;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    writeFileAtomic(file, JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Playfield en portrait
 

@@ -59,8 +59,15 @@ export function edgeExePaths(env: Record<string, string | undefined>): string[] 
   return [...new Set(roots.map((r) => `${r.replace(/[\\/]+$/, '')}\\Microsoft\\Edge\\Application\\msedge.exe`))];
 }
 
-/** Réglages communs : pas d'accueil, pas de synchronisation, pas de connexion implicite au compte Microsoft de Windows. */
-export const EDGE_QUIET_ARGS: readonly string[] = ['--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-features=msImplicitSignin,msEdgeSidebarV2,msShoppingExp,msUndersideButton', '--no-service-autorun'];
+/**
+ * Fonctions d'Edge coupées sur la borne. Un seul --disable-features compte (le dernier l'emporte) : tout tient
+ * dans cette liste. Traduction (bulle « Traduire cette page ? », Microsoft Translator) : jamais, la fenêtre d'une
+ * application n'a personne pour la fermer.
+ */
+export const EDGE_DISABLED_FEATURES: readonly string[] = ['msImplicitSignin', 'msEdgeSidebarV2', 'msShoppingExp', 'msUndersideButton', 'Translate', 'TranslateUI', 'TranslateSubFrames', 'msEdgeTranslate', 'msTranslatorUI'];
+
+/** Réglages communs : pas d'accueil, pas de synchronisation, pas de connexion implicite au compte Microsoft de Windows, pas de traduction. */
+export const EDGE_QUIET_ARGS: readonly string[] = ['--no-first-run', '--no-default-browser-check', '--disable-sync', `--disable-features=${EDGE_DISABLED_FEATURES.join(',')}`, '--no-service-autorun'];
 
 export interface ScreenRect {
   x: number;

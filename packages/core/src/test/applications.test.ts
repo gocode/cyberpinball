@@ -19,6 +19,8 @@ import {
   APP_ZOOM_MIN,
   APP_ZOOM_STEPS,
   appBrowserArgs,
+  blockEdgeTranslate,
+  withoutTranslatePrefs,
   appIconDue,
   appIdFor,
   appMobile,
@@ -579,6 +581,35 @@ test('affichage mobile : oui sur le playfield, non sur le fronton sans choix ; l
   // Les événements tactiles vont avec lui (le miroir du téléphone injecte un doigt), et seulement avec lui.
   assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes('--touch-events=enabled'));
   assert.equal(appBrowserArgs('p', at, 'https://a.example.com/', false).includes('--touch-events=enabled'), false);
+});
+
+// Invariant : la fenêtre d'une application n'a personne pour fermer la bulle « Traduire cette page ? » ;
+// Edge n'en propose jamais (drapeau, et préférence du profil en second verrou).
+test('Edge des applications : traduction coupée par le drapeau et par le profil', () => {
+  const at = { x: 0, y: 0, width: 1920, height: 1080 };
+  const flags = appBrowserArgs('p', at, 'https://a.example.com/').filter((a) => a.startsWith('--disable-features='));
+  assert.equal(flags.length, 1, 'un seul --disable-features : le dernier écraserait les autres');
+  assert.match(flags[0]!, /(^|[=,])Translate(,|$)/);
+  assert.match(flags[0]!, /TranslateUI/);
+  assert.match(flags[0]!, /msImplicitSignin/, 'les anciens réglages restent');
+  // Préférences : le reste du fichier est gardé, un fichier cassé est repris.
+  assert.deepEqual(withoutTranslatePrefs({ a: 1, translate: { x: 2, enabled: true } }), { a: 1, translate: { x: 2, enabled: false } });
+  assert.deepEqual(withoutTranslatePrefs(undefined), { translate: { enabled: false } });
+  assert.deepEqual(withoutTranslatePrefs([1]), { translate: { enabled: false } });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-edge-prefs-'));
+  try {
+    assert.equal(blockEdgeTranslate(dir), true);
+    const file = path.join(dir, 'Default', 'Preferences');
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { translate: { enabled: false } });
+    fs.writeFileSync(file, JSON.stringify({ browser: { x: 1 }, translate: { enabled: true } }));
+    assert.equal(blockEdgeTranslate(dir), true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { browser: { x: 1 }, translate: { enabled: false } });
+    fs.writeFileSync(file, '{ cassé');
+    assert.equal(blockEdgeTranslate(dir), true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { translate: { enabled: false } });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('zoom de la page : 200 % d\'office sur le playfield, 100 % au fronton, borné de 100 à 300, écrit seulement quand on le change ; Edge reçoit le facteur d\'échelle, jamais un port de débogage', () => {

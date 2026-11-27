@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications: Edge no longer ever offers to translate the page (no more "Translate this page?" bubble getting in the way at the cabinet); translation is turned off on every launch, including the Juke-box sign-in.
 - Framing: Cyber Pinball no longer offers on its own to change a table's framing. The one it already has (taken over from PinUP Popper or another installation, a view set for it, a POV) is no longer questioned by "What's missing to play", and no other framing or community POV is put forward there. To change it, "Point of view" in the table sheet shows each framing on the table and keeps the previous one.
 - Table diagnosis: "Fix all" never touches the framing anymore, and a framing finding leads to "Point of view" instead of a one-press fix. Only a table that is really sideways on your cabinet (direction checked) is still offered to be turned the right way.
 - Tables taken over from PinUP Popper: the VPX that played each table is now found correctly (its emulator's folder and launch script, 10.7 or 10.8). Without it, Popper's framing was kept for no table Popper knew, neither when added nor in the catch-up.
