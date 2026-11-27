@@ -34,13 +34,14 @@
 // positions se comptent en pixels depuis le coin haut gauche de l'écran principal (le bureau de
 // Windows, des valeurs négatives sont possibles), le jeu reste sur l'écran principal, et « Reload
 // Configuration » relit le fichier. Cyber Pinball y écrit, avant chaque partie, l'activation et la place
-// de la fenêtre du DMD d'après ses propres écrans ; il ne touche à rien d'autre (MonitorNumber, dont
+// des fenêtres du DMD et du fronton d'après ses propres écrans ; il ne touche à rien d'autre (MonitorNumber, dont
 // rien ne documente le sens, ExternalDevice, Padding, taille des points…).
 //
-// Fronton (retour d'un joueur sur sa borne, 20/11/2026) : une seule image, le média Backglass choisi à l'ajout de la
-// table, affiché par la fenêtre du fronton de Cyber Pinball comme avant le mode borne. La fenêtre du
-// fronton de Pinball FX ([BackglassWindow]) est donc éteinte : sur un PinCab, elle se posait par-dessus
-// et montrait Table_<n>.png, ou, l'image absente (table choisie dans le jeu, menus), le chemin du fichier.
+// Fronton (décision du 27/11/2026, qui remplace celle du 20/11) : comme pour tous les jeux, la roue
+// montre les médias de Cyber Pinball, et pendant la partie Pinball FX affiche ce qu'il a lui-même (fronton,
+// DMD, playfield). Sa fenêtre du fronton ([BackglassWindow]) est donc allumée et posée sur l'écran du
+// fronton. Elle n'affiche que Table_<n>.png (pas de fronton propre au jeu) : frontend.ts ne lui donne la zone
+// du fronton que si cette image est là (pinballfx-backglass.ts). Du 20 au 27/11 elle était toujours éteinte.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -88,8 +89,8 @@ export function pinballFxCabinetLayout(roles: { dmd?: DesktopRect; backglass?: D
 }
 
 /**
- * Texte de Settings.ini avec le mode borne activé, la fenêtre du DMD à sa place et celle du fronton
- * éteinte (le fronton de Cyber Pinball reste seul, voir plus haut) ; undefined si rien ne change. Le
+ * Texte de Settings.ini avec le mode borne activé, les fenêtres du DMD et du fronton du jeu à leur place
+ * (celle du fronton éteinte si la borne n'a pas d'écran du fronton) ; undefined si rien ne change. Le
  * reste du fichier est gardé tel quel (IniDocument).
  */
 export function pinballFxSettingsWithCabinet(text: string, layout: PinballFxCabinetLayout): string | undefined {
@@ -107,8 +108,16 @@ export function pinballFxSettingsWithCabinet(text: string, layout: PinballFxCabi
     set('DotMatrixWindow', 'Width', String(Math.max(1, Math.round(rect.width))));
     set('DotMatrixWindow', 'Height', String(Math.max(1, Math.round(rect.height))));
   }
-  // Une seule image sur le fronton : celle de Cyber Pinball. Celle du jeu ne se superpose plus.
-  set('BackglassWindow', 'Enabled', 'False');
+  // Pendant la partie, le jeu affiche ses propres éléments, comme tous les jeux : sa fenêtre du fronton sur
+  // l'écran du fronton (la fenêtre du front-end passe derrière, game-screens.ts). Borne sans fronton : éteinte.
+  if (layout.backglass) {
+    const rect = layout.backglass;
+    set('BackglassWindow', 'Enabled', 'True');
+    set('BackglassWindow', 'PositionX', String(Math.round(rect.x)));
+    set('BackglassWindow', 'PositionY', String(Math.round(rect.y)));
+    set('BackglassWindow', 'Width', String(Math.max(1, Math.round(rect.width))));
+    set('BackglassWindow', 'Height', String(Math.max(1, Math.round(rect.height))));
+  } else set('BackglassWindow', 'Enabled', 'False');
   const next = doc.toString();
   return next === text ? undefined : next;
 }

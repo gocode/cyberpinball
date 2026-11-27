@@ -169,7 +169,7 @@ export interface LibraryHost {
   quit(): void;
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
-  /** Flippers, Start et Exit du jeu pour le sélecteur local, même si le menu a ses propres boutons. */
+  /** Sélecteur des joueurs : flippers, Start et Exit du jeu, plus les boutons de l'interface (Valider, Retour…) quand ils sont ailleurs (playerPickerKeys). */
   playerModeKeys?(): NavigationKeys;
   /** Touches qui basculent entre la liste de contenu d'un écran et ses actions : les MagnaSave, F6 (zoneSwitchKeys). */
   zoneKeys?(): string[];

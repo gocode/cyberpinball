@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Pinball FX sur une borne : pendant la partie, l'écran du fronton montre le fronton de la table, affiché par le jeu lui-même, comme pour les autres jeux. Cyber Pinball lui donne l'image de fronton de la table (Table_<numéro>.png) et allume sa fenêtre du fronton sur ton écran du fronton. Une table sans image de fronton garde celui de Cyber Pinball, jamais un chemin de fichier.
+- Pinball FX et Pinball FX Midnight : au choix du nombre de joueurs, ton bouton Valider valide aussi, et ton bouton Retour revient à la fiche, comme Start et Exit. Sur une borne où Valider et Retour sont d'autres boutons (les MagnaSave, par exemple), seul Start validait.
 - Tables reprises de PinUP Popper, PinballY ou d'un dossier de VPX : leur cadrage d'origine est maintenant gardé, quel que soit le chemin de l'ajout (dossier, archive, glisser-déposer), pas seulement depuis l'écran de reprise d'une installation.
 - Les tables reprises avant cette version retrouvent une fois le cadrage qu'elles avaient dans leur installation d'origine, sauf si tu en as choisi un dans Cyber Pinball. Le cadrage d'avant reste dans l'historique : « Point de vue » > « Rétablir le cadrage précédent » le remet.
 - Un réglage fait en partie dans le menu de VPX est désormais gardé dans l'historique du cadrage, et n'est plus jamais remplacé.

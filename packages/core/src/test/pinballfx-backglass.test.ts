@@ -1,6 +1,6 @@
 // Frontons des jeux de Zen autour de la partie (app/src/frontend.ts, playPinballFx) : mode borne de Pinball FX
-// (Settings.ini), DMD virtuel de dmdext, image de la table de FX3. Pinball FX ne reçoit plus d'image de fronton
-// (décision du 20/11/2026 : sa fenêtre du fronton est fermée, celle de Cyber Pinball montre le média de la table).
+// (Settings.ini), DMD virtuel de dmdext, image de la table de FX3. Pinball FX reçoit Table_<n>.png, le fronton de
+// la table, et sa fenêtre du fronton est allumée sur l'écran du fronton quand l'image existe (27/11/2026).
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -40,7 +40,7 @@ const SETTINGS = [
   '',
 ].join('\r\n');
 
-test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, fronton du jeu éteint, le reste gardé', () => {
+test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, fronton du jeu sur l’écran du fronton, le reste gardé', () => {
   // Borne de l'essai : FullDMD 1920 × 1080 en (3840, 90), fronton en (5760, 101).
   const layout = pinballFxCabinetLayout({ dmd: { x: 3840, y: 90, width: 1920, height: 1080 }, backglass: { x: 5760, y: 101, width: 1920, height: 1080 } }, 'fulldmd');
   assert.deepEqual(layout.dmd, { x: 3840, y: 390, width: 1920, height: 480 }, 'les valeurs validées sur le PinCab pour FX3');
@@ -52,12 +52,21 @@ test('mode borne de Pinball FX : activé, DMD sur la bande 4:1 du FullDMD, front
   const doc = IniDocument.parse(next);
   assert.equal(doc.get('General', 'CabinetEnabled'), 'True');
   assert.deepEqual(['PositionX', 'PositionY', 'Width', 'Height'].map((k) => doc.get('DotMatrixWindow', k)), ['3840', '390', '1920', '480']);
-  // Une seule image sur le fronton, le média choisi à l'ajout de la table (retour d'un joueur, 20/11/2026) :
-  // la fenêtre du fronton du jeu ne se superpose plus à celle de Cyber Pinball.
-  assert.equal(doc.get('BackglassWindow', 'Enabled'), 'False');
-  assert.equal(pinballFxSettingsWithCabinet(SETTINGS, { backglass: layout.backglass! })?.includes('[BackglassWindow]'), true);
-  assert.equal(IniDocument.parse(pinballFxSettingsWithCabinet(SETTINGS, { backglass: layout.backglass! })!).get('BackglassWindow', 'Enabled'), 'False', 'même sans DMD');
-  // Rien d'autre ne bouge : numéro d'écran, DMD externe, marges, mise en forme, fins de ligne.
+  // Pendant la partie, le jeu affiche son propre fronton, comme tous les jeux (décision du 27/11/2026) : sa fenêtre
+  // du fronton allumée et posée sur l'écran du fronton. Éteinte, l'écran ne montrait que la carte texte de la table.
+  assert.equal(doc.get('BackglassWindow', 'Enabled'), 'True');
+  assert.deepEqual(['PositionX', 'PositionY', 'Width', 'Height'].map((k) => doc.get('BackglassWindow', k)), ['5760', '101', '1920', '1080']);
+  const alone = IniDocument.parse(pinballFxSettingsWithCabinet(SETTINGS, { backglass: layout.backglass! })!);
+  assert.equal(alone.get('BackglassWindow', 'Enabled'), 'True', 'même sans DMD');
+  assert.equal(alone.get('BackglassWindow', 'PositionX'), '5760');
+  // Borne sans écran du fronton : la fenêtre du jeu éteinte, jamais posée au hasard.
+  const noBackglass = IniDocument.parse(pinballFxSettingsWithCabinet(SETTINGS, { dmd: layout.dmd! })!);
+  assert.equal(noBackglass.get('BackglassWindow', 'Enabled'), 'False');
+  assert.equal(noBackglass.get('BackglassWindow', 'PositionX'), '0', 'position non touchée');
+  // Rien d'autre ne bouge : numéro d'écran, DMD externe, mise à l'échelle, marges, mise en forme, fins de ligne.
+  assert.equal(doc.get('BackglassWindow', 'MonitorNumber'), '1');
+  assert.equal(doc.get('BackglassWindow', 'ExternalDevice'), 'False');
+  assert.equal(doc.get('BackglassWindow', 'ScaleType'), 'BestFit');
   assert.equal(doc.get('DotMatrixWindow', 'MonitorNumber'), '0');
   assert.equal(doc.get('DotMatrixWindow', 'ExternalDevice'), 'True');
   assert.match(next, /\r\nPadding=\(Left=0\.000000,Top=0\.000000,Right=0\.000000,Bottom=0\.000000\)\r\n/);
@@ -97,7 +106,7 @@ test('mode borne de Pinball FX : fichier écrit seulement s’il existe, UTF-16 
   assert.equal(applyPinballFxCabinet(dir, layout), file);
   const raw = fs.readFileSync(file);
   assert.deepEqual([...raw.subarray(0, 2)], [0xff, 0xfe]);
-  assert.match(raw.subarray(2).toString('utf16le'), /\[BackglassWindow\]\r\nEnabled=False\r\n/);
+  assert.match(raw.subarray(2).toString('utf16le'), /\[BackglassWindow\]\r\nEnabled=True\r\nPriority=1\r\nMonitorNumber=1\r\nPositionX=1920\r\n/);
   assert.equal(applyPinballFxCabinet(dir, layout), undefined);
 });
 
@@ -111,6 +120,8 @@ test('frontend.ts : le mode borne de Pinball FX est écrit avant le lancement, d
   const watch = body.indexOf('placeVirtualDmd(');
   assert.ok(watch > 0 && body.slice(watch - 400, watch).includes("zenKey === 'pinballfx'"));
   assert.match(body, /clearInterval\(virtualDmdWatch\)/, 'arrêté à la fin de la partie');
+  // Les écrans où le jeu dessine (fronton, DMD) lui sont laissés : son processus est suivi par watchOccupied.
+  assert.match(body, /watchOccupied\([^;]*pids: \(\) => \[game\.pid/);
 });
 
 test('frontend.ts : l’image de la table de FX3 est posée avant le lancement, et devient le fronton de la table s’il lui manque', () => {
@@ -128,10 +139,63 @@ test('frontend.ts : l’image de la table de FX3 est posée avant le lancement, 
   assert.match(body.slice(all, all + 200), /downloads: library\.downloads\.manager/, 'suivi dans les téléchargements');
 });
 
-test('Pinball FX : plus d’image de fronton déposée pour le jeu (Table_<n>.png, PFX.png), celle de Cyber Pinball reste', () => {
-  // 20/11/2026 : une table choisie dans le jeu restait sans image et le jeu écrivait le chemin cherché.
+interface BackglassModule {
+  placePinballFxBackglass(install: { cabinetDir: string }, tableId: number, source: string | undefined, toPng?: (file: string) => Buffer): { result: 'placed' | 'present' | 'no-media' | 'failed'; target: string; reason?: string };
+  placePinballFxHomeBackglass(install: { cabinetDir: string }, source: string | undefined, toPng?: (f: string) => Buffer, blank?: () => Buffer): { result: string; target: string };
+}
+
+test('fronton de Pinball FX : Table_<numéro>.png déposé, converti en PNG, jamais remplacé', () => {
+  // Le jeu n'a pas de fronton à lui : sans cette image, sa fenêtre écrit le chemin cherché (PinCab, 27/11/2026).
+  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-backglass.js')) as BackglassModule;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pfx-fronton-'));
+  const cabinetDir = path.join(root, 'PinballFX', 'Mods', 'Cabinet');
+  const medias = path.join(root, 'medias');
+  fs.mkdirSync(medias, { recursive: true });
+  fs.writeFileSync(path.join(medias, '(Backglass) AFM.png'), 'PNG-AFM');
+  fs.writeFileSync(path.join(medias, '(Backglass) BTTF.jpg'), 'JPG-BTTF');
+  fs.writeFileSync(path.join(medias, '(Backglass) Video.mp4'), 'MP4');
+  const converted: string[] = [];
+  const toPng = (file: string) => (converted.push(file), Buffer.from('PNG-CONVERTI'));
+  const afm = app.placePinballFxBackglass({ cabinetDir }, 119, path.join(medias, '(Backglass) AFM.png'), toPng);
+  assert.deepEqual([afm.result, path.basename(afm.target)], ['placed', 'Table_119.png']);
+  assert.equal(fs.readFileSync(afm.target, 'utf8'), 'PNG-AFM', 'un PNG copié tel quel');
+  const bttf = app.placePinballFxBackglass({ cabinetDir }, 97, path.join(medias, '(Backglass) BTTF.jpg'), toPng);
+  assert.equal(fs.readFileSync(bttf.target, 'utf8'), 'PNG-CONVERTI', 'autre format converti : le jeu ne lit que le PNG');
+  assert.deepEqual(converted.map((f) => path.basename(f)), ['(Backglass) BTTF.jpg']);
+  fs.writeFileSync(afm.target, 'IMAGE-DU-JOUEUR');
+  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 119, path.join(medias, '(Backglass) AFM.png'), toPng).result, 'present');
+  assert.equal(fs.readFileSync(afm.target, 'utf8'), 'IMAGE-DU-JOUEUR', 'jamais remplacée');
+  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 5, undefined, toPng).result, 'no-media');
+  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 6, path.join(medias, '(Backglass) Video.mp4'), toPng).result, 'no-media');
+  assert.equal(app.placePinballFxBackglass({ cabinetDir }, 7, path.join(medias, '(Backglass) BTTF.jpg'), () => Buffer.alloc(0)).result, 'failed');
+  assert.ok(!fs.existsSync(path.join(cabinetDir, 'Table_6.png')) && !fs.existsSync(path.join(cabinetDir, 'Table_7.png')));
+});
+
+test('fronton des menus de Pinball FX (PFX.png) : défaut de la borne, sinon noir, jamais remplacé', () => {
+  const app = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-backglass.js')) as BackglassModule;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pfx-menus-'));
+  const cabinetDir = path.join(root, 'PinballFX', 'Mods', 'Cabinet');
+  const black = () => Buffer.from('PNG-NOIR');
+  const first = app.placePinballFxHomeBackglass({ cabinetDir }, undefined, undefined, black);
+  assert.deepEqual([first.result, path.basename(first.target)], ['placed', 'PFX.png']);
+  assert.equal(fs.readFileSync(first.target, 'utf8'), 'PNG-NOIR');
+  fs.writeFileSync(first.target, 'IMAGE-DU-JOUEUR');
+  assert.equal(app.placePinballFxHomeBackglass({ cabinetDir }, undefined, undefined, black).result, 'present');
+  fs.rmSync(first.target);
+  const def = path.join(root, '(Backglass).png');
+  fs.writeFileSync(def, 'PNG-DEFAUT');
+  app.placePinballFxHomeBackglass({ cabinetDir }, def, undefined, black);
+  assert.equal(fs.readFileSync(first.target, 'utf8'), 'PNG-DEFAUT');
+});
+
+test('frontend.ts : fronton de Pinball FX déposé d’après le média de la table, fenêtre du jeu allumée seulement avec son image', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
-  assert.ok(!/placePinballFx(Home)?Backglass\(/.test(src));
-  const mod = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'pinballfx-backglass.ts'), 'utf8');
-  assert.ok(!/Table_|PFX\.png['"]/.test(mod.replace(/^\/\/.*$/gm, '')), 'plus de nom de fichier de Pinball FX hors des commentaires');
+  const body = src.slice(src.indexOf('async function playPinballFx('));
+  const at = body.indexOf('placePinballFxBackglass(');
+  assert.ok(at > 0 && at < body.indexOf('applyPinballFxCabinet(') && at < body.indexOf('launchPinballFx('), 'avant les réglages et le lancement');
+  assert.match(body.slice(at - 400, at), /resolveMedia\(table, loc\.root, 'Backglass'\)/);
+  assert.match(body.slice(at - 400, at), /source !== 'default'/, 'le média de la table, pas l’affichage par défaut');
+  // Sans image de la table, pas de zone du fronton donnée au mode borne : la fenêtre du jeu reste éteinte.
+  assert.match(body, /tableImage = placed\.result === 'placed' \|\| placed\.result === 'present'/);
+  assert.match(body, /const backglassRect = tableImage \? rectOf\('backglass'\) : undefined/);
 });

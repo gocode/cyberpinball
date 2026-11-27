@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Pinball FX on a cabinet: during the game, the backglass screen shows the table's backglass, displayed by the game itself, like other games. Cyber Pinball gives it the table's backglass image (Table_<number>.png) and turns on its backglass window on your backglass screen. A table without a backglass image keeps Cyber Pinball's, never a file path.
+- Pinball FX and Pinball FX Midnight: on the player count choice, your Confirm button now confirms too, and your Back button returns to the table page, like Start and Exit. On a cabinet where Confirm and Back are other buttons (the MagnaSave, for example), only Start confirmed.
 - Tables taken over from PinUP Popper, PinballY or a VPX folder: their original framing is now kept whatever the way they were added (folder, archive, drag and drop), not only from the installation takeover screen.
 - Tables taken over before this version get back, once, the framing they had in their original installation, unless you chose one in Cyber Pinball. The previous framing stays in the history: "Point of view" > "Restore the previous framing" puts it back.
 - A setting made in game in the VPX menu is now kept in the framing history, and is never replaced.

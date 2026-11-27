@@ -853,6 +853,22 @@ export function navigationKeys(source: ButtonsSource, vertical = true): Navigati
 }
 
 /**
+ * Touches du sélecteur des joueurs de Pinball FX (pinballfx-modes.ts) : flippers, Start et Exit du
+ * jeu, plus les boutons Précédent, Suivant, Valider et Retour de l'interface quand ils sont ailleurs.
+ * 27/11/2026, sur un PinCab dont Valider et Retour sont les MagnaSave : seul Start validait le choix.
+ * Un bouton qui a déjà un rôle du jeu dans ce sélecteur le garde (jamais deux rôles pour une touche).
+ */
+export function playerPickerKeys(source: ButtonsSource): NavigationKeys {
+  const game = navigationKeys({ buttons: source?.buttons });
+  const ui = navigationKeys(source);
+  const groups = Object.keys(game) as (keyof NavigationKeys)[];
+  const taken = new Set(groups.flatMap((g) => game[g]));
+  const result = {} as NavigationKeys;
+  for (const g of groups) result[g] = [...game[g], ...ui[g].filter((k) => !taken.has(k))];
+  return result;
+}
+
+/**
  * Touches de toute l'interface : navigation, puis aide-mémoire (H, F1), réglages de VPX (R) et
  * Bureau Windows (son seul bouton : Ctrl+Maj+D, raccourci du clavier, se lit à part, SHORTCUTS).
  */

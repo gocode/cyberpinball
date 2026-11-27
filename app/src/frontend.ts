@@ -64,6 +64,7 @@ import {
   keyLabel,
   interfaceKeys,
   navigationKeys,
+  playerPickerKeys,
   collectionKeys as cabinetCollectionKeys,
   menuButton,
   zoneSwitchKeys,
@@ -373,6 +374,7 @@ import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingS
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { lastLaunchLogPath, rememberLaunch } from './launch-evidence';
 import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
+import { placePinballFxBackglass, placePinballFxHomeBackglass } from './pinballfx-backglass';
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
 import { placePinballFxPlayfield } from './pinballfx-playfield';
 import { detectPinballFx, detectPinballFx3, detectPinballFxMidnight } from './pinballfx-install';
@@ -1670,7 +1672,7 @@ const library = createLibrary({
   framing: () => framingHost,
   quit: () => void quit(),
   keys: () => KEYS,
-  playerModeKeys: () => navigationKeys({ buttons }),
+  playerModeKeys: () => playerPickerKeys({ buttons, navigation }),
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   windows: () => windows,
   landscape: () => playfieldLandscape(),
@@ -6083,9 +6085,33 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   }
   // Pinball FX : son mode borne activé, fenêtres du DMD et du fronton posées sur les écrans de la borne (pinballfx-cabinet.ts).
   if (simulated === undefined && zenKey === 'pinballfx' && fx) {
+    // Le jeu n'a pas de fronton à lui : sa fenêtre montre Table_<n>.png, déposé ici depuis le fronton de la
+    // table (pinballfx-backglass.ts), et PFX.png dans ses menus. Sans image de la table, la fenêtre reste
+    // éteinte : elle écrirait le chemin cherché (capture du 27/11/2026), le fronton de Cyber Pinball reste.
+    let tableImage = false;
+    if (table.pinballFxTable !== undefined && loc.root) {
+      const own = resolveMedia(table, loc.root, 'Backglass');
+      const source = own.source !== 'default' && own.source !== 'fallback' ? own.file : undefined;
+      const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
+      tableImage = placed.result === 'placed' || placed.result === 'present';
+      if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
+      else if (placed.result === 'no-media') console.log(`${zenName} (${table.id}) : pas d'image de fronton pour la table, fenêtre du fronton du jeu éteinte.`); // i18n-ignore : journal
+      else if (placed.result === 'failed') console.log(`${zenName} (${table.id}) : fronton pas déposé (${placed.reason}) ; fenêtre du fronton du jeu éteinte.`); // i18n-ignore : journal
+      if (tableImage) {
+        let defaults: string[] = [];
+        try {
+          defaults = fs.readdirSync(layoutOf(loc.root).media).filter((f) => /^\(Backglass\)/i.test(f) && mediaKind(f) === 'image');
+        } catch {
+          defaults = [];
+        }
+        const home = placePinballFxHomeBackglass(fx, defaults[0] ? path.join(layoutOf(loc.root).media, defaults[0]) : undefined);
+        if (home.result === 'placed') console.log(`${zenName} : fronton des menus déposé, ${home.target}${defaults[0] ? ` (depuis ${defaults[0]})` : ' (image noire)'}.`); // i18n-ignore : journal
+        else if (home.result === 'failed') console.log(`${zenName} : fronton des menus pas déposé (${home.reason}).`); // i18n-ignore : journal
+      }
+    }
     const rectOf = (role: RoleId) => roleRects.find((r) => r.role === role)?.rect;
     const dmdRect = rectOf('dmd');
-    const backglassRect = rectOf('backglass');
+    const backglassRect = tableImage ? rectOf('backglass') : undefined;
     const cabinetModel = loadCabinet(loc.dataDir);
     const layout = pinballFxCabinetLayout({ ...(dmdRect ? { dmd: dmdRect } : {}), ...(backglassRect ? { backglass: backglassRect } : {}) }, cabinetModel ? dmdKindOf(cabinetModel) : undefined);
     try {
@@ -6126,8 +6152,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     // Bibliothèques (.fpl) de la table absentes du jeu : remises si une autre installation les a, sinon dites ici.
     await logFuturePinballLibraries({ tableId: table.id, tableFile: table.file, install: fpInstall, ...(loc.root ? { downloadsDir: layoutOf(loc.root).downloads } : {}), log: (line) => console.log(line) });
   }
-  // Pinball FX : pas d'image de fronton déposée pour le jeu. Sa fenêtre du fronton est fermée dans son mode borne
-  // (décision du 20/11/2026) : le fronton de la borne reste celui de Cyber Pinball, le média de la table.
+  // Pinball FX : fronton de la table déposé plus haut (Table_<n>.png) ; watchOccupied laisse l'écran à sa fenêtre.
   // Pinball FX3 : l'image de la table pour sa fenêtre du fronton (data\steam\<table>.*), si elle n'en a pas ;
   // sans elle, FX3 y écrit le chemin qu'il cherche (essai du 20/11/2026). Le fronton de la table dans
   // Cyber Pinball d'abord, sinon le catalogue d'archive.org (pinballfx3-backglass.ts). Et l'inverse : une
