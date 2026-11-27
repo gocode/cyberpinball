@@ -374,6 +374,7 @@ import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launche
 import { lastLaunchLogPath, rememberLaunch } from './launch-evidence';
 import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
 import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
+import { placePinballFxPlayfield } from './pinballfx-playfield';
 import { detectPinballFx, detectPinballFx3, detectPinballFxMidnight } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
 import { fetchAllPinballFx3Backglasses, preparePinballFx3Backglass } from './pinballfx3-backglass';
@@ -6229,6 +6230,21 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           if (placed) console.log(`${zenName} (${table.id}) : DMD virtuel de dmdext posé sur l'écran DMD (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
         }, 1000)
       : undefined;
+  // Pinball FX ignore l'écran et la taille de ses réglages (plein écran fenêtré : il reste sur l'écran
+  // principal, essai du 27/11/2026) : sa fenêtre est posée sur l'écran du playfield (pinballfx-playfield.ts).
+  // Au plus 40 déplacements : un jeu qui reprendrait sa place à chaque fois ne se bat pas avec nous.
+  let playfieldMoves = 0;
+  const playfieldWatch =
+    simulated === undefined && command && zenKey === 'pinballfx' && !simulatedDisplays()
+      ? setInterval(() => {
+          if (playfieldMoves >= 40) return;
+          const placed = placePinballFxPlayfield(roleRects.find((r) => r.role === 'playfield')?.rect, () => listWindows((w) => w.visible), setWindowBounds);
+          if (placed) {
+            playfieldMoves++;
+            console.log(`${zenName} (${table.id}) : fenêtre du jeu posée sur l'écran du playfield (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal
+          }
+        }, 1000)
+      : undefined;
   // Pinball FX3 en mode borne : ses fenêtres du DMD et du fronton posées sur les écrans de ces rôles
   // (pinballfx3-windows.ts ; PinCab, 27/11/2026 : elles s'ouvraient décalées). Relues au passage suivant,
   // et signalées au journal si le jeu les remet ailleurs.
@@ -6274,6 +6290,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   const result = await game.done;
   if (dmdMirrorWatch) clearInterval(dmdMirrorWatch);
   if (virtualDmdWatch) clearInterval(virtualDmdWatch);
+  if (playfieldWatch) clearInterval(playfieldWatch);
   if (fx3PlacementWatch) clearInterval(fx3PlacementWatch);
   dmdMirror?.stop();
   const pupClosed = fp && simulated === undefined ? closePupStartedDuringGame(pupBefore, pupPlayerPids()) : [];

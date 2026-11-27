@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Pinball FX : sur une borne à plusieurs écrans, la fenêtre du jeu est maintenant posée sur l'écran du playfield, à sa taille, pendant la partie. Le jeu ignore l'écran et la taille écrits dans ses réglages et s'ouvrait toujours sur l'écran principal.
 - Télécommande, miroir de l'application : correction du balayage qui ne faisait rien (ni Facebook ni TikTok) : le téléphone annonçait la fin du geste à chaque message, le doigt injecté sur la borne était donc levé aussitôt et Edge n'y voyait qu'un appui. Le geste est maintenant continu du premier au dernier déplacement. La molette de repli se referme aussi après un silence du téléphone.
 - Journal de la borne : chaque balayage reçu de la télécommande laisse une ligne (au doigt ou à la molette, point de départ, taille de la fenêtre, nombre de messages, pixels parcourus, refus de Windows). Pas de ligne = le téléphone n'a rien envoyé.
 - Pinball FX3 en mode borne : Cyber Pinball place maintenant lui-même les fenêtres du DMD et du fronton sur les écrans de ces rôles, une fois la partie lancée. Avant, elles s'ouvraient où les réglages du jeu les avaient mises (DMD décentré, fronton décalé de 101 px et rogné en bas, relevé sur un PinCab). Rien à faire : si le jeu remet une fenêtre ailleurs malgré quatre essais, le journal le signale et Cyber Pinball la laisse. L'activation du mode borne et l'orientation restent à régler dans le jeu (ses réglages sont chiffrés).
