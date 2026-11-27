@@ -7,7 +7,9 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import {
   applyPinballFxRotation,
+  hasArrowMenus,
   pinballFxLocalSettingsFiles,
+  pinballFxMidnightCabinetDir,
   pinballFxRotationValue,
   pinballFxSettingsWithRotation,
   PINBALLFX3_EXTRA_KEYS,
@@ -136,6 +138,30 @@ test('borne au clavier, Pinball FX3 : chaque flipper reçoit en plus la flèche 
   assert.equal(zenKeyboardEchoes(PINSCAPE, 'pinballfx3').size, 0, 'flippers de joystick : zenJoystickKeys envoie déjà Maj et la flèche, rien en double');
   // Borne sans relevé des boutons : touches par défaut des encodeurs (Maj), doublées aussi.
   assert.ok(zenKeyboardEchoes(undefined, 'pinballfx3').size > 0);
+});
+
+// PinCab, 27/11/2026 : Pinball FX Midnight, impossible de naviguer aux flips (Maj seul, comme FX3 sans ses flèches).
+test('Pinball FX Midnight : flèches aux flippers pour ses menus, Maj gardé pour la partie, comme FX3', () => {
+  const keys = zenJoystickKeys(PINSCAPE, 'pinballfxmidnight');
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft']);
+  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight', 'ArrowRight']);
+  assert.deepEqual(keys.get(JOY(12)), ['Enter']);
+  assert.deepEqual([...zenKeyboardEchoes(KEYBOARD, 'pinballfxmidnight')], [['ShiftLeft', ['ArrowLeft']], ['ShiftRight', ['ArrowRight']]]);
+  assert.equal(hasArrowMenus('pinballfx'), false);
+});
+
+test('Pinball FX Midnight : dossier du mode borne et rotation dans le dossier PinballM', () => {
+  assert.equal(pinballFxMidnightCabinetDir({ gameDir: path.join('lib', 'Pinball M') }), path.join('lib', 'Pinball M', 'PinballM', 'Mods', 'Cabinet'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-pm-'));
+  try {
+    const dir = path.join(root, 'PinballM', 'Saved', 'PersistentDownloadDir', 'Steam');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'LocalSettings.cfg'), LOCAL_SETTINGS);
+    assert.deepEqual(applyPinballFxRotation(root, 270), [], 'Pinball FX : son dossier à lui, celui de Midnight n\'est pas touché');
+    assert.deepEqual(applyPinballFxRotation(root, 270, 'PinballM').map((c) => c.value), ['Rot_270']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('tremblements : Alt gauche, Alt droite, Espace, comme dans le jeu', () => {

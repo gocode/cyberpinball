@@ -173,9 +173,13 @@ export function pinballFxSettingsWithRotation(text: string, rotation: Rotation):
   return JSON.stringify(doc, null, '\t').replace(/\n/g, eol) + (/\r?\n$/.test(text) ? eol : '');
 }
 
-/** Fichiers de réglages de Pinball FX (un par boutique : Steam, Epic) sous %LOCALAPPDATA%. */
-export function pinballFxLocalSettingsFiles(localAppData: string): string[] {
-  const root = path.join(localAppData, 'PinballFX', 'Saved', 'PersistentDownloadDir');
+/**
+ * Fichiers de réglages de Pinball FX (un par boutique : Steam, Epic) sous %LOCALAPPDATA%. `appDir` : le
+ * dossier du jeu (« PinballFX » ; Midnight, même moteur et même arborescence, « PinballM », 27/11/2026,
+ * non relevé sur une borne : sans ce dossier, rien n'est écrit).
+ */
+export function pinballFxLocalSettingsFiles(localAppData: string, appDir = 'PinballFX'): string[] {
+  const root = path.join(localAppData, appDir, 'Saved', 'PersistentDownloadDir');
   let dirs: string[];
   try {
     dirs = fs.readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
@@ -196,11 +200,11 @@ export interface PinballFxRotationChange {
  * changés ; aucun si l'image est droite, si le jeu n'a encore jamais été ouvert (pas de fichier : il
  * l'écrira à sa première ouverture, la partie suivante le recevra) ou si tout est déjà réglé.
  */
-export function applyPinballFxRotation(localAppData: string, rotation: Rotation): PinballFxRotationChange[] {
+export function applyPinballFxRotation(localAppData: string, rotation: Rotation, appDir = 'PinballFX'): PinballFxRotationChange[] {
   const value = pinballFxRotationValue(rotation);
   if (!value) return [];
   const changed: PinballFxRotationChange[] = [];
-  for (const file of pinballFxLocalSettingsFiles(localAppData)) {
+  for (const file of pinballFxLocalSettingsFiles(localAppData, appDir)) {
     let text: string;
     try {
       text = fs.readFileSync(file, 'utf8');
@@ -245,6 +249,15 @@ export const PINBALLFX3_EXTRA_KEYS: Readonly<Partial<Record<ButtonId, string>>> 
   rightFlipper: 'ArrowRight',
 };
 
+/**
+ * Jeux de Zen dont les menus se parcourent aux flèches gauche et droite : Pinball FX3, et Pinball FX
+ * Midnight (27/11/2026, PinCab : ses flips ne permettaient pas de naviguer avec Maj seul, comme FX3).
+ * Pinball FX (2023) se parcourt aux flippers eux-mêmes.
+ */
+export function hasArrowMenus(game?: ZenGameKey): boolean {
+  return game === 'pinballfx3' || game === 'pinballfxmidnight';
+}
+
 /** Touches d'un rôle dans le jeu de Zen `game` (sans jeu précisé : celles de Pinball FX). */
 export function zenGameKeys(game?: ZenGameKey): Partial<Record<ButtonId, string[]>> {
   const out: Partial<Record<ButtonId, string[]>> = {};
@@ -252,7 +265,7 @@ export function zenGameKeys(game?: ZenGameKey): Partial<Record<ButtonId, string[
     for (const [id, key] of Object.entries(keys) as [ButtonId, string][]) out[id] = [...(out[id] ?? []), key];
   };
   add(ZEN_GAME_KEYS);
-  if (game === 'pinballfx3') add(PINBALLFX3_EXTRA_KEYS);
+  if (hasArrowMenus(game)) add(PINBALLFX3_EXTRA_KEYS);
   return out;
 }
 
@@ -293,7 +306,7 @@ export function joystickKeysFor(source: ButtonsSource, table: Partial<Record<But
  */
 export function zenKeyboardEchoes(source: ButtonsSource, zenGame?: ZenGameKey): Map<string, string[]> {
   const map = new Map<string, string[]>();
-  if (zenGame !== 'pinballfx3') return map;
+  if (!hasArrowMenus(zenGame)) return map;
   const game = buttonKeys(source?.buttons);
   for (const [id, extra] of Object.entries(PINBALLFX3_EXTRA_KEYS) as [ButtonId, string][]) {
     const code = game[id];

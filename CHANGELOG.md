@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Applications : un liseré fin, de la couleur de l'application, court en haut de l'écran tant qu'une page charge. Tu vois ainsi si ton clic a lancé une page ou s'il n'a rien fait.
+- Le liseré s'éteint dès que la page est chargée, ignore les publicités et lecteurs intégrés, et ne s'allume pas pour un chargement très court.
+- Pour le savoir, Edge ouvre un tube de débogage réservé à Cyber Pinball (aucun port, rien n'écoute sur ta machine), seulement pour les applications ; la connexion à Google reste sans débogage.
+- Pinball FX Midnight : les flippers de la borne parcourent maintenant ses menus (flèches gauche et droite envoyées en plus de Maj, comme pour Pinball FX3).
+- Pinball FX Midnight : avant chaque partie, Cyber Pinball place comme pour Pinball FX les fenêtres du DMD et du fronton (Mods\Cabinet\Settings.ini, une fois « Cabinet Mode » activé dans le jeu), pose la fenêtre du jeu sur l'écran du playfield et applique la rotation de la borne.
 - Propositions de médias : l'écran s'ouvre tout de suite. Les aperçus de VPinMediaDB (« Aperçu en route… »), les résultats de VPForums et de VPUniverse et le poids des fichiers arrivent ensuite et remplissent l'écran à mesure, au lieu de tout attendre avant de l'ouvrir. Une connexion lente, ou l'attente imposée par VPUniverse, ne bloque plus le choix d'un fronton ou d'un plateau.
 - Les aperçus se reçoivent six à la fois au lieu d'un par un (sur une connexion lente, les attentes de chaque requête s'additionnaient), et un aperçu déjà demandé n'est pas téléchargé deux fois.
 - Pinball FX3 : quand le playfield s'ouvre en mode fenêtré (barre de titre, boutons réduire et agrandir, cadre), Cyber Pinball retire la bordure et cale la fenêtre sur l'écran du playfield. Un playfield déjà sans bordure n'est pas touché.

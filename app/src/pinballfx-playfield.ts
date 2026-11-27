@@ -26,9 +26,14 @@ export function pinballFxPlayfieldPlacement(window: Rect, screen: Rect): Rect | 
  * l'écran du playfield tel qu'il est maintenant. Rend la place donnée, ou undefined (pas d'écran
  * playfield, pas de fenêtre, déjà posée, déplacement refusé).
  */
-export function placePinballFxPlayfield(screen: Rect | undefined, windows: () => WindowInfo[], setBounds: (w: WindowInfo, r: Rect) => boolean): Rect | undefined {
+export function placePinballFxPlayfield(
+  screen: Rect | undefined,
+  windows: () => WindowInfo[],
+  setBounds: (w: WindowInfo, r: Rect) => boolean,
+  /** Fenêtre du jeu : Pinball FX par défaut, Midnight (même moteur, 27/11/2026) en le passant. */
+  isGame: (w: WindowInfo) => boolean = ZEN_LAUNCH_GAMES.pinballfx.isWindow,
+): Rect | undefined {
   if (!screen) return undefined;
-  const isGame = ZEN_LAUNCH_GAMES.pinballfx.isWindow;
   const game = windows()
     .filter((w) => w.visible && !w.minimized && w.rect.width > 0 && w.rect.height > 0 && isGame(w))
     .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0];

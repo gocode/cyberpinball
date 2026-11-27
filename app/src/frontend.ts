@@ -355,6 +355,8 @@ import {
   applyPinballFxRotation,
   applyPinballFxCabinet,
   pinballFxCabinetLayout,
+  pinballFxMidnightCabinetDir,
+  PINBALLFX_CABINET_SETTINGS,
   mediaKind,
   formatDateTime,
 } from '@cyberpinball/core';
@@ -402,6 +404,7 @@ import { createApplicationsMenu } from './applications-menu';
 import { createRootAccess } from './root-access';
 import { RootAccessLeds, rootAccessAnimation } from '@cyberpinball/core';
 import { createAppsBrowser, watchAppButtons } from './applications-browser';
+import { createLoadingStripFactory } from './page-loading';
 import { fetchSiteLook, storedIconSide } from './applications-icons';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
@@ -4263,7 +4266,7 @@ const applicationsMenu = createApplicationsMenu({
   },
   fronton: () => Boolean(menuAssignments.backglass),
   portrait: () => orientationForApp(),
-  browser: createAppsBrowser({ dataDir: loc.dataDir, log: (line) => console.log(line) }),
+  browser: createAppsBrowser({ dataDir: loc.dataDir, log: (line) => console.log(line), strip: createLoadingStripFactory() }),
   buttons: {
     keys: () => buttons ?? {},
     watch: (input) =>
@@ -6080,23 +6083,28 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     await delay(1500);
   }
   // Borne : le playfield tourné, Pinball FX tourne son image comme les fenêtres du front-end (pinballfx-cabinet.ts).
-  if (simulated === undefined && zenKey === 'pinballfx' && process.env.LOCALAPPDATA) {
+  // Midnight (27/11/2026) : même moteur, même réglage, dans le dossier PinballM.
+  if (simulated === undefined && (zenKey === 'pinballfx' || zenKey === 'pinballfxmidnight') && process.env.LOCALAPPDATA) {
     try {
-      for (const c of applyPinballFxRotation(process.env.LOCALAPPDATA, rotation)) console.log(`${zenName} (${table.id}) : rotation forcée ${c.value} écrite dans ${c.file}.`); // i18n-ignore : journal
+      for (const c of applyPinballFxRotation(process.env.LOCALAPPDATA, rotation, zenKey === 'pinballfxmidnight' ? 'PinballM' : 'PinballFX')) console.log(`${zenName} (${table.id}) : rotation forcée ${c.value} écrite dans ${c.file}.`); // i18n-ignore : journal
     } catch (error) {
       console.log(`${zenName} (${table.id}) : rotation pas écrite (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
     }
   }
   // Pinball FX : son mode borne activé, fenêtres du DMD et du fronton posées sur les écrans de la borne (pinballfx-cabinet.ts).
-  if (simulated === undefined && zenKey === 'pinballfx' && fx) {
+  // Midnight (27/11/2026) : même mode borne, même Settings.ini, dans <jeu>\PinballM\Mods\Cabinet (le jeu le
+  // crée quand le joueur active « Cabinet Mode » une fois : on ne l'invente pas).
+  const cabinetInstall = fx ?? (midnight ? { cabinetDir: pinballFxMidnightCabinetDir(midnight) } : undefined);
+  const cabinetTable = zenKey === 'pinballfxmidnight' ? table.pinballFxMidnightTable : table.pinballFxTable;
+  if (simulated === undefined && cabinetInstall) {
     // Le jeu n'a pas de fronton à lui : sa fenêtre montre Table_<n>.png, déposé ici depuis le fronton de la
     // table (pinballfx-backglass.ts), et PFX.png dans ses menus. Sans image de la table, la fenêtre reste
     // éteinte : elle écrirait le chemin cherché (capture du 27/11/2026), le fronton de Cyber Pinball reste.
     let tableImage = false;
-    if (table.pinballFxTable !== undefined && loc.root) {
+    if (cabinetTable !== undefined && loc.root) {
       const own = resolveMedia(table, loc.root, 'Backglass');
       const source = own.source !== 'default' && own.source !== 'fallback' ? own.file : undefined;
-      const placed = placePinballFxBackglass(fx, table.pinballFxTable, source);
+      const placed = placePinballFxBackglass(cabinetInstall, cabinetTable, source);
       tableImage = placed.result === 'placed' || placed.result === 'present';
       if (placed.result === 'placed') console.log(`${zenName} (${table.id}) : fronton déposé pour le jeu, ${placed.target} (depuis ${source}).`); // i18n-ignore : journal
       else if (placed.result === 'no-media') console.log(`${zenName} (${table.id}) : pas d'image de fronton pour la table, fenêtre du fronton du jeu éteinte.`); // i18n-ignore : journal
@@ -6108,7 +6116,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
         } catch {
           defaults = [];
         }
-        const home = placePinballFxHomeBackglass(fx, defaults[0] ? path.join(layoutOf(loc.root).media, defaults[0]) : undefined);
+        const home = placePinballFxHomeBackglass(cabinetInstall, defaults[0] ? path.join(layoutOf(loc.root).media, defaults[0]) : undefined);
         if (home.result === 'placed') console.log(`${zenName} : fronton des menus déposé, ${home.target}${defaults[0] ? ` (depuis ${defaults[0]})` : ' (image noire)'}.`); // i18n-ignore : journal
         else if (home.result === 'failed') console.log(`${zenName} : fronton des menus pas déposé (${home.reason}).`); // i18n-ignore : journal
       }
@@ -6119,7 +6127,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     const cabinetModel = loadCabinet(loc.dataDir);
     const layout = pinballFxCabinetLayout({ ...(dmdRect ? { dmd: dmdRect } : {}), ...(backglassRect ? { backglass: backglassRect } : {}) }, cabinetModel ? dmdKindOf(cabinetModel) : undefined);
     try {
-      const written = applyPinballFxCabinet(fx.cabinetDir, layout);
+      const written = applyPinballFxCabinet(cabinetInstall.cabinetDir, layout);
+      if (!written && !fs.existsSync(path.join(cabinetInstall.cabinetDir, PINBALLFX_CABINET_SETTINGS))) console.log(`${zenName} (${table.id}) : pas de Settings.ini dans ${cabinetInstall.cabinetDir} ; activer une fois « Cabinet Mode » dans les réglages du jeu pour que les écrans du DMD et du fronton soient placés.`); // i18n-ignore : journal
       if (written) console.log(`${zenName} (${table.id}) : mode borne écrit dans ${written} (DMD ${JSON.stringify(layout.dmd ?? null)}, fronton ${JSON.stringify(layout.backglass ?? null)}).`); // i18n-ignore : journal
     } catch (error) {
       console.log(`${zenName} (${table.id}) : mode borne pas écrit (${(error as Error).message}) ; la partie se lance quand même.`); // i18n-ignore : journal
@@ -6264,10 +6273,10 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Au plus 40 déplacements : un jeu qui reprendrait sa place à chaque fois ne se bat pas avec nous.
   let playfieldMoves = 0;
   const playfieldWatch =
-    simulated === undefined && command && zenKey === 'pinballfx' && !simulatedDisplays()
+    simulated === undefined && command && (zenKey === 'pinballfx' || zenKey === 'pinballfxmidnight') && !simulatedDisplays()
       ? setInterval(() => {
           if (playfieldMoves >= 40) return;
-          const placed = placePinballFxPlayfield(roleRects.find((r) => r.role === 'playfield')?.rect, () => listWindows((w) => w.visible), setWindowBounds);
+          const placed = placePinballFxPlayfield(roleRects.find((r) => r.role === 'playfield')?.rect, () => listWindows((w) => w.visible), setWindowBounds, ZEN_LAUNCH_GAMES[zenKey].isWindow);
           if (placed) {
             playfieldMoves++;
             console.log(`${zenName} (${table.id}) : fenêtre du jeu posée sur l'écran du playfield (${placed.x}, ${placed.y}, ${placed.width} × ${placed.height}).`); // i18n-ignore : journal

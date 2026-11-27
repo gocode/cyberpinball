@@ -15,6 +15,7 @@ import {
   EDGE_APPS_PROFILE_DIR,
   JUKEBOX_SEEK_EVERY_MS,
   JUKEBOX_SEEK_HOLD_MS,
+  PAGE_LOADING_ARGS,
   appBrowserArgs,
   appMobile,
   appZoom,
@@ -36,6 +37,7 @@ import {
 } from '@cyberpinball/core';
 import { edgeWindowOps, type EdgeKey, type EdgeWindowOps, type KeyMods } from './edge-login';
 import { windowCapture, type MirrorShot } from './phone-mirror';
+import { watchPageLoading, type LoadingStripFactory } from './page-loading';
 
 const VK: Record<EdgeKey, number> = { Enter: 0x0d, Tab: 0x09, Backspace: 0x08, ArrowLeft: 0x25, ArrowUp: 0x26, ArrowRight: 0x27, ArrowDown: 0x28, Space: 0x20, Escape: 0x1b };
 const VK_A = 0x41;
@@ -59,6 +61,8 @@ export interface AppsBrowserOptions {
   log?: (line: string) => void;
   /** Essais seulement : arguments passés avant ceux du navigateur (le faux Edge est Node et son script). */
   argsPrefix?: string[];
+  /** Liseré de chargement aux couleurs de l'application (page-loading.ts) ; absent : Edge n'ouvre aucun tube. */
+  strip?: LoadingStripFactory;
 }
 
 export interface AppsBrowserExe {
@@ -118,12 +122,20 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
     current?.finish();
     fs.mkdirSync(profile, { recursive: true });
     blockEdgeTranslate(profile);
+    // Liseré de chargement : le tube de débogage d'Edge (page-loading.ts), sans port ; sans liseré, rien n'est ouvert.
+    const watched = Boolean(opts.strip);
+    const args = [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app), appZoom(app)), ...(watched ? PAGE_LOADING_ARGS : [])];
     // Edge est l'application elle-même : sa fenêtre doit se voir.
-    const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app), appZoom(app))], { stdio: 'ignore' }); // fenêtre voulue
+    const child: ChildProcess = spawn(found.exe, args, { stdio: watched ? ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] : 'ignore' }); // fenêtre voulue
     child.once('error', () => undefined);
     log(`Applications : ${app.name} ouverte dans ${found.kind === 'edge' ? 'Edge' : 'Chrome'} à ${appZoom(app)} % (${Math.round(at.width)} × ${Math.round(at.height)} en ${Math.round(at.x)}, ${Math.round(at.y)})`); // i18n-ignore : journal
     let win: unknown;
     const exited = new Promise<void>((r) => child.once('exit', () => r()));
+    if (opts.strip) {
+      const strip = opts.strip(app.color, () => (win ? ops().rect(win) : undefined));
+      watchPageLoading(child, (loading) => strip.set(loading));
+      child.once('exit', () => strip.close());
+    }
     const shown = (async () => {
       const until = Date.now() + FIND_TIMEOUT_MS;
       while (!win && Date.now() < until && child.exitCode === null) {

@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications: a thin strip in the application's colour runs along the top of the screen while a page is loading, so you can tell whether your click started a page or did nothing.
+- The strip goes out as soon as the page has loaded, ignores ads and embedded players, and does not light up for a very short load.
+- To know this, Edge opens a debugging pipe reserved for Cyber Pinball (no port, nothing listens on your machine), for applications only; signing in to Google stays free of debugging.
+- Pinball FX Midnight: the cabinet's flippers now move through its menus (Left and Right arrows sent along with Shift, as for Pinball FX3).
+- Pinball FX Midnight: before each game, Cyber Pinball now places the DMD and backglass windows as it does for Pinball FX (Mods\Cabinet\Settings.ini, once "Cabinet Mode" is turned on in the game), puts the game window on the playfield screen and applies the cabinet's rotation.
 - Media proposals: the screen now opens straight away. The VPinMediaDB previews ("Preview on its way…"), the VPForums and VPUniverse results and the file sizes arrive afterwards and fill the screen as they come, instead of everything being awaited before it opens. A slow connection, or the wait VPUniverse imposes, no longer blocks choosing a backglass or a playfield.
 - Previews are received six at a time instead of one by one (on a slow connection the wait of each request added up), and a preview already requested is not downloaded twice.
 - Pinball FX3: when the playfield opens in windowed mode (title bar, minimise and maximise buttons, frame), Cyber Pinball removes the border and fits the window to the playfield screen. A playfield that is already borderless is left alone.

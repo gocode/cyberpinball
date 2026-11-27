@@ -31,6 +31,15 @@ export interface PinballFxMidnightInstall {
   gameDir: string;
 }
 
+/**
+ * Dossier du mode borne de Midnight : <jeu>\PinballM\Mods\Cabinet, avec le même Settings.ini que Pinball FX
+ * (blog de Zen du 28/11/2023 ; joueurs : copier celui de Pinball FX dans Midnight fonctionne). Le jeu le
+ * crée quand le joueur active « Cabinet Mode » dans ses réglages.
+ */
+export function pinballFxMidnightCabinetDir(install: Pick<PinballFxMidnightInstall, 'gameDir'>): string {
+  return path.join(install.gameDir, 'PinballM', 'Mods', 'Cabinet');
+}
+
 export function isPinballFxMidnightId(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
