@@ -418,7 +418,7 @@ body.typing .pad-hint {
 /* --- Miroir du navigateur : l'image de la fenêtre d'Edge, à toucher comme sur un téléphone ---
    body[data-miroir] : none (pas de miroir possible), off (« Pavé »), on (« Miroir »). */
 
-/* La bascule Pavé ↔ Miroir est le bouton #nav-mirror de la barre d'outils (plus bas). */
+/* Le choix Pavé / Miroir, ce sont les boutons #nav-pad et #nav-mirror de la barre d'outils (plus bas). */
 .mirror {
   position: relative;
   flex: 1;
@@ -2750,6 +2750,7 @@ body:not([data-mode='browser']) .tools {
 }
 
 body[data-mode='browser'] #nav-send,
+body:not([data-miroir='on']):not([data-miroir='off']) #nav-pad,
 body:not([data-miroir='on']):not([data-miroir='off']) #nav-mirror,
 body:not([data-mode='browser']) #nav-back,
 body:not([data-mode='browser']) #nav-forward,

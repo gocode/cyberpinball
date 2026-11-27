@@ -47,19 +47,20 @@ test('barre du bas : des icônes seules, le libellé reste en infobulle et pour 
   assert.ok(Number(sizes[0]?.[1]) >= 44 && Number(sizes[0]?.[2]) >= 44);
 });
 
-test('barre du bas : la bascule Pavé ↔ Miroir est dans la barre, cachée tant que la fenêtre ne se capture pas, verte quand elle est enfoncée', () => {
+test('barre du bas : les boutons Pavé et Miroir sont dans la barre, cachés tant que la fenêtre ne se capture pas, celui du mode montré est vert', () => {
   const tools = html.slice(html.indexOf('<nav class="tools"'), html.indexOf('</nav>', html.indexOf('<nav class="tools"')));
   assert.ok(tools.includes('id="nav-mirror"'));
   assert.ok(tools.indexOf('id="nav-forward"') < tools.indexOf('id="nav-mirror"') && tools.indexOf('id="nav-mirror"') < tools.indexOf('id="nav-keyboard"'));
   assert.match(css, /body:not\(\[data-miroir='on'\]\):not\(\[data-miroir='off'\]\) #nav-mirror,/);
   assert.match(css, /\.tool\[aria-pressed='true'\] \{[^}]*var\(--signal\)/);
-  // Autant de colonnes que de boutons visibles (cinq sans miroir, six avec).
+  // Autant de colonnes que de boutons visibles (cinq sans miroir, sept avec).
   assert.match(css, /\.tools \{\s*display: grid;\s*grid-auto-flow: column;\s*grid-auto-columns: minmax\(0, 1fr\);/);
 });
 
-test('bouton Miroir : un appui alterne miroir et pavé, et l\'état enfoncé suit le choix', () => {
+test('boutons Pavé et Miroir : chacun choisit son mode, et l\'état enfoncé suit le choix', () => {
   const toggle = fakeElement();
-  const elements: Record<string, unknown> = { mirror: { getBoundingClientRect: () => ({ width: 400, height: 800 }), addEventListener: () => undefined, classList: { add: () => undefined, remove: () => undefined, toggle: () => undefined } }, 'mirror-canvas': { getContext: () => ({ clearRect: () => undefined, setTransform: () => undefined }), addEventListener: () => undefined }, 'nav-mirror': toggle };
+  const pad = fakeElement();
+  const elements: Record<string, unknown> = { mirror: { getBoundingClientRect: () => ({ width: 400, height: 800 }), addEventListener: () => undefined, classList: { add: () => undefined, remove: () => undefined, toggle: () => undefined } }, 'mirror-canvas': { getContext: () => ({ clearRect: () => undefined, setTransform: () => undefined }), addEventListener: () => undefined }, 'nav-mirror': toggle, 'nav-pad': pad };
   const sent: Array<Record<string, unknown>> = [];
   const store: Record<string, string> = {};
   const context = vm.createContext({
@@ -79,19 +80,25 @@ test('bouton Miroir : un appui alterne miroir et pavé, et l\'état enfoncé sui
   });
   vm.runInContext(read('telephone-miroir.js'), context);
   assert.equal(toggle.title, 'Miroir', 'infobulle');
+  assert.equal(pad.title, 'Pavé tactile', 'infobulle');
   vm.runInContext('mirror.available = true; mirrorRefresh();', context);
   assert.equal(toggle.attrs['aria-pressed'], 'false');
+  assert.equal(pad.attrs['aria-pressed'], 'true', 'le pavé est le mode montré au départ');
   assert.equal(vm.runInContext('document.body.dataset.miroir', context), 'off');
   assert.equal(sent.length, 0, 'aucune demande tant que le miroir n\'est pas choisi');
 
   toggle.click();
   assert.equal(toggle.attrs['aria-pressed'], 'true');
+  assert.equal(pad.attrs['aria-pressed'], 'false');
   assert.equal(vm.runInContext('document.body.dataset.miroir', context), 'on');
   assert.ok(sent.some((m) => m.t === 'mirror' && m.on === true), 'la borne est priée de capturer');
   assert.equal(store['cyberpinball.miroir'], 'on', 'choix retenu pour la session');
 
   toggle.click();
+  assert.equal(vm.runInContext('document.body.dataset.miroir', context), 'on', 'un second appui sur Miroir ne fait pas revenir au pavé');
+  pad.click();
   assert.equal(toggle.attrs['aria-pressed'], 'false');
+  assert.equal(pad.attrs['aria-pressed'], 'true');
   assert.equal(vm.runInContext('document.body.dataset.miroir', context), 'off');
   assert.ok(sent.some((m) => m.t === 'mirror' && m.on === false), 'retour au pavé : la borne s\'arrête');
 });

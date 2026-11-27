@@ -451,7 +451,8 @@ test('page du téléphone : le pavé reste, le miroir est une option à côté',
   // La bascule est un bouton-icône de la barre d'outils du bas (plus de barre Pavé / Miroir), enfoncé quand le miroir est montré.
   assert.match(phonePage, /<nav class="tools" id="tools">[\s\S]*id="nav-mirror" aria-pressed="false"/, "bouton Miroir dans la barre d'outils");
   assert.equal(/mirror-seg|mirror-tab-/.test(phonePage), false, 'plus de barre Pavé / Miroir');
-  assert.match(phoneMirror, /mirrorToggle\.addEventListener\('click', \(\) => mirrorChoose\(!mirror\.choice\)\)/);
+  assert.match(phoneMirror, /mirrorToggle\.addEventListener\('click', \(\) => mirrorChoose\(true\)\)/);
+  assert.match(phoneMirror, /padToggle\.addEventListener\('click', \(\) => mirrorChoose\(false\)\)/);
   // Le choix se retient pour la session de la télécommande seulement.
   assert.match(phoneMirror, /sessionStorage/);
   assert.equal(/localStorage/.test(phoneMirror), false, 'le choix ne survit pas à la session');
@@ -496,7 +497,7 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
   const context2d = { clearRect: () => undefined, setTransform: () => calls.push('setTransform'), translate: () => calls.push('translate'), rotate: () => calls.push('rotate'), drawImage: () => calls.push('drawImage') };
   const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: () => undefined };
   const tab = { setAttribute: () => undefined, addEventListener: () => undefined, replaceChildren: () => undefined };
-  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab };
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab, 'nav-pad': tab };
   const sandbox: Record<string, unknown> = {
     document: { getElementById: (id: string) => elements[id], createElement: () => ({}), addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
     window: { devicePixelRatio: 1, addEventListener: () => undefined },

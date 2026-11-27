@@ -107,6 +107,7 @@ const CYBER_ICONS = {
   tables: '<path d="M6 3h12v14H6zM3 7v14h12M9 13l3 2 3-2"/>', // Collection de plateaux.
   book: '<path d="M3 4c4-1 6 0 9 2 3-2 5-3 9-2v15c-4-1-6 0-9 2-3-2-5-3-9-2zM12 6v15"/>', // Prospectus et documentation.
   monitor: '<rect x="3" y="3" width="18" height="13" rx="2"/><path d="M12 16v5M7 21h10"/>', // Un écran physique.
+  touchpad: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18M12 15v5"/>', // Pavé tactile de la télécommande.
   flipper: '<path d="m6 21 13-9a4 4 0 0 0-5-6L3 17a2.5 2.5 0 0 0 3 4z"/>', // Batteur de flipper, silhouette élargie.
   start: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>', // Bouton Start vu du dessus.
   exit: '<path d="M14 3h7v18h-7M16 12H3M8 7l-5 5 5 5"/>', // Bouton Exit, sortie d’un parcours, quitter Cyber Pinball.

@@ -308,7 +308,7 @@ function loadMirror() {
   const context2d = { clearRect: noop, setTransform: noop, translate: noop, rotate: noop, drawImage: noop };
   const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: noop };
   const tab = { setAttribute: noop, addEventListener: noop, replaceChildren: noop };
-  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab };
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab, 'nav-pad': tab };
   const doc = {
     getElementById: (id: string) => elements[id],
     createElement: () => ({}),

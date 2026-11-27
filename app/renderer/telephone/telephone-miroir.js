@@ -1,6 +1,6 @@
 // Miroir du navigateur : au téléphone, la fenêtre d'Edge que la borne montre (Applications, connexion
 // YouTube du Juke-box), en images, qu'on touche comme sur un téléphone. C'est une option du pavé
-// tactile, qui reste là : le bouton-icône « Miroir » de la barre du bas bascule de l'un à l'autre, et le choix se retient
+// tactile, qui reste là : les deux boutons-icônes « Pavé tactile » et « Miroir » de la barre du bas choisissent l'un ou l'autre, et le choix se retient
 // le temps de la session de la télécommande (sessionStorage).
 //
 // La borne n'envoie rien tant que le miroir n'est pas demandé (message « mirror »). Les images
@@ -60,15 +60,19 @@ function mirrorRemember() {
 const mirrorView = document.getElementById('mirror');
 const mirrorCanvas = document.getElementById('mirror-canvas');
 const mirrorContext = mirrorCanvas.getContext('2d');
-/** Le bouton-icône de la barre du bas qui alterne Pavé et Miroir (enfoncé : le miroir est montré). */
+/** Les deux boutons-icônes de la barre du bas qui choisissent le pavé ou le miroir : celui du mode montré est vert (enfoncé). */
 const mirrorToggle = document.getElementById('nav-mirror');
-{
+const padToggle = document.getElementById('nav-pad');
+/** Un bouton-icône de la barre : l'icône, son libellé (pour les lecteurs d'écran) et l'infobulle. */
+function mirrorToolButton(button, icon, text) {
   const label = document.createElement('span');
   label.className = 'tool-label';
-  label.textContent = t('Miroir');
-  mirrorToggle.replaceChildren(cyberIcon('monitor'), label);
-  mirrorToggle.title = label.textContent;
+  label.textContent = text;
+  button.replaceChildren(icon, label);
+  button.title = text;
 }
+mirrorToolButton(padToggle, cyberIcon('touchpad'), t('Pavé tactile'));
+mirrorToolButton(mirrorToggle, cyberIcon('monitor'), t('Miroir'));
 
 /** Le miroir est montré : possible, choisi, au navigateur, liaison acceptée, page visible. */
 function mirrorWanted() {
@@ -100,6 +104,7 @@ function mirrorRefresh() {
   const shown = mirror.available && mode === 'browser';
   document.body.dataset.miroir = !shown ? 'none' : mirror.choice ? 'on' : 'off';
   mirrorToggle.setAttribute('aria-pressed', String(mirror.choice));
+  padToggle.setAttribute('aria-pressed', String(!mirror.choice));
   mirrorSync();
 }
 
@@ -166,7 +171,8 @@ function mirrorClear() {
   mirrorContext.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
 }
 
-mirrorToggle.addEventListener('click', () => mirrorChoose(!mirror.choice));
+mirrorToggle.addEventListener('click', () => mirrorChoose(true));
+padToggle.addEventListener('click', () => mirrorChoose(false));
 
 // --- Ce que la borne envoie ---------------------------------------------------
 

@@ -100,6 +100,7 @@ export const ICON_NAMES = [
   'toolbox',
   'book',
   'monitor',
+  'touchpad',
   'flipper',
   'start',
   'exit',
