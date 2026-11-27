@@ -971,9 +971,10 @@ test('cadrage manuel imposé par la table : la clé est retirée, le reste du .i
   assert.equal(fs.readFileSync(ini, 'utf8'), '[Player]\r\nCabinetAutofitMode = 1\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n');
   assert.equal(fs.readdirSync(trashDir).length, 1);
   assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
-  // Sans vue propre : la vue de l'auteur, peut-être pour un autre écran ; la clé est retirée.
+  // Sans vue propre : la vue de l'auteur, peut-être pour un autre écran ; la clé est retirée. Une supposition : une
+  // information, jamais proposée d'office (framing-choice.ts).
   write(ini, '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabRotation = 0\r\n');
-  assert.equal(diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'manualView')?.severity, 'warning');
+  assert.equal(diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'manualView')?.severity, 'info');
   repair();
   assert.equal(fs.readFileSync(ini, 'utf8'), '[TableOverride]\r\nViewCabRotation = 0\r\n');
   assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
@@ -1005,6 +1006,8 @@ test('table qui change le sens de la partie : constat, réparation, rien quand V
   const manual = findings();
   assert.deepEqual(manual.map((f) => f.code), ['tableOrientation']);
   assert.match(manual[0]!.detail, /\[Player\] CabinetAutofitMode = 0 : VPX reprend la vue de l’auteur/);
+  // Sens de la partie inconnu : une supposition, une information (framing-choice.ts) ; vérifié, un avertissement (plus bas).
+  assert.equal(manual[0]!.severity, 'info');
   applyOps(manual[0]!.fix!.ops, { trashDir });
   assert.equal(fs.readFileSync(ini, 'utf8'), '[TableOverride]\r\nViewCabRotation = 270\r\n');
   assert.deepEqual(findings(), [], 'cadrage automatique : ViewCabRotation est sans effet');
@@ -1015,6 +1018,7 @@ test('table qui change le sens de la partie : constat, réparation, rien quand V
   const desktop = findings(side);
   assert.equal(desktop[0]?.code, 'tableOrientation');
   assert.match(desktop[0]!.detail, /flippers en bas, alors que tu es à droite/);
+  assert.equal(desktop[0]!.severity, 'warning', 'sens vérifié : la table serait vraiment de travers');
   applyOps(desktop[0]!.fix!.ops, { trashDir });
   assert.ok(!fs.existsSync(ini), 'seule la clé dans le fichier : il part entier à la corbeille');
   // VPinballX.ini lui-même en cadrage manuel : la synchronisation le dit, pas le médecin de chaque table.

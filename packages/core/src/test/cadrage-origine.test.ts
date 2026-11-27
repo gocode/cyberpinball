@@ -164,7 +164,7 @@ test('réglages du VPX d’origine : où ils sont lus, et ceux du registre (VPX 
  * cadrage figé d'une table reprise (originFramingOf) avant d'être ajouté ici.
  */
 const FRAMING_WRITERS: Record<string, string> = {
-  'packages/core/src/doctor.ts': 'manualView et tableOrientation, réparations proposées ; le cadrage d’origine passe avant (originFramingFinding)',
+  'packages/core/src/doctor.ts': 'manualView et tableOrientation : corrections choisies dans le diagnostic, jamais proposées d’office sauf table vraiment de travers (framing-choice.ts) ; le cadrage d’origine passe avant (originFramingFinding)',
   'packages/core/src/origin-framing.ts': 'le cadrage d’origine lui-même',
   'packages/core/src/origin-framing-catchup.ts': 'le cadrage d’origine rendu une fois aux tables reprises avant, sauf cadrage choisi par le joueur (cadrage-rattrapage.test.ts)',
   'app/src/origin-framing-catchup.ts': 'idem, l’état d’avant gardé (framing-history.ts)',

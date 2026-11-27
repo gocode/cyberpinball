@@ -144,7 +144,7 @@ test('.ini écrit par le menu de VPX en passant en manuel, sans vue réglée (Th
   const matrix = '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabMode = 2\r\nViewCabRotation = 0.0\r\nViewCabWindowTop = 530\r\nViewCabWindowBot = 185\r\n';
   const s = setup({ [`${TABLE}.ini`]: matrix });
   const found = s.views();
-  assert.deepEqual(found.map((f) => [f.code, f.severity, f.title]), [['manualView', 'warning', 'Cadrage manuel sans vue réglée']]);
+  assert.deepEqual(found.map((f) => [f.code, f.severity, f.title]), [['manualView', 'info', 'Cadrage manuel sans vue réglée']]);
   applyOps(found[0]!.fix!.ops, { trashDir: s.trashDir });
   assert.equal(IniDocument.parse(fs.readFileSync(s.ini, 'utf8')).get('Player', 'CabinetAutofitMode'), undefined);
   // Rendu au cadrage de la borne, et rien ne le repasse en manuel avant la partie.

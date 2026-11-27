@@ -38,6 +38,7 @@ import {
   type WaitList,
 } from './acquisition';
 import type { Finding, ScriptFacts } from './doctor';
+import { isFramingChoice } from './framing-choice';
 import { formatDate, formatList, t, tn } from './i18n';
 import { blocksPlay } from './playable';
 import { neighbourRom, neighbourWarning, romFamilyOf } from './romalias';
@@ -503,22 +504,27 @@ function pupStep(input: JourneyInput): JourneyStep | undefined {
 }
 
 function displayStep(input: JourneyInput): JourneyStep | undefined {
-  const found = input.findings.filter((f) => ['originFraming', 'tableOrientation', 'manualView', 'importedView', 'povView', 'povOffered', 'tableWindows', 'fullDmdHidden'].includes(f.code) && f.fix);
-  // En vue borne, le cadrage se choisit sur des images de la table (23/11/2026), comme les médias ; un POV de la
-  // communauté (base VPS) est proposé quand la table n'en a pas.
+  // Seuls les vrais défauts d'affichage se proposent (27/11/2026) : une table de travers dont le sens se vérifie, des
+  // fenêtres réglées pour elle seule, l'habillage FullDMD caché. Le cadrage que la table a déjà n'est jamais remis en
+  // cause d'office et aucun autre ne se propose, POV de la communauté compris : il se choisit dans « Point de vue »
+  // (framing-choice.ts). L'étape est alors réglée : elle ne compte pas parmi les améliorations proposées.
+  const found = input.findings.filter((f) => ['tableOrientation', 'tableWindows', 'fullDmdHidden'].includes(f.code) && f.fix && !isFramingChoice(f));
+  // En vue borne, le cadrage se choisit sur des images de la table (23/11/2026), comme les médias.
   const framing: JourneyChoice[] = input.cabinetView ? [{ action: { kind: 'framing' }, label: t('Choisir le cadrage'), detail: t('Chaque cadrage rendu sur cette table par VPX, au choix') }] : [];
-  const hasPov = input.findings.some((f) => ['povView', 'povOffered', 'povWrongWay'].includes(f.code));
-  const povs = input.cabinetView && !hasPov ? gameSources(input.vps, input.vpsId, 'pov', input.screens, input.sourceFileId) : [];
-  const community = povs.length ? [fetchChoice(povs[0]!, t('Récupérer un POV de la communauté : {label}', { label: versionLabel(povs[0]!.file) })), ...chooseChoice(povs)] : [];
-  if (!found.length && !framing.length) return input.seen?.includes('display') ? { id: 'display', title: t('Affichage'), state: 'done', required: false, detail: t('Cadrage et écrans de la configuration de la borne.'), choices: [] } : undefined;
-  const choices = [...found.map((f) => repairChoice(f)), ...framing, ...community];
+  if (!found.length) {
+    if (!framing.length && !input.seen?.includes('display')) return undefined;
+    // Le cadrage que la table suit, s'il lui est propre (installation d'origine, vue réglée pour elle, POV repris).
+    const current = input.findings.find((f) => isFramingChoice(f) && f.code !== 'povOffered' && f.code !== 'tableOrientation');
+    return { id: 'display', title: t('Affichage'), state: 'done', required: false, detail: current ? `${current.title}.` : t('Cadrage et écrans de la configuration de la borne.'), choices: framing };
+  }
+  const choices = [...found.map((f) => repairChoice(f)), ...framing];
   choices[0]!.primary = true;
   return {
     id: 'display',
     title: t('Affichage'),
     state: found.some((f) => f.severity === 'warning') ? 'todo' : 'optional',
     required: false,
-    detail: found[0] ? `${found[0].title}. ${found[0].detail}` : t('Le cadrage de la borne, un autre pour cette table seule, ou un POV de la communauté.'),
+    detail: `${found[0]!.title}. ${found[0]!.detail}`,
     choices,
   };
 }

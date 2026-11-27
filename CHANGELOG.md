@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Cadrage : Cyber Pinball ne propose plus d'office de changer le cadrage d'une table. Celui qu'elle a déjà (repris de PinUP Popper ou d'une autre installation, vue réglée pour elle, POV) n'est plus remis en cause par « Ce qu'il manque pour jouer », et aucun autre cadrage ni POV de la communauté n'y est mis en avant. Pour en changer, « Point de vue » dans la fiche montre chaque cadrage sur la table et garde le précédent.
+- Diagnostic d'une table : « Tout réparer » ne touche plus jamais au cadrage, et un constat de cadrage mène à « Point de vue » au lieu d'une correction d'un appui. Seule une table vraiment de travers sur ta borne (sens vérifié) se propose encore d'être remise dans le bon sens.
 - Tables reprises de PinUP Popper : le VPX qui jouait chaque table est maintenant bien retrouvé (dossier et script de lancement de son émulateur, 10.7 ou 10.8). Sans lui, le cadrage de Popper n'était repris pour aucune table connue de Popper, ni à l'ajout ni au rattrapage.
 - Les tables reprises de Popper que le rattrapage précédent avait laissées de côté retrouvent une fois leur cadrage de Popper, sauf si tu en as choisi un dans Cyber Pinball. Le cadrage d'avant reste dans l'historique : « Point de vue » > « Rétablir le cadrage précédent » le remet.
 - Nouveautés : une ligne présente Pinball FX Midnight (un autre jeu de Zen Studios que Pinball FX) ; "Essayer" ouvre l'écran "Tables de Pinball FX Midnight".

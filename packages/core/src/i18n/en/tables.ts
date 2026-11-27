@@ -833,8 +833,6 @@ export const messages: Record<string, string> = {
   'Toute la table, étirée en largeur pour remplir l’écran.': 'The whole table, stretched in width to fill the screen.',
   'Choisir le cadrage': 'Choose the framing',
   'Chaque cadrage rendu sur cette table par VPX, au choix': 'Each framing rendered on this table by VPX, to choose from',
-  'Récupérer un POV de la communauté : {label}': 'Get a community POV: {label}',
-  'Le cadrage de la borne, un autre pour cette table seule, ou un POV de la communauté.': 'The cabinet framing, another one for this table only, or a community POV.',
   'À la dernière partie, le DMD n’a pas trouvé {list} dans « {folder} » : il n’en montre que les textes.':
     'During the last game, the DMD did not find {list} in “{folder}”: it only shows its texts.',
   'À la dernière partie, le DMD n’a pas trouvé {n} images dans « {folder} » ({list}) : il n’en montre que les textes.':

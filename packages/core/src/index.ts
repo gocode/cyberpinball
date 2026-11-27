@@ -54,6 +54,7 @@ export * from './origin-framing';
 export * from './origin-framing-catchup';
 export * from './framing-styles';
 export * from './framing-history';
+export * from './framing-choice';
 export * from './framing-custom';
 export * from './framing-close-corners';
 export * from './qoi';

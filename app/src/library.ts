@@ -149,6 +149,7 @@ import {
   romSpace,
   romsToTidy,
   sameFile,
+  isFramingChoice,
   sheetPages,
   readVpxPlayfield,
   SHEET_PAGE_TYPES,
@@ -2220,7 +2221,8 @@ export function createLibrary(host: LibraryHost) {
       current.ignored = ignored;
       // Rien à réparer ni à ignorer : Start mène plus loin, sur la dernière action (« Table suivante »,
       // « Retour à la fiche » : buildDoctor), que la vue recale (followCursor).
-      cursor = findings.every((f) => f.note && !f.fix) ? Number.MAX_SAFE_INTEGER : 0;
+      // Un cadrage à choisir (framing-choice.ts) ne retient pas le curseur non plus.
+      cursor = findings.every((f) => (f.note && !f.fix) || (f.fix && isFramingChoice(f))) ? Number.MAX_SAFE_INTEGER : 0;
     });
   }
 
@@ -3501,9 +3503,15 @@ export function createLibrary(host: LibraryHost) {
     if (playBlockers(findings).length) {
       actions.push({ label: t('Ce qu’il manque pour jouer'), detail: t('Étape par étape, jusqu’à « Jouer »'), tone: 'ok', run: () => journeyUi.open(table.file) });
     }
+    // Un cadrage se choisit, il ne se répare pas (framing-choice.ts) : ces constats mènent à « Point de vue », où chaque
+    // cadrage est nommé, montré et réversible ; jamais une correction d'un appui, ni dans « Tout réparer ».
+    let povAction: number | undefined;
     const rows: Row[] = findings.map((f) => {
       const row: Row = { text: f.title, detail: f.detail, tone: f.severity };
-      if (f.fix) {
+      if (f.fix && isFramingChoice(f)) {
+        povAction ??= actions.push({ label: t('Point de vue'), detail: tablePov.detail(table), icon: 'crop', run: () => tablePov.open(table, () => openDoctor(table.file, s.queue, s.afterImport, s.added, s.back)) }) - 1;
+        row.action = povAction;
+      } else if (f.fix) {
         row.action = actions.length;
         actions.push({ label: f.fix.label, detail: t('Réparer'), tone: f.severity, run: () => repair(s, [f]) });
       }
@@ -3515,7 +3523,7 @@ export function createLibrary(host: LibraryHost) {
       }
       return row;
     });
-    const fixable = findings.filter((f) => f.fix);
+    const fixable = findings.filter((f) => f.fix && !isFramingChoice(f));
     if (fixable.length > 1) actions.push({ label: t('Tout réparer'), detail: tn(fixable.length, '{n} correction', '{n} corrections'), run: () => repair(s, fixable) });
     // Chaque constat peut être ignoré pour cette table : il ne compte plus nulle part, et se rétablit d'ici.
     // Un code n'est proposé qu'une fois (plusieurs constats du même code partent ensemble).

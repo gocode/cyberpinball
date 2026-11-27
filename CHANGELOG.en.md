@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Framing: Cyber Pinball no longer offers on its own to change a table's framing. The one it already has (taken over from PinUP Popper or another installation, a view set for it, a POV) is no longer questioned by "What's missing to play", and no other framing or community POV is put forward there. To change it, "Point of view" in the table sheet shows each framing on the table and keeps the previous one.
+- Table diagnosis: "Fix all" never touches the framing anymore, and a framing finding leads to "Point of view" instead of a one-press fix. Only a table that is really sideways on your cabinet (direction checked) is still offered to be turned the right way.
 - Tables taken over from PinUP Popper: the VPX that played each table is now found correctly (its emulator's folder and launch script, 10.7 or 10.8). Without it, Popper's framing was kept for no table Popper knew, neither when added nor in the catch-up.
 - Tables taken over from Popper that the previous catch-up left aside get back, once, their Popper framing, unless you chose one in Cyber Pinball. The previous framing stays in the history: "Point of view" > "Restore the previous framing" puts it back.
 - What's new: a line introduces Pinball FX Midnight (a different Zen Studios game from Pinball FX); "Try it" opens the "Pinball FX Midnight tables" screen.

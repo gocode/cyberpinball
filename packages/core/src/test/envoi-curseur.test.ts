@@ -60,7 +60,8 @@ test('envoi et curseur : la vue applique la règle, chaque action « Envoyer / P
 test('envoi et curseur : le Diagnostic sans constat mène plus loin, son entrée de rapport envoie', () => {
   const library = fs.readFileSync(path.join(APP_SRC, 'library.ts'), 'utf8');
   assert.match(library, /key: 'doctor:report',\s*sends: true,/);
-  assert.match(library, /cursor = findings\.every\(\(f\) => f\.note && !f\.fix\) \? Number\.MAX_SAFE_INTEGER : 0;/);
+  // Un cadrage à choisir (framing-choice.ts) ne retient pas le curseur non plus.
+  assert.match(library, /cursor = findings\.every\(\(f\) => \(f\.note && !f\.fix\) \|\| \(f\.fix && isFramingChoice\(f\)\)\) \? Number\.MAX_SAFE_INTEGER : 0;/);
   // « Table suivante » / « Retour à la fiche » reste la dernière action du Diagnostic.
   const doctor = library.slice(library.indexOf('function buildDoctor('), library.indexOf('function buildDoctor(') + 6000);
   const next = doctor.indexOf("key: 'doctor:next'");

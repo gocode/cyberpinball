@@ -967,11 +967,13 @@ function manualViewFinding(tableFile: string): Finding | undefined {
   }
   // Passée en cadrage manuel dans le menu de VPX sans vue réglée (hauteurs de vitre, mode, rotation seuls) : la vue de
   // l'auteur, enregistrée dans le .vpx pour son écran, pas un cadrage fait pour cette borne.
+  // La vue de l'auteur peut très bien convenir : une information, la correction ne se propose pas d'office
+  // (framing-choice.ts).
   const fromMenu = touchesCabinetView(doc);
   doc.remove('Player', 'CabinetAutofitMode');
   return {
     code: 'manualView',
-    severity: 'warning',
+    severity: 'info',
     title: fromMenu ? t('Cadrage manuel sans vue réglée') : t('Cadrage manuel imposé par la table'),
     detail: fromMenu
       ? t(
@@ -1015,9 +1017,11 @@ function tableOrientationFinding(tableFile: string, orientation: PlayfieldOrient
   const set = keys.map((key) => t('[Player] {key} = {value}', { key, value: doc.get('Player', key)!.trim() })).join(t(' ; '));
   for (const key of keys) doc.remove('Player', key);
   const name = path.basename(ini.path);
+  // Sens vérifié : la table serait vraiment de travers. Sinon (vue de l'auteur, sens inconnu), une supposition : une
+  // information, la correction ne se propose pas d'office (framing-choice.ts).
   return {
     code: 'tableOrientation',
-    severity: 'warning',
+    severity: played.edge ? 'warning' : 'info',
     title: t('Table de travers sur cette borne'),
     detail: played.edge
       ? t('{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que tu es {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans ton sens.', {
