@@ -9,6 +9,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Fewer game stops while the antivirus scans a table script: timers described by a text (Guardians of the Galaxy, Game of Thrones…) are compiled only once, and those written as is in the table are compiled all at once while it loads, instead of one scan at every deadline.
+- Same for commands a table keeps in a text before running them (Guardians of the Galaxy's `Execute qCmd`, at every scene): the diagnosis spots them ("Script that stops the game at every command it runs") and the copy of the script VPX plays compiles them once. The table is never modified, and a text that depends on the procedure running it is still run as before.
+- A script adapted by a previous version of Cyber Pinball is rewritten automatically before the game with the current fixes, instead of being taken for a script from elsewhere.
+- When the game stutters, the log also tells whether the table script was having the antivirus scan text at that moment (amsi.dll and vbscript.dll found on the stack).
+- Applications: the 200% default zoom now applies to the playfield only, where the text was too small; the backglass stays at 100%. Each application's "Page zoom" setting (100 to 300%) still takes precedence on both screens.
+- Remote, mirror: pinching with two fingers on the browser image zooms the page, on the playfield as well as on the backglass (spread to enlarge, pinch to shrink). The zoom is remembered per site in Cyber Pinball's Edge profile.
 - Remote: the volume now also controls the sound of Edge and of the apps opened at the cabinet. It only set the outputs chosen in the "Sound" step (backglass, playfield), while Edge plays on the Windows default output, which can be another one, so the volume bar and Mute did nothing. The volume now follows, by the same amount, the default output and any output where a program is playing.
 - Remote: the volume slider now says why the sound does not change (Windows not answering, no audio output, or an output that did not take the setting) instead of staying silent.
 - What's new: searching the System menu and the LED animations each get a schematic illustration that reads well in the timeline thumbnail (the search one was cropped to an empty strip).

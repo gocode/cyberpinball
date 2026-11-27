@@ -100,7 +100,7 @@ const STALL_PLACES: readonly [RegExp, string][] = [
 /** Fonctions de Windows où un fil ne fait qu'attendre : pour le fil du rendu, on regarde alors qui l'a appelé. */
 const WAITING = /^(ntdll|kernelbase|kernel32|win32u)\.dll$/i;
 
-type Place = { module: string; share: number; samples: number; what?: string };
+type Place = { module: string; share: number; samples: number; what?: string; via?: { modules: string; share: number } };
 
 /** Le module le plus vu d'une liste « A n, B m » cumulée sur plusieurs lignes. */
 function addCounts(counts: Map<string, number>, list: string): number {
@@ -129,6 +129,8 @@ function topPlace(counts: Map<string, number>, total: number): Place | undefined
  */
 export function stallPlace(lines: readonly string[]): (Place & { render?: Place }) | undefined {
   const main = new Map<string, number>();
+  // Modules de Windows relevés plus loin que « under » (plugin du 27/11/2026) : amsi.dll, vbscript.dll.
+  const via = new Map<string, number>();
   const renderIn = new Map<string, number>();
   const renderUnder = new Map<string, number>();
   let total = 0;
@@ -138,7 +140,9 @@ export function stallPlace(lines: readonly string[]): (Place & { render?: Place 
     const [mainPart, renderPart] = line.split(' | render thread ');
     const under = /; main thread \d+ samples: .*?; under ([^;]+)/.exec(mainPart!)?.[1];
     if (under) total += addCounts(main, under);
-    const r = renderPart && /^\d+ samples: in ([^;]+); under ([^;(]+)/.exec(renderPart);
+    const through = /; main thread \d+ samples: [^|]*?; via ([^;|]+)/.exec(mainPart!)?.[1];
+    if (through) addCounts(via, through);
+    const r =renderPart && /^\d+ samples: in ([^;]+); under ([^;(]+)/.exec(renderPart);
     if (r) {
       renderTotal += addCounts(renderIn, r[1]!);
       addCounts(renderUnder, r[2]!);
@@ -146,6 +150,8 @@ export function stallPlace(lines: readonly string[]): (Place & { render?: Place 
   }
   const place = topPlace(main, total);
   if (!place) return undefined;
+  const [viaModules, viaSamples] = [...via].sort((a, b) => b[1] - a[1])[0] ?? [];
+  if (viaModules && viaSamples) place.via = { modules: viaModules, share: viaSamples / total };
   let render = topPlace(renderIn, renderTotal);
   if (render && WAITING.test(render.module)) {
     const caller = topPlace(renderUnder, [...renderUnder.values()].reduce((a, b) => a + b, 0));
@@ -160,9 +166,10 @@ export function stallPlace(lines: readonly string[]): (Place & { render?: Place 
 export function stallPlaceJournal(table: string, lines: readonly string[]): string | undefined {
   const place = stallPlace(lines);
   if (!place) return undefined;
-  const pct = (p: Place) => Math.round(p.share * 100);
+  const pct = (p: { share: number }) => Math.round(p.share * 100);
   const render = place.render ? ` ; le fil du rendu était surtout dans ${place.render.module} (${pct(place.render)} % de ${place.render.samples} relevés)${place.render.what ? `, ${place.render.what}` : ''}` : ''; // i18n-ignore : journal
-  return `À-coups de la partie (${table}) : le fil des images de VPX était surtout dans ${place.module} (${pct(place)} % de ${place.samples} relevés)${place.what ? `, ${place.what}` : ''}${render}.`; // i18n-ignore : journal
+  const via = place.via ? `, appelé par ${place.via.modules.replace('+', ' et ')} dans ${pct(place.via)} % des relevés` : ''; // i18n-ignore : journal
+  return `À-coups de la partie (${table}) : le fil des images de VPX était surtout dans ${place.module} (${pct(place)} % de ${place.samples} relevés)${place.what ? `, ${place.what}` : ''}${via}${render}.`; // i18n-ignore : journal
 }
 
 /** Le dernier bilan des lignes données (celles d'une partie) : celui de fin, sinon le dernier d'étape. */

@@ -75,7 +75,7 @@ const TABLE = [
   '  vpmTimer.AddTimer 0, "Say ""a"" \'"',
   '  vpmTimer.AddTimer 0, "Hit"',
   '  vpmTimer.AddTimer2 0, "Hit", 7',
-  '  vpmTimer.AddTimer 0, "Say ""n" & n & """ \'" \' texte qui change : jamais retenu',
+  '  vpmTimer.AddTimer 0, "Say ""n" & n & """ \'" \' texte qui change : compilé à chaque fois, par ExecuteGlobal',
   '  vpmTimer.AddTimer 0, "Say obj \'" \' obj est une variable de cvpmTimer.Update : laissé à Execute',
   'End Sub',
   'For i = 1 To 3 : Fire i : vpmTimer.Update : Next',
@@ -131,9 +131,22 @@ test('exécuté : même effet qu’avant ; un texte revu passe par sa Sub compil
   assert.equal(original, 'absent,a,hit0,hit7,n1,,a,hit0,hit7,n2,,a,hit0,hit7,n3,,');
   const fixed = applyCompatFixes(TABLE, ['timerTextOnce'])!;
   assert.equal(run(fixed), original, 'même sortie avec le correctif');
-  // Premier tour : Execute (texte vu une fois) ; ensuite « Say "a" » et « Hit » ont chacun leur Sub ; ni le texte qui
-  // change, ni celui qui lit une variable de cvpmTimer.Update.
-  assert.equal(run(fixed, 'said = CyberPinball_TimerCall_Count'), '2');
+  // Dès le premier passage, chaque texte a sa Sub : « Say "a" », « Hit » (le même pour AddTimer et AddTimer2), puis
+  // « Say "n1" », « Say "n2" », « Say "n3" » ; pas celui qui lit une variable de cvpmTimer.Update.
+  assert.equal(run(fixed, 'said = CyberPinball_Compile_Count'), '5');
+});
+
+test('exécuté : les textes fixes sont compilés au chargement, en un lot ; un texte fautif reste à Execute', { skip: process.platform !== 'win32' }, () => {
+  // Partie jouée après le chargement, comme dans VPX ; un texte fixe qui ne se compile pas, dans une Sub jamais appelée.
+  const table = TABLE.replace('For i = 1 To 3 : Fire i : vpmTimer.Update : Next', 'Sub Never : vpmTimer.AddTimer 0, "Say (" : End Sub');
+  const game = 'For i = 1 To 3 : Fire i : vpmTimer.Update : Next';
+  const count = 'said = said & "c" & CyberPinball_Compile_Count & ","';
+  const fixed = applyCompatFixes(table, ['timerTextOnce'])!;
+  assert.match(fixed, /^CyberPinball_Compile_Want "Say ""a"" '", "CyberPinball_Arg", CyberPinball_TimerGuard$/m);
+  // Chargement : « Say "a" » et « Hit » compilés ; « Say obj » écarté par sa garde (variable de cvpmTimer.Update) ;
+  // « Say ( » isolé, sans numéro. Partie : les trois textes qui changent.
+  assert.equal(run(fixed, `${count} : ${game} : ${count}`), 'absent,c2,a,hit0,hit7,n1,,a,hit0,hit7,n2,,a,hit0,hit7,n3,,c5,');
+  assert.equal(run(table, game), run(TABLE), 'même partie sans le correctif');
 });
 
 test('exécuté : une erreur du rappel reste une erreur, comme avec Execute', { skip: process.platform !== 'win32' }, () => {

@@ -8,7 +8,8 @@
 // canvas (sans URL : la page n'a pas le droit de charger d'image d'ailleurs que d'elle-même) puis
 // acquittée (« mirror-ack »), et la borne n'en envoie pas d'autre avant. Un appui devient « tap »,
 // un glissement « mscroll », un appui long un « tap » du bouton droit : leurs points sont des
-// fractions de l'image, la borne les convertit en pixels de la fenêtre.
+// fractions de l'image, la borne les convertit en pixels de la fenêtre. Deux doigts qui s'écartent ou se
+// rapprochent sont un pincement « mzoom » : la borne zoome la page d'un pas (Ctrl+ ou Ctrl- dans Edge) par cran.
 //
 // Limite connue : les vidéos protégées (Netflix, Prime Video, Disney+) sortent noires de la capture
 // d'écran ; le miroir n'y peut rien. Il n'affiche aucun texte d'aide : rien d'autre que l'image.
@@ -20,6 +21,10 @@ const MIRROR_STORE = 'cyberpinball.miroir';
 const MIRROR_TAP_MS = 320;
 const MIRROR_LONG_MS = 550;
 const MIRROR_SLOP = 10;
+/** Écart des doigts (rapport) qui vaut un pas de zoom : à peu près un cran du zoom d'Edge. */
+const MIRROR_PINCH_STEP = 1.25;
+/** Pas au plus par mouvement de doigts (la borne en accepte quatre par message). */
+const MIRROR_PINCH_MAX = 4;
 /** Au plus 1,5 pixel d'image par pixel CSS : au-delà, l'image ne gagne rien et la liaison s'alourdit. */
 const MIRROR_DENSITY_MAX = 1.5;
 const mirror = {
@@ -308,6 +313,7 @@ let mirrorGesture;
 let mirrorPending = { dx: 0, dy: 0 };
 let mirrorFrameId;
 let mirrorLongTimer;
+let mirrorPinch;
 
 function mirrorFlush() {
   mirrorFrameId = undefined;
@@ -330,9 +336,10 @@ mirrorView.addEventListener('pointerdown', (e) => {
   mirrorPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   e.preventDefault();
   if (mirrorPointers.size > 1) {
-    // Deux doigts : ni appui ni glissement (le pincement n'est pas géré).
+    // Deux doigts : ni appui ni glissement, un pincement (zoom de la page, un pas par MIRROR_PINCH_STEP d'écart).
     clearTimeout(mirrorLongTimer);
     if (mirrorGesture) mirrorGesture.cancelled = true;
+    mirrorPinch = mirrorPinchStart();
     return;
   }
   const at = mirrorFraction(e.clientX, e.clientY, false);
@@ -347,8 +354,47 @@ mirrorView.addEventListener('pointerdown', (e) => {
   }, MIRROR_LONG_MS);
 });
 
+/** Distance entre les deux premiers doigts posés ; undefined s'il y en a moins de deux. */
+function mirrorFingerGap() {
+  const [a, b] = [...mirrorPointers.values()];
+  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : undefined;
+}
+
+function mirrorPinchStart() {
+  const gap = mirrorFingerGap();
+  return gap && gap > 1 ? { gap } : undefined;
+}
+
+/**
+ * Pincement : chaque fois que l'écart des doigts a changé d'un facteur MIRROR_PINCH_STEP depuis le dernier pas,
+ * la borne zoome d'un pas (écartés : agrandir, rapprochés : rapetisser). Le point de départ avance d'autant :
+ * un pincement continu fait plusieurs pas, un doigt qui tremble n'en fait aucun.
+ */
+function mirrorPinchMove() {
+  const gap = mirrorFingerGap();
+  if (!mirrorPinch || !gap) return;
+  let steps = 0;
+  while (gap / mirrorPinch.gap >= MIRROR_PINCH_STEP && steps < MIRROR_PINCH_MAX) {
+    mirrorPinch.gap *= MIRROR_PINCH_STEP;
+    steps++;
+  }
+  while (gap / mirrorPinch.gap <= 1 / MIRROR_PINCH_STEP && steps > -MIRROR_PINCH_MAX) {
+    mirrorPinch.gap /= MIRROR_PINCH_STEP;
+    steps--;
+  }
+  if (!steps) return;
+  if (navigator.vibrate) navigator.vibrate(8);
+  send({ t: 'mzoom', steps });
+}
+
 mirrorView.addEventListener('pointermove', (e) => {
   const p = mirrorPointers.get(e.pointerId);
+  if (p && mirrorPointers.size > 1) {
+    p.x = e.clientX;
+    p.y = e.clientY;
+    mirrorPinchMove();
+    return;
+  }
   const g = mirrorGesture;
   if (!p || !g || g.cancelled) return;
   p.x = e.clientX;
@@ -366,6 +412,8 @@ mirrorView.addEventListener('pointermove', (e) => {
 
 function mirrorRelease(e) {
   if (!mirrorPointers.delete(e.pointerId)) return;
+  // Un doigt levé : plus de pincement ; le doigt qui reste ne fait ni appui ni glissement (le geste est annulé).
+  mirrorPinch = undefined;
   if (mirrorPointers.size) return;
   clearTimeout(mirrorLongTimer);
   const g = mirrorGesture;

@@ -30,6 +30,7 @@ const COMPAT_FIX_LABELS: Record<CompatFix, () => string> = {
   vrRoomOnScreens: () => t('pièce VR réservée au casque'),
   executeGlobalOnce: () => t('clignotements sans analyse de l’antivirus'),
   timerTextOnce: () => t('minuteries sans analyse de l’antivirus'),
+  executeOnce: () => t('commandes exécutées sans analyse de l’antivirus'),
   tablesDirectoryDmd: () => t('dossier du DMD cherché dans celui de la table'),
   b2sArgs: () => t('appels au fronton B2S convertis en nombres'),
   dofTapOwnSub: () => t('événements DOF du script transmis aux effets LED'),

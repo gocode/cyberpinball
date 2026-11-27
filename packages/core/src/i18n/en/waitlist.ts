@@ -238,6 +238,7 @@ export const messages: Record<string, string> = {
   'pièce VR réservée au casque': 'VR room kept for the headset',
   'clignotements sans analyse de l’antivirus': 'blinking lights without antivirus scans',
   'minuteries sans analyse de l’antivirus': 'timers without antivirus scans',
+  'commandes exécutées sans analyse de l’antivirus': 'commands run without antivirus scans',
   'dossier du DMD cherché dans celui de la table': 'DMD folder looked for in the table’s own folder',
   'appels au fronton B2S convertis en nombres': 'B2S backglass calls converted to numbers',
   'événements DOF du script transmis aux effets LED': 'script DOF events passed on to the LED effects',

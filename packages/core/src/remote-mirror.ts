@@ -24,7 +24,12 @@ export type MirrorMessage =
   /** Un appui sur l'image : clic à cet endroit de la fenêtre. */
   | { t: 'tap'; s: number; fx: number; fy: number; button: 'left' | 'right'; count: 1 | 2 }
   /** Un glissement du doigt commencé en (fx, fy) ; dx, dy : fractions de l'image (la page suit le doigt). */
-  | { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number };
+  | { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number }
+  /** Un pincement à deux doigts : `steps` pas de zoom de la page (positif : agrandir, négatif : rapetisser), au plus MIRROR_ZOOM_STEPS_MAX à la fois. */
+  | { t: 'mzoom'; s: number; steps: number };
+
+/** Pas de zoom qu'un seul message peut demander (un pincement ample en envoie plusieurs, pas davantage). */
+export const MIRROR_ZOOM_STEPS_MAX = 4;
 
 const unit = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 const span = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 2;
@@ -50,6 +55,8 @@ export function parseMirrorMessage(m: Record<string, unknown>, s: number): Mirro
       return unit(m.fx) && unit(m.fy) && (m.button === 'left' || m.button === 'right') ? { t: 'tap', s, fx: m.fx, fy: m.fy, button: m.button, count: m.count === 2 ? 2 : 1 } : undefined;
     case 'mscroll':
       return unit(m.fx) && unit(m.fy) && span(m.dx) && span(m.dy) ? { t: 'mscroll', s, fx: m.fx, fy: m.fy, dx: m.dx, dy: m.dy } : undefined;
+    case 'mzoom':
+      return typeof m.steps === 'number' && Number.isInteger(m.steps) && m.steps !== 0 && Math.abs(m.steps) <= MIRROR_ZOOM_STEPS_MAX ? { t: 'mzoom', s, steps: m.steps } : undefined;
     default:
       return undefined;
   }

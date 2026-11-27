@@ -14,6 +14,7 @@ import {
   addApplication,
   APP_MOBILE_USER_AGENT,
   APP_ZOOM_DEFAULT,
+  APP_ZOOM_DEFAULT_FRONTON,
   APP_ZOOM_MAX,
   APP_ZOOM_MIN,
   APP_ZOOM_STEPS,
@@ -577,10 +578,13 @@ test('affichage mobile : oui sur le playfield, non sur le fronton sans choix ; l
   assert.match(APP_MOBILE_USER_AGENT, /Android[\s\S]*Mobile/);
 });
 
-test('zoom de la page : 200 % d\'office, borné de 100 à 300, écrit seulement quand on le change ; Edge reçoit le facteur d\'échelle, jamais un port de débogage', () => {
+test('zoom de la page : 200 % d\'office sur le playfield, 100 % au fronton, borné de 100 à 300, écrit seulement quand on le change ; Edge reçoit le facteur d\'échelle, jamais un port de débogage', () => {
   const base = { id: 'ok', name: 'Fictive', url: 'https://fictive.example.com/', screen: 'playfield' as const, color: '#112233', added: 'x' };
   assert.equal(APP_ZOOM_DEFAULT, 200);
-  assert.equal(appZoom(base), 200, 'sans choix : la valeur d\'office');
+  assert.equal(appZoom(base), 200, 'sans choix : la valeur d\'office du playfield');
+  assert.equal(APP_ZOOM_DEFAULT_FRONTON, 100);
+  assert.equal(appZoom({ ...base, screen: 'backglass' }), 100, 'sans choix, au fronton : pas de zoom imposé');
+  assert.equal(appZoom({ screen: 'backglass', zoom: 175 }), 175, 'le choix fait à la main l\'emporte au fronton aussi');
   assert.equal(appZoom({ zoom: 150 }), 150);
   assert.equal(appZoom({ zoom: 20 }), 100, 'borné en bas');
   assert.equal(appZoom({ zoom: 900 }), 300, 'borné en haut');
@@ -609,10 +613,19 @@ test('zoom de la page : 200 % d\'office, borné de 100 à 300, écrit seulement 
   assert.ok(args(200).includes('--start-fullscreen') && args(200).includes('--app=https://a.example.com/'));
 });
 
-test('réglage Zoom de la page : ligne des réglages de l\'application, 200 % d\'office, Start passe au pas suivant et le choix se retient', () => {
+test('réglage Zoom de la page : ligne des réglages, 200 % d\'office sur le playfield et 100 % au fronton, Start passe au pas suivant et le choix se retient', () => {
   const dir = tmp();
-  const m = makeMenu({ dataDir: dir });
+  const pf = { id: 'sur-playfield', name: 'Playfield', url: 'https://pf.example.com/', screen: 'playfield' as const, color: '#112233', added: 'a' };
+  const fr = { id: 'au-fronton', name: 'Fronton', url: 'https://fr.example.com/', screen: 'backglass' as const, color: '#223344', added: 'b' };
+  // Au fronton : 100 % affiché, Start passe à 125 %.
+  const m2 = makeMenu({ dataDir: tmp(), apps: [fr] });
+  m2.top().keys(key('keyDown', 'ShiftLeft'));
+  const zoom2 = () => m2.top().actions.find((a: any) => a.key === 'zoom');
+  assert.equal(zoom2().activeChoice, '100 %');
+  assert.match(zoom2().detail, /Start : 125 %/);
+  const m = makeMenu({ dataDir: dir, apps: [pf, fr] });
   m.top().keys(key('keyDown', 'ShiftLeft'));
+  assert.equal(m.top().heading, 'Playfield');
   const zoom = () => m.top().actions.find((a: any) => a.key === 'zoom');
   assert.equal(zoom().label, 'Zoom de la page');
   assert.equal(zoom().activeChoice, '200 %');
@@ -623,9 +636,8 @@ test('réglage Zoom de la page : ligne des réglages de l\'application, 200 % d\
   assert.equal(zoom().activeChoice, '300 %');
   zoom().run();
   assert.equal(zoom().activeChoice, '100 %', 'après 300 %, retour à 100 %');
-  assert.equal(loadApplications(dir).apps[0]!.zoom, 100, 'le choix est écrit dans la liste des applications');
-  // Un autre démarrage de la borne le retrouve ; les autres applications gardent la valeur d'office.
+  // Un autre démarrage de la borne le retrouve ; l'autre application n'est pas touchée.
   const again = loadApplications(dir);
-  assert.equal(appZoom(again.apps[0]!), 100);
-  assert.equal(appZoom(again.apps[1]!), 200);
+  assert.equal(again.apps.find((a) => a.id === 'sur-playfield')!.zoom, 100, 'le choix est écrit dans la liste des applications');
+  assert.equal('zoom' in again.apps.find((a) => a.id === 'au-fronton')!, false);
 });

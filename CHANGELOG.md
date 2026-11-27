@@ -11,6 +11,12 @@ son interface).
 
 ## 0.2.4
 
+- Moins d'arrêts de la partie quand l'antivirus analyse le script d'une table : les minuteries décrites par un texte (Guardians of the Galaxy, Game of Thrones…) sont compilées une seule fois, et celles écrites telles quelles dans la table le sont d'un seul coup au chargement, au lieu d'une analyse à chaque échéance.
+- Même chose pour les commandes qu'une table range dans un texte avant de les exécuter (`Execute qCmd` de Guardians of the Galaxy, à chaque scène) : le diagnostic les repère ("Script qui arrête la partie à chaque commande exécutée") et la copie du script que joue VPX les compile une fois. La table n'est jamais modifiée, et un texte qui dépend de la procédure qui l'exécute reste exécuté comme avant.
+- Un script adapté par une version précédente de Cyber Pinball est refait d'office avant la partie avec les correctifs d'aujourd'hui, au lieu d'être pris pour un script venu d'ailleurs.
+- Quand la partie s'arrête par à-coups, le journal dit aussi si le script de la table faisait analyser du texte par l'antivirus à ce moment-là (amsi.dll et vbscript.dll relevés sur la pile).
+- Applications : le zoom de 200 % par défaut ne s'applique plus qu'au playfield, où le texte était trop petit ; le fronton reste à 100 %. Le réglage "Zoom de la page" de chaque application (100 à 300 %) garde la main sur les deux écrans.
+- Télécommande, miroir : un pincement à deux doigts sur l'image du navigateur zoome la page, sur le playfield comme sur le fronton (écarter agrandit, rapprocher rapetisse). Le zoom se retient par site dans le profil d'Edge de Cyber Pinball.
 - Télécommande : le volume règle aussi le son d'Edge et des applications ouvertes à la borne. Il ne réglait que les sorties choisies à l'étape "Son" (fronton, plateau) ; Edge joue sur la sortie par défaut de Windows, qui peut être une autre, d'où une barre de son et un Muet sans effet. Le volume suit maintenant, du même écart, la sortie par défaut et toute sortie où un programme joue.
 - Télécommande : la réglette du volume dit pourquoi le son ne bouge pas (Windows ne répond pas, aucune sortie audio, ou réglage non pris par une sortie) au lieu de rester muette.
 - Nouveautés : la recherche dans le Menu système et les animations des LED ont chacune une illustration schématique, lisible dans la vignette de la chronologie (celle de la recherche était rognée en bande vide).

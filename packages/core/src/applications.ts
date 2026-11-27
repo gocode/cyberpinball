@@ -44,7 +44,7 @@ export interface AppEntry {
    * dans un sens comme dans l'autre (appMobile).
    */
   mobile?: boolean;
-  /** Zoom de la page, en pourcents (APP_ZOOM_MIN à APP_ZOOM_MAX) ; absent : APP_ZOOM_DEFAULT (appZoom). */
+  /** Zoom de la page, en pourcents (APP_ZOOM_MIN à APP_ZOOM_MAX) ; absent : 200 sur le playfield, 100 sur le fronton (appZoom). */
   zoom?: number;
   /** Teinte de la tuile composée (#rrggbb), et du halo de l'icône. */
   color: string;
@@ -577,9 +577,16 @@ export function clampAppZoom(percent: number): number {
   return Math.min(APP_ZOOM_MAX, Math.max(APP_ZOOM_MIN, Math.round(percent)));
 }
 
-/** Zoom de l'application, en pourcents : celui qu'elle a gardé, sinon APP_ZOOM_DEFAULT. */
+/** Valeur d'office au fronton (un écran large, où les textes se lisent déjà) : le zoom n'y est pas imposé. */
+export const APP_ZOOM_DEFAULT_FRONTON = 100;
+
+/**
+ * Zoom de l'application, en pourcents : celui qu'elle a gardé, sinon APP_ZOOM_DEFAULT sur le playfield
+ * (où les textes étaient trop petits) et APP_ZOOM_DEFAULT_FRONTON sur le fronton. Comme pour l'affichage
+ * mobile, sans choix fait à la main le défaut suit l'écran.
+ */
 export function appZoom(app: Partial<AppEntry>): number {
-  return clampAppZoom(app.zoom ?? APP_ZOOM_DEFAULT);
+  return clampAppZoom(app.zoom ?? (app.screen === 'backglass' ? APP_ZOOM_DEFAULT_FRONTON : APP_ZOOM_DEFAULT));
 }
 
 /** Le pas suivant du réglage (au-dessus du zoom donné), puis retour au plus petit après le plus grand. */

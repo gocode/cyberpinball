@@ -17,6 +17,10 @@
 // Sûreté : pendant que le fil est suspendu, la veille n'appelle rien qui prenne un verrou de l'espace utilisateur
 // (ni allocation, ni chargeur, ni journal) : GetThreadContext, VirtualQuery et une copie dans un tampon fait
 // d'avance. Tout le reste (modules, comptes) se fait une fois le fil relancé.
+// « sous » saute les modules de Windows : quand c'est un antivirus (rapport du 27/11/2026, McAfee, « under
+// mc-sec-plugin-x64.dll » à presque chaque relevé), rien ne disait s'il était appelé pour analyser un script. La
+// suite de la pile, plus loin que lui, est donc lue aussi : amsi.dll (l'analyse que demande Windows) et vbscript.dll
+// (le script de la table) y sont relevés, « ; via amsi.dll+vbscript.dll 150 » (absent quand ni l'un ni l'autre n'y est).
 // Logique de comptage seule (sans Windows) : Comptes, banc dans test/banc-arrets.cpp.
 
 #pragma once
@@ -25,6 +29,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 namespace cyberpinball
 {
@@ -36,7 +41,8 @@ public:
    static constexpr int NOMS = 12;
    static constexpr int POSITIONS = 48;
 
-   void ajouter(const char* dans, const char* sous, const char* modulePosition, uint64_t position)
+   /** `via` : modules de Windows notables trouvés sur la pile plus loin que `sous` (« amsi.dll+vbscript.dll »), ou nullptr. */
+   void ajouter(const char* dans, const char* sous, const char* modulePosition, uint64_t position, const char* via = nullptr)
    {
       m_releves++;
       // Actif : le fil était ailleurs que dans les attentes de Windows (ntdll, win32u, KERNELBASE).
@@ -44,6 +50,8 @@ public:
          m_actifs++;
       compter(m_dans, dans);
       compter(m_sous, sous);
+      if (via && *via)
+         compter(m_via, via);
       if (!modulePosition || !*modulePosition)
          return;
       for (Position& p : m_positions)
@@ -67,7 +75,7 @@ public:
    /** Relevés où le fil travaillait (hors attentes de Windows). */
    int actifs() const { return m_actifs; }
 
-   /** « N samples: in a 60, b 20; under c 70; top c+0x1234 (40) » ; vide sans relevé. */
+   /** « N samples: in a 60, b 20; under c 70; via d 50; top c+0x1234 (40) » (« via » seulement s'il y en a) ; vide sans relevé. */
    void dire(char* ligne, size_t taille) const
    {
       if (!taille)
@@ -89,6 +97,11 @@ public:
       liste(m_dans, ajoute);
       ajoute("; under");
       liste(m_sous, ajoute);
+      if (std::any_of(std::begin(m_via), std::end(m_via), [](const Nom& x) { return x.n > 0; }))
+      {
+         ajoute("; via");
+         liste(m_via, ajoute);
+      }
       const Position* haut = nullptr;
       for (const Position& p : m_positions)
          if (p.n && (!haut || p.n > haut->n))
@@ -153,6 +166,7 @@ private:
 
    Nom m_dans[NOMS] {};
    Nom m_sous[NOMS] {};
+   Nom m_via[NOMS] {};
    Position m_positions[POSITIONS] {};
    int m_releves = 0;
    int m_actifs = 0;
@@ -344,7 +358,10 @@ private:
       uintptr_t base;
       char nom[64];
       bool windows;
+      /** VIA_AMSI ou VIA_VBSCRIPT : module de Windows relevé quand il est sur la pile plus loin que « sous ». */
+      unsigned via;
    };
+   static constexpr unsigned VIA_AMSI = 1, VIA_VBSCRIPT = 2;
    static constexpr int MODULES = 512;
    static constexpr size_t PILE = 32 * 1024;
 
@@ -587,10 +604,11 @@ private:
       const Module* dans = trouver(ip);
       const Module* sous = (dans && !dans->windows) ? dans : nullptr;
       uintptr_t positionSous = sous ? ip : 0;
-      for (size_t i = 0; !sous && i + sizeof(uintptr_t) <= copie; i += sizeof(uintptr_t))
+      size_t k = 0;
+      for (; !sous && k + sizeof(uintptr_t) <= copie; k += sizeof(uintptr_t))
       {
          uintptr_t valeur;
-         std::memcpy(&valeur, m_pile + i, sizeof(valeur));
+         std::memcpy(&valeur, m_pile + k, sizeof(valeur));
          const Module* m = trouver(valeur);
          if (m && !m->windows)
          {
@@ -598,6 +616,16 @@ private:
             positionSous = valeur;
          }
       }
+      // Plus loin que « sous » : qui l'a appelé, parmi les modules de Windows qu'il saute (AMSI, le moteur VBScript).
+      unsigned via = 0;
+      for (; sous && k + sizeof(uintptr_t) <= copie && via != (VIA_AMSI | VIA_VBSCRIPT); k += sizeof(uintptr_t))
+      {
+         uintptr_t valeur;
+         std::memcpy(&valeur, m_pile + k, sizeof(valeur));
+         if (const Module* m = trouver(valeur))
+            via |= m->via;
+      }
+      const char* const viaNom = via == (VIA_AMSI | VIA_VBSCRIPT) ? "amsi.dll+vbscript.dll" : via == VIA_AMSI ? "amsi.dll" : via == VIA_VBSCRIPT ? "vbscript.dll" : nullptr;
       const std::lock_guard<std::mutex> verrou(m_verrou);
       if (m_arret != arret)
       {
@@ -607,7 +635,7 @@ private:
             m_autres[i].comptes.remiseAZero();
          m_arret = arret;
       }
-      comptes.ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0);
+      comptes.ajouter(dans ? dans->nom : "?", sous ? sous->nom : "-", sous ? sous->nom : "", sous ? positionSous - sous->base : 0, viaNom);
    }
 
    /** Le module dont la partie exécutable contient `adresse` ; la liste est relue une fois par arrêt au plus. */
@@ -652,6 +680,7 @@ private:
          m.windows = longueurWindows && _wcsnicmp(chemin, windows, longueurWindows) == 0;
          const wchar_t* nom = wcsrchr(chemin, L'\\');
          nom = nom ? nom + 1 : chemin;
+         m.via = _wcsicmp(nom, L"amsi.dll") == 0 ? VIA_AMSI : _wcsicmp(nom, L"vbscript.dll") == 0 ? VIA_VBSCRIPT : 0;
          WideCharToMultiByte(CP_UTF8, 0, nom, -1, m.nom, sizeof(m.nom), nullptr, nullptr);
          m.nom[sizeof(m.nom) - 1] = '\0';
       }

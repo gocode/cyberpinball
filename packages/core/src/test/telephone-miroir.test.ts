@@ -12,6 +12,7 @@ import * as vm from 'node:vm';
 import { appBrowserArgs } from '../applications';
 import {
   MIRROR_BOX_MAX,
+  MIRROR_ZOOM_STEPS_MAX,
   MIRROR_EDGE_MAX,
   MIRROR_EDGE_MIN,
   MIRROR_LEVELS,
@@ -142,6 +143,16 @@ test('les messages du miroir passent par le parseur de la télécommande, bornes
   assert.equal(parseMirrorMessage({ t: 'move' }, 1), undefined);
 });
 
+test('un pincement « mzoom » : un nombre entier de pas non nul, au plus MIRROR_ZOOM_STEPS_MAX', () => {
+  assert.deepEqual(parsePhoneMessage({ t: 'mzoom', s: 7, steps: 1 }), { t: 'mzoom', s: 7, steps: 1 });
+  assert.deepEqual(parsePhoneMessage({ t: 'mzoom', s: 7, steps: -MIRROR_ZOOM_STEPS_MAX }), { t: 'mzoom', s: 7, steps: -MIRROR_ZOOM_STEPS_MAX });
+  assert.equal(parsePhoneMessage({ t: 'mzoom', s: 7, steps: 0 }), undefined);
+  assert.equal(parsePhoneMessage({ t: 'mzoom', s: 7, steps: MIRROR_ZOOM_STEPS_MAX + 1 }), undefined);
+  assert.equal(parsePhoneMessage({ t: 'mzoom', s: 7, steps: 1.5 }), undefined);
+  assert.equal(parsePhoneMessage({ t: 'mzoom', s: 7, steps: '2' }), undefined);
+  assert.equal(parsePhoneMessage({ t: 'mzoom', s: 7 }), undefined);
+});
+
 test('le pavé tactile garde son vocabulaire : move, click et scroll se lisent comme avant', () => {
   assert.deepEqual(parsePhoneMessage({ t: 'move', s: 1, dx: 3, dy: -4, ms: 16 }), { t: 'move', s: 1, dx: 3, dy: -4, ms: 16 });
   assert.deepEqual(parsePhoneMessage({ t: 'click', s: 2, button: 'left', count: 2 }), { t: 'click', s: 2, button: 'left', count: 2 });
@@ -164,6 +175,7 @@ interface FakeHost {
   pointer(x: number, y: number): void;
   click(b: 'left' | 'right', c: number): void;
   wheel(dx: number, dy: number): void;
+  zoom(dir: 1 | -1): void;
   now(): number;
   after(ms: number, fn: () => void): () => void;
 }
@@ -172,6 +184,7 @@ interface Mirror {
   ack(n: number): void;
   tap(m: { t: 'tap'; s: number; fx: number; fy: number; button: 'left' | 'right'; count: 1 | 2 }): void;
   scroll(m: { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number }): void;
+  zoom(m: { t: 'mzoom'; s: number; steps: number }): void;
   readonly active: boolean;
   stop(): void;
 }
@@ -189,6 +202,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean } = {}) {
     pointer: [] as [number, number][],
     clicks: [] as [string, number][],
     wheels: [] as [number, number][],
+    zooms: [] as number[],
     pending: undefined as undefined | ((s: MirrorShot | undefined) => void),
     manual: false,
   };
@@ -204,6 +218,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean } = {}) {
     pointer: (x, y) => void state.pointer.push([x, y]),
     click: (b, c) => void state.clicks.push([b, c]),
     wheel: (dx, dy) => void state.wheels.push([dx, dy]),
+    zoom: (dir) => void state.zooms.push(dir),
     now: () => t,
     after: (ms, fn) => {
       const id = nextId++;
@@ -406,6 +421,30 @@ test('un glissement devient un coup de molette à l\'endroit du doigt', async ()
   assert.equal(r.state.wheels.length, 1);
 });
 
+test('un pincement zoome la page d\'autant de pas, dans le bon sens, et rien hors miroir actif', async () => {
+  const r = rig();
+  // Miroir non demandé : rien.
+  r.mirror.zoom({ t: 'mzoom', s: 1, steps: 2 });
+  assert.deepEqual(r.state.zooms, []);
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  r.mirror.zoom({ t: 'mzoom', s: 2, steps: 2 });
+  r.mirror.zoom({ t: 'mzoom', s: 3, steps: -1 });
+  assert.deepEqual(r.state.zooms, [1, 1, -1]);
+  // Au plus MIRROR_ZOOM_STEPS_MAX pas par message, même si le message en demande plus.
+  r.state.zooms.length = 0;
+  r.mirror.zoom({ t: 'mzoom', s: 4, steps: 99 });
+  assert.equal(r.state.zooms.length, MIRROR_ZOOM_STEPS_MAX);
+  // La télécommande ne pilote plus la fenêtre, ou la fenêtre a disparu : rien.
+  r.state.zooms.length = 0;
+  r.state.live = false;
+  r.mirror.zoom({ t: 'mzoom', s: 5, steps: 1 });
+  r.state.live = true;
+  r.state.rect = undefined;
+  r.mirror.zoom({ t: 'mzoom', s: 6, steps: 1 });
+  assert.deepEqual(r.state.zooms, []);
+});
+
 test('la télécommande qui ne pilote plus la fenêtre : appuis ignorés même si le miroir est demandé', async () => {
   const r = rig();
   r.mirror.request(true, { w: 390, h: 700 });
@@ -470,6 +509,9 @@ test('page du téléphone : les gestes du miroir sont ceux du brief (appui, glis
   assert.match(phoneMirror, /t: 'tap', fx: g\.fx, fy: g\.fy, button: 'left'/);
   assert.match(phoneMirror, /t: 'tap', fx: g\.fx, fy: g\.fy, button: 'right'/);
   assert.match(phoneMirror, /t: 'mscroll'/);
+  // Deux doigts : un pincement, qui zoome la page d'un pas par cran (au plus quatre pas par message, comme la borne).
+  assert.match(phoneMirror, /t: 'mzoom', steps/);
+  assert.match(phoneMirror, /MIRROR_PINCH_MAX = 4/);
   // Les images se dessinent sans URL (img-src 'self' de la page) : canvas, ni data: ni blob: dans la page.
   assert.match(phoneMirror, /createImageBitmap/);
   assert.equal(/data:image|URL\.createObjectURL/.test(phoneMirror), false);

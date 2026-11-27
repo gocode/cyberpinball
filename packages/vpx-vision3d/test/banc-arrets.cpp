@@ -81,6 +81,14 @@ int main()
       VERIFIE(d.releves() == Comptes::NOMS + 5);
       d.dire(ligne, sizeof(ligne));
       VERIFIE(std::strstr(ligne, "other 6") != nullptr);
+      // Antivirus appelé par AMSI pour le script (rapport du 27/11/2026) : « via » après « under », avant « top ».
+      Comptes e;
+      for (int i = 0; i < 3; i++)
+         e.ajouter("win32u.dll", "mc-sec-plugin-x64.dll", "mc-sec-plugin-x64.dll", 0x96c3f, "amsi.dll+vbscript.dll");
+      e.ajouter("vbscript.dll", "VPinballX64.exe", "VPinballX64.exe", 0x10, nullptr);
+      e.dire(ligne, sizeof(ligne));
+      std::printf("%s\n", ligne);
+      VERIFIE(std::strcmp(ligne, "4 samples: in win32u.dll 3, vbscript.dll 1; under mc-sec-plugin-x64.dll 3, VPinballX64.exe 1; via amsi.dll+vbscript.dll 3; top mc-sec-plugin-x64.dll+0x96c3f (3)") == 0);
    }
    {
       ReleveArrets releve;

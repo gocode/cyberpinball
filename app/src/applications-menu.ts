@@ -408,6 +408,7 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
       pointer: (x, y) => session.pointer(x, y),
       click: (button, count) => session.click(button, count),
       scroll: (dx, dy) => session.wheel(dx, dy),
+      zoom: (dir) => session.zoom(dir),
       // Le miroir du téléphone : seulement si la session sait capturer sa fenêtre.
       ...(session.capture ? { capture: (size, quality) => session.capture!(size, quality) } : {}),
       text: (del, ins) => {

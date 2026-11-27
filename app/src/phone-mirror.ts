@@ -13,7 +13,7 @@
 //    une capture d'écran de la fenêtre (desktopCapturer) ;
 //  - une image noire (vidéo protégée : Netflix, Prime, Disney+) est envoyée telle quelle.
 
-import { mirrorAdapt, mirrorFit, mirrorPoint, mirrorWheel, MIRROR_LEVELS, type MirrorMessage, type MirrorPace, type MirrorRect } from '@cyberpinball/core';
+import { mirrorAdapt, mirrorFit, mirrorPoint, mirrorWheel, MIRROR_LEVELS, MIRROR_ZOOM_STEPS_MAX, type MirrorMessage, type MirrorPace, type MirrorRect } from '@cyberpinball/core';
 
 /** Une image capturée : le JPEG et sa taille réelle. */
 export interface MirrorShot {
@@ -34,6 +34,8 @@ export interface MirrorHost {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Zoom de la page d'un pas : 1 agrandit, -1 rapetisse (Ctrl+ et Ctrl- dans la fenêtre). Absent : le pincement ne fait rien. */
+  zoom?(dir: 1 | -1): void;
   log?(line: string): void;
   /** Essais : horloge et minuterie remplaçables. `after` rend la fonction qui l'annule. */
   now?(): number;
@@ -54,6 +56,8 @@ export interface PhoneMirror {
   ack(n: number): void;
   tap(message: Extract<MirrorMessage, { t: 'tap' }>): void;
   scroll(message: Extract<MirrorMessage, { t: 'mscroll' }>): void;
+  /** Pincement du téléphone : la page de la fenêtre est agrandie ou rapetissée de `steps` pas. */
+  zoom(message: Extract<MirrorMessage, { t: 'mzoom' }>): void;
   /** Le miroir est demandé. */
   readonly active: boolean;
   /** Arrête tout : plus de capture, plus d'image attendue. */
@@ -207,6 +211,11 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       if (wheel.deltaX === 0 && wheel.deltaY === 0) return;
       host.pointer(p.x, p.y);
       host.wheel(wheel.deltaX, wheel.deltaY);
+    },
+    zoom(m) {
+      if (!on || !host.live() || !host.rect()) return;
+      const dir = m.steps > 0 ? 1 : -1;
+      for (let i = Math.min(MIRROR_ZOOM_STEPS_MAX, Math.abs(m.steps)); i > 0; i--) host.zoom?.(dir);
     },
     stop,
   };

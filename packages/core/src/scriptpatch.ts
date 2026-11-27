@@ -17,7 +17,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { addCaptureWatch, captureBlock, type PupCapture } from './pupcapture';
-import { applyCompatFixes, compatFixesApplicable, type CompatFix } from './scriptcompat';
+import { applyCompatFixes, COMPAT_VERSION, compatFixesApplicable, compatFixesFound, type CompatFix } from './scriptcompat';
 import { addPupLoader, enablePupSwitch, pupLoaderNeeded, pupScriptFacts, pupSwitchesToEnable, usesPinmameCode, type PupLoader, type PupSwitch } from './puppack';
 import { scriptCode } from './vbscript';
 import { addFlexPrewarm, flexDmdVariable, type FlexPrewarm } from './flexprewarm';
@@ -36,6 +36,8 @@ export interface ScriptPatch {
   capture?: PupCapture;
   /** Correctifs pour le core.vbs actuel (scriptcompat.ts). */
   compat?: CompatFix[];
+  /** Version du texte de ces correctifs (COMPAT_VERSION) ; absente : 1. */
+  compatVersion?: number;
   /** Images du DMD que FlexDMD charge pendant le chargement de la table (flexprewarm.ts). */
   prewarm?: FlexPrewarm;
 }
@@ -75,7 +77,7 @@ export function buildScriptPatch(original: string, switches: PupSwitch[], loader
     switches,
     ...(loader ? { loader } : {}),
     ...(capture ? { capture: capture.settings } : {}),
-    ...(compat.length ? { compat } : {}),
+    ...(compat.length ? { compat, compatVersion: COMPAT_VERSION } : {}),
     ...(prewarm ? { prewarm } : {}),
   };
   return `${text}${/\r?\n$/.test(text) ? '' : eol}${SCRIPT_PATCH_MARK}${JSON.stringify(patch)}${eol}`;
@@ -100,8 +102,10 @@ export type ScriptPatchState =
    * Écrit d'après le script d'une version précédente de la table : VPX joue l'ancien
    * script avec la nouvelle table. `content` : le .vbs refait d'après le nouveau script ;
    * absent si le nouveau script lance déjà le pack (le .vbs n'a plus lieu d'être).
+   * `older` : même script de table, mais correctifs écrits par une version précédente de
+   * Cyber Pinball (compatVersion) ; `content` les écrit tels qu'aujourd'hui.
    */
-  | { kind: 'stale'; patch: ScriptPatch; content?: string }
+  | { kind: 'stale'; patch: ScriptPatch; content?: string; older?: true }
   /** Un .vbs venu d'ailleurs (auteur, extraction), ou modifié à la main depuis. */
   | { kind: 'foreign' };
 
@@ -113,25 +117,30 @@ export function scriptPatchState(vbs: string, embedded: string | undefined): Scr
   const patch = readScriptPatch(vbs);
   if (!patch) return { kind: 'foreign' };
   if (embedded === undefined) return { kind: 'ours', patch };
-  if (scriptHash(embedded) !== patch.from) {
-    // Refait avec les mêmes sortes d'interrupteurs : la PuP-DMD seulement si l'ancien l'allumait ;
-    // le lancement du pack, tant que le nouveau script ne le fait pas lui-même.
-    const code = scriptCode(embedded);
-    const switches = pupSwitchesToEnable(code, patch.switches.some((s) => s.kind === 'dmd'));
-    const loader = patch.loader && pupLoaderNeeded({ usesPinmame: usesPinmameCode(code), roms: [], pup: pupScriptFacts(code) }) ? patch.loader : undefined;
-    // La reconnaissance est gardée si le nouveau script a encore son minuteur ; sinon le médecin
-    // la refera, ou dira pourquoi il ne le peut plus (pupCaptureUnseen).
-    const capture = ownCapture(vbs, patch);
-    // Les correctifs pour le core.vbs, tant que le nouveau script s'y prête ; s'il en réclame un
-    // autre, le médecin l'ajoute (scriptCoreCompat).
-    const compat = compatFixesApplicable(patch.compat ?? [], code);
-    // Le chargement d'avance, tant que le nouveau script lance encore le même FlexDMD ; sinon le médecin le refait.
-    const prewarm = patch.prewarm && flexDmdVariable(code) === patch.prewarm.variable ? patch.prewarm : undefined;
-    const kept = capture ? buildScriptPatch(embedded, switches, loader, capture, compat, prewarm) : undefined;
-    const content = kept ?? (switches.length || loader || compat.length || prewarm ? buildScriptPatch(embedded, switches, loader, undefined, compat, prewarm) : undefined);
-    return content ? { kind: 'stale', patch, content } : { kind: 'stale', patch };
-  }
-  return buildScriptPatch(embedded, patch.switches, patch.loader, ownCapture(vbs, patch), patch.compat, patch.prewarm) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };
+  const sameScript = scriptHash(embedded) === patch.from;
+  if (sameScript && buildScriptPatch(embedded, patch.switches, patch.loader, ownCapture(vbs, patch), patch.compat, patch.prewarm) === vbs) return { kind: 'ours', patch };
+  // Correctifs écrits par une version précédente de Cyber Pinball : le texte refait n'est plus le même, sans que
+  // personne ait touché au .vbs. Il est refait comme pour une table mise à jour (dernière ligne marquée, même script).
+  const older = sameScript && !!patch.compat?.length && (patch.compatVersion ?? 1) < COMPAT_VERSION;
+  if (sameScript && !older) return { kind: 'foreign' };
+  // Refait avec les mêmes sortes d'interrupteurs : la PuP-DMD seulement si l'ancien l'allumait ;
+  // le lancement du pack, tant que le nouveau script ne le fait pas lui-même.
+  const code = scriptCode(embedded);
+  const switches = pupSwitchesToEnable(code, patch.switches.some((s) => s.kind === 'dmd'));
+  const loader = patch.loader && pupLoaderNeeded({ usesPinmame: usesPinmameCode(code), roms: [], pup: pupScriptFacts(code) }) ? patch.loader : undefined;
+  // La reconnaissance est gardée si le nouveau script a encore son minuteur ; sinon le médecin
+  // la refera, ou dira pourquoi il ne le peut plus (pupCaptureUnseen).
+  const capture = ownCapture(vbs, patch);
+  // Les correctifs pour le core.vbs, tant que le nouveau script s'y prête ; s'il en réclame un
+  // autre, le médecin l'ajoute (scriptCoreCompat). Refaits par une version plus récente, ils comprennent d'office ceux
+  // qu'elle a appris à repérer depuis (le .vbs est réécrit une seule fois, avant la partie).
+  const compat = compatFixesApplicable([...(patch.compat ?? []), ...(older ? compatFixesFound(code) : [])], code);
+  // Le chargement d'avance, tant que le nouveau script lance encore le même FlexDMD ; sinon le médecin le refait.
+  const prewarm = patch.prewarm && flexDmdVariable(code) === patch.prewarm.variable ? patch.prewarm : undefined;
+  const kept = capture ? buildScriptPatch(embedded, switches, loader, capture, compat, prewarm) : undefined;
+  const content = kept ?? (switches.length || loader || compat.length || prewarm ? buildScriptPatch(embedded, switches, loader, undefined, compat, prewarm) : undefined);
+  const why = older ? { older: true as const } : {};
+  return content ? { kind: 'stale', patch, content, ...why } : { kind: 'stale', patch, ...why };
 }
 
 /** Le bloc de reconnaissance d'un .vbs de Cyber Pinball, tel quel, quand sa dernière ligne en annonce un. */

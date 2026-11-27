@@ -161,6 +161,17 @@ test('à-coups : les antivirus tiers (McAfee, rapport du 27/11/2026) sont reconn
   assert.match(stallPlaceJournal('SPACE_CADET', stall('mc-sec-plugin-x64.dll'))!, /surtout dans mc-sec-plugin-x64\.dll \(100 % de 40 relevés\), l'antivirus McAfee, /);
 });
 
+test('à-coups : qui a appelé l\'antivirus, relevé plus loin sur la pile (« via », plugin du 27/11/2026)', () => {
+  const line = (via: string, other = '') =>
+    `Cadence: stall of 785 ms at 12.0s; main thread 40 samples: in win32u.dll 40; under mc-sec-plugin-x64.dll 40${via}; top mc-sec-plugin-x64.dll+0x96c3f (30)${other}`;
+  const lines = [line('; via amsi.dll+vbscript.dll 30'), line('; via amsi.dll+vbscript.dll 6, amsi.dll 2')];
+  assert.deepEqual(stallPlace(lines)!.via, { modules: 'amsi.dll+vbscript.dll', share: 36 / 80 });
+  assert.match(stallPlaceJournal('GOONIES', lines)!, /l'antivirus McAfee, [^;]*, appelé par amsi\.dll et vbscript\.dll dans 45 % des relevés\.$/);
+  // Un ancien plugin (sans « via ») ne dit rien de plus ; le « via » d'un autre fil n'est pas celui du fil des images.
+  assert.equal(stallPlace([line('')])!.via, undefined);
+  assert.equal(stallPlace([line('', ' | thread Audio 5 samples: in x 5; under y 5; via vbscript.dll 5')])!.via, undefined);
+});
+
 test('à-coups : la boucle de jeu qui attend le rendu (rapport du 21/11/2026), et où était le fil du rendu', () => {
   // Lignes réelles de la borne d'Eric (24, plugin d'avant le relevé du rendu) : SDL364.dll = la pause de la boucle de jeu.
   const old = [

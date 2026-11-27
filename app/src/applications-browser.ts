@@ -38,6 +38,9 @@ import { windowCapture, type MirrorShot } from './phone-mirror';
 
 const VK: Record<EdgeKey, number> = { Enter: 0x0d, Tab: 0x09, Backspace: 0x08, ArrowLeft: 0x25, ArrowUp: 0x26, ArrowRight: 0x27, ArrowDown: 0x28, Space: 0x20, Escape: 0x1b };
 const VK_A = 0x41;
+/** Ctrl+= et Ctrl+- : le zoom de la page d'Edge (touches « = » et « - » de la rangée du haut, quel que soit le clavier). */
+const VK_ZOOM_IN = 0xbb;
+const VK_ZOOM_OUT = 0xbd;
 const FIND_TIMEOUT_MS = 20_000;
 const CLOSE_GRACE_MS = 10_000;
 /** Délai laissé à Edge pour se mettre en plein écran avant de contrôler sa position. */
@@ -74,6 +77,8 @@ export interface AppSession {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Zoom de la page d'un pas (Ctrl+ ou Ctrl- dans Edge) : le pincement du miroir du téléphone. */
+  zoom(dir: 1 | -1): void;
   /** Image de la fenêtre, pour le miroir du téléphone ; absent si la capture n'est pas possible. */
   capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   type(text: string): void;
@@ -169,6 +174,7 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
       pointer: (x, y) => win && ops().pointer(x, y),
       click: (button, count) => ready() && ops().click(button, count),
       wheel: (dx, dy) => win && ops().wheel(dx, dy),
+      zoom: (dir) => ready() && ops().key(dir > 0 ? VK_ZOOM_IN : VK_ZOOM_OUT, { ctrl: true }),
       ...windowCapture(ops, () => win),
       type: (text) => ready() && ops().type(text),
       key: (k, mods) => ready() && ops().key(VK[k], mods),

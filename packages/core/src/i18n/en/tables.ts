@@ -137,6 +137,9 @@ export const messages: Record<string, string> = {
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.': 'The table is not modified: VPX plays {file}, a copy of its script where a procedure is only redefined when its text changes.',
   'Ne redéfinir une procédure que si elle change (dans {file})': 'Only redefine a procedure when it changes (in {file})',
   'Script qui arrête la partie à chaque minuterie': 'Script that stops the game at every timer',
+  'Script qui arrête la partie pour compiler du texte': 'Script that stops the game to compile text',
+  'Script qui arrête la partie à chaque commande exécutée': 'Script that stops the game at every command it runs',
+  'Le script de la table range des commandes dans un texte qu’il fait exécuter pendant la partie (Execute) : VPX compile ce texte à chaque fois, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.': 'The table script keeps commands in a text that it runs during the game (Execute): VPX compiles this text every time, Windows has its antivirus scan it, and the game stops while it does.',
   'Script qui arrête la partie à chaque clignotement et à chaque minuterie': 'Script that stops the game at every blink and every timer',
   'Le script de la table décrit des minuteries par un texte (vpmTimer.AddTimer) : VPX compile ce texte à chaque échéance, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.':
     'The table’s script describes timers as text (vpmTimer.AddTimer): VPX compiles that text each time a timer fires, Windows has its antivirus scan it, and the game stops while it does.',
@@ -692,6 +695,9 @@ export const messages: Record<string, string> = {
   'Script adapté pour une ancienne version de la table': 'Script adapted for an older version of the table',
   'Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.': 'Cyber Pinball wrote {file} from the script of a previous version of the table: VPX plays that old script with the new table.',
   'Refaire {file} d’après le nouveau script': 'Rewrite {file} from the new script',
+  'Script adapté par une version précédente de Cyber Pinball': 'Script adapted by a previous version of Cyber Pinball',
+  'Cyber Pinball a écrit {file} avec une version précédente de ses correctifs : il le refait avec ceux d’aujourd’hui.': 'Cyber Pinball wrote {file} with a previous version of its fixes: it rewrites it with the current ones.',
+  'Refaire {file} avec les correctifs d’aujourd’hui': 'Rewrite {file} with the current fixes',
   'Script écrit pour un ancien core.vbs': 'Script written for an older core.vbs',
   'DMD réglé pour le mode bureau': 'DMD set for desktop mode',
   'Le script de la table choisit son DMD par {options} dans le menu de VPX (F12), réglé par défaut sur {from} : un DMD dessiné dans le décor du mode bureau, invisible sur une borne, et la fenêtre du DMD reste noire. Sur cette borne, l’option passe sur {to} dans {file} : la table n’est pas modifiée, et le menu de VPX permet d’y revenir.':

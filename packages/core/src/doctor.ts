@@ -1451,13 +1451,16 @@ function packFileNamesFinding(pack: string, root: string, media: PackFileFixes):
 function staleFinding(override: Override): Finding {
   const file = path.basename(override.file);
   const content = override.state.kind === 'stale' ? override.state.content : undefined;
+  const older = override.state.kind === 'stale' && override.state.older;
   return {
     code: 'scriptPatchStale',
-    severity: 'warning',
-    title: t('Script adapté pour une ancienne version de la table'),
-    detail: t('Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
+    severity: older ? 'info' : 'warning',
+    title: older ? t('Script adapté par une version précédente de Cyber Pinball') : t('Script adapté pour une ancienne version de la table'),
+    detail: older
+      ? t('Cyber Pinball a écrit {file} avec une version précédente de ses correctifs : il le refait avec ceux d’aujourd’hui.', { file })
+      : t('Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
     fix: content
-      ? { label: t('Refaire {file} d’après le nouveau script', { file }), ops: [{ op: 'write', path: override.file, content, encoding: 'latin1' }] }
+      ? { label: older ? t('Refaire {file} avec les correctifs d’aujourd’hui', { file }) : t('Refaire {file} d’après le nouveau script', { file }), ops: [{ op: 'write', path: override.file, content, encoding: 'latin1' }] }
       : { label: t('Mettre {file} à la corbeille', { file }), ops: [{ op: 'trash', path: override.file }] },
   };
 }
@@ -1549,15 +1552,19 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
   }
   // Procedures redefined during the game (FlashForMs and SetFlash blinking): the only fix missing.
   // vpmTimer timers described by a text: compiled by Execute at each deadline.
-  if (shown.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce')) {
+  // Commands kept in a variable (Execute qCmd): compiled at each call.
+  if (shown.filter((f) => f !== 'tablesDirectoryDmd').every((f) => f === 'executeGlobalOnce' || f === 'timerTextOnce' || f === 'executeOnce')) {
     const blinks = missing.includes('executeGlobalOnce');
     const timers = missing.includes('timerTextOnce');
+    const commands = missing.includes('executeOnce');
+    const compiled = timers || commands;
     const detail = [
       ...(blinks ? [t('Le script de la table redéfinit des procédures pendant la partie (ExecuteGlobal, à chaque clignotement d’une lumière). Windows fait analyser chacune par son antivirus, et la partie s’arrête le temps de l’analyse : de quelques millisecondes à une seconde selon le PC.')] : []),
       ...(timers ? [t('Le script de la table décrit des minuteries par un texte (vpmTimer.AddTimer) : VPX compile ce texte à chaque échéance, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.')] : []),
+      ...(commands ? [t('Le script de la table range des commandes dans un texte qu’il fait exécuter pendant la partie (Execute) : VPX compile ce texte à chaque fois, Windows le fait analyser par son antivirus, et la partie s’arrête le temps de l’analyse.')] : []),
       !content
         ? t('Le script de la table est protégé : Cyber Pinball ne peut pas le corriger.')
-        : !timers
+        : !compiled
           ? foreign
             ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : une procédure n’est redéfinie que si son texte change.', { file })
             : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où une procédure n’est redéfinie que si son texte change.', { file })
@@ -1565,11 +1572,14 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
             ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table : chaque texte n’est compilé qu’une fois.', { file })
             : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où chaque texte n’est compilé qu’une fois.', { file }),
     ];
-    const label = timers ? t('Ne compiler chaque texte qu’une fois (dans {file})', { file }) : t('Ne redéfinir une procédure que si elle change (dans {file})', { file });
+    const label = compiled ? t('Ne compiler chaque texte qu’une fois (dans {file})', { file }) : t('Ne redéfinir une procédure que si elle change (dans {file})', { file });
+    const title = commands
+      ? blinks || timers ? t('Script qui arrête la partie pour compiler du texte') : t('Script qui arrête la partie à chaque commande exécutée')
+      : blinks && timers ? t('Script qui arrête la partie à chaque clignotement et à chaque minuterie') : blinks ? t('Script qui arrête la partie à chaque clignotement') : t('Script qui arrête la partie à chaque minuterie');
     return {
       code: 'scriptCoreCompat',
       severity: 'warning',
-      title: blinks && timers ? t('Script qui arrête la partie à chaque clignotement et à chaque minuterie') : blinks ? t('Script qui arrête la partie à chaque clignotement') : t('Script qui arrête la partie à chaque minuterie'),
+      title,
       detail: detail.join(' '),
       fix: content ? { label, ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
     };

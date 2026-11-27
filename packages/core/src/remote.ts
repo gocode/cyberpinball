@@ -696,6 +696,7 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'mirror-ack':
     case 'tap':
     case 'mscroll':
+    case 'mzoom':
       return parseMirrorMessage(m, s);
     case 'ping':
       return { t: 'ping', s };

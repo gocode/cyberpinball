@@ -14,10 +14,18 @@
 // l'installation ; la table n'est jamais modifiée.
 
 import { addTableDofTap, dofCallLines, DOF_TAP_TABLE_SUB, ownDofSubs } from './dof-evenements';
-import { commentStart, scriptCode } from './vbscript';
+import { commentStart, scriptCode, statements } from './vbscript';
 
 /** Correctifs connus, nommés dans la dernière ligne du .vbs de Cyber Pinball. */
-export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'tablesDirectoryDmd' | 'b2sArgs' | 'dofTapOwnSub';
+export type CompatFix = 'vpmInitOnce' | 'vrRoomOnScreens' | 'executeGlobalOnce' | 'timerTextOnce' | 'executeOnce' | 'tablesDirectoryDmd' | 'b2sArgs' | 'dofTapOwnSub';
+
+/**
+ * Version du texte que les correctifs écrivent, notée dans la dernière ligne du .vbs (compatVersion ; absente = 1). À
+ * augmenter dès que le texte écrit par un correctif change : un .vbs de Cyber Pinball écrit avec une version
+ * précédente est alors refait avant la partie suivante (scriptPatchState), au lieu de passer pour un .vbs modifié à la
+ * main. 2 : minuteries compilées au premier passage et d'avance, au chargement (27/11/2026).
+ */
+export const COMPAT_VERSION = 2;
 
 interface CompatRule {
   id: CompatFix;
@@ -310,13 +318,173 @@ const executeGlobalOnce: CompatRule = {
 // recopie la file sans Set quand une minuterie part : un objet placé derrière fait tomber la partie (erreur 450). Le .vbs
 // de Cyber Pinball corrige donc le core.vbs lui-même, au chargement : les textes que le script charge par GetTextFile
 // (core.vbs, et les scripts de système qui le chargent à leur tour) passent par CyberPinball_TextFile, qui fait précéder
-// cet Execute de CyberPinball_TimerCall. Un texte vu une deuxième fois devient une Sub compilée une fois pour toutes
-// (« <texte> <argument> », comme Execute le recevait), appelée ensuite sans analyse ; un texte vu une seule fois (valeurs
-// qui changent) ne coûte rien de plus qu'avant. Execute agit dans la portée de cvpmTimer.Update : un texte qui nomme une
-// de ses variables, un de ses membres, ou qui ouvre ou ferme une procédure, est laissé à Execute, comme avant.
+// cet Execute de CyberPinball_TimerCall. Un texte devient, dès son premier passage, une Sub compilée une fois pour toutes
+// (« <texte> <argument> », comme Execute le recevait), appelée ensuite sans analyse (CyberPinball_Compile, plus bas).
+// Execute agit dans la portée de cvpmTimer.Update : un texte qui nomme une de ses variables, un de ses membres, ou qui
+// ouvre ou ferme une procédure, est laissé à Execute, comme avant.
+//
+// Précompilation (rapport du 27/11/2026, McAfee : environ 785 ms par analyse, à la suite, sur The Goonies et Guardians
+// of the Galaxy) : les textes écrits tels quels dans la table (« vpmTimer.AddTimer 500, "GIOn '" ») sont tous compilés
+// au chargement, en un seul ExecuteGlobal, donc une seule analyse, avant la partie. Compiler au premier passage n'est
+// jamais plus cher qu'avant : ExecuteGlobal coûte moins qu'Execute (cscript, Defender, 1000 appels : 1,6 s contre 6,0 s
+// pour un texte identique, 3,2 s contre 16,7 s pour des textes distincts).
 
 const TIMER_TEXT = 'CyberPinball_TextFile';
 const TIMER_CALL = 'CyberPinball_TimerCall';
+const TIMER_GUARD = 'CyberPinball_TimerGuard';
+/** Le paramètre de la Sub compilée qui reçoit l'argument de la minuterie (« <texte> <argument> », comme Execute). */
+const TIMER_ARG = 'CyberPinball_Arg';
+/** Variables et membres de cvpmTimer.Update (core.vbs 3.61), que voit un texte passé à Execute. */
+const TIMER_SCOPE = 'ii|jj|sw|obj|mquecopy|mnow|mtimers|mque\\d|mslowupdates|mfastupdates|mresets|mfasttimer|update|fastupdate|reset|inittimer|enableupdate|addresetobj|pulsesw|pulseswitch|addtimer2?';
+
+/** Un texte écrit entre guillemets en VBScript. */
+function vbString(s: string): string {
+  return s.replace(/"/g, '""');
+}
+
+/**
+ * Les rappels de minuterie écrits tels quels dans le script (« vpmTimer.AddTimer 500, "GIOn '" » : le texte seul, sans
+ * concaténation), dans l'ordre, sans doublon ; ce que le core.vbs passera à Execute.
+ */
+function constantTimerTexts(code: string): string[] {
+  const texts = new Set<string>();
+  for (const line of code.split('\n')) {
+    for (const m of line.matchAll(TIMER_ADD)) {
+      const at = m.index! + m[0].length;
+      if ((line.slice(0, at).match(/"/g)?.length ?? 0) % 2) continue;
+      const rest = line.slice(at).replace(/^\s*\(/, '');
+      const callback = callArguments(rest)[/^PulseSwitch$/i.test(m[2]!) ? 2 : 1] ?? '';
+      const literal = /^"((?:[^"]|"")*)"$/.exec(callback);
+      if (literal) texts.add(literal[1]!.replace(/""/g, '"'));
+    }
+  }
+  return [...texts];
+}
+
+// ---------- Textes compilés une fois (minuteries, Execute d'une variable) ----------
+//
+// CyberPinball_Compile(texte, paramètre, garde) rend la Sub qui fait ce qu'Execute ferait du texte, compilée une fois
+// par ExecuteGlobal puis gardée ; Nothing quand le texte doit rester à Execute : il nomme un nom de la garde (variables
+// de la procédure qui l'exécute, que la Sub ne verrait pas), il ouvre ou ferme une procédure, nomme Me, ou ne se compile
+// pas seul. 2000 textes au plus ; au-delà, Execute comme avant. _Want et _Wanted compilent d'avance une liste de
+// textes en un seul ExecuteGlobal ; une erreur de compilation fait échouer tout le lot, qui est alors coupé en deux
+// jusqu'à isoler le texte fautif, laissé à Execute (il y donnera son erreur, comme avant).
+
+const COMPILE = 'CyberPinball_Compile';
+const COMPILED = 'CyberPinball_Compiled';
+
+/** Le texte avec le moteur de compilation (une fois : les deux règles qui s'en servent l'ajoutent chacune). */
+function withCompiler(text: string): string {
+  if (new RegExp(`^\\s*function\\s+${COMPILE}\\b`, 'im').test(text)) return text;
+  const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+  const c = COMPILE;
+  const lines = [
+    `Dim ${c}_Seen, ${c}_Wants, ${c}_Guards, ${c}_Count, ${c}_Done`,
+    `Sub ${c}_Init()`,
+    `  If Not IsEmpty(${c}_Seen) Then Exit Sub`,
+    `  Set ${c}_Seen = CreateObject("Scripting.Dictionary")`,
+    `  Set ${c}_Wants = CreateObject("Scripting.Dictionary")`,
+    `  Set ${c}_Guards = CreateObject("Scripting.Dictionary")`,
+    `  ${c}_Count = 0`,
+    `End Sub`,
+    `Function ${c}_Safe(aCode, aGuard)`,
+    `  Dim re, words`,
+    `  If Not ${c}_Guards.Exists(aGuard) Then`,
+    `    words = "me|sub|function|class|property|end|exit"`,
+    `    If aGuard <> "" Then words = words & "|" & aGuard`,
+    `    Set re = New RegExp`,
+    `    re.IgnoreCase = True`,
+    `    re.Pattern = "(^|[^\\w.])(" & words & ")(?!\\w)"`,
+    `    ${c}_Guards.Add aGuard, re`,
+    `  End If`,
+    `  ${c}_Safe = Not ${c}_Guards.Item(aGuard).Test(aCode)`,
+    `End Function`,
+    `Function ${c}_Source(aName, aCode, aArg)`,
+    `  If aArg = "" Then`,
+    `    ${c}_Source = "Sub " & aName & "()" & vbNewLine & aCode & vbNewLine & "End Sub" & vbNewLine`,
+    `  Else`,
+    `    ${c}_Source = "Sub " & aName & "(" & aArg & ")" & vbNewLine & aCode & " " & aArg & " " & vbNewLine & "End Sub" & vbNewLine`,
+    `  End If`,
+    `End Function`,
+    `Function ${c}_Run(aSource)`,
+    `  On Error Resume Next`,
+    `  ExecuteGlobal aSource`,
+    `  ${c}_Run = (Err.Number = 0)`,
+    `  Err.Clear`,
+    `End Function`,
+    `Function ${c}(aCode, aArg, aGuard)`,
+    `  Dim key, name`,
+    `  Set ${c} = Nothing`,
+    `  ${c}_Init`,
+    `  key = aArg & "|" & aGuard & "|" & aCode`,
+    `  If Not ${c}_Seen.Exists(key) Then`,
+    `    If ${c}_Seen.Count >= 2000 Then Exit Function`,
+    `    ${c}_Seen.Add key, 0`,
+    `    If Not ${c}_Safe(aCode, aGuard) Then Exit Function`,
+    `    ${c}_Count = ${c}_Count + 1`,
+    `    name = "${COMPILED}_" & ${c}_Count`,
+    `    If Not ${c}_Run(${c}_Source(name, aCode, aArg)) Then Exit Function`,
+    `    Set ${c}_Seen.Item(key) = GetRef(name)`,
+    `  End If`,
+    `  If IsObject(${c}_Seen.Item(key)) Then Set ${c} = ${c}_Seen.Item(key)`,
+    `End Function`,
+    // Fait ce qu'Execute ferait du texte, par sa Sub compilée ; _Done dit si c'est fait (sinon, à Execute de le faire).
+    // Jamais dans la condition d'un If : sous On Error Resume Next, une erreur y ferait exécuter le Then, et le texte
+    // deux fois. Une erreur du texte arrête sa Sub au même endroit qu'Execute, puis est rendue à l'appelant telle quelle,
+    // _Done déjà vrai (un texte qui en exécute un autre a pu le changer entre-temps).
+    `Sub ${c}_Do(aCode, aArgName, aArg, aGuard)`,
+    `  Dim f, n, s, d`,
+    `  ${c}_Done = False`,
+    `  If VarType(aCode) <> vbString Then Exit Sub`,
+    `  Set f = ${c}(aCode, aArgName, aGuard)`,
+    `  If f Is Nothing Then Exit Sub`,
+    `  On Error Resume Next`,
+    `  If aArgName = "" Then Call f() Else Call f(aArg)`,
+    `  n = Err.Number : s = Err.Source : d = Err.Description`,
+    `  On Error Goto 0`,
+    `  ${c}_Done = True`,
+    `  If n <> 0 Then Err.Raise n, s, d`,
+    `End Sub`,
+    `Sub ${c}_Want(aCode, aArg, aGuard)`,
+    `  Dim key`,
+    `  ${c}_Init`,
+    `  key = aArg & "|" & aGuard & "|" & aCode`,
+    `  If ${c}_Seen.Exists(key) Or ${c}_Wants.Exists(key) Then Exit Sub`,
+    `  If Not ${c}_Safe(aCode, aGuard) Then Exit Sub`,
+    `  ${c}_Wants.Add key, Array(aCode, aArg)`,
+    `End Sub`,
+    `Sub ${c}_Wanted()`,
+    `  Dim keys`,
+    `  ${c}_Init`,
+    `  If ${c}_Wants.Count = 0 Then Exit Sub`,
+    `  keys = ${c}_Wants.Keys`,
+    `  ${c}_Some keys, 0, UBound(keys)`,
+    `  ${c}_Wants.RemoveAll`,
+    `End Sub`,
+    `Sub ${c}_Some(aKeys, aFrom, aTo)`,
+    `  Dim i, w, src, first, middle`,
+    `  first = ${c}_Count + 1`,
+    `  src = ""`,
+    `  For i = aFrom To aTo`,
+    `    w = ${c}_Wants.Item(aKeys(i))`,
+    `    src = src & ${c}_Source("${COMPILED}_" & (first + i - aFrom), w(0), w(1))`,
+    `  Next`,
+    `  If ${c}_Run(src) Then`,
+    `    ${c}_Count = first + aTo - aFrom`,
+    `    For i = aFrom To aTo`,
+    `      If Not ${c}_Seen.Exists(aKeys(i)) And ${c}_Seen.Count < 2000 Then ${c}_Seen.Add aKeys(i), GetRef("${COMPILED}_" & (first + i - aFrom))`,
+    `    Next`,
+    `  ElseIf aFrom = aTo Then`,
+    `    If Not ${c}_Seen.Exists(aKeys(aFrom)) Then ${c}_Seen.Add aKeys(aFrom), 0`,
+    `  Else`,
+    `    middle = (aFrom + aTo) \\ 2`,
+    `    ${c}_Some aKeys, aFrom, middle`,
+    `    ${c}_Some aKeys, middle + 1, aTo`,
+    `  End If`,
+    `End Sub`,
+  ];
+  return text + (text && !/\r?\n$/.test(text) ? eol : '') + lines.join(eol) + eol;
+}
 /** L'appel du texte dans cvpmTimer.Update (core.vbs 3.61 : « Execute mQue3(ii) & " " & mQue2(ii) & " " »). */
 export const CORE_TIMER_EXECUTE = 'Execute mQue3(ii) & " " & mQue2(ii)';
 /** Une minuterie de vpmTimer et la place (à partir de 0) de son rappel parmi ses arguments. */
@@ -395,7 +563,6 @@ const timerTextOnce: CompatRule = {
     if (!calls) return undefined;
     let out = parts.join('');
     if (out && !/\r?\n$/.test(out)) out += eol;
-    const q = (s: string) => s.replace(/"/g, '""');
     const lines = [
       // Le texte d'un fichier de VPX, avec ses propres chargements et l'Execute des minuteries corrigés. Sans On Error :
       // un fichier introuvable reste une erreur pour l'appelant, qui la traite comme avant (If Err Then MsgBox…).
@@ -403,46 +570,133 @@ const timerTextOnce: CompatRule = {
       `  Dim text`,
       `  text = GetTextFile(aFile)`,
       `  text = Replace(text, "GetTextFile(", "${TIMER_TEXT}(", 1, -1, vbTextCompare)`,
-      `  text = Replace(text, "${q(CORE_TIMER_EXECUTE)}", "If ${TIMER_CALL}(mQue3(ii), mQue2(ii)) = False Then ${q(CORE_TIMER_EXECUTE)}", 1, -1, vbTextCompare)`,
+      `  text = Replace(text, "${vbString(CORE_TIMER_EXECUTE)}", "${TIMER_CALL} mQue3(ii), mQue2(ii) : If Not ${COMPILE}_Done Then ${vbString(CORE_TIMER_EXECUTE)}", 1, -1, vbTextCompare)`,
       `  ${TIMER_TEXT} = text`,
       `End Function`,
-      `Dim ${TIMER_CALL}_Seen, ${TIMER_CALL}_Unsafe, ${TIMER_CALL}_Count`,
-      // True : le rappel a été fait par sa Sub compilée ; False : à Execute de le faire, comme avant.
-      `Function ${TIMER_CALL}(aCode, aArg)`,
-      `  Dim code, f, name`,
-      `  ${TIMER_CALL} = False`,
-      `  If VarType(aCode) <> vbString Then Exit Function`,
-      `  code = aCode`,
-      `  If IsEmpty(${TIMER_CALL}_Seen) Then`,
-      `    Set ${TIMER_CALL}_Seen = CreateObject("Scripting.Dictionary")`,
-      `    Set ${TIMER_CALL}_Unsafe = New RegExp`,
-      `    ${TIMER_CALL}_Unsafe.IgnoreCase = True`,
-      `    ${TIMER_CALL}_Unsafe.Pattern = "(^|[^\\w.])(ii|jj|sw|obj|mquecopy|me|mnow|mtimers|mque\\d|mslowupdates|mfastupdates|mresets|mfasttimer|update|fastupdate|reset|inittimer|enableupdate|addresetobj|pulsesw|pulseswitch|addtimer2?|sub|function|class|property|end|exit)(?!\\w)"`,
-      `  End If`,
-      `  If Not ${TIMER_CALL}_Seen.Exists(code) Then`,
-      `    If ${TIMER_CALL}_Seen.Count < 2000 Then ${TIMER_CALL}_Seen.Add code, 1`,
-      `    Exit Function`,
-      `  End If`,
-      `  If IsObject(${TIMER_CALL}_Seen.Item(code)) Then`,
-      `    Set f = ${TIMER_CALL}_Seen.Item(code)`,
-      `  Else`,
-      `    If ${TIMER_CALL}_Seen.Item(code) <> 1 Then Exit Function`,
-      `    ${TIMER_CALL}_Seen.Item(code) = 0`,
-      `    If ${TIMER_CALL}_Unsafe.Test(code) Then Exit Function`,
-      `    ${TIMER_CALL}_Count = ${TIMER_CALL}_Count + 1`,
-      `    name = "${TIMER_CALL}_" & ${TIMER_CALL}_Count`,
-      `    On Error Resume Next`,
-      `    ExecuteGlobal "Sub " & name & "(CyberPinball_Arg)" & vbNewLine & code & " CyberPinball_Arg " & vbNewLine & "End Sub"`,
-      `    If Err.Number = 0 Then Set f = GetRef(name)`,
-      `    If Err.Number <> 0 Then Err.Clear : Exit Function`,
-      `    On Error Goto 0`,
-      `    Set ${TIMER_CALL}_Seen.Item(code) = f`,
-      `  End If`,
-      `  ${TIMER_CALL} = True`,
-      `  Call f(aArg)`,
-      `End Function`,
+      // Les noms de la portée de cvpmTimer.Update (variables, membres) : un texte qui en nomme un reste à Execute.
+      `Const ${TIMER_GUARD} = "${TIMER_SCOPE}"`,
+      // Le rappel fait par sa Sub compilée ; sinon (CyberPinball_Compile_Done faux), à Execute de le faire, comme avant.
+      `Sub ${TIMER_CALL}(aCode, aArg)`,
+      `  ${COMPILE}_Do aCode, "${TIMER_ARG}", aArg, ${TIMER_GUARD}`,
+      `End Sub`,
+      // Les textes écrits tels quels dans la table, compilés d'un seul coup au chargement.
+      ...constantTimerTexts(scriptCode(text)).map((s) => `${COMPILE}_Want "${vbString(s)}", "${TIMER_ARG}", ${TIMER_GUARD}`),
+      `${COMPILE}_Wanted`,
     ];
-    return out + lines.join(eol) + eol;
+    return withCompiler(out + lines.join(eol) + eol);
+  },
+  // Aucun message de VPX : la partie s'arrête un instant, sans erreur.
+  stop: /(?!)/,
+};
+
+// ---------- Execute d'un texte rangé dans une variable ----------
+//
+// Guardians of the Galaxy (rapport du 27/11/2026, McAfee) range des commandes en texte dans une file (QueueScene :
+// « PuPEvent 12 », « pDMDStartBall »...) et les fait exécuter par « Execute qCmd » dans sa Sub RunQueue, à chaque scène :
+// autant d'analyses de l'antivirus, en pleine partie. Le .vbs de Cyber Pinball fait précéder un tel Execute, seul sur sa
+// ligne, de CyberPinball_Execute, qui exécute le texte par une Sub compilée une fois (CyberPinball_Compile). Execute agit
+// dans la portée de la procédure qui l'appelle : un texte qui nomme une de ses variables (paramètres, Dim, ReDim,
+// Const, noms auxquels elle donne une valeur ou qu'elle parcourt par For) reste à Execute, comme avant. Pas de
+// correctif dans une Class (les membres s'y lisent sans Me) ni dans un bloc With (« .Nom » désigne l'objet du With).
+
+const EXECUTE_ONCE = 'CyberPinball_Execute';
+const EXECUTE_ALONE = /^(\s*)Execute(\s+)([A-Za-z_]\w*)(\s*)$/i;
+const CLASS_START = /^\s*(?:(?:public|private)\s+)?class\s+[A-Za-z_]/i;
+const CLASS_END = /^\s*end\s+class\b/i;
+const PROC_HEAD = /^\s*(?:(?:public|private)\s+)?(?:default\s+)?(?:sub|function|property\s+(?:get|let|set))\s+[A-Za-z_]\w*\s*(?:\(([^)]*)\))?/i;
+const PROC_TAIL = /^\s*end\s+(?:sub|function|property)\b/i;
+const WITH_START = /^\s*with\s/i;
+const WITH_END = /^\s*end\s+with\b/i;
+
+interface ExecuteSite {
+  /** Ligne (à partir de 0). */
+  line: number;
+  /** Noms de la procédure, en minuscules, séparés par « | » (la garde de CyberPinball_Compile). */
+  guard: string;
+}
+
+/** Les noms qu'une procédure tient pour siens : paramètres, Dim, ReDim, Const, affectations, variables de For. */
+function procedureNames(params: string, body: readonly string[]): string[] {
+  const names = new Set<string>();
+  const add = (name: string | undefined) => {
+    if (name && /^[A-Za-z_]\w*$/.test(name) && !VB_WORDS.has(name.toLowerCase())) names.add(name.toLowerCase());
+  };
+  for (const p of params.split(',')) add(/^\s*(?:optional\s+)?(?:(?:byval|byref)\s+)?([A-Za-z_]\w*)/i.exec(p)?.[1]);
+  for (const line of body) {
+    for (const statement of statements(line)) {
+      const declared = /^\s*(?:dim|redim(?:\s+preserve)?|const|private|public)\s+(.*)$/i.exec(statement);
+      if (declared) {
+        for (const part of declared[1]!.replace(/\([^)]*\)/g, '').split(',')) add(/^\s*([A-Za-z_]\w*)/.exec(part)?.[1]);
+        continue;
+      }
+      // « If c Then x = 1 Else y = 2 » : chaque morceau peut donner une valeur à un nom.
+      for (const piece of statement.split(/\b(?:then|else)\b/i)) {
+        add(/^\s*(?:set\s+)?([A-Za-z_]\w*)\s*(?:\([^)]*\)\s*)?=/i.exec(piece)?.[1]);
+        add(/^\s*for\s+(?:each\s+)?([A-Za-z_]\w*)/i.exec(piece)?.[1]);
+      }
+    }
+  }
+  return [...names];
+}
+
+/** Les « Execute <variable> » seuls sur leur ligne, dans une procédure hors Class et hors With, avec la garde de chacun. */
+function executeSites(code: string): ExecuteSite[] {
+  const lines = code.split('\n');
+  const sites: ExecuteSite[] = [];
+  let inClass = false;
+  let proc: { start: number; params: string; withs: number; found: number[] } | undefined;
+  lines.forEach((line, i) => {
+    if (!proc) {
+      if (CLASS_START.test(line)) inClass = true;
+      else if (CLASS_END.test(line)) inClass = false;
+      const head = PROC_HEAD.exec(line);
+      // Une procédure écrite sur une seule ligne (« Sub X : … : End Sub ») n'a rien à corriger.
+      if (head && !inClass && !/\bend\s+(?:sub|function|property)\b/i.test(line)) proc = { start: i, params: head[1] ?? '', withs: 0, found: [] };
+      return;
+    }
+    if (PROC_TAIL.test(line)) {
+      if (proc.found.length) {
+        const guard = procedureNames(proc.params, lines.slice(proc.start + 1, i)).join('|');
+        for (const at of proc.found) sites.push({ line: at, guard });
+      }
+      proc = undefined;
+      return;
+    }
+    if (WITH_START.test(line)) proc.withs++;
+    else if (WITH_END.test(line)) proc.withs = Math.max(0, proc.withs - 1);
+    else if (!proc.withs && EXECUTE_ALONE.test(line)) proc.found.push(i);
+  });
+  return sites;
+}
+
+const executeOnce: CompatRule = {
+  id: 'executeOnce',
+  found: (code) => executeSites(code).length > 0,
+  applicable: (code) => executeSites(code).length > 0,
+  applied: (text) => new RegExp(`^\\s*sub\\s+${EXECUTE_ONCE}\\b`, 'im').test(text),
+  apply(text) {
+    const sites = executeSites(scriptCode(text));
+    if (!sites.length) return undefined;
+    const eol = /\r\n/.test(text) ? '\r\n' : '\n';
+    const parts = text.split(/(\r?\n)/);
+    for (const site of sites) {
+      const line = parts[site.line * 2]!;
+      const at = commentStart(line);
+      const code = at < 0 ? line : line.slice(0, at);
+      const m = EXECUTE_ALONE.exec(code);
+      if (!m) return undefined;
+      const [, indent, space, variable, trail] = m;
+      parts[site.line * 2] = `${indent}${EXECUTE_ONCE} ${variable}, "${site.guard}" : If Not ${COMPILE}_Done Then Execute${space}${variable}${trail}${at < 0 ? '' : line.slice(at)}`;
+    }
+    let out = parts.join('');
+    if (out && !/\r?\n$/.test(out)) out += eol;
+    const lines = [
+      // Le texte exécuté par sa Sub compilée ; sinon (CyberPinball_Compile_Done faux), à Execute de le faire, comme avant.
+      `Sub ${EXECUTE_ONCE}(aCode, aGuard)`,
+      `  ${COMPILE}_Do aCode, "", Empty, aGuard`,
+      `End Sub`,
+    ];
+    return withCompiler(out + lines.join(eol) + eol);
   },
   // Aucun message de VPX : la partie s'arrête un instant, sans erreur.
   stop: /(?!)/,
@@ -729,7 +983,7 @@ const dofTapOwnSub: CompatRule = {
   stop: /(?!)/,
 };
 
-const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, tablesDirectoryDmd, b2sArgs, dofTapOwnSub];
+const RULES: readonly CompatRule[] = [vpmInitOnce, vrRoomOnScreens, executeGlobalOnce, timerTextOnce, executeOnce, tablesDirectoryDmd, b2sArgs, dofTapOwnSub];
 
 /** Correctifs que réclament les lignes du journal de VPX d'une partie de la table (erreurs du script, refus d'un plugin). */
 export function compatFixesFromLog(lines: readonly string[], code?: string): CompatFix[] {

@@ -525,6 +525,8 @@ export interface ExternalTarget {
   click(button: 'left' | 'right', count: number): void;
   /** Au sens de sendInputEvent d'Electron (wheelFor). */
   scroll(deltaX: number, deltaY: number): void;
+  /** Zoom de la page d'un pas (pincement du miroir) : 1 agrandit, -1 rapetisse ; absent : le pincement ne fait rien. */
+  zoom?(dir: 1 | -1): void;
   /** Image de la fenêtre pour le miroir du téléphone (phone-mirror.ts) ; absent : pas de miroir, le pavé seul. */
   capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   /** `del` retours arrière, puis `ins`. */
@@ -732,6 +734,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     pointer: (x, y) => external?.pointer(x, y),
     click: (button, count) => external?.click(button, count),
     wheel: (dx, dy) => external?.scroll(dx, dy),
+    zoom: (dir) => external?.zoom?.(dir),
     log,
   });
   let ticker: NodeJS.Timeout | undefined;
@@ -1990,6 +1993,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (message.t === 'mirror') return mirror.request(message.on, { w: message.w, h: message.h });
     if (message.t === 'tap') return mirror.tap(message);
     if (message.t === 'mscroll') return mirror.scroll(message);
+    if (message.t === 'mzoom') return mirror.zoom(message);
     // L'envoi ne passe pas par la file des gestes : sa réponse ne doit pas attendre une injection.
     if (message.t === 'up') return void startUpload(link, message);
     // Les classements non plus : une lecture, sans geste injecté à la borne.
