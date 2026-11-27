@@ -77,8 +77,10 @@ export interface AppSession {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
-  /** Zoom de la page d'un pas (Ctrl+ ou Ctrl- dans Edge) : le pincement du miroir du téléphone. */
+  /** Zoom de la page d'un pas (Ctrl+ ou Ctrl- dans Edge) : les boutons de zoom du miroir du téléphone. */
   zoom(dir: 1 | -1): void;
+  /** Un doigt sur la fenêtre (injection tactile), pour les sites au rendu mobile ; absent pour un site au rendu d'ordinateur. */
+  touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   /** Image de la fenêtre, pour le miroir du téléphone ; absent si la capture n'est pas possible. */
   capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   type(text: string): void;
@@ -175,6 +177,8 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
       click: (button, count) => ready() && ops().click(button, count),
       wheel: (dx, dy) => win && ops().wheel(dx, dy),
       zoom: (dir) => ready() && ops().key(dir > 0 ? VK_ZOOM_IN : VK_ZOOM_OUT, { ctrl: true }),
+      // Site au rendu mobile (agent utilisateur de téléphone) : il attend des glissements tactiles, pas la molette.
+      ...(appMobile(app) ? { touch: (phase: 'down' | 'move' | 'up', x: number, y: number) => Boolean(win) && ops().touch?.(phase, x, y) === true } : {}),
       ...windowCapture(ops, () => win),
       type: (text) => ready() && ops().type(text),
       key: (k, mods) => ready() && ops().key(VK[k], mods),

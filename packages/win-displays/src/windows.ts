@@ -64,6 +64,8 @@ interface Api {
   SendInput: NativeFn;
   SetWindowPosAfter: NativeFn;
   MapVirtualKeyW: NativeFn;
+  InitializeTouchInjection: NativeFn;
+  InjectTouchInput: NativeFn;
 }
 
 let api: Api | undefined;
@@ -104,6 +106,8 @@ function loadApi(): Api {
     SendInput: user32.func('uint32_t __stdcall SendInput(uint32_t count, void *inputs, int size)'),
     SetWindowPosAfter: user32.func('bool __stdcall SetWindowPos(void *hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
     MapVirtualKeyW: user32.func('uint32_t __stdcall MapVirtualKeyW(uint32_t code, uint32_t mapType)'),
+    InitializeTouchInjection: user32.func('bool __stdcall InitializeTouchInjection(uint32_t count, uint32_t mode)'),
+    InjectTouchInput: user32.func('bool __stdcall InjectTouchInput(uint32_t count, void *contacts)'),
   };
   return api;
 }
@@ -446,6 +450,54 @@ export function mouseWheel(dx: number, dy: number): boolean {
   if (Math.round(dx)) parts.push(mouseInput(MOUSEEVENTF_HWHEEL, -Math.round(dx)));
   if (!parts.length) return true;
   return (loadApi().SendInput(parts.length, Buffer.concat(parts), INPUT_SIZE) as number) === parts.length;
+}
+
+// POINTER_TOUCH_INFO (Windows 8+, x64) : POINTER_INFO (96 octets) puis le contact tactile ; 144 octets.
+const TOUCH_INFO_SIZE = 144;
+const PT_TOUCH = 2;
+const POINTER_FLAG_INRANGE = 0x2;
+const POINTER_FLAG_INCONTACT = 0x4;
+const POINTER_FLAG_DOWN = 0x10000;
+const POINTER_FLAG_UPDATE = 0x20000;
+const POINTER_FLAG_UP = 0x40000;
+/** Aucune pastille de retour visuel sur l'écran de la borne. */
+const TOUCH_FEEDBACK_NONE = 3;
+const TOUCH_MASK_ALL = 0x7; // zone de contact, orientation, pression
+let touchReady: boolean | undefined;
+
+/** Le contenu de POINTER_TOUCH_INFO pour un doigt (identifiant 0) à (x, y) ; exporté pour les essais. */
+export function touchContact(phase: 'down' | 'move' | 'up', x: number, y: number): Buffer {
+  const buf = Buffer.alloc(TOUCH_INFO_SIZE);
+  const px = Math.round(x);
+  const py = Math.round(y);
+  const flags = phase === 'down' ? POINTER_FLAG_DOWN | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT : phase === 'move' ? POINTER_FLAG_UPDATE | POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT : POINTER_FLAG_UP;
+  buf.writeUInt32LE(PT_TOUCH, 0);
+  buf.writeUInt32LE(0, 4); // pointerId
+  buf.writeUInt32LE(flags, 12);
+  buf.writeInt32LE(px, 32); // ptPixelLocation
+  buf.writeInt32LE(py, 36);
+  buf.writeUInt32LE(TOUCH_MASK_ALL, 100);
+  // rcContact : une pointe de doigt de 4 × 4 pixels.
+  buf.writeInt32LE(px - 2, 104);
+  buf.writeInt32LE(py - 2, 108);
+  buf.writeInt32LE(px + 2, 112);
+  buf.writeInt32LE(py + 2, 116);
+  buf.writeUInt32LE(90, 136); // orientation
+  buf.writeUInt32LE(phase === 'up' ? 0 : 32, 140); // pression
+  return buf;
+}
+
+/**
+ * Un doigt sur l'écran, par l'injection tactile de Windows (InjectTouchInput) : `down`, des `move`, puis `up`, en
+ * pixels physiques du bureau. La fenêtre sous le doigt le reçoit comme celui d'un écran tactile : une page qui
+ * attend un vrai glissement (TikTok au rendu mobile) défile, ce que la molette ne fait pas. Rend faux quand
+ * Windows refuse l'injection (la molette reste alors le recours de l'appelant).
+ */
+export function touchPoint(phase: 'down' | 'move' | 'up', x: number, y: number): boolean {
+  const w = loadApi();
+  touchReady ??= Boolean(w.InitializeTouchInjection(1, TOUCH_FEEDBACK_NONE));
+  if (!touchReady) return false;
+  return Boolean(w.InjectTouchInput(1, touchContact(phase, x, y)));
 }
 
 const HWND_TOPMOST = -1;

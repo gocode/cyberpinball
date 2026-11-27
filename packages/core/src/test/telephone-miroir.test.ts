@@ -176,6 +176,7 @@ interface FakeHost {
   click(b: 'left' | 'right', c: number): void;
   wheel(dx: number, dy: number): void;
   zoom(dir: 1 | -1): void;
+  touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   now(): number;
   after(ms: number, fn: () => void): () => void;
 }
@@ -183,13 +184,13 @@ interface Mirror {
   request(on: boolean, box: { w: number; h: number }): void;
   ack(n: number): void;
   tap(m: { t: 'tap'; s: number; fx: number; fy: number; button: 'left' | 'right'; count: 1 | 2 }): void;
-  scroll(m: { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number }): void;
+  scroll(m: { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number; end?: true }): void;
   zoom(m: { t: 'mzoom'; s: number; steps: number }): void;
   readonly active: boolean;
   stop(): void;
 }
 
-function rig(opts: { rect?: MirrorRect; live?: boolean } = {}) {
+function rig(opts: { rect?: MirrorRect; live?: boolean; touch?: 'ok' | 'refused' } = {}) {
   let t = 0;
   let nextId = 1;
   const timers = new Map<number, { at: number; fn: () => void }>();
@@ -203,6 +204,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean } = {}) {
     clicks: [] as [string, number][],
     wheels: [] as [number, number][],
     zooms: [] as number[],
+    touches: [] as [string, number, number][],
     pending: undefined as undefined | ((s: MirrorShot | undefined) => void),
     manual: false,
   };
@@ -219,6 +221,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean } = {}) {
     click: (b, c) => void state.clicks.push([b, c]),
     wheel: (dx, dy) => void state.wheels.push([dx, dy]),
     zoom: (dir) => void state.zooms.push(dir),
+    ...(opts.touch ? { touch: (phase: string, x: number, y: number) => (state.touches.push([phase, x, y]), opts.touch === 'ok') } : {}),
     now: () => t,
     after: (ms, fn) => {
       const id = nextId++;
@@ -445,6 +448,50 @@ test('un pincement zoome la page d\'autant de pas, dans le bon sens, et rien hor
   assert.deepEqual(r.state.zooms, []);
 });
 
+test('site au rendu mobile : le glissement est un vrai doigt (pose, déplacements, levée), jamais la molette', async () => {
+  const r = rig({ rect: { x: 100, y: 50, width: 1000, height: 800 }, touch: 'ok' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  // Glissement vers le haut (TikTok : la vidéo suivante) commencé au milieu de l'image.
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.8, dx: 0, dy: -0.1 });
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.8, dx: 0, dy: -0.3 });
+  r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.8, dx: 0, dy: 0, end: true });
+  assert.deepEqual(r.state.touches, [['down', 600, 690], ['move', 600, 610], ['move', 600, 370], ['up', 600, 370]]);
+  assert.deepEqual(r.state.wheels, [], 'pas de molette en plus du doigt');
+  assert.deepEqual(r.state.pointer, [], 'le pointeur de la souris ne bouge pas');
+  // Un autre glissement repart d'un nouveau doigt, et ne sort pas de la fenêtre.
+  r.state.touches.length = 0;
+  r.mirror.scroll({ t: 'mscroll', s: 4, fx: 0.9, fy: 0.1, dx: 0.5, dy: -0.5 });
+  r.mirror.scroll({ t: 'mscroll', s: 5, fx: 0.9, fy: 0.1, dx: 0, dy: 0, end: true });
+  assert.deepEqual(r.state.touches, [['down', 1000, 130], ['move', 1099, 50], ['up', 1099, 50]]);
+});
+
+test('glissement tactile : un doigt resté posé est levé après un silence, et à l\'arrêt du miroir', async () => {
+  const r = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 }, touch: 'ok' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.5, dx: 0, dy: -0.1 });
+  await r.advance(1600);
+  assert.deepEqual(r.state.touches.map((x) => x[0]), ['down', 'move', 'up'], 'levé après le silence');
+  r.state.touches.length = 0;
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.5, dx: 0, dy: -0.1 });
+  r.mirror.stop();
+  assert.deepEqual(r.state.touches.map((x) => x[0]), ['down', 'move', 'up'], 'levé à l\'arrêt');
+});
+
+test('Windows refuse l\'injection tactile : le glissement passe par la molette, comme avant', async () => {
+  const r = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 }, touch: 'refused' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.5, dx: 0, dy: 0.25 });
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.5, dx: 0, dy: 0.1, end: true });
+  assert.deepEqual(r.state.touches, [['down', 500, 400]], 'une seule tentative par glissement');
+  assert.deepEqual(r.state.wheels, [[0, 200], [0, 80]]);
+  // Un glissement qui ne fait que se terminer n'envoie rien.
+  r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.5, dx: 0, dy: 0, end: true });
+  assert.equal(r.state.wheels.length, 2);
+});
+
 test('la télécommande qui ne pilote plus la fenêtre : appuis ignorés même si le miroir est demandé', async () => {
   const r = rig();
   r.mirror.request(true, { w: 390, h: 700 });
@@ -509,9 +556,9 @@ test('page du téléphone : les gestes du miroir sont ceux du brief (appui, glis
   assert.match(phoneMirror, /t: 'tap', fx: g\.fx, fy: g\.fy, button: 'left'/);
   assert.match(phoneMirror, /t: 'tap', fx: g\.fx, fy: g\.fy, button: 'right'/);
   assert.match(phoneMirror, /t: 'mscroll'/);
-  // Deux doigts : un pincement, qui zoome la page d'un pas par cran (au plus quatre pas par message, comme la borne).
+  // Deux doigts : la loupe du téléphone ; le zoom de la page d'Edge a ses deux boutons, un pas par appui.
   assert.match(phoneMirror, /t: 'mzoom', steps/);
-  assert.match(phoneMirror, /MIRROR_PINCH_MAX = 4/);
+  assert.equal(phoneMirror.includes('MIRROR_PINCH_STEP'), false, "le pincement ne zoome plus la page d'Edge");
   // Les images se dessinent sans URL (img-src 'self' de la page) : canvas, ni data: ni blob: dans la page.
   assert.match(phoneMirror, /createImageBitmap/);
   assert.equal(/data:image|URL\.createObjectURL/.test(phoneMirror), false);
@@ -528,18 +575,23 @@ test('page du téléphone : les messages de la borne sont branchés, et la liais
 function loadMirrorPage(area: { width: number; height: number }, frameSize: { width: number; height: number }) {
   const sent: Array<Record<string, unknown>> = [];
   const classes = new Set<string>();
+  const listeners = new Map<string, ((e: Record<string, unknown>) => void)[]>();
   const view = {
     getBoundingClientRect: () => ({ left: 0, top: 0, width: area.width, height: area.height, right: area.width, bottom: area.height }),
     classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), toggle: (c: string, on: boolean) => (on ? classes.add(c) : classes.delete(c)) },
-    addEventListener: () => undefined,
+    addEventListener: (type: string, fn: (e: Record<string, unknown>) => void) => void listeners.set(type, [...(listeners.get(type) ?? []), fn]),
     setPointerCapture: () => undefined,
   };
   const calls: string[] = [];
   const locks: string[] = [];
   const context2d = { clearRect: () => undefined, setTransform: () => calls.push('setTransform'), translate: () => calls.push('translate'), rotate: () => calls.push('rotate'), drawImage: () => calls.push('drawImage') };
-  const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: () => undefined };
+  const canvas = { width: 1, height: 1, style: {} as Record<string, string>, getContext: () => context2d, addEventListener: () => undefined };
   const tab = { setAttribute: () => undefined, addEventListener: () => undefined, replaceChildren: () => undefined };
-  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab, 'nav-pad': tab };
+  const resetListeners = new Map<string, ((e: Record<string, unknown>) => void)[]>();
+  const zoomButton = { ...tab, addEventListener: (type: string, fn: (e: Record<string, unknown>) => void) => void resetListeners.set(type, [...(resetListeners.get(type) ?? []), fn]) };
+  const pageZoomListeners = new Map<string, ((e: Record<string, unknown>) => void)[]>();
+  const pageZoomButton = (key: string) => ({ ...tab, addEventListener: (type: string, fn: (e: Record<string, unknown>) => void) => void pageZoomListeners.set(key + type, [...(pageZoomListeners.get(key + type) ?? []), fn]) });
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'mirror-zoom-reset': zoomButton, 'mirror-page-zoom-in': pageZoomButton('in'), 'mirror-page-zoom-out': pageZoomButton('out'), 'nav-mirror': tab, 'nav-pad': tab };
   const sandbox: Record<string, unknown> = {
     document: { getElementById: (id: string) => elements[id], createElement: () => ({}), addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
     window: { devicePixelRatio: 1, addEventListener: () => undefined },
@@ -556,6 +608,7 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
     createImageBitmap: async () => ({ ...frameSize, close: () => undefined }),
     clearTimeout,
     setTimeout,
+    requestAnimationFrame: (fn: () => void) => setTimeout(fn, 0),
     mode: 'browser',
     state: 'paired',
     send: (m: Record<string, unknown>) => (sent.push(m), true),
@@ -565,7 +618,28 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
   vm.runInContext('mirror.available = true; mirror.choice = true;', context);
   // JSON : les objets d'un autre contexte vm ne passent pas deepEqual.
   const run = <T>(code: string) => { const v = vm.runInContext(code, context) as unknown; return (v === undefined || typeof (v as { then?: unknown }).then === 'function' ? v : JSON.parse(JSON.stringify(v))) as T; };
-  return { sent, classes, canvas, calls, locks, run, frame: () => run<Promise<void>>("mirrorFrame({ n: 1, d: 'eA==' })") };
+  /** Un événement du doigt sur la vue (pointerdown, pointermove, pointerup) ; `at` : l'heure en ms. */
+  const touch = (type: 'pointerdown' | 'pointermove' | 'pointerup', id: number, x: number, y: number, at = 0) => {
+    for (const fn of listeners.get(type) ?? []) fn({ type, pointerId: id, clientX: x, clientY: y, timeStamp: at, preventDefault: () => undefined });
+  };
+  const resetButton = () => void resetListeners.get('click')?.forEach((fn) => fn({}));
+  /** Appui sur « Agrandir la page » (in) ou « Réduire la page » (out) ; rend si le doigt a été gardé hors de l'image (stopPropagation du pointerdown). */
+  const pageZoom = (key: 'in' | 'out') => {
+    let stopped = false;
+    pageZoomListeners.get(key + 'pointerdown')?.forEach((fn) => fn({ stopPropagation: () => (stopped = true) }));
+    pageZoomListeners.get(key + 'click')?.forEach((fn) => fn({}));
+    return stopped;
+  };
+  /** Pincement : deux doigts posés puis écartés (ou rapprochés), milieu et écart donnés avant et après. */
+  const pinch = (from: { cx: number; cy: number; gap: number }, to: { cx: number; cy: number; gap: number }) => {
+    touch('pointerdown', 1, from.cx - from.gap / 2, from.cy);
+    touch('pointerdown', 2, from.cx + from.gap / 2, from.cy);
+    touch('pointermove', 1, to.cx - to.gap / 2, to.cy);
+    touch('pointermove', 2, to.cx + to.gap / 2, to.cy);
+    touch('pointerup', 1, to.cx - to.gap / 2, to.cy);
+    touch('pointerup', 2, to.cx + to.gap / 2, to.cy);
+  };
+  return { sent, classes, canvas, calls, locks, run, touch, pinch, resetButton, pageZoom, frame: () => run<Promise<void>>("mirrorFrame({ n: 1, d: 'eA==' })") };
 }
 
 test('page du téléphone : le fronton (paysage) dans la place en portrait est tourné d\'un quart de tour, et un appui retombe au bon endroit', async () => {
@@ -630,4 +704,184 @@ test('page du téléphone : la page est verrouillée dans le sens de la fenêtre
   portrait.run('mirror.choice = false; mirrorChoose(true)');
   await portrait.frame();
   assert.deepEqual(portrait.locks, ['portrait'], 'fenêtre en portrait : le portrait reste');
+});
+
+// ---------------------------------------------------------------------------
+// Loupe (pincement à deux doigts) et glissements, par le faux DOM
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+type Tap = { t: string; fx: number; fy: number; button?: string };
+const taps = (sent: Array<Record<string, unknown>>) => sent.filter((m) => m.t === 'tap') as unknown as Tap[];
+const near = (a: number, b: number, eps = 0.0006) => Math.abs(a - b) <= eps;
+type Zoom = { s: number; tx: number; ty: number };
+type Box = { x: number; y: number; w: number; h: number };
+
+/** Fenêtre en portrait (1080 × 1920) dans une place 400 × 800 : l'image fait 400 × 711, bandes noires en haut et en bas. */
+async function zoomPage() {
+  const page = loadMirrorPage({ width: 400, height: 800 }, { width: 1080, height: 1920 });
+  await page.frame();
+  assert.equal(page.run('mirror.turned'), false);
+  return page;
+}
+
+/** L'invariant de la loupe : un point de l'image, montré où l'agrandissement le met, se touche à la même fraction qu'avant. */
+function assertTapsStayExact(page: Awaited<ReturnType<typeof zoomPage>>, z: Zoom) {
+  const base = [[10, 60], [200, 400], [399, 740], [123, 321], [350, 100]];
+  for (const [x, y] of base) {
+    const before = page.run<{ fx: number; fy: number } | undefined>(`(() => { const z = mirror.zoom; mirror.zoom = { s: 1, tx: 0, ty: 0 }; const f = mirrorFraction(${x}, ${y}, false); mirror.zoom = z; return f; })()`);
+    const after = page.run<{ fx: number; fy: number } | undefined>(`mirrorFraction(${z.tx + z.s * x!}, ${z.ty + z.s * y!}, false)`);
+    assert.ok(before && after, `(${x}, ${y}) est dans l'image`);
+    assert.ok(near(before.fx, after.fx) && near(before.fy, after.fy), `(${x}, ${y}) : ${JSON.stringify(before)} avant, ${JSON.stringify(after)} après la loupe`);
+  }
+}
+
+test('loupe : le pincement agrandit autour des doigts, et les appuis tombent juste avant comme après', async () => {
+  const page = await zoomPage();
+  // Avant : un appui au milieu de la vue.
+  page.touch('pointerdown', 1, 200, 400, 0);
+  page.touch('pointerup', 1, 200, 400, 40);
+  const [first] = taps(page.sent);
+  assert.ok(first && near(first.fx, 0.5) && near(first.fy, 0.5), 'appui exact sans loupe');
+
+  // Pincement centré en (300, 300) : l'écart double, l'image double.
+  const under = page.run<{ fx: number; fy: number }>('mirrorFraction(300, 300, false)');
+  page.pinch({ cx: 300, cy: 300, gap: 100 }, { cx: 300, cy: 300, gap: 200 });
+  const zoom = page.run<Zoom>('mirror.zoom');
+  assert.ok(near(zoom.s, 2, 0.001), `agrandissement ×2 (${zoom.s})`);
+  assert.ok(page.classes.has('zoomed'));
+  assert.match(page.canvas.style.transform ?? '', /scale\(2\)/);
+  // Le point sous le milieu des doigts y est resté.
+  const still = page.run<{ fx: number; fy: number }>('mirrorFraction(300, 300, false)');
+  assert.ok(near(still.fx, under.fx) && near(still.fy, under.fy), 'le zoom est centré sur les doigts');
+  assertTapsStayExact(page, zoom);
+
+  // Un appui sur l'image agrandie part (après le délai d'un double appui possible), à la bonne fraction.
+  page.touch('pointerdown', 3, 100, 100, 1000);
+  page.touch('pointerup', 3, 100, 100, 1040);
+  assert.equal(taps(page.sent).length, 1, 'retenu le temps d\'un double appui');
+  await wait(340);
+  const second = taps(page.sent)[1]!;
+  const rect = page.run<Box>('mirrorImageRect()');
+  assert.ok(near(second.fx, (100 - rect.x) / rect.w) && near(second.fy, (100 - rect.y) / rect.h), 'appui exact sous la loupe');
+  assert.ok(near(second.fx, 0.5, 0.01), 'vue de 400 de large, image doublée, décalée de 300 : (100 + 300) / 800');
+});
+
+test('loupe : un doigt déplace le cadre agrandi (sans faire défiler la page), qui reste dans l\'image, et les appuis restent justes', async () => {
+  const page = await zoomPage();
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 300 });
+  const z0 = page.run<Zoom>('mirror.zoom');
+  assert.ok(near(z0.s, 3, 0.001));
+  page.touch('pointerdown', 1, 200, 400, 0);
+  page.touch('pointermove', 1, 230, 420, 20);
+  page.touch('pointerup', 1, 230, 420, 40);
+  const z1 = page.run<Zoom>('mirror.zoom');
+  assert.ok(near(z1.tx, z0.tx + 30, 0.01) && near(z1.ty, z0.ty + 20, 0.01), 'le cadre suit le doigt');
+  assert.equal(page.sent.filter((m) => m.t === 'mscroll').length, 0, 'aucun glissement envoyé à la page');
+  assertTapsStayExact(page, z1);
+  // Tiré très loin : le cadre bute sur le bord de l'image (plus de noir au-delà).
+  page.touch('pointerdown', 1, 0, 0, 100);
+  page.touch('pointermove', 1, 400, 800, 120);
+  page.touch('pointerup', 1, 400, 800, 140);
+  const edge = page.run<Box>('mirrorImageRect()');
+  assert.ok(edge.x <= 0.001 && edge.x + edge.w >= 399.999, 'l\'image couvre la largeur de la vue');
+  assert.ok(edge.y <= 0.001 && edge.y + edge.h >= 799.999, 'et sa hauteur');
+  assertTapsStayExact(page, page.run<Zoom>('mirror.zoom'));
+});
+
+test('loupe : un double appui, ou le bouton, ramène au cadrage normal sans cliquer dans la page', async () => {
+  const page = await zoomPage();
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 250 });
+  assert.ok(page.run<number>('mirror.zoom.s') > 2);
+  // Double appui.
+  page.touch('pointerdown', 1, 150, 350, 0);
+  page.touch('pointerup', 1, 150, 350, 40);
+  page.touch('pointerdown', 1, 155, 352, 150);
+  page.touch('pointerup', 1, 155, 352, 190);
+  assert.equal(page.run('mirror.zoom.s'), 1);
+  assert.equal(page.classes.has('zoomed'), false);
+  assert.equal(page.canvas.style.transform, '');
+  await wait(340);
+  assert.equal(taps(page.sent).length, 0, 'aucun clic n\'est parti dans la page');
+  // Sans loupe, un appui part tout de suite, à la place exacte.
+  page.touch('pointerdown', 1, 200, 400, 1000);
+  page.touch('pointerup', 1, 200, 400, 1040);
+  assert.equal(taps(page.sent).length, 1);
+  // Le bouton fait la même chose.
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 250 });
+  assert.ok(page.run<number>('mirror.zoom.s') > 2);
+  page.resetButton();
+  assert.equal(page.run('mirror.zoom.s'), 1);
+  assert.equal(page.classes.has('zoomed'), false);
+});
+
+test('loupe : bornée, un pincement à peine agrandi revient au cadrage normal, et la borne prépare une image plus fine', async () => {
+  const page = await zoomPage();
+  page.run('mirror.asked = true; mirror.box = { w: 400, h: 800 }');
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 3000 });
+  assert.equal(page.run('mirror.zoom.s'), 5, 'agrandissement le plus fort : ×5');
+  assert.ok(page.sent.some((m) => m.t === 'mirror' && m.on === true && m.w === 800 && m.h === 1600), 'image plus fine demandée sous la loupe');
+  page.resetButton();
+  assert.equal(page.sent.filter((m) => m.t === 'mirror').at(-1)?.w, 400, 'cadrage normal : taille d\'avant');
+  // Écarter de 2 % ne change rien.
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 102 });
+  assert.equal(page.run('mirror.zoom.s'), 1);
+  // Pincer vers l'intérieur sans loupe : toujours ×1.
+  page.pinch({ cx: 200, cy: 400, gap: 300 }, { cx: 200, cy: 400, gap: 50 });
+  assert.equal(page.run('mirror.zoom.s'), 1);
+});
+
+test('glissement du doigt sans loupe : défilement de la page, doigt levé annoncé (end) pour finir le geste tactile', async () => {
+  const page = await zoomPage();
+  const imageH = 400 * (1920 / 1080);
+  // Balayage vers le haut, commencé à (200, 600).
+  page.touch('pointerdown', 1, 200, 600, 0);
+  page.touch('pointermove', 1, 200, 500, 16);
+  await wait(30);
+  page.touch('pointermove', 1, 200, 300, 32);
+  page.touch('pointerup', 1, 200, 300, 48);
+  const slides = page.sent.filter((m) => m.t === 'mscroll') as unknown as { fx: number; fy: number; dx: number; dy: number; end?: boolean }[];
+  assert.equal(slides.length, 2);
+  assert.ok(near(slides[0]!.fy, (600 - (800 - imageH) / 2) / imageH, 0.001), 'commencé sous le doigt');
+  assert.ok(slides[0]!.dy < 0 && slides[0]!.end === undefined);
+  assert.ok(slides[1]!.dy < 0 && slides[1]!.end === true, 'le dernier message porte la levée du doigt');
+  assert.ok(near(slides[0]!.dy + slides[1]!.dy, -300 / imageH, 0.001), 'tout le parcours du doigt est transmis');
+  // Un appui sans mouvement n'envoie aucun glissement.
+  page.sent.length = 0;
+  page.touch('pointerdown', 1, 200, 400, 1000);
+  page.touch('pointerup', 1, 200, 400, 1040);
+  assert.equal(page.sent.filter((m) => m.t === 'mscroll').length, 0);
+  assert.equal(taps(page.sent).length, 1);
+});
+
+test('glissement : le message lit end (doigt levé) et l\'ignore autrement', () => {
+  assert.deepEqual(parsePhoneMessage({ t: 'mscroll', s: 7, fx: 0.2, fy: 0.3, dx: 0, dy: -0.4, end: true }), { t: 'mscroll', s: 7, fx: 0.2, fy: 0.3, dx: 0, dy: -0.4, end: true });
+  assert.deepEqual(parsePhoneMessage({ t: 'mscroll', s: 7, fx: 0.2, fy: 0.3, dx: 0, dy: -0.4, end: 'oui' }), { t: 'mscroll', s: 7, fx: 0.2, fy: 0.3, dx: 0, dy: -0.4 });
+});
+
+test('page du téléphone : le bouton de retour au cadrage normal existe et est traduit, la loupe reste dans le module du miroir', () => {
+  assert.match(phonePage, /id="mirror-zoom-reset"/);
+  assert.match(phoneMirror, /t\('Cadrage normal'\)/);
+  assert.equal(phoneMain.includes('mirror.zoom'), false);
+});
+
+test("zoom de la page d'Edge : deux boutons, un pas par appui, sans toucher à la loupe ni cliquer dans l'image", async () => {
+  const page = await zoomPage();
+  assert.equal(page.pageZoom('in'), true, "le doigt reste sur le bouton : pas de clic ni de glissement dans l'image");
+  assert.equal(page.pageZoom('out'), true);
+  assert.equal(page.pageZoom('out'), true);
+  assert.deepEqual(page.sent.filter((m) => m.t === 'mzoom').map((m) => m.steps), [1, -1, -1]);
+  assert.equal(page.run('mirror.zoom.s'), 1, "la loupe n'a pas bougé");
+  assert.equal(taps(page.sent).length, 0);
+  // Un pincement, lui, ne demande rien à Edge : c'est la loupe.
+  page.sent.length = 0;
+  page.pinch({ cx: 200, cy: 400, gap: 100 }, { cx: 200, cy: 400, gap: 250 });
+  assert.equal(page.sent.some((m) => m.t === 'mzoom'), false);
+  assert.ok(page.run<number>('mirror.zoom.s') > 2);
+});
+
+test("page du téléphone : les boutons de zoom de la page d'Edge existent et sont traduits", () => {
+  assert.match(phonePage, /id="mirror-page-zoom-in"/);
+  assert.match(phonePage, /id="mirror-page-zoom-out"/);
+  assert.match(phoneMirror, /t\("Agrandir la page de la borne"\)/);
+  assert.match(phoneMirror, /t\("Réduire la page de la borne"\)/);
 });

@@ -608,7 +608,8 @@ export function appBrowserArgs(profile: string, at: ScreenRect, url: string, mob
     `--user-data-dir=${profile}`,
     ...EDGE_QUIET_ARGS,
     '--autoplay-policy=no-user-gesture-required',
-    ...(mobile ? [`--user-agent=${APP_MOBILE_USER_AGENT}`] : []),
+    // Rendu de téléphone : l'agent utilisateur, et les événements tactiles (les sites mobiles attendent un doigt : le miroir du téléphone en injecte un).
+    ...(mobile ? [`--user-agent=${APP_MOBILE_USER_AGENT}`, '--touch-events=enabled'] : []),
     ...(scale === 1 ? [] : [`--force-device-scale-factor=${scale}`]),
     `--window-position=${Math.round(at.x)},${Math.round(at.y)}`,
     `--window-size=${Math.max(1, Math.round(at.width))},${Math.max(1, Math.round(at.height))}`,

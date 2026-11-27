@@ -409,6 +409,8 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
       click: (button, count) => session.click(button, count),
       scroll: (dx, dy) => session.wheel(dx, dy),
       zoom: (dir) => session.zoom(dir),
+      // Glissement tactile du miroir : seulement pour un site au rendu mobile.
+      ...(session.touch ? { touch: (phase: 'down' | 'move' | 'up', x: number, y: number) => session.touch!(phase, x, y) } : {}),
       // Le miroir du téléphone : seulement si la session sait capturer sa fenêtre.
       ...(session.capture ? { capture: (size, quality) => session.capture!(size, quality) } : {}),
       text: (del, ins) => {

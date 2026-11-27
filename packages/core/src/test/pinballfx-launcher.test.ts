@@ -29,6 +29,7 @@ interface LaunchResultLike {
 
 const launcher = require(path.join(REPO_ROOT, 'app', 'dist', 'pinballfx-launcher.js')) as {
   isPinballFxWindow(w: Pick<FakeWindow, 'title' | 'className' | 'visible'>): boolean;
+  ZEN_LAUNCH_GAMES: { pinballfxmidnight: { isWindow(w: Pick<FakeWindow, 'title' | 'className' | 'visible'>): boolean } };
   launchPinballFx(opts: {
     command: { file: string; args: string[] };
     game?: unknown;
@@ -246,4 +247,26 @@ test('installer : Epic ouvert sur sa page par son adresse', () => {
   assert.deepEqual(sys.spawned, []);
   assert.equal(install.isStoreWindow({ title: 'Epic Games Launcher', visible: true }), true);
   assert.equal(install.isStoreWindow({ title: 'Cyber Pinball', visible: true }), false);
+});
+
+test('Midnight : identifie sa fenêtre, rend le focus et termine quand son processus s’arrête', async () => {
+  const system = fakeSystem();
+  const midnight = launcher.ZEN_LAUNCH_GAMES.pinballfxmidnight;
+  assert.equal(midnight.isWindow(win(8, 'Pinball FX Midnight  ')), true);
+  assert.equal(midnight.isWindow(win(8, 'Pinball M')), true);
+  assert.equal(midnight.isWindow(win(8, 'Pinball FX Midnight', 'Chrome_WidgetWin_1')), false);
+  assert.equal(midnight.isWindow(win(8, 'Pinball FX Midnight - Steam')), false);
+  const args = ['-applaunch', '2337640', '-Table', '171', '-GameMode', 'Hotseat_4'];
+  let playing = 0;
+  const game = launcher.launchPinballFx({ command: { file: 'steam.exe', args }, game: midnight, system, onPlaying: () => playing++ });
+  assert.deepEqual(system.spawned, [{ file: 'steam.exe', args }]);
+  system.shown.push(win(8, 'PinballFX'), win(9, 'Pinball FX Midnight  '));
+  system.living.add(8).add(9);
+  await tick();
+  assert.equal(game.pid, 9);
+  assert.equal(playing, 1);
+  assert.deepEqual(system.fronted, [9]);
+  system.living.delete(9);
+  assert.equal((await game.done).ok, true);
+  assert.equal(system.living.has(8), true);
 });

@@ -9,7 +9,8 @@
 // acquittée (« mirror-ack »), et la borne n'en envoie pas d'autre avant. Un appui devient « tap »,
 // un glissement « mscroll », un appui long un « tap » du bouton droit : leurs points sont des
 // fractions de l'image, la borne les convertit en pixels de la fenêtre. Deux doigts qui s'écartent ou se
-// rapprochent sont un pincement « mzoom » : la borne zoome la page d'un pas (Ctrl+ ou Ctrl- dans Edge) par cran.
+// rapprochent sont une loupe, au téléphone seulement (l'image s'agrandit, rien ne change dans Edge) ; le zoom de la page
+// d'Edge sur la borne (Ctrl+ ou Ctrl-) a ses deux boutons « mzoom », un pas par appui.
 //
 // Limite connue : les vidéos protégées (Netflix, Prime Video, Disney+) sortent noires de la capture
 // d'écran ; le miroir n'y peut rien. Il n'affiche aucun texte d'aide : rien d'autre que l'image.
@@ -21,12 +22,14 @@ const MIRROR_STORE = 'cyberpinball.miroir';
 const MIRROR_TAP_MS = 320;
 const MIRROR_LONG_MS = 550;
 const MIRROR_SLOP = 10;
-/** Écart des doigts (rapport) qui vaut un pas de zoom : à peu près un cran du zoom d'Edge. */
-const MIRROR_PINCH_STEP = 1.25;
-/** Pas au plus par mouvement de doigts (la borne en accepte quatre par message). */
-const MIRROR_PINCH_MAX = 4;
 /** Au plus 1,5 pixel d'image par pixel CSS : au-delà, l'image ne gagne rien et la liaison s'alourdit. */
 const MIRROR_DENSITY_MAX = 1.5;
+/** Loupe : agrandissement le plus fort, et délai d'un double appui (retour au cadrage normal). */
+const MIRROR_ZOOM_MAX = 5;
+const MIRROR_DOUBLE_MS = 280;
+const MIRROR_DOUBLE_SLOP = 40;
+/** Image agrandie : la borne en envoie une plus fine (deux fois plus de pixels par côté) pour que la loupe ne floute pas. */
+const MIRROR_ZOOM_DETAIL = 2;
 const mirror = {
   /** La borne annonce que cette fenêtre se capture (message « page »). */
   available: false,
@@ -46,6 +49,13 @@ const mirror = {
   landscape: false,
   /** L'image est dessinée tournée d'un quart de tour : paysage dans une place en portrait. */
   turned: false,
+  /**
+   * Loupe (pincement à deux doigts) : le canvas est agrandi par `s` autour du coin haut gauche de la vue puis
+   * décalé de (tx, ty) pixels. s = 1 : cadrage normal. Toujours rangée par mirrorZoomClamp (l'image couvre la vue).
+   */
+  zoom: { s: 1, tx: 0, ty: 0 },
+  /** La borne prépare l'image pour la loupe : à vrai quand le cadre est agrandi (mirrorZoomSettle). */
+  detail: false,
 };
 
 try {
@@ -68,6 +78,11 @@ const mirrorContext = mirrorCanvas.getContext('2d');
 /** Les deux boutons-icônes de la barre du bas qui choisissent le pavé ou le miroir : celui du mode montré est vert (enfoncé). */
 const mirrorToggle = document.getElementById('nav-mirror');
 const padToggle = document.getElementById('nav-pad');
+/** Retour au cadrage normal : visible seulement quand l'image est agrandie. */
+const zoomReset = document.getElementById('mirror-zoom-reset');
+/** Zoom de la page d'Edge sur la borne (Ctrl+ et Ctrl-), distinct de la loupe : celle-ci agrandit l'image ici, au téléphone. */
+const pageZoomIn = document.getElementById('mirror-page-zoom-in');
+const pageZoomOut = document.getElementById('mirror-page-zoom-out');
 /** Un bouton-icône de la barre : l'icône, son libellé (pour les lecteurs d'écran) et l'infobulle. */
 function mirrorToolButton(button, icon, text) {
   const label = document.createElement('span');
@@ -81,6 +96,15 @@ mirrorToolButton(mirrorToggle, cyberIcon('monitor'), t('Miroir'));
 /** Rappel dans le pavé, avec la même icône que le bouton ; la feuille de style ne le montre que si le miroir est possible. */
 const padHintMirror = document.getElementById('pad-hint-mirror');
 if (padHintMirror) padHintMirror.replaceChildren(cyberIcon('monitor'), t("Touche l'icône écran en bas pour voir l'écran de la borne"));
+zoomReset.replaceChildren(cyberIcon('zoom-out'));
+zoomReset.title = t('Cadrage normal');
+zoomReset.setAttribute('aria-label', t('Cadrage normal'));
+pageZoomIn.textContent = 'A+';
+pageZoomIn.title = t("Agrandir la page de la borne");
+pageZoomIn.setAttribute('aria-label', t("Agrandir la page de la borne"));
+pageZoomOut.textContent = 'A−';
+pageZoomOut.title = t("Réduire la page de la borne");
+pageZoomOut.setAttribute('aria-label', t("Réduire la page de la borne"));
 
 /** Le miroir est montré : possible, choisi, au navigateur, liaison acceptée, page visible. */
 function mirrorWanted() {
@@ -101,8 +125,9 @@ function mirrorBox() {
   const r = mirrorView.getBoundingClientRect();
   if (r.width < 8 || r.height < 8) return undefined;
   const k = Math.min(window.devicePixelRatio || 1, MIRROR_DENSITY_MAX);
-  const w = Math.min(4000, Math.round(r.width * k));
-  const h = Math.min(4000, Math.round(r.height * k));
+  const d = mirror.detail ? MIRROR_ZOOM_DETAIL : 1;
+  const w = Math.min(4000, Math.round(r.width * k * d));
+  const h = Math.min(4000, Math.round(r.height * k * d));
   // Fenêtre en paysage dans une place en portrait : l'image sera tournée, la borne la prépare pour la place tournée.
   return mirrorTurns(mirror.landscape, r.width, r.height) ? { w: h, h: w } : { w, h };
 }
@@ -170,6 +195,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 function mirrorClear() {
+  mirrorZoomReset();
   mirror.bitmap?.close?.();
   mirror.bitmap = undefined;
   mirror.landscape = false;
@@ -239,6 +265,9 @@ function mirrorPaint() {
     mirrorContext.rotate(Math.PI / 2);
   }
   mirrorContext.drawImage(b, 0, 0);
+  // La place a pu changer (rotation, clavier) : l'image agrandie reste dans la vue.
+  mirrorZoomClamp();
+  mirrorZoomApply();
 }
 
 /** Message « frame » : une image JPEG, dessinée puis acquittée. */
@@ -266,6 +295,8 @@ async function mirrorFrame(m) {
       send({ t: 'mirror-ack', n: m.n });
       // Le sens de l'image vient d'être connu : la borne prépare la taille pour la place telle qu'elle est montrée.
       if (changed) {
+        // Une autre fenêtre (ou un autre sens) : l'ancien cadrage n'a plus de sens.
+        mirrorZoomReset();
         mirrorSync();
         mirrorLockOrientation();
       }
@@ -281,9 +312,8 @@ async function mirrorFrame(m) {
 
 // --- Ce qu'on fait sur l'image ------------------------------------------------
 
-/** La place de l'image dans la vue (object-fit: contain), en pixels de l'écran ; undefined sans image. */
-function mirrorImageRect() {
-  if (!mirror.hasFrame) return undefined;
+/** La place de l'image sans loupe, en pixels de la vue (object-fit: contain) ; undefined sans image. */
+function mirrorBaseRect() {
   const r = mirrorView.getBoundingClientRect();
   const nw = mirrorCanvas.width;
   const nh = mirrorCanvas.height;
@@ -291,7 +321,76 @@ function mirrorImageRect() {
   const k = Math.min(r.width / nw, r.height / nh);
   const w = nw * k;
   const h = nh * k;
-  return { x: r.left + (r.width - w) / 2, y: r.top + (r.height - h) / 2, w, h };
+  return { view: r, x: (r.width - w) / 2, y: (r.height - h) / 2, w, h };
+}
+
+/**
+ * La place de l'image dans la vue, en pixels de l'écran, loupe comprise : c'est ce rectangle (et lui seul) que
+ * lisent les appuis et les glissements, pour qu'ils tombent juste que l'image soit agrandie ou non. undefined sans image.
+ */
+function mirrorImageRect() {
+  if (!mirror.hasFrame) return undefined;
+  const b = mirrorBaseRect();
+  if (!b) return undefined;
+  const z = mirror.zoom;
+  return { x: b.view.left + z.tx + z.s * b.x, y: b.view.top + z.ty + z.s * b.y, w: z.s * b.w, h: z.s * b.h };
+}
+
+// --- Loupe : pincement à deux doigts, cadre agrandi déplacé à un doigt, retour au cadrage normal ---------
+
+/** Ramène un décalage pour que l'image agrandie couvre la vue (centrée sur l'axe où elle est plus petite qu'elle). */
+function mirrorZoomAxis(t, s, base, length, view) {
+  if (s * length <= view) return (view - s * length) / 2 - s * base;
+  return Math.min(-s * base, Math.max(view - s * (base + length), t));
+}
+
+function mirrorZoomClamp() {
+  const z = mirror.zoom;
+  z.s = Math.min(MIRROR_ZOOM_MAX, Math.max(1, z.s));
+  const b = z.s > 1 ? mirrorBaseRect() : undefined;
+  if (!b) {
+    z.s = 1;
+    z.tx = 0;
+    z.ty = 0;
+    return;
+  }
+  z.tx = mirrorZoomAxis(z.tx, z.s, b.x, b.w, b.view.width);
+  z.ty = mirrorZoomAxis(z.ty, z.s, b.y, b.h, b.view.height);
+}
+
+function mirrorZoomApply() {
+  const z = mirror.zoom;
+  mirrorCanvas.style.transform = z.s > 1 ? `translate(${Math.round(z.tx * 100) / 100}px, ${Math.round(z.ty * 100) / 100}px) scale(${Math.round(z.s * 1000) / 1000})` : '';
+  mirrorView.classList.toggle('zoomed', z.s > 1);
+}
+
+/** Retour au cadrage normal (double appui, bouton, autre fenêtre, fin du miroir). */
+function mirrorZoomReset() {
+  clearTimeout(mirrorTapTimer);
+  mirrorTapTimer = undefined;
+  mirrorLastTap = undefined;
+  mirror.zoom = { s: 1, tx: 0, ty: 0 };
+  mirrorZoomApply();
+  mirrorZoomSettle();
+}
+
+/** Le cadre est agrandi ou ne l'est plus : la borne prépare l'image à la bonne finesse. */
+function mirrorZoomSettle() {
+  const detail = mirror.zoom.s > 1;
+  if (detail === mirror.detail) return;
+  mirror.detail = detail;
+  if (mirror.asked) mirrorSync();
+}
+
+zoomReset.addEventListener('pointerdown', (e) => e.stopPropagation());
+zoomReset.addEventListener('click', () => mirrorZoomReset());
+// Un pas de zoom de la page d'Edge par appui (la borne envoie Ctrl+ ou Ctrl-) ; le doigt ne doit ni cliquer ni glisser dans l'image.
+for (const [button, steps] of [[pageZoomIn, 1], [pageZoomOut, -1]]) {
+  button.addEventListener('pointerdown', (e) => e.stopPropagation());
+  button.addEventListener('click', () => {
+    if (navigator.vibrate) navigator.vibrate(8);
+    send({ t: 'mzoom', steps });
+  });
 }
 
 /** Un point de l'écran en fractions de l'image ; `clamp` : ramené dedans, sinon undefined hors de l'image. */
@@ -313,13 +412,51 @@ let mirrorGesture;
 let mirrorPending = { dx: 0, dy: 0 };
 let mirrorFrameId;
 let mirrorLongTimer;
+/** Pincement en cours : écart et milieu des deux doigts au départ, et cadrage de départ. */
 let mirrorPinch;
+/** Appui d'une vue agrandie, retenu le temps d'un double appui possible (qui ramène au cadrage normal au lieu de cliquer). */
+let mirrorTapTimer;
+let mirrorLastTap;
 
-function mirrorFlush() {
+/** Les deux premiers doigts : écart et milieu. */
+function mirrorPinchPoints() {
+  const [a, b] = [...mirrorPointers.values()];
+  return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function mirrorPinchStart() {
+  clearTimeout(mirrorLongTimer);
+  // Un appui retenu (double appui possible) n'est plus un appui : les doigts viennent de se poser pour autre chose.
+  clearTimeout(mirrorTapTimer);
+  mirrorTapTimer = undefined;
+  mirrorLastTap = undefined;
+  mirrorPending = { dx: 0, dy: 0 };
+  const p = mirrorPinchPoints();
+  mirrorPinch = { d: p.d, x: p.x, y: p.y, zoom: { ...mirror.zoom } };
+}
+
+/** Le point de l'image sous le milieu des doigts au départ reste sous leur milieu : zoom centré sur les doigts, et déplacement avec eux. */
+function mirrorPinchMove() {
+  const start = mirrorPinch;
+  const v = mirrorView.getBoundingClientRect();
+  const p = mirrorPinchPoints();
+  const s = Math.min(MIRROR_ZOOM_MAX, Math.max(1, start.zoom.s * (p.d / start.d)));
+  const qx = (start.x - v.left - start.zoom.tx) / start.zoom.s;
+  const qy = (start.y - v.top - start.zoom.ty) / start.zoom.s;
+  mirror.zoom = { s, tx: p.x - v.left - s * qx, ty: p.y - v.top - s * qy };
+  mirrorZoomClamp();
+  mirrorZoomApply();
+}
+
+/**
+ * Envoie ce que le doigt a parcouru depuis le dernier envoi. `end` : le doigt est levé, la borne le sait (même sans
+ * mouvement de plus) pour finir son geste : un vrai glissement tactile se termine doigt levé, comme sur un téléphone.
+ */
+function mirrorFlush(end = false) {
   mirrorFrameId = undefined;
   const g = mirrorGesture;
   const r = mirrorImageRect();
-  if (!g || !r || (!mirrorPending.dx && !mirrorPending.dy)) return;
+  if (!g || !r || (!end && !mirrorPending.dx && !mirrorPending.dy)) return;
   // Le doigt a fait dx × dy pixels de l'écran : en fractions de l'image, la borne les rend en pixels de la fenêtre.
   const cdx = mirrorPending.dx / r.w;
   const cdy = mirrorPending.dy / r.h;
@@ -327,7 +464,7 @@ function mirrorFlush() {
   const dx = Math.round((mirror.turned ? cdy : cdx) * 10000) / 10000;
   const dy = Math.round((mirror.turned ? -cdx : cdy) * 10000) / 10000;
   mirrorPending = { dx: 0, dy: 0 };
-  if (dx || dy) send({ t: 'mscroll', fx: g.fx, fy: g.fy, dx: Math.max(-2, Math.min(2, dx)), dy: Math.max(-2, Math.min(2, dy)) });
+  if (dx || dy || end) send({ t: 'mscroll', fx: g.fx, fy: g.fy, dx: Math.max(-2, Math.min(2, dx)), dy: Math.max(-2, Math.min(2, dy)), ...(end ? { end: true } : {}) });
 }
 
 mirrorView.addEventListener('pointerdown', (e) => {
@@ -336,10 +473,10 @@ mirrorView.addEventListener('pointerdown', (e) => {
   mirrorPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   e.preventDefault();
   if (mirrorPointers.size > 1) {
-    // Deux doigts : ni appui ni glissement, un pincement (zoom de la page, un pas par MIRROR_PINCH_STEP d'écart).
+    // Deux doigts : ni appui ni glissement, une loupe (pincement).
     clearTimeout(mirrorLongTimer);
     if (mirrorGesture) mirrorGesture.cancelled = true;
-    mirrorPinch = mirrorPinchStart();
+    if (mirrorPointers.size === 2) mirrorPinchStart();
     return;
   }
   const at = mirrorFraction(e.clientX, e.clientY, false);
@@ -354,56 +491,28 @@ mirrorView.addEventListener('pointerdown', (e) => {
   }, MIRROR_LONG_MS);
 });
 
-/** Distance entre les deux premiers doigts posés ; undefined s'il y en a moins de deux. */
-function mirrorFingerGap() {
-  const [a, b] = [...mirrorPointers.values()];
-  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : undefined;
-}
-
-function mirrorPinchStart() {
-  const gap = mirrorFingerGap();
-  return gap && gap > 1 ? { gap } : undefined;
-}
-
-/**
- * Pincement : chaque fois que l'écart des doigts a changé d'un facteur MIRROR_PINCH_STEP depuis le dernier pas,
- * la borne zoome d'un pas (écartés : agrandir, rapprochés : rapetisser). Le point de départ avance d'autant :
- * un pincement continu fait plusieurs pas, un doigt qui tremble n'en fait aucun.
- */
-function mirrorPinchMove() {
-  const gap = mirrorFingerGap();
-  if (!mirrorPinch || !gap) return;
-  let steps = 0;
-  while (gap / mirrorPinch.gap >= MIRROR_PINCH_STEP && steps < MIRROR_PINCH_MAX) {
-    mirrorPinch.gap *= MIRROR_PINCH_STEP;
-    steps++;
-  }
-  while (gap / mirrorPinch.gap <= 1 / MIRROR_PINCH_STEP && steps > -MIRROR_PINCH_MAX) {
-    mirrorPinch.gap /= MIRROR_PINCH_STEP;
-    steps--;
-  }
-  if (!steps) return;
-  if (navigator.vibrate) navigator.vibrate(8);
-  send({ t: 'mzoom', steps });
-}
-
 mirrorView.addEventListener('pointermove', (e) => {
   const p = mirrorPointers.get(e.pointerId);
-  if (p && mirrorPointers.size > 1) {
-    p.x = e.clientX;
-    p.y = e.clientY;
-    mirrorPinchMove();
-    return;
-  }
-  const g = mirrorGesture;
-  if (!p || !g || g.cancelled) return;
+  if (!p) return;
   p.x = e.clientX;
   p.y = e.clientY;
+  if (mirrorPinch && mirrorPointers.size >= 2) return mirrorPinchMove();
+  const g = mirrorGesture;
+  if (!g || g.cancelled) return;
   if (!g.moved && Math.hypot(e.clientX - g.x, e.clientY - g.y) > MIRROR_SLOP) {
     g.moved = true;
     clearTimeout(mirrorLongTimer);
   }
   if (!g.moved || g.long) return;
+  if (mirror.zoom.s > 1) {
+    // Image agrandie : un doigt déplace le cadre (la page ne défile pas ; retour au cadrage normal pour la faire défiler).
+    mirror.zoom.tx += e.clientX - g.last.x;
+    mirror.zoom.ty += e.clientY - g.last.y;
+    g.last = { x: e.clientX, y: e.clientY };
+    mirrorZoomClamp();
+    mirrorZoomApply();
+    return;
+  }
   mirrorPending.dx += e.clientX - g.last.x;
   mirrorPending.dy += e.clientY - g.last.y;
   g.last = { x: e.clientX, y: e.clientY };
@@ -412,8 +521,14 @@ mirrorView.addEventListener('pointermove', (e) => {
 
 function mirrorRelease(e) {
   if (!mirrorPointers.delete(e.pointerId)) return;
-  // Un doigt levé : plus de pincement ; le doigt qui reste ne fait ni appui ni glissement (le geste est annulé).
-  mirrorPinch = undefined;
+  if (mirrorPointers.size < 2 && mirrorPinch) {
+    // Fin du pincement : un cadrage à peine agrandi revient au cadrage normal ; la borne prépare l'image à la bonne finesse.
+    mirrorPinch = undefined;
+    if (mirror.zoom.s < 1.05) mirror.zoom = { s: 1, tx: 0, ty: 0 };
+    mirrorZoomClamp();
+    mirrorZoomApply();
+    mirrorZoomSettle();
+  }
   if (mirrorPointers.size) return;
   clearTimeout(mirrorLongTimer);
   const g = mirrorGesture;
@@ -421,14 +536,25 @@ function mirrorRelease(e) {
   if (!g) return;
   if (g.moved && !g.cancelled) {
     // Ce qui reste du glissement part tout de suite.
+    // (Image agrandie : le doigt déplaçait le cadre, la borne n'a rien reçu.)
     mirrorGesture = g;
-    mirrorFlush();
+    if (mirror.zoom.s <= 1) mirrorFlush(true);
     mirrorGesture = undefined;
     mirrorPending = { dx: 0, dy: 0 };
     return;
   }
   if (g.cancelled || g.long || e.type === 'pointercancel' || e.timeStamp - g.start > MIRROR_TAP_MS) return;
-  send({ t: 'tap', fx: g.fx, fy: g.fy, button: 'left', count: 1 });
+  if (mirror.zoom.s <= 1) return void send({ t: 'tap', fx: g.fx, fy: g.fy, button: 'left', count: 1 });
+  // Image agrandie : le double appui ramène au cadrage normal ; un appui seul part une fois ce délai écoulé sans second.
+  const last = mirrorLastTap;
+  if (last && e.timeStamp - last.at <= MIRROR_DOUBLE_MS && Math.hypot(g.x - last.x, g.y - last.y) <= MIRROR_DOUBLE_SLOP) return mirrorZoomReset();
+  mirrorLastTap = { at: e.timeStamp, x: g.x, y: g.y };
+  const tap = { t: 'tap', fx: g.fx, fy: g.fy, button: 'left', count: 1 };
+  clearTimeout(mirrorTapTimer);
+  mirrorTapTimer = setTimeout(() => {
+    mirrorTapTimer = undefined;
+    send(tap);
+  }, MIRROR_DOUBLE_MS);
 }
 mirrorView.addEventListener('pointerup', mirrorRelease);
 mirrorView.addEventListener('pointercancel', mirrorRelease);

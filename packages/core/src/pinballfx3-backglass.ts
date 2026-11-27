@@ -76,9 +76,9 @@ function key(name: string): string {
  * Nom FX3 sous lequel chercher une table de Zen dans le catalogue : son .pxp pour FX3 ; pour Pinball FX,
  * celui de la table FX3 du même jeu VPS (même table, autre version du jeu). undefined : aucune.
  */
-export function zenCatalogName(fx: { game: 'pinballfx' | 'pinballfx3'; key: string; vps?: string }): string | undefined {
+export function zenCatalogName(fx: { game: 'pinballfx' | 'pinballfx3' | 'pinballfxmidnight'; key: string; vps?: string }): string | undefined {
   if (fx.game === 'pinballfx3') return fx.key;
-  return fx.vps ? PINBALLFX3_TABLES.find((t) => t.vps === fx.vps)?.name : undefined;
+  return fx.game === 'pinballfx' && fx.vps ? PINBALLFX3_TABLES.find((t) => t.vps === fx.vps)?.name : undefined;
 }
 
 /** Image du catalogue pour la table FX3 `name` (nom du .pxp, alias compris) ; undefined si le catalogue n'en a pas. */

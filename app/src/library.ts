@@ -79,10 +79,13 @@ import {
   zenLocalImageType,
   pinballFx3InstalledTables,
   ZEN_GAMES,
+  zenCatalog,
+  zenTable,
   zenEntryKey,
   zenFromPinballFx,
   zenFromPinballFx3,
   zenTableOfEntry,
+  type PinballFxGameMode,
   pinballFxVpsImage,
   pickNamedMedia,
   parseSizeText,
@@ -309,6 +312,7 @@ import { vpxCorrigeInPlace } from './vpx-corrige';
 import { activeVpxIni, usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { openPinballFxStore, zenSetup, type ZenSetup } from './pinballfx-install';
+import { openPinballFxModes } from './pinballfx-modes';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
@@ -2611,6 +2615,8 @@ export function createLibrary(host: LibraryHost) {
         const s = screen as Extract<Screen, { kind: 'notice' }>;
         return { heading: s.heading, sections: [{ rows: s.lines.map((text) => ({ text })) }], actions: [{ label: t('Continuer'), run: s.then }], back: s.then };
       }
+      case 'pinballFxModes':
+        return screen!.build();
       case 'custom':
         return (screen as Extract<Screen, { kind: 'custom' }>).build();
       case 'prompt': {
@@ -2813,6 +2819,12 @@ export function createLibrary(host: LibraryHost) {
     const watch = manage.filter((a) => a.tone === 'warning').map((a) => a.label);
     // Côté joueurs (table-social.ts) : « Sur cette table » à la place des fichiers, qui restent dans « Gérer la table… ».
     const social = host.tableSocial && !localPlay() ? kept('joueurs', () => host.tableSocial!(table, () => openSheet(table))) : undefined;
+    const launch = (fxGameMode?: PinballFxGameMode) => {
+      screen = undefined;
+      sheetReturn = undefined;
+      sheetManage = undefined;
+      host.play(table, fxGameMode);
+    };
     const actions: SheetAction[] = [
       ...missing,
       ...(social?.first.map((a): SheetAction => ({ ...a, door: 'sheet.instant' })) ?? []),
@@ -2822,11 +2834,9 @@ export function createLibrary(host: LibraryHost) {
         icon: 'play',
         door: 'sheet.play',
         run: () => {
-          screen = undefined;
-          sheetReturn = undefined;
-          sheetManage = undefined;
-          host.play(table);
+          if (!openPinballFxModes(table, launch, (build) => go({ kind: 'pinballFxModes', build, file: table.file }), openSheet)) launch();
         },
+        runFromPhone: () => launch(),
       },
       // « Jouer ensemble… » regroupe ami et partie en direct (table-social.ts) ; sans lui, les deux entrées d'avant.
       ...(social
@@ -3892,6 +3902,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glisse-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
       zenAction('pinballfx'),
+      zenAction('pinballfxmidnight'),
       zenAction('pinballfx3'),
       futurePinballUi.action(),
       // Bêta : la reprise sans duplication (liens physiques NTFS, 0.2.1), comme sa ligne des Nouveautés.
@@ -3942,7 +3953,9 @@ export function createLibrary(host: LibraryHost) {
     /** FX3 : images rangées à côté des tables dans data\steam (zen-media.ts), lues à l'ouverture. */
     local?: Map<string, string>;
   }
-  const zenUi: Record<ZenGameKey, ZenUi> = { pinballfx: { storeOpened: false }, pinballfx3: { storeOpened: false } };
+  const zenUi: Record<ZenGameKey, ZenUi> = {
+    pinballfx: { storeOpened: false }, pinballfx3: { storeOpened: false }, pinballfxmidnight: { storeOpened: false },
+  };
 
   function zenNow(game: ZenGameKey): ZenSetup {
     return (zenUi[game].now ??= zenSetup(game, host.dataDir));
@@ -4002,7 +4015,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** « Installer … » : la boutique ouverte sur le jeu, puis l'installation guettée. */
   function openZenStore(game: ZenGameKey, getter: NonNullable<ZenSetup['getter']>): void {
-    if (!openPinballFxStore(getter)) return;
+    if (!openPinballFxStore(getter, { name: ZEN_GAMES[game].name })) return;
     zenUi[game].storeOpened = true;
     watchZenInstall(game);
     host.broadcast();
@@ -4045,7 +4058,9 @@ export function createLibrary(host: LibraryHost) {
   let pinballFxVpsTried = false;
 
   /** Écran des tables de chaque jeu : une fonction par jeu, pour que chacun garde sa place du curseur. */
-  const zenListBuilders: Record<ZenGameKey, () => Built> = { pinballfx: () => buildZen('pinballfx'), pinballfx3: () => buildZen('pinballfx3') };
+  const zenListBuilders: Record<ZenGameKey, () => Built> = {
+    pinballfx: () => buildZen('pinballfx'), pinballfx3: () => buildZen('pinballfx3'), pinballfxmidnight: () => buildZen('pinballfxmidnight'),
+  };
 
   /**
    * Tables d'un jeu de Zen : Pinball FX, le catalogue de Zen ; Pinball FX3, les fichiers de tables
@@ -4055,6 +4070,12 @@ export function createLibrary(host: LibraryHost) {
    */
   function openZen(game: ZenGameKey, focus?: string, at?: number): void {
     const ui = zenUi[game];
+    if (game === 'pinballfxmidnight') {
+      ui.now = zenSetup(game, host.dataDir);
+      const items = midnightList();
+      openCustom(zenListBuilders[game], focus === undefined ? at : Math.max(0, items.findIndex((entry) => entry.key === focus)));
+      return;
+    }
     // Vignettes rangées ou nettoyées depuis (dossier de réception) : redemandées. Le disque est lu
     // ici, à l'ouverture, jamais en dessinant l'écran (refait à chaque touche).
     for (const [url, local] of pinballFxThumbs) {
@@ -4145,7 +4166,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** Qui chercher dans un pack reçu pour cette table : ses titres, et ce que le jeu en dit. */
   function zenTarget(fx: ZenTable, titles: string[]): { titles: string[]; pinballFx?: number; pinballFx3?: string } {
-    return { titles, ...(fx.game === 'pinballfx' ? { pinballFx: Number(fx.key) } : { pinballFx3: fx.key }) };
+    return { titles, ...(fx.game === 'pinballfx' ? { pinballFx: Number(fx.key) } : fx.game === 'pinballfx3' ? { pinballFx3: fx.key } : {}) };
   }
 
   /**
@@ -4424,6 +4445,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** Ce que la fiche dit de la table dans son jeu : « Pinball FX, table n° 156 », « Pinball FX3, fichier « WMS_Fish_Tales » ». */
   function zenTableFacts(fx: Pick<ZenTable, 'game' | 'key'>): string {
+    if (fx.game === 'pinballfxmidnight') return t('{game}, table n° {n}', { game: ZEN_GAMES[fx.game].name, n: fx.key });
     return fx.game === 'pinballfx' ? t('Pinball FX, table n° {n}', { n: fx.key }) : t('Pinball FX3, fichier « {name} »', { name: fx.key });
   }
 
@@ -4732,6 +4754,42 @@ export function createLibrary(host: LibraryHost) {
     return ui.list;
   }
 
+  function midnightList(): ZenTable[] {
+    const tables = new Map(zenCatalog('pinballfxmidnight').map((entry) => [entry.key, entry]));
+    for (const entry of host.tables()) {
+      if (entry.emulator !== 'pinballfxmidnight') continue;
+      const table = zenTableOfEntry(entry);
+      if (table) tables.set(table.key, { ...table, title: entry.title });
+    }
+    return [...tables.values()].sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  function addMidnight(table: ZenTable): void {
+    const game = 'pinballfxmidnight';
+    const added = addZenTable(tablesDir(), table);
+    host.reload(added.file);
+    sheetReturn = () => openZen(game, table.key);
+    openSheet(find(added.file) ?? added);
+  }
+
+  function askMidnightId(): void {
+    const game = 'pinballfxmidnight';
+    openPrompt(t('Ajouter par numéro de table'), t('Numéro de table Steam'), '', (value) => {
+      if (value === undefined) return openZen(game);
+      const table = zenTable(game, value.trim());
+      if (table) {
+        try {
+          addMidnight(table);
+        } catch (error) {
+          actionFailed(error, () => openZen(game));
+        }
+        return;
+      }
+      zenUi[game].flash = t('Le numéro de table doit être un entier positif.');
+      openZen(game);
+    }, t('Entre le numéro de table utilisé par Pinball FX Midnight.'));
+  }
+
   function buildZen(game: ZenGameKey): Built {
     const ui = zenUi[game];
     const name = ZEN_GAMES[game].name;
@@ -4744,8 +4802,9 @@ export function createLibrary(host: LibraryHost) {
       return key === undefined ? [] : [[key, x] as const];
     }));
     const actions: Action[] = [];
-    const list = zenList(game);
-    const images = zenImageMap(game);
+    const midnight = game === 'pinballfxmidnight';
+    const list = midnight ? midnightList() : zenList(game);
+    const images = midnight ? new Map<string, string>() : zenImageMap(game);
     loadPinballFxThumbs([...images.values()]);
     const rows: Row[] = list.map((fx) => {
       const entry = present.get(fx.key);
@@ -4757,6 +4816,10 @@ export function createLibrary(host: LibraryHost) {
             if (entry) {
               sheetReturn = () => openZen(game, fx.key);
               openSheet(entry);
+              return;
+            }
+            if (midnight) {
+              addMidnight(fx);
               return;
             }
             // Comme une table VPX (17/11/2026) : la fiche de la table et ses médias à choisir d'abord ;
@@ -4778,7 +4841,8 @@ export function createLibrary(host: LibraryHost) {
     });
     // Tables déjà dans le front-end (ajoutées avant, ou compte d'un site connecté depuis) : leurs
     // médias absents, cherchés de nouveau en arrière-plan. Sans lecture du disque ici (écran refait à chaque touche).
-    if (present.size)
+    if (midnight) actions.push({ label: t('Ajouter par numéro de table'), icon: 'table-add', key: 'midnight:number', run: askMidnightId });
+    if (present.size && !midnight)
       actions.push({
         label: t('Chercher les médias manquants'),
         detail: ui.hunt ?? t('Logo, fronton, topper, vidéos… des tables de {game} déjà dans le front-end', { game: name }),
@@ -4804,14 +4868,16 @@ export function createLibrary(host: LibraryHost) {
     // FX3 : toutes les tables sont installées, achetées ou non ; le lancement direct demande le mode
     // borne, activé une fois dans le jeu (plus de code à demander à Zen depuis le 4 novembre 2024).
     const lead =
-      game === 'pinballfx'
+      midnight
+        ? t('Start ajoute une table ou ouvre sa fiche. Choisis une table que tu possèdes sur Steam et règle les écrans dans le mode borne du jeu.')
+        : game === 'pinballfx'
         ? t('Start : ajouter au front-end une table que tu possèdes dans Pinball FX. Une table déjà dans le front-end : Start ouvre sa fiche. Les écrans et le DMD se règlent dans le mode borne de Pinball FX.')
         : t('Start : ajouter au front-end une table que tu possèdes dans {game}. Le jeu installe toutes ses tables, même celles que tu n’as pas achetées : Cyber Pinball ne peut pas savoir lesquelles sont à toi. Mode borne : à activer une fois dans le jeu (icône de borne à côté du profil), sans code à demander à Zen ; aide de Zen : {url}.', { game: name, url: PINBALLFX3_CABINET_HELP_URL.replace(/^https:\/\/(www\.)?/, '') });
     return {
       heading: t('Tables de {game}', { game: name }),
       icon: 'table-add',
       subheading: [t('Bêta : {game} est en phase de test dans Cyber Pinball', { game: name }), inMenu ? tn(inMenu, '{n} table dans le front-end', '{n} tables dans le front-end') : undefined].filter(Boolean).join(' · '),
-      lead: ui.flash ?? pinballFx3Folder.notice() ?? lead,
+      lead: ui.flash ?? (midnight ? undefined : pinballFx3Folder.notice()) ?? lead,
       sections: [
         ...(fx3Setup ? [{ title: name, rows: pinballFx3Folder.rows(fx3Setup) }] : []),
         {
@@ -5598,11 +5664,9 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Touches et souris ----------
 
-  function handleKey(input: Input): boolean {
+  function handleKey(input: Input, fromPhone = false): boolean {
     if (!screen) return false;
     if (busy) return true;
-    const KEYS = host.keys();
-    const is = (group: string[]) => group.includes(input.code);
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       // Toute touche d'une saisie est un geste : sa validation pose le message qui suit (gesture-flash.ts).
       userGesture();
@@ -5622,6 +5686,10 @@ export function createLibrary(host: LibraryHost) {
       }
     }
     const built = build();
+    const pickingPlayers = screen.kind === 'pinballFxModes';
+    const KEYS = (pickingPlayers ? host.playerModeKeys?.() : undefined) ?? host.keys();
+    const is = (group: string[]) => group.includes(input.code);
+    if (pickingPlayers && (fromPhone || (input.isAutoRepeat && is(KEYS.confirm)))) return true;
     // Déplacer la sélection ou faire défiler n'est pas un geste : le message de l'écran reste (gesture-flash.ts).
     const navigation = is(KEYS.previous) || is(KEYS.next) || input.code === CONFIG_KEY || (host.zoneKeys?.() ?? []).includes(input.code) || PAGE_KEYS[input.code] !== undefined;
     if (built.keys && !navigation) userGesture();
@@ -5680,7 +5748,8 @@ export function createLibrary(host: LibraryHost) {
         userGesture();
         if (built.actions[cursor]?.run === built.back) expectBack();
         const before = screen;
-        afterRun(runAction(built.actions[cursor]?.run, built.back), before);
+        const selected = built.actions[cursor];
+        afterRun(runAction(fromPhone ? selected?.runFromPhone ?? selected?.run : selected?.run, built.back), before);
       }
     }
     // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
@@ -5700,7 +5769,7 @@ export function createLibrary(host: LibraryHost) {
       reading.active = false;
       userGesture();
       const before = screen;
-      afterRun(runAction(hit.run, built.back), before);
+      afterRun(runAction(fromPhone ? hit.runFromPhone ?? hit.run : hit.run, built.back), before);
     }
     host.broadcast();
     return true;
@@ -6027,7 +6096,7 @@ export function createLibrary(host: LibraryHost) {
     } else e.armed = true;
   }
 
-  function handleAction(action: UiAction): void {
+  function handleAction(action: UiAction, fromPhone = false): void {
     // Mesure du texte : même pendant une opération, sinon elle serait perdue (le rendu ne la renvoie qu'au changement).
     if (action.type === 'reading') {
       if (!screen) return;
@@ -6050,7 +6119,7 @@ export function createLibrary(host: LibraryHost) {
       else startImport(action.paths, 'copy');
       return;
     }
-    if (!screen) return;
+    if (!screen || (fromPhone && screen.kind === 'pinballFxModes')) return;
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       userGesture();
       pressKey(screen, action.index);
@@ -6115,7 +6184,8 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
       if (built.actions[index]!.run === built.back) expectBack();
       const before = screen;
-      afterRun(runAction(built.actions[index]!.run, built.back), before);
+      const selected = built.actions[index]!;
+      afterRun(runAction(fromPhone ? selected.runFromPhone ?? selected.run : selected.run, built.back), before);
     }
   }
 
@@ -6425,7 +6495,7 @@ export function createLibrary(host: LibraryHost) {
 
   /** En tête de la page du téléphone : l'écran affiché et ce qui y est choisi. */
   function remoteScreen(): { title: string; item?: string } | undefined {
-    if (!screen) return undefined;
+    if (!screen || screen.kind === 'pinballFxModes') return undefined;
     const built = build();
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return { title: built.heading, item: screen.editor.label };
     const ids = actionIds(built.actions);
@@ -6440,7 +6510,7 @@ export function createLibrary(host: LibraryHost) {
    * Une liste de choix du clavier à l'écran (fabricant) y est aussi ; une opération en cours, rien.
    */
   function remoteEntries(): MenuEntries | undefined {
-    if (!screen) return undefined;
+    if (!screen || screen.kind === 'pinballFxModes') return undefined;
     const built = build();
     const icon = built.icon ?? (TABLE_SCREENS.includes(screen.kind) ? undefined : section);
     if (busy) return { kind: 'busy', title: built.heading, ...(icon ? { icon } : {}), items: [], current: -1, note: busy };
@@ -6501,8 +6571,8 @@ export function createLibrary(host: LibraryHost) {
           // Une page hors de la borne (« Nous suivre ») : le téléphone l'ouvre lui-même.
           ...(a.link ? { link: a.link } : {}),
           // Comme un clic à la borne : l'élément retrouvé par son identité, même si la liste a bougé.
-          pick: () => handleAction({ type: 'activate', index, id: ids[index] }),
-          focus: () => handleAction({ type: 'focus', index, id: ids[index] }),
+          pick: () => handleAction({ type: 'activate', index, id: ids[index] }, true),
+          focus: () => handleAction({ type: 'focus', index, id: ids[index] }, true),
         };
       }),
       current: followCursor(ids, cursor, screen, anchor),

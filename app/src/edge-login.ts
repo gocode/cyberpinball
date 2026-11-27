@@ -46,6 +46,8 @@ export interface EdgeWindowOps {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
+  /** Un doigt sur la fenêtre (injection tactile de Windows) : down, move, up ; faux si Windows refuse. */
+  touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   /** Image de la fenêtre (miroir du téléphone, phone-mirror.ts) ; absent si la capture n'est pas possible. */
   capture?(win: unknown, size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
 }
@@ -118,6 +120,7 @@ export function edgeWindowOps(): EdgeWindowOps {
     pointer: (x, y) => void w.setCursorPosition(x, y),
     click: (button, count) => void w.mouseClick(button, count),
     wheel: (dx, dy) => void w.mouseWheel(dx, dy),
+    touch: (phase, x, y) => w.touchPoint(phase, x, y),
     capture: (win, size, quality) => captureWindow((win as Win).handle, size, quality),
   };
 }

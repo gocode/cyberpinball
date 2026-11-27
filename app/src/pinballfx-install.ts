@@ -15,6 +15,7 @@ import {
   type PinballFx3Chosen,
   pinballFx3Getter,
   pinballFxGetter,
+  pinballFxMidnightSetup,
   steamPinballFx3Downloading,
   steamPinballFxDownloading,
   type PinballFx3Install,
@@ -120,7 +121,12 @@ export interface ZenSetup {
 }
 
 export function zenSetup(game: ZenGameKey, dataDir?: string): ZenSetup {
+  if (game === 'pinballfxmidnight') return pinballFxMidnightSetup(steamDir());
   return game === 'pinballfx' ? pinballFxSetup() : pinballFx3Setup(dataDir);
+}
+
+export function detectPinballFxMidnight() {
+  return pinballFxMidnightSetup(steamDir()).install;
 }
 
 /** Fenêtre de la boutique : Steam (sa fenêtre « Installer », sa connexion) ou le lanceur d'Epic. */
@@ -135,24 +141,25 @@ export function isStoreWindow(w: Pick<WindowInfo, 'title' | 'visible'>): boolean
  */
 export function openPinballFxStore(
   getter: PinballFxGetter,
-  opts: { system?: PinballFxSystem; openUrl?: (url: string) => void; log?: (line: string) => void } = {},
+  opts: { system?: PinballFxSystem; openUrl?: (url: string) => void; log?: (line: string) => void; name?: string } = {},
 ): boolean {
   const sys = opts.system ?? realPinballFxSystem;
+  const name = opts.name ?? 'Pinball FX';
   const log = opts.log ?? ((line: string) => console.log(line));
   const before = new Set(sys.windows().map((w) => w.handle));
   if (!opts.system) allowAnyForeground();
   try {
     if (getter.store === 'steam') {
       const child = sys.launch(getter.file, getter.args);
-      child.on('error', (e: Error) => log(`Pinball FX : Steam n'a pas pu être lancé (${e.message}).`)); // i18n-ignore : journal
+      child.on('error', (e: Error) => log(`${name} : Steam n'a pas pu être lancé (${e.message}).`)); // i18n-ignore : journal
     } else {
       (opts.openUrl ?? ((url: string) => void (require('electron') as typeof import('electron')).shell.openExternal(url)))(getter.url);
     }
   } catch (e) {
-    log(`Pinball FX : boutique ${getter.store} impossible à ouvrir (${(e as Error).message}).`); // i18n-ignore : journal
+    log(`${name} : boutique ${getter.store} impossible à ouvrir (${(e as Error).message}).`); // i18n-ignore : journal
     return false;
   }
-  log(`Pinball FX : installation ouverte dans ${getter.store === 'steam' ? 'Steam' : 'Epic'}.`); // i18n-ignore : journal
+  log(`${name} : installation ouverte dans ${getter.store === 'steam' ? 'Steam' : 'Epic'}.`); // i18n-ignore : journal
   const t0 = sys.now();
   const poll = setInterval(() => {
     const shown = sys.windows().find((w) => !before.has(w.handle) && isStoreWindow(w));

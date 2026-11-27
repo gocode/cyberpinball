@@ -34,8 +34,14 @@ export interface MirrorHost {
   pointer(x: number, y: number): void;
   click(button: 'left' | 'right', count: number): void;
   wheel(dx: number, dy: number): void;
-  /** Zoom de la page d'un pas : 1 agrandit, -1 rapetisse (Ctrl+ et Ctrl- dans la fenêtre). Absent : le pincement ne fait rien. */
+  /** Zoom de la page d'un pas : 1 agrandit, -1 rapetisse (Ctrl+ et Ctrl- dans la fenêtre). Absent : les boutons de zoom de la page ne font rien. */
   zoom?(dir: 1 | -1): void;
+  /**
+   * Un doigt sur l'écran de la fenêtre, en pixels physiques du bureau (injection tactile de Windows) : `down`, puis
+   * des `move`, puis `up`. Rend faux quand la fenêtre n'en veut pas (site au rendu d'ordinateur, où la molette
+   * suffit) ou que Windows refuse : le glissement passe alors par la molette.
+   */
+  touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   log?(line: string): void;
   /** Essais : horloge et minuterie remplaçables. `after` rend la fonction qui l'annule. */
   now?(): number;
@@ -48,6 +54,8 @@ export const MIRROR_FRAME_TIMEOUT_MS = 8000;
 export const MIRROR_FAILS_BEFORE_NOTICE = 5;
 /** Délai de la nouvelle tentative quand rien n'est capturable (fenêtre absente, capture en échec). */
 const RETRY_MS = 500;
+/** Un doigt resté posé sans nouvelle du téléphone (liaison coupée en plein geste) est levé après ce délai. */
+export const MIRROR_TOUCH_IDLE_MS = 1500;
 
 export interface PhoneMirror {
   /** Demande (on) ou fin (off) du miroir ; `box` : la place de l'image au téléphone, en pixels. */
@@ -56,7 +64,7 @@ export interface PhoneMirror {
   ack(n: number): void;
   tap(message: Extract<MirrorMessage, { t: 'tap' }>): void;
   scroll(message: Extract<MirrorMessage, { t: 'mscroll' }>): void;
-  /** Pincement du téléphone : la page de la fenêtre est agrandie ou rapetissée de `steps` pas. */
+  /** Boutons de zoom de la page du téléphone : la page de la fenêtre est agrandie ou rapetissée de `steps` pas. */
   zoom(message: Extract<MirrorMessage, { t: 'mzoom' }>): void;
   /** Le miroir est demandé. */
   readonly active: boolean;
@@ -88,6 +96,20 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
   let noticed = false;
   /** Début de la dernière capture : le rythme (4 à 8 images par seconde) se compte d'un début à l'autre. */
   let startedAt = 0;
+  /**
+   * Glissement en cours. `touch` : un doigt est posé dans la fenêtre à (x, y) (injection tactile) ; sinon le
+   * glissement passe par la molette. Une page qui attend un vrai glissement (TikTok au rendu mobile) ne
+   * défile pas à la molette : elle reçoit un doigt, avec son élan à la levée.
+   */
+  let drag: { touch: boolean; x: number; y: number; cancel?: () => void } | undefined;
+
+  /** Lève le doigt posé, s'il y en a un (fin du glissement, arrêt du miroir, silence du téléphone). */
+  const liftTouch = () => {
+    const d = drag;
+    drag = undefined;
+    d?.cancel?.();
+    if (d?.touch) host.touch?.('up', d.x, d.y);
+  };
 
   const clearTimer = () => {
     cancelTimer?.();
@@ -156,6 +178,7 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
   }
 
   function stop(): void {
+    liftTouch();
     on = false;
     epoch++;
     inFlight = undefined;
@@ -207,10 +230,29 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       const rect = host.rect();
       if (!rect) return;
       const p = mirrorPoint(rect, m.fx, m.fy);
-      const wheel = mirrorWheel(rect, m.dx, m.dy);
-      if (wheel.deltaX === 0 && wheel.deltaY === 0) return;
-      host.pointer(p.x, p.y);
-      host.wheel(wheel.deltaX, wheel.deltaY);
+      // Début de glissement : un doigt si la fenêtre en veut un, sinon la molette pour tout le glissement.
+      if (!drag) {
+        if (m.end && m.dx === 0 && m.dy === 0) return;
+        drag = { touch: host.touch?.('down', p.x, p.y) === true, x: p.x, y: p.y };
+      }
+      const d = drag;
+      if (!d.touch) {
+        if (m.end) drag = undefined;
+        const wheel = mirrorWheel(rect, m.dx, m.dy);
+        if (wheel.deltaX === 0 && wheel.deltaY === 0) return;
+        host.pointer(p.x, p.y);
+        host.wheel(wheel.deltaX, wheel.deltaY);
+        return;
+      }
+      // Le doigt suit le doigt du téléphone, sans sortir de la fenêtre.
+      const right = Math.round(rect.x) + Math.max(1, Math.round(rect.width)) - 1;
+      const bottom = Math.round(rect.y) + Math.max(1, Math.round(rect.height)) - 1;
+      d.x = Math.min(right, Math.max(Math.round(rect.x), d.x + Math.round(m.dx * rect.width)));
+      d.y = Math.min(bottom, Math.max(Math.round(rect.y), d.y + Math.round(m.dy * rect.height)));
+      if (m.end) return liftTouch();
+      host.touch?.('move', d.x, d.y);
+      d.cancel?.();
+      d.cancel = after(MIRROR_TOUCH_IDLE_MS, liftTouch);
     },
     zoom(m) {
       if (!on || !host.live() || !host.rect()) return;

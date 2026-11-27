@@ -473,10 +473,64 @@ body[data-miroir='on'] .pad {
   height: 100%;
   object-fit: contain;
   opacity: 0;
+  /* Loupe (telephone-miroir.js) : agrandie autour du coin haut gauche, puis décalée. */
+  transform-origin: 0 0;
 }
 
 .mirror.has-frame .mirror-canvas {
   opacity: 1;
+}
+
+/* Retour au cadrage normal : seulement sous la loupe, en haut à droite. */
+.mirror-zoom-reset {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.mirror-zoom-reset svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mirror.zoomed .mirror-zoom-reset {
+  display: flex;
+}
+
+/* Zoom de la page d'Edge sur la borne : deux boutons en haut à gauche, dès que l'image est là. */
+.mirror-page-zoom {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: none;
+  gap: 8px;
+}
+
+.mirror.has-frame .mirror-page-zoom {
+  display: flex;
+}
+
+.mirror-page-zoom button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  font: 600 15px/1 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
 }
 
 .mirror-hint {

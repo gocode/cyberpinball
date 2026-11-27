@@ -70,7 +70,7 @@ test('mode invité : chaque action de la fiche déclare sa porte, et une action 
   assert.match(library, /host\.guest\.active \? \{ \.\.\.built, actions: built\.actions\.filter\(\(a\) => host\.guest\.allows\(a\.door\)\) \}/);
   // Seuls la fiche, ses pages et son tableau des scores s'ouvrent ; tout autre écran passe par une porte fermée.
   const screens = /const GUEST_SCREENS: [^=]+= \{([^}]*)\};/.exec(types)?.[1];
-  assert.equal(screens?.trim(), "sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores'");
+  assert.equal(screens?.trim(), "sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores', pinballFxModes: 'sheet.play'");
   assert.match(library, /if \(!host\.guest\.knock\(GUEST_SCREENS\[next\.kind\]\)\) return;/);
   assert.match(library, /!host\.guest\.knock\('files\.drop'\)/);
   // Une entrée du menu système ne se lance pas, même atteinte sans passer par son écran (autopilote).

@@ -24,6 +24,7 @@ export * from './configurations';
 export * from './locations';
 export * from './tables';
 export * from './pinballfx';
+export * from './pinballfx-midnight';
 export * from './pinballfx3';
 export * from './pinballfx3-backglass';
 export * from './pinballfx3-cabinet';

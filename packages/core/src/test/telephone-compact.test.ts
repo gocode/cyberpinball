@@ -60,7 +60,7 @@ test('barre du bas : les boutons Pavé et Miroir sont dans la barre, cachés tan
 test('boutons Pavé et Miroir : chacun choisit son mode, et l\'état enfoncé suit le choix', () => {
   const toggle = fakeElement();
   const pad = fakeElement();
-  const elements: Record<string, unknown> = { mirror: { getBoundingClientRect: () => ({ width: 400, height: 800 }), addEventListener: () => undefined, classList: { add: () => undefined, remove: () => undefined, toggle: () => undefined } }, 'mirror-canvas': { getContext: () => ({ clearRect: () => undefined, setTransform: () => undefined }), addEventListener: () => undefined }, 'nav-mirror': toggle, 'nav-pad': pad };
+  const elements: Record<string, unknown> = { mirror: { getBoundingClientRect: () => ({ width: 400, height: 800 }), addEventListener: () => undefined, classList: { add: () => undefined, remove: () => undefined, toggle: () => undefined } }, 'mirror-canvas': { style: {}, getContext: () => ({ clearRect: () => undefined, setTransform: () => undefined }), addEventListener: () => undefined }, 'nav-mirror': toggle, 'nav-pad': pad, 'mirror-zoom-reset': fakeElement(), 'mirror-page-zoom-in': fakeElement(), 'mirror-page-zoom-out': fakeElement() };
   const sent: Array<Record<string, unknown>> = [];
   const store: Record<string, string> = {};
   const context = vm.createContext({

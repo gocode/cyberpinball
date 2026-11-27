@@ -11,6 +11,12 @@ son interface).
 
 ## 0.2.4
 
+- Pinball FX Midnight (anciennement Pinball M) est pris en charge sur Steam : Cyber Pinball retrouve l'installation, y compris dans une bibliothèque Steam secondaire, et lance ses tables depuis la roue. Menu système > Tables > Ajouter une table > "Tables de Pinball FX Midnight" propose quelques tables connues et "Ajouter par numéro de table" accepte les autres ; Steam gère l'accès aux tables. Les écrans et le DMD se règlent dans le menu "Cabinet Support" du jeu.
+- Pinball FX et Pinball FX Midnight : après Jouer sur la fiche d'une table, choisis 1 à 4 joueurs avec les flippers et Start (Exit revient à la fiche). Pinball FX garde aussi l'entraînement, le mode Pro des tables Williams et Bally et ses quatre défis dans "Autres modes". Le téléphone, Table surprise et les lancements directs restent en un joueur.
+- Mode invité : une collection verrouillée décide seule des tables visibles et jouables, même vide ; une collection introuvable ne montre aucune table.
+- Télécommande, miroir de l'application : un balayage du doigt vers le haut ou vers le bas fait maintenant défiler une vidéo TikTok (et les autres sites en affichage mobile). La borne envoie à Edge un vrai geste tactile (injection tactile Windows) au lieu d'une simple molette de souris ; si Windows la refuse, la molette reste en repli, et les pages ordinaires défilent comme avant.
+- Télécommande, miroir de l'application : pincer à deux doigts agrandit l'image sur l'écran du téléphone (loupe, sans toucher au zoom d'Edge sur la borne), centrée entre les doigts. Un doigt déplace le cadre agrandi, un double appui ou le bouton rond ramène au cadrage normal, et les appuis restent exacts sous la loupe.
+- Télécommande, miroir de l'application : le zoom de la page d'Edge sur la borne n'est plus sur le pincement (il est celui de la loupe) mais sur deux boutons A+ et A− en haut à gauche de l'image, un pas par appui.
 - LED : une table originale dont le script n'appelle jamais DOF (Agentic) restait noire en partie, même quand la config DOF de la borne avait une ligne à son nom : elle passe maintenant aux effets de Cyber Pinball, avec les boutons de la borne.
 - LED : les effets de Cyber Pinball sans DOF jouent une animation de départ à l'ouverture de la partie, sans attendre un bouton ou un événement de la table.
 - Fusion des branches : la commande de fin de branche attend le vrai résultat (fusionnée puis publiée, conflit, refus, publication en échec) au lieu de s'arrêter sur "En file" ; un blocage n'est plus ignoré.

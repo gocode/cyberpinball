@@ -23,12 +23,15 @@ export type MirrorMessage =
   | { t: 'mirror-ack'; s: number; n: number }
   /** Un appui sur l'image : clic à cet endroit de la fenêtre. */
   | { t: 'tap'; s: number; fx: number; fy: number; button: 'left' | 'right'; count: 1 | 2 }
-  /** Un glissement du doigt commencé en (fx, fy) ; dx, dy : fractions de l'image (la page suit le doigt). */
-  | { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number }
-  /** Un pincement à deux doigts : `steps` pas de zoom de la page (positif : agrandir, négatif : rapetisser), au plus MIRROR_ZOOM_STEPS_MAX à la fois. */
+  /**
+   * Un glissement du doigt commencé en (fx, fy) ; dx, dy : fractions de l'image (la page suit le doigt).
+   * `end` : le doigt est levé (dernier message du glissement, éventuellement sans mouvement de plus).
+   */
+  | { t: 'mscroll'; s: number; fx: number; fy: number; dx: number; dy: number; end?: true }
+  /** Un appui sur « Agrandir / Réduire la page » : `steps` pas de zoom de la page d'Edge (positif : agrandir, négatif : rapetisser), au plus MIRROR_ZOOM_STEPS_MAX à la fois. */
   | { t: 'mzoom'; s: number; steps: number };
 
-/** Pas de zoom qu'un seul message peut demander (un pincement ample en envoie plusieurs, pas davantage). */
+/** Pas de zoom qu'un seul message peut demander. */
 export const MIRROR_ZOOM_STEPS_MAX = 4;
 
 const unit = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
@@ -54,7 +57,7 @@ export function parseMirrorMessage(m: Record<string, unknown>, s: number): Mirro
     case 'tap':
       return unit(m.fx) && unit(m.fy) && (m.button === 'left' || m.button === 'right') ? { t: 'tap', s, fx: m.fx, fy: m.fy, button: m.button, count: m.count === 2 ? 2 : 1 } : undefined;
     case 'mscroll':
-      return unit(m.fx) && unit(m.fy) && span(m.dx) && span(m.dy) ? { t: 'mscroll', s, fx: m.fx, fy: m.fy, dx: m.dx, dy: m.dy } : undefined;
+      return unit(m.fx) && unit(m.fy) && span(m.dx) && span(m.dy) ? { t: 'mscroll', s, fx: m.fx, fy: m.fy, dx: m.dx, dy: m.dy, ...(m.end === true ? { end: true as const } : {}) } : undefined;
     case 'mzoom':
       return typeof m.steps === 'number' && Number.isInteger(m.steps) && m.steps !== 0 && Math.abs(m.steps) <= MIRROR_ZOOM_STEPS_MAX ? { t: 'mzoom', s, steps: m.steps } : undefined;
     default:

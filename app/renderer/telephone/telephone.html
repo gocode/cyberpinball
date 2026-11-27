@@ -246,6 +246,13 @@
            le pavé reste le réglage de départ, le bouton « Miroir » de la barre du bas bascule de l'un à l'autre. -->
       <div class="mirror" id="mirror">
         <canvas class="mirror-canvas" id="mirror-canvas" width="1" height="1"></canvas>
+        <!-- Loupe : visible seulement quand l'image est agrandie (pincement) ; ramène au cadrage normal. -->
+        <button type="button" class="mirror-zoom-reset" id="mirror-zoom-reset"></button>
+        <!-- Zoom de la page d'Edge sur la borne (Ctrl+ et Ctrl-) : un pas par appui, distinct de la loupe du pincement. -->
+        <div class="mirror-page-zoom">
+          <button type="button" id="mirror-page-zoom-out"></button>
+          <button type="button" id="mirror-page-zoom-in"></button>
+        </div>
         <!-- Aucun texte pendant le miroir : un point qui pulse tant que la première image n'est pas là. -->
         <div class="mirror-hint" id="mirror-wait" aria-hidden="true"><span class="mirror-dot"></span></div>
         <div class="mirror-hint mirror-broken" id="mirror-broken">

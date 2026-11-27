@@ -306,9 +306,9 @@ function loadMirror() {
   const noop = () => undefined;
   const view = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 800 }), classList: { add: noop, remove: noop, toggle: noop }, addEventListener: noop, setPointerCapture: noop };
   const context2d = { clearRect: noop, setTransform: noop, translate: noop, rotate: noop, drawImage: noop };
-  const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: noop };
+  const canvas = { style: {}, width: 1, height: 1, getContext: () => context2d, addEventListener: noop };
   const tab = { setAttribute: noop, addEventListener: noop, replaceChildren: noop };
-  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab, 'nav-pad': tab };
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab, 'nav-pad': tab, 'mirror-zoom-reset': tab, 'mirror-page-zoom-in': tab, 'mirror-page-zoom-out': tab };
   const doc = {
     getElementById: (id: string) => elements[id],
     createElement: () => ({}),

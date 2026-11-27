@@ -96,9 +96,14 @@ export function isPinballFx3Window(w: Pick<WindowInfo, 'title' | 'className' | '
   return w.visible && isPinballFx3WindowTitle(w.title);
 }
 
+export function isPinballFxMidnightWindow(w: Pick<WindowInfo, 'title' | 'className' | 'visible'>): boolean {
+  return w.visible && w.className === 'UnrealWindow' && /^(?:Pinball FX Midnight|Pinball ?M)$/i.test(w.title.trim());
+}
+
 export const ZEN_LAUNCH_GAMES: Readonly<Record<ZenGameKey, ZenLaunchGame>> = {
   pinballfx: { name: ZEN_GAMES.pinballfx.name, isWindow: isPinballFxWindow },
   pinballfx3: { name: ZEN_GAMES.pinballfx3.name, isWindow: isPinballFx3Window },
+  pinballfxmidnight: { name: ZEN_GAMES.pinballfxmidnight.name, isWindow: isPinballFxMidnightWindow },
 };
 
 /**

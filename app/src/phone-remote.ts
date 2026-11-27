@@ -525,8 +525,10 @@ export interface ExternalTarget {
   click(button: 'left' | 'right', count: number): void;
   /** Au sens de sendInputEvent d'Electron (wheelFor). */
   scroll(deltaX: number, deltaY: number): void;
-  /** Zoom de la page d'un pas (pincement du miroir) : 1 agrandit, -1 rapetisse ; absent : le pincement ne fait rien. */
+  /** Zoom de la page d'un pas (boutons du miroir) : 1 agrandit, -1 rapetisse ; absent : les boutons ne font rien. */
   zoom?(dir: 1 | -1): void;
+  /** Un doigt sur la fenêtre (injection tactile) pour les glissements du miroir ; absent : molette. Faux : Windows refuse, molette. */
+  touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   /** Image de la fenêtre pour le miroir du téléphone (phone-mirror.ts) ; absent : pas de miroir, le pavé seul. */
   capture?(size: { width: number; height: number }, quality: number): Promise<MirrorShot | undefined>;
   /** `del` retours arrière, puis `ins`. */
@@ -735,6 +737,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     click: (button, count) => external?.click(button, count),
     wheel: (dx, dy) => external?.scroll(dx, dy),
     zoom: (dir) => external?.zoom?.(dir),
+    touch: (phase, x, y) => external?.touch?.(phase, x, y) === true,
     log,
   });
   let ticker: NodeJS.Timeout | undefined;

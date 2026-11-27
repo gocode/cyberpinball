@@ -576,6 +576,9 @@ test('affichage mobile : oui sur le playfield, non sur le fronton sans choix ; l
   assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes(`--user-agent=${APP_MOBILE_USER_AGENT}`));
   assert.equal(appBrowserArgs('p', at, 'https://a.example.com/', false).some((a) => a.startsWith('--user-agent')), false);
   assert.match(APP_MOBILE_USER_AGENT, /Android[\s\S]*Mobile/);
+  // Les événements tactiles vont avec lui (le miroir du téléphone injecte un doigt), et seulement avec lui.
+  assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes('--touch-events=enabled'));
+  assert.equal(appBrowserArgs('p', at, 'https://a.example.com/', false).includes('--touch-events=enabled'), false);
 });
 
 test('zoom de la page : 200 % d\'office sur le playfield, 100 % au fronton, borné de 100 à 300, écrit seulement quand on le change ; Edge reçoit le facteur d\'échelle, jamais un port de débogage', () => {
