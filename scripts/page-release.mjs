@@ -33,15 +33,36 @@ export function straightQuotes(text) {
     .replace(/[‘’]/g, "'");
 }
 
+/** Limite de l'API GitHub pour le corps d'une release (caractères) : au-delà, HTTP 422. */
+export const RELEASE_BODY_LIMIT = 125000;
+/** Plafond visé, avec marge (le 27/11/2026, essai.74 : plus de 125 000 caractères, refusé). */
+export const RELEASE_BODY_TARGET = 110000;
+
+/**
+ * Nombre de points les plus récents (une section de CHANGELOG commence par eux) qui tiennent dans
+ * `budget` caractères. Les préversions d'une même version cumulent leurs nouveautés dans une seule
+ * section, qui peut dépasser la limite de GitHub.
+ */
+export function bulletsThatFit(list, budget) {
+  let used = 0;
+  let kept = 0;
+  for (const n of list) {
+    used += n.length + 3;
+    if (used > budget - 400) break;
+    kept++;
+  }
+  return kept;
+}
+
 /**
  * Corps de la release.
+ * repository : "propriétaire/dépôt", pour les liens vers les CHANGELOG complets quand la liste est abrégée.
  * notes / notesEn : points en français et en anglais (autant de chaque côté).
  * reference : { version, url } des installeurs repris d'une publication précédente (--rapide).
  */
-export function releaseBody({ version, notes, notesEn, socle, installerName, appName, installerSha256, appSha256, reference }) {
+export function releaseBody({ version, notes, notesEn, socle, installerName, appName, installerSha256, appSha256, reference, repository }) {
   if (!notesEn?.length) throw new Error(`aucune nouveauté en anglais pour ${version} : la page de release commence par l'anglais.`);
   if (notesEn.length !== notes.length) throw new Error(`${notes.length} nouveauté(s) en français, ${notesEn.length} en anglais pour ${version}.`);
-  const bullets = (list) => list.map((n) => `- ${n}`);
   // Pied : chaque paragraphe en anglais, puis le même en français à la ligne suivante.
   const pairs = [
     [
@@ -66,21 +87,33 @@ export function releaseBody({ version, notes, notesEn, socle, installerName, app
           ],
         ]),
   ];
-  return straightQuotes(
+  const footer = [
+    '---',
+    '',
+    ...pairs.flatMap(([en, fr]) => [en, fr, '']),
+    `SHA-256 (${installerName}): \`${installerSha256}\``,
+    `SHA-256 (${appName}): \`${appSha256}\``,
+  ];
+  const link = (file) => (repository ? `https://github.com/${repository}/blob/main/${file}` : file);
+  // Anglais et français se partagent ce qui reste sous le plafond après le pied, avec le même nombre
+  // de points dans les deux langues (le plus petit des deux) pour rester appariées.
+  const budget = Math.floor((RELEASE_BODY_TARGET - footer.join('\n').length) / 2);
+  const kept = Math.min(bulletsThatFit(notesEn, budget), bulletsThatFit(notes, budget));
+  const shown = (list, more) => [...list.slice(0, kept).map((n) => `- ${n}`), ...(kept < list.length ? ['', more(list.length - kept)] : [])];
+  const body = straightQuotes(
     [
       '## English',
       '',
-      ...bullets(notesEn),
+      ...shown(notesEn, (n) => `_${n} older notes not shown here: see the [full changelog](${link('CHANGELOG.en.md')})._`),
       '',
       '## Français',
       '',
-      ...bullets(notes),
+      ...shown(notes, (n) => `_${n} notes plus anciennes non affichées ici : voir le [CHANGELOG complet](${link('CHANGELOG.md')})._`),
       '',
-      '---',
-      '',
-      ...pairs.flatMap(([en, fr]) => [en, fr, '']),
-      `SHA-256 (${installerName}): \`${installerSha256}\``,
-      `SHA-256 (${appName}): \`${appSha256}\``,
+      ...footer,
     ].join('\n'),
   );
+  // Contrôle avant l'appel à GitHub : un refus 422 arriverait après l'envoi du code.
+  if (body.length > RELEASE_BODY_LIMIT) throw new Error(`texte de release de ${version} trop long : ${body.length} caractères (maximum GitHub ${RELEASE_BODY_LIMIT}).`);
+  return body;
 }

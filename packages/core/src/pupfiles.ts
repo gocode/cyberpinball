@@ -16,7 +16,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatList, tn } from './i18n';
-import { fileIsAbsent, NOT_A_PLAYLIST, pupScriptCalls } from './pup-medias-absents';
+import { fileIsAbsent, NOT_A_PLAYLIST, notAMediaTarget, pupScriptCalls } from './pup-medias-absents';
 import { isJunkName, PUP_FILES } from './puppack';
 
 /** Nature d'un fichier d'après ses premiers octets. */
@@ -304,19 +304,71 @@ export function missingPackFiles(root: string, script?: string): string[] {
       if (name === 'screens.pup' && field(5).toLowerCase() === 'off') continue;
       const playlist = field(columns.playlist);
       const wanted = field(columns.file);
-      if (!playlist || !wanted) continue;
-      const files = playlistFiles(playlist);
-      if (files && fileIsAbsent(files, wanted)) missing.add(`${playlist}\\${wanted}`);
+      if (!playlist || !wanted || NOT_PLAYLIST.test(playlist.trim())) continue;
+      // Ligne de séparation de l'auteur (« ***MULTIBALL*** ») : pas un déclencheur.
+      if (notAMediaTarget(playlist, wanted, name === 'triggers.pup' ? field(3) : undefined)) continue;
+      // Un fichier nommé par le pack lui-même dans un dossier qui n'existe pas : absent lui aussi.
+      const files = playlistFiles(playlist) ?? [];
+      if (fileIsAbsent(files, wanted)) missing.add(`${playlist}\\${wanted}`);
     }
   }
+  // Pack sans un seul média (configuration seule, médias jamais copiés) : pas « incomplet », il n'est pas
+  // installé ; un autre constat en parle.
+  if (!entries.some((d) => d.isDirectory() && listFiles(path.join(root, d.name)).some((f) => PACK_MEDIA.test(f)))) return [];
   // Le script : un fichier nommé en toutes lettres dans un dossier de playlist qui existe (un dossier
   // absent relève des playlists vides).
   for (const call of pupScriptCalls(script)) {
-    if (!call.file || NOT_PLAYLIST.test(call.folder.trim())) continue;
+    if (!call.file || NOT_PLAYLIST.test(call.folder.trim()) || notAMediaTarget(call.folder, call.file)) continue;
     const files = playlistFiles(call.folder.trim());
     if (files && fileIsAbsent(files, call.file)) missing.add(`${call.folder.trim()}\\${call.file}`);
   }
   return [...missing];
+}
+
+/**
+ * Part du pack qui manque, pour la gravité du constat : les déclencheurs actifs de triggers.pup, et
+ * combien n'ont pas leur média (dossier de playlist absent ou sans fichier, fichier nommé absent). Un
+ * pack où quelques médias manquent se joue presque comme prévu ; un pack où la moitié manque, non.
+ */
+export function packCoverage(root: string): { total: number; broken: number } {
+  const entries = readDirents(root);
+  const file = entries.find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
+  if (!file) return { total: 0, broken: 0 };
+  let raw: string;
+  try {
+    raw = fs.readFileSync(path.join(root, file.name), 'latin1');
+  } catch {
+    return { total: 0, broken: 0 };
+  }
+  const columns = COLUMNS['triggers.pup']!;
+  const cache = new Map<string, string[] | undefined>();
+  const media = (playlist: string) => {
+    const key = playlist.toLowerCase();
+    if (!cache.has(key)) {
+      const dir = entries.find((d) => d.isDirectory() && d.name.toLowerCase() === key);
+      cache.set(key, dir ? listFiles(path.join(root, dir.name)).filter((f) => !isJunkName(path.basename(f))).map((f) => f.toLowerCase()) : undefined);
+    }
+    return cache.get(key);
+  };
+  let total = 0;
+  let broken = 0;
+  for (const line of raw.split(/\r?\n/).slice(1)) {
+    const spans = csvSpans(line);
+    const field = (n: number) => (spans[n] ? decode(line.slice(spans[n]!.start, spans[n]!.end)) : '');
+    const playlist = field(columns.playlist).trim();
+    if (field(1) !== '1' || !playlist || NOT_PLAYLIST.test(playlist)) continue;
+    if (notAMediaTarget(playlist, field(columns.file!), field(3))) continue;
+    total++;
+    const files = media(playlist);
+    const wanted = field(columns.file!);
+    if (!files?.length || (wanted && fileIsAbsent(files, wanted))) broken++;
+  }
+  return { total, broken };
+}
+
+/** Assez de déclencheurs pour juger d'une part du pack, et la moitié au moins sans leur média. */
+export function packMostlyMissing(coverage: { total: number; broken: number }): boolean {
+  return coverage.total >= 4 && coverage.broken * 2 >= coverage.total;
 }
 
 /**
@@ -347,6 +399,7 @@ export function emptyPlayedPlaylists(root: string, script?: string): string[] {
       const field = (n: number) => (spans[n] ? decode(line.slice(spans[n]!.start, spans[n]!.end)) : '');
       if (name === 'triggers.pup' && (field(1) !== '1' || field(columns.file!))) continue;
       if (name === 'screens.pup' && field(5).toLowerCase() === 'off') continue;
+      if (notAMediaTarget(field(columns.playlist), name === 'triggers.pup' ? field(3) : undefined)) continue;
       add(field(columns.playlist));
     }
   }
@@ -366,7 +419,7 @@ export function emptyPlayedPlaylists(root: string, script?: string): string[] {
   }
   // playlistadd : le script déclare lui-même la playlist, déclarée ou non par le pack. Options inactives ignorées.
   for (const call of pupScriptCalls(script)) {
-    if (!call.dynamicFile && (call.kind === 'add' || declared.has(call.folder.trim().toLowerCase())) && !NOT_PLAYLIST.test(call.folder.trim())) add(call.folder);
+    if (!call.dynamicFile && (call.kind === 'add' || declared.has(call.folder.trim().toLowerCase())) && !NOT_PLAYLIST.test(call.folder.trim()) && !notAMediaTarget(call.folder)) add(call.folder);
   }
   const media = (name: string) => listFiles(path.join(root, name)).filter((f) => !isJunkName(path.basename(f)));
   // Pack sans un seul média (configuration seule, médias jamais copiés) : pas « incomplet », il n'est pas

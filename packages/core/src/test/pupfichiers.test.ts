@@ -150,11 +150,14 @@ test('médecin, avant la partie : la table joue ses images comme des images, ses
   assert.deepEqual(missingPackFiles(root), ['FullDMD\\Absent.mp4']);
   const after = diagnose(scanTables(tablesDir)[0]!, ctx);
   assert.deepEqual(after.filter((f) => ['pupFileNames', 'pupOptionNotApplied', 'pupOptionMismatch'].includes(f.code)).map((f) => f.code), []);
-  const missing = after.find((f) => f.code === 'pupFilesMissing');
-  assert.equal(missing?.severity, 'info');
-  assert.equal(missing?.fix, undefined);
-  assert.match(missing!.detail, /FullDMD\\Absent\.mp4/);
-  // Les .pup de l'option sont restés ceux de la racine.
+  // FullDMD est vide : une seule alerte, celle de la playlist vide, qui couvre son fichier absent ;
+  // dans un pack qui joue par ailleurs, c'est un « À savoir », hors des problèmes à régler.
+  assert.equal(after.find((f) => f.code === 'pupFilesMissing'), undefined);
+  const empty = after.find((f) => f.code === 'pupPlaylistsEmpty');
+  assert.equal(empty?.severity, 'info');
+  assert.equal(empty?.fix, undefined);
+  assert.equal(empty?.note, true);
+  assert.match(empty!.detail, /FullDMD/);
   assert.deepEqual(fs.readFileSync(path.join(root, OPTION, 'triggers.pup')), fs.readFileSync(path.join(root, 'triggers.pup')));
   assert.deepEqual(repairPupForPlay(scanTables(tablesDir)[0]!, ctx, { trashDir: `${tablesDir}-corbeille` }).map((f) => f.code), []);
 });

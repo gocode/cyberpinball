@@ -9,6 +9,16 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- When a game stutters because the antivirus scans the code compiled by the table's script, the log and the report now say so for McAfee (mc-sec-plugin-x64.dll, mfe*), Avast and AVG, Bitdefender, Kaspersky, ESET, Malwarebytes and Sophos, and for any other antivirus registered as an AMSI provider, by name. Before, only Defender was recognised: a stall caused by another antivirus stayed unexplained.
+- New "Audio output in VR" setting (System menu > My cabinet > Virtual reality and 3D vision): you choose where the sound comes out when you play in the headset. Automatic (as before: the headset audio output if Windows knows one, otherwise the cabinet), The cabinet (sound always stays on your configuration output), or any Windows audio output. This also covers a headset, such as a Pimax, whose audio device is not recognised: pick it from the list.
+- When no headset output is recognised, the log now lists the Windows audio outputs it saw.
+- Adding a table with a PuP-Pack that has options: the install now always stops on "Which PuP-Pack option?". The option that matches your screens is preselected, but you have to confirm it instead of letting it slip by unseen.
+- Missing media in a PuP-Pack no longer show as problems when the pack otherwise plays: a few missing media stay a "Good to know" note, outside the problems to fix. A warning only appears when at least half of the pack's triggers have no media, or when the music is empty. An empty playlist and the files it should hold are no longer reported twice, and the separator lines some authors put among their triggers ("***MULTIBALL***") are no longer taken for missing media.
+- The GitHub release page is no longer rejected when a version's accumulated notes exceed GitHub's limit: it keeps the most recent ones and links to the full changelog for the older ones.
+- Android: the "Add to Home screen" tip now says the remote goes full screen on the first tap (Chrome does not open an HTTP page from the local network as a real app, but full screen removes the address bar).
+- The mirror's orientation lock is applied again as soon as full screen is granted, including when you bring it back from the ⋮ menu: the page no longer flips when you rotate the phone.
+- iPhone: the "Add to Home Screen" tip now mentions iOS 26's "Open as Web App" option, without which the shortcut reopens Safari with its bars. The shortcut that follows the cabinet also opens without bars.
+- Notched screens: in landscape, the page and the action sheet keep clear of the notch and the rounded corners.
 - Applications: mobile display now follows the screen when you have not chosen: on for the playfield (portrait screen), off for the backglass (wide screen). Netflix, on the backglass, no longer offers to install its app. Your choice in the application's settings still wins, either way.
 - Applications: when you open an application's settings by holding Start for one second, the Screen line no longer flips by itself; the settings wait until you let go of Start.
 - Applications: the icon of an application whose site only has a small logo (Netflix) no longer changes size on every tile you move over, and the cabinet only looks for it on the Internet once a week (once a day for a site with no icon), instead of at every start.

@@ -196,6 +196,37 @@ export function headsetAudioOutput<T extends { friendlyName: string; deviceDesc?
   return candidates.find((o) => /virtual audio device/i.test(named(o))) ?? candidates[0];
 }
 
+/** Choix du joueur pour le son en VR : 'auto' (la sortie du casque si Windows en a une), 'config' (toujours la sortie de la borne), ou 'sortie:<nom Windows>'. */
+export const VR_AUDIO_AUTO = 'auto';
+export const VR_AUDIO_CONFIG = 'config';
+const VR_AUDIO_PREFIX = 'sortie:';
+
+export const vrAudioChoiceFor = (friendlyName: string): string => VR_AUDIO_PREFIX + friendlyName;
+
+/** Choix lu d'un fichier : une valeur inconnue vaut 'auto'. */
+export function normalizeVrAudioChoice(value: unknown): string {
+  return value === VR_AUDIO_CONFIG || (typeof value === 'string' && value.startsWith(VR_AUDIO_PREFIX) && value.length > VR_AUDIO_PREFIX.length) ? (value as string) : VR_AUDIO_AUTO;
+}
+
+/**
+ * La sortie audio à utiliser en VR selon le choix du joueur. 'auto' : celle du casque (headsetAudioOutput) ;
+ * 'config' : undefined, le son reste sur la sortie de la configuration ; une sortie nommée : celle-là, ou
+ * (absente de Windows, périphérique débranché) la détection automatique.
+ */
+export function vrAudioOutput<T extends { friendlyName: string; deviceDesc?: string; interfaceName?: string }>(choice: string, outputs: readonly T[] | undefined): T | undefined {
+  if (choice === VR_AUDIO_CONFIG) return undefined;
+  if (choice.startsWith(VR_AUDIO_PREFIX)) {
+    const chosen = (outputs ?? []).find((o) => o.friendlyName === choice.slice(VR_AUDIO_PREFIX.length));
+    if (chosen) return chosen;
+  }
+  return headsetAudioOutput(outputs);
+}
+
+/** Les choix qu'on peut parcourir : automatique, sortie de la borne, puis chaque sortie de Windows. */
+export function vrAudioChoices(outputs: readonly { friendlyName: string }[] | undefined): string[] {
+  return [VR_AUDIO_AUTO, VR_AUDIO_CONFIG, ...(outputs ?? []).map((o) => vrAudioChoiceFor(o.friendlyName))];
+}
+
 /** Les deux sorties de VPX (son de la table, et fronton : ROM, PuP, musique) sur la sortie du casque. */
 export function vrAudioSettings(friendlyName: string): VpxSetting[] {
   return [

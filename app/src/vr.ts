@@ -22,6 +22,8 @@ import {
   vrStereoFxaa,
   vrCarriedSettings,
   windowsVk,
+  normalizeVrAudioChoice,
+  VR_AUDIO_AUTO,
   vrReadiness,
   withoutQualityPreset,
   writeFileAtomic,
@@ -70,11 +72,35 @@ export function writeVrMirror(dataDir: string, mirror: boolean): void {
 }
 
 /**
+ * « Sortie audio » en VR (Menu système > Ma borne > Réalité virtuelle et vision 3D) : 'auto' (défaut, celle du casque
+ * si Windows en a une), 'config' (toujours la sortie de la borne), ou une sortie de Windows (vr-profil.ts, vrAudioOutput).
+ * Gardée en mémoire : lue à chaque recherche de la sortie du casque.
+ */
+let audioChoice: { dir: string; value: string } | undefined;
+export function readVrAudio(dataDir: string): string {
+  if (audioChoice?.dir === dataDir) return audioChoice.value;
+  let value = VR_AUDIO_AUTO;
+  try {
+    value = normalizeVrAudioChoice((JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as { audio?: unknown }).audio);
+  } catch {
+    // Pas encore de réglage : automatique.
+  }
+  audioChoice = { dir: dataDir, value };
+  return value;
+}
+
+export function writeVrAudio(dataDir: string, audio: string): void {
+  const value = normalizeVrAudioChoice(audio);
+  writeVrSetting(dataDir, { audio: value });
+  audioChoice = { dir: dataDir, value };
+}
+
+/**
  * Un réglage de la VR écrit sans perdre les autres (mode, recopie). L'ancien « autoRecal » (option « Recalage
  * automatique », retirée le 13 novembre 2026 : l'ancrage sur la limite du Quest la remplace) est ignoré à la lecture
  * et oublié ici.
  */
-function writeVrSetting(dataDir: string, patch: { mode?: VrMode; mirror?: boolean }): void {
+function writeVrSetting(dataDir: string, patch: { mode?: VrMode; mirror?: boolean; audio?: string }): void {
   let current: Record<string, unknown> = {};
   try {
     current = JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')) as Record<string, unknown>;

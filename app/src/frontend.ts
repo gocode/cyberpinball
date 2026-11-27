@@ -87,7 +87,8 @@ import {
   pupVideosDir,
   activePacks,
   missingPackFiles,
-  headsetAudioOutput,
+  VR_AUDIO_CONFIG,
+  vrAudioOutput,
   vrCenterKey,
   vrHasSavedPlace,
   type NavigationButtons,
@@ -480,7 +481,7 @@ import { watchSoloScores, type SoloScoreWatch } from './solo-score-watch';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
-import { centerWhenStarted, probeVr, rememberVrSettings, restoreVrTableIni, writeIniSettings,  } from './vr';
+import { centerWhenStarted, probeVr, readVrAudio, rememberVrSettings, restoreVrTableIni, writeIniSettings,  } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace } from './casque';
 import { DMD_PLUGIN, installVpxPlugin } from './vpx-plugins';
 import { installVpxCorrige, installVpxCorrigeAtStartup, vpxCorrigeInPlace } from './vpx-corrige';
@@ -891,15 +892,36 @@ let headsetAudio: string | undefined;
 let headsetAudioSaid: string | undefined | null = null;
 /** Dernière recherche infructueuse : pas plus d'une lecture des sorties de Windows toutes les 30 s. */
 let headsetAudioSearched = 0;
+/** Noms des sorties de Windows vues à cette recherche, pour le journal quand aucune n'est celle du casque. */
+let headsetAudioOutputs = '';
+
+let headsetAudioChoice = '';
 
 function findHeadsetAudio(): string | undefined {
+  // Le choix du joueur (Menu système > Ma borne > Réalité virtuelle et vision 3D) : un changement relance la recherche.
+  const choice = readVrAudio(loc.dataDir);
+  if (choice !== headsetAudioChoice) {
+    headsetAudioChoice = choice;
+    headsetAudio = undefined;
+    headsetAudioSearched = 0;
+    headsetAudioSaid = null;
+  }
+  if (choice === VR_AUDIO_CONFIG) {
+    if (headsetAudioSaid !== undefined) {
+      headsetAudioSaid = undefined;
+      console.log('Son en VR : sortie de la configuration, au choix du joueur.'); // i18n-ignore : journal
+    }
+    return undefined;
+  }
   if (!headsetAudio && Date.now() - headsetAudioSearched > 30_000) {
     headsetAudioSearched = Date.now();
-    headsetAudio = headsetAudioOutput(audioOutputs())?.friendlyName;
+    const outputs = audioOutputs();
+    headsetAudio = vrAudioOutput(choice, outputs)?.friendlyName;
+    headsetAudioOutputs = (outputs ?? []).map((o) => o.friendlyName).join(' | ');
   }
   if (headsetAudioSaid !== headsetAudio) {
     headsetAudioSaid = headsetAudio;
-    console.log(headsetAudio ? `Son dans le casque : sortie « ${headsetAudio} » de Windows.` : 'Son dans le casque : aucune sortie audio de casque dans Windows (Link, SteamVR, casque branché) ; le son reste sur la sortie de la configuration.'); // i18n-ignore : journal
+    console.log(headsetAudio ? `Son dans le casque : sortie « ${headsetAudio} » de Windows.` : `Son dans le casque : aucune sortie audio de casque dans Windows (Link, SteamVR, casque branché) ; le son reste sur la sortie de la configuration. Sorties de Windows : ${headsetAudioOutputs || 'aucune'}.`); // i18n-ignore : journal
   }
   return headsetAudio;
 }

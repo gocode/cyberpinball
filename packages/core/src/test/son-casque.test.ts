@@ -5,7 +5,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { headsetAudioOutput, vrAudioSettings } from '../vr-profil';
+import { headsetAudioOutput, normalizeVrAudioChoice, vrAudioChoiceFor, vrAudioChoices, vrAudioOutput, vrAudioSettings } from '../vr-profil';
 import { frontendSource } from './frontend-source';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -43,4 +43,25 @@ test('son dans le casque : le menu, le Juke-box et la partie dans le casque y pa
   const prepare = frontend.slice(debut, frontend.indexOf('function ', debut + 20)); // toute la fonction, quelle que soit sa longueur
   assert.match(prepare, /const audio = findHeadsetAudio\(\);\s*if \(audio\) \{\s*writeIniSettings\(vr\.ini, vrAudioSettings\(audio\)\);/);
   assert.equal(frontend.match(/vrAudioSettings\(/g)?.length, 1);
+});
+
+test('son en VR : le joueur choisit la sortie (automatique, la borne, ou une sortie de Windows)', () => {
+  const outs = ['Casque (Oculus Virtual Audio Device)', 'Haut-parleurs (Realtek(R) Audio)', 'Speakers (NVIDIA High Definition Audio)'].map(out);
+  // Automatique (défaut) : le comportement d'avant, rien ne change pour le Quest via Link.
+  assert.equal(vrAudioOutput('auto', outs)?.friendlyName, 'Casque (Oculus Virtual Audio Device)');
+  // La borne : jamais de sortie forcée, le son reste sur la sortie de la configuration.
+  assert.equal(vrAudioOutput('config', outs), undefined);
+  // Une sortie nommée (un Pimax dont le nom n'est pas reconnu), ou, si elle a disparu, l'automatique.
+  assert.equal(vrAudioOutput(vrAudioChoiceFor('Speakers (NVIDIA High Definition Audio)'), outs)?.friendlyName, 'Speakers (NVIDIA High Definition Audio)');
+  assert.equal(vrAudioOutput(vrAudioChoiceFor('Disparue'), outs)?.friendlyName, 'Casque (Oculus Virtual Audio Device)');
+  assert.equal(vrAudioOutput(vrAudioChoiceFor('Disparue'), outs.slice(1)), undefined);
+  // Le fichier : toute valeur inconnue vaut automatique.
+  assert.equal(normalizeVrAudioChoice(undefined), 'auto');
+  assert.equal(normalizeVrAudioChoice('sortie:'), 'auto');
+  assert.equal(normalizeVrAudioChoice('config'), 'config');
+  assert.equal(normalizeVrAudioChoice('sortie:X'), 'sortie:X');
+  assert.deepEqual(vrAudioChoices(outs.slice(0, 1)), ['auto', 'config', 'sortie:Casque (Oculus Virtual Audio Device)']);
+  // Le front-end applique le choix à l'unique point de recherche du casque (menu et partie).
+  assert.match(frontendSource(), /const choice = readVrAudio\(loc\.dataDir\);/);
+  assert.match(frontendSource(), /library\.provideSystemItem\('vr-audio', \{/);
 });

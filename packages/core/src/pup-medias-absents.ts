@@ -71,3 +71,15 @@ export function fileIsAbsent(files: Iterable<string>, wanted: string): boolean {
 
 /** Dossiers qui ne sont pas des playlists (options inactives, capture, polices). */
 export const NOT_A_PLAYLIST = /^(pupcapture|fonts)$|option/i;
+
+/**
+ * Caractère interdit dans un nom Windows : la valeur n'est pas un nom de dossier ni de fichier. Les auteurs
+ * séparent leurs déclencheurs par des lignes « ***MULTIBALL*** » parfois marquées actives (The Matrix,
+ * 27/11/2026) : ce ne sont pas des déclencheurs, jamais une alerte ni un déclencheur compté.
+ */
+const NOT_A_NAME = /[*?"<>|:]/;
+
+/** Ligne de .pup ou appel du script qui ne vise pas un vrai média : déclencheur, playlist ou fichier impossible. */
+export function notAMediaTarget(...values: (string | undefined)[]): boolean {
+  return values.some((v) => v !== undefined && NOT_A_NAME.test(v));
+}

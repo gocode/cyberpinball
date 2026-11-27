@@ -20,7 +20,7 @@ import {
   pupScriptFacts,
   type PupCabinet,
 } from '../puppack';
-import { applyImport, planImport } from '../tableimport';
+import { applyImport, packNeedsChoice, planImport } from '../tableimport';
 import { starTrekPack } from './fixtures';
 import { readInfo } from '../tables';
 
@@ -317,6 +317,30 @@ test('import : pack d’une table originale nommé d’après B2SInit, choix de 
     pupChoices: new Map([[step.pack!.key, 'Option 3 - Desktop']]),
   }).tables[0]!.steps.find((s) => s.kind === 'pup')!.pack!;
   assert.deepEqual([picked.choice.chosen?.label, picked.decided], ['Option 3 - Desktop', true]);
+  fs.rmSync(root, { recursive: true });
+});
+
+test('import : un pack à options oblige à choisir, même quand la borne rend une option évidente', () => {
+  const root = tmp();
+  const tablesDir = path.join(root, 'tables');
+  const src = path.join(root, 'source', 'The Goonies (VPW 2021)');
+  const vpx = write(path.join(src, 'The Goonies Never Say Die (VPW 2021) v1.4.3.vpx'), 'vpx');
+  packWithOptions(path.join(src, 'Goonies PuP-Pack'));
+  const scripts = new Map([[vpx.toLowerCase(), scriptFacts('Dim pGameName : pGameName="TheGoonies"\nSet PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\nPuPlayer.B2SInit "", pGameName')]]);
+  const packOf = (pupChoices?: Map<string, string>) =>
+    planImport([{ path: src, mode: 'copy' }], { tablesDir, scripts, cabinet: CABINET_3, ...(pupChoices && { pupChoices }) }).tables[0]!.steps.find((s) => s.kind === 'pup')!.pack!;
+  const fresh = packOf();
+  assert.ok(fresh.variants.length > 1);
+  assert.equal(packNeedsChoice(fresh), true, 'aucun choix fait : l’installation s’arrête sur le pack');
+  assert.ok(fresh.choice.chosen, 'l’option de la borne reste proposée (présélectionnée)');
+  // Choix fait : plus rien à demander.
+  assert.equal(packNeedsChoice(packOf(new Map([[fresh.key, fresh.choice.chosen!.label]]))), false);
+  // Pack sans option, ou option d'une installation précédente : pas de question.
+  assert.equal(packNeedsChoice({ ...fresh, variants: fresh.variants.slice(0, 1) }), false);
+  assert.equal(packNeedsChoice({ ...fresh, choice: { ...fresh.choice, reason: 'remembered' } }), false);
+  assert.equal(packNeedsChoice({ ...fresh, choice: { ...fresh.choice, reason: 'remembered' }, failedBats: [{ bat: 'Option 1.bat', ok: false }] }), true);
+  // Le branchement : la liste de ce qui reste à trancher passe par cette règle.
+  assert.match(fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'library.ts'), 'utf8'), /if \(packNeedsChoice\(p\)\) pending\.push\(\{ kind: 'pup'/);
   fs.rmSync(root, { recursive: true });
 });
 

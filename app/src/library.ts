@@ -216,6 +216,7 @@ import {
   type IconName,
   type KnownTable,
   type PackPlan,
+  packNeedsChoice,
   type PupVariant,
   type RomEntry,
   type RomImport,
@@ -5076,7 +5077,7 @@ export function createLibrary(host: LibraryHost) {
     for (const t of s.plan?.tables ?? []) {
       if (t.vps && !t.vps.confident && !t.vps.decided && t.vps.candidates.length) pending.push({ kind: 'vps', key: t.vps.key });
       for (const p of t.steps.flatMap((st) => (st.pack ? [st.pack] : []))) {
-        if (!p.decided && p.variants.length > 1 && (!p.choice.confident || p.failedBats.length)) pending.push({ kind: 'pup', key: p.key });
+        if (packNeedsChoice(p)) pending.push({ kind: 'pup', key: p.key });
       }
     }
     return pending;
@@ -5180,7 +5181,7 @@ export function createLibrary(host: LibraryHost) {
     return {
       heading: t('Quelle option du PuP-Pack ?'),
       subheading: `${pack.disabled ? PUP_DISABLED_FOLDER : PUP_FOLDER}\\${pack.name} · ${path.relative(tablesDir(), table.folder)}`,
-      lead: t('Le pack propose plusieurs dispositions des écrans. Cyber Pinball recopie les fichiers de l’option choisie, comme le ferait son .bat, sans jamais l’exécuter ; l’option est retenue pour les mises à jour du pack. Rien n’est installé avant « Installer ».'),
+      lead: t('Le pack propose plusieurs dispositions des écrans : choisis celle qui correspond à tes écrans, le pack s’affichera mal avec une autre. Cyber Pinball recopie les fichiers de l’option choisie, comme le ferait son .bat, sans jamais l’exécuter ; l’option est retenue pour les mises à jour du pack. Rien n’est installé avant « Installer ».'),
       sections: [{ title: t('Pack'), rows }],
       actions,
       back,

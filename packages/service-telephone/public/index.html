@@ -8,6 +8,11 @@
     <meta name="color-scheme" content="dark" />
     <!-- Raccourci de l'écran d'accueil : l'adresse avec la clé (#g=…). Pas de manifeste : son adresse
          de départ perdrait la clé, que la page ne garde jamais dans son stockage. -->
+    <!-- iPhone : sans « capable », le raccourci s'ouvre dans Safari, avec ses barres, avant de renvoyer à
+         la borne ; avec, il s'ouvre en plein écran et la page de la borne s'y charge, barres comprises. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Cyber Pinball" />
     <meta name="application-name" content="Cyber Pinball" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icone-180.png" />

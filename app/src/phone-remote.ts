@@ -592,6 +592,7 @@ export const PHONE_FILES: Readonly<Record<string, string>> = {
   '/telephone-jukebox.js': 'telephone/telephone-jukebox.js',
   '/telephone-retour.js': 'telephone/telephone-retour.js',
   '/telephone-miroir.js': 'telephone/telephone-miroir.js',
+  '/telephone-plein-ecran.js': 'telephone/telephone-plein-ecran.js',
   '/telephone-volume.js': 'telephone/telephone-volume.js',
   // La pastille d'un joueur, dessinée comme à la borne (vue Scores).
   '/avatar.js': 'avatar.js',

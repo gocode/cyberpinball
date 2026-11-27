@@ -5283,3 +5283,19 @@ body:not([data-mode='browser'])[data-view='page'] .full-page {
     display: none;
   }
 }
+
+/*
+ * --- Écran à encoche (viewport-fit=cover : la page prend tout l'écran, plein écran ou écran d'accueil) ---
+ * Téléphone en paysage : l'encoche et les coins arrondis sont à gauche et à droite. La page s'en écarte
+ * par une marge du corps (indépendante de son remplissage) ; la feuille d'actions, fixée à l'écran, par
+ * le sien. Sans encoche, les deux valent 0 : rien ne change.
+ */
+body {
+  margin-left: env(safe-area-inset-left, 0px);
+  margin-right: env(safe-area-inset-right, 0px);
+}
+
+.sheet {
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+}

@@ -465,6 +465,7 @@ const body = releaseBody({
   version,
   notes,
   notesEn,
+  repository,
   socle,
   installerName: update.UPDATE_INSTALLER_NAME,
   appName: update.UPDATE_APP_NAME,

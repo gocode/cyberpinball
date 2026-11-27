@@ -139,6 +139,28 @@ test('à-coups : où attendait VPX, lu dans les lignes du relevé (rapport de Da
   assert.match(stallPlace(['Cadence: stall of 300 ms at 2.0s; main thread 50 samples: in x 50; under swscale-8.dll 50; top x (1)'])!.what!, /vidéo/);
 });
 
+test('à-coups : les antivirus tiers (McAfee, rapport du 27/11/2026) sont reconnus comme Defender, par leur nom', () => {
+  const stall = (module: string) => [`Cadence: stall of 785 ms at 12.0s; main thread 40 samples: in ntdll.dll 40; under ${module} 40; top ${module}+0x10 (30)`];
+  const what = (module: string) => stallPlace(stall(module))!.what;
+  const scans = 'qui analyse du code compilé par le script (ExecuteGlobal, Execute, Eval)';
+  assert.equal(what('mc-sec-plugin-x64.dll'), `l'antivirus McAfee, ${scans}`);
+  assert.equal(what('MFEAMSI.DLL'), `l'antivirus McAfee, ${scans}`);
+  assert.equal(what('aswhook.dll'), `l'antivirus Avast ou AVG, ${scans}`);
+  assert.equal(what('atcuf64.dll'), `l'antivirus Bitdefender, ${scans}`);
+  assert.equal(what('klhk.dll'), `l'antivirus Kaspersky, ${scans}`);
+  assert.equal(what('eamsi.dll'), `l'antivirus ESET, ${scans}`);
+  assert.equal(what('mbamchameleon.dll'), `l'antivirus Malwarebytes, ${scans}`);
+  assert.equal(what('SophosHook.dll'), `l'antivirus Sophos, ${scans}`);
+  // Un fournisseur AMSI inconnu est reconnu par son nom ; Defender garde son libellé.
+  assert.equal(what('zzamsi64.dll'), `un antivirus tiers (fournisseur AMSI), ${scans}`);
+  assert.equal(what('amsi.dll'), `l'antivirus de Windows, ${scans}`);
+  assert.equal(what('MPCLIENT.DLL'), `l'antivirus de Windows, ${scans}`);
+  // Pas de faux positif : les MFC de Microsoft et les DLL de VPX ne sont pas un antivirus.
+  assert.equal(what('mfc140u.dll'), undefined);
+  assert.equal(what('plugin-flexdmd64.dll'), undefined);
+  assert.match(stallPlaceJournal('SPACE_CADET', stall('mc-sec-plugin-x64.dll'))!, /surtout dans mc-sec-plugin-x64\.dll \(100 % de 40 relevés\), l'antivirus McAfee, /);
+});
+
 test('à-coups : la boucle de jeu qui attend le rendu (rapport du 21/11/2026), et où était le fil du rendu', () => {
   // Lignes réelles de la borne d'Eric (24, plugin d'avant le relevé du rendu) : SDL364.dll = la pause de la boucle de jeu.
   const old = [

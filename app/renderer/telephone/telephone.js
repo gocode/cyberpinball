@@ -211,15 +211,11 @@ function store(name, value) {
     // Stockage refusé (navigation privée) : l'adresse (#g=…) porte la clé.
   }
 }
+// Plein écran et écran d'accueil : telephone-plein-ecran.js (CyberScreen).
 /** Ouverte depuis l'écran d'accueil (plein écran), plutôt que dans un onglet. */
-const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+const standalone = () => CyberScreen.standalone();
 /** Comment ajouter la page à l'écran d'accueil, selon le téléphone. */
-function homeScreenHow() {
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return t('Dans Safari : touche Partager, puis « Sur l’écran d’accueil ».');
-  if (/Android/.test(ua)) return t('Dans le menu du navigateur (⋮) : « Ajouter à l’écran d’accueil ».');
-  return t('Dans le menu du navigateur : « Ajouter à l’écran d’accueil ».');
-}
+const homeScreenHow = () => CyberScreen.homeScreenHow();
 /**
  * Le raccourci qui suit la borne : l'entrée stable donnée par la borne, si la page n'est pas déjà
  * sous le nom de la borne (qui suit aussi son adresse). Sinon rien.
@@ -2175,81 +2171,12 @@ if (window.visualViewport) {
   fit();
 }
 
-// --- Plein écran au toucher (Android) -------------------------------------------
+// --- Plein écran (Android, ordinateur) --------------------------------------------
 //
-// Chrome pour Android ouvre le raccourci d'une page HTTP dans un onglet, barre d'adresse comprise :
-// seule une page HTTPS installable s'ouvre sans elle. La page demande donc le plein écran au premier
-// toucher (l'API l'exige), et de nouveau après une sortie subie (autre application, écran verrouillé :
-// la page passe en arrière-plan). Quitté exprès (le geste « glisser pour quitter » de Chrome, ou
-// « Quitter le plein écran » du menu ⋮), il n'est plus repris de lui-même : le menu ⋮ le rend. Chrome
-// montre son propre avertissement à chaque entrée, que la page ne peut ni masquer ni remplacer : d'où
-// une demande aussi rare que possible. Le toucher fait aussi ce qu'il touche : la demande part au
-// relâchement, sans rien empêcher. Rien sur l'iPhone (le raccourci y est déjà plein écran), ni quand
-// le navigateur n'a pas de plein écran ou le refuse. La hauteur suit la zone visible (fit ci-dessus) : rien ne saute, le
-// clavier du téléphone et les feuilles restent utilisables. Jamais dans Electron (les essais chargent
-// la vraie page dans des fenêtres hors écran : un vrai plein écran les montrerait), sauf essai qui
-// le simule (window.cyberFullscreenTest).
-let fullscreenRefused = false;
-/** Plein écran quitté exprès : plus repris au toucher (gardé d'une visite à l'autre). */
-const FULLSCREEN_STORE = 'cyberpinball.plein-ecran';
-let fullscreenOff = stored(FULLSCREEN_STORE) === 'non';
-/** Le navigateur sait passer en plein écran, et c'est utile ici (pas l'iPhone, déjà plein écran). */
-function fullscreenPossible() {
-  if (fullscreenRefused || standalone()) return false;
-  if (/Electron\//.test(navigator.userAgent) && !window.cyberFullscreenTest) return false;
-  return Boolean(document.fullscreenEnabled && typeof document.documentElement.requestFullscreen === 'function');
-}
-function fullscreenWanted() {
-  return !fullscreenOff && !document.fullscreenElement && fullscreenPossible();
-}
-/** Le menu ⋮ : entrer en plein écran (et le garder), ou le quitter (et ne plus le reprendre). */
-function toggleFullscreen() {
-  if (document.fullscreenElement) {
-    leavingOnPurpose = true;
-    setFullscreenOff(true);
-    void document.exitFullscreen?.().catch(() => undefined);
-    return;
-  }
-  setFullscreenOff(false);
-  fullscreenRefused = false;
-  askFullscreen();
-}
-function setFullscreenOff(off) {
-  fullscreenOff = off;
-  store(FULLSCREEN_STORE, off ? 'non' : '');
-}
-/** Sortie du plein écran : subie si la page passe en arrière-plan juste après (autre application), sinon voulue. */
-let leavingOnPurpose = false;
-let hiddenAfterExit = false;
-let exitTimer;
-document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement) return;
-  clearTimeout(exitTimer);
-  if (leavingOnPurpose || document.visibilityState === 'hidden') {
-    leavingOnPurpose = false;
-    return;
-  }  hiddenAfterExit = false;
-  exitTimer = setTimeout(() => {
-    if (!hiddenAfterExit) setFullscreenOff(true);
-  }, 700);
-});
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') hiddenAfterExit = true;
-});
-function askFullscreen() {
-  if (!fullscreenWanted()) return;
-  // Le champ qui a le clavier le garde : la bascule ne le replie pas.
-  const focused = document.activeElement;
-  Promise.resolve(document.documentElement.requestFullscreen({ navigationUI: 'hide' }))
-    .then(() => {
-      if (focused instanceof HTMLElement && focused !== document.body && document.activeElement !== focused) focused.focus({ preventScroll: true });
-    })
-    .catch(() => {
-      // Refusé (réglage du navigateur, page sans geste) : on ne redemande plus pendant cette visite.
-      fullscreenRefused = true;
-    });
-}
-document.addEventListener('pointerup', askFullscreen, { capture: true, passive: true });
+// Tout est dans telephone-plein-ecran.js (CyberScreen) : demande au toucher, sortie voulue ou subie,
+// menu ⋮. Ici, seulement ce que le menu ⋮ en lit.
+const fullscreenPossible = () => CyberScreen.possible();
+const toggleFullscreen = () => CyberScreen.toggle();
 
 /** Nouvelle tentative de liaison, repartie de zéro (« Reprendre », retour de Cyber Pinball). */
 function connectFresh() {

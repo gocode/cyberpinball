@@ -78,6 +78,7 @@ export const SYSTEM_ITEM_IDS = [
   'vr-calibrate',
   'vr-controllers',
   'vr-mirror',
+  'vr-audio',
   'controls',
   'phone-remote',
   'dmd-screen',
@@ -221,7 +222,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     get label() { return t('Réalité virtuelle et vision 3D'); },
     get detail() { return t('Activer le casque, caler la borne, manettes du casque, recopie sur le playfield, vision 3D, lunettes 3D'); },
     // Les lunettes 3D (anaglyphe, 21/11/2026) juste après la vision 3D : les deux se cumulent.
-    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vision3d', 'anaglyph'],
+    entries: ['vr', 'vr-calibrate', 'vr-controllers', 'vr-mirror', 'vr-audio', 'vision3d', 'anaglyph'],
   },
   // Comment la borne démarre, et qui a le droit de faire quoi.
   demarrage: {
@@ -402,6 +403,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
   'vr-controllers': { icon: 'button', get label() { return t('Manettes du casque'); } },
   'vr-mirror': { icon: 'screens', get label() { return t('Recopie sur le playfield'); } },
+  // La sortie du son en VR : celle du casque, celle de la borne, ou une sortie de Windows au choix.
+  'vr-audio': { icon: 'music', get label() { return t('Sortie audio en VR'); } },
   // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.
   vision3d: { icon: 'eye', get label() { return t('Vision 3D'); } },
   // La table en relief avec des lunettes à filtres colorés (anaglyph.ts), seule ou avec la vision 3D.

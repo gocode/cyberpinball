@@ -129,6 +129,9 @@ import {
   vpxRoomChanges,
   type VpxTableGeometry,
   VR_DMD_BAND,
+  VR_AUDIO_AUTO,
+  VR_AUDIO_CONFIG,
+  vrAudioChoices,
   vrAudioSettings,
   type VrBackglassView,
   vrCadenceCapped,
@@ -169,15 +172,17 @@ import { type locations, vpxInstall } from './paths';
 import { installPausePlugin, pauseSettingsFor, QUIT_HOLD_S } from './pause-vr';
 import { prepareSchemaImage, type SchemaImage, schemaImageFile } from './schema-image';
 import { type OvrJump, OvrProbe } from './sonde-ovr';
-import { activeVpxIni } from './vpx-ini';
+import { activeVpxIni, audioOutputs } from './vpx-ini';
 import {
   prepareVrGame,
   prepareVrTableIni,
   probeVr,
+  readVrAudio,
   readVrMirror,
   readVrMode,
   type VrGame,
   writeIniSettings,
+  writeVrAudio,
   writeVrCalibration,
   writeVrMirror,
   writeVrMode,
@@ -636,6 +641,27 @@ export function createVrFrontend(ctx: VrFrontendContext) {
       vrMirror = !vrMirror;
       writeVrMirror(loc.dataDir, vrMirror);
       console.log(`Réalité virtuelle : recopie sur le playfield ${vrMirror ? 'activée' : 'désactivée'}.`); // i18n-ignore : journal
+      library.openSystem();
+    },
+  });
+
+  // « Sortie audio en VR » (Menu système > Ma borne > Réalité virtuelle et vision 3D) : le son du menu et des parties dans le casque
+  // sort par celui du casque si Windows en a un (automatique), toujours par la borne, ou par la sortie de Windows choisie.
+  library.provideSystemItem('vr-audio', {
+    get detail() {
+      const choice = readVrAudio(loc.dataDir);
+      if (choice === VR_AUDIO_AUTO) return t('Automatique · le casque si Windows lui connaît une sortie audio, sinon la borne');
+      if (choice === VR_AUDIO_CONFIG) return t('La borne · le son reste sur la sortie de la configuration, même dans le casque');
+      return t('{sortie} · sortie de Windows choisie', { sortie: choice.slice('sortie:'.length) });
+    },
+    get tone() {
+      return vrMode === 'auto' ? undefined : ('quiet' as const);
+    },
+    run: () => {
+      const choices = vrAudioChoices(audioOutputs());
+      const next = choices[(Math.max(0, choices.indexOf(readVrAudio(loc.dataDir))) + 1) % choices.length]!;
+      writeVrAudio(loc.dataDir, next);
+      console.log(`Réalité virtuelle : sortie audio « ${next} ».`); // i18n-ignore : journal
       library.openSystem();
     },
   });

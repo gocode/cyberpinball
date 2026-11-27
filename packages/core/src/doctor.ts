@@ -103,7 +103,7 @@ import { scriptCode } from './vbscript';
 import { cabinetDmdIni, cabinetDmdOptions, type CabinetDmdOption } from './tableoptions';
 import { readVpxFileVersion, readVpxImageNames, readVpxScript, readVpxTableName } from './vpxinfo';
 import { tableTooNew, tooNewAdvice, tooNewReason, withVpxChoice, type OtherVpx } from './autres-vpx';
-import { describeRenames, describeTrims, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
+import { describeRenames, describeTrims, emptyPlayedPlaylists, missingPackFiles, packCoverage, packFileFixes, packMostlyMissing, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
 import { tableHasVrRoom } from './vr';
@@ -2233,17 +2233,34 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     // with accents, name padded with spaces in a .pup), then files named by the pack and missing:
     // without them, screens stay black.
     if (!nested.has(pack)) {
+      // Gravity: a few missing media in a pack that plays otherwise is a quiet note ("À savoir"),
+      // outside the problem count (PinUP Popper says nothing about it either); half the pack missing,
+      // the table plays almost without its videos: a warning, said once.
+      const coverage = packCoverage(info.root);
+      const major = packMostlyMissing(coverage);
+      let majorSaid = false;
+      const majorSentence = () => {
+        if (!major || majorSaid) return [];
+        majorSaid = true;
+        return [t('{broken} déclencheurs sur {total} n’ont pas leur média : la table se joue presque sans les vidéos du pack. Reprends le pack en entier.', coverage)];
+      };
+      const empty = emptyPlayedPlaylists(info.root, facts?.pup ? played : undefined);
+      const emptyKeys = new Set(empty.map((p) => p.toLowerCase()));
       const media = packFileFixes(info.root, facts?.pup ? played : undefined);
       if (media.renames.length || media.trimmed.length) findings.push(packFileNamesFinding(pack, info.root, media));
       else {
-        const missing = missingPackFiles(info.root, facts?.pup ? played : undefined);
+        // A file of a playlist already said empty is covered by that finding: one alert per cause.
+        const missing = missingPackFiles(info.root, facts?.pup ? played : undefined).filter((f) => !emptyKeys.has(f.split('\\')[0]!.trim().toLowerCase()));
         if (missing.length) {
-          // Information only: in play the plugin just skips the media (a blank, no crash). No cause is claimed.
+          // In play the plugin just skips the media (a blank, no crash). No cause is claimed.
           findings.push({
             code: 'pupFilesMissing',
-            severity: 'info',
+            severity: major ? 'warning' : 'info',
+            ...(major ? {} : { note: true }),
             title: tn(missing.length, 'Média attendu par le PuP-Pack, absent', 'Médias attendus par le PuP-Pack, absents'),
-            detail: tn(
+            detail: [
+              ...majorSentence(),
+              tn(
               missing.length,
               'pupvideos\\{pack} attend {list}, qui manque : en jeu, le plugin saute ce média (un blanc, sans plantage). Causes possibles : média fourni à part par l’auteur du pack (musique sous droits, topper), pack d’une autre version que la table, installation incomplète.',
               'pupvideos\\{pack} attend {n} médias qui manquent ({list}) : en jeu, le plugin saute ces médias (un blanc, sans plantage). Causes possibles : médias fournis à part par l’auteur du pack (musique sous droits, topper), pack d’une autre version que la table, installation incomplète.',
@@ -2253,20 +2270,22 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
                 list: missing.slice(0, 3).map(quote).join(', ') + (missing.length > 3 ? '…' : ''),
               },
             ),
+            ].join(' '),
           });
         }
       }
       // Empty playlists that the pack really plays (active trigger, screen, script): nothing is shown
       // or heard there. An empty playlist that nothing targets does not count (pupfiles.ts).
-      const empty = emptyPlayedPlaylists(info.root, facts?.pup ? played : undefined);
       if (empty.length) {
         // The table's music goes through the pack ("Music" playlist): empty, the table is silent (Goldorak, 19/11/2026).
         const music = empty.filter((p) => /music|musique|audio|sound|song/i.test(p));
         findings.push({
           code: 'pupPlaylistsEmpty',
-          severity: music.length ? 'warning' : 'info',
+          severity: music.length || major ? 'warning' : 'info',
+          ...(music.length || major ? {} : { note: true }),
           title: tn(empty.length, 'Playlist du PuP-Pack vide', 'Playlists du PuP-Pack vides'),
           detail: [
+            ...majorSentence(),
             tn(empty.length, 'pupvideos\\{pack} joue la playlist {list}, vide ou absente : rien ne s’y verra ni ne s’y entendra.', 'pupvideos\\{pack} joue {n} playlists vides ou absentes ({list}) : rien ne s’y verra ni ne s’y entendra.', {
               pack,
               n: empty.length,

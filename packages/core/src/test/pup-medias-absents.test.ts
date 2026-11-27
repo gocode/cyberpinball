@@ -7,7 +7,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { fileIsAbsent, pupScriptCalls } from '../pup-medias-absents';
-import { emptyPlayedPlaylists, missingPackFiles } from '../pupfiles';
+import { emptyPlayedPlaylists, missingPackFiles, packCoverage, packMostlyMissing } from '../pupfiles';
 
 const CRLF = String.fromCharCode(13, 10);
 const lines = (...rows: string[]) => rows.join(CRLF) + CRLF;
@@ -73,4 +73,41 @@ test('médias absents : un dossier que le script déclare (playlistadd) ou joue,
   const script = 'PuPlayer.playlistadd 2,"Absent",1,0\nPuPlayer.playlistplayex 2,"Vide","",1,1\n\'PuPlayer.playlistadd 2,"Commente",1,0\nPuPlayer.playlistplayex pDMD,"Frames",fname,0,1';
   // « Vide » n'est joué que s'il est déclaré par le pack ; « Absent » est déclaré par le script lui-même.
   assert.deepEqual(emptyPlayedPlaylists(root, script), ['Absent', 'Vide']);
+});
+
+test('médias absents : une ligne de séparation de l’auteur, même active, n’est pas un déclencheur', () => {
+  // Lignes réelles d'un triggers.pup (The Matrix, 27/11/2026).
+  const root = pack(
+    [
+      '379,1,***MULTIBALL***,********,****,*************,*****************,**********,*****,,,,,0',
+      '683,1,"**GHOST SENTINELS EVENT***",**************,***,********************,*********************,,,,,,,0',
+      '1,1,A,E1,0,Music,a.mp3',
+    ],
+    { Music: ['a.mp3'] },
+  );
+  assert.deepEqual(missingPackFiles(root), []);
+  assert.deepEqual(emptyPlayedPlaylists(root), []);
+  assert.deepEqual(packCoverage(root), { total: 1, broken: 0 });
+  assert.deepEqual(missingPackFiles(root, 'PuPlayer.playlistplayex 2,"Music","a?.mp3",0,1\nPuPlayer.playlistadd 2,"***",1,0'), []);
+  assert.deepEqual(emptyPlayedPlaylists(root, 'PuPlayer.playlistadd 2,"***",1,0'), []);
+});
+
+test('médias absents : gravité, le pack n’est « en grande partie absent » qu’à partir de la moitié de 4 déclencheurs actifs', () => {
+  // 1 déclencheur cassé sur 4 : simple information.
+  const peu = pack(['1,1,A,E1,0,Music,a.mp3', '2,1,B,E2,0,Music,', '3,1,C,E3,0,Fond,', '4,1,D,E4,0,Music,absent.mp3'], { Music: ['a.mp3'], Fond: ['f.mp4'] });
+  assert.deepEqual(packCoverage(peu), { total: 4, broken: 1 });
+  assert.equal(packMostlyMissing(packCoverage(peu)), false);
+  // 2 sur 4 (dossier absent, fichier absent), les inactifs et les options ne comptent pas.
+  const moitie = pack(
+    ['1,1,A,E1,0,Music,a.mp3', '2,1,B,E2,0,Music,', '3,1,C,E3,0,Absent,', '4,1,D,E4,0,Music,absent.mp3', '5,0,E,E5,0,Absent,', '6,1,F,E6,0,PuP-Pack_Options,'],
+    { Music: ['a.mp3'] },
+  );
+  assert.deepEqual(packCoverage(moitie), { total: 4, broken: 2 });
+  assert.equal(packMostlyMissing(packCoverage(moitie)), true);
+  // Trop peu de déclencheurs pour juger : jamais « en grande partie absent ».
+  assert.equal(packMostlyMissing({ total: 3, broken: 3 }), false);
+  // Un fichier visé dans un dossier absent est listé ; un pack sans aucun média ne liste rien (déjà signalé en entier).
+  assert.deepEqual(missingPackFiles(moitie), ['Music\\absent.mp3']);
+  const nu = pack(['1,1,A,E1,0,Music,a.mp3'], { Music: [] });
+  assert.deepEqual(missingPackFiles(nu), []);
 });

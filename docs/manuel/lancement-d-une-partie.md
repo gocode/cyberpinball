@@ -470,6 +470,10 @@ Hors du casque, rien : le plugin n'est activé que dans l'INI des parties dans l
 Une table dont la pièce VR n'a pas de fronton dans la scène (fronton en image) ne demande jamais ce dessin : la pause passe alors par la notification de VPX, moins lisible.
 Banc : `build\vision3d\Release\banc-pause.exe` (construit par `node scripts/vision3d.mjs`).
 
+**Sortie audio en VR** (Menu système > Ma borne > Réalité virtuelle et vision 3D, entrée `vr-audio`) : où sort le son du menu et des parties dans le casque.
+Un appui passe au choix suivant : Automatique (la sortie audio du casque quand Windows en connaît une, sinon la borne), La borne (le son reste sur la sortie de la configuration, même dans le casque), puis chaque sortie audio de Windows.
+Utile quand le casque n'a pas de périphérique audio reconnu, ou quand on préfère garder le son de la borne.
+
 **Casque pas sur la tête au lancement** (`vrWearHint` de `app/src/frontend.ts`, `vrWearCard` de `app/renderer/frontend.js`, figé par [chargement.test.ts](../../packages/core/src/test/chargement.test.ts)).
 VPX attend le casque pour démarrer la table : tant que personne ne le porte, il reste sur sa première image du casque, sans rien écrire dans son journal (12/11/2026, The Addams Family lancée depuis la borne : plus de 3 minutes de chargement, crues bloquées).
 Quand une partie part dans le casque alors qu'il n'est pas sur la tête (le compagnon le dit, ou il ne tourne pas), le playfield et le fronton de la borne affichent en grand « Partie dans le casque · Mettez le casque : la table démarre quand il est sur la tête », avec, une consigne par ligne, l'arrêt (« Exit : arrêter », et au clavier Ctrl+Maj+K ou Échap) et le chemin pour jouer sur les écrans (Menu système > Ma borne > Réalité virtuelle et vision 3D).

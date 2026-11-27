@@ -16,6 +16,7 @@ interface Reference {
   url: string;
 }
 interface BodyInput {
+  repository?: string;
   version: string;
   notes: string[];
   notesEn: string[];
@@ -31,6 +32,7 @@ interface PageRelease {
   looksFrench(line: string): boolean;
   frenchOutsideQuotes(line: string): boolean;
   straightQuotes(text: string): string;
+  RELEASE_BODY_LIMIT: number;
 }
 interface Traductions {
   fragmentProblems(root: string): string[];
@@ -163,4 +165,23 @@ test('changements/*.md : un point anglais en français est refusé', async () =>
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('page de release : jamais plus que la limite de GitHub, même avec des centaines de nouveautés cumulées', async () => {
+  // Le 27/11/2026, essai.74 : la section "## 0.2.4" cumulait toutes les préversions (plus de 125 000 caractères
+  // en deux langues) et GitHub a refusé la release (HTTP 422). Le texte est abrégé, les plus récentes d'abord.
+  const page = await load();
+  const many = (prefix: string) => Array.from({ length: 600 }, (_, i) => `${prefix} ${i + 1} : ${'mot '.repeat(80)}`.trim());
+  const body = page.releaseBody({ ...input(), repository: 'example/cyberpinball', notes: many('Nouveauté'), notesEn: many('News') });
+  assert.ok(body.length <= page.RELEASE_BODY_LIMIT, `${body.length} caractères`);
+  assert.deepEqual(problems(body, page), []);
+  assert.ok(body.includes('- News 1 :') && body.includes('- Nouveauté 1 :'), 'les plus récentes sont gardées');
+  assert.ok(!body.includes('- News 600 :'), 'les plus anciennes sont abrégées');
+  assert.ok(body.includes('https://github.com/example/cyberpinball/blob/main/CHANGELOG.en.md'));
+  assert.ok(body.includes('https://github.com/example/cyberpinball/blob/main/CHANGELOG.md'));
+  // Une liste courte reste entière, sans ligne d'abrègement.
+  const short = page.releaseBody(input());
+  assert.ok(!short.includes('older notes not shown'));
+  // Un pied démesuré ferait dépasser la limite : l'erreur est levée avant tout appel à GitHub.
+  assert.throws(() => page.releaseBody({ ...input(), appName: 'x'.repeat(130000) }), /trop long/);
 });

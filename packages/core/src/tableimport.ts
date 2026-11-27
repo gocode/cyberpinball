@@ -220,6 +220,18 @@ export interface PackPlan {
   renames: { from: string; to: string }[];
 }
 
+/**
+ * The installation stops on this pack until the user picks an option: several options, none chosen
+ * yet. Even when the cabinet makes one obvious, it is only proposed (preselected): people click through
+ * the install without reading, then a pack set up for other screens "does not work" (report of
+ * 27/11/2026). The option of an earlier installation of the same pack ("remembered") is kept: it was
+ * chosen once. A .bat read without success always asks.
+ */
+export function packNeedsChoice(pack: Pick<PackPlan, 'decided' | 'variants' | 'choice' | 'failedBats'>): boolean {
+  if (pack.decided || pack.variants.length < 2) return false;
+  return pack.choice.reason !== 'remembered' || pack.failedBats.length > 0;
+}
+
 /** What the VPS database says about a new table. */
 export interface TableVps {
   /** Key of the table in the plan (first .vpx), to remember the choice. */

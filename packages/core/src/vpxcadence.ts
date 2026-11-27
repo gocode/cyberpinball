@@ -70,9 +70,25 @@ export function vpxMemoryGrowth(lines: readonly string[]): { fromMB: number; toM
   return { fromMB: first.memMB!, toMB: last.memMB!, minutes: Math.max(0, (last.durationS - first.durationS) / 60) };
 }
 
-/** Ce que fait un module quand le fil des images de VPX y attend (noms en minuscules). */
+/** Ce que fait un antivirus quand le fil des images y attend : vbscript.dll lui envoie chaque texte compilé (AMSI). */
+const SCANS = 'qui analyse du code compilé par le script (ExecuteGlobal, Execute, Eval)'; // i18n-ignore : journal
+
+/**
+ * Ce que fait un module quand le fil des images de VPX y attend (noms en minuscules). Les antivirus tiers s'installent
+ * comme fournisseur AMSI (McAfee : mc-sec-plugin-x64.dll, relevé de Jax34 le 27/11/2026, ~785 ms par blocage) : même
+ * cause que Defender, d'où le même constat, avec le nom de l'antivirus quand on le reconnaît. Un nom inconnu mais qui
+ * contient « amsi » est un fournisseur AMSI. Évite « mfc*.dll » : ce sont les bibliothèques MFC de Microsoft.
+ */
 const STALL_PLACES: readonly [RegExp, string][] = [
-  [/^(mpclient|mpoav|amsi)\.dll$/, "l'antivirus de Windows, qui analyse du code compilé par le script (ExecuteGlobal, Execute, Eval)"], // i18n-ignore : journal
+  [/^(mpclient|mpoav|amsi)\.dll$/, `l'antivirus de Windows, ${SCANS}`], // i18n-ignore : journal
+  [/^(mc-sec-plugin[\w-]*|mfe\w*|mcshield|mcafee\w*)\.dll$/, `l'antivirus McAfee, ${SCANS}`], // i18n-ignore : journal
+  [/^(aswhook|aswamsi|snxhk|avghook)\.dll$/, `l'antivirus Avast ou AVG, ${SCANS}`], // i18n-ignore : journal
+  [/^(atcuf\w*|bdhkm\w*|bdamsi)\.dll$/, `l'antivirus Bitdefender, ${SCANS}`], // i18n-ignore : journal
+  [/^(klhk\w*|kloehook\w*|klamsi\w*)\.dll$/, `l'antivirus Kaspersky, ${SCANS}`], // i18n-ignore : journal
+  [/^(eamsi|ehdrv\w*)\.dll$/, `l'antivirus ESET, ${SCANS}`], // i18n-ignore : journal
+  [/^(mbam\w*|mbae\w*)\.dll$/, `l'antivirus Malwarebytes, ${SCANS}`], // i18n-ignore : journal
+  [/^sophos\w*\.dll$/, `l'antivirus Sophos, ${SCANS}`], // i18n-ignore : journal
+  [/^[\w-]*amsi[\w-]*\.dll$/, `un antivirus tiers (fournisseur AMSI), ${SCANS}`], // i18n-ignore : journal
   [/^vbscript\.dll$/, 'le script de la table'], // i18n-ignore : journal
   [/^(avcodec|avformat|avutil|swscale|swresample)[-\w]*\.dll$/, "le décodage d'une vidéo"], // i18n-ignore : journal
   [/^(nvoglv|nvwgf2um|nvd3dum|igd|amdxx|atiu|aticfx|d3d1[01]|dxgi)[\w]*\.dll$/, 'le pilote de la carte graphique'], // i18n-ignore : journal

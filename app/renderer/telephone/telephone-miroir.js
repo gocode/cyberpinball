@@ -143,6 +143,12 @@ function mirrorLockOrientation() {
   }
 }
 
+// Le plein écran (telephone-plein-ecran.js) est pris après le choix du miroir (premier toucher), ou rendu
+// par le menu ⋮ : le verrou refusé avant lui est repris dès qu'il est accordé.
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement && mirror.choice) mirrorLockOrientation();
+});
+
 function mirrorClear() {
   mirror.bitmap?.close?.();
   mirror.bitmap = undefined;

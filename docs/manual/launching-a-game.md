@@ -470,6 +470,10 @@ Outside the headset, nothing: the plugin is only enabled in the INI of games in 
 A table whose VR room has no backglass in the scene (an image backglass) never asks for this drawing: the pause then goes through VPX's notification, less legible.
 Bench: `build\vision3d\Release\banc-pause.exe` (built by `node scripts/vision3d.mjs`).
 
+**Audio output in VR** (System menu > My cabinet > Virtual reality and 3D vision, `vr-audio` entry): where the sound of the menu and of games in the headset comes out.
+Each press moves to the next choice: Automatic (the headset audio output when Windows knows one, otherwise the cabinet), The cabinet (sound stays on the configuration output, even in the headset), then each Windows audio output.
+Useful when the headset has no recognised audio device, or to keep the cabinet sound.
+
 **Headset not on at launch** (`vrWearHint` in `app/src/frontend.ts`, `vrWearCard` in `app/renderer/frontend.js`, pinned by [chargement.test.ts](../../packages/core/src/test/chargement.test.ts)).
 VPX waits for the headset to start the table: while nobody wears it, it stays on its first headset frame, without writing anything to its log (12/11/2026, The Addams Family started from the cabinet: over 3 minutes of loading, taken for a freeze).
 When a game goes to the headset while it is not on (the companion says so, or it isn't running), the cabinet's playfield and backglass show in large type "Partie dans le casque · Mettez le casque : la table démarre quand il est sur la tête" (Game in the headset · Put the headset on: the table starts once it's on your head), with, one instruction per line, how to stop ("Exit : arrêter", and on the keyboard Ctrl+Shift+K or Esc) and the path to play on the screens (System menu > My cabinet > Virtual reality and 3D vision).
