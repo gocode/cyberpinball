@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Télécommande, miroir de l'application : correction du balayage qui ne faisait rien (ni Facebook ni TikTok) : le téléphone annonçait la fin du geste à chaque message, le doigt injecté sur la borne était donc levé aussitôt et Edge n'y voyait qu'un appui. Le geste est maintenant continu du premier au dernier déplacement. La molette de repli se referme aussi après un silence du téléphone.
+- Journal de la borne : chaque balayage reçu de la télécommande laisse une ligne (au doigt ou à la molette, point de départ, taille de la fenêtre, nombre de messages, pixels parcourus, refus de Windows). Pas de ligne = le téléphone n'a rien envoyé.
 - Pinball FX3 en mode borne : Cyber Pinball place maintenant lui-même les fenêtres du DMD et du fronton sur les écrans de ces rôles, une fois la partie lancée. Avant, elles s'ouvraient où les réglages du jeu les avaient mises (DMD décentré, fronton décalé de 101 px et rogné en bas, relevé sur un PinCab). Rien à faire : si le jeu remet une fenêtre ailleurs malgré quatre essais, le journal le signale et Cyber Pinball la laisse. L'activation du mode borne et l'orientation restent à régler dans le jeu (ses réglages sont chiffrés).
 - Pinball FX3, première ouverture sur ce PC : le message dit maintenant quelle orientation saisir dans le jeu, d'après le côté des flippers de ta borne, et que le DMD et le fronton seront replacés par Cyber Pinball.
 - Les couleurs du DMD et des LED qui suivent la table affichée ont plus de peps : le bleu, le rouge, le violet et le rose ne sortent plus en pastel (la clarté s'adapte à la teinte pour garder une couleur franche). Les couleurs déjà mesurées sont recalculées une fois, en tâche de fond.

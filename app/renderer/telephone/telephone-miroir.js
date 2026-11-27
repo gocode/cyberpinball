@@ -452,7 +452,9 @@ function mirrorPinchMove() {
  * Envoie ce que le doigt a parcouru depuis le dernier envoi. `end` : le doigt est levé, la borne le sait (même sans
  * mouvement de plus) pour finir son geste : un vrai glissement tactile se termine doigt levé, comme sur un téléphone.
  */
-function mirrorFlush(end = false) {
+function mirrorFlush(finished) {
+  // Le navigateur rappelle requestAnimationFrame avec l'heure : seul « true » dit que le doigt est levé (le 27/11/2026, l'heure faisait lever le doigt à chaque envoi).
+  const end = finished === true;
   mirrorFrameId = undefined;
   const g = mirrorGesture;
   const r = mirrorImageRect();
@@ -516,7 +518,7 @@ mirrorView.addEventListener('pointermove', (e) => {
   mirrorPending.dx += e.clientX - g.last.x;
   mirrorPending.dy += e.clientY - g.last.y;
   g.last = { x: e.clientX, y: e.clientY };
-  mirrorFrameId ??= requestAnimationFrame(mirrorFlush);
+  mirrorFrameId ??= requestAnimationFrame(() => mirrorFlush(false));
 });
 
 function mirrorRelease(e) {

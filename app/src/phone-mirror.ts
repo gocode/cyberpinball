@@ -101,14 +101,35 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
    * glissement passe par la molette. Une page qui attend un vrai glissement (TikTok au rendu mobile) ne
    * défile pas à la molette : elle reçoit un doigt, avec son élan à la levée.
    */
-  let drag: { touch: boolean; x: number; y: number; cancel?: () => void } | undefined;
+  let drag:
+    | {
+        touch: boolean;
+        x: number;
+        y: number;
+        cancel?: () => void;
+        /** Pour le journal : d'où le glissement est parti, dans quelle fenêtre, ce qu'il a envoyé et ce que Windows a refusé. */
+        from: { x: number; y: number };
+        window: { width: number; height: number };
+        messages: number;
+        moved: { x: number; y: number };
+        refused: number;
+      }
+    | undefined;
 
-  /** Lève le doigt posé, s'il y en a un (fin du glissement, arrêt du miroir, silence du téléphone). */
-  const liftTouch = () => {
+  /**
+   * Fin du glissement (doigt levé, silence du téléphone, arrêt du miroir) : le doigt posé est levé, et le journal dit
+   * ce qui est parti. C'est la preuve quand un balayage « ne fait rien » : aucune ligne = le téléphone n'a rien envoyé ;
+   * « au doigt » ou « à la molette » avec des refus = Windows n'a pas pris le geste.
+   */
+  const endDrag = () => {
     const d = drag;
     drag = undefined;
     d?.cancel?.();
-    if (d?.touch) host.touch?.('up', d.x, d.y);
+    if (!d) return;
+    if (d.touch && !host.touch?.('up', d.x, d.y)) d.refused++;
+    host.log?.(
+      `Miroir : glissement ${d.touch ? 'au doigt (injection tactile)' : 'à la molette'} parti de (${d.from.x}, ${d.from.y}) dans une fenêtre de ${d.window.width} × ${d.window.height}, ${d.messages} message(s), ${d.moved.x} × ${d.moved.y} px${d.refused ? `, ${d.refused} refus de Windows` : ''}`, // i18n-ignore : journal
+    );
   };
 
   const clearTimer = () => {
@@ -178,7 +199,7 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
   }
 
   function stop(): void {
-    liftTouch();
+    endDrag();
     on = false;
     epoch++;
     inFlight = undefined;
@@ -233,26 +254,38 @@ export function createPhoneMirror(host: MirrorHost): PhoneMirror {
       // Début de glissement : un doigt si la fenêtre en veut un, sinon la molette pour tout le glissement.
       if (!drag) {
         if (m.end && m.dx === 0 && m.dy === 0) return;
-        drag = { touch: host.touch?.('down', p.x, p.y) === true, x: p.x, y: p.y };
+        const down = host.touch?.('down', p.x, p.y) === true;
+        drag = { touch: down, x: p.x, y: p.y, from: p, window: { width: Math.round(rect.width), height: Math.round(rect.height) }, messages: 0, moved: { x: 0, y: 0 }, refused: !down && host.touch ? 1 : 0 };
       }
       const d = drag;
+      d.messages++;
+      // Un glissement dont la fin ne vient pas (liaison coupée) se termine après un silence, doigt levé s'il y en a un.
+      d.cancel?.();
+      d.cancel = after(MIRROR_TOUCH_IDLE_MS, endDrag);
       if (!d.touch) {
-        if (m.end) drag = undefined;
         const wheel = mirrorWheel(rect, m.dx, m.dy);
-        if (wheel.deltaX === 0 && wheel.deltaY === 0) return;
-        host.pointer(p.x, p.y);
-        host.wheel(wheel.deltaX, wheel.deltaY);
+        if (wheel.deltaX !== 0 || wheel.deltaY !== 0) {
+          host.pointer(p.x, p.y);
+          host.wheel(wheel.deltaX, wheel.deltaY);
+          d.moved.x += wheel.deltaX;
+          d.moved.y += wheel.deltaY;
+        }
+        if (m.end) endDrag();
         return;
       }
-      // Le doigt suit le doigt du téléphone, sans sortir de la fenêtre.
+      // Le doigt suit le doigt du téléphone, sans sortir de la fenêtre ; levé à la fin, après son dernier déplacement.
       const right = Math.round(rect.x) + Math.max(1, Math.round(rect.width)) - 1;
       const bottom = Math.round(rect.y) + Math.max(1, Math.round(rect.height)) - 1;
-      d.x = Math.min(right, Math.max(Math.round(rect.x), d.x + Math.round(m.dx * rect.width)));
-      d.y = Math.min(bottom, Math.max(Math.round(rect.y), d.y + Math.round(m.dy * rect.height)));
-      if (m.end) return liftTouch();
-      host.touch?.('move', d.x, d.y);
-      d.cancel?.();
-      d.cancel = after(MIRROR_TOUCH_IDLE_MS, liftTouch);
+      const x = Math.min(right, Math.max(Math.round(rect.x), d.x + Math.round(m.dx * rect.width)));
+      const y = Math.min(bottom, Math.max(Math.round(rect.y), d.y + Math.round(m.dy * rect.height)));
+      if (x !== d.x || y !== d.y || !m.end) {
+        d.moved.x += x - d.x;
+        d.moved.y += y - d.y;
+        d.x = x;
+        d.y = y;
+        if (!host.touch?.('move', x, y)) d.refused++;
+      }
+      if (m.end) endDrag();
     },
     zoom(m) {
       if (!on || !host.live() || !host.rect()) return;

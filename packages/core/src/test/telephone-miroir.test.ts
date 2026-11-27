@@ -176,6 +176,7 @@ interface FakeHost {
   click(b: 'left' | 'right', c: number): void;
   wheel(dx: number, dy: number): void;
   zoom(dir: 1 | -1): void;
+  log(line: string): void;
   touch?(phase: 'down' | 'move' | 'up', x: number, y: number): boolean;
   now(): number;
   after(ms: number, fn: () => void): () => void;
@@ -205,6 +206,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean; touch?: 'ok' | 'refused'
     wheels: [] as [number, number][],
     zooms: [] as number[],
     touches: [] as [string, number, number][],
+    logs: [] as string[],
     pending: undefined as undefined | ((s: MirrorShot | undefined) => void),
     manual: false,
   };
@@ -221,6 +223,7 @@ function rig(opts: { rect?: MirrorRect; live?: boolean; touch?: 'ok' | 'refused'
     click: (b, c) => void state.clicks.push([b, c]),
     wheel: (dx, dy) => void state.wheels.push([dx, dy]),
     zoom: (dir) => void state.zooms.push(dir),
+    log: (line) => void state.logs.push(line),
     ...(opts.touch ? { touch: (phase: string, x: number, y: number) => (state.touches.push([phase, x, y]), opts.touch === 'ok') } : {}),
     now: () => t,
     after: (ms, fn) => {
@@ -492,6 +495,39 @@ test('Windows refuse l\'injection tactile : le glissement passe par la molette, 
   assert.equal(r.state.wheels.length, 2);
 });
 
+test('journal : une ligne par glissement dit le mode, le départ, le nombre de messages et les pixels', async () => {
+  const r = rig({ rect: { x: 100, y: 50, width: 1000, height: 800 }, touch: 'ok' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  // Aucun message du téléphone : aucune ligne (c'est la preuve que le téléphone n'a rien envoyé).
+  assert.deepEqual(r.state.logs, []);
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.8, dx: 0, dy: -0.1 });
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.8, dx: 0, dy: -0.3 });
+  assert.deepEqual(r.state.logs, [], 'pas de ligne tant que le doigt est posé');
+  r.mirror.scroll({ t: 'mscroll', s: 3, fx: 0.5, fy: 0.8, dx: 0, dy: 0, end: true });
+  assert.equal(r.state.logs.length, 1);
+  assert.match(r.state.logs[0]!, /glissement au doigt \(injection tactile\) parti de \(600, 690\) dans une fenêtre de 1000 × 800, 3 message\(s\), 0 × -320 px$/);
+  // Mode molette : la ligne le dit, et le téléphone sans doigt levé est clos après le silence.
+  const w = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 } });
+  w.mirror.request(true, { w: 390, h: 700 });
+  await w.advance(0);
+  w.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.5, dx: 0, dy: 0.25 });
+  assert.deepEqual(w.state.logs, []);
+  await w.advance(1600);
+  assert.equal(w.state.logs.length, 1);
+  assert.match(w.state.logs[0]!, /glissement à la molette parti de \(500, 400\) dans une fenêtre de 1000 × 800, 1 message\(s\), 0 × 200 px$/);
+});
+
+test('journal : les refus de Windows sont comptés, le glissement repasse par la molette', async () => {
+  const r = rig({ rect: { x: 0, y: 0, width: 1000, height: 800 }, touch: 'refused' });
+  r.mirror.request(true, { w: 390, h: 700 });
+  await r.advance(0);
+  r.mirror.scroll({ t: 'mscroll', s: 1, fx: 0.5, fy: 0.5, dx: 0, dy: 0.25 });
+  r.mirror.scroll({ t: 'mscroll', s: 2, fx: 0.5, fy: 0.5, dx: 0, dy: 0.1, end: true });
+  assert.equal(r.state.logs.length, 1);
+  assert.match(r.state.logs[0]!, /à la molette.*2 message\(s\), 0 × 280 px, 1 refus de Windows$/);
+});
+
 test('la télécommande qui ne pilote plus la fenêtre : appuis ignorés même si le miroir est demandé', async () => {
   const r = rig();
   r.mirror.request(true, { w: 390, h: 700 });
@@ -608,7 +644,8 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
     createImageBitmap: async () => ({ ...frameSize, close: () => undefined }),
     clearTimeout,
     setTimeout,
-    requestAnimationFrame: (fn: () => void) => setTimeout(fn, 0),
+    // Comme un navigateur : le rappel reçoit l'heure (un argument imprévu doit rester sans effet).
+    requestAnimationFrame: (fn: (time: number) => void) => setTimeout(() => fn(16.7), 0),
     mode: 'browser',
     state: 'paired',
     send: (m: Record<string, unknown>) => (sent.push(m), true),

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Remote, application mirror: fixed the swipe that did nothing (neither Facebook nor TikTok): the phone flagged the end of the gesture on every message, so the finger injected on the cabinet was lifted at once and Edge only saw a tap. The gesture is now continuous from the first to the last move. The fallback wheel also closes after the phone goes silent.
+- Cabinet journal: every swipe received from the remote leaves a line (finger or wheel, start point, window size, message count, pixels travelled, Windows refusals). No line means the phone sent nothing.
 - Pinball FX3 in cabinet mode: Cyber Pinball now places the DMD and backglass windows on the screens of those roles itself, once the game is launched. Before, they opened wherever the game's settings put them (off-centre DMD, backglass shifted 101 px down and cut off at the bottom, seen on a PinCab). Nothing to do: if the game puts a window back elsewhere despite four tries, the log says so and Cyber Pinball leaves it. Turning cabinet mode on and the orientation still have to be set in the game (its settings are encrypted).
 - Pinball FX3, first opening on this PC: the message now says which orientation to enter in the game, from the flipper side of your cabinet, and that Cyber Pinball will move the DMD and the backglass back into place.
 - The DMD and LED colors that follow the table on screen are punchier: blue, red, purple and pink no longer come out pastel (lightness adapts to the hue to keep a vivid color). Colors already measured are recomputed once, in the background.
