@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Remote, cabinet browser: the bottom bar is now icons only (Back, Forward, Keyboard, More, Close), lower, with their name as a tooltip and for screen readers.
+- Remote: the Pad / Mirror switch becomes an icon button in the bottom bar, green while the mirror is shown; the row it used to take is gone.
+- Remote: single-line header, smaller margins and gaps, and the screen's safe areas are now respected on the left and right too; the pad gains about 50 pixels of height and the mirror about 115.
+- Remote: a button in the header hides the bars to give the whole screen to the pad or the mirror, and a handle at the bottom of the screen brings them back.
 - When a game stutters because the antivirus scans the code compiled by the table's script, the log and the report now say so for McAfee (mc-sec-plugin-x64.dll, mfe*), Avast and AVG, Bitdefender, Kaspersky, ESET, Malwarebytes and Sophos, and for any other antivirus registered as an AMSI provider, by name. Before, only Defender was recognised: a stall caused by another antivirus stayed unexplained.
 - New "Audio output in VR" setting (System menu > My cabinet > Virtual reality and 3D vision): you choose where the sound comes out when you play in the headset. Automatic (as before: the headset audio output if Windows knows one, otherwise the cabinet), The cabinet (sound always stays on your configuration output), or any Windows audio output. This also covers a headset, such as a Pimax, whose audio device is not recognised: pick it from the list.
 - When no headset output is recognised, the log now lists the Windows audio outputs it saw.

@@ -11,6 +11,10 @@ son interface).
 
 ## 0.2.4
 
+- Télécommande, navigateur de la borne : la barre du bas n'a plus que des icônes (Retour, Avancer, Clavier, Plus, Fermer), plus basses, avec leur nom en infobulle et pour les lecteurs d'écran.
+- Télécommande : la bascule Pavé / Miroir devient un bouton-icône de la barre du bas, vert quand le miroir est montré ; la ligne qui lui était réservée disparaît.
+- Télécommande : en-tête sur une seule ligne, marges et écarts réduits, zones sûres de l'écran respectées à gauche et à droite aussi ; le pavé gagne environ 50 pixels de hauteur et le miroir environ 115.
+- Télécommande : un bouton dans l'en-tête masque les barres pour donner tout l'écran au pavé ou au miroir, et une poignée au bas de l'écran les ramène.
 - Quand une partie saccade parce que l'antivirus analyse le code compilé par le script de la table, le journal et le rapport le disent maintenant aussi pour McAfee (mc-sec-plugin-x64.dll, mfe*), Avast et AVG, Bitdefender, Kaspersky, ESET, Malwarebytes et Sophos, et pour tout autre antivirus qui se déclare comme fournisseur AMSI, avec son nom. Avant, seul Defender était reconnu : un à-coup causé par un autre antivirus restait sans explication.
 - Nouveau réglage « Sortie audio en VR » (Menu système > Ma borne > Réalité virtuelle et vision 3D) : tu choisis où sort le son quand tu joues dans le casque. Automatique (comme avant : la sortie audio du casque si Windows en connaît une, sinon la borne), La borne (le son reste toujours sur la sortie de ta configuration), ou n'importe quelle sortie audio de Windows. Cela règle aussi le cas d'un casque, comme un Pimax, dont le périphérique audio n'est pas reconnu : choisis-le dans la liste.
 - Quand aucune sortie de casque n'est reconnue, le journal liste maintenant les sorties audio de Windows vues.

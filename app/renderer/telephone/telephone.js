@@ -63,6 +63,8 @@ for (const [id, tool] of Object.entries(TOOLS)) {
   const reason = document.createElement('span');
   reason.className = 'tool-reason';
   b.replaceChildren(cyberIcon(tool.icon), span, reason);
+  // Icône seule (telephone.css cache le texte) : le libellé reste dans le nom accessible et en infobulle.
+  b.title = span.textContent;
 }
 $('key-backspace').replaceChildren(cyberIcon('backspace'));
 

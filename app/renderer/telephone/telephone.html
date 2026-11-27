@@ -41,6 +41,8 @@
       <!-- Le volume de la borne (telephone-volume.js), dans tous les modes : menu, partie, applications. -->
       <button type="button" class="top-volume" id="top-volume" aria-controls="volume" aria-expanded="false"></button>
       <button type="button" class="top-more" id="top-more" aria-controls="sheet" aria-haspopup="dialog"></button>
+      <!-- Au navigateur : masque les barres pour donner tout l'écran au pavé ou au miroir (telephone-immersif.js). -->
+      <button type="button" class="top-immersive" id="top-immersive" aria-pressed="false"></button>
     </header>
     <!-- La réglette du volume, sous la barre du haut : Volume −, le niveau, Volume +, Muet. -->
     <section class="volume" id="volume" role="group" hidden>
@@ -241,11 +243,7 @@
         </section>
       </div>
       <!-- Miroir du navigateur (telephone-miroir.js) : offert quand la fenêtre d'Edge de la borne se capture ;
-           « Pavé » reste le réglage de départ. -->
-      <div class="mirror-seg" id="mirror-seg" role="group">
-        <button type="button" class="seg-tab" id="mirror-tab-pad" aria-selected="true" data-i18n>Pavé</button>
-        <button type="button" class="seg-tab" id="mirror-tab-mirror" aria-selected="false" data-i18n>Miroir</button>
-      </div>
+           le pavé reste le réglage de départ, le bouton « Miroir » de la barre du bas bascule de l'un à l'autre. -->
       <div class="mirror" id="mirror">
         <canvas class="mirror-canvas" id="mirror-canvas" width="1" height="1"></canvas>
         <!-- Aucun texte pendant le miroir : un point qui pulse tant que la première image n'est pas là. -->
@@ -317,11 +315,16 @@
     <nav class="tools" id="tools">
       <button type="button" class="tool" id="nav-back"></button>
       <button type="button" class="tool" id="nav-forward"></button>
+      <!-- Pavé ↔ Miroir (telephone-miroir.js) : seulement quand la fenêtre d'Edge se capture. -->
+      <button type="button" class="tool" id="nav-mirror" aria-pressed="false"></button>
       <button type="button" class="tool" id="nav-keyboard" aria-controls="keys"></button>
       <button type="button" class="tool" id="nav-send"></button>
       <button type="button" class="tool" id="nav-more" aria-controls="sheet" aria-haspopup="dialog"></button>
       <button type="button" class="tool danger" id="nav-close"></button>
     </nav>
+
+    <!-- Barres masquées : la poignée au bas de l'écran les ramène. -->
+    <button type="button" class="immersive-handle" id="immersive-handle"></button>
 
     <div class="sheet" id="sheet" hidden>
       <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
@@ -353,6 +356,7 @@
     <script src="telephone-retour.js"></script>
     <script src="telephone-plein-ecran.js"></script>
     <script src="telephone-miroir.js"></script>
+    <script src="telephone-immersif.js"></script>
     <script src="telephone.js"></script>
   </body>
 </html>

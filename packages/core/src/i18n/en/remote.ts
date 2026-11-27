@@ -30,8 +30,10 @@ export const messages: Record<string, string> = {
   'Deux doigts pour défiler': 'Two fingers to scroll',
   'Appui long pour le clic droit': 'Long press to right-click',
   // Miroir du navigateur (telephone-miroir.js)
-  Pavé: 'Pad',
   Miroir: 'Mirror',
+  // Mode immersif, au navigateur (telephone-immersif.js)
+  'Masquer les barres': 'Hide the bars',
+  'Afficher les barres': 'Show the bars',
   "La borne n'arrive pas à capturer la fenêtre. Reviens au pavé.": "The cabinet can't capture the window. Go back to the pad.",
   Masquer: 'Hide',
   'Champ suivant': 'Next field',

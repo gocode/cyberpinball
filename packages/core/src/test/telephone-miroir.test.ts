@@ -448,8 +448,10 @@ test('page du téléphone : le module du miroir est servi, et chargé avant tele
 
 test('page du téléphone : le pavé reste, le miroir est une option à côté', () => {
   assert.match(phonePage, /id="pad"/, 'le pavé tactile est toujours là');
-  assert.match(phonePage, /id="mirror-tab-pad"[^>]*>Pavé</, 'bouton Pavé');
-  assert.match(phonePage, /id="mirror-tab-mirror"[^>]*>Miroir</, 'bouton Miroir');
+  // La bascule est un bouton-icône de la barre d'outils du bas (plus de barre Pavé / Miroir), enfoncé quand le miroir est montré.
+  assert.match(phonePage, /<nav class="tools" id="tools">[\s\S]*id="nav-mirror" aria-pressed="false"/, "bouton Miroir dans la barre d'outils");
+  assert.equal(/mirror-seg|mirror-tab-/.test(phonePage), false, 'plus de barre Pavé / Miroir');
+  assert.match(phoneMirror, /mirrorToggle\.addEventListener\('click', \(\) => mirrorChoose\(!mirror\.choice\)\)/);
   // Le choix se retient pour la session de la télécommande seulement.
   assert.match(phoneMirror, /sessionStorage/);
   assert.equal(/localStorage/.test(phoneMirror), false, 'le choix ne survit pas à la session');
@@ -493,14 +495,16 @@ function loadMirrorPage(area: { width: number; height: number }, frameSize: { wi
   const locks: string[] = [];
   const context2d = { clearRect: () => undefined, setTransform: () => calls.push('setTransform'), translate: () => calls.push('translate'), rotate: () => calls.push('rotate'), drawImage: () => calls.push('drawImage') };
   const canvas = { width: 1, height: 1, getContext: () => context2d, addEventListener: () => undefined };
-  const tab = { setAttribute: () => undefined, addEventListener: () => undefined };
-  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'mirror-tab-pad': tab, 'mirror-tab-mirror': tab };
+  const tab = { setAttribute: () => undefined, addEventListener: () => undefined, replaceChildren: () => undefined };
+  const elements: Record<string, unknown> = { mirror: view, 'mirror-canvas': canvas, 'nav-mirror': tab };
   const sandbox: Record<string, unknown> = {
-    document: { getElementById: (id: string) => elements[id], addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
+    document: { getElementById: (id: string) => elements[id], createElement: () => ({}), addEventListener: () => undefined, hidden: false, body: { dataset: {} } },
     window: { devicePixelRatio: 1, addEventListener: () => undefined },
     sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
     screen: { orientation: { lock: (o: string) => (locks.push(o), Promise.resolve()), unlock: () => locks.push('unlock') } },
     navigator: {},
+    t: (s: string) => s,
+    cyberIcon: () => ({}),
     atob: (s: string) => Buffer.from(s, 'base64').toString('binary'),
     Blob,
     Uint8Array,

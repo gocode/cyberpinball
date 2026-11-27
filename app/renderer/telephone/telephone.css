@@ -25,7 +25,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+  padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   gap: 10px;
   background: var(--fond-ambiance);
   user-select: none;
@@ -241,7 +241,7 @@ body:not([data-state='paired']) .top-volume {
   display: none;
 }
 
-/* Au navigateur : la barre d'outils en bas a déjà Clavier et Plus. */
+/* Au navigateur : la barre d'outils en bas a déjà Clavier et Plus (et, à sa place ici, le mode immersif). */
 body[data-mode='browser'] .top-more,
 body:not([data-state='paired']) .top-more {
   display: none;
@@ -418,22 +418,7 @@ body.typing .pad-hint {
 /* --- Miroir du navigateur : l'image de la fenêtre d'Edge, à toucher comme sur un téléphone ---
    body[data-miroir] : none (pas de miroir possible), off (« Pavé »), on (« Miroir »). */
 
-/* Une classe à lui (pas « seg ») : les règles des vues Scores, Messages et Amis ne doivent pas l'afficher. */
-.mirror-seg {
-  display: none;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  flex-shrink: 0;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
-  background: var(--surface-sunken);
-}
-
-body:not([data-miroir='none'])[data-miroir] .mirror-seg {
-  display: grid;
-}
-
+/* La bascule Pavé ↔ Miroir est le bouton #nav-mirror de la barre d'outils (plus bas). */
 .mirror {
   position: relative;
   flex: 1;
@@ -451,13 +436,14 @@ body:not([data-miroir='none'])[data-miroir] .mirror-seg {
 
 body[data-miroir='on'] .mirror {
   display: block;
+  /* Pas de bordure qui mange la place ni fausse le calcul des appuis (telephone-miroir.js lit le rectangle de la vue
+     et dessine l'image dans son cadre intérieur) : le contour est une ombre, hors de la boîte. */
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 body[data-miroir='on'] .pad {
-  display: none;
-}
-
-body.typing[data-miroir] .mirror-seg {
   display: none;
 }
 
@@ -2750,9 +2736,11 @@ body[data-panel='keys'] .upload {
 
 /* --- Barre d'outils --- */
 
+/* Des icônes seules, sur autant de colonnes que de boutons visibles (le bouton Miroir n'est là que si la fenêtre se capture). */
 .tools {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 6px;
 }
 
@@ -2762,6 +2750,7 @@ body:not([data-mode='browser']) .tools {
 }
 
 body[data-mode='browser'] #nav-send,
+body:not([data-miroir='on']):not([data-miroir='off']) #nav-mirror,
 body:not([data-mode='browser']) #nav-back,
 body:not([data-mode='browser']) #nav-forward,
 body:not([data-mode='browser']) #nav-close,
@@ -2777,8 +2766,8 @@ body:not([data-mode='browser']) #key-tab {
   justify-content: center;
   gap: 4px;
   min-width: 0;
-  min-height: 64px;
-  padding: 6px 2px;
+  min-height: 48px;
+  padding: 4px 2px;
   border: 1px solid var(--line-soft);
   border-radius: 14px;
   background: var(--surface);
@@ -2787,17 +2776,25 @@ body:not([data-mode='browser']) #key-tab {
 }
 
 .tool .icon {
-  font-size: 24px;
+  font-size: 26px;
 }
 
+/* Icône seule : le libellé et la raison d'un outil indisponible restent dans le nom accessible (et l'infobulle), jamais à l'écran. */
+.tool-label,
 .tool-reason {
-  font-size: 15px;
-  line-height: 20px;
-  color: var(--ink-muted);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
-.tool-reason:empty {
-  display: none;
+/* La bascule Pavé ↔ Miroir : enfoncée (vert) quand le miroir est montré. */
+.tool[aria-pressed='true'] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal);
 }
 
 body[data-mode='game'] .tool {
@@ -2815,6 +2812,138 @@ body[data-mode='game'] .tool {
 
 body:not([data-state='paired']) .tools {
   visibility: hidden;
+}
+
+/*
+ * --- Au navigateur, liaison acceptée : l'interface se fait toute petite, la place va au pavé ou au miroir ---
+ * Marges et écarts réduits (les zones sûres de l'écran restent respectées), barre du haut sur une seule ligne,
+ * pavé et miroir aux coins moins arrondis. Les autres modes (menu, partie) gardent leur mise en page.
+ */
+
+body[data-mode='browser'][data-state='paired'] {
+  padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  gap: 6px;
+}
+
+body[data-mode='browser'][data-state='paired'] .stage {
+  gap: 6px;
+}
+
+body[data-mode='browser'][data-state='paired'] .top {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0 2px 2px;
+  gap: 4px;
+}
+
+body[data-mode='browser'][data-state='paired'] .top-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+
+/* Titre et adresse de la page sur une seule ligne : le titre d'abord, l'adresse prend ce qui reste. */
+body[data-mode='browser'][data-state='paired'] .page {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+body[data-mode='browser'][data-state='paired'] .page-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 20px;
+}
+
+body[data-mode='browser'][data-state='paired'] .page-host {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+body[data-mode='browser'][data-state='paired'] .link {
+  padding: 0 4px;
+}
+
+body[data-mode='browser'][data-state='paired'] .top-volume,
+body[data-mode='browser'][data-state='paired'] .top-immersive {
+  width: 44px;
+  height: 44px;
+}
+
+body[data-mode='browser'][data-state='paired'] .pad {
+  border-radius: 14px;
+}
+
+body[data-mode='browser'][data-state='paired'] .tool {
+  min-height: 48px;
+}
+
+.tool {
+  position: relative;
+}
+
+/* Le mode immersif (telephone-immersif.js) : un bouton dans la barre du haut, au navigateur seulement. */
+.top-immersive {
+  flex: none;
+  display: none;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-size: 22px;
+}
+
+body[data-mode='browser'][data-state='paired'] .top-immersive {
+  display: grid;
+}
+
+.top-immersive[aria-pressed='true'] {
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+
+/* Barres masquées : tout l'écran au pavé ou au miroir ; la poignée du bas les ramène. */
+body.immersive[data-mode='browser'][data-state='paired'] .top,
+body.immersive[data-mode='browser'][data-state='paired'] .volume,
+body.immersive[data-mode='browser'][data-state='paired'] .tools {
+  display: none;
+}
+
+.immersive-handle {
+  position: fixed;
+  left: 50%;
+  bottom: max(0px, env(safe-area-inset-bottom));
+  z-index: 5;
+  display: none;
+  width: 72px;
+  height: 36px;
+  margin: 0 0 0 -36px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* Le trait visible est discret (une poignée, pas un bouton) ; la zone d'appui est plus large que lui. */
+.immersive-handle::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ink-muted);
+  opacity: 0.7;
+}
+
+body.immersive[data-mode='browser'][data-state='paired'] .immersive-handle {
+  display: block;
 }
 
 /* --- Vue de saisie : le clavier du téléphone prend la place (hauteur visible sous 680 px) --- */

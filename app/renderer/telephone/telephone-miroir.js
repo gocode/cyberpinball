@@ -1,6 +1,6 @@
 // Miroir du navigateur : au téléphone, la fenêtre d'Edge que la borne montre (Applications, connexion
 // YouTube du Juke-box), en images, qu'on touche comme sur un téléphone. C'est une option du pavé
-// tactile, qui reste là : le bouton « Pavé / Miroir » bascule de l'un à l'autre, et le choix se retient
+// tactile, qui reste là : le bouton-icône « Miroir » de la barre du bas bascule de l'un à l'autre, et le choix se retient
 // le temps de la session de la télécommande (sessionStorage).
 //
 // La borne n'envoie rien tant que le miroir n'est pas demandé (message « mirror »). Les images
@@ -60,7 +60,15 @@ function mirrorRemember() {
 const mirrorView = document.getElementById('mirror');
 const mirrorCanvas = document.getElementById('mirror-canvas');
 const mirrorContext = mirrorCanvas.getContext('2d');
-const mirrorTabs = { pad: document.getElementById('mirror-tab-pad'), mirror: document.getElementById('mirror-tab-mirror') };
+/** Le bouton-icône de la barre du bas qui alterne Pavé et Miroir (enfoncé : le miroir est montré). */
+const mirrorToggle = document.getElementById('nav-mirror');
+{
+  const label = document.createElement('span');
+  label.className = 'tool-label';
+  label.textContent = t('Miroir');
+  mirrorToggle.replaceChildren(cyberIcon('monitor'), label);
+  mirrorToggle.title = label.textContent;
+}
 
 /** Le miroir est montré : possible, choisi, au navigateur, liaison acceptée, page visible. */
 function mirrorWanted() {
@@ -91,8 +99,7 @@ function mirrorBox() {
 function mirrorRefresh() {
   const shown = mirror.available && mode === 'browser';
   document.body.dataset.miroir = !shown ? 'none' : mirror.choice ? 'on' : 'off';
-  mirrorTabs.pad.setAttribute('aria-selected', String(!mirror.choice));
-  mirrorTabs.mirror.setAttribute('aria-selected', String(mirror.choice));
+  mirrorToggle.setAttribute('aria-pressed', String(mirror.choice));
   mirrorSync();
 }
 
@@ -159,8 +166,7 @@ function mirrorClear() {
   mirrorContext.clearRect(0, 0, mirrorCanvas.width, mirrorCanvas.height);
 }
 
-mirrorTabs.pad.addEventListener('click', () => mirrorChoose(false));
-mirrorTabs.mirror.addEventListener('click', () => mirrorChoose(true));
+mirrorToggle.addEventListener('click', () => mirrorChoose(!mirror.choice));
 
 // --- Ce que la borne envoie ---------------------------------------------------
 
