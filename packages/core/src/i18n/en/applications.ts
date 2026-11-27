@@ -102,6 +102,8 @@ export const messages: Record<string, string> = {
   'Affichage mobile': 'Mobile display',
   'Le site s’affiche comme sur un téléphone · Start : Non': 'The site shows as on a phone · Start: No',
   'Le site s’affiche comme sur un ordinateur · Start : Oui': 'The site shows as on a computer · Start: Yes',
+  'Zoom de la page': 'Page zoom',
+  'Agrandit le texte du site · Start : {zoom} %': 'Enlarges the site text · Start: {zoom}%',
   'Retirer l’application': 'Remove the application',
   'Elle reste dans le catalogue': 'It stays in the catalog',
   'Son adresse est oubliée': 'Its address is forgotten',

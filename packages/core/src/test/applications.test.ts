@@ -13,10 +13,17 @@ import * as path from 'node:path';
 import {
   addApplication,
   APP_MOBILE_USER_AGENT,
+  APP_ZOOM_DEFAULT,
+  APP_ZOOM_MAX,
+  APP_ZOOM_MIN,
+  APP_ZOOM_STEPS,
   appBrowserArgs,
   appIconDue,
   appIdFor,
   appMobile,
+  appZoom,
+  clampAppZoom,
+  nextAppZoom,
   appInitials,
   appScreenLabel,
   appSite,
@@ -568,4 +575,57 @@ test('affichage mobile : oui sur le playfield, non sur le fronton sans choix ; l
   assert.ok(appBrowserArgs('p', at, 'https://a.example.com/', true).includes(`--user-agent=${APP_MOBILE_USER_AGENT}`));
   assert.equal(appBrowserArgs('p', at, 'https://a.example.com/', false).some((a) => a.startsWith('--user-agent')), false);
   assert.match(APP_MOBILE_USER_AGENT, /Android[\s\S]*Mobile/);
+});
+
+test('zoom de la page : 200 % d\'office, borné de 100 à 300, écrit seulement quand on le change ; Edge reçoit le facteur d\'échelle, jamais un port de débogage', () => {
+  const base = { id: 'ok', name: 'Fictive', url: 'https://fictive.example.com/', screen: 'playfield' as const, color: '#112233', added: 'x' };
+  assert.equal(APP_ZOOM_DEFAULT, 200);
+  assert.equal(appZoom(base), 200, 'sans choix : la valeur d\'office');
+  assert.equal(appZoom({ zoom: 150 }), 150);
+  assert.equal(appZoom({ zoom: 20 }), 100, 'borné en bas');
+  assert.equal(appZoom({ zoom: 900 }), 300, 'borné en haut');
+  assert.equal(clampAppZoom(137.6), 138);
+  // Les pas : tous dans la plage, le zoom d'office parmi eux, retour au plus petit après le plus grand, un zoom écrit à la main passe au pas du dessus.
+  assert.ok(APP_ZOOM_STEPS.every((s) => s >= APP_ZOOM_MIN && s <= APP_ZOOM_MAX) && APP_ZOOM_STEPS.includes(APP_ZOOM_DEFAULT));
+  assert.equal(nextAppZoom(200), 250);
+  assert.equal(nextAppZoom(300), 100);
+  assert.equal(nextAppZoom(180), 200);
+  // Une liste écrite avant l'option reste sans zoom ; le réglage s'écrit, se relit et résiste à une valeur absurde.
+  const dir = tmp();
+  saveApplications(dir, { apps: [base, { ...base, id: 'deux', url: 'https://deux.example.com/', zoom: 125 }, { ...base, id: 'trois', url: 'https://trois.example.com/', zoom: 5000 }] });
+  const loaded = loadApplications(dir);
+  assert.equal('zoom' in loaded.apps[0]!, false, 'sans choix, rien n\'est écrit');
+  assert.deepEqual(loaded.apps.map((a) => appZoom(a)), [200, 125, 300]);
+  assert.equal(updateApplication(loaded, 'ok', { zoom: 250 }).apps[0]!.zoom, 250);
+  // Les arguments d'Edge : 200 % = facteur 2 ; 100 % ne change rien ; le miroir du téléphone reste sans port de débogage.
+  const at = { x: 0, y: 0, width: 2160, height: 3840 };
+  const args = (zoom?: number) => appBrowserArgs('p', at, 'https://a.example.com/', true, zoom);
+  assert.ok(args(200).includes('--force-device-scale-factor=2'));
+  assert.ok(args(150).includes('--force-device-scale-factor=1.5'));
+  assert.equal(args(100).some((a) => a.includes('scale-factor')), false, '100 % : rien d\'imposé');
+  assert.equal(args().some((a) => a.includes('scale-factor')), false, 'sans zoom donné (connexion YouTube, essais) : rien d\'imposé');
+  assert.ok(args(9999).includes('--force-device-scale-factor=3'), 'valeur absurde ramenée à la plage');
+  assert.equal(args(200).some((a) => /remote-debugging|enable-automation/.test(a)), false);
+  assert.ok(args(200).includes('--start-fullscreen') && args(200).includes('--app=https://a.example.com/'));
+});
+
+test('réglage Zoom de la page : ligne des réglages de l\'application, 200 % d\'office, Start passe au pas suivant et le choix se retient', () => {
+  const dir = tmp();
+  const m = makeMenu({ dataDir: dir });
+  m.top().keys(key('keyDown', 'ShiftLeft'));
+  const zoom = () => m.top().actions.find((a: any) => a.key === 'zoom');
+  assert.equal(zoom().label, 'Zoom de la page');
+  assert.equal(zoom().activeChoice, '200 %');
+  assert.match(zoom().detail, /Start : 250 %/);
+  zoom().run();
+  assert.equal(zoom().activeChoice, '250 %');
+  zoom().run();
+  assert.equal(zoom().activeChoice, '300 %');
+  zoom().run();
+  assert.equal(zoom().activeChoice, '100 %', 'après 300 %, retour à 100 %');
+  assert.equal(loadApplications(dir).apps[0]!.zoom, 100, 'le choix est écrit dans la liste des applications');
+  // Un autre démarrage de la borne le retrouve ; les autres applications gardent la valeur d'office.
+  const again = loadApplications(dir);
+  assert.equal(appZoom(again.apps[0]!), 100);
+  assert.equal(appZoom(again.apps[1]!), 200);
 });

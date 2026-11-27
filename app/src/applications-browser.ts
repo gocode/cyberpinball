@@ -17,6 +17,7 @@ import {
   JUKEBOX_SEEK_HOLD_MS,
   appBrowserArgs,
   appMobile,
+  appZoom,
   appButtonKey,
   appSeekKeyCount,
   chromeExePaths,
@@ -109,9 +110,9 @@ export function createAppsBrowser(opts: AppsBrowserOptions) {
     current?.finish();
     fs.mkdirSync(profile, { recursive: true });
     // Edge est l'application elle-même : sa fenêtre doit se voir.
-    const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app))], { stdio: 'ignore' }); // fenêtre voulue
+    const child: ChildProcess = spawn(found.exe, [...(opts.argsPrefix ?? []), ...appBrowserArgs(profile, at, app.url, appMobile(app), appZoom(app))], { stdio: 'ignore' }); // fenêtre voulue
     child.once('error', () => undefined);
-    log(`Applications : ${app.name} ouverte dans ${found.kind === 'edge' ? 'Edge' : 'Chrome'} (${Math.round(at.width)} × ${Math.round(at.height)} en ${Math.round(at.x)}, ${Math.round(at.y)})`); // i18n-ignore : journal
+    log(`Applications : ${app.name} ouverte dans ${found.kind === 'edge' ? 'Edge' : 'Chrome'} à ${appZoom(app)} % (${Math.round(at.width)} × ${Math.round(at.height)} en ${Math.round(at.x)}, ${Math.round(at.y)})`); // i18n-ignore : journal
     let win: unknown;
     const exited = new Promise<void>((r) => child.once('exit', () => r()));
     const shown = (async () => {

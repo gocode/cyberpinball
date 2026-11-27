@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Applications : le navigateur de la borne (Edge) ouvre désormais chaque site à 200 % de zoom, pour que les textes se lisent sur le grand écran du playfield. Nouveau réglage « Zoom de la page » dans les réglages de chaque application (Start maintenu 1 s sur sa tuile) : Start passe de 100 % à 300 % par pas (100, 125, 150, 175, 200, 250, 300) ; le choix se retient pour l'application. Le miroir du téléphone n'est pas touché.
 - Télécommande, navigateur de la borne : le choix Pavé / Miroir redevient évident, avec deux boutons-icônes côte à côte dans la barre du bas (un pavé tactile, un écran) ; celui du mode montré est vert, et un appui sur le pavé en revient toujours.
 - Un bouton de manette lié à Extra Ball (ou la touche F12) n'arrête plus la partie : il ouvrait l'aide de débogage des tables à ROM de `core.vbs` ("Click YES to Add a ball to the Trough…"), que Cyber Pinball traitait comme une erreur fatale. Elle est maintenant fermée par Annuler, sans effet sur la table, et une ligne du journal t'explique ce qui s'est passé. Les autres questions des tables restent fatales, et Cyber Pinball ne répond jamais Oui ni Non à ta place.
 - Télécommande, navigateur de la borne : la barre du bas n'a plus que des icônes (Retour, Avancer, Clavier, Plus, Fermer), plus basses, avec leur nom en infobulle et pour les lecteurs d'écran.

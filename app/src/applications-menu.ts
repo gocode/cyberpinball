@@ -21,6 +21,8 @@ import {
   appIconDue,
   appInitials,
   appMobile,
+  appZoom,
+  nextAppZoom,
   appScreenLabel,
   appSite,
   appsBrowserMissingText,
@@ -592,6 +594,14 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
             icon: 'phone',
             key: 'mobile',
             run: () => (save(updateApplication(store, id, { mobile: !appMobile(a) })), host.library.openCustom(build)),
+          },
+          {
+            label: t('Zoom de la page'),
+            activeChoice: `${appZoom(a)} %`,
+            detail: t('Agrandit le texte du site · Start : {zoom} %', { zoom: nextAppZoom(appZoom(a)) }),
+            icon: 'search',
+            key: 'zoom',
+            run: () => (save(updateApplication(store, id, { zoom: nextAppZoom(appZoom(a)) })), host.library.openCustom(build)),
           },
           {
             label: t('Nom'),

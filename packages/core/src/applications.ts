@@ -44,6 +44,8 @@ export interface AppEntry {
    * dans un sens comme dans l'autre (appMobile).
    */
   mobile?: boolean;
+  /** Zoom de la page, en pourcents (APP_ZOOM_MIN à APP_ZOOM_MAX) ; absent : APP_ZOOM_DEFAULT (appZoom). */
+  zoom?: number;
   /** Teinte de la tuile composée (#rrggbb), et du halo de l'icône. */
   color: string;
   /** Fichier de l'icône relevée sur le site, dans APPLICATIONS_ICON_DIR ; absent : tuile composée. */
@@ -471,6 +473,7 @@ function cleanApp(v: unknown): AppEntry | undefined {
     url,
     screen: APP_SCREENS.includes(r.screen as AppScreen) ? (r.screen as AppScreen) : 'backglass',
     ...(typeof r.mobile === 'boolean' ? { mobile: r.mobile } : {}),
+    ...(typeof r.zoom === 'number' && Number.isFinite(r.zoom) ? { zoom: clampAppZoom(r.zoom) } : {}),
     color: cleanColor(r.color) ?? appColorFor(name),
     // Un nom de fichier seul : jamais un chemin qui sortirait du dossier des icônes.
     ...(icon && /^[a-z0-9-]+\.(png|jpg|webp|gif)$/.test(icon) ? { icon } : {}),
@@ -563,17 +566,43 @@ export function appMobile(app: Pick<AppEntry, 'mobile' | 'screen'>): boolean {
   return app.mobile ?? app.screen === 'playfield';
 }
 
+/** Zoom de la page d'une application (pourcents) : les bornes, la valeur d'office (27/11/2026 : sur le playfield, les textes étaient trop petits) et les pas du réglage. */
+export const APP_ZOOM_MIN = 100;
+export const APP_ZOOM_MAX = 300;
+export const APP_ZOOM_DEFAULT = 200;
+export const APP_ZOOM_STEPS: readonly number[] = [100, 125, 150, 175, 200, 250, 300];
+
+/** Un zoom ramené à un entier entre APP_ZOOM_MIN et APP_ZOOM_MAX (un fichier écrit à la main reste utilisable). */
+export function clampAppZoom(percent: number): number {
+  return Math.min(APP_ZOOM_MAX, Math.max(APP_ZOOM_MIN, Math.round(percent)));
+}
+
+/** Zoom de l'application, en pourcents : celui qu'elle a gardé, sinon APP_ZOOM_DEFAULT. */
+export function appZoom(app: Partial<AppEntry>): number {
+  return clampAppZoom(app.zoom ?? APP_ZOOM_DEFAULT);
+}
+
+/** Le pas suivant du réglage (au-dessus du zoom donné), puis retour au plus petit après le plus grand. */
+export function nextAppZoom(percent: number): number {
+  return APP_ZOOM_STEPS.find((s) => s > percent) ?? APP_ZOOM_STEPS[0]!;
+}
+
 /**
  * Edge (ou Chrome) d'une application : fenêtre d'application (ni barre d'adresse ni onglets), posée
  * sur l'écran voulu puis en plein écran, lecture automatique permise (la télécommande n'est pas un
- * clic de souris). Aucun port de débogage.
+ * clic de souris). Aucun port de débogage. `zoom` (pourcents) : le facteur d'échelle d'affichage de
+ * Chromium (--force-device-scale-factor), qui agrandit la page comme le zoom du navigateur sans rien
+ * piloter dans Edge ; 100 : rien n'est imposé. Le miroir du téléphone n'en est pas touché : il capture
+ * et mesure des pixels d'écran.
  */
-export function appBrowserArgs(profile: string, at: ScreenRect, url: string, mobile = false): string[] {
+export function appBrowserArgs(profile: string, at: ScreenRect, url: string, mobile = false, zoom = 100): string[] {
+  const scale = clampAppZoom(zoom) / 100;
   return [
     `--user-data-dir=${profile}`,
     ...EDGE_QUIET_ARGS,
     '--autoplay-policy=no-user-gesture-required',
     ...(mobile ? [`--user-agent=${APP_MOBILE_USER_AGENT}`] : []),
+    ...(scale === 1 ? [] : [`--force-device-scale-factor=${scale}`]),
     `--window-position=${Math.round(at.x)},${Math.round(at.y)}`,
     `--window-size=${Math.max(1, Math.round(at.width))},${Math.max(1, Math.round(at.height))}`,
     '--start-fullscreen',

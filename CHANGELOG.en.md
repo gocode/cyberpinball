@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Applications: the cabinet's browser (Edge) now opens every site at 200% zoom, so text is readable on the large playfield screen. New "Page zoom" setting in each application's settings (hold Start for 1 s on its tile): Start steps from 100% to 300% (100, 125, 150, 175, 200, 250, 300), and the choice is remembered per application. The phone mirror is unaffected.
 - Remote, cabinet browser: the Pad / Mirror choice is obvious again, with two icon buttons side by side in the bottom bar (a touchpad, a screen); the one for the mode shown is green, and tapping the pad always goes back to it.
 - A controller button bound to Extra Ball (or the F12 key) no longer stops the game: it opened the `core.vbs` debug helper of ROM tables ("Click YES to Add a ball to the Trough…"), which Cyber Pinball treated as a fatal error. It is now closed with Cancel, with no effect on the table, and a log line tells you what happened. Other table questions stay fatal, and Cyber Pinball never answers Yes or No for you.
 - Remote, cabinet browser: the bottom bar is now icons only (Back, Forward, Keyboard, More, Close), lower, with their name as a tooltip and for screen readers.
