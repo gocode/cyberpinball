@@ -103,6 +103,38 @@ test('boutons Pavé et Miroir : chacun choisit son mode, et l\'état enfoncé su
   assert.ok(sent.some((m) => m.t === 'mirror' && m.on === false), 'retour au pavé : la borne s\'arrête');
 });
 
+test("pavé : le rappel de la bascule vers le miroir n'apparaît que lorsque le miroir est possible, avec l'icône du bouton", () => {
+  assert.match(html, /<div class="pad-hint-mirror" id="pad-hint-mirror"><\/div>/);
+  assert.match(css, /\.pad-hint-mirror \{\s*display: none;/);
+  assert.match(css, /body\[data-miroir='off'\] \.pad-hint-mirror \{\s*display: flex;/);
+  const hint = { children: [] as unknown[], replaceChildren: (...n: unknown[]) => void (hint.children = n) };
+  const context = vm.createContext({
+    document: {
+      getElementById: (id: string) =>
+        id === 'pad-hint-mirror' ? hint : id === 'mirror-canvas' ? { getContext: () => ({}), addEventListener: () => undefined } : { ...fakeElement(), classList: { add: () => undefined, remove: () => undefined, toggle: () => undefined } },
+      createElement: () => ({}),
+      addEventListener: () => undefined,
+      hidden: false,
+      body: { dataset: {} },
+    },
+    window: { devicePixelRatio: 1, addEventListener: () => undefined },
+    sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    screen: {},
+    navigator: {},
+    t: (s: string) => s,
+    cyberIcon: (name: string) => ({ icon: name }),
+    Math,
+    clearTimeout,
+    setTimeout,
+    mode: 'browser',
+    state: 'paired',
+    send: () => true,
+  });
+  vm.runInContext(read('telephone-miroir.js'), context);
+  assert.deepEqual(hint.children[0], { icon: 'monitor' }, 'la même icône que le bouton Miroir');
+  assert.equal(hint.children[1], "Touche l'icône écran en bas pour voir l'écran de la borne");
+});
+
 test('en-tête et marges : réduits au navigateur, zones sûres respectées, miroir sans bordure qui fausserait les appuis', () => {
   const compact = css.slice(css.indexOf('Au navigateur, liaison acceptée'));
   assert.match(compact, /body\[data-mode='browser'\]\[data-state='paired'\] \{\s*padding: max\(4px, env\(safe-area-inset-top\)\) max\(6px, env\(safe-area-inset-right\)\) max\(6px, env\(safe-area-inset-bottom\)\) max\(6px, env\(safe-area-inset-left\)\);/);

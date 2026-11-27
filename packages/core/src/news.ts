@@ -115,7 +115,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Ma borne › DMD et LED › LED et retours (DOF) › Animations des LED'); },
     reach: { kind: 'system', id: 'dof' },
-    noPreview: 'Une animation de LED se voit sur les bandes de la borne, pas à l’écran : aucune capture ne la montre sans matériel réel.', // i18n-ignore : raison interne, jamais affichée
   },
   {
     // Recherche dans le Menu système (24/11/2026) ; « La Communauté » (0.1.11) sort de la liste pour

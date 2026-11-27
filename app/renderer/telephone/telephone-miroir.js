@@ -73,6 +73,9 @@ function mirrorToolButton(button, icon, text) {
 }
 mirrorToolButton(padToggle, cyberIcon('touchpad'), t('Pavé tactile'));
 mirrorToolButton(mirrorToggle, cyberIcon('monitor'), t('Miroir'));
+/** Rappel dans le pavé, avec la même icône que le bouton ; la feuille de style ne le montre que si le miroir est possible. */
+const padHintMirror = document.getElementById('pad-hint-mirror');
+if (padHintMirror) padHintMirror.replaceChildren(cyberIcon('monitor'), t("Touche l'icône écran en bas pour voir l'écran de la borne"));
 
 /** Le miroir est montré : possible, choisi, au navigateur, liaison acceptée, page visible. */
 function mirrorWanted() {

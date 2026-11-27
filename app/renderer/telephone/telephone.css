@@ -409,6 +409,25 @@ body:not([data-state='paired']) .page-host {
   color: var(--ink);
 }
 
+/* Rappel de la bascule vers le miroir : seulement quand elle est possible (miroir disponible, pavé montré). */
+.pad-hint-mirror {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--signal);
+}
+
+body[data-miroir='off'] .pad-hint-mirror {
+  display: flex;
+}
+
+.pad-hint-mirror .icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
 /* Pendant le geste et la saisie, l'aide s'efface : le regard est sur la borne. */
 .pad.touching .pad-hint,
 body.typing .pad-hint {
