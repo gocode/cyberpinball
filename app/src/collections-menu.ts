@@ -437,7 +437,11 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
   function current(): Collection<TableEntry> {
     const all = list();
     const forced = host.guestCollection();
-    const wanted = findCollection(all, forced ?? active);
+    if (forced) {
+      const locked = all.find((c) => c.id === forced);
+      return locked ?? { ...all[0]!, label: t('Collection imposée en mode invité'), tables: [] };
+    }
+    const wanted = findCollection(all, active);
     // Une collection devenue vide (dernier favori retiré, ami parti) : Toutes, jusqu'à ce qu'on en change.
     return wanted.tables.length ? wanted : all[0]!;
   }

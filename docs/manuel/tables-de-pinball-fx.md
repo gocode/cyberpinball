@@ -88,3 +88,38 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Le script d'une table n'est lu que dans un `.vpx` (`app/src/vbs.ts`) : une fiche n'a ni ROM ni PuP-Pack.
   Tests : `pinballfx.test.ts`, `pinballfx-launcher.test.ts` (système simulé), `pinballfx-cabinet.test.ts`, `gamescreens.test.ts`.
   Démonstration interne hors écran avec un faux Steam (`CYBERPINBALL_STEAM_SIMULE`).
+
+## Choisir le nombre de joueurs
+
+Sur la fiche d’une table de Pinball FX ou Pinball FX Midnight, choisir **Jouer**.
+Utiliser les flippers gauche et droit pour choisir **1, 2, 3 ou 4 joueurs**, puis appuyer sur **Start**.
+**Exit** revient à la fiche.
+Au clavier, utiliser les flèches, Entrée et Échap.
+Les joueurs jouent à tour de rôle sur la même borne.
+En cours de partie, un appui long sur Exit ferme le jeu et ramène à la roue de Cyber Pinball.
+
+Les deux jeux documentent `Classic` pour un joueur et `Hotseat_2`, `Hotseat_3` et `Hotseat_4` pour deux à quatre joueurs.
+Dans Pinball FX, **Autres modes** donne accès à l’entraînement, au mode Pro des tables Williams et Bally et aux quatre défis solo existants.
+Table surprise et les autres lancements directs utilisent Classic.
+[Paramètres de lancement de Pinball FX](https://www.pinballfx.com/?page_id=7754) · [Paramètres de lancement de Pinball FX Midnight](https://steamcommunity.com/app/2337640/discussions/0/4040354495827792021/?ctp=4)
+
+## Ajouter Pinball FX Midnight
+
+1. Installer Pinball FX Midnight (anciennement Pinball M) via Steam.
+   Ouvrir **Cabinet Support** dans le jeu pour y régler les écrans.
+   Cyber Pinball détecte l’installation Steam, y compris dans une bibliothèque secondaire.
+   Les réglages d’affichage de Midnight se font dans le jeu.
+2. Dans Cyber Pinball, ouvrir **Menu système → Tables → Ajouter une table → Tables de Pinball FX Midnight**.
+   Choisir une table de la liste ou **Ajouter par numéro de table** et saisir le numéro utilisé par Midnight.
+   La liste propose quelques identifiants connus.
+   Steam gère les contenus et les licences.
+   Si la table est indisponible sur le compte, le jeu peut s’ouvrir sur son écran d’accueil.
+3. Ajouter les médias utilisés avec la table via **Médias du jeu**, puis ranger la table dans ses collections.
+   En mode Invité, une collection verrouillée limite les tables que l’on peut lancer.
+   Pour Table surprise, utiliser les exclusions de collections existantes.
+   Le sélecteur agit uniquement sur les arguments de lancement de la partie.
+
+Midnight et Pinball FX ont des fiches distinctes, même si un numéro existe dans les deux jeux.
+Midnight utilise `steam.exe -applaunch 2337640 -Table <numéro> -GameMode <mode>`.
+Sa fiche est un fichier `.pinballfxmidnight` contenant `{ "PinballFXMidnight": { "Table": 171 } }`.
+Une ancienne fiche `.pinballfx` qui contient une clé `PinballFXMidnight` est reconnue à son emplacement actuel.

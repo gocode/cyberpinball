@@ -201,3 +201,24 @@ test('mes collections : créer, nommer, remplir, renommer, supprimer ; gardées 
   assert.deepEqual(loadCollections(dir), { active: 'all', mine: [{ id: 'mine:bon', name: 'Bon', tables: ['A/a.vpx'] }] });
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('collection verrouillée en mode invité : une liste vide ou absente ne montre aucune table Midnight', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-midnight-collection-'));
+  try {
+    const entry = { ...table('Demo'), id: 'Demo/Demo.pinballfxmidnight', emulator: 'pinballfxmidnight' };
+    const { createCollectionsMenu } = require(path.join(__dirname, '../../../../app/dist/collections-menu.js')) as {
+      createCollectionsMenu(host: unknown): { current(): { tables: TableEntry[] }; exact(): { tables: TableEntry[] } | undefined };
+    };
+    let locked = 'mine:empty';
+    const settings: CollectionsSettings = { active: 'all', mine: [{ id: 'mine:empty', name: 'Empty', tables: [] }, { id: 'mine:full', name: 'Full', tables: [entry.id] }] };
+    saveCollections(home, settings);
+    const menu = createCollectionsMenu({ dataDir: home, tables: () => [entry], guestCollection: () => locked });
+    assert.deepEqual(menu.current().tables, []);
+    locked = 'mine:missing';
+    assert.deepEqual(menu.current().tables, []);
+    assert.equal(menu.exact(), undefined);
+    locked = 'mine:full';
+    assert.deepEqual(menu.current().tables, [entry]);
+    assert.deepEqual(loadCollections(home), settings);
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+});

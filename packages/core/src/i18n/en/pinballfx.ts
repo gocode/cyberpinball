@@ -3,6 +3,23 @@
 // Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
   // app/src/frontend.ts
+  'Mode de jeu': 'Game mode',
+  'Ce mode de jeu n’est pas disponible dans {game}.': 'This game mode is unavailable in {game}.',
+  '1 joueur': '1 player',
+  '{count} joueurs': '{count} players',
+  'Autres modes': 'Other modes',
+  'Entraînement': 'Practice',
+  'Défi · Billes limitées': 'Challenge · Limited balls',
+  'Défi · Temps limité': 'Challenge · Time limit',
+  'Défi · Distance limitée': 'Challenge · Distance limit',
+  'Défi · Coups de flipper limités': 'Challenge · Limited flips',
+  'Retour au choix des joueurs': 'Back to player selection',
+  '{game}, table n° {n}': '{game}, table #{n}',
+  'Ajouter par numéro de table': 'Add by table number',
+  'Numéro de table Steam': 'Steam table number',
+  'Le numéro de table doit être un entier positif.': 'The table number must be a positive integer.',
+  'Entre le numéro de table utilisé par Pinball FX Midnight.': 'Enter the table number used by Pinball FX Midnight.',
+  'Start ajoute une table ou ouvre sa fiche. Choisis une table que tu possèdes sur Steam et règle les écrans dans le mode borne du jeu.': 'Start adds a table or opens its game page. Choose a table you own on Steam and set up your screens in the game’s cabinet mode.',
   'Le cadrage d’une table de {game} se règle dans le jeu (mode borne).': 'A {game} table’s framing is set in the game (cabinet mode).',
   'La fiche de cette table ne dit pas quelle table de {game} ouvrir.': 'This table’s entry doesn’t say which {game} table to open.',
   '{game} n’est pas installé sur ce PC. Menu système > Tables > Ajouter une table > « Installer {game} ».': '{game} isn’t installed on this PC. System menu > Tables > Add a table > "Install {game}".',

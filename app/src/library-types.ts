@@ -108,7 +108,7 @@ export interface LibraryHost {
   enter(): void;
   /** Retour au menu. */
   leave(): void;
-  play(table: TableEntry): void;
+  play(table: TableEntry, fxGameMode?: import('@cyberpinball/core').PinballFxGameMode): void;
   /** Réglages de VPX propres à cette table (écran des réglages, settings.ts). */
   tableSettings?(table: TableEntry): void;
   /** Volume de la ROM de la table (rom-volume.ts) : la fiche le dit, le médecin le signale bas. */
@@ -169,6 +169,8 @@ export interface LibraryHost {
   quit(): void;
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
+  /** Flippers, Start et Exit du jeu pour le sélecteur local, même si le menu a ses propres boutons. */
+  playerModeKeys?(): NavigationKeys;
   /** Touches qui basculent entre la liste de contenu d'un écran et ses actions : les MagnaSave, F6 (zoneSwitchKeys). */
   zoneKeys?(): string[];
   windows(): Map<RoleId, BrowserWindow>;
@@ -523,6 +525,7 @@ export interface Action {
    */
   sends?: true | 'confirmation';
   run: () => void | Promise<void>;
+  runFromPhone?: () => void | Promise<void>;
 }
 
 /** Action de la fiche : chacune déclare sa porte, ouverte ou fermée à l'invité (le compilateur l'exige). */
@@ -815,13 +818,14 @@ export type Screen =
   | { kind: 'notice'; heading: string; lines: string[]; then: () => void; table?: string }
   /** Écran décrit hors de la gestion des tables (configurations de la borne), recalculé à chaque affichage. */
   | { kind: 'custom'; build: () => Built; table?: string }
+  | { kind: 'pinballFxModes'; build: () => Built; file: string }
   /** Saisie d'un texte au clavier à l'écran ; `done` reçoit undefined à l'annulation. */
   | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string; onInput?: (active: boolean) => void; live?: PromptLive };
 
 export type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 
 /** Écrans d'une table : son titre est le nom du jeu, sans l'icône de la partie du menu d'où l'on vient. */
-export const TABLE_SCREENS: readonly Screen['kind'][] = ['sheet', 'pupOptions', 'pages', 'scores', 'edit', 'doctor', 'remove'];
+export const TABLE_SCREENS: readonly Screen['kind'][] = ['sheet', 'pupOptions', 'pages', 'scores', 'edit', 'doctor', 'remove', 'pinballFxModes'];
 
 /**
  * Table dont parle un écran : les écrans de la borne gardent ses médias (screensTable de
@@ -836,8 +840,8 @@ export function tableOf(s: Screen | undefined): string | undefined {
   return undefined;
 }
 
-/** Écrans ouverts à l'invité, par leur porte : la fiche, le prospectus et les règles, le tableau des scores. Tout autre écran est fermé. */
-export const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores' };
+/** Écrans ouverts à l'invité, par leur porte : la fiche, le prospectus et les règles, le tableau des scores et le choix du nombre de joueurs. Tout autre écran est fermé. */
+export const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores', pinballFxModes: 'sheet.play' };
 
 export type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 export type PagesScreen = Extract<Screen, { kind: 'pages' }>;
