@@ -33,6 +33,8 @@ export type NewsReach =
   | { kind: 'jukebox' }
   /** La grille des Applications. */
   | { kind: 'applications' }
+  /** L'écran « Tables de Pinball FX Midnight » (Menu système › Tables › Ajouter une table). */
+  | { kind: 'midnight' }
   /** La roue, et un tirage de la table surprise tout de suite. */
   | { kind: 'surprise' }
   | { kind: 'sheet'; part: 'credits' | 'scores' | 'rules' | 'pov' };
@@ -63,6 +65,23 @@ export interface NewsItem {
 
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
+  {
+    // Pinball FX Midnight (27/11/2026), contribution d'un joueur sur GitHub ; « Parties en direct »
+    // (0.1.14) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'pinballfx-midnight',
+    date: '2026-11-27',
+    version: '0.2.4',
+    get title() { return t('Pinball FX Midnight sur la roue'); },
+    get detail() { return t('Les tables de Pinball FX Midnight, autre jeu de Zen Studios, lancées depuis la roue, de 1 à 4 joueurs.'); },
+    get more() {
+      return [
+        t('Pinball FX Midnight (anciennement Pinball M) est un jeu à part de Pinball FX, avec ses propres tables (Chucky, Dead by Daylight, The Thing…). Il vient de Steam, qui gère l’accès aux tables.'),
+        t('Cyber Pinball retrouve le jeu, même dans une bibliothèque Steam secondaire. Après Jouer sur la fiche d’une table, choisis 1 à 4 joueurs ; c’est aussi le cas pour Pinball FX.'),
+      ];
+    },
+    get where() { return t('Menu système › Tables › Ajouter une table › Tables de Pinball FX Midnight'); },
+    reach: { kind: 'midnight' },
+  },
   {
     // Applications (26/11/2026) : « Pinball FX sur la roue » (0.1.13) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
@@ -452,21 +471,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Communauté › Mon niveau'); },
     reach: { kind: 'level' },
-  },
-  {
-    id: 'parties-instantanees',
-    date: '2026-11-17',
-    version: '0.1.14',
-    get title() { return t('Parties en direct'); },
-    get detail() { return t('Une partie en direct ouverte à tous, qui part d’elle-même dès qu’elle est complète.'); },
-    get more() {
-      return [
-        t('Choisis une table et le nombre de joueurs, de 2 à 4 : ta partie s’affiche chez tous les joueurs en ligne, et part toute seule dès qu’elle est complète.'),
-        t('Amis ou non, il suffit d’avoir la même version de la table. Tu es prévenu de chaque arrivée, et une partie s’ouvre aussi depuis la fiche d’une table.'),
-      ];
-    },
-    get where() { return t('Communauté › Parties en direct'); },
-    reach: { kind: 'community', door: 'instant' },
   },
 ];
 

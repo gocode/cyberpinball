@@ -3353,6 +3353,9 @@ function newsReach(target: NewsReach, back: () => void): { run?: () => void; gon
       return { run: () => openJukebox() };
     case 'applications':
       return mediaSettings.applications ? { run: () => applicationsMenu.open(back) } : { gone: t('Indisponible : Applications masquées dans la roue (Réglages de la roue)') };
+    // L'écran des tables de Pinball FX Midnight (library.ts, openZen) : son Exit revient au Menu système.
+    case 'midnight':
+      return { run: () => library.openZen('pinballfxmidnight') };
     // Table surprise : retour à la roue et tirage aussitôt, comme les deux flippers tenus.
     case 'surprise':
       return { run: () => { library.leave(); void surprise.start(); } };

@@ -2,6 +2,14 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties en direct, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  // Pinball FX Midnight (27/11/2026)
+  'Pinball FX Midnight sur la roue': 'Pinball FX Midnight on the wheel',
+  'Les tables de Pinball FX Midnight, autre jeu de Zen Studios, lancées depuis la roue, de 1 à 4 joueurs.': 'The tables of Pinball FX Midnight, another Zen Studios game, launched from the wheel, with 1 to 4 players.',
+  'Pinball FX Midnight (anciennement Pinball M) est un jeu à part de Pinball FX, avec ses propres tables (Chucky, Dead by Daylight, The Thing…). Il vient de Steam, qui gère l’accès aux tables.':
+    'Pinball FX Midnight (formerly Pinball M) is a separate game from Pinball FX, with its own tables (Chucky, Dead by Daylight, The Thing…). It comes from Steam, which manages access to the tables.',
+  'Cyber Pinball retrouve le jeu, même dans une bibliothèque Steam secondaire. Après Jouer sur la fiche d’une table, choisis 1 à 4 joueurs ; c’est aussi le cas pour Pinball FX.':
+    'Cyber Pinball finds the game, even in a secondary Steam library. After Play on a table’s page, pick 1 to 4 players; the same goes for Pinball FX.',
+  'Menu système › Tables › Ajouter une table › Tables de Pinball FX Midnight': 'System menu › Tables › Add a table › Pinball FX Midnight tables',
   // Applications (26/11/2026)
   'Netflix, YouTube, Spotify ou ton serveur de la maison, en plein écran sur la borne.': 'Netflix, YouTube, Spotify or your home server, full screen on the cabinet.',
   'Le médaillon suit le Juke-box. Start ouvre la grille au fronton, avec la fiche de l’application au playfield ; les flippers choisissent, Start ouvre, Start tenu ou un MagnaSave ouvre ses réglages.':
@@ -101,12 +109,6 @@ export const messages: Record<string, string> = {
     'A badge earned gets its moment when you come back from the game, with its animation and music, and reaching a new level has its rays. “My level” tells you what brings XP and which badges are closest.',
   'Communauté › Mon niveau': 'Community › My level',
 
-  'Une partie en direct ouverte à tous, qui part d’elle-même dès qu’elle est complète.': 'A live game open to everyone, which starts by itself as soon as it is full.',
-  'Choisis une table et le nombre de joueurs, de 2 à 4 : ta partie s’affiche chez tous les joueurs en ligne, et part toute seule dès qu’elle est complète.':
-    'Pick a table and the number of players, from 2 to 4: your game shows up for every player online, and starts by itself as soon as it is full.',
-  'Amis ou non, il suffit d’avoir la même version de la table. Tu es prévenu de chaque arrivée, et une partie s’ouvre aussi depuis la fiche d’une table.':
-    'Friends or not, all it takes is the same version of the table. You are told whenever someone joins, and a game can also be opened from a table’s page.',
-  'Communauté › Parties en direct': 'Community › Live games',
 
   'Communauté › Groupes': 'Community › Groups',
 

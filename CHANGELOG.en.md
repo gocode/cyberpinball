@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- What's new: a line introduces Pinball FX Midnight (a different Zen Studios game from Pinball FX); "Try it" opens the "Pinball FX Midnight tables" screen.
 - Diagnostic: when a table plays without its music or without its UltraDMD folder, Cyber Pinball now looks for them by itself in your old Visual Pinball (its "Music" and "Tables" folders) and offers to copy them to the table in one tap, replacing nothing. If it cannot find them, "Choose the folder…" copies them from the place you point to, and the text says exactly which name is expected and where it came from.
 - Adding a table: a folder that gathers different games (the Tables folder of an old installation, for example) now gives one table per game. Before, all its .vpx files ended up in a single table folder, under the title of one of them.
 - LEDs: with Cyber Pinball's effects, a ROM table now drives your strips on everything that happens in play (ejects, knocker, flashers, ramps, ball served, autoplunger), read from the ROM's solenoids. Before, only the flippers lit up.

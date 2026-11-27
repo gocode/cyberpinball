@@ -4022,7 +4022,8 @@ export function createLibrary(host: LibraryHost) {
     // En phase de test (16/11/2026) : pastille « BÊTA » dans tous ses états, comme la VR.
     // Une icône par jeu, quel que soit son état (19/11/2026) : deux jeux installés, ou deux à installer,
     // montraient la même dans l'entonnoir (Future Pinball a la sienne, futurepinball-ui.ts).
-    const icon = game === 'pinballfx' ? ('table-add' as const) : ('flipper' as const);
+    // Midnight a la sienne aussi (27/11/2026) : il partageait « flipper » avec FX3 dans l'entonnoir.
+    const icon = game === 'pinballfx' ? ('table-add' as const) : game === 'pinballfxmidnight' ? ('pinball-app' as const) : ('flipper' as const);
     const base = { label: t('Tables de {game}', { game: name }), icon, badge: 'beta' as const };
     if (!install) {
       if (setup.downloading) return { ...base, detail: t('Téléchargement en cours dans Steam : la liste des tables s’ouvre une fois le jeu installé'), tone: 'quiet', run: () => undefined };
@@ -6968,6 +6969,12 @@ export function createLibrary(host: LibraryHost) {
     openSystemGroupFrom,
     decorateSystemGroup,
     openCustom,
+    /**
+     * L'entrée « Tables de … » d'un jeu de Zen Studios (Pinball FX, FX3, Midnight) ouverte depuis un autre
+     * écran (Nouveautés) : sa liste si le jeu est là, sinon « Installer … » ou l'attente de Steam, comme
+     * dans l'entonnoir « Ajouter une table ». Son « Retour » mène à l'entonnoir.
+     */
+    openZen: (game: ZenGameKey) => void zenAction(game).run?.(),
     /** Lecture du disque d'un écran fourni : faite à son ouverture, gardée tant qu'il reste affiché. */
     kept,
     /** Le disque a changé (guet des dossiers, téléchargement fini) : l'écran affiché relit ce qu'il montre. */
