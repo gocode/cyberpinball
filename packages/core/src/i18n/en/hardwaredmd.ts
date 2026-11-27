@@ -131,6 +131,10 @@ export const messages: Record<string, string> = {
   '{port} est le port d’un contrôleur de DOF (Cabinet.xml) : ZeDMD n’y est pas allumé d’office ({yes}).': '{port} is the port of a DOF controller (Cabinet.xml): ZeDMD is not turned on there by default ({yes}).',
   '{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être ton contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).':
     '{port} does not answer like a ZeDMD (last game: “handshake response error”): it may be your LED controller. ZeDMD is no longer turned on there by default ({yes}).',
+  'Si c’est bien ton ZeDMD, son firmware est peut-être trop ancien (4.x) : mets-le à jour, puis choisis « ZeDMD : oui ».':
+    'If it really is your ZeDMD, its firmware may be too old (4.x): update it, then choose “ZeDMD: yes”.',
+  '{port} : « ZeDMD : oui » est choisi, mais le ZeDMD ne répond pas à VPX (dernière partie : « handshake response error »). Cause fréquente : un firmware ancien (4.x) que VPX ne comprend plus ; mets le firmware du ZeDMD à jour. Sinon, un autre programme garde le port : ferme-le.':
+    '{port}: “ZeDMD: yes” is chosen, but the ZeDMD does not answer VPX (last game: “handshake response error”). Common cause: an old firmware (4.x) that VPX no longer understands; update the ZeDMD firmware. Otherwise another program is holding the port: close it.',
   '{port} : pont USB-série courant, et ta configuration DOF a des LED adressables : c’est peut-être leur contrôleur. ZeDMD n’y est pas allumé d’office ({yes}).':
     '{port}: common USB-serial bridge, and your DOF configuration has addressable LEDs: it may be their controller. ZeDMD is not turned on there by default ({yes}).',
   '{port} : pont USB-série, pas un ZeDMD': '{port}: USB-serial bridge, not a ZeDMD',

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- DMD réel : si "ZeDMD : oui" est choisi mais que le ZeDMD ne répond toujours pas à VPX, la borne le dit maintenant (écran DMD réel, Santé, rapport) et nomme la cause fréquente, un firmware ancien (4.x) que VPX ne comprend plus, au lieu de ne rien signaler.
+- DMD réel : quand un port série ne répond pas comme un ZeDMD, le message ajoute que le firmware est peut-être trop ancien et dit quoi faire (mettre à jour le firmware, puis choisir "ZeDMD : oui").
 - Miroir du téléphone : plus aucun texte en miroir (ni aide des gestes, ni message d'attente : un simple point qui pulse avant la première image). La page se verrouille dans le sens de la fenêtre montrée : paysage pour le fronton (on pivote le téléphone pour le lire), portrait pour une fenêtre en portrait ; le verrou est libéré au retour au pavé. Là où le navigateur refuse le verrou (Android hors plein écran, iPhone), l'image est tournée d'un quart de tour dans la page en portrait, et droite dans la page en paysage.
 - Applications : nouvelle option « Affichage mobile » (Oui par défaut) dans les réglages de chaque application et sur sa fiche. En Oui, Edge s'ouvre avec l'en-tête de navigateur d'un téléphone Android et le site rend sa version mobile ; en Non, le site s'affiche comme sur un ordinateur (utile si un site refuse la version mobile).
 - Root Access : la musique de fond et les bruitages suivent les volumes réglés dans la roue (musique, sons de l'interface) et sont nettement plus forts qu'avant.

@@ -153,7 +153,10 @@ export function zedmdDoubt(d: DetectedDmd, hints: DmdPortHints | undefined, setu
   if (has(hints.failed)) {
     return {
       reason: 'failed',
-      message: t('{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être ton contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).', { port, yes }),
+      message:
+        t('{port} ne répond pas comme un ZeDMD (dernière partie : « handshake response error ») : c’est peut-être ton contrôleur de LED. ZeDMD n’y est plus allumé d’office ({yes}).', { port, yes }) +
+        ' ' +
+        t('Si c’est bien ton ZeDMD, son firmware est peut-être trop ancien (4.x) : mets-le à jour, puis choisis « ZeDMD : oui ».'),
     };
   }
   if (hints.addressable) {
@@ -163,6 +166,21 @@ export function zedmdDoubt(d: DetectedDmd, hints: DmdPortHints | undefined, setu
     };
   }
   return undefined;
+}
+
+/**
+ * « ZeDMD : oui » est choisi (il passe outre zedmdDoubt), mais la dernière recherche de DMDUtil n'a
+ * eu aucune réponse sur ce port : le plus souvent un firmware ancien (4.x) que la bibliothèque de VPX
+ * ne comprend plus (rapport du 25/11/2026 : ZeDMD 4.0.2 sur COM8, ancien PinUP Popper), sinon un
+ * programme qui garde le port. Sans ce constat, la borne ne disait rien. undefined : rien à dire.
+ */
+export function zedmdSilentFault(d: DetectedDmd, hints: DmdPortHints | undefined, setup?: HardwareDmdSetup): string | undefined {
+  if (d.model !== 'ZeDMD' || !hints || hardwareDmdChoice(setup, d.model) !== 'on') return undefined;
+  const port = d.device.port?.toUpperCase();
+  if (!port) return undefined;
+  const has = (list: string[] | undefined) => Boolean(list?.some((p) => p.toUpperCase() === port));
+  if (has(hints.confirmed) || !has(hints.failed)) return undefined;
+  return t('{port} : « ZeDMD : oui » est choisi, mais le ZeDMD ne répond pas à VPX (dernière partie : « handshake response error »). Cause fréquente : un firmware ancien (4.x) que VPX ne comprend plus ; mets le firmware du ZeDMD à jour. Sinon, un autre programme garde le port : ferme-le.', { port });
 }
 
 // ---------------------------------------------------------------------------
@@ -403,6 +421,10 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[], setup?: HardwareDmd
     if (doubt) findings.push({ severity: doubt.reason === 'failed' ? 'warning' : 'info', message: doubt.message });
   }
   const detected = all.filter((d) => !zedmdDoubt(d, hints, setup));
+  for (const d of detected) {
+    const fault = zedmdSilentFault(d, hints, setup);
+    if (fault) findings.push({ severity: 'warning', message: fault });
+  }
   // Un programme ouvert qui garde souvent le DMD réel (dmdext, PinUP Popper…) : DMDUtil ne pourra pas
   // l'ouvrir, et libdmdutil n'en dit rien. Dit avant la partie, pour tous les modèles.
   const lit = detected.some((d) => hardwareDmdChoice(setup, d.model) !== 'off') || Boolean(setup?.zedmdWifi?.enabled);
@@ -488,7 +510,8 @@ export function hardwareDmdFacts(devices: ObservedUsbDevice[], setup?: HardwareD
   const on = found.filter((_, i) => !doubts[i]);
   const names = on.map((d) => hardwareDmdName(d));
   if (setup?.zedmdWifi?.enabled) names.push(t('ZeDMD en wifi ({address})', { address: setup.zedmdWifi.address }));
-  const problems = [...doubts.filter((x) => x?.reason === 'failed').map((x) => x!.message), ...on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p))];
+  const faults = on.map((d) => zedmdSilentFault(d, hints, setup)).filter((p): p is string => Boolean(p));
+  const problems = [...doubts.filter((x) => x?.reason === 'failed').map((x) => x!.message), ...faults, ...on.map((d) => hardwareDmdDriverProblem(d)).filter((p): p is string => Boolean(p))];
   if (setup?.menu && names.length && serverProblem) problems.push(t('Image du front-end sur le DMD réel : {problem}', { problem: serverProblem }));
   // PIN2DMD : seul le serveur le pilote, même sans l'image du front-end ; sans lui, la carte reste noire.
   else if (serverProblem && dmdServerDrivesPin2dmd(devices, setup)) problems.push(t('PIN2DMD : {problem}', { problem: serverProblem }));

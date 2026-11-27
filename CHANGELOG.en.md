@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Hardware DMD: when "ZeDMD: yes" is chosen but the ZeDMD still does not answer VPX, the cabinet now says so (hardware DMD screen, Health, report) and names the usual cause, an old firmware (4.x) that VPX no longer understands, instead of staying silent.
+- Hardware DMD: when a serial port does not answer like a ZeDMD, the message now adds that the firmware may be too old and what to do (update the firmware, then choose "ZeDMD: yes").
 - Phone mirror: no text at all in mirror mode (no gesture help, no waiting message: just a pulsing dot before the first image). The page locks to the orientation of the window shown: landscape for the backglass (turn the phone to read it), portrait for a portrait window; the lock is released when going back to the pad. Where the browser refuses the lock (Android outside full screen, iPhone), the image is turned a quarter turn in the portrait page, and upright in the landscape page.
 - Applications: new "Mobile display" option (Yes by default) in each application's settings and on its sheet. When Yes, Edge opens with the browser header of an Android phone and the site renders its mobile version; when No, the site shows as on a computer (useful if a site refuses the mobile version).
 - Root Access: the background music and the sound effects follow the volumes set in the wheel (music, interface sounds) and are much louder than before.

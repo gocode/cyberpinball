@@ -810,6 +810,13 @@ test('DMD réel : un pont USB-série qui ne répond pas comme un ZeDMD n’est p
   assert.equal(zedmd(vpxDmdSettings(devices, { models: { ZeDMD: 'on' } }, false, [], failed)), '1');
   assert.equal(zedmd(vpxDmdSettings(devices, undefined, false, [], dmdPortHints(readDofSetup(dir), ok))), '1');
   assert.equal(zedmd(vpxDmdSettings(devices)), '1');
+  // Rapport du 25/11/2026 (ZeDMD 4.0.2) : « ZeDMD : oui » choisi, DMDUtil n'a toujours aucune réponse ;
+  // la borne le disait nulle part (problems vide). Elle nomme maintenant le firmware ancien.
+  const forced = vpxDmdSettings(devices, { models: { ZeDMD: 'on' } }, false, [], failed);
+  assert.ok(forced.findings.some((f) => f.severity === 'warning' && /COM3 : « ZeDMD : oui » est choisi.*firmware/.test(f.message)), forced.findings.map((f) => f.message).join(' | '));
+  assert.ok(hardwareDmdFacts(devices, { models: { ZeDMD: 'on' } }, undefined, failed).problems.some((p) => /firmware/.test(p)));
+  assert.ok(!vpxDmdSettings(devices, { models: { ZeDMD: 'on' } }, false, [], dmdPortHints(readDofSetup(dir), ok)).findings.some((f) => /firmware/.test(f.message)), 'répondu : rien à dire');
+  assert.ok(plan.findings.some((f) => /firmware est peut-être trop ancien/.test(f.message)), 'le doute annonce aussi le firmware');
 
   // Bandes déclarées sur COM3 : c'est le port de DOF, plus jamais celui d'un ZeDMD, même sans journal.
   const leds: CabinetLeds = {
