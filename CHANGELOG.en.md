@@ -9,6 +9,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Media proposals: the screen now opens straight away. The VPinMediaDB previews ("Preview on its way…"), the VPForums and VPUniverse results and the file sizes arrive afterwards and fill the screen as they come, instead of everything being awaited before it opens. A slow connection, or the wait VPUniverse imposes, no longer blocks choosing a backglass or a playfield.
+- Previews are received six at a time instead of one by one (on a slow connection the wait of each request added up), and a preview already requested is not downloaded twice.
+- Pinball FX3: when the playfield opens in windowed mode (title bar, minimise and maximise buttons, frame), Cyber Pinball removes the border and fits the window to the playfield screen. A playfield that is already borderless is left alone.
+- Pinball FX3: the DMD is no longer centred in the middle of the FullDMD screen: when the table has a FullDMD media with a frame (the same detection as for VPX), Cyber Pinball places the DMD in that frame.
+- Pinball FX, Future Pinball and Applications: the loading screen now tells you how to get back to Cyber Pinball ("To get back to Cyber Pinball: hold Exit for 2 s"), in a pill at the bottom of the screen. An opened application shows the same hint for 10 seconds on its window (1 s hold).
 - Applications: Edge no longer ever offers to translate the page (no more "Translate this page?" bubble getting in the way at the cabinet); translation is turned off on every launch, including the Juke-box sign-in.
 - Framing: Cyber Pinball no longer offers on its own to change a table's framing. The one it already has (taken over from PinUP Popper or another installation, a view set for it, a POV) is no longer questioned by "What's missing to play", and no other framing or community POV is put forward there. To change it, "Point of view" in the table sheet shows each framing on the table and keeps the previous one.
 - Table diagnosis: "Fix all" never touches the framing anymore, and a framing finding leads to "Point of view" instead of a one-press fix. Only a table that is really sideways on your cabinet (direction checked) is still offered to be turned the right way.

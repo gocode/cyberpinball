@@ -34,6 +34,12 @@ const GWL_EXSTYLE = -20;
 const GWL_STYLE = -16;
 const WM_COMMAND = 0x0111;
 const WS_EX_TOPMOST = 0x0008;
+const WS_CAPTION = 0x00c00000;
+const WS_THICKFRAME = 0x00040000;
+const WS_SYSMENU = 0x00080000;
+const WS_MINIMIZEBOX = 0x00020000;
+const WS_MAXIMIZEBOX = 0x00010000;
+const SWP_FRAMECHANGED = 0x0020;
 
 interface Api {
   EnumWindows: NativeFn;
@@ -59,6 +65,7 @@ interface Api {
   SetCursorPos: NativeFn;
   SetWindowPos: NativeFn;
   GetWindowLongPtrW: NativeFn;
+  SetWindowLongPtrW: NativeFn;
   GetAsyncKeyState: NativeFn;
   IsHungAppWindow: NativeFn;
   SendInput: NativeFn;
@@ -101,6 +108,7 @@ function loadApi(): Api {
     SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
     SetWindowPos: user32.func('bool __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)'),
     GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)'),
+    SetWindowLongPtrW: user32.func('intptr_t __stdcall SetWindowLongPtrW(void *hwnd, int index, intptr_t value)'),
     GetAsyncKeyState: user32.func('int16_t __stdcall GetAsyncKeyState(int vk)'),
     IsHungAppWindow: user32.func('bool __stdcall IsHungAppWindow(void *hwnd)'),
     SendInput: user32.func('uint32_t __stdcall SendInput(uint32_t count, void *inputs, int size)'),
@@ -126,6 +134,8 @@ export interface WindowInfo {
   minimized: boolean;
   /** Au premier plan permanent (WS_EX_TOPMOST), comme la barre des tâches devant une fenêtre ordinaire. */
   topmost: boolean;
+  /** Avec sa barre de titre et son cadre (WS_CAPTION) : fenêtre en mode fenêtré, par opposition à sans bordure. */
+  framed?: boolean;
   rect:{ x: number; y: number; width: number; height: number };
 }
 
@@ -150,6 +160,7 @@ function describe(w: Api, hwnd: unknown): WindowInfo {
     visible: Boolean(w.IsWindowVisible(hwnd)),
     minimized: Boolean(w.IsIconic(hwnd)),
     topmost: (Number(w.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & WS_EX_TOPMOST) !== 0,
+    framed: (Number(w.GetWindowLongPtrW(hwnd, GWL_STYLE)) & WS_CAPTION) === WS_CAPTION,
     rect: { x: left, y: top, width: rect.readInt32LE(8) - left, height: rect.readInt32LE(12) - top },
   };
 }
@@ -319,6 +330,21 @@ export function moveWindow(target: WindowInfo, x: number, y: number): boolean {
 export function setWindowBounds(target: WindowInfo, rect: { x: number; y: number; width: number; height: number }): boolean {
   const flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
   return Boolean(loadApi().SetWindowPos(target.hwnd, null, Math.round(rect.x), Math.round(rect.y), Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), flags));
+}
+
+/**
+ * Retire la barre de titre, le cadre et les boutons réduire / agrandir d'une fenêtre d'un autre
+ * processus (une fenêtre fenêtrée passe sans bordure). Sa place et sa taille ne bougent pas : la
+ * zone utile s'agrandit du cadre. À suivre d'un setWindowBounds pour la caler sur son écran.
+ */
+export function stripWindowFrame(target: WindowInfo): boolean {
+  const w = loadApi();
+  const style = Number(w.GetWindowLongPtrW(target.hwnd, GWL_STYLE)) >>> 0;
+  const next = (style & ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX)) >>> 0;
+  if (next === style) return false;
+  w.SetWindowLongPtrW(target.hwnd, GWL_STYLE, next | 0);
+  const flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS;
+  return Boolean(w.SetWindowPos(target.hwnd, null, 0, 0, 0, 0, flags));
 }
 
 /**

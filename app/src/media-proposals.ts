@@ -106,6 +106,8 @@ export interface ProposalsContext {
   /** Affiche un écran des médias (le message prévu pour lui remplace l'ancien). */
   show(build: () => Built, at?: number): void;
   cursor(): number;
+  /** L'écran affiché se redessine : un aperçu ou les résultats d'un site viennent d'arriver en arrière-plan. */
+  changed?(): void;
   find(file: string): TableEntry | undefined;
   /** Aperçu et caractéristiques d'un fichier local, comme sur les autres écrans des médias. */
   thumb(table: TableEntry, type: MediaType, file: string): MediaThumb;
@@ -217,6 +219,13 @@ interface State {
   extra?: string;
   /** Image du disque -> animée (APNG, GIF, WebP), lue une fois. */
   animatedFiles: Map<string, boolean | undefined>;
+  /**
+   * Préparation d'un média en arrière-plan (prepareType) : numéro de la dernière lancée, la plus
+   * ancienne s'arrête ; sites en cours de lecture ; aperçus attendus (adresses).
+   */
+  run?: number;
+  searching: Set<MediaSiteId>;
+  loading: Set<string>;
 }
 
 /** Mots ajoutés, débarrassés des espaces en trop. */
@@ -251,6 +260,8 @@ function vpsImageCount(game: VpsGame): number {
 
 /** Au plus, des jeux proposés d'office : le reste s'ajoute depuis « Autres jeux… ». */
 const DEFAULT_GAMES = 4;
+/** Aperçus de VPinMediaDB reçus en même temps : les attentes de chaque requête se recouvrent (connexion lente). */
+const PREVIEWS_AT_ONCE = 6;
 
 export function createProposals(ctx: ProposalsContext) {
   let state: State | undefined;
@@ -314,6 +325,8 @@ export function createProposals(ctx: ProposalsContext) {
       wide: previous?.wide,
       extra: previous?.extra,
       animatedFiles: previous?.animatedFiles ?? new Map(),
+      searching: new Set(),
+      loading: new Set(),
     };
     ctx.progress(t('Recherche sur VPinMediaDB…'));
     const { db, problem } = await ctx.search.index();
@@ -422,59 +435,119 @@ export function createProposals(ctx: ProposalsContext) {
    * plus par titre, gardées une demi-heure. VPForums réserve sa recherche aux membres ;
    * VPUniverse montre ses résultats à tous, mais ne laisse télécharger qu'avec un compte.
    */
-  async function searchSites(st: State, type: MediaType): Promise<void> {
+  async function searchSites(st: State, type: MediaType, live: () => boolean, refresh: () => void): Promise<void> {
     const sites = ctx.sites;
     if (!sites) return;
     const queries = siteQueries(st);
     for (const site of MEDIA_SITES) {
+      if (!live()) return;
       const account = await sites.state(site.id);
       const found: SiteSearch = { account, queries, hits: [] };
-      st.sites[site.id] = found;
-      if (!queries.length) continue;
-      if (site.searchNeedsLogin && !account.connected) {
-        found.login = true;
-        continue;
-      }
-      const refine = refineFor(st, type);
-      for (const q of queries) {
-        ctx.progress(t('Recherche sur {site} : « {query} »…', { site: site.name, query: [q, refine.extra].filter(Boolean).join(' ') }));
-        const r = await sites.search(site.id, q, type, { ...refine, pages: st.wide ? SITE_SEARCH_MORE_PAGES : undefined });
-        if (r.kind === 'hits') found.hits.push(...r.hits.filter((h) => !found.hits.some((k) => k.id === h.id)));
-        else if (r.kind === 'login') found.login = true;
-        else
-          found.problem =
-            r.reason === 'challenge'
-              ? t('le site fait une vérification (Cloudflare)')
-              : r.reason === 'down'
-                ? t('le site ne répond pas pour l’instant')
-                : r.reason === 'flood'
-                  ? t('le site impose d’attendre entre deux recherches : réessaie dans {n} s', { n: r.wait })
-                  : t('page de résultats illisible');
+      // Les résultats de la visite précédente restent affichés jusqu'à ceux-ci ; la première fois,
+      // les fiches se montrent à mesure (une recherche par titre).
+      const previous = st.sites[site.id];
+      if (!previous) st.sites[site.id] = found;
+      st.searching.add(site.id);
+      refresh();
+      try {
+        if (!queries.length) continue;
+        if (site.searchNeedsLogin && !account.connected) {
+          found.login = true;
+          continue;
+        }
+        const refine = refineFor(st, type);
+        for (const q of queries) {
+          const r = await sites.search(site.id, q, type, { ...refine, pages: st.wide ? SITE_SEARCH_MORE_PAGES : undefined });
+          if (!live()) return;
+          if (r.kind === 'hits') found.hits.push(...r.hits.filter((h) => !found.hits.some((k) => k.id === h.id)));
+          else if (r.kind === 'login') found.login = true;
+          else
+            found.problem =
+              r.reason === 'challenge'
+                ? t('le site fait une vérification (Cloudflare)')
+                : r.reason === 'down'
+                  ? t('le site ne répond pas pour l’instant')
+                  : r.reason === 'flood'
+                    ? t('le site impose d’attendre entre deux recherches : réessaie dans {n} s', { n: r.wait })
+                    : t('page de résultats illisible');
+          if (!previous) refresh();
+        }
+      } finally {
+        if (live()) {
+          st.sites[site.id] = found;
+          st.searching.delete(site.id);
+          refresh();
+        }
       }
     }
   }
 
-  /** Aperçus (image 1k, ou le son lui-même) et poids des propositions de VPinMediaDB pour ce type ; vignettes des sites. */
-  async function prepareType(st: State, type: MediaType): Promise<void> {
-    await searchSites(st, type);
-    if (ctx.sites) {
-      ctx.progress(t('Vignettes des sites…'));
+  /**
+   * Prépare ce média pour l'écran, **sans le faire attendre** : l'écran s'ouvre avec ce qu'on a
+   * déjà (la borne, VPinMediaDB, les résultats gardés) ; les résultats des sites, leurs vignettes,
+   * les aperçus de VPinMediaDB (image 1k, ou le son lui-même) et le poids des fichiers arrivent
+   * ensuite et redessinent l'écran. Sites et GitHub sont lus en même temps, aperçus 6 à la fois.
+   * Avant, tout se lisait à la suite avant d'ouvrir l'écran : sur une connexion lente (547 ms
+   * jusqu'à la box, 5 à 18 s avant le premier octet, PinCab du 27/11/2026) les attentes
+   * s'additionnaient, et l'attente imposée par VPUniverse (45 s ou plus) bloquait tout.
+   * Une préparation plus récente (autre média, autre titre) arrête la précédente.
+   */
+  function prepareType(st: State, type: MediaType): void {
+    const mine = (st.run = (st.run ?? 0) + 1);
+    const live = () => state === st && st.run === mine;
+    // Redessin groupé : dix aperçus reçus à la suite ne font pas dix redessins.
+    let timer: NodeJS.Timeout | undefined;
+    const refresh = () => {
+      if (timer || !live() || !ctx.changed) return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (live()) ctx.changed?.();
+      }, 250);
+    };
+    st.searching.clear();
+    st.loading.clear();
+
+    const fromSites = async () => {
+      await searchSites(st, type, live, refresh);
+      if (!ctx.sites || !live()) return;
       await ctx.sites.stageThumbs(choicesFor(st, type).flatMap((c) => (c.site && !c.site.received ? [c.site.hit] : [])));
-    }
-    const remote = choicesFor(st, type).filter((c) => c.offer);
-    const previews = remote.flatMap((c) => (c.offer!.kind === 'audio' ? [c.offer!.file] : c.offer!.preview ? [c.offer!.preview] : []));
-    await ctx.search.stagePreviews(previews, st.previews);
-    // Un son reçu qui n'en est pas un (lien Dropbox mort : page HTML) : effacé, la carte le dit.
-    for (const c of remote) {
-      const got = c.offer!.kind === 'audio' ? st.previews.get(c.offer!.file.url) : undefined;
-      if (got && !isAudioFile(got)) {
-        fs.rmSync(got, { force: true });
-        st.previews.delete(c.offer!.file.url);
-        st.dead.add(c.offer!.file.url);
+      refresh();
+    };
+
+    const fromMediaDb = async () => {
+      const remote = choicesFor(st, type).filter((c) => c.offer);
+      const previews = remote.flatMap((c) => (c.offer!.kind === 'audio' ? [c.offer!.file] : c.offer!.preview ? [c.offer!.preview] : []));
+      for (const p of previews) if (!st.previews.has(p.url)) st.loading.add(p.url);
+      await ctx.search.stagePreviews(previews, st.previews, undefined, {
+        quiet: true,
+        atOnce: PREVIEWS_AT_ONCE,
+        stop: () => !live(),
+        onEach: (url) => {
+          st.loading.delete(url);
+          refresh();
+        },
+      });
+      for (const p of previews) st.loading.delete(p.url);
+      if (!live()) return;
+      // Un son reçu qui n'en est pas un (lien Dropbox mort : page HTML) : effacé, la carte le dit.
+      for (const c of remote) {
+        const got = c.offer!.kind === 'audio' ? st.previews.get(c.offer!.file.url) : undefined;
+        if (got && !isAudioFile(got)) {
+          fs.rmSync(got, { force: true });
+          st.previews.delete(c.offer!.file.url);
+          st.dead.add(c.offer!.file.url);
+        }
       }
+      refresh();
+      const unknown = remote.map((c) => c.offer!.file).filter((f) => !st.sizes.has(f.url));
+      if (unknown.length) for (const [url, size] of await ctx.search.sizes(unknown, { quiet: true })) st.sizes.set(url, size);
+      refresh();
+    };
+
+    // Une erreur imprévue d'un côté ne doit pas arrêter l'autre ni rester sans suite.
+    for (const work of [fromSites, fromMediaDb]) {
+      void work().catch((error) => console.warn('Propositions de médias : préparation interrompue.', error)); // i18n-ignore : journal
     }
-    const unknown = remote.map((c) => c.offer!.file).filter((f) => !st.sizes.has(f.url));
-    if (unknown.length) for (const [url, size] of await ctx.search.sizes(unknown)) st.sizes.set(url, size);
   }
 
   // ---------- Écran des propositions ----------
@@ -484,15 +557,15 @@ export function createProposals(ctx: ProposalsContext) {
       const st = await ensure(table);
       // Le message d'un autre média ne suit pas.
       st.notice = undefined;
-      await prepareType(st, type);
+      prepareType(st, type);
       ctx.show(() => build(type), at);
     });
   }
 
-  /** Après un changement de jeux ou une recherche : les aperçus de ce type, puis l'écran. */
+  /** Après un changement de jeux ou une recherche : l'écran tout de suite, les aperçus et les sites ensuite. */
   function reopen(table: TableEntry, type: MediaType, at = 0): void {
     void ctx.task(t('Aperçus…'), async () => {
-      await prepareType(await ensure(table), type);
+      prepareType(await ensure(table), type);
       ctx.show(() => build(type), at);
     });
   }
@@ -507,6 +580,8 @@ export function createProposals(ctx: ProposalsContext) {
       return { kind: 'audio', url: mediaUrl(file), rotation: 0, text: '♪' };
     }
     const file = offer.preview && st.previews.get(offer.preview.url);
+    // Pas encore reçu : la carte le dit et se remplit à l'arrivée (redessin de prepareType).
+    if ((!file || !fs.existsSync(file)) && offer.preview && st.loading.has(offer.preview.url)) return { kind: 'fallback', rotation: 0, text: t('Aperçu en route…'), pending: true };
     if (!file || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: t('Aperçu indisponible') };
     allowPreview(file);
     // Vu du joueur, flippers en bas : la rotation que le menu appliquera.
@@ -676,6 +751,10 @@ export function createProposals(ctx: ProposalsContext) {
     const partner: MediaType | undefined = type === 'DMD' ? 'FullDMD' : type === 'FullDMD' ? 'DMD' : undefined;
     // Un site qui n'a pas pu chercher, VPinMediaDB injoignable : dit en peu de mots, là où l'on cherche plus.
     const problems = [
+      // Lecture en cours (prepareType) : l'écran est déjà là, les fiches du site arrivent ; VPUniverse peut imposer une attente.
+      ...MEDIA_SITES.filter((site) => st.searching.has(site.id)).map((site) =>
+        site.wait ? t('{site} : recherche en cours, le site peut imposer une attente…', { site: site.name }) : t('{site} : recherche en cours…', { site: site.name }),
+      ),
       ...MEDIA_SITES.flatMap((site) => {
         const found = st.sites[site.id];
         return found?.account.connected && found.problem ? [t('{site} : {problem}', { site: site.name, problem: found.problem })] : [];
@@ -1061,7 +1140,7 @@ export function createProposals(ctx: ProposalsContext) {
   function searchTitle(table: TableEntry, type: MediaType, query: string): void {
     void ctx.task(t('Recherche de « {query} »…', { query }), async () => {
       const st = await ensure(table, query);
-      await prepareType(st, type);
+      prepareType(st, type);
       ctx.show(() => build(type));
     });
   }

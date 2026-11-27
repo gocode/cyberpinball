@@ -11,6 +11,11 @@ son interface).
 
 ## 0.2.4
 
+- Propositions de médias : l'écran s'ouvre tout de suite. Les aperçus de VPinMediaDB (« Aperçu en route… »), les résultats de VPForums et de VPUniverse et le poids des fichiers arrivent ensuite et remplissent l'écran à mesure, au lieu de tout attendre avant de l'ouvrir. Une connexion lente, ou l'attente imposée par VPUniverse, ne bloque plus le choix d'un fronton ou d'un plateau.
+- Les aperçus se reçoivent six à la fois au lieu d'un par un (sur une connexion lente, les attentes de chaque requête s'additionnaient), et un aperçu déjà demandé n'est pas téléchargé deux fois.
+- Pinball FX3 : quand le playfield s'ouvre en mode fenêtré (barre de titre, boutons réduire et agrandir, cadre), Cyber Pinball retire la bordure et cale la fenêtre sur l'écran du playfield. Un playfield déjà sans bordure n'est pas touché.
+- Pinball FX3 : le DMD n'est plus centré au milieu de l'écran du FullDMD : quand la table a un média FullDMD avec un cadre (le même repérage que pour VPX), Cyber Pinball pose le DMD dans ce cadre.
+- Pinball FX, Future Pinball et les applications : l'écran de chargement dit maintenant comment revenir à Cyber Pinball ("Pour revenir à Cyber Pinball : maintiens Exit 2 s"), en une pastille au bas de l'écran. Une application ouverte affiche la même indication, 10 secondes, sur sa fenêtre (1 s d'appui).
 - Applications : Edge ne propose plus jamais de traduire la page (plus de bulle « Traduire cette page ? » qui gênait l'usage à la borne) ; la traduction est coupée à chaque ouverture, aussi dans la connexion du Juke-box.
 - Cadrage : Cyber Pinball ne propose plus d'office de changer le cadrage d'une table. Celui qu'elle a déjà (repris de PinUP Popper ou d'une autre installation, vue réglée pour elle, POV) n'est plus remis en cause par « Ce qu'il manque pour jouer », et aucun autre cadrage ni POV de la communauté n'y est mis en avant. Pour en changer, « Point de vue » dans la fiche montre chaque cadrage sur la table et garde le précédent.
 - Diagnostic d'une table : « Tout réparer » ne touche plus jamais au cadrage, et un constat de cadrage mène à « Point de vue » au lieu d'une correction d'un appui. Seule une table vraiment de travers sur ta borne (sens vérifié) se propose encore d'être remise dans le bon sens.

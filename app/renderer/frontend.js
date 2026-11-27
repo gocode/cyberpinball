@@ -928,6 +928,7 @@ function loadingCard(s) {
   state.append(el('span', s.slow ? 'loading-slow-step' : '', s.slow ? s.slow.step : t('Chargement de la table…')), bar);
   if (s.slow) state.append(slowMeta(s.slow));
   card.append(head, state);
+  if (s.exitHint) card.append(el('div', 'loading-exit-hint', s.exitHint));
   // La carte « Objectif » dans l'encart : à droite du cadre du média, jamais dessus.
   if (s.objective) card.append(objectiveCard(s.objective));
   card.append(keysGrid(s.loadingKeys.title, s.loadingKeys.rows));
@@ -1030,6 +1031,14 @@ document.fonts?.addEventListener('loadingdone', refitLoadingCard);
  * et des commandes à sa droite (loadingCard), la marque à sa place.
  */
 function loadingScreen(s) {
+  const nodes = loadingNodes(s);
+  // Pinball FX, Future Pinball : comment revenir à Cyber Pinball, sur tout média, même celui du joueur (demande du mainteneur, 27/11/2026).
+  // Au bureau, elle est dans l'encart (loadingCard) ; en borne, une pastille au bas de l'écran, sur le média.
+  if (s.exitHint && !document.documentElement.classList.contains('menu-desktop')) nodes.push(el('div', 'loading-exit-hint', s.exitHint));
+  return nodes;
+}
+
+function loadingNodes(s) {
   const desktop = document.documentElement.classList.contains('menu-desktop');
   if (desktop) {
     const nodes = [brand(), loadingCard(s)];

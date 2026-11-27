@@ -47,6 +47,7 @@ import {
   type ScreenRect,
 } from '@cyberpinball/core';
 import type { Built } from './library-types';
+import { appExitHint, APP_EXIT_HINT_MS } from './exit-hint';
 import type { AppsBrowser, AppSession } from './applications-browser';
 import type { SiteLook } from './applications-icons';
 import type { MedallionPosterView } from './community-menu';
@@ -155,6 +156,8 @@ export interface ApplicationsMenu {
   card(): { title: string; subtitle: string };
   /** L'application ouverte, s'il y en a une. */
   running(): AppEntry | undefined;
+  /** Application ouverte depuis peu : de quoi dire comment revenir à Cyber Pinball, sur sa fenêtre (exit-hint.ts). */
+  exitHint(): { text: string; rect: ScreenRect } | undefined;
   /** Ferme l'application ouverte (sortie du front-end, partie lancée). */
   close(): void;
 }
@@ -168,7 +171,7 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
   let store: AppsStore = loadApplications(host.dataDir);
   let at = 0;
   let back: () => void = () => undefined;
-  let running: { app: AppEntry; session: AppSession; stop(): void } | undefined;
+  let running: { app: AppEntry; session: AppSession; stop(): void; rect: ScreenRect; hintUntil: number } | undefined;
   const closedOutside = new WeakSet<AppSession>();
   let lastGesture = Date.now();
   let dimTimer: ReturnType<typeof setTimeout> | undefined;
@@ -443,7 +446,9 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
       },
       activity: wake,
     });
-    running = { app, session, stop: stopButtons };
+    running = { app, session, stop: stopButtons, rect, hintUntil: Date.now() + APP_EXIT_HINT_MS };
+    // La fenêtre de l'application prend l'écran et ne dit pas comment en sortir : l'indication (exit-hint.ts) reste APP_EXIT_HINT_MS.
+    setTimeout(() => host.library.changed(), APP_EXIT_HINT_MS + 100).unref?.();
     wake();
     host.library.openCustom(openBuilt);
     void session.done.finally(() => {
@@ -694,6 +699,7 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
     poster,
     card: () => ({ title: t('Applications'), subtitle: t('{n} applications', { n: apps().length }) }),
     running: () => running?.app,
+    exitHint: () => (running && Date.now() < running.hintUntil ? { text: appExitHint(APP_EXIT_HOLD_MS), rect: running.rect } : undefined),
     close: () => {
       if (!running) return;
       closedOutside.add(running.session);

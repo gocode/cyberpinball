@@ -31,6 +31,7 @@ export const messages: Record<string, string> = {
   'Impossible de lancer {game} : {error}': 'Couldn’t start {game}: {error}',
   '{game} n’a pas ouvert sa fenêtre de jeu après {n} s.': '{game} didn’t open its game window after {n} s.',
   'Appui long sur Exit : {game} fermé, retour au front-end.': 'Exit held: {game} closed, back to the menu.',
+  'Pour revenir à Cyber Pinball : maintiens Exit {seconds} s': 'To get back to Cyber Pinball: hold Exit for {seconds} s',
   // app/src/library.ts : fiche d'une table de Pinball FX
   'Pinball FX, table n° {n}': 'Pinball FX, table no. {n}',
   'Fiche illisible : numéro de table absent': 'Unreadable entry: no table number',

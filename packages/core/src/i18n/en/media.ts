@@ -345,10 +345,10 @@ export const messages: Record<string, string> = {
   'Son illisible': 'Unreadable sound',
 
   // app/src/media-proposals.ts
-  'Recherche sur {site} : « {query} »…': 'Searching {site}: “{query}”…',
+  '{site} : recherche en cours…': '{site}: searching…',
+  '{site} : recherche en cours, le site peut imposer une attente…': '{site}: searching, the site may make you wait…',
   'le site fait une vérification (Cloudflare)': 'the site is running a check (Cloudflare)',
   'page de résultats illisible': 'results page unreadable',
-  'Vignettes des sites…': 'Site thumbnails…',
   'Pas d’aperçu': 'No preview',
   'par {author}': 'by {author}',
   '{n} téléchargement': '{n} download',

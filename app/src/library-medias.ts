@@ -502,6 +502,7 @@ export function createMedias(ctx: MediasContext) {
         ...ctx.proposals,
         show: (build, at) => (session ? nav(session, build, at) : ctx.show(build, at)),
         cursor: () => ctx.cursor(),
+        changed: () => ctx.changed(),
         find: (file) => ctx.find(file),
         thumb: (table, type, file) => thumbOf(session!, table, type, file),
         facts: (file) => factsOf(session!, file),

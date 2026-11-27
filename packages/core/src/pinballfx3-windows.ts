@@ -24,10 +24,15 @@ export interface Fx3Window {
   title: string;
   visible: boolean;
   minimized?: boolean;
+  /** Avec barre de titre et cadre (mode fenêtré du jeu, `Mode = 0` de graphics.cfg). */
+  framed?: boolean;
   rect: Rect;
 }
 
-export type Fx3WindowRole = 'backglass' | 'dmd';
+export type Fx3WindowRole = 'playfield' | 'backglass' | 'dmd';
+
+/** Titres de la fenêtre du playfield : « Pinball FX Classic » (Steam 442120 renommé) ou « Pinball FX3 ». */
+const PLAYFIELD_TITLES: readonly string[] = ['Pinball FX Classic', 'Pinball FX3'];
 
 /** Au-delà de ce rapport largeur / hauteur, une fenêtre annexe est le DMD (4 : 1 chez FX3), sinon le fronton (16 : 9). */
 const DMD_MIN_RATIO = 2.5;
@@ -40,8 +45,9 @@ const DMD_MIN_RATIO = 2.5;
 export function classifyFx3Windows<W extends Fx3Window>(windows: readonly W[]): Partial<Record<Fx3WindowRole, W>> {
   const found: Partial<Record<Fx3WindowRole, W>> = {};
   for (const w of windows) {
-    if (!w.visible || w.minimized || w.title !== PINBALLFX3_SECONDARY_TITLE || w.rect.width <= 0 || w.rect.height <= 0) continue;
-    const role: Fx3WindowRole = w.rect.width / w.rect.height >= DMD_MIN_RATIO ? 'dmd' : 'backglass';
+    if (!w.visible || w.minimized || w.rect.width <= 0 || w.rect.height <= 0) continue;
+    if (!PLAYFIELD_TITLES.includes(w.title) && w.title !== PINBALLFX3_SECONDARY_TITLE) continue;
+    const role: Fx3WindowRole = PLAYFIELD_TITLES.includes(w.title) ? 'playfield' : w.rect.width / w.rect.height >= DMD_MIN_RATIO ? 'dmd' : 'backglass';
     const current = found[role];
     if (!current || w.rect.width * w.rect.height > current.rect.width * current.rect.height) found[role] = w;
   }
@@ -54,6 +60,10 @@ export function classifyFx3Windows<W extends Fx3Window>(windows: readonly W[]): 
  */
 export function fx3WindowTarget(window: Rect, screen: Rect): Rect | undefined {
   if (window.width <= 0 || window.height <= 0 || screen.width <= 0 || screen.height <= 0) return undefined;
+  // Forme de l'écran à 2 % près (la zone utile d'un playfield fenêtré 3840 × 2160 dans sa fenêtre de
+  // 3856 × 2180) : tout l'écran, sans bandes de quelques pixels.
+  const ratio = window.width / window.height / (screen.width / screen.height);
+  if (Math.abs(ratio - 1) <= 0.02) return { ...screen };
   const scale = Math.min(screen.width / window.width, screen.height / window.height);
   const width = Math.round(window.width * scale);
   const height = Math.round(window.height * scale);
@@ -89,7 +99,13 @@ export interface Fx3PlacementWatch {
    * À appeler régulièrement pendant la partie : pose les fenêtres annexes sur l'écran de leur rôle
    * (`roleRect`), relit leur place au passage suivant et la signale si le jeu l'a changée.
    */
-  tick<W extends Fx3Window>(windows: readonly W[], roleRect: (role: Fx3WindowRole) => Rect | undefined, setBounds: (w: W, r: Rect) => boolean, events: Fx3PlacementEvents): void;
+  tick<W extends Fx3Window>(
+    windows: readonly W[],
+    roleRect: (role: Fx3WindowRole) => Rect | undefined,
+    setBounds: (w: W, r: Rect) => boolean,
+    events: Fx3PlacementEvents,
+    stripFrame?: (w: W) => boolean,
+  ): void;
 }
 
 /**
@@ -101,16 +117,35 @@ export interface Fx3PlacementWatch {
 export function createFx3PlacementWatch(): Fx3PlacementWatch {
   const states = new Map<Fx3WindowRole, RoleState>();
   return {
-    tick(windows, roleRect, setBounds, events) {
+    tick(windows, roleRect, setBounds, events, stripFrame) {
       const found = classifyFx3Windows(windows);
-      for (const role of ['backglass', 'dmd'] as const) {
+      for (const role of ['playfield', 'backglass', 'dmd'] as const) {
         const w = found[role];
         const screen = roleRect(role);
         if (!w || !screen) continue;
-        const target = fx3WindowTarget(w.rect, screen);
-        if (!target) continue;
         let state = states.get(role);
         if (state?.gaveUp) continue;
+        if (role === 'playfield') {
+          // Le playfield n'est touché que s'il est fenêtré (barre de titre, boutons) : sans bordure d'emblée,
+          // il reste où le jeu l'a mis (son orientation est un réglage du jeu). Le cadre est retiré à un
+          // passage, la fenêtre calée sur son écran au suivant, une fois sa nouvelle taille relue.
+          if (w.framed && stripFrame) {
+            state ??= { target: screen, attempts: 0, confirmed: false, gaveUp: false };
+            states.set(role, state);
+            if (state.attempts >= FX3_MAX_ATTEMPTS) {
+              state.gaveUp = true;
+              events.resisted(role, state.target, w.rect);
+              continue;
+            }
+            state.attempts++;
+            state.confirmed = false;
+            stripFrame(w);
+            continue;
+          }
+          if (!state) continue;
+        }
+        const target = fx3WindowTarget(w.rect, screen);
+        if (!target) continue;
         if (state?.confirmed && sameFx3Place(w.rect, state.target)) continue;
         if (state && !state.confirmed && sameFx3Place(w.rect, state.target)) {
           state.confirmed = true;

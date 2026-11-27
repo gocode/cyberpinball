@@ -358,7 +358,7 @@ import {
   mediaKind,
   formatDateTime,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, stripWindowFrame, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
 import { logFuturePinballLaunch, logFuturePinballLibraries, logFuturePinballView } from './futurepinball-diagnostics';
 import { closePupStartedDuringGame, detectFuturePinball, futurePinballBamMenu, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
@@ -375,7 +375,8 @@ import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launche
 import { lastLaunchLogPath, rememberLaunch } from './launch-evidence';
 import { restoreVpxFiles, vpxChangedFiles, vpxFilesStatus } from './vpx-integrity';
 import { placePinballFxBackglass, placePinballFxHomeBackglass } from './pinballfx-backglass';
-import { launchPinballFx, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
+import { launchPinballFx, PINBALLFX_EXIT_HOLD_MS, runningPinballFx, ZEN_LAUNCH_GAMES } from './pinballfx-launcher';
+import { loadingExitHint } from './exit-hint';
 import { placePinballFxPlayfield } from './pinballfx-playfield';
 import { detectPinballFx, detectPinballFx3, detectPinballFxMidnight } from './pinballfx-install';
 import { bridgeZenKeys } from './zen-keys';
@@ -388,7 +389,7 @@ import { onAppCrash } from './uncaught';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { readVpxLogTail, vpxLogPath } from './dmd-hints';
-import { mediaFrame, prepareDressing } from './fulldmd';
+import { analyseDressing, mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { applyMenuDmdServer, handDmdToVpx, menuDmdServer } from './dmd-server';
 import { DmdWheels } from './dmd-wheel';
@@ -6276,6 +6277,18 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // Pinball FX3 en mode borne : ses fenêtres du DMD et du fronton posées sur les écrans de ces rôles
   // (pinballfx3-windows.ts ; PinCab, 27/11/2026 : elles s'ouvraient décalées). Relues au passage suivant,
   // et signalées au journal si le jeu les remet ailleurs.
+  const fx3RoleName = (role: 'playfield' | 'backglass' | 'dmd') => (role === 'dmd' ? 'du DMD' : role === 'playfield' ? 'du playfield' : 'du fronton'); // i18n-ignore : journal
+  // Cadre du DMD dans le média FullDMD de la table (le même que pour VPX) : le DMD de FX3 y est posé, plutôt que centré sur tout l'écran.
+  let fx3DmdFrame: { zone: Rect; window: Rect } | undefined;
+  if (simulated === undefined && command && fx3 && loc.root) {
+    void analyseDressing(table, { root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), facts: undefined, converter: (converter ??= createConverter()) })
+      .then((dressing) => {
+        if (!dressing.plan.dressed || !dressing.zone) return;
+        fx3DmdFrame = { zone: dressing.zone, window: dressing.plan.window };
+        console.log(`${zenName} (${table.id}) : cadre du DMD dans le média FullDMD (${dressing.plan.window.width} × ${dressing.plan.window.height} en ${dressing.plan.window.x}, ${dressing.plan.window.y}).`); // i18n-ignore : journal
+      })
+      .catch(() => undefined);
+  }
   const fx3PlacementWatch =
     simulated === undefined && command && fx3
       ? (() => {
@@ -6283,11 +6296,21 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
           return setInterval(() => {
             watch.tick(
               listWindows((w) => w.visible && w.className === 'PxWindowClass'),
-              (role) => roleRects.find((r) => r.role === role)?.rect,
+              (role) => {
+                const rect = roleRects.find((r) => r.role === role)?.rect;
+                if (role !== 'dmd' || !rect || !fx3DmdFrame) return rect;
+                const { zone, window } = fx3DmdFrame;
+                return { x: rect.x - zone.x + window.x, y: rect.y - zone.y + window.y, width: window.width, height: window.height };
+              },
               setWindowBounds,
               {
-                placed: (role, to) => console.log(`${zenName} (${table.id}) : fenêtre ${role === 'dmd' ? 'du DMD' : 'du fronton'} posée sur son écran (${to.x}, ${to.y}, ${to.width} × ${to.height}).`), // i18n-ignore : journal
-                resisted: (role, wanted, actual) => console.log(`${zenName} (${table.id}) : diagnostic : le jeu remet la fenêtre ${role === 'dmd' ? 'du DMD' : 'du fronton'} ailleurs (voulu ${wanted.x}, ${wanted.y}, ${wanted.width} × ${wanted.height} ; relevé ${actual.x}, ${actual.y}, ${actual.width} × ${actual.height}) ; je la laisse.`), // i18n-ignore : journal
+                placed: (role, to) => console.log(`${zenName} (${table.id}) : fenêtre ${fx3RoleName(role)} posée sur son écran (${to.x}, ${to.y}, ${to.width} × ${to.height}).`), // i18n-ignore : journal
+                resisted: (role, wanted, actual) => console.log(`${zenName} (${table.id}) : diagnostic : le jeu remet la fenêtre ${fx3RoleName(role)} ailleurs ou lui remet sa bordure (voulu ${wanted.x}, ${wanted.y}, ${wanted.width} × ${wanted.height} ; relevé ${actual.x}, ${actual.y}, ${actual.width} × ${actual.height}) ; je la laisse.`), // i18n-ignore : journal
+              },
+              (w) => {
+                const done = stripWindowFrame(w);
+                if (done) console.log(`${zenName} (${table.id}) : bordure de la fenêtre du playfield retirée (mode fenêtré du jeu).`); // i18n-ignore : journal
+                return done;
               },
             );
           }, 1000);
@@ -8163,6 +8186,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
           ? { step: t('Arrêt demandé : VPX se ferme'), since: launch.since }
           : { step: loadingStepLabel(launch.step), since: launch.since, stop: isZenEmulator(playing?.emulator) || playing?.emulator === 'futurepinball' ? t('{keys} ou Exit : arrêter · en partie, appui long sur Exit : quitter {game}', { keys: shortcutLabel(SHORTCUTS.forceStop), game: TABLE_ENGINES[playing!.emulator].short }) : t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
+    // Jeu d'un autre éditeur (Pinball FX, Future Pinball) : Exit n'y ramène pas à Cyber Pinball, un appui long le fait ; dit dès le chargement (exit-hint.ts).
+    exitHint: state.phase === 'loading' && role === 'playfield' && !displayMode ? loadingExitHint((playing ?? table)?.emulator, PINBALLFX_EXIT_HOLD_MS) : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && m && table && !shown && !onMedallion() ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
     // Mode invité : un message dont l'action est fermée n'en propose pas (son pied dit « Revenir au menu »).
@@ -8272,7 +8297,10 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
   const over = zone.place === 'over' && corner.notice ? corner.notice : undefined;
   // Le navigateur : en bas de sa page, jamais sur sa barre (adresse, téléchargements) ; VPX : le coin haut du joueur.
   const browser = zoneScreen() === 'browser' ? browserScreenRect()?.bounds : undefined;
-  gameNotices.line(over, browser ? { zone: browser, rotation: 0, corner: 'bottom-left' } : undefined);
+  // Une application ouverte depuis peu (Edge prend l'écran) : comment revenir à Cyber Pinball, en bas de sa fenêtre (exit-hint.ts).
+  const appHint = applicationsMenu.running() ? applicationsMenu.exitHint() : undefined;
+  if (appHint && !over) gameNotices.line({ id: 'app-exit-hint', icon: 'exit', tone: 'info', title: appHint.text }, { zone: appHint.rect, rotation: 0, corner: 'bottom-left' });
+  else gameNotices.line(over, browser ? { zone: browser, rotation: 0, corner: 'bottom-left' } : undefined);
   if (zone.place !== 'corner' && zone.place !== 'head') return {};
   // La carte du joueur et ses badges : le même en-tête sur l'écran des tables et les écrans pleins (menu
   // système, Mes badges, aide…), 17/11/2026 ; ni en mode attente (vitrine pour qui passe) ni au Juke-box

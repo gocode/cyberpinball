@@ -238,20 +238,33 @@ export function createMediaSearch(ctx: MediaSearchContext) {
   /**
    * Aperçus reçus et vérifiés dans downloads\vpinmediadb ; ceux qui manquent (réseau) sont absents.
    * `quiet` : sans message d'attente (il occuperait l'écran et bloquerait les touches), pour des
-   * vignettes chargées pendant qu'on navigue ; `atOnce` : téléchargements menés ensemble.
+   * vignettes chargées pendant qu'on navigue ; `atOnce` : téléchargements menés ensemble (4 par
+   * défaut : sur une connexion lente, l'attente de chaque requête domine, et menées à la suite
+   * elles s'additionnent : l'index de 1,7 Mo mettait 26 à 44 s sur un PinCab, 5 à 18 s avant le
+   * premier octet, mesuré le 27/11/2026) ; `stop` : consulté avant chaque fichier (l'écran a changé,
+   * la suite n'est plus utile) ; `onEach` : après chaque fichier, reçu ou non (redessiner l'écran).
    */
-  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = t('Aperçus'), opts: { quiet?: boolean; atOnce?: number } = {}): Promise<void> {
+  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = t('Aperçus'), opts: { quiet?: boolean; atOnce?: number; stop?(): boolean; onEach?(url: string): void } = {}): Promise<void> {
     const wanted = [...new Map(files.map((f) => [f.url, f])).values()]
       // Un aperçu déjà reçu peut avoir été rangé dans medias\ entre-temps (même fichier que le téléchargement) : on le reprend.
       .filter((f) => !into.has(f.url) || !fs.existsSync(into.get(f.url)!));
     let n = 0;
     let next = 0;
     const worker = async () => {
-      while (next < wanted.length) {
+      while (next < wanted.length && !opts.stop?.()) {
         const file = wanted[next++]!;
         if (!opts.quiet) ctx.progress(t('{label} : {n} sur {total}…', { label, n: ++n, total: wanted.length }));
         try {
-          const staged = (await stageMediaDbFile(staging(), file)).path;
+          // Un même aperçu demandé par deux écrans à la fois (on change de média pendant la réception) :
+          // un seul téléchargement, sinon deux écritures du même .part.
+          let job = previewJobs.get(file.url);
+          if (!job) {
+            job = stageMediaDbFile(staging(), file)
+              .then((got) => got.path)
+              .finally(() => previewJobs.delete(file.url));
+            previewJobs.set(file.url, job);
+          }
+          const staged = await job;
           // Lisible avant d'entrer dans la table : un écran redessiné entre-temps (touche, notification)
           // demandait l'image avant son autorisation, refusée, et le rendu gardait ce refus (302 vignettes
           // de VPinMediaDB refusées au journal d'un PinCab, liste des tables de Zen, 19-20/11/2026).
@@ -260,13 +273,18 @@ export function createMediaSearch(ctx: MediaSearchContext) {
         } catch {
           // Aperçu indisponible (réseau) : la carte le dit.
         }
+        opts.onEach?.(file.url);
       }
     };
-    await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.atOnce ?? 1, wanted.length)) }, worker));
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.atOnce ?? 4, wanted.length)) }, worker));
   }
 
-  async function sizes(files: MediaDbFile[]): Promise<Map<string, number>> {
-    return mediaDbSizes(files, { downloadsDir: downloads(), onProgress: (done, total) => ctx.progress(t('Poids des fichiers : {done} sur {total}…', { done, total })) });
+  /** Aperçus en cours de réception, par adresse. */
+  const previewJobs = new Map<string, Promise<string>>();
+
+  /** `quiet` : sans message d'attente (appel en arrière-plan, hors d'une opération qui l'effacerait ensuite). */
+  async function sizes(files: MediaDbFile[], opts: { quiet?: boolean } = {}): Promise<Map<string, number>> {
+    return mediaDbSizes(files, { downloadsDir: downloads(), ...(opts.quiet ? {} : { onProgress: (done: number, total: number) => ctx.progress(t('Poids des fichiers : {done} sur {total}…', { done, total })) }) });
   }
 
   /**
