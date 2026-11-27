@@ -19,6 +19,8 @@ interface TapModule {
   loadEventSettings(dir: string): { enabled: boolean; intensity: number };
   saveEventSettings(dir: string, s: { enabled: boolean; intensity: number }): void;
   tapPlanned(deps: unknown, hasRom: boolean): boolean;
+  tapMode(deps: unknown, table: { hasRom: boolean; b2sName?: string; noDofCalls?: boolean }): { kind: string; rom?: string } | undefined;
+  scriptCallsNoDof(script: string | undefined): boolean;
   zoneTarget(leds: CabinetLeds, zone: string): string;
   startTap(deps: unknown, exe: string, mode?: { kind: 'generique' }, table?: string, about?: { script?: string; color?: string }): { env: Record<string, string>; stop(): void } | undefined;
   gameLedGain(dir: string): number;
@@ -107,6 +109,22 @@ test('effets sans ROM : une ancienne intensité linéaire est reprise sans surpr
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// 27/11/2026, Agentic (table originale) : la config DOF de la borne avait une ligne pour son nom (repli), mais son
+// script n'appelle jamais DOF : le relais ne recevait rien, « 0 événement relayé », LED muettes. Sans appel DOF
+// dans le script, la partie passe aux effets sans ROM (boutons, animation de départ).
+test('table originale dont le script n’appelle aucun DOF : effets sans ROM, jamais un relais muet', () => {
+  const { dir } = setup();
+  tap.saveEventSettings(dir, { enabled: true, intensity: 50 });
+  const deps = { dataDir: dir, leds: () => LEDS, service: {}, log: () => undefined, dof: () => ({ base: dir, has: (rom: string) => rom === 'agentic' }) };
+  assert.deepEqual(tap.tapMode(deps, { hasRom: false, b2sName: 'agentic' }), { kind: 'relais', rom: 'agentic' }, 'script inconnu ou avec DOF : relais');
+  assert.deepEqual(tap.tapMode(deps, { hasRom: false, b2sName: 'agentic', noDofCalls: true }), { kind: 'generique' });
+  assert.equal(tap.tapMode({ ...deps, leds: () => undefined }, { hasRom: false, b2sName: 'agentic', noDofCalls: true }), undefined, 'sans bandes décrites : rien');
+  assert.equal(tap.scriptCallsNoDof(undefined), false, 'script illisible : on ne sait pas');
+  assert.equal(tap.scriptCallsNoDof('Const cGameName = "agentic"\r\nExecuteGlobal CyberPinball_TextFile("controller.vbs")\r\nPlaySoundAtLevelStatic SoundFX("Knocker_1",DOFKnocker), 1, 1\r\n'), true);
+  assert.equal(tap.scriptCallsNoDof('Sub Bumper1_Hit : DOF 107, DOFPulse : End Sub'), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('effets sans ROM : bandes de gauche et de droite trouvées par leur nom, sinon toutes', () => {
   assert.equal(tap.zoneTarget(LEDS, 'left'), 'Gauche');
   assert.equal(tap.zoneTarget(LEDS, 'right'), 'Droite');
@@ -146,6 +164,10 @@ test('effets sans ROM : flipper, lanceur de la borne et événement lu dans le s
     const sum = (o: number) => [...service.simulation!.device.shownOutput(o, 10)].reduce((s, v) => s + v, 0);
     return { left: sum(0), right: sum(1) };
   };
+  // Animation de départ à l'ouverture, avant tout bouton ou événement ; puis retour au noir.
+  const started = await shown(150);
+  assert.ok(started.left + started.right > 100, `animation de départ : ${JSON.stringify(started)}`);
+  await shown(1800);
   const ambient = await shown();
   assert.deepEqual(ambient, { left: 0, right: 0 }, 'noir au repos');
   fs.appendFileSync(file, 'E,101,1,1.0\r\n');

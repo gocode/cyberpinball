@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- LED : une table originale dont le script n'appelle jamais DOF (Agentic) restait noire en partie, même quand la config DOF de la borne avait une ligne à son nom : elle passe maintenant aux effets de Cyber Pinball, avec les boutons de la borne.
+- LED : les effets de Cyber Pinball sans DOF jouent une animation de départ à l'ouverture de la partie, sans attendre un bouton ou un événement de la table.
 - Fusion des branches : la commande de fin de branche attend le vrai résultat (fusionnée puis publiée, conflit, refus, publication en échec) au lieu de s'arrêter sur "En file" ; un blocage n'est plus ignoré.
 - Fusion des branches : une note de changements supprimée par une publication puis retouchée par la branche se résout seule ; les points nouveaux de la branche sont gardés dans une note "-suite".
 - Fusion des branches : un conflit laissé sans lecteur est retenté dès que la branche principale change, et les branches bloquées depuis plus d'une heure sont affichées en tête de la commande de fusion.

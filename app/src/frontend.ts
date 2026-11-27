@@ -519,7 +519,7 @@ import { syncRelaunchWatcher, watchDesktopButton, watchStartHold } from './start
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
 import { createLedService } from './led-live';
-import { capDofLeds, loadEventSettings, openTap, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame, type DofTapMode } from './dof-evenements-jeu';
+import { capDofLeds, loadEventSettings, openTap, scriptCallsNoDof, startTap, tapMode, tapPlanned, type DofButton, type DofTapDeps, type DofTapGame, type DofTapMode } from './dof-evenements-jeu';
 import { ledsHaveRom, rememberPinmame, rememberedPinmame, watchPinmame } from './led-rom';
 import { installationHintsIfKnown } from './installation-hints';
 import { createLedAnimations } from './led-animations';
@@ -6748,7 +6748,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // dans Cabinet.xml, le moteur sans DOF les prend pour la partie, ROM ou pas ; les autres toys restent à DOF.
   const replaced = ledGame ? dofReplace.beforeGame(table, Boolean(ledTap)) : false;
   if (replaced) dofSetupMemo = undefined;
-  const dofMode: DofTapMode | undefined = replaced ? { kind: 'generique' } : ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table) }) : undefined;
+  const dofMode: DofTapMode | undefined = replaced ? { kind: 'generique' } : ledGame ? tapMode(dofTapDeps, { hasRom, b2sName: b2sNameOf(table), noDofCalls: !hasRom && tableCallsNoDof(table) }) : undefined;
   // Au journal, le mode LED de chaque partie (25/11/2026 : une table à ROM jouée en effets sans ROM, sans trace).
   if (replaced) console.log(`LED de la partie : effets de Cyber Pinball à la place du DOF de la table (${hasRom ? `ROM ${romsOf(table).join(', ') || 'au nom inconnu'}` : 'sans ROM'}).`); // i18n-ignore : journal
   else if (ledGame && hasRom) console.log(`LED de la partie : DOF de VPX (ROM ${romsOf(table).join(', ') || 'au nom inconnu'}).`); // i18n-ignore : journal
@@ -6773,7 +6773,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
           // Remplacement : le moteur de Cyber Pinball garde les bandes, que PinMAME tourne ou non.
           if (replaced) return void console.log(`LED de la partie : PinMAME ${pinmame ? 'a démarré' : "n'a pas démarré"} (vpinball.log) ; remplacement : le moteur Cyber Pinball garde les bandes.`); // i18n-ignore : journal
           if (!pinmame) {
-            const mode = tapMode(dofTapDeps, { hasRom: false, b2sName: b2sNameOf(table) });
+            const mode = tapMode(dofTapDeps, { hasRom: false, b2sName: b2sNameOf(table), noDofCalls: tableCallsNoDof(table) });
             console.log(`LED de la partie : PinMAME n'a pas démarré (vpinball.log), table retenue sans ROM pour les LED : ${mode ? (mode.kind === 'relais' ? 'relais vers libdof' : 'effets sans ROM') : 'aucun effet (effets sans ROM coupés, ou pas de bandes décrites)'}.`); // i18n-ignore : journal
             if (mode?.kind === 'relais') refreshRomFallback(table, mode.rom);
             dofTap = mode ? startTap(dofTapDeps, install.exe, mode, played.file, ledAbout(), { tap: ledTap, takeBack: true }) : undefined;
@@ -7607,6 +7607,24 @@ function tableScriptText(table: TableEntry): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** Le script de la table n'appelle aucun DOF (dof-evenements-jeu.ts) : relu seulement si son fichier a changé (appelé à chaque état envoyé). */
+const noDofCallsMemo = new Map<string, boolean>();
+function tableCallsNoDof(table: TableEntry): boolean {
+  let stamp = '';
+  try {
+    stamp = String(fs.statSync(tableScriptFile(table) ?? table.file).mtimeMs);
+  } catch {
+    // fichier illisible : relu à chaque fois
+  }
+  const key = `${table.file}|${stamp}`;
+  let known = stamp ? noDofCallsMemo.get(key) : undefined;
+  if (known === undefined) {
+    known = scriptCallsNoDof(tableScriptText(table));
+    if (stamp) noDofCallsMemo.set(key, known);
+  }
+  return known;
 }
 
 /**
@@ -8610,7 +8628,7 @@ function broadcast(): void {
   nightMode?.game(gameOn); // variante DOF du mode nuit posée avant le lancement de VPX, remise à la fin
   const tapTable = gameOn ? (playing ?? tables[state.index]) : undefined;
   // Partie lancée : ce qu'elle a décidé (et changé en route : relais en échec, PinMAME absent ou présent).
-  const tapOwns = gameLeds !== undefined ? gameLeds !== 'dof' && gameLeds.ownsLeds() : Boolean(tapTable && tapPlanned(dofTapDeps, hasRomOf(tapTable), b2sNameOf(tapTable)));
+  const tapOwns = gameLeds !== undefined ? gameLeds !== 'dof' && gameLeds.ownsLeds() : Boolean(tapTable && tapPlanned(dofTapDeps, hasRomOf(tapTable), b2sNameOf(tapTable), !hasRomOf(tapTable) && tableCallsNoDof(tapTable)));
   if (gameOn && !tapOwns) void ledService.gameStarted();
   else if (!gameOn) ledService.gameEnded();
   ledAnimations.update(ledContext());

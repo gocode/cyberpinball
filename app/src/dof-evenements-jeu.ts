@@ -122,16 +122,24 @@ export interface DofTapDeps {
 export type DofTapMode = { kind: 'relais'; rom: string } | { kind: 'generique' };
 
 /** Ce que fera une partie : relais vers libdof, profil générique, ou rien (table à ROM : le plugin DOF de VPX s'en charge). */
-export function tapMode(deps: DofTapDeps, table: { hasRom: boolean; b2sName?: string }): DofTapMode | undefined {
+export function tapMode(deps: DofTapDeps, table: { hasRom: boolean; b2sName?: string; noDofCalls?: boolean }): DofTapMode | undefined {
   if (table.hasRom) return undefined;
   const settings = loadEventSettings(deps.dataDir);
-  if (table.b2sName && settings.originals !== false && deps.dof?.()?.has(table.b2sName)) return { kind: 'relais', rom: table.b2sName };
+  // Un script qui n'appelle jamais DOF n'enverrait rien à libdof : la config DOF de la borne, même complétée par
+  // le repli, resterait muette (Agentic, 27/11/2026 : « 0 événement relayé », aucune LED). Les effets sans ROM,
+  // eux, ont les boutons de la borne et leur animation de départ.
+  if (table.b2sName && !table.noDofCalls && settings.originals !== false && deps.dof?.()?.has(table.b2sName)) return { kind: 'relais', rom: table.b2sName };
   return settings.enabled && deps.leds()?.strips.length ? { kind: 'generique' } : undefined;
 }
 
 /** Le port des LED reste-t-il à Cyber Pinball pendant cette partie (profil générique) ? */
-export function tapPlanned(deps: DofTapDeps, hasRom: boolean, b2sName?: string): boolean {
-  return tapMode(deps, { hasRom, b2sName })?.kind === 'generique';
+export function tapPlanned(deps: DofTapDeps, hasRom: boolean, b2sName?: string, noDofCalls?: boolean): boolean {
+  return tapMode(deps, { hasRom, b2sName, noDofCalls })?.kind === 'generique';
+}
+
+/** Le script de la table n'appelle aucun DOF (ni `DOF n, état`, ni Sub DOF à lui). undefined script : on ne sait pas. */
+export function scriptCallsNoDof(script: string | undefined): boolean {
+  return script !== undefined && dofTapReach(script) === 'none';
 }
 
 /** Les bandes d'une zone : par leur nom (gauche, droite), sinon toutes. */
@@ -335,17 +343,21 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
   if (!leds) return undefined;
   const file = tap.file;
   let stopped = false;
-  const open = async () => {
+  const open = async (): Promise<boolean> => {
     if (how.takeBack) {
       // Après un gameStarted en cours ou fini : port fermé, puis repris.
       await deps.service.gameStarted().catch(() => undefined);
       deps.service.gameReleased?.();
     }
-    if (stopped) return;
+    if (stopped) return false;
     deps.service.configure(leds);
     await deps.service.start();
+    return !stopped;
   };
-  open().catch((e: Error) => deps.log(`Effets LED sans DOF : ${e.message}`)); // i18n-ignore : journal
+  const opened = open().catch((e: Error) => {
+    deps.log(`Effets LED sans DOF : ${e.message}`); // i18n-ignore : journal
+    return false;
+  });
   const gain = gameLedGain(deps.dataDir);
   const palette = dofScenePalette(about.color, about.colors);
   const scene = createDofScene(palette, gain);
@@ -365,6 +377,13 @@ function startGenericGame(deps: DofTapDeps, tap: DofTapFile, about: DofTapTable,
     if (on) seen.set(c.kind, (seen.get(c.kind) ?? 0) + 1);
     return on ? scene.trigger(c.kind, c.side, Date.now()) : scene.release(c.kind, c.side, Date.now());
   };
+  // Animation de départ : la partie qui s'ouvre montre ses bandes tout de suite, sans attendre un bouton ni
+  // un événement du script (une table sans DOF restait noire jusqu'à Start). Pas au repli en cours de partie.
+  if (!how.fromEnd) {
+    void opened.then((ok) => {
+      if (ok && !stopped) scene.trigger('game-start', 'center', Date.now());
+    });
+  }
   const stopButtons = deps.watchButtons?.((button, down) => {
     // Lanceur : la bille part quand le bouton est relâché.
     if (button === 'plunger') return void (down ? undefined : play(BUTTON_EVENTS.plunger, true));

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- LEDs: an original table whose script never calls DOF (Agentic) stayed dark during play, even when the cabinet's DOF config had a line for its name: it now uses Cyber Pinball's own effects, with the cabinet buttons.
+- LEDs: Cyber Pinball's effects without DOF now play a start animation when the game opens, without waiting for a button or a table event.
 - Branch merging: the end-of-branch command waits for the real outcome (merged then published, conflict, rejection, failed publication) instead of stopping at "In queue"; a blockage is no longer ignored.
 - Branch merging: a changes note deleted by a publication and then edited by the branch is resolved automatically; the branch's new points are kept in a "-suite" note.
 - Branch merging: a conflict left unread is retried as soon as the main branch changes, and branches blocked for over an hour are shown at the top of the merge command.
