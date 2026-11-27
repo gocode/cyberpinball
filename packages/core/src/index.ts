@@ -51,6 +51,7 @@ export * from './ratelimit';
 export * from './tablefiles';
 export * from './povview';
 export * from './origin-framing';
+export * from './origin-framing-catchup';
 export * from './framing-styles';
 export * from './framing-history';
 export * from './framing-custom';

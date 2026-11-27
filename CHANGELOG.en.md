@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Tables taken over from PinUP Popper, PinballY or a VPX folder: their original framing is now kept whatever the way they were added (folder, archive, drag and drop), not only from the installation takeover screen.
+- Tables taken over before this version get back, once, the framing they had in their original installation, unless you chose one in Cyber Pinball. The previous framing stays in the history: "Point of view" > "Restore the previous framing" puts it back.
+- A setting made in game in the VPX menu is now kept in the framing history, and is never replaced.
 - Pinball FX: on a multi-screen cabinet, the game window is now placed on the playfield screen, at its size, during the game. The game ignores the screen and size written in its settings and always opened on the main screen.
 - Remote, application mirror: fixed the swipe that did nothing (neither Facebook nor TikTok): the phone flagged the end of the gesture on every message, so the finger injected on the cabinet was lifted at once and Edge only saw a tap. The gesture is now continuous from the first to the last move. The fallback wheel also closes after the phone goes silent.
 - Cabinet journal: every swipe received from the remote leaves a line (finger or wheel, start point, window size, message count, pixels travelled, Windows refusals). No line means the phone sent nothing.

@@ -166,6 +166,8 @@ test('réglages du VPX d’origine : où ils sont lus, et ceux du registre (VPX 
 const FRAMING_WRITERS: Record<string, string> = {
   'packages/core/src/doctor.ts': 'manualView et tableOrientation, réparations proposées ; le cadrage d’origine passe avant (originFramingFinding)',
   'packages/core/src/origin-framing.ts': 'le cadrage d’origine lui-même',
+  'packages/core/src/origin-framing-catchup.ts': 'le cadrage d’origine rendu une fois aux tables reprises avant, sauf cadrage choisi par le joueur (cadrage-rattrapage.test.ts)',
+  'app/src/origin-framing-catchup.ts': 'idem, l’état d’avant gardé (framing-history.ts)',
   'packages/core/src/povview.ts': 'POV : appliqué seulement sans mode choisi (povView), sinon proposé ; écran « Point de vue »',
   'packages/core/src/tableview.ts': 'importedView : seulement sans mode choisi',
   'app/src/vpx-launch-compat.ts': 'copie à part pour VPX 10.8.0, le .ini de la table intact',

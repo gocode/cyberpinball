@@ -819,6 +819,8 @@ export const messages: Record<string, string> = {
   'Enregistrée pour elle dans le menu de VPX, ou reprise d’une autre installation': 'Saved for it in the VPX menu, or taken over from another installation',
   '{label} : choisi pour cette table.': '{label}: chosen for this table.',
   'Rétablir le cadrage précédent': 'Restore the previous framing',
+  'Cadrage d’avant le retour à celui de l’installation d’origine': 'Framing before the return to the one of the original installation',
+  'Avant le réglage en partie, dans le menu de VPX': 'Before the in-game setting, in the VPX menu',
   'Ce qui cadre cette table sur l’écran du plateau, chaque choix montré sur la table rendue par VPX. Le sens de la table est toujours vérifié : un point de vue qui la mettrait de travers sur cette borne est refusé.': 'What frames this table on the playfield screen, each choice shown on the table rendered by VPX. The direction of the table is always checked: a point of view that would turn it the wrong way on this cabinet is refused.',
   'Cadrage de cette table (menu de VPX › Point of View)': 'Framing of this table (VPX menu › Point of View)',
   'Au plus près des coins, écran incliné': 'Corners as close as possible, tilted screen',

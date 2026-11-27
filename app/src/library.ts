@@ -292,6 +292,8 @@ import {
   loadFeedbackState,
   fileErrorText,
   isFileLocked,
+  rememberFraming,
+  rememberOriginCatchUp,
 } from '@cyberpinball/core';
 import { createCreditsMenu, type CreditsDepth } from './credits-menu';
 import { createFollowMenu } from './follow-menu';
@@ -322,7 +324,8 @@ import { joystickStatus, watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import { createTablePov } from './table-pov';
-import { findOriginTable, freezeOriginFraming } from './origin-framing';
+import { findOriginTable, freezeOriginFraming, originPlan } from './origin-framing';
+import { catchUpOriginFraming, ORIGIN_CATCHUP_DELAY_MS } from './origin-framing-catchup';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
 import { qrRows } from './remote-qr';
@@ -1942,6 +1945,26 @@ export function createLibrary(host: LibraryHost) {
     findOnline: (table, back) => gameParts.openPartFrom(table, 'pov', back),
   });
 
+  // Tables reprises d'une autre installation avant que leur cadrage soit figé à l'ajout : le cadrage d'origine rendu,
+  // une fois par table, en tâche de fond (origin-framing-catchup.ts). Jamais dans un bac à sable ni un essai sans
+  // opérateur : il lit les installations du vrai PC.
+  if (host.root && !process.env.CYBERPINBALL_HOME && !process.env.CYBERPINBALL_AUTOPILOT && !process.env.CYBERPINBALL_STRESS) {
+    setTimeout(() => {
+      try {
+        const done = catchUpOriginFraming(host.tables(), {
+          dataDir: host.dataDir,
+          orientation: host.playfieldOrientation?.(),
+          findOrigin: (file) => findOriginTable(file, host.root ? [host.root] : []),
+          plan: originPlan,
+          log: (line) => console.log(line),
+        });
+        if (done.noted) host.reload();
+      } catch (error) {
+        console.log(`Cadrage d'origine : rattrapage impossible (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }, ORIGIN_CATCHUP_DELAY_MS).unref();
+  }
+
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
   const gameParts = createGameParts({
     layout,
@@ -3385,6 +3408,9 @@ export function createLibrary(host: LibraryHost) {
     if (!result) return;
     if (!result.ok) return openSheet(table, t('Le réglage de l’affichage n’a pas pu se dérouler : {message}', { message: result.message ?? t('erreur inconnue') }));
     const after = readTextIfExists(ini);
+    // Un réglage fait en partie est un choix du joueur : gardé dans l'historique du cadrage, que le rattrapage du
+    // cadrage d'origine respecte (origin-framing-catchup.ts) et que « Rétablir le cadrage précédent » défait.
+    if (after !== before) rememberFraming(host.dataDir, table.file, { at: new Date().toISOString(), label: t('Avant le réglage en partie, dans le menu de VPX'), ini: before ?? null });
     openSheet(table, after !== before ? t('Affichage enregistré pour cette table ({file}).', { file: path.basename(ini) }) : t('Rien n’a été enregistré pour cette table seule.'));
   }
 
@@ -5546,8 +5572,11 @@ export function createLibrary(host: LibraryHost) {
       const others = otherVpxMenu.list();
       // Tables reprises d'une autre installation : le .vpx d'origine et le VPX qui l'y jouait, pour figer son cadrage.
       const origins = new Map<string, { vpx: string; exe: string }>();
+      // Les tables copiées par cet ajout (pas celles qu'une ROM relie seulement).
+      const copied = new Set<string>();
       for (const t of plan.tables) {
         for (const step of t.steps.filter((st) => st.kind === 'table')) {
+          copied.add(path.resolve(step.to).toLowerCase());
           const exe = s.vpxHints?.get(step.from.toLowerCase());
           if (exe) origins.set(path.resolve(step.to).toLowerCase(), { vpx: step.from, exe });
         }
@@ -5587,15 +5616,30 @@ export function createLibrary(host: LibraryHost) {
         if (!table) continue;
         // Avant les réparations : le cadrage de l'installation d'origine, figé (mode écrit dans le .ini), passe avant un
         // POV ou une vue reprise, que ces réparations ne posent que sur une table sans mode choisi.
-        const origin = origins.get(path.resolve(file).toLowerCase());
+        // Sans indice de l'import (dossier, archive, glisser-déposer) : la même table dans une autre installation du PC.
+        const key = path.resolve(file).toLowerCase();
+        let origin = origins.get(key);
+        if (!origin && copied.has(key) && /\.vpx$/i.test(file)) {
+          try {
+            origin = findOriginTable(table.file, host.root ? [host.root] : []);
+          } catch {
+            // Installations illisibles : la table garde le cadrage de la borne.
+          }
+        }
         if (origin) {
           try {
-            const framed = freezeOriginFraming(table.file, table.infoFile, origin.vpx, origin.exe, host.playfieldOrientation?.());
+            const orientation = host.playfieldOrientation?.();
+            const framed = freezeOriginFraming(table.file, table.infoFile, origin.vpx, origin.exe, orientation);
             console.log(`Cadrage d'origine (${table.id}) : ${framed.summary}${framed.refused ? ` ; ${framed.refused}` : ''}.`); // i18n-ignore : journal
             if (framed.note) framedAny = true;
+            // Le rattrapage au démarrage (origin-framing-catchup.ts) ne repasse pas sur une table traitée ici ; borne
+            // pas décrite : il la reprendra une fois l'assistant d'écrans passé.
+            if (orientation) rememberOriginCatchUp(host.dataDir, [{ file: table.file, record: { at: new Date().toISOString(), result: framed.note ? 'same' : 'refused', detail: framed.summary } }]);
           } catch (error) {
             console.log(`Cadrage d'origine (${table.id}) : non figé (${(error as Error).message}).`); // i18n-ignore : journal
           }
+        } else if (copied.has(key)) {
+          rememberOriginCatchUp(host.dataDir, [{ file: table.file, record: { at: new Date().toISOString(), result: 'none', detail: 'à l’ajout' } }]); // i18n-ignore : journal
         }
         try {
           repairPupForPlay(table, { tablesDir: layout()!.tables, script: cachedScript(file, host.dataDir), cabinet: borne, orientation: host.playfieldOrientation?.() }, { trashDir });

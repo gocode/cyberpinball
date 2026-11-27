@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.4
 
+- Tables reprises de PinUP Popper, PinballY ou d'un dossier de VPX : leur cadrage d'origine est maintenant gardé, quel que soit le chemin de l'ajout (dossier, archive, glisser-déposer), pas seulement depuis l'écran de reprise d'une installation.
+- Les tables reprises avant cette version retrouvent une fois le cadrage qu'elles avaient dans leur installation d'origine, sauf si tu en as choisi un dans Cyber Pinball. Le cadrage d'avant reste dans l'historique : « Point de vue » > « Rétablir le cadrage précédent » le remet.
+- Un réglage fait en partie dans le menu de VPX est désormais gardé dans l'historique du cadrage, et n'est plus jamais remplacé.
 - Pinball FX : sur une borne à plusieurs écrans, la fenêtre du jeu est maintenant posée sur l'écran du playfield, à sa taille, pendant la partie. Le jeu ignore l'écran et la taille écrits dans ses réglages et s'ouvrait toujours sur l'écran principal.
 - Télécommande, miroir de l'application : correction du balayage qui ne faisait rien (ni Facebook ni TikTok) : le téléphone annonçait la fin du geste à chaque message, le doigt injecté sur la borne était donc levé aussitôt et Edge n'y voyait qu'un appui. Le geste est maintenant continu du premier au dernier déplacement. La molette de repli se referme aussi après un silence du téléphone.
 - Journal de la borne : chaque balayage reçu de la télécommande laisse une ligne (au doigt ou à la molette, point de départ, taille de la fenêtre, nombre de messages, pixels parcourus, refus de Windows). Pas de ligne = le téléphone n'a rien envoyé.
