@@ -119,6 +119,8 @@ VPX planté avant d'écrire la moindre ligne de son journal n'avait pas encore o
 Cyber Pinball compare alors les fichiers de son VPX à ceux de l'archive (voir « Fichiers de VPX contrôlés » dans [Installation et organisation des fichiers](installation-et-organisation-des-fichiers.md#installation-et-organisation-des-fichiers)) : remplacés hors de Cyber Pinball, ils sont nommés à l'écran et Start remet leurs originaux ; sinon l'écran renvoie à « Santé de la borne ».
 Cas réel : un autre VPX copié par-dessus celui de Cyber Pinball (SDL 3.2.18 à la place de 3.4.14) arrêtait VPX 0,2 s après chaque lancement, sur toutes les tables.
 VPX arrêté juste après le démarrage du PuP-Pack : l'écran d'échec le dit et propose de rejouer la table sans son PuP-Pack (Start), rangé à part ; « Réactiver le PuP-Pack », dans « Parties du jeu », le remet tel quel (voir [PuP-Pack désactivé, table par table](pup-pack-desactive-table-par-table.md#pup-pack-désactivé-table-par-table)).
+Si VPX reste bloqué à la fermeture (écran figé, son de la bille en boucle) et ne se ferme pas dans les 10 secondes qui suivent la fin de la partie, Cyber Pinball le ferme, relève la partie et te ramène à l'écran des tables, avec une note qui explique ce qui s'est passé : il n'y a pas à redémarrer la borne.
+Quand VPX s'est figé en arrêtant le PuP-Pack, cette note te propose de jouer la table sans son PuP-Pack.
 Quand VPX s'arrête sans laisser de rapport de plantage, le rapport joint l'événement de Windows qui nomme le module fautif (le plugin PuP, par exemple), et l'écran d'arrêt le cite.
 
 **Rapport d'une partie échouée.**

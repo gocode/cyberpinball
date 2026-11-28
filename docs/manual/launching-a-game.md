@@ -119,6 +119,8 @@ VPX crashing before writing a single line of its log had not opened the table ye
 Cyber Pinball then compares its VPX's files with those of the archive (see "Checked VPX files" in [Installation and file layout](installation-and-file-layout.md#installation-and-file-layout)): replaced outside Cyber Pinball, they are named on the screen and Start puts their originals back; otherwise the screen points to "Santé de la borne" (Cabinet health).
 Real case: another VPX copied over Cyber Pinball's (SDL 3.2.18 instead of 3.4.14) stopped VPX 0.2 s after every launch, on every table.
 VPX stopped right after the PuP-Pack starts: the failure screen says so and offers to replay the table without its PuP-Pack (Start), set aside; "Re-enable the PuP-Pack", in "Game parts", puts it back as it was (see [PuP-Pack disabled, table by table](pup-pack-disabled-table-by-table.md#pup-pack-disabled-table-by-table)).
+If VPX stays stuck on closing (frozen screen, ball sound looping) and does not close within 10 seconds of the end of the game, Cyber Pinball closes it, picks up the game and takes you back to the tables screen, with a note explaining what happened: there is no need to restart the cabinet.
+When VPX froze while stopping the PuP-Pack, this note offers to play the table without its PuP-Pack.
 When VPX stops without leaving a crash report, the report attaches the Windows event that names the faulty module (the PuP plugin, for example), and the stop screen quotes it.
 
 **Report of a failed game.**
