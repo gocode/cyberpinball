@@ -5,7 +5,8 @@
 // remet ensuite (app/src/game-audio-route.ts). Ici, seulement la décision, sans toucher à Windows.
 // Lignes de journal : en français seulement, comme celles du reste du journal.
 
-import type { AudioRole, CabinetAudio, ObservedAudioOutput } from './model';
+import { audioScreen } from './audio';
+import type { AudioRole, CabinetAudio, ObservedAudioOutput, ObservedDisplay } from './model';
 
 export interface GameAudioRoute {
   /** La sortie à poser comme sortie par défaut ; absente : rien à changer. */
@@ -16,12 +17,26 @@ export interface GameAudioRoute {
 
 const same = (a: string | undefined, b: string | undefined) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
-/** Sortie de l'étape « Son » dont le son compte pour la partie : celle du playfield, à défaut celle du fronton. */
-export function wantedGameOutput(audio: CabinetAudio | undefined): { id: string; role: AudioRole } | undefined {
-  const playfield = audio?.roles.playfield;
-  if (playfield) return { id: playfield, role: 'playfield' };
-  const backglass = audio?.roles.backglass;
-  return backglass ? { id: backglass, role: 'backglass' } : undefined;
+/**
+ * Sortie de l'étape « Son » dont le son compte pour la partie : celle du playfield, à défaut celle du
+ * fronton. Ces jeux n'ont qu'une sortie : le haut-parleur d'un écran de la borne (HDMI d'un moniteur) ne
+ * vaut que s'il n'y a rien d'autre (28/11/2026 : playfield sur l'écran, enceintes sur le fronton, le son
+ * sortait de l'écran). Une sortie absente (carte débranchée) passe après celles qui sont là.
+ */
+export function wantedGameOutput(
+  audio: CabinetAudio | undefined,
+  outputs: readonly ObservedAudioOutput[] = [],
+  displays: readonly ObservedDisplay[] = [],
+): { id: string; role: AudioRole } | undefined {
+  const candidates: { id: string; role: AudioRole }[] = [];
+  if (audio?.roles.playfield) candidates.push({ id: audio.roles.playfield, role: 'playfield' });
+  if (audio?.roles.backglass) candidates.push({ id: audio.roles.backglass, role: 'backglass' });
+  const seen = (c: { id: string }) => outputs.find((o) => same(o.endpointId, c.id));
+  const speakers = (c: { id: string }) => {
+    const o = seen(c);
+    return !!o && !audioScreen(o, [...displays]);
+  };
+  return candidates.find(speakers) ?? candidates.find((c) => seen(c)) ?? candidates[0];
 }
 
 /**
@@ -29,8 +44,8 @@ export function wantedGameOutput(audio: CabinetAudio | undefined): { id: string;
  * ne répond pas ; `outputs` : les sorties actives ; `audio` : l'étape « Son »). Une sortie voulue absente
  * des sorties actives (écran éteint, carte débranchée) n'est jamais posée : Windows garde la sienne.
  */
-export function gameAudioRoute(input: { defaultId: string | undefined; outputs: readonly ObservedAudioOutput[]; audio: CabinetAudio | undefined }): GameAudioRoute {
-  const wanted = wantedGameOutput(input.audio);
+export function gameAudioRoute(input: { defaultId: string | undefined; outputs: readonly ObservedAudioOutput[]; audio: CabinetAudio | undefined; displays?: readonly ObservedDisplay[] }): GameAudioRoute {
+  const wanted = wantedGameOutput(input.audio, input.outputs, input.displays);
   if (!wanted) return { line: 'aucune sortie à l’étape « Son » : la sortie par défaut de Windows reste celle du jeu.' }; // i18n-ignore : journal
   const seen = input.outputs.find((o) => same(o.endpointId, wanted.id));
   const name = seen?.friendlyName ?? input.audio?.outputs.find((o) => same(o.endpointId, wanted.id))?.lastSeen?.friendlyName ?? wanted.id;

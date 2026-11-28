@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.5
 
+- Pinball FX, Pinball FX3, Pinball FX Midnight and Future Pinball now play through the speakers chosen in the cabinet's "Sound" step (the playfield one, otherwise the backglass one; a screen's own speaker only comes after real speakers). These games have no output setting: they play on the Windows default output, which could be a headset or a monitor, so the sound came out of the wrong speakers. Cyber Pinball sets the "Sound" step output as the default output for the length of the game, then gives the previous one back.
 - Darkest Dungeon (Original 2023) starts again: its script reads the PuP-Pack root while the table loads, and the patched VPX (patch set 12) answered nothing until a game was set, so the script stopped and the game drowned in "Object required" errors. The PuP plugin now answers, like PinUP Player, with the table's pupvideos folder.
 - The table diagnosis warns when a table's script looks, as soon as it loads, for a PuP-Pack file that is missing from the table's pupvideos folder.
 - You can give each button a name, with the mouse or with the cabinet buttons: a ready-made name ("Left flipper", "Right MagnaSave", "Fire (lockbar)"…), a color or number and a place ("red button, front", "no. 2 button, underneath"), or a name you type yourself (computer keyboard, or the on-screen keyboard driven with the flippers and Start).

@@ -20,6 +20,7 @@ import {
   type FuturePinballInstall,
   type FuturePinballViewValues,
   type ObservedAudioOutput,
+  type ObservedDisplay,
   type Rotation,
 } from '@cyberpinball/core';
 import { hkcuValue, readEndpointVolumes } from '@cyberpinball/win-displays';
@@ -30,6 +31,8 @@ export interface FuturePinballLaunchFacts {
   install: FuturePinballInstall | undefined;
   audio: CabinetAudio | undefined;
   outputs: readonly ObservedAudioOutput[];
+  /** Écrans branchés : le haut-parleur d'un écran n'est visé qu'à défaut d'autre sortie. */
+  displays?: readonly ObservedDisplay[];
   log: (line: string) => void;
   /** Sortie par défaut de Windows ; Core Audio par défaut (jamais écrit : lecture seule). */
   readDefault?: () => DefaultOutputState | undefined;
@@ -102,7 +105,7 @@ export function logFuturePinballLaunch(facts: FuturePinballLaunchFacts): void {
   const prefix = `${FUTURE_PINBALL_NAME} (${facts.tableId}) : `; // i18n-ignore : journal
   try {
     const defaultOutput = (facts.readDefault ?? defaultOutputOfWindows)();
-    for (const line of futurePinballSoundReport({ ...(defaultOutput ? { defaultOutput } : {}), outputs: facts.outputs, ...(facts.audio ? { audio: facts.audio } : {}) }).lines) facts.log(prefix + line);
+    for (const line of futurePinballSoundReport({ ...(defaultOutput ? { defaultOutput } : {}), outputs: facts.outputs, displays: facts.displays, ...(facts.audio ? { audio: facts.audio } : {}) }).lines) facts.log(prefix + line);
   } catch (error) {
     facts.log(`${prefix}son : sortie par défaut illisible (${(error as Error).message}).`); // i18n-ignore : journal
   }

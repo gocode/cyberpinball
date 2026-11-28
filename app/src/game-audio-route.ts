@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { gameAudioRoute, type CabinetAudio, type ObservedAudioOutput } from '@cyberpinball/core';
+import { gameAudioRoute, type CabinetAudio, type ObservedAudioOutput, type ObservedDisplay } from '@cyberpinball/core';
 import { readEndpointVolumes, setDefaultEndpoint } from '@cyberpinball/win-displays';
 
 export interface GameAudioDeps {
@@ -76,6 +76,8 @@ export interface GameAudioFacts {
   label: string;
   audio: CabinetAudio | undefined;
   outputs: readonly ObservedAudioOutput[];
+  /** Écrans branchés : le haut-parleur d'un écran n'est choisi qu'à défaut d'autre sortie. */
+  displays?: readonly ObservedDisplay[];
   log: (line: string) => void;
   deps?: GameAudioDeps;
 }
@@ -94,7 +96,7 @@ export function routeGameAudio(facts: GameAudioFacts): () => void {
     const left = readWitness(file);
     if (left) giveBack(file, left, facts.log, prefix, deps);
     const before = deps.readDefault();
-    const route = gameAudioRoute({ defaultId: before, outputs: facts.outputs, audio: facts.audio });
+    const route = gameAudioRoute({ defaultId: before, outputs: facts.outputs, audio: facts.audio, displays: facts.displays });
     facts.log(`${prefix}Son : ${route.line}`); // i18n-ignore : journal
     if (!route.target || !before) {
       if (route.target && !before) facts.log(`${prefix}Son : sortie par défaut de Windows illisible, rien n'est changé.`); // i18n-ignore : journal

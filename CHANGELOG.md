@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.5
 
+- Pinball FX, Pinball FX3, Pinball FX Midnight et Future Pinball jouent maintenant sur les enceintes de l'étape "Son" de la borne (le plateau, sinon le fronton ; le haut-parleur d'un écran de la borne ne passe qu'après de vraies enceintes). Ces jeux n'ont aucun choix de sortie : ils jouent sur la sortie par défaut de Windows, qui pouvait être un casque ou un écran, d'où un son qui ne sortait pas par les bonnes enceintes. Cyber Pinball pose la sortie de l'étape "Son" comme sortie par défaut le temps de la partie, puis rend celle d'avant.
 - Darkest Dungeon (Original 2023) démarre de nouveau : son script lit la racine du PuP-Pack dès le chargement de la table, et le VPX corrigé (série 12) ne répondait rien tant qu'aucun jeu n'était fixé, si bien que le script s'arrêtait et que la partie se perdait en erreurs "Objet requis". Le plugin PuP répond maintenant, comme PinUP Player, avec le dossier pupvideos de la table.
 - Le diagnostic des tables prévient quand le script d'une table cherche, dès son chargement, un fichier du PuP-Pack absent du dossier pupvideos de la table.
 - Tu peux donner un nom à chaque bouton, à la souris comme aux boutons de la borne : un nom prêt ("Flipper gauche", "MagnaSave droit", "Fire (barre de verrouillage)"…), un repère et une place ("Bouton rouge devant", "Bouton n° 2 dessous"), ou le nom que tu écris toi-même (clavier de l'ordinateur, ou clavier affiché à l'écran que tu pilotes avec les flippers et Start).

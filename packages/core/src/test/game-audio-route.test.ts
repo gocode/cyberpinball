@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { gameAudioRoute, type CabinetAudio, type ObservedAudioOutput } from '../index';
+import { gameAudioRoute, type CabinetAudio, type ObservedAudioOutput, type ObservedDisplay } from '../index';
 import { REPO_ROOT } from './i18n-scan';
 
 interface Deps {
@@ -59,6 +59,26 @@ test('décision : déjà la bonne (casse de l’identifiant sans importance), so
   // Sans playfield : le fronton.
   const backglass = { roles: { backglass: SPEAKERS }, outputs: [] } as unknown as CabinetAudio;
   assert.equal(gameAudioRoute({ defaultId: HEADSET, outputs, audio: backglass }).target?.role, 'backglass');
+});
+
+test('décision : le haut-parleur d’un écran de la borne ne passe qu’après les enceintes (rapport du 28/11/2026 : le son sortait de l’écran)', () => {
+  const SCREEN = '{0.0.0.00000000}.{ecran}';
+  const CONTAINER = '{5C5D31D9-DA90-5984-B322-628AD26691C4}';
+  const both = [
+    { endpointId: SCREEN, friendlyName: 'PL4380UH (NVIDIA High Definition Audio)', containerId: CONTAINER, formFactor: 9 },
+    { endpointId: SPEAKERS, friendlyName: 'Haut-parleurs (High Definition Audio Device)', containerId: '{00000000-0000-0000-FFFF-FFFFFFFFFFFF}', formFactor: 1 },
+  ] as unknown as ObservedAudioOutput[];
+  const displays = [{ containerId: CONTAINER.toLowerCase() }] as unknown as ObservedDisplay[];
+  // Plateau sur l'écran, enceintes au fronton : les enceintes.
+  const split = { roles: { playfield: SCREEN, backglass: SPEAKERS }, outputs: [] } as unknown as CabinetAudio;
+  const r = gameAudioRoute({ defaultId: SCREEN, outputs: both, audio: split, displays });
+  assert.equal(r.target?.id, SPEAKERS);
+  assert.equal(r.target?.role, 'backglass');
+  // Rien d'autre que l'écran : l'écran, faute de mieux.
+  const onlyScreen = { roles: { playfield: SCREEN }, outputs: [] } as unknown as CabinetAudio;
+  assert.equal(gameAudioRoute({ defaultId: SPEAKERS, outputs: both, audio: onlyScreen, displays }).target?.id, SCREEN);
+  // Enceintes débranchées : l'écran qui est là passe avant une sortie absente.
+  assert.equal(gameAudioRoute({ defaultId: SPEAKERS, outputs: [both[0]!], audio: split, displays }).target?.id, SCREEN);
 });
 
 test('partie : la sortie de l’étape « Son » est posée, puis l’ancienne rendue, témoin effacé', () => {

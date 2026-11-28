@@ -6295,7 +6295,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   // sortie par défaut le temps de la partie, rendue à la fin (game-audio-route.ts).
   const giveBackGameAudio =
     simulated === undefined && !simulatedDisplays() && process.platform === 'win32'
-      ? routeGameAudio({ dataDir: loc.dataDir, label: `${zenName} (${table.id})`, audio: loadCabinet(loc.dataDir)?.audio, outputs: audioOutputs() ?? [], log: (line) => console.log(line) })
+      ? routeGameAudio({ dataDir: loc.dataDir, label: `${zenName} (${table.id})`, audio: loadCabinet(loc.dataDir)?.audio, outputs: audioOutputs() ?? [], displays: observedDisplays(), log: (line) => console.log(line) })
       : () => undefined;
   // Future Pinball : son playfield et son fronton visent le NOM GDI d'un écran que Windows renumérote ; sur un
   // PinCab, le playfield 4K s'ouvrait sur l'écran du DMD (futurepinball-screens.ts). Réglé d'après les rôles.
@@ -6315,7 +6315,7 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     }
     // Son et vue : ce que la partie va trouver (sortie par défaut de Windows, vue de BAM de la table), dit avant qu'elle ne parte.
     const fpInstall = detectFuturePinball(loc.dataDir, loc.root);
-    logFuturePinballLaunch({ tableId: table.id, tableFile: table.file, install: fpInstall, audio: loadCabinet(loc.dataDir)?.audio, outputs: audioOutputs() ?? [], log: (line) => console.log(line) });
+    logFuturePinballLaunch({ tableId: table.id, tableFile: table.file, install: fpInstall, audio: loadCabinet(loc.dataDir)?.audio, outputs: audioOutputs() ?? [], displays: observedDisplays(), log: (line) => console.log(line) });
     // Cadrage : résolution, mode, rotation de la table, mode arcade et caméra que le jeu va trouver, face à l'écran du playfield.
     const fpScreen = menuAssignments.playfield;
     const fpEdge = loadCabinet(loc.dataDir)?.playfield?.flipperEdge;

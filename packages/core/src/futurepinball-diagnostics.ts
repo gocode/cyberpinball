@@ -13,7 +13,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { AudioRole, CabinetAudio, ObservedAudioOutput } from './model';
+import type { CabinetAudio, ObservedAudioOutput, ObservedDisplay } from './model';
+import { wantedGameOutput } from './game-audio-route';
 import { FUTURE_PINBALL_VIEW_UNTOUCHED_MS, planFuturePinballViews } from './futurepinball-managed';
 
 /** La sortie par défaut de Windows, telle que Core Audio la rend (system-volume.ts). */
@@ -44,26 +45,19 @@ function outputName(id: string | undefined, outputs: readonly ObservedAudioOutpu
   return known?.lastSeen?.friendlyName ?? known?.label;
 }
 
-/** Sortie de l'étape « Son » dont le son compte pour la partie : celle du playfield, à défaut celle du fronton. */
-function wantedOutput(audio: CabinetAudio | undefined): { id: string; role: AudioRole } | undefined {
-  const playfield = audio?.roles.playfield;
-  if (playfield) return { id: playfield, role: 'playfield' };
-  const backglass = audio?.roles.backglass;
-  return backglass ? { id: backglass, role: 'backglass' } : undefined;
-}
 
 /**
  * Où jouera le son de Future Pinball, d'après la sortie par défaut de Windows (`defaultOutput`, vide si
  * Core Audio ne répond pas), les sorties vues (`outputs`) et l'étape « Son » de la borne (`audio`).
  */
-export function futurePinballSoundReport(input: { defaultOutput?: DefaultOutputState; outputs: readonly ObservedAudioOutput[]; audio?: CabinetAudio }): FuturePinballSoundReport {
-  const { defaultOutput, outputs, audio } = input;
+export function futurePinballSoundReport(input: { defaultOutput?: DefaultOutputState; outputs: readonly ObservedAudioOutput[]; audio?: CabinetAudio; displays?: readonly ObservedDisplay[] }): FuturePinballSoundReport {
+  const { defaultOutput, outputs, audio, displays } = input;
   if (!defaultOutput) return { elsewhere: false, silent: false, lines: ['Son : la sortie par défaut de Windows n’a pas pu être lue.'] }; // i18n-ignore : journal
   const name = outputName(defaultOutput.id, outputs, audio) ?? defaultOutput.id;
   const state = defaultOutput.muted ? 'coupée' : `${Math.round(defaultOutput.level * 100)} %`; // i18n-ignore : journal
   const silent = defaultOutput.muted || defaultOutput.level < 0.01;
   const lines = [`Son : Future Pinball n’a pas de choix de sortie, il joue sur la sortie par défaut de Windows, « ${name} » (${state}).`]; // i18n-ignore : journal
-  const wanted = wantedOutput(audio);
+  const wanted = wantedGameOutput(audio, outputs, displays); // Même choix que game-audio-route.ts.
   const elsewhere = !!wanted && !same(wanted.id, defaultOutput.id);
   if (wanted && elsewhere) {
     const target = outputName(wanted.id, outputs, audio) ?? wanted.id;
