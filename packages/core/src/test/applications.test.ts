@@ -22,6 +22,7 @@ import {
   blockEdgeTranslate,
   withoutTranslatePrefs,
   appIconDue,
+  DEFAULT_APPS,
   appIdFor,
   appMobile,
   appZoom,
@@ -45,6 +46,7 @@ import {
   updateApplication,
   type AppEntry,
 } from '../applications';
+import { BUNDLED_APP_ICON_DIR, bundledAppIcon } from '../applications-bundled';
 import { toPhysicalScreen } from '../fingerprint';
 import { setLanguage } from '../i18n';
 import type { Cabinet, Rotation } from '../model';
@@ -352,10 +354,12 @@ test('icône trop petite ou introuvable : cherchée au plus une fois par délai,
   // Le menu : un site muet est interrogé une fois, la date s'écrit, et rouvrir la grille ne relit rien.
   const dir = tmp();
   const looks: string[] = [];
-  const menu = makeMenu({ apps: defaultApplications().apps, online: true, look: async (id: string) => (looks.push(id), {}), dataDir: dir });
+  // Des sites ajoutés à la main (les six d'office ont une icône livrée et ne sont jamais cherchées).
+  const sites = defaultApplications().apps.map((a) => ({ ...a, id: `site-${a.id}` }));
+  const menu = makeMenu({ apps: sites, online: true, look: async (id: string) => (looks.push(id), {}), dataDir: dir });
   await settle();
   const first = looks.length;
-  assert.ok(first > 0 && first <= defaultApplications().apps.length, 'chaque application sans icône, une fois');
+  assert.ok(first > 0 && first <= sites.length, 'chaque application sans icône, une fois');
   const saved = loadApplications(dir);
   assert.ok(saved.apps.every((a) => a.iconChecked), 'la date de la recherche est écrite');
   menu.menu.open(() => undefined);
@@ -366,6 +370,28 @@ test('icône trop petite ou introuvable : cherchée au plus une fois par délai,
   await settle();
   assert.equal(looks.length, first, 'au démarrage suivant, rien avant le délai');
   void again;
+});
+
+test('icônes livrées : les six d’office ont un fichier net embarqué, la grille le montre et ne cherche rien sur le réseau', async () => {
+  const dir = path.resolve(__dirname, '..', '..', '..', '..', 'app', 'renderer', BUNDLED_APP_ICON_DIR);
+  for (const d of DEFAULT_APPS) {
+    const rel = bundledAppIcon(d.id);
+    assert.ok(rel, `${d.id} : icône livrée`);
+    const file = path.join(dir, path.basename(rel!));
+    assert.ok(fs.existsSync(file), `${d.id} : ${path.basename(rel!)} est dans app/renderer`);
+    const head = fs.readFileSync(file);
+    if (file.endsWith('.png')) assert.ok(head.readUInt32BE(16) >= 128 && head.readUInt32BE(20) >= 128, `${d.id} : au moins 128 px`);
+    else assert.match(head.toString('utf8'), /width="256" height="256"/, `${d.id} : SVG de 256 px (naturalWidth lu par la grille)`);
+    assert.equal(appIconDue({ id: d.id }, undefined, Date.now()), false, `${d.id} : jamais cherchée sur le site`);
+  }
+  assert.equal(bundledAppIcon('plex'), undefined, 'une application du catalogue garde l’icône de son site');
+  assert.equal(bundledAppIcon('constructor'), undefined, 'pas de clé héritée d’Object');
+  const looks: string[] = [];
+  const m = makeMenu({ apps: defaultApplications().apps, online: true, look: async (id: string) => (looks.push(id), {}) });
+  await settle();
+  assert.deepEqual(looks, [], 'hors ligne ou non : aucune requête pour les six');
+  const tiles = m.top().apps.tiles as { id: string; icon?: string }[];
+  for (const tile of tiles) assert.equal(tile.icon, bundledAppIcon(tile.id), `${tile.id} : la tuile porte l’icône livrée`);
 });
 
 test('fermée par le front-end (partie, sortie) : ni premier plan ni grille', async () => {

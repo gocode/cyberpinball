@@ -7,11 +7,13 @@
 // Ce module ne fait rien sur le réseau ni sur l'écran (app/src/applications*.ts s'en chargent) : la
 // liste écrite (applications.json), le catalogue des suggestions, les adresses, la lecture des icônes
 // d'une page (manifeste, icône Apple, favicon), la tuile composée quand un site n'en a pas de grande, et
-// les arguments d'Edge. Aucun logo n'est livré : chaque icône vient du site lui-même.
+// les arguments d'Edge. Seules les six installées d'office ont une icône livrée (applications-bundled.ts) ;
+// pour les autres, l'icône vient du site lui-même.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { bundledAppIcon } from './applications-bundled';
 import { t } from './i18n';
 import { readJsonFile } from './store';
 import { EDGE_QUIET_ARGS, type ScreenRect } from './youtube-account';
@@ -411,7 +413,8 @@ export const APP_ICON_RECHECK_NONE_MS = 24 * 3600 * 1000;
  * tuile, et jamais plus d'une fois par délai (sinon, un site qui n'a pas mieux serait relu, page,
  * manifeste et sept images, à chaque démarrage de la borne).
  */
-export function appIconDue(app: Pick<AppEntry, 'icon' | 'iconChecked'>, side: number | undefined, nowMs: number): boolean {
+export function appIconDue(app: Pick<AppEntry, 'icon' | 'iconChecked'> & { id?: string }, side: number | undefined, nowMs: number): boolean {
+  if (app.id && bundledAppIcon(app.id)) return false;
   if (app.icon && (side ?? APP_ICON_MIN) >= APP_ICON_MIN) return false;
   const checked = app.iconChecked ? Date.parse(app.iconChecked) : NaN;
   if (!Number.isFinite(checked)) return true;

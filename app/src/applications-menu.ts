@@ -19,6 +19,7 @@ import {
   DEFAULT_APPS,
   addApplication,
   appIconDue,
+  bundledAppIcon,
   appInitials,
   appMobile,
   appZoom,
@@ -190,7 +191,12 @@ export function createApplicationsMenu(host: ApplicationsMenuHost): Applications
       log(`Applications : enregistrement impossible (${(error as Error).message})`); // i18n-ignore : journal
     }
   };
-  const face = (a: Pick<AppEntry, 'id' | 'name' | 'color' | 'icon'>): AppFace => ({ id: a.id, name: a.name, initials: appInitials(a.name), color: a.color, ...(a.icon ? { icon: host.iconUrl(a.icon) } : {}) });
+  // L'icône livrée avec le logiciel (applications-bundled.ts) l'emporte sur celle relevée sur le site.
+  const iconOf = (a: Pick<AppEntry, 'id' | 'icon'>): string | undefined => bundledAppIcon(a.id) ?? (a.icon ? host.iconUrl(a.icon) : undefined);
+  const face = (a: Pick<AppEntry, 'id' | 'name' | 'color' | 'icon'>): AppFace => {
+    const icon = iconOf(a);
+    return { id: a.id, name: a.name, initials: appInitials(a.name), color: a.color, ...(icon ? { icon } : {}) };
+  };
   const whereOf = (a: AppEntry): { where: string; whereIcon: IconName } =>
     isLocalApp(a) ? { where: t('{screen} · local', { screen: shortScreen(a.screen) }), whereIcon: 'network' } : { where: shortScreen(a.screen), whereIcon: a.screen === 'playfield' ? 'playfield' : 'monitor' };
 

@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.2.5
+
+- Applications: Netflix, Prime Video, Disney+, YouTube, Twitch and Spotify now show their real icon, sharp at any size and shipped with the software: nothing is fetched online for them, so they also show offline.
+
 ## 0.2.4
 
 - Pinball FX Midnight and Surprise table were developed by Emeric (lechable472-cloud): thanks to him. What's new says so.

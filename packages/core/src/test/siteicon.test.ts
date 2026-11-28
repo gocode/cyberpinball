@@ -216,7 +216,8 @@ test('une icône gardée plus petite que la tuile est relue une fois ; une grand
   assert.equal(storedIconSide(dataDir, 'petite.png'), 32);
   assert.equal(storedIconSide(dataDir, 'absente.png'), undefined);
   let store = core.defaultApplications('2026-11-20T10:00:00.000Z');
-  store = { apps: store.apps.map((a: { id: string }, i: number) => ({ ...a, icon: i === 0 ? 'petite.png' : 'grande.png' })) };
+  // Des sites ajoutés à la main : les six d'office ont une icône livrée et ne sont jamais relues.
+  store = { apps: store.apps.map((a: { id: string }, i: number) => ({ ...a, id: `site-${a.id}`, icon: i === 0 ? 'petite.png' : 'grande.png' })) };
   core.saveApplications(dataDir, store);
   const looked: string[] = [];
   const host = {

@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.2.5
+
+- Applications : Netflix, Prime Video, Disney+, YouTube, Twitch et Spotify s'affichent avec leur vraie icône, nette en grand et livrée avec le logiciel : plus rien n'est cherché en ligne pour elles, elles s'affichent aussi sans connexion.
+
 ## 0.2.4
 
 - Pinball FX Midnight et la Table surprise ont été développés par Emeric (lechable472-cloud) : merci à lui. Les Nouveautés le disent.

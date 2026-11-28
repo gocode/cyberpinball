@@ -240,6 +240,7 @@ export * from './badges';
 export * from './levels';
 export * from './arena';
 export * from './applications';
+export * from './applications-bundled';
 export * from './page-loading';
 export * from './communityhome';
 export * from './account';
