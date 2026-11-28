@@ -340,18 +340,23 @@ export interface VpxPresetsMenuHost {
   iniPath(): string;
 }
 
-export function createVpxPresetsMenu(host: VpxPresetsMenuHost): { item: ProvidedSystemItem; open(at?: number): void } {
-  function effectiveState(): QualityState {
-    const doc = IniDocument.parse(readTextIfExists(host.iniPath()));
-    const state = readQualityState(host.dataDir(), host.iniPath()) ?? firstState(doc);
-    return state.choice !== 'custom' && manualChange(doc, state.written) ? personalizedState(doc, state) : state;
-  }
+/** Le choix en vigueur : une modification faite à la main dans l'INI vaut « Personnalisé ». */
+export function effectiveQualityState(dataDir: string, iniPath: string): QualityState {
+  const doc = IniDocument.parse(readTextIfExists(iniPath));
+  const state = readQualityState(dataDir, iniPath) ?? firstState(doc);
+  return state.choice !== 'custom' && manualChange(doc, state.written) ? personalizedState(doc, state) : state;
+}
 
-  function summary(): string {
-    const state = effectiveState();
-    if (state.choice === 'auto') return state.level ? t('Auto · actuellement {mode}', { mode: qualityLabel(state.level) }) : t('Auto · choisi à la prochaine partie');
-    return qualityLabel(state.choice);
-  }
+/** Le pré-réglage en vigueur, en une ligne : « Équilibré », « Personnalisé », « Auto · actuellement Qualité ». */
+export function qualitySummary(dataDir: string, iniPath: string): string {
+  const state = effectiveQualityState(dataDir, iniPath);
+  if (state.choice === 'auto') return state.level ? t('Auto · actuellement {mode}', { mode: qualityLabel(state.level) }) : t('Auto · choisi à la prochaine partie');
+  return qualityLabel(state.choice);
+}
+
+export function createVpxPresetsMenu(host: VpxPresetsMenuHost): { item: ProvidedSystemItem; open(at?: number): void } {
+  const effectiveState = () => effectiveQualityState(host.dataDir(), host.iniPath());
+  const summary = () => qualitySummary(host.dataDir(), host.iniPath());
 
   let openedState: QualityState = { choice: 'custom' };
 

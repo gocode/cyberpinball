@@ -409,7 +409,7 @@ import { createLoadingStripFactory } from './page-loading';
 import { fetchSiteLook, storedIconSide } from './applications-icons';
 import { locations, trialVpxAllowedHere, vpxInstall, vpxProfile } from './paths';
 import { createVpxTrialMenu } from './vpx-essai-menu';
-import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine } from './qualite-vpx';
+import { createVpxPresetsMenu, prepareQuality, qualityAfterGame, qualityMachine, qualitySummary } from './qualite-vpx';
 import { createFramingMenu } from './cadrage-menu';
 import { createFramingPreviews } from './framing-preview';
 import { loadPlugins } from './plugins';
@@ -3669,6 +3669,7 @@ const endCard = createEndCard({ place: playfieldPlace, captureDir: process.env.C
 let challengeAfterGame: TableEntry | undefined;
 // Mode débogage (debogage.ts) : les mesures de tous les écrans en direct, par-dessus un seul d'entre eux ; éteint, rien ne tourne.
 let debugGpu: { at: number; gpu: { name: string; vramMb?: number } | undefined } | undefined;
+let debugQuality: { at: number; text: string } | undefined;
 const debug = createDebug({
   dataDir: loc.dataDir,
   version: app.getVersion(),
@@ -3692,6 +3693,11 @@ const debug = createDebug({
       debugGpu = { at: Date.now(), gpu: machine.gpu ? { name: machine.gpu, ...(machine.vramMb ? { vramMb: machine.vramMb } : {}) } : undefined };
     }
     return debugGpu.gpu;
+  },
+  // Le pré-réglage de qualité vient de l'INI actif et de qualite-vpx.json : relu toutes les cinq secondes au plus.
+  quality: () => {
+    if (!debugQuality || Date.now() - debugQuality.at > 5_000) debugQuality = { at: Date.now(), text: qualitySummary(loc.dataDir, activeVpxIni(loc)) };
+    return debugQuality.text;
   },
   coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
   captureDir: process.env.CYBERPINBALL_CAPTURE,

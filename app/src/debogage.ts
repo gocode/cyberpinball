@@ -76,6 +76,8 @@ export interface DebugHost {
   /** La table que la roue montre, ou que la partie joue. */
   table(): string | undefined;
   gpu(): { name: string; vramMb?: number } | undefined;
+  /** Le pré-réglage de qualité de VPX en vigueur, déjà traduit (« Équilibré », « Auto · actuellement Qualité »). */
+  quality?(): string | undefined;
   /** La fenêtre étrangère (VPX, PuP…) qui passe devant la nôtre, décrite pour le journal ; undefined : rien devant. */
   coveredBy?(win: BrowserWindow): string | undefined;
   /** Essais sans opérateur : capture de ce que la fenêtre montre. */
@@ -381,6 +383,7 @@ export function createDebug(host: DebugHost): DebugController {
     });
     const table = host.table();
     const gpu = host.gpu();
+    const quality = setting.mode === 'detailed' ? host.quality?.() : undefined;
     const previousMs = table ? previousLaunch.get(table) : undefined;
     return {
       mode: setting.mode,
@@ -393,6 +396,7 @@ export function createDebug(host: DebugHost): DebugController {
       samples: ring.samples(),
       screens,
       ...(gpu ? { gpu } : {}),
+      ...(quality ? { quality } : {}),
       ...(target ? { target } : {}),
       ...(cap ? { cap } : {}),
       ...(stall ? { stall } : {}),

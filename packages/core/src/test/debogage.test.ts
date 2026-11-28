@@ -172,7 +172,7 @@ test('hors partie, détaillé : chaque écran, le chargement des médias, le sys
     s.screens.playfield = { fps: 47, worstMs: 96, hz: 60, width: 2160, height: 3840 };
     s.cpu = 75;
   });
-  const view = buildDebugView(base({ samples, media: { table: 'Atlas Rising', rows: [{ role: 'playfield', kind: 'vidéo', ms: 160 }, { role: 'backglass', kind: 'vidéo', ms: 1900 }] }, gpu: { name: 'GTX 1050', vramMb: 2048 } }))!;
+  const view = buildDebugView(base({ samples, media: { table: 'Atlas Rising', rows: [{ role: 'playfield', kind: 'vidéo', ms: 160 }, { role: 'backglass', kind: 'vidéo', ms: 1900 }] }, gpu: { name: 'GTX 1050', vramMb: 2048 }, quality: 'Auto · actuellement Qualité' }))!;
   assert.equal(view.layout, 'detailed');
   assert.equal(view.tone, 'ko');
   const screens = view.blocks.find((b) => b.kind === 'screens')!;
@@ -193,6 +193,14 @@ test('hors partie, détaillé : chaque écran, le chargement des médias, le sys
   assert.ok(system.kind === 'kv');
   assert.equal(system.rows.find((r) => r.k === 'Processeur')!.tone, 'av', '75 % : chargé');
   assert.equal(system.rows.find((r) => r.k === 'Carte graphique')!.s, 'GTX 1050');
+  assert.equal(system.rows.find((r) => r.k === 'Pré-réglage VPX')!.v, 'Auto · actuellement Qualité', 'le pré-réglage VPX en vigueur est dit dans le panneau détaillé');
+});
+
+test('pré-réglage VPX : montré seulement dans le panneau détaillé, jamais inventé', () => {
+  const rows = (v: ReturnType<typeof buildDebugView>) => v!.blocks.flatMap((b) => (b.kind === 'kv' ? b.rows : [])).map((r) => r.k);
+  const samples = menuSamples((s) => { s.cpu = 20; });
+  assert.ok(!rows(buildDebugView(base({ samples }))).includes('Pré-réglage VPX'), 'inconnu : pas de ligne');
+  assert.ok(!rows(buildDebugView(base({ mode: 'compact', samples, quality: 'Équilibré' }))).includes('Pré-réglage VPX'), 'compact : pas de ligne');
 });
 
 test('lancement : chaque étape avec son temps, celle qui attend en cours, les suivantes grisées', () => {

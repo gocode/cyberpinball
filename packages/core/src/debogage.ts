@@ -266,6 +266,8 @@ export interface DebugInput {
   /** Écrans de la borne : définition et fréquence. */
   screens: { role: RoleId; width: number; height: number; hz?: number }[];
   gpu?: { name: string; vramMb?: number };
+  /** Le pré-réglage de qualité de VPX en vigueur (déjà traduit) ; absent : non connu. */
+  quality?: string;
   /** Cadence visée par VPX (Hz de l'écran du playfield, ou son maximum réglé). */
   target?: number;
   /** Partie calée sur un écran annexe plus lent (readScreenCap). */
@@ -531,6 +533,7 @@ export function buildDebugView(input: DebugInput): DebugView | undefined {
   if (cpu !== undefined) system.push({ k: t('Processeur'), ...(mine?.cpu !== undefined ? { s: `${mineName} ${num(Math.round(mine.cpu))} %` } : {}), v: `${num(Math.round(cpu))} %`, ...(cpuTone(cpu) !== 'ok' ? { tone: cpuTone(cpu) } : {}) });
   if (ramTotal) system.push({ k: t('Mémoire'), ...(game && vpxMem !== undefined ? { s: `VPX ${memText(vpxMem)}` } : last?.app?.memMb !== undefined ? { s: `Cyber Pinball ${memText(last.app.memMb)}` } : {}), v: `${gb(ramUsed)} / ${gb(ramTotal)}`, ...(ramTone(ramUsed, ramTotal) !== 'ok' ? { tone: ramTone(ramUsed, ramTotal) } : {}) });
   if (input.gpu) system.push({ k: t('Carte graphique'), s: input.gpu.name, v: input.gpu.vramMb ? gb(input.gpu.vramMb) : '–' });
+  if (layout === 'detailed' && input.quality) system.push({ k: t('Pré-réglage VPX'), v: input.quality });
   if (system.length) view.blocks.push({ kind: 'kv', title: t('SYSTÈME'), rows: system });
   return view;
 }

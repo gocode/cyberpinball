@@ -48,6 +48,7 @@ export const messages: Record<string, string> = {
   'Processeur': 'Processor',
   'Mémoire': 'Memory',
   'Carte graphique': 'Graphics card',
+  'Pré-réglage VPX': 'VPX preset',
   'SYSTÈME': 'SYSTEM',
   // app/src/debogage.ts
   'vidéo': 'video',
