@@ -147,6 +147,7 @@ import {
   PINBALLFX3_BACKGLASS_PAGE,
   PINBALLFX3_BACKGLASS_TITLE,
   buttonKeys,
+  ButtonTally,
   windowsVk,
   readTextIfExists,
   IniDocument,
@@ -2610,7 +2611,7 @@ function buttonSetupItems(): SystemItem[] {
   const check = resetCheck();
   const backup = buttonsBackup();
   return [
-    ...(['boutons', 'interface', 'lanceur', 'tilt'] as const).map(wizardStepItem),
+    ...(['boutons', 'interface', 'lanceur', 'tilt', 'essai'] as const).map(wizardStepItem),
     ...(backup
       ? [{ label: t('Rétablir les boutons d’avant'), detail: t('Relevé remplacé le {date} par les touches par défaut des encodeurs', { date: formatDateTime(backup.at) }), icon: 'restore' as const, run: () => restoreButtonsFromMenu() }]
       : []),
@@ -2650,7 +2651,7 @@ function cabinetSetupItems(): SystemItem[] {
   const buttonsPart = buttonSetupItems();
   const screensPart = screenSetupItems();
   return [
-    { label: t('Boutons'), detail: t('Boutons du jeu et de l’interface, lanceur analogique, tilt, touches par défaut'), icon: 'button', attention: buttonsPart.some((i) => i.attention), run: () => openCabinetPart('buttons') },
+    { label: t('Boutons'), detail: t('Boutons du jeu et de l’interface, lanceur analogique, tilt, essai et noms des boutons, touches par défaut'), icon: 'button', attention: buttonsPart.some((i) => i.attention), run: () => openCabinetPart('buttons') },
     { label: t('Écrans'), detail: t('Écrans, playfield, disposition, écran du DMD'), icon: 'screens', attention: screensPart.some((i) => i.attention), run: () => openCabinetPart('screens') },
     wizardStepItem('son'),
     { label: t('Mode nuit'), detail: nightModeMenu.summary(), icon: 'moon', run: () => nightModeMenu.open(() => openCabinetSetup()) },
@@ -6240,7 +6241,11 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
     if (cinema.handover()) playUiSound('coil');
   };
   // Exit tenu se lit quel que soit le premier plan : le sondage des joysticks tourne pendant la partie.
-  const stopJoystick = watchJoystickButtons(() => undefined);
+  // Les appuis lus sont comptés : au retour, le journal dit si les boutons (volume compris) arrivent pendant la partie.
+  const buttonTally = new ButtonTally();
+  const stopJoystick = watchJoystickButtons((code, down) => {
+    if (down) buttonTally.press(code);
+  });
   const command: { file: string; args: string[]; cwd?: string; bam?: true } | undefined = fp
     ? fp.command
     : fx && table.pinballFxTable !== undefined
@@ -6390,6 +6395,8 @@ async function playPinballFx(table: TableEntry, autoStopAfterMs: number | undefi
   stopZenKeys();
   stopNudgeKeys();
   stopJoystick();
+  const volumeButtons = loadCabinet(loc.dataDir)?.buttons;
+  console.log(`${zenName} : ${buttonTally.summary([volumeButtons?.volumeDown, volumeButtons?.volumeUp, volumeButtons?.volumeMute].filter((code): code is string => typeof code === 'string'))}.`); // i18n-ignore : journal
   const stoppedLoading = launch?.stopped === true;
   endLaunch();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));

@@ -14,6 +14,7 @@
 // manette : le jeton de VPX lui-même, « SDLJoy_<GUID>_<n>;<bouton> », lu par la
 // bibliothèque SDL de VPX, packages/win-displays/src/joystick.ts).
 
+import { buttonNameOf } from './button-names';
 import { formatList, t } from './i18n';
 import { IniDocument } from './ini';
 import type { ButtonId, Cabinet, CabinetButtons, CabinetTilt, NavigationButtons, NavigationId } from './model';
@@ -482,6 +483,12 @@ const KEY_LABELS: Record<string, string> = {
  */
 export function keyLabel(code: string | undefined): string {
   if (!code) return t('aucune');
+  // Le nom que le joueur a donné à ce bouton (button-names.ts) passe devant son numéro ou sa touche.
+  return buttonNameOf(code) ?? defaultKeyLabel(code);
+}
+
+/** Nom d'une touche ou d'un bouton sans le nom du joueur : « Bouton 7 du joystick », « Maj gauche ». */
+export function defaultKeyLabel(code: string): string {
   const joy = joystickButton(code);
   // Numéroté à partir de 1, comme le panneau « Contrôleurs de jeu » de Windows et l'outil de configuration du Pinscape.
   if (joy) {

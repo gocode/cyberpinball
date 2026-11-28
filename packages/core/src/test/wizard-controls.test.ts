@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { WIZARD_PHASES } from '../wizardsteps';
+import { STANDALONE_PHASES, WIZARD_PHASES } from '../wizardsteps';
 
 type Role = 'back' | 'previous' | 'next' | 'confirm' | 'exit';
 type Keys = Record<Role, readonly string[]>;
@@ -56,7 +56,8 @@ const progress = require(path.join(REPO_ROOT, 'app', 'dist', 'wizard-progress.js
 
 test('frise des étapes : chaque étape de l’assistant y a sa place, une seule en cours, nommée avec où l’on en est', () => {
   // Une phase ajoutée à l'assistant sans place dans la frise la laisserait sans étape en cours.
-  assert.deepEqual([...progress.progressPhases()].sort(), WIZARD_PHASES.filter((p) => p !== 'done').sort());
+  // Sauf les étapes à part (essai des boutons, 28/11/2026) : elles n'entrent jamais dans l'assistant complet.
+  assert.deepEqual([...progress.progressPhases()].sort(), WIZARD_PHASES.filter((p) => p !== 'done' && !STANDALONE_PHASES.includes(p)).sort());
   const items = progress.progressView('assign', undefined, 'Rôle 2 sur 4')!;
   assert.deepEqual(items.map((i) => i.state), ['done', 'done', 'done', 'done', 'current', 'todo', 'todo', 'todo']);
   assert.deepEqual(items.filter((i) => i.label).map((i) => i.label), ['Écrans · Rôle 2 sur 4'], 'seule l’étape en cours est nommée');

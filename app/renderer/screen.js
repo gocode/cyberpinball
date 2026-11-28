@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'buttonTest', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -162,6 +162,43 @@ function renderPlumb(state) {
   const caption = $('plumb-caption');
   caption.classList.toggle('contact', Boolean(p.contact));
   text('plumb-caption', p.contact ? 'TILT' : p.caption);
+}
+
+// Étape « Essai et noms des boutons » : une case par entrée de la carte, rangées par carte. Elle
+// s'allume tant que le bouton est enfoncé, garde le compte des appuis, et reste grise tant que rien
+// n'est venu (fil, contact ou entrée à vérifier). Le nom donné par le joueur remplace le numéro.
+function renderPins(state) {
+  const box = $('pins');
+  const pins = state.phase === 'buttonTest' ? (state.pins ?? []) : [];
+  box.hidden = pins.length === 0;
+  box.replaceChildren();
+  let group;
+  let grid;
+  for (const pin of pins) {
+    if (pin.group !== group) {
+      group = pin.group;
+      const head = document.createElement('h3');
+      head.textContent = group;
+      grid = document.createElement('div');
+      grid.className = 'pin-grid';
+      box.append(head, grid);
+    }
+    const cell = document.createElement('div');
+    cell.className = `pin ${pin.state}${pin.target ? ' target' : ''}`;
+    const title = document.createElement('span');
+    title.className = 'pin-title';
+    title.textContent = pin.title;
+    const count = document.createElement('b');
+    count.textContent = pin.count ? `×${pin.count}` : '—';
+    cell.append(title, count);
+    for (const extra of [pin.sub, pin.roles]) {
+      if (!extra) continue;
+      const small = document.createElement('small');
+      small.textContent = extra;
+      cell.append(small);
+    }
+    grid.append(cell);
+  }
 }
 
 document.addEventListener('click', (event) => {
@@ -466,10 +503,12 @@ function render(state) {
   const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
   root.classList.toggle('choice', state.phase === 'buttonsChoice');
-  root.classList.toggle('buttons', ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt'].includes(state.phase));
-  // Lanceur et tilt : une colonne de réglages sous la jauge ou le balancier.
-  root.classList.toggle('plunger', state.phase === 'plunger' || state.phase === 'tilt');
+  root.classList.toggle('buttons', ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'buttonTest', 'plunger', 'tilt'].includes(state.phase));
+  // Lanceur, tilt et essai des boutons : une colonne de réglages sous la jauge, le balancier ou les cases.
+  root.classList.toggle('plunger', ['plunger', 'tilt', 'buttonTest'].includes(state.phase));
+  root.classList.toggle('pinning', state.phase === 'buttonTest');
   renderButtons(state);
+  renderPins(state);
   renderCountdown(state);
   renderGauge(state);
   renderPlumb(state);

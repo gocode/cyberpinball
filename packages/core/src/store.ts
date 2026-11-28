@@ -18,6 +18,7 @@ import {
   type CabinetSet,
   type ConfigurationChoice,
 } from './configurations';
+import { setButtonNames } from './button-names';
 import { t } from './i18n';
 import type { Cabinet, ObservedDisplay } from './model';
 import type { OwnedMemory, SyncFinding } from './sync';
@@ -63,7 +64,11 @@ export function updateCabinetSet(home: string, change: (set: CabinetSet) => Cabi
 /** Configuration active : celle que lisent le menu, les réglages de VPX et l'assistant. */
 export function loadCabinet(home: string): CabinetConfiguration | undefined {
   const set = loadCabinetSet(home);
-  return set && activeConfiguration(set);
+  const active = set && activeConfiguration(set);
+  // Les noms que le joueur a donnés à ses boutons suivent la configuration lue : tout ce qui cite un
+  // bouton (keyLabel) les affiche, sans que chaque appelant les passe (button-names.ts).
+  setButtonNames(active?.buttonNames);
+  return active;
 }
 
 /**
@@ -74,10 +79,16 @@ export function loadCabinet(home: string): CabinetConfiguration | undefined {
 export function saveCabinet(home: string, cabinet: Cabinet | CabinetConfiguration): string {
   const set = loadCabinetSet(home);
   const target = set && (set.configurations.find((c) => c.id === (cabinet as Partial<CabinetConfiguration>).id) ?? activeConfiguration(set));
-  if (!set || !target) return saveCabinetSet(home, addConfiguration(set, cabinet).set);
+  if (!set || !target) {
+    setButtonNames(cabinet.buttonNames);
+    return saveCabinetSet(home, addConfiguration(set, cabinet).set);
+  }
   // Réglages que l'assistant ne demande pas (écran du navigateur intégré) : gardés quand il refait le modèle.
   const kept = !('browserScreen' in cabinet) && target.browserScreen ? { browserScreen: target.browserScreen } : {};
-  const saved: CabinetConfiguration = { ...kept, ...cabinet, id: target.id, name: target.name, ...(target.iniFile && { iniFile: target.iniFile }), updatedAt: new Date().toISOString() };
+  // Noms des boutons : ceux du modèle déjà enregistré quand l'assistant refait le modèle sans les connaître.
+  const names = !('buttonNames' in cabinet) && target.buttonNames ? { buttonNames: target.buttonNames } : {};
+  const saved: CabinetConfiguration = { ...kept, ...names, ...cabinet, id: target.id, name: target.name, ...(target.iniFile && { iniFile: target.iniFile }), updatedAt: new Date().toISOString() };
+  setButtonNames(saved.buttonNames);
   return saveCabinetSet(home, { ...set, configurations: set.configurations.map((c) => (c.id === target.id ? saved : c)) });
 }
 

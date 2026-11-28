@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { BUTTONS, DEFAULT_BUTTONS, buttonInfo, gameKeys, recordButton, vpxVolumeSettings } from '../buttons';
-import { MUTE_HOLD_MS, VOLUME_BADGE_SIZE, VolumeButtons, gameNoticeBounds, volumeAfter, unappliedOutputs, volumeOutputIds, volumeView, type OutputVolume, type VolumeButton } from '../index';
+import { ButtonTally, MUTE_HOLD_MS, VOLUME_BADGE_SIZE, VolumeButtons, gameNoticeBounds, volumeNoEffectLine, volumeAfter, unappliedOutputs, volumeOutputIds, volumeView, type OutputVolume, type VolumeButton } from '../index';
 import { IniDocument } from '../ini';
 import { planVpxSync } from '../sync';
 import type { Cabinet, CabinetButtons } from '../model';
@@ -12,6 +12,24 @@ import { REPO_ROOT } from './i18n-scan';
 
 const one = (level: number, muted = false): OutputVolume[] => [{ id: 'a', level, muted }];
 const levels = (outputs: OutputVolume[]) => outputs.map((o) => o.level);
+
+test('volume : un appui vu qui ne règle rien dit pourquoi au journal (jamais de bouton muet sans trace)', () => {
+  assert.match(volumeNoEffectLine('up', undefined), /Volume \+\) : appui sans effet, aucune sortie audio lisible/);
+  assert.match(volumeNoEffectLine('hold', 'COM refusé'), /Volume − maintenu\) : appui sans effet, son de Windows illisible \(COM refusé\)/);
+});
+
+test('bilan des boutons d\'une partie : appuis comptés par code, ceux du volume à part, « aucun » dit clairement', () => {
+  const tally = new ButtonTally();
+  assert.match(tally.summary(['SDLJoy_x_1;23']), /aucun appui de bouton lu/);
+  tally.press('SDLJoy_x_1;23');
+  tally.press('SDLJoy_x_1;23');
+  tally.press('SDLJoy_x_1;5');
+  assert.equal(tally.total, 3);
+  const line = tally.summary(['SDLJoy_x_1;23', 'SDLJoy_x_1;11']);
+  assert.match(line, /3 appui\(s\) de bouton lu\(s\)/);
+  assert.match(line, /1;23 ×2/);
+  assert.match(line, /dont 2 sur les boutons de volume/);
+});
 
 test('boutons de volume : un pas par appui, sans répétition ; Volume − tenu une seconde, une fois', () => {
   const b = new VolumeButtons();

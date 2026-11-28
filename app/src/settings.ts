@@ -35,6 +35,8 @@ import {
   readTextIfExists,
   sameValue,
   settingId,
+  labelQualifiers,
+  type LabelQualifier,
   settingState,
   formatNumber,
   language,
@@ -563,7 +565,7 @@ function save(def: VpxSettingDef, value: SettingValue | undefined): void {
     }
     reload();
     const shown = s.essentials.get(settingId(def.section, def.key));
-    const name = shown?.label ?? def.label ?? def.key;
+    const name = shown?.label ?? defLabel(def);
     const now = stateOf(def);
     s.notice = {
       tone: 'ok',
@@ -946,7 +948,31 @@ function format(def: VpxSettingDef, value: SettingValue | undefined, essential?:
 
 function label(row: Row): string {
   if (row.kind !== 'setting') return '';
-  return row.essential?.label ?? (row.def.label || row.def.key);
+  return row.essential?.label ?? defLabel(row.def);
+}
+
+const qualifierCache = new WeakMap<VpxSettingsSchema, Map<VpxSettingDef, LabelQualifier>>();
+
+/**
+ * Libellé d'un réglage de VPX, complété de ce qui le distingue de ses homonymes de la
+ * section (sept profils DMD au même « Dot Tint », dix anaglyphes, vues Desktop / FSS / Cab).
+ */
+function defLabel(def: VpxSettingDef): string {
+  const base = def.label || def.key;
+  const schema = session?.schema;
+  if (!schema || !def.label) return base;
+  let qualifiers = qualifierCache.get(schema);
+  if (!qualifiers) {
+    qualifiers = labelQualifiers(schema.settings);
+    qualifierCache.set(schema, qualifiers);
+  }
+  const q = qualifiers.get(def);
+  if (!q || q.part === '') return base;
+  if (!q.numeric) return `${q.part} · ${base}`;
+  if (q.word === 'Profile') return `${t('Profil {n}', { n: q.part })} · ${base}`;
+  // « Anaglyph Filter » + 3 : le mot est déjà dans le libellé, on ajoute juste le numéro.
+  if (q.word && base.toLowerCase().includes(q.word.toLowerCase())) return `${base} ${q.part}`;
+  return `${q.word ? `${q.word} ${q.part}` : q.part} · ${base}`;
 }
 
 interface Badge {
@@ -1149,7 +1175,7 @@ function panelView(panel: Panel | undefined) {
   if (panel.id === ROM_VOLUME && panel.kind === 'choices') return { kind: 'choices', title: t('Volume de la ROM'), choices: panel.choices.map((c) => ({ label: c.label, note: c.note })), index: panel.index };
   const def = s.defs.get(panel.id)!;
   const e = s.essentials.get(panel.id);
-  const title = s.tab === 'essentials' && e ? e.label : def.label || def.key;
+  const title = s.tab === 'essentials' && e ? e.label : defLabel(def);
   if (panel.kind === 'text') {
     return {
       kind: 'text',

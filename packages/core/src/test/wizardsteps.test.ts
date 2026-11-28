@@ -124,7 +124,7 @@ test('quitter sans enregistrer : retour au menu, ou fermeture annoncée au premi
 
 test('étapes seules : options, phases et entrées du menu', () => {
   const ids = WIZARD_STEPS.map((s) => s.id);
-  assert.deepEqual(ids, ['boutons', 'interface', 'lanceur', 'tilt', 'ecrans', 'playfield', 'disposition', 'son']);
+  assert.deepEqual(ids, ['boutons', 'interface', 'essai', 'lanceur', 'tilt', 'ecrans', 'playfield', 'disposition', 'son']);
   assert.equal(new Set(WIZARD_STEPS.map((s) => s.flag)).size, WIZARD_STEPS.length);
   for (const step of WIZARD_STEPS) {
     assert.ok(step.phases.length > 0 && step.phases.every((p) => WIZARD_PHASES.includes(p) && p !== 'done'), step.id);
@@ -282,10 +282,11 @@ test('menu système : chaque étape seule dans « Configuration de la borne »',
   assert.match(frontend, /library\.provideSystemItem\('cabinet'/);
   assert.match(frontend, /const step = WIZARD_STEPS\.find\(\(s\) => s\.id === id\)!;\s*return \{ label: step\.label, detail: step\.detail, icon: step\.icon, run: \(\) => relaunchWizard\(step\.flag\) \};/);
   // Six lignes depuis le 20/11/2026 : chaque étape rangée sous Boutons, Écrans, ou seule (le son).
-  assert.match(frontend, /\(\['boutons', 'interface', 'lanceur', 'tilt'\] as const\)\.map\(wizardStepItem\)/);
+  // « Essai et noms des boutons » : une option à part, en fin de liste, jamais dans l'assistant complet.
+  assert.match(frontend, /\(\['boutons', 'interface', 'lanceur', 'tilt', 'essai'\] as const\)\.map\(wizardStepItem\)/);
   assert.match(frontend, /\(\['ecrans', 'playfield', 'disposition'\] as const\)\.map\(wizardStepItem\)/);
   assert.match(frontend, /wizardStepItem\('son'\)/);
-  assert.deepEqual(WIZARD_STEPS.map((s) => s.id).sort(), ['boutons', 'disposition', 'ecrans', 'interface', 'lanceur', 'playfield', 'son', 'tilt'], 'une étape ajoutée doit trouver sa place dans la Configuration de la borne');
+  assert.deepEqual(WIZARD_STEPS.map((s) => s.id).sort(), ['boutons', 'disposition', 'ecrans', 'essai', 'interface', 'lanceur', 'playfield', 'son', 'tilt'], 'une étape ajoutée doit trouver sa place dans la Configuration de la borne');
   // Plus d'entrée d'étape directement dans le menu système.
   assert.doesNotMatch(frontend, /relaunchWizard\('(boutons|disposition)'\)/);
 });

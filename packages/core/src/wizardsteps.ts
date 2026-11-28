@@ -26,8 +26,14 @@ import { VPX_LAYOUT_KEYS } from './vpx';
  * « buttonsChoice » : premier écran d'une borne sans boutons enregistrés, « Vos boutons sont-ils
  * déjà les bons ? » ; ses appuis choisissent, aucun n'est relevé.
  */
-export const WIZARD_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'summary', 'done'] as const;
+export const WIZARD_PHASES = ['buttonsChoice', 'buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'buttonTest', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'setups', 'sound', 'channels', 'summary', 'done'] as const;
 export type WizardPhase = (typeof WIZARD_PHASES)[number];
+
+/**
+ * Phases qu'on ne parcourt qu'en étape seule, jamais dans l'assistant complet (sans place dans sa
+ * frise) : l'essai et les noms des boutons, qu'on refait quand on veut vérifier une carte.
+ */
+export const STANDALONE_PHASES: readonly WizardPhase[] = ['buttonTest'];
 
 /**
  * Relevé des boutons, du jeu (« buttons ») puis de l'interface (« navigation ») : tant
@@ -35,10 +41,10 @@ export type WizardPhase = (typeof WIZARD_PHASES)[number];
  */
 export const CAPTURE_PHASES: readonly WizardPhase[] = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'];
 
-export type WizardStepId = 'boutons' | 'interface' | 'lanceur' | 'tilt' | 'ecrans' | 'playfield' | 'disposition' | 'son';
+export type WizardStepId = 'boutons' | 'interface' | 'essai' | 'lanceur' | 'tilt' | 'ecrans' | 'playfield' | 'disposition' | 'son';
 
 /** Champs du modèle de borne qu'une étape peut décider. */
-export type CabinetField = 'buttons' | 'navigation' | 'analog' | 'tilt' | 'screens' | 'roles' | 'zones' | 'dmdKind' | 'playfield' | 'audio';
+export type CabinetField = 'buttons' | 'navigation' | 'buttonNames' | 'analog' | 'tilt' | 'screens' | 'roles' | 'zones' | 'dmdKind' | 'playfield' | 'audio';
 
 export interface WizardStep {
   id: WizardStepId;
@@ -94,6 +100,18 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     phases: ['navigation', 'navigationSummary'],
     fields: ['navigation'],
     // VPX ne lit pas les boutons de l'interface : aucune clé de VPinballX.ini.
+    owns: () => false,
+  },
+  {
+    id: 'essai',
+    flag: '--essai-boutons',
+    icon: 'usb',
+    get label() { return t('Essai et noms des boutons'); },
+    get detail() { return t('Vérifie que chaque bouton répond, et donne-lui un nom : « Flipper gauche », « Bouton rouge devant »…'); },
+    get saved() { return t('Noms des boutons enregistrés'); },
+    phases: ['buttonTest'],
+    fields: ['buttonNames'],
+    // Les noms ne sont que pour Cyber Pinball : aucune clé de VPinballX.ini.
     owns: () => false,
   },
   {
@@ -167,7 +185,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
 ];
 
 /** Étapes de l'assistant complet, dans l'ordre. */
-export const FULL_WIZARD_PHASES: readonly WizardPhase[] = WIZARD_PHASES.filter((p) => p !== 'done');
+export const FULL_WIZARD_PHASES: readonly WizardPhase[] = WIZARD_PHASES.filter((p) => p !== 'done' && !STANDALONE_PHASES.includes(p));
 
 /** Options de la ligne de commande propres à l'assistant (retirées pour revenir au menu). */
 export const WIZARD_FLAGS: readonly string[] = ['--assistant', '--nouvelle-configuration', ...WIZARD_STEPS.map((s) => s.flag)];

@@ -200,6 +200,7 @@ export const messages: Record<string, string> = {
   'Éditeur seulement': 'Editor only',
   'Surchargé pour cette table': 'Overridden for this table',
   Modifié: 'Changed',
+  'Profil {n}': 'Profile {n}',
   'Valeur illisible, ignorée par VPX': 'Unreadable value, ignored by VPX',
   'Ouvrir l’assistant d’écrans': 'Open the screen wizard',
   'Ouvrir l’assistant': 'Open the setup wizard',

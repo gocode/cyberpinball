@@ -150,6 +150,39 @@ export function volumeView(outputs: readonly OutputVolume[], muteButton: boolean
   return { percent, muted: true, title: t('Son coupé'), detail: back };
 }
 
+/**
+ * Boutons du joystick lus pendant une partie, comptés par code : un bouton qui « ne fait rien » dans un
+ * jeu a pour premier suspect un appui jamais lu ; ce bilan, au journal au retour de partie, tranche.
+ */
+export class ButtonTally {
+  private readonly counts = new Map<string, number>();
+
+  /** Un appui (pas un relâchement) lu. */
+  press(code: string): void {
+    this.counts.set(code, (this.counts.get(code) ?? 0) + 1);
+  }
+
+  get total(): number {
+    let n = 0;
+    for (const c of this.counts.values()) n += c;
+    return n;
+  }
+
+  /** « 3 appui(s) de bouton lu(s) (1;23 ×2, 1;11 ×1), dont 3 sur les boutons de volume », ou « aucun appui… lu ». */
+  summary(volumeCodes: readonly string[] = []): string {
+    if (!this.counts.size) return 'aucun appui de bouton lu (le sondage des boutons ne les a pas vus)'; // i18n-ignore : journal
+    const top = [...this.counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([code, n]) => `${code.split('_').pop()} ×${n}`).join(', ');
+    const volume = volumeCodes.reduce((sum, code) => sum + (this.counts.get(code) ?? 0), 0);
+    return `${this.total} appui(s) de bouton lu(s) (${top})${volumeCodes.length ? `, dont ${volume} sur les boutons de volume` : ''}`; // i18n-ignore : journal
+  }
+}
+
+/** Ligne du journal d'un appui vu qui ne règle rien : sans elle, « le bouton ne fait rien » ne dit pas où ça s'arrête. */
+export function volumeNoEffectLine(command: VolumeCommand, readError: string | undefined): string {
+  const how = { up: 'Volume +', down: 'Volume −', mute: 'Muet', hold: 'Volume − maintenu' }[command]; // i18n-ignore : journal
+  return `Volume de la borne (${how}) : appui sans effet, ${readError ? `son de Windows illisible (${readError})` : 'aucune sortie audio lisible'}.`; // i18n-ignore : journal
+}
+
 /** Ligne du journal : « Volume de la borne : 45 % (2 sorties) ». */
 export function volumeLogLine(outputs: readonly OutputVolume[], command: VolumeCommand | 'windows' | 'reminder'): string {
   const lead = outputs[0];

@@ -226,6 +226,81 @@ body {
   font-size: 2.6vmin;
 }
 
+/*
+ * Essai des boutons : une case par entrée de la carte, rangées par carte. Grise tant que rien n'est
+ * venu, allumée tant que le bouton est enfoncé, cochée (avec son nombre d'appuis) une fois essayée.
+ * Le nom du joueur est le titre, le numéro d'origine dessous.
+ */
+.pins {
+  width: min(94%, 160vmin);
+  margin: 1vmin 0 0;
+  text-align: left;
+  overflow: hidden;
+}
+
+.pins h3 {
+  margin: 0.8vmin 0 0.4vmin;
+  font-size: 1.9vmin;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.pin-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.6vmin;
+}
+
+.pin {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: 0.8vmin;
+  padding: 0.5vmin 1vmin;
+  border: 0.3vmin solid transparent;
+  border-radius: 0.5vmin;
+  background: var(--tile);
+  color: var(--quiet);
+  font-size: 1.9vmin;
+}
+
+.pin small {
+  flex-basis: 100%;
+  font-size: 1.9vmin;
+  color: var(--ink-muted);
+}
+
+.pin.tested,
+.pin.last {
+  color: var(--ink);
+}
+
+.pin.tested b {
+  color: var(--accent);
+}
+
+.pin.last {
+  border-color: var(--tile-line);
+}
+
+.pin.lit {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  color: var(--ink);
+  box-shadow: 0 0 1.6vmin var(--signal-haze);
+}
+
+.pin.target {
+  border-color: var(--accent);
+}
+
+@container (max-aspect-ratio: 1 / 1) {
+  .pin-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* Jauge du lanceur : l'avant à gauche, le repos au quart, tiré à fond à droite. */
 .gauge {
   width: min(94%, 110vmin);

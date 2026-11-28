@@ -203,6 +203,12 @@ export interface Cabinet {
    */
   navigation?: NavigationButtons;
   /**
+   * Names the player gave to the physical buttons ("Rouge devant", "Fire"), by key code or VPX
+   * joystick token, at the "Essai et noms des boutons" step (button-names.ts). Absent: buttons
+   * keep their number or key name. Read by keyLabel everywhere a button is cited.
+   */
+  buttonNames?: Record<string, string>;
+  /**
    * Analog plunger and accelerometer, captured at the "Lanceur" (Plunger) step (plunger.ts). Absent
    * until that step has been done: no sensor is written to [Input]; empty: the cabinet
    * has none, VPX reads none.

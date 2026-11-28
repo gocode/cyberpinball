@@ -35,6 +35,7 @@ import {
   takenNotice,
   withoutButtonKeys,
   IniDocument,
+  defaultKeyLabel,
   keyLabel,
   type HatDirection,
   twinJoysticks,
@@ -171,6 +172,7 @@ import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVi
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { vcRuntimeReady } from './vc-runtime';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, withoutPlunger, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
+import { buttonTestClick, buttonTestKey, buttonTestTick, buttonTestUp, buttonTestView, namesToSave, startButtonTest as startButtonTestStep, type ButtonTestStep, type TestAction, type TestOutcome } from './button-test';
 import { analogWithGain, startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
@@ -249,6 +251,8 @@ interface Wizard {
   tilt?: CabinetTilt;
   /** Étape « Tilt » en cours. */
   tiltStep?: TiltStep;
+  /** Étape « Essai et noms des boutons » en cours (étape seule : jamais dans l'assistant complet). */
+  buttonTest?: ButtonTestStep;
   roleIndex: number;
   /** Réponse proposée au rôle en cours : indice dans roleOptions(). */
   option: number;
@@ -402,6 +406,8 @@ let buttonsCountdown: NodeJS.Timeout | undefined;
 let plungerTimer: NodeJS.Timeout | undefined;
 /** Lecture de l'accéléromètre pendant l'étape « Tilt ». */
 let tiltTimer: NodeJS.Timeout | undefined;
+/** Compte à rebours de l'attente du bouton à nommer (étape « Essai et noms des boutons »). */
+let buttonTestTimer: NodeJS.Timeout | undefined;
 let quitCountdown: NodeJS.Timeout | undefined;
 /** Étape refaite seule (--boutons, --son…) : le modèle existe, le reste est gardé. */
 let only: WizardStep | undefined;
@@ -859,6 +865,15 @@ function handleKey(input: Input): boolean {
     return true;
   }
 
+  if (wizard.phase === 'buttonTest') {
+    // Chaque appui compte, même celui d'un bouton sans rôle : c'est l'essai (et une touche tenue ne recompte pas).
+    const step = wizard.buttonTest!;
+    const outcome = buttonTestKey(step, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm), back: is(KEYS.exit) || is(KEYS.back) }, input.code, input.isAutoRepeat, Date.now());
+    afterButtonTest(outcome);
+    broadcast();
+    return true;
+  }
+
   if (wizard.phase === 'flip') {
     if (is(KEYS.confirm)) keepFlip();
     else if (is(KEYS.exit) || is(KEYS.back)) void revertFlip(false);
@@ -938,6 +953,11 @@ function handleKey(input: Input): boolean {
 /** Touche relâchée : fin d'un maintien, et relevé du bouton pendant l'étape « Boutons ». */
 function handleKeyUp(input: Input): boolean {
   if (held?.code === input.code) stopHold();
+  if (wizard.phase === 'buttonTest' && wizard.buttonTest) {
+    buttonTestUp(wizard.buttonTest, input.code);
+    broadcast();
+    return true;
+  }
   if (!pressed.delete(input.code)) return false;
   if (busy || wizard.quit || wizard.leaving) return true;
   if (wizard.phase === 'buttonsChoice') {
@@ -970,6 +990,8 @@ function handleKeyUp(input: Input): boolean {
 function stepKeys(): string[] {
   if (isSummaryPhase(wizard.phase) && wizard.capture) return Object.values(wizard.capture.keys).filter((k): k is string => Boolean(k));
   if (wizard.phase === 'tilt' && wizard.tiltStep?.bob) return [wizard.tiltStep.bob];
+  // À l'essai des boutons, le bouton « Quitter » se teste comme les autres : on sort par Exit maintenu ou Ctrl+Q.
+  if (wizard.phase === 'buttonTest') return KEYS.quit;
   return [];
 }
 
@@ -1248,7 +1270,7 @@ function inForceKeys(set: KeySet): SetKeys {
 }
 
 /** Ce que la souris envoie depuis screen.js. */
-type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction | ControlAction;
+type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction | TestAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction | ControlAction;
 
 /**
  * Étapes dont les commandes se cliquent comme on presse leur bouton (wizard-controls.ts). Pas le
@@ -1616,6 +1638,11 @@ function handleWizardAction(action: WizardAction): void {
     broadcast();
     return;
   }
+  if (wizard.phase === 'buttonTest' && (action.type === 'button' || action.type === 'buttons')) {
+    afterButtonTest(buttonTestClick(wizard.buttonTest!, action.type === 'button' ? { row: action.index } : { action: action.action as TestAction }, Date.now()));
+    broadcast();
+    return;
+  }
   const capture = wizard.capture;
   if (!capture || !(wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase))) return;
   touched(capture);
@@ -1896,6 +1923,50 @@ function tiltViewFor(index: number, base: Record<string, unknown>) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Étape « Essai et noms des boutons » (button-test.ts) : une option à part, jamais dans
+// l'assistant complet (demande du 28/11/2026). Les noms ne changent rien à VPinballX.ini.
+
+/** Rafraîchit le compte à rebours de l'attente du bouton à nommer. */
+const BUTTON_TEST_TICK_MS = 500;
+
+function startButtonTest(): void {
+  stopButtonTestTimer();
+  joystickAxes(); // ouvre la lecture des joysticks si elle ne l'est pas encore
+  const joysticks = joystickStatus();
+  wizard.buttonTest = startButtonTestStep(previous?.buttonNames, joysticks.state === 'ready' ? joysticks.devices : [], wizard.buttons, wizard.navigation);
+  wizard.phase = 'buttonTest';
+  buttonTestTimer = setInterval(() => {
+    const step = wizard.buttonTest;
+    if (wizard.phase !== 'buttonTest' || !step) return stopButtonTestTimer();
+    if (buttonTestTick(step, Date.now()) || step.mode === 'listen') broadcast();
+  }, BUTTON_TEST_TICK_MS);
+}
+
+function stopButtonTestTimer(): void {
+  if (buttonTestTimer) clearInterval(buttonTestTimer);
+  buttonTestTimer = undefined;
+}
+
+/** Enregistrer : les noms donnés, sans toucher au reste du modèle ni à VPinballX.ini. */
+function afterButtonTest(outcome: TestOutcome): void {
+  if (outcome !== 'save') return;
+  stopButtonTestTimer();
+  saveStep();
+}
+
+/** Étape « Essai et noms des boutons » : même écran partout, droit sur l'ancien playfield. */
+function buttonTestViewFor(index: number, base: Record<string, unknown>) {
+  const label = (codes: string[]) => keyLabel(codes[0]);
+  const view = buttonTestView(wizard.buttonTest!, t('Enregistrer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm) });
+  return {
+    ...base,
+    rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
+    highlight: true,
+    ...view,
+  };
+}
+
 /**
  * Étape refaite seule : le modèle garde tout le reste (stepCabinet, core), et
  * VPinballX.ini ne reprend la main que sur les clés de l'étape ; les autres clés
@@ -1911,6 +1982,10 @@ function saveStep(): void {
   wizard.phase = 'done';
   if (interfaceOnly) {
     wizard.result = { lines: [t('VPinballX.ini inchangé : VPX ne lit pas les boutons de l’interface.')], findings: [], iniPath: cabinet.vpx.iniPath };
+    return;
+  }
+  if (isOnly('essai')) {
+    wizard.result = { lines: [t('VPinballX.ini inchangé : les noms ne servent qu’aux textes de Cyber Pinball.')], findings: [], iniPath: cabinet.vpx.iniPath };
     return;
   }
   // Seulement les clés de l'étape, reprises en main même changées à la main ; les autres restent telles quelles.
@@ -1947,6 +2022,7 @@ function stepBuilt(): Cabinet {
   if (interfaceOnly) return { ...previous!, navigation: wizard.navigation, ...stamp };
   if (isOnly('lanceur')) return { ...previous!, analog: wizard.analog, ...stamp };
   if (isOnly('tilt')) return { ...previous!, tilt: wizard.tilt, analog: wizard.analog, ...stamp };
+  if (isOnly('essai')) return { ...previous!, buttonNames: namesToSave(wizard.buttonTest!), ...stamp };
   if (arrangeOnly) return arrangeCabinet();
   return buildCabinet();
 }
@@ -3054,6 +3130,8 @@ function startMode(): void {
       return startPlunger();
     case 'tilt':
       return startTilt();
+    case 'essai':
+      return startButtonTest();
     case 'disposition':
       return startArrangeOnly();
     case 'ecrans':
@@ -3088,6 +3166,7 @@ function restart(): void {
   KEYS = wizardKeys({ buttons, navigation });
   stopPlungerTimer();
   stopTiltTimer();
+  stopButtonTestTimer();
   wizard = {
     buttons,
     navigation,
@@ -3582,6 +3661,7 @@ function viewFor(index: number) {
   if (wizard.phase === 'buttonsChoice' || CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
   if (wizard.phase === 'plunger') return plungerViewFor(index, base);
   if (wizard.phase === 'tilt') return tiltViewFor(index, base);
+  if (wizard.phase === 'buttonTest') return buttonTestViewFor(index, base);
 
   if (wizard.phase === 'orient' || wizard.phase === 'flip' || wizard.phase === 'size') {
     const isPlayfield = assignedRole === 'playfield';
@@ -3805,8 +3885,8 @@ function viewFor(index: number) {
 
   if (only) {
     // Boutons seuls : l'écran que le joueur regarde n'est pas connu, le résultat s'affiche partout.
-    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur') || isOnly('tilt');
-    const report = buttonsOnly || interfaceOnly || isOnly('lanceur') || isOnly('tilt') || index === (wizard.assignments.playfield ?? 0);
+    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur') || isOnly('tilt') || isOnly('essai');
+    const report = buttonsOnly || interfaceOnly || isOnly('lanceur') || isOnly('tilt') || isOnly('essai') || index === (wizard.assignments.playfield ?? 0);
     return {
       ...base,
       ...(previousLayout && { rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0 }),
@@ -3839,7 +3919,7 @@ function viewFor(index: number) {
 
 /** Colonne de gauche du récapitulatif et du résultat d'une étape seule. */
 function summaryColumn(): string {
-  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('lanceur') ? t('Lanceur') : isOnly('tilt') ? 'Tilt' : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
+  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('lanceur') ? t('Lanceur') : isOnly('tilt') ? 'Tilt' : isOnly('essai') ? t('Noms des boutons') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
 }
 
 /** Ce que l'étape seule a décidé, pour le récapitulatif et le résultat. */
@@ -3853,6 +3933,10 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
       return analogLines(wizard.analog ?? {});
     case 'tilt':
       return wizard.tilt ? tiltLines(wizard.tilt, wizard.buttons) : [];
+    case 'essai': {
+      const names = Object.entries(wizard.buttonTest?.names ?? {});
+      return names.length ? names.map(([code, name]) => `${name} : ${defaultKeyLabel(code)}`) : [t('Aucun nom donné : les boutons gardent leur numéro')];
+    }
     case 'disposition':
       return rolesLines;
     case 'ecrans':

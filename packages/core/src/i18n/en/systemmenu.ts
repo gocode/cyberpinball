@@ -37,7 +37,7 @@ export const messages: Record<string, string> = {
   'Présence et salons': 'Presence and rooms',
   // app/src/frontend.ts
   'Boutons, écrans, son, langue, configurations, ou l’assistant complet': 'Buttons, screens, sound, language, configurations, or the full wizard',
-  'Boutons du jeu et de l’interface, lanceur analogique, tilt, touches par défaut': 'Game and interface buttons, analog plunger, tilt, default keys',
+  'Boutons du jeu et de l’interface, lanceur analogique, tilt, essai et noms des boutons, touches par défaut': 'Game and interface buttons, analog plunger, tilt, button test and names, default keys',
   'Écrans, playfield, disposition, écran du DMD': 'Screens, playfield, layout, DMD screen',
   // app/src/community-menu.ts
   'Le choisir : Mon profil › Modifier mon profil › Mon pays': 'Choose it: My profile › Edit my profile › My country',

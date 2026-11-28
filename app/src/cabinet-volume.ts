@@ -29,6 +29,7 @@ import {
   unappliedOutputs,
   volumeAfter,
   volumeLogLine,
+  volumeNoEffectLine,
   volumeView,
   windowsVk,
   type CabinetButtons,
@@ -165,7 +166,10 @@ export function startCabinetVolume(opts: CabinetVolumeOptions): CabinetVolume {
   function poll(): void {
     const c = config();
     const { down, windows } = pressed(c.keys);
-    for (const command of buttons.update(down, Date.now())) apply(command, c);
+    for (const command of buttons.update(down, Date.now())) {
+      // Un appui vu qui ne règle rien laisse sa trace : sans elle, « le bouton ne fait rien » ne dit pas où ça s'arrête.
+      if (!apply(command, c)) opts.log(volumeNoEffectLine(command, readError));
+    }
     // Touche multimédia : Windows a déjà réglé le son, la pastille montre ce qu'il en est.
     for (const code of windows) if (!windowsHeld.has(code)) setTimeout(() => show(readSafe(c.outputs), 'windows', c.keys), WINDOWS_SETTLE_MS);
     windowsHeld.clear();
