@@ -126,6 +126,7 @@ export const FINDING_CODES = [
   'scriptPatchStale',
   'scriptCoreCompat',
   'flexImagesLate',
+  'pupRootAtLoad',
   'dmdDesktopOption',
   'backglassMissing',
   'backglassMisnamed',
@@ -753,6 +754,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     // DMD images that FlexDMD takes from the table, loaded in the middle of the game (flexprewarm.ts): loaded in advance.
     const prewarm = compat ? undefined : flexPrewarmFinding(entry, ctx, override);
     if (prewarm) findings.push(prewarm);
+    // Script that reads the PuP root (GetRoot) while loading, before any PuP-Pack is set: the file it opens must exist.
+    const rootAtLoad = pupRootAtLoadFinding(entry, override);
+    if (rootAtLoad) findings.push(rootAtLoad);
   }
   const desktopDmd = desktopDmdFinding(entry, ctx);
   if (desktopDmd) findings.push(desktopDmd);
@@ -1703,6 +1707,52 @@ function flexPrewarmFinding(entry: TableEntry, ctx: DoctorContext, override: Ove
       t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui charge ces images pendant le chargement de la table.', { file }),
     ].join(' '),
     fix: { label: t('Charger les images du DMD d’avance (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] },
+  };
+}
+
+/**
+ * The paths that the global code of a script builds from PuPlayer.GetRoot (GetRoot & "Pack\file.txt"), outside any
+ * Sub, Function, Property or Class: it runs while the table loads, before PuPlayer is given a game. PinUP Player
+ * answers with its PUPVideos folder; the patched VPX (patch set 12) with the pupvideos folder next to the table.
+ * Darkest Dungeon (Original 2023) opens its ScreenType.txt there; when the file is not found, the global code stops
+ * before it sets its objects, and the game fills the log with "Object required" errors.
+ */
+export function pupRootReadsAtLoad(script: string): string[] {
+  const reads: string[] = [];
+  let depth = 0;
+  for (const raw of script.split(/\r?\n/)) {
+    const line = raw.replace(/^\s+/, '');
+    if (line.startsWith("'") || /^rem\b/i.test(line)) continue;
+    const code = line.replace(/"[^"]*"/g, '""');
+    if (/^end\s+(?:sub|function|property|class)\b/i.test(code)) depth = Math.max(0, depth - 1);
+    else if (/^(?:(?:public|private|friend)\s+)?(?:default\s+)?(?:sub|function|property|class)\s/i.test(code)) {
+      // A one-line "Sub X : ... : End Sub" opens and closes at once.
+      if (!/\bend\s+(?:sub|function|property)\b/i.test(code)) depth++;
+    } else if (depth === 0) {
+      const m = /\.getroot\s*&\s*"([^"]+)"/i.exec(line);
+      if (m) reads.push(m[1]!);
+    }
+  }
+  return reads;
+}
+
+function pupRootAtLoadFinding(entry: TableEntry, override: Override | undefined): Finding | undefined {
+  const source = override?.state.kind === 'foreign' ? override.text : readVpxScript(entry.file);
+  if (!source) return undefined;
+  const reads = pupRootReadsAtLoad(source);
+  if (!reads.length) return undefined;
+  const dir = pupVideosDir(entry.folder);
+  const missing = reads.filter((rel) => {
+    const parts = rel.split(/[\\/]+/).filter(Boolean);
+    return !dir || !fs.existsSync(path.join(dir, ...parts));
+  });
+  if (!missing.length) return undefined;
+  const shown = missing[0]!.replace(/^[\\/]+/, '');
+  return {
+    code: 'pupRootAtLoad',
+    severity: 'warning',
+    title: t('Le script cherche un fichier du PuP-Pack dès le chargement'),
+    detail: t('Le script de la table lit la racine du PuP-Pack pendant le chargement et ouvre « {file} », introuvable dans le dossier pupvideos de la table. Le script s’arrête alors avant d’avoir préparé ses objets, et la partie ne démarre pas (erreurs « Objet requis » en boucle dans le journal de VPX). Remets le PuP-Pack complet dans le dossier pupvideos de la table.', { file: shown }),
   };
 }
 

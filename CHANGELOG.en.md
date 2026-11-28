@@ -9,6 +9,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.5
 
+- Darkest Dungeon (Original 2023) starts again: its script reads the PuP-Pack root while the table loads, and the patched VPX (patch set 12) answered nothing until a game was set, so the script stopped and the game drowned in "Object required" errors. The PuP plugin now answers, like PinUP Player, with the table's pupvideos folder.
+- The table diagnosis warns when a table's script looks, as soon as it loads, for a PuP-Pack file that is missing from the table's pupvideos folder.
+- You can give each button a name, with the mouse or with the cabinet buttons: a ready-made name ("Left flipper", "Right MagnaSave", "Fire (lockbar)"…), a color or number and a place ("red button, front", "no. 2 button, underneath"), or a name you type yourself (computer keyboard, or the on-screen keyboard driven with the flippers and Start).
 - Optional parental controls (System menu > My cabinet > Parental controls): choose a four-digit PIN, then protect whole collections or individual tables. Protection is off by default.
 - A protected collection covers all of its tables, including in All, Favorites, Recent or any other collection; a table's protection follows its folder when you replace its game file.
 - The code is entered on the cabinet: the flippers scroll the digit from 0 to 9, Start confirms a digit, Exit cancels. After five wrong codes you must wait a minute between attempts, even after a restart. The code is never stored in clear (scrypt hash with a random salt).

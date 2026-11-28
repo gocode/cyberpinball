@@ -31,6 +31,8 @@ function renderButtons(state) {
   const list = $('buttons');
   const actions = $('actions');
   list.hidden = !state.buttons;
+  // Saisie libre d'un nom : les touches en grille, comme un clavier.
+  list.classList.toggle('keyboard', Boolean(state.keyboard));
   actions.hidden = !state.actions;
   list.replaceChildren();
   actions.replaceChildren();

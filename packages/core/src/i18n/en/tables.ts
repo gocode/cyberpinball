@@ -76,6 +76,8 @@ export const messages: Record<string, string> = {
   'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.': 'The table uses PinMAME, but its script doesn’t clearly name its ROM.',
   'Rapport de plantage de VPX': 'VPX crash report',
   'Images du DMD chargées en pleine partie': 'DMD images loaded mid-game',
+  'Le script cherche un fichier du PuP-Pack dès le chargement': 'The script looks for a PuP-Pack file as soon as it loads',
+  'Le script de la table lit la racine du PuP-Pack pendant le chargement et ouvre « {file} », introuvable dans le dossier pupvideos de la table. Le script s’arrête alors avant d’avoir préparé ses objets, et la partie ne démarre pas (erreurs « Objet requis » en boucle dans le journal de VPX). Remets le PuP-Pack complet dans le dossier pupvideos de la table.': 'The table’s script reads the PuP-Pack root while loading and opens “{file}”, which is not in the table’s pupvideos folder. The script then stops before it has set up its objects, and the game does not start (endless “Object required” errors in the VPX log). Put the complete PuP-Pack back in the table’s pupvideos folder.',
   'Le DMD de cette table montre {n} image rangée dans la table, par FlexDMD.': 'This table’s DMD shows {n} image stored in the table, through FlexDMD.',
   'Le DMD de cette table montre {n} images rangées dans la table, par FlexDMD.': 'This table’s DMD shows {n} images stored in the table, through FlexDMD.',
   'Dossier « {folder} » rangé ailleurs': 'Folder “{folder}” stored elsewhere',

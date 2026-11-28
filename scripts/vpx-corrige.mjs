@@ -50,7 +50,7 @@ function patchSet(dir) {
  * dépendent). `patch` : numéro de la série de correctifs, nommée en anglais partout où elle se voit (« patched Cyber
  * Pinball 1 ») : version produit de l'exécutable, journal de VPX, release des sources, fiche technique.
  */
-export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 11 };
+export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 12 };
 VPX_BASE.sha = `af26b2d93-patched-cyberpinball-${VPX_BASE.patch}`;
 
 const work = process.env.CYBERPINBALL_VPX_BUILD ?? path.join(process.env.LOCALAPPDATA ?? os.tmpdir(), 'cpvpx');

@@ -11,6 +11,9 @@ son interface).
 
 ## 0.2.5
 
+- Darkest Dungeon (Original 2023) démarre de nouveau : son script lit la racine du PuP-Pack dès le chargement de la table, et le VPX corrigé (série 12) ne répondait rien tant qu'aucun jeu n'était fixé, si bien que le script s'arrêtait et que la partie se perdait en erreurs "Objet requis". Le plugin PuP répond maintenant, comme PinUP Player, avec le dossier pupvideos de la table.
+- Le diagnostic des tables prévient quand le script d'une table cherche, dès son chargement, un fichier du PuP-Pack absent du dossier pupvideos de la table.
+- Tu peux donner un nom à chaque bouton, à la souris comme aux boutons de la borne : un nom prêt ("Flipper gauche", "MagnaSave droit", "Fire (barre de verrouillage)"…), un repère et une place ("Bouton rouge devant", "Bouton n° 2 dessous"), ou le nom que tu écris toi-même (clavier de l'ordinateur, ou clavier affiché à l'écran que tu pilotes avec les flippers et Start).
 - Contrôle parental facultatif (Menu système > Ma borne > Contrôle parental) : tu choisis un code PIN à quatre chiffres, puis tu protèges des collections entières ou des tables une par une. La protection est désactivée au départ.
 - Une collection protégée couvre toutes ses tables, aussi dans Toutes, Favoris, Récentes ou une autre collection ; la protection d'une table suit son dossier quand tu remplaces son fichier de jeu.
 - Le code se saisit sur la borne : les flippers font défiler le chiffre de 0 à 9, Start valide un chiffre, Exit annule. Après cinq erreurs, il faut attendre une minute entre les essais, même après un redémarrage. Le code n'est jamais stocké en clair (empreinte scrypt avec un sel aléatoire).

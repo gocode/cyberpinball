@@ -4,6 +4,7 @@
 export const messages: Record<string, string> = {
   // wizardsteps.ts
   'Essai et noms des boutons': 'Button test and names',
+  '{title} ({n} sur {total})': '{title} ({n} of {total})',
   'Vérifie que chaque bouton répond, et donne-lui un nom : « Flipper gauche », « Bouton rouge devant »…': 'Checks that every button responds, and gives it a name: "Left flipper", "Red button front"…',
   'Noms des boutons enregistrés': 'Button names saved',
   // button-names.ts : où est le bouton, et ce qui le repère
@@ -35,6 +36,11 @@ export const messages: Record<string, string> = {
   'Un nom prêt : « Flipper gauche »…': 'A ready-made name: "Left flipper"…',
   'Un repère et une place : « Bouton rouge devant »…': 'A marker and a place: "Red button, front"…',
   'Retirer son nom': 'Remove its name',
+  'Écrire un nom à toi…': 'Type a name of your own…',
+  espace: 'space',
+  '✔ Valider': '✔ Done',
+  'Nom : « {text} »': 'Name: "{text}"',
+  'Flippers ({left} / {right}) : choisir une touche · Start ({start}) : l’écrire · « ✔ Valider » pour finir · au clavier : tape, Entrée valide': 'Flippers ({left} / {right}): choose a key · Start ({start}): type it · "✔ Done" to finish · on a keyboard: type, Enter confirms',
   '{button} s’appelle maintenant « {name} ».': '{button} is now called "{name}".',
   '{button} n’a plus de nom.': '{button} has no name any more.',
   'Appuie sur le bouton à nommer… ({s} s)': 'Press the button to name… ({s} s)',

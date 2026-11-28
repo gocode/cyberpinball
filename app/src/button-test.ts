@@ -24,6 +24,7 @@ import {
   readyNames,
   t,
   withButtonName,
+  MAX_BUTTON_NAME,
   type ButtonNames,
   type CabinetButtons,
   type NavigationButtons,
@@ -32,6 +33,8 @@ import type { JoystickDevice } from '@cyberpinball/win-displays';
 
 /** Sans appui, l'attente du bouton à nommer s'arrête d'elle-même. */
 export const LISTEN_MS = 15_000;
+/** Lignes du choix du nom montrées à la fois (la liste des noms prêts en a une quinzaine). */
+export const CHOICE_ROWS = 7;
 
 export type TestAction = 'name' | 'save' | 'cancel';
 
@@ -39,7 +42,10 @@ export type TestAction = 'name' | 'save' | 'cancel';
 type Mode = 'test' | 'listen' | 'choose';
 
 /** Niveau du choix du nom : le départ, les noms prêts, ou le repère puis la place. */
-type Stage = 'root' | 'ready' | 'marker' | 'position';
+type Stage = 'root' | 'ready' | 'marker' | 'position' | 'text';
+
+/** Touches de la saisie libre : lettres, accents du français, chiffres, tiret et apostrophe. */
+const TYPED_KEYS = [..."abcdefghijklmnopqrstuvwxyzéèêàçù0123456789-'"]; // i18n-ignore : touches du clavier, pas du texte
 
 interface Option {
   label: string;
@@ -48,6 +54,9 @@ interface Option {
   go?: Stage | 'clear' | 'back' | 'cancel';
   /** Ligne « Revenir » : celle que prend Exit. */
   isBack?: boolean;
+  /** Saisie libre : le caractère de la touche, ou l'action de la touche (valider, effacer, majuscule). */
+  char?: string;
+  type?: 'done' | 'delete' | 'shift';
 }
 
 export interface Pin {
@@ -76,6 +85,9 @@ export interface ButtonTestStep {
   /** Repère choisi, en attendant la place. */
   marker?: string;
   option: number;
+  /** Saisie libre : le nom en cours d'écriture, et la prochaine lettre en majuscule. */
+  text: string;
+  shift: boolean;
   /** Nom donné au dernier choix, rappelé sous la liste. */
   done?: string;
 }
@@ -117,6 +129,8 @@ export function startButtonTest(names: ButtonNames | undefined, devices: readonl
     listenUntil: 0,
     stage: 'root',
     option: 0,
+    text: '',
+    shift: false,
   };
   // Boutons d'un encodeur en mode clavier, et ceux déjà nommés : une case chacun, même muets.
   for (const code of [...step.roles.keys(), ...Object.keys(step.names)]) addPin(step, code);
@@ -145,6 +159,7 @@ function options(step: ButtonTestStep): Option[] {
       return [
         { label: t('Un nom prêt : « Flipper gauche »…'), go: 'ready' },
         { label: t('Un repère et une place : « Bouton rouge devant »…'), go: 'marker' },
+        { label: t('Écrire un nom à toi…'), go: 'text' },
         ...(step.target && step.names[step.target] ? [{ label: t('Retirer son nom'), go: 'clear' as const }] : []),
         { label: t('Annuler'), go: 'cancel' },
       ];
@@ -154,7 +169,46 @@ function options(step: ButtonTestStep): Option[] {
       return [...markerChoices().map((label) => ({ label, pick: label })), back];
     case 'position':
       return [...positionChoices().map((label) => ({ label, pick: label })), back];
+    case 'text':
+      return typingOptions(step);
   }
+}
+
+/**
+ * Le clavier de la saisie libre. Les touches d'écriture d'abord, puis espace, majuscule, effacer, annuler et valider :
+ * depuis la première touche, le flipper gauche arrive tout de suite sur « Valider ».
+ */
+function typingOptions(step: ButtonTestStep): Option[] {
+  const letters = TYPED_KEYS.map((key) => {
+    const char = step.shift ? key.toUpperCase() : key;
+    return { label: char, char };
+  });
+  return [
+    ...letters,
+    { label: t('espace'), char: ' ' },
+    { label: step.shift ? 'abc' : 'ABC', type: 'shift' as const },
+    { label: '⌫', type: 'delete' as const },
+    { label: t('Annuler'), go: 'cancel' as const },
+    { label: t('✔ Valider'), type: 'done' as const },
+  ];
+}
+
+/** Ajoute un caractère au nom en cours (jamais au-delà de la longueur permise). */
+function typeChar(step: ButtonTestStep, char: string): void {
+  if ([...step.text].length < MAX_BUTTON_NAME) step.text += char;
+  step.shift = false;
+}
+
+function deleteChar(step: ButtonTestStep): void {
+  step.text = [...step.text].slice(0, -1).join('');
+}
+
+/** « Valider » : un nom vide ne change rien et revient au départ. */
+function finishText(step: ButtonTestStep): void {
+  const value = step.text.replace(/\s+/g, ' ').trim();
+  if (value) return name(step, value);
+  step.stage = 'root';
+  step.option = 0;
 }
 
 /** Un appui (ou sa répétition) : la case s'allume, puis l'étape en fait ce qu'elle doit. */
@@ -172,7 +226,22 @@ export type TestOutcome = 'stay' | 'save';
  * Une touche pendant l'étape. Chaque appui allume sa case ; ensuite, selon l'écran : l'attente du bouton
  * à nommer le prend, le choix du nom le déplace, l'essai déplace son choix d'action. `repeat` : touche tenue.
  */
-export function buttonTestKey(step: ButtonTestStep, keys: TestKeys, code: string, repeat: boolean, now: number): TestOutcome {
+export function buttonTestKey(step: ButtonTestStep, keys: TestKeys, code: string, repeat: boolean, now: number, typed?: string): TestOutcome {
+  // Saisie libre au clavier : la lettre tapée s'écrit, Retour arrière efface, Entrée valide. Ce ne sont pas des appuis d'essai.
+  if (step.mode === 'choose' && step.stage === 'text') {
+    if (code === 'Enter' || code === 'NumpadEnter') {
+      if (!repeat) finishText(step);
+      return 'stay';
+    }
+    if (code === 'Backspace') {
+      deleteChar(step);
+      return 'stay';
+    }
+    if (typed && [...typed].length === 1 && typed >= ' ' && !keys.previous && !keys.next && !keys.confirm && !keys.back) {
+      typeChar(step, typed);
+      return 'stay';
+    }
+  }
   if (!repeat) {
     step.down.add(code);
     step.counts.set(code, (step.counts.get(code) ?? 0) + 1);
@@ -192,7 +261,8 @@ export function buttonTestKey(step: ButtonTestStep, keys: TestKeys, code: string
     if (keys.previous) step.option = (step.option - 1 + list.length) % list.length;
     else if (keys.next) step.option = (step.option + 1) % list.length;
     else if (keys.confirm && !repeat) chooseOption(step, list[step.option]!);
-    else if (keys.back && !repeat) chooseOption(step, list.find((o) => o.isBack || o.go === 'cancel') ?? list[0]!);
+    // Exit : remonte d'un niveau ; dans la saisie libre, laisse le nom en cours et revient au départ.
+    else if (keys.back && !repeat) chooseOption(step, step.stage === 'text' ? { label: '', go: 'root' } : (list.find((o) => o.isBack || o.go === 'cancel') ?? list[0]!));
     return 'stay';
   }
   if (repeat) return 'stay';
@@ -245,6 +315,23 @@ function chooseOption(step: ButtonTestStep, option: Option): void {
     return;
   }
   if (option.go === 'clear') return name(step, undefined);
+  if (option.go === 'text') {
+    step.stage = 'text';
+    step.text = (step.target && step.names[step.target]) || '';
+    step.shift = !step.text;
+    step.option = 0;
+    return;
+  }
+  if (step.stage === 'text' && option.go !== 'root') {
+    if (option.type === 'done') return finishText(step);
+    if (option.type === 'delete') return deleteChar(step);
+    if (option.type === 'shift') {
+      step.shift = !step.shift;
+      return;
+    }
+    if (option.char !== undefined) typeChar(step, option.char);
+    return;
+  }
   if (option.go === 'back' || option.go === 'ready' || option.go === 'marker' || option.go === 'root') {
     step.stage = option.go === 'back' ? 'root' : option.go;
     step.option = 0;
@@ -270,6 +357,8 @@ function name(step: ButtonTestStep, value: string | undefined): void {
   step.target = undefined;
   step.stage = 'root';
   step.marker = undefined;
+  step.text = '';
+  step.shift = false;
   step.option = 0;
 }
 
@@ -306,16 +395,24 @@ export function buttonTestView(step: ButtonTestStep, saveLabel: string, keys: Te
   else line = silent && tested ? t('Boutons essayés : {tested} sur {total} · sans réponse sur la carte : {silent}', { tested, total, silent }) : t('Boutons essayés : {tested} sur {total}', { tested, total });
   const selected = step.mode === 'test' ? step.selected : undefined;
   const list = step.mode === 'choose' ? options(step) : [];
+  // Une liste longue (les noms prêts) ne montre que CHOICE_ROWS lignes autour du choix : elle ne déborde jamais de l'écran.
+  const first = Math.max(0, Math.min(step.option - Math.floor(CHOICE_ROWS / 2), list.length - CHOICE_ROWS));
+  const typing = step.mode === 'choose' && step.stage === 'text';
+  // Le clavier de la saisie libre se montre en entier, en grille.
+  const window_ = typing ? list.map((_, i) => i) : list.map((_, i) => i).slice(first, first + CHOICE_ROWS);
+  const title = (text: string) => (!typing && list.length > CHOICE_ROWS ? t('{title} ({n} sur {total})', { title: text, n: step.option + 1, total: list.length }) : text);
   return {
     prompt: t('Essai et noms des boutons'),
     measure: undefined,
     name:
       step.mode === 'choose'
-        ? step.stage === 'marker'
-          ? t('Quel repère a-t-il ? (couleur ou numéro)')
+        ? typing
+          ? t('Nom : « {text} »', { text: `${step.text}_` })
+          : step.stage === 'marker'
+          ? title(t('Quel repère a-t-il ? (couleur ou numéro)'))
           : step.stage === 'position'
-            ? t('Où est-il sur la borne ?')
-            : t('Comment l’appeler ?')
+            ? title(t('Où est-il sur la borne ?'))
+            : title(t('Comment l’appeler ?'))
         : t('Appuie sur chaque bouton : sa case s’allume et compte les appuis.'),
     details: step.mode === 'test' ? t('Une case qui reste muette : fil, contact ou entrée de la carte à vérifier. Les noms que tu donnes remplacent « Bouton 7 » partout : aide-mémoire, relevé, indications.') : '',
     notice: step.done,
@@ -331,10 +428,13 @@ export function buttonTestView(step: ButtonTestStep, saveLabel: string, keys: Te
       state: step.down.has(p.code) ? 'lit' : step.last === p.code ? 'last' : step.counts.has(p.code) ? 'tested' : 'idle',
       target: step.target === p.code,
     })),
-    buttons: step.mode === 'choose' ? list.map((o, i) => ({ label: o.label, key: '', state: 'done', selected: step.option === i })) : undefined,
+    keyboard: typing,
+    buttons: step.mode === 'choose' ? window_.map((i) => ({ label: list[i]!.label, key: '', state: 'done', selected: step.option === i, act: { type: 'button', index: i } })) : undefined,
     actions: actions(step).map((id) => ({ id, label: id === 'save' ? saveLabel : id === 'name' ? t('Nommer un bouton') : t('Annuler'), selected: selected === id })),
     hint:
-      step.mode === 'choose'
+      typing
+        ? t('Flippers ({left} / {right}) : choisir une touche · Start ({start}) : l’écrire · « ✔ Valider » pour finir · au clavier : tape, Entrée valide', { left: keys.previous, right: keys.next, start: keys.confirm })
+        : step.mode === 'choose'
         ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : valider · Clic sur une ligne : la choisir', { left: keys.previous, right: keys.next, start: keys.confirm })
         : step.mode === 'listen'
           ? t('Appuie sur le bouton à nommer · ou clique sur « Annuler »')

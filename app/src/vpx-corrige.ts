@@ -23,6 +23,8 @@
 // - l'exécutable encore (série 11, 28/11/2026) : bgfx donne trois tampons au lieu de deux aux fenêtres annexes
 //   (backglass, ScoreView, topper) ; sur un écran annexe plus lent que le playfield, l'image suivante n'attend plus
 //   que l'écran rende la précédente, attente qui bloquait toute la carte graphique (images du playfield en retard).
+// - GetRoot avant le choix du jeu (série 12, 28/11/2026) : sans dossier PuP global, le plugin répond avec le dossier
+//   pupvideos à côté de la table, comme PinUP Player avec sa racine PUPVideos (Darkest Dungeon lit GetRoot au chargement).
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -146,8 +148,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 11 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 11;
+/** Série de correctifs livrée (« patched Cyber Pinball 12 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 12;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

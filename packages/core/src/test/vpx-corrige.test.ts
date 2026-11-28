@@ -323,6 +323,19 @@ test('série 11, bgfx : au moins trois tampons pour les fenêtres annexes, rien 
     assert.ok(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', doc), 'utf8').includes('`correctifs-bgfx/`'), `${doc} décrit le correctif`);
 });
 
+test('correctif 12 (série 12) : GetRoot répond avant le choix du jeu, avec le dossier pupvideos de la table', () => {
+  // Darkest Dungeon (Original 2023), 28/11/2026 : son script lit PuPlayer.GetRoot & "DarkestDungeon\ScreenType.txt" en code global.
+  // Vide, la lecture échouait et le script s'arrêtait avant ses objets (« Objet requis » en boucle). PinUP Player répond
+  // avec sa racine PUPVideos, séparateur final compris : sans dossier global, c'est le pupvideos à côté de la table.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  const diff = fs.readFileSync(path.join(dir, '12-pup-getroot-avant-le-jeu.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de VPX');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 12\)/);
+  assert.deepEqual([...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]), ['plugins/pup/PUPManager.cpp', 'plugins/pup/PUPManager.h', 'plugins/pup/PUPPinDisplay.cpp']);
+  assert.match(diff, /GetTablePupRoot\(\)/);
+  assert.match(diff, /root \/ ""sv/, 'le séparateur final est gardé');
+});
+
 test('série 6, bibliothèque DOF : posée à côté du plugin-dof64.dll officiel, qui n’est jamais touché', () => {
   // Rapports du 19/11 et du 23/11/2026 (bornes à DudesCab) : VPX plantait en se fermant, pendant le déchargement de DOF.
   const DOF = path.join('plugins', 'dof', 'dof64.dll');

@@ -226,6 +226,28 @@ body {
   font-size: 2.6vmin;
 }
 
+/* Saisie libre du nom d'un bouton : les touches en grille, la touche choisie cerclée comme une ligne choisie. */
+#screen.plunger .buttons-list.keyboard {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  width: min(94%, 130vmin);
+}
+
+#screen.plunger .buttons-list.keyboard li {
+  justify-content: center;
+  padding: 0.8vmin 0.4vmin;
+  text-align: center;
+}
+
+#screen.plunger .buttons-list.keyboard li b {
+  display: none;
+}
+
+@container (max-aspect-ratio: 1 / 1) {
+  #screen.plunger .buttons-list.keyboard {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
 /*
  * Essai des boutons : une case par entrée de la carte, rangées par carte. Grise tant que rien n'est
  * venu, allumée tant que le bouton est enfoncé, cochée (avec son nombre d'appuis) une fois essayée.

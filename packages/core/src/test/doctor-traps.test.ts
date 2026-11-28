@@ -45,6 +45,8 @@ const DESKTOP_DMD_SCRIPT = `${SCRIPT}Sub Table1_OptionEvent(ByVal e)\r\n  x = Ta
 const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
 /** Même table sans ROM, dont le script n'envoie au plugin PUP que l'effet DOF 105 (E105). */
 const NOT_DRIVEN_SCRIPT = `${NO_PUP_SCRIPT}Sub Kicker1_Hit\r\n  DOF 105, DOFPulse\r\nEnd Sub\r\n`;
+/** Script qui lit la racine du PuP-Pack à son chargement (pupRootAtLoad), et plus tard dans une Sub (ignoré). */
+const PUP_ROOT_SCRIPT = `${SCRIPT}Dim PuPlayer: Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nDim screenFile: screenFile = PuPlayer.GetRoot & "DarkestDungeon\\ScreenType.txt"\r\nSub Later\r\n  x = PuPlayer.GetRoot & "Autre\\a.txt"\r\nEnd Sub\r\n`;
 /** Table de JP : FlexDMD lancé, noms d'images assemblés par « "VPX." & … » (flexprewarm.ts). */
 const FLEX_JP_SCRIPT = `Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nFlexDMD.Run = True\r\nChars(65) = "d_a"\r\nSub Show(c) : FlexDMD.NewImage "", "VPX." & Chars(c) & "&dmd=2" : End Sub\r\n`;
 /** Fichier POV (VPX 10.7, XML) d'une vue borne en mode « Window » (povview.ts). */
@@ -666,6 +668,12 @@ const TRAPS: Trap[] = [
     code: 'flexImagesLate',
     arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScriptAndImages(FLEX_JP_SCRIPT, [{ name: 'd_a', width: 128, height: 32 }])),
     script: scriptFacts(FLEX_JP_SCRIPT),
+  },
+  // Racine du PuP-Pack lue au chargement (Darkest Dungeon, 28/11/2026) : le fichier ouvert n'existe pas dans pupvideos, le script s'arrête avant ses objets.
+  {
+    code: 'pupRootAtLoad',
+    arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScriptAndImages(PUP_ROOT_SCRIPT, [])),
+    script: scriptFacts(PUP_ROOT_SCRIPT),
   },
   // Cadence (slowtable.ts) : la dernière partie de la table, mesurée par le plugin du DMD, a ramé (17/11/2026).
   {

@@ -20,6 +20,7 @@ interface Pin {
 }
 interface Step {
   names: Record<string, string>;
+  text: string;
   mode: string;
   stage: string;
   target?: string;
@@ -33,14 +34,15 @@ interface Step {
 type Keys = { previous: boolean; next: boolean; confirm: boolean; back: boolean };
 const test_ = require(path.join(REPO_ROOT, 'app', 'dist', 'button-test.js')) as {
   LISTEN_MS: number;
+  CHOICE_ROWS: number;
   startButtonTest(names: Record<string, string> | undefined, devices: unknown[], buttons: Record<string, string> | undefined, navigation: Record<string, string> | undefined): Step;
-  buttonTestKey(step: Step, keys: Keys, code: string, repeat: boolean, now: number): 'stay' | 'save';
+  buttonTestKey(step: Step, keys: Keys, code: string, repeat: boolean, now: number, typed?: string): 'stay' | 'save';
   buttonTestUp(step: Step, code: string): void;
   buttonTestClick(step: Step, what: { row: number } | { action: string }, now: number): 'stay' | 'save';
   buttonTestTick(step: Step, now: number): boolean;
   testedCount(step: Step): { tested: number; total: number };
   namesToSave(step: Step): Record<string, string>;
-  buttonTestView(step: Step, save: string, keys: { previous: string; next: string; confirm: string }, now?: number): { pins: Pin[]; buttons?: { label: string; selected: boolean }[]; actions: { id: string; selected: boolean }[]; step: string; hint: string };
+  buttonTestView(step: Step, save: string, keys: { previous: string; next: string; confirm: string }, now?: number): { name: string; keyboard: boolean; pins: Pin[]; buttons?: { label: string; selected: boolean }[]; actions: { id: string; selected: boolean }[]; step: string; hint: string };
 };
 
 const DEVICE = { id: 'SDLJoy_03000000fa190000ed00000000000000_1', name: 'Pinscape Controller', buttons: 3, axes: 2, hats: 1 };
@@ -98,7 +100,7 @@ test('noms : « Nommer un bouton » attend l’appui, puis un nom prêt, aux bou
   assert.equal(step.target, code(2));
   assert.equal(view(step).pins.length, 0, 'les choix prennent la place des cases');
   // Départ : nom prêt, repère et place, (retrait), annuler.
-  assert.equal(view(step).buttons!.length, 3);
+  assert.equal(view(step).buttons!.length, 4);
   test_.buttonTestKey(step, { ...NONE, confirm: true }, 'Digit1', false, 300);
   assert.equal(step.stage, 'ready');
   // Flipper droit : deux crans plus loin que « Flipper gauche ».
@@ -131,8 +133,8 @@ test('noms : retirer un nom, revenir en arrière, annuler, et l’attente qui s�
   test_.buttonTestClick(step, { action: 'name' }, 0);
   test_.buttonTestKey(step, NONE, code(0), false, 1);
   // Un bouton nommé propose de retirer son nom.
-  assert.equal(view(step).buttons!.length, 4);
-  test_.buttonTestClick(step, { row: 2 }, 2);
+  assert.equal(view(step).buttons!.length, 5);
+  test_.buttonTestClick(step, { row: 3 }, 2);
   assert.deepEqual(test_.namesToSave(step), {});
   assert.match(step.done!, /plus de nom/);
   // Revenir : du niveau des places au repère, puis au départ ; Exit remonte aussi.
@@ -153,6 +155,88 @@ test('noms : retirer un nom, revenir en arrière, annuler, et l’attente qui s�
   test_.buttonTestClick(step, { action: 'name' }, 2000);
   test_.buttonTestClick(step, { action: 'cancel' }, 2001);
   assert.equal(step.mode, 'test');
+});
+
+test('noms : la liste des noms prêts ne montre que quelques lignes autour du choix, et un clic vise la bonne', () => {
+  const step = test_.startButtonTest(undefined, [DEVICE], undefined, undefined);
+  test_.buttonTestClick(step, { action: 'name' }, 0);
+  test_.buttonTestKey(step, NONE, code(0), false, 1);
+  test_.buttonTestClick(step, { row: 0 }, 2);
+  assert.equal(step.stage, 'ready');
+  const rows = () => view(step).buttons as { label: string; selected: boolean; act: { index: number } }[];
+  assert.equal(rows().length, test_.CHOICE_ROWS);
+  assert.equal(rows()[0]!.act.index, 0);
+  // Le choix descend : la fenêtre le suit, et le choix reste toujours dans ce qui est montré.
+  for (let i = 0; i < 12; i++) {
+    test_.buttonTestKey(step, { ...NONE, next: true }, 'ShiftRight', false, 10 + i);
+    assert.equal(rows().filter((r) => r.selected).length, 1, `choix ${step.option}`);
+  }
+  assert.match(view(step).name, /sur/, 'où l’on en est dans la liste');
+  // Un clic sur une ligne montrée choisit cette ligne, pas celle de même rang dans la liste entière.
+  const shown = rows()[1]!;
+  test_.buttonTestClick(step, { row: shown.act.index }, 100);
+  assert.equal(step.names[code(0)], shown.label);
+});
+
+test('noms : un nom à soi s’écrit aux flippers et à Start, ou à la souris, avec « Valider » au bout', () => {
+  const step = test_.startButtonTest(undefined, [DEVICE], undefined, undefined);
+  test_.buttonTestClick(step, { action: 'name' }, 0);
+  test_.buttonTestKey(step, NONE, code(2), false, 1);
+  test_.buttonTestClick(step, { row: 2 }, 2);
+  assert.equal(step.stage, 'text');
+  const keys = () => view(step).buttons as { label: string; selected: boolean }[];
+  assert.equal(view(step).keyboard, true);
+  assert.equal(keys()[0]!.label, 'A', 'la première lettre est une majuscule');
+  assert.match(view(step).name, /Nom/);
+  // À la souris : la majuscule, puis la touche suivante en minuscule.
+  test_.buttonTestClick(step, { row: 0 }, 3);
+  assert.equal(step.text, 'A');
+  assert.equal(keys()[0]!.label, 'a');
+  // Aux flippers : le droit avance, Start écrit.
+  test_.buttonTestKey(step, { ...NONE, next: true }, 'ShiftRight', false, 4);
+  test_.buttonTestKey(step, { ...NONE, confirm: true }, 'Digit1', false, 5);
+  assert.equal(step.text, 'Ab');
+  // Le flipper gauche, depuis le début de la liste, arrive sur « Valider » ; il valide.
+  test_.buttonTestClick(step, { row: 0 }, 6);
+  assert.equal(step.text, 'Aba');
+  test_.buttonTestKey(step, { ...NONE, previous: true }, 'ShiftLeft', false, 7);
+  assert.equal(keys().filter((k) => k.selected).length, 1);
+  assert.equal(keys()[keys().length - 1]!.selected, true);
+  assert.match(keys()[keys().length - 1]!.label, /Valider/);
+  test_.buttonTestKey(step, { ...NONE, confirm: true }, 'Digit1', false, 8);
+  assert.equal(step.mode, 'test');
+  assert.equal(step.names[code(2)], 'Aba');
+  assert.equal(step.text, '', 'la saisie est remise à zéro');
+});
+
+test('noms : au clavier, la lettre tapée s’écrit, Retour arrière efface, Entrée valide, sans compter comme essai', () => {
+  const step = test_.startButtonTest({ [code(1)]: 'Flipper gauche' }, [DEVICE], undefined, undefined);
+  const pins = step.pins.length;
+  test_.buttonTestClick(step, { action: 'name' }, 0);
+  test_.buttonTestKey(step, NONE, code(1), false, 1);
+  test_.buttonTestClick(step, { row: 2 }, 2);
+  assert.equal(step.text, 'Flipper gauche', 'un bouton déjà nommé se corrige : son nom est repris');
+  for (const char of ' à') test_.buttonTestKey(step, NONE, char === ' ' ? 'Space' : 'KeyQ', false, 3, char);
+  test_.buttonTestKey(step, NONE, 'Backspace', false, 4);
+  test_.buttonTestKey(step, NONE, 'Backspace', false, 5, 'Backspace');
+  assert.equal(step.text, 'Flipper gauche');
+  // Taper n'ajoute aucune case et ne compte pas comme essai.
+  assert.equal(step.pins.length, pins, 'taper n’ajoute aucune case');
+  assert.equal(step.counts.has('KeyQ'), false);
+  // Une touche sans caractère (F5) n'écrit rien : c'est un appui comme un autre.
+  test_.buttonTestKey(step, NONE, 'F5', false, 6, 'F5');
+  assert.equal(step.text, 'Flipper gauche');
+  // Exit abandonne l'écriture sans rien changer.
+  test_.buttonTestKey(step, { ...NONE, back: true }, 'Escape', false, 7);
+  assert.equal(step.stage, 'root');
+  assert.equal(step.names[code(1)], 'Flipper gauche');
+  // Un nom neuf, tapé, validé par Entrée ; un nom trop long est coupé à sa limite.
+  test_.buttonTestClick(step, { row: 2 }, 8);
+  for (let i = 0; i < 60; i++) test_.buttonTestKey(step, NONE, 'KeyX', true, 9, 'x');
+  assert.equal([...step.text].length, 14 + 26, 'la longueur permise est tenue');
+  test_.buttonTestKey(step, NONE, 'Enter', false, 10);
+  assert.equal(step.mode, 'test');
+  assert.equal([...step.names[code(1)]!].length, 40);
 });
 
 test('enregistrer : à la souris ou à Start sur la deuxième action, jamais en passant par un appui d’essai', () => {

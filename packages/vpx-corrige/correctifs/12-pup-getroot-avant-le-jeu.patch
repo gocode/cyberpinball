@@ -1,0 +1,55 @@
+diff --git a/plugins/pup/PUPManager.cpp b/plugins/pup/PUPManager.cpp
+index 71b6dc9..6339345 100644
+--- a/plugins/pup/PUPManager.cpp
++++ b/plugins/pup/PUPManager.cpp
+@@ -140,6 +140,17 @@ void PUPManager::Stop()
+    m_B2SPluginEventStream = nullptr;
+ }
+ 
++std::filesystem::path PUPManager::GetTablePupRoot() const
++{
++   if (m_vpxApi == nullptr)
++      return {};
++   VPXTableInfo tableInfo {};
++   m_vpxApi->GetTableInfo(&tableInfo);
++   if (tableInfo.path == nullptr || *tableInfo.path == 0)
++      return {};
++   return find_case_insensitive_directory_path(PluginStrings::PathFromNative(tableInfo.path).parent_path() / "pupvideos"sv);
++}
++
+ std::filesystem::path PUPManager::FindGameDir(const std::string_view& gameNs, const std::string_view& gameId) const
+ {
+    if (gameId.empty())
+diff --git a/plugins/pup/PUPManager.h b/plugins/pup/PUPManager.h
+index c9c273b..91f75e8 100644
+--- a/plugins/pup/PUPManager.h
++++ b/plugins/pup/PUPManager.h
+@@ -68,6 +68,8 @@ public:
+    ~PUPManager();
+ 
+    const std::filesystem::path& GetRootPath() const { return m_szRootPath; }
++   // Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 12): the pupvideos folder next to the table file (empty if none): what GetRoot answers before a game is set and without a global folder
++   std::filesystem::path GetTablePupRoot() const;
+ 
+    // Locate the pupvideos folder for a game id (format: ns::rom), searching
+    // each base under an optional intermediate namespace folder first --
+diff --git a/plugins/pup/PUPPinDisplay.cpp b/plugins/pup/PUPPinDisplay.cpp
+index 1f4fcf6..be02fbd 100644
+--- a/plugins/pup/PUPPinDisplay.cpp
++++ b/plugins/pup/PUPPinDisplay.cpp
+@@ -421,7 +421,14 @@ string PUPPinDisplay::GetGetRoot() const
+    // The return path is either the default one when not playing or the one actually being played (which may be a per table or a global folder)
+    // Both end with a separator, as PinUP Player's (C:\PinUPSystem\PUPVideos\): scripts append the pack folder to it, like GetRoot & "pack\file.txt"
+    if (m_pupManager.GetPath().empty())
+-      return m_pupManager.GetRootPath().empty() ? std::string() : PluginStrings::PathToUTF8(m_pupManager.GetRootPath() / ""sv);
++   {
++      // Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 12): some scripts read GetRoot at load time, before any game is set (Darkest Dungeon: GetRoot & "DarkestDungeon\ScreenType.txt"): an empty answer stops their global code.
++      // Without a global folder, answer with the per-table pupvideos folder, as PinUP Player answers with its PUPVideos folder.
++      std::filesystem::path root = m_pupManager.GetRootPath();
++      if (root.empty())
++         root = m_pupManager.GetTablePupRoot();
++      return root.empty() ? std::string() : PluginStrings::PathToUTF8(root / ""sv);
++   }
+    else
+       return PluginStrings::PathToUTF8(m_pupManager.GetPath().parent_path() / ""sv);
+ }

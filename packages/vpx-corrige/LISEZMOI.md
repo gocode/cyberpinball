@@ -6,8 +6,8 @@ Cyber Pinball installe Visual Pinball X 10.8.1-5436 depuis son archive officiell
 Les autres plugins et les bibliothèques restent ceux de l'archive officielle.
 Un autre VPX (version d'essai, VPX installé par l'utilisateur) n'est jamais touché.
 
-Série de correctifs actuelle : « patched Cyber Pinball 11 ».
-Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-11`.
+Série de correctifs actuelle : « patched Cyber Pinball 12 ».
+Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-12`.
 
 ## Correctifs
 
@@ -19,6 +19,7 @@ Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les table
 - `08-pup-playlistadd-met-a-jour.patch` (plugin PuP, série 8, appliqué après le 07) : comme PinUP Player, `playlistadd` sur une playlist déjà déclarée dans `playlists.pup` met à jour son ordre (mélangé ou alphabétique) et son temps de repos, au lieu d'être ignoré. Stranger Things 4 déclare toutes ses playlists avec 30 secondes de repos et les remet à 0 depuis son script : annonces et sons d'une même playlist étaient sautés pendant 30 secondes.
 - `09-pup-pupcapture-sans-plantage.patch` (plugin PuP, série 9, appliqué après le 07) : libpupdmd lit le numéro de chaque capture `PupCapture/<nombre>.bmp` avec `std::stoi`, qui lève une exception au-delà de 2147483647, et convertit chaque chemin dans la page de code ANSI, qui en lève une sur les autres noms. Levée sur un fil du plugin, l'exception terminait VPX (0xC0000409) à la première image du DMD : The Avengers Pro livre `PupCapture/12341241234.bmp`. Le plugin l'attrape, relit les captures lisibles depuis une copie temporaire, et à défaut joue le pack sans ses déclencheurs DMD.
 - `10-pup-cout-au-journal.patch` et `11-images-par-etape-au-journal.patch` (Cyber Pinball, série 10) : chaque seconde de partie, VPX écrit dans son journal ce que coûtent les vidéos PuP (« PuP live » : images envoyées à la carte graphique, temps d'envoi et de conversion), le fil logique (« Logic live » : script, physique, préparation, plugins, attente) et le fil de rendu (« Render live » : temps GPU, attente de l'écran, envoi, présentation), avec à part les images en retard sur la fréquence du playfield. Rien d'autre ne change : les vidéos sont envoyées telles quelles.
+- `12-pup-getroot-avant-le-jeu.patch` (plugin PuP, série 12, appliqué après le 07) : `PuPlayer.GetRoot` lu avant le choix du jeu répondait une chaîne vide quand aucun dossier PuP global n'est réglé, ce qui est le cas de Cyber Pinball (le dossier `pupvideos` est rangé à côté de chaque table). Darkest Dungeon (Original 2023) lit `GetRoot & "DarkestDungeon\ScreenType.txt"` dans son code global : le fichier restait introuvable, le script s'arrêtait avant de créer ses objets, et la partie remplissait le journal d'erreurs « Objet requis » sans démarrer. Comme PinUP Player, qui répond avec son dossier PUPVideos (séparateur final compris), le plugin répond désormais avec le dossier `pupvideos` à côté de la table, s'il existe.
 
 - `correctifs-libdof/` (bibliothèque DOF, série 6) : la libdof de la 5436 (commit `eef645d9`) avec le report des commits [0383246](https://github.com/vpinball/libdof/commit/03832462f10d19b1795e2292646193ca39e51fbd) et [c79bcff](https://github.com/vpinball/libdof/commit/c79bcff5be61e3c10022d2e6fa25f207e038bc53) (partie `FinishUpdaterThread`) de libdof. En se déchargeant, la 5436 arrêtait une carte DudesCab une seconde fois, après sa vraie fermeture, et VPX plantait en se fermant (0xC0000005). Le destructeur de la DudesCab ne relance plus l'arrêt, et le fil de sortie d'un contrôleur est toujours attendu au lieu d'être abandonné. L'interface de la bibliothèque (`include/DOF/DOF.h`) ne change pas : le `plugin-dof64.dll` officiel la charge telle quelle.
 
@@ -37,4 +38,4 @@ Le plugin PuP est lié aux DLL de l'archive officielle (SDL_image, SDL_ttf, pupd
 ## Licence
 
 VPX est distribué sous GPLv3+ (et une licence dérivée de MAME pour une partie des fichiers), voir le fichier `LICENSE` joint ; libdof sous sa propre licence, jointe dans `plugins/dof/LICENSE-libdof`.
-Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-11
+Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-12

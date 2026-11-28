@@ -868,7 +868,7 @@ function handleKey(input: Input): boolean {
   if (wizard.phase === 'buttonTest') {
     // Chaque appui compte, même celui d'un bouton sans rôle : c'est l'essai (et une touche tenue ne recompte pas).
     const step = wizard.buttonTest!;
-    const outcome = buttonTestKey(step, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm), back: is(KEYS.exit) || is(KEYS.back) }, input.code, input.isAutoRepeat, Date.now());
+    const outcome = buttonTestKey(step, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm), back: is(KEYS.exit) || is(KEYS.back) }, input.code, input.isAutoRepeat, Date.now(), input.key);
     afterButtonTest(outcome);
     broadcast();
     return true;
