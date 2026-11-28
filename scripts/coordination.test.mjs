@@ -62,6 +62,11 @@ test('reprise : seulement une préversion effectivement préparée, jamais une f
   assert.equal(publicationRetry({ ...attempt, subject: 'Version 0.2.3' }), undefined, 'aucune finale automatique');
   assert.equal(publicationRetry({ ...attempt, subject: 'Autre correction' }), undefined);
   assert.deepEqual(publicationRetry({ ...attempt, head: 'old', reprendre: true }), { head: 'old', leger: true }, 'une reprise peut échouer avant de refabriquer');
+  // Release en ligne, puis contrôle des bornes en échec (0.2.4-essai.100 invisible, 27/11/2026) : le numéro est pris.
+  const online = 'envoyé\n\nPubliée : https://github.com/o/r/releases/tag/v0.2.3-essai.46\n\nPublication arrêtée : la release 0.2.3-essai.46 est publiée (…), mais …';
+  assert.equal(publicationRetry({ ...attempt, out: online }), undefined, 'jamais republiée sous le même numéro');
+  assert.equal(publicationRetry({ ...attempt, reprendre: true, out: online }), undefined);
+  assert.deepEqual(publicationRetry({ ...attempt, out: 'envoi de CyberPinball-Setup.exe refusé (HTTP 502). La release reste en brouillon.' }), { head: 'new', leger: true });
 });
 
 test('durée prévue d’une suite : médiane des dernières mesures, sinon la valeur par défaut', () => {

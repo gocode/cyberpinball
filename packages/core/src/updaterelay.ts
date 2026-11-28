@@ -24,6 +24,8 @@ export const DIRECT_PATIENCE_MS = 8_000;
 export function relayedUpdateUrl(url: string, origin = RELAY_ORIGIN): string | undefined {
   const api = `https://api.github.com/repos/${REPOSITORY}/releases`;
   if (url === api || url.startsWith(`${api}?`)) return `${origin}/maj/api/releases${url.slice(api.length)}`;
+  // Les étiquettes (update.ts, tagsApiUrl) : la plus haute version, quel que soit l'ordre de la liste.
+  if (url === `https://api.github.com/repos/${REPOSITORY}/git/matching-refs/tags/v`) return `${origin}/maj/api/tags`;
   const site = `https://github.com/${REPOSITORY}/releases/`;
   if (url.startsWith(site)) return `${origin}/maj/github/releases/${url.slice(site.length)}`;
   return undefined;

@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { describeNetworkError, networkErrorCode, networkFailureOf } from '../netcause';
 import { RELAY_ORIGIN } from '../remote-relay';
-import { checkForUpdate, downloadUpdate, signManifest, UPDATE_REPOSITORY, type UpdateManifest } from '../update';
+import { checkForUpdate, downloadUpdate, signManifest, tagsApiUrl, UPDATE_REPOSITORY, type UpdateManifest } from '../update';
 import { relayedUpdateUrl, updateFetchWithRelay } from '../updaterelay';
 import { SERVICE_DIR } from './fausse-d1';
 import { REPO_ROOT } from './i18n-scan';
@@ -53,6 +53,8 @@ test('relais : les adresses publiques du dépôt seulement, le même dépôt par
   assert.equal(relayedUpdateUrl(`${API}?per_page=10`), `${RELAY_ORIGIN}/maj/api/releases?per_page=10`);
   assert.equal(relayedUpdateUrl(`${SITE}download/v0.2.2/CyberPinball-Setup.exe`), `${RELAY_ORIGIN}/maj/github/releases/download/v0.2.2/CyberPinball-Setup.exe`);
   assert.equal(relayedUpdateUrl(`${SITE}latest/download/cyberpinball-maj.json`), `${RELAY_ORIGIN}/maj/github/releases/latest/download/cyberpinball-maj.json`);
+  assert.equal(relayedUpdateUrl(tagsApiUrl()), `${RELAY_ORIGIN}/maj/api/tags`);
+  assert.equal(relayedUpdateUrl(tagsApiUrl('autre/depot')), undefined);
   assert.equal(relayedUpdateUrl('https://api.github.com/repos/autre/depot/releases'), undefined);
   assert.equal(relayedUpdateUrl('https://github.com/autre/depot/releases/download/v1/x.exe'), undefined);
   assert.equal(relayedUpdateUrl('https://objects.githubusercontent.com/x'), undefined);
@@ -174,7 +176,11 @@ test('de bout en bout : borne sans GitHub → service → « GitHub » : version
   };
   const feed = `${SITE}download/${tag}/cyberpinball-maj.json`;
   // « GitHub », vu du service seulement.
-  const github = (async (input: string) => {
+  const githubSeen: string[] = [];
+  const github = (async (input: string, init?: RequestInit) => {
+    githubSeen.push(`${init?.method ?? 'GET'} ${input}`);
+    // Les étiquettes (la plus haute version, quel que soit l'ordre de la liste) ; la liste n'est plus lue.
+    if (input === tagsApiUrl()) return Response.json([{ ref: 'refs/tags/v0.2.1-essai.29' }, { ref: `refs/tags/${tag}` }]);
     if (input.startsWith(API)) return Response.json([{ tag_name: tag, assets: [{ name: 'cyberpinball-maj.json', browser_download_url: feed, url: 'https://api.github.com/x' }] }]);
     if (input === feed) return new Response(JSON.stringify(signManifest(manifest, priv)));
     if (input === manifest.installer.url) return new Response(exe, { headers: { 'content-length': String(exe.length) } });
@@ -191,6 +197,8 @@ test('de bout en bout : borne sans GitHub → service → « GitHub » : version
   const check = await checkForUpdate({ current: '0.2.1-essai.29', prereleases: true, publicKey: pub, fetch: get, patience: { retryDelayMs: 10 } });
   assert.equal(check.status, 'available');
   assert.equal(check.latest.version, '0.3.0-essai.1');
+  assert.ok(githubSeen.includes(`GET ${tagsApiUrl()}`) && githubSeen.includes(`HEAD ${feed}`), githubSeen.join('\n'));
+  assert.ok(!githubSeen.some((s) => s.includes('/releases?')), 'étiquettes lues par le relais : la liste n’est pas demandée');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-relais-'));
   try {
     const file = await downloadUpdate(check.latest, dir, { fetch: get });

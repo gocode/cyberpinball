@@ -523,22 +523,44 @@ if (argv.includes('--brouillon')) {
   const published = await api('PATCH', `/releases/${created.json.id}`, { draft: false });
   if (published.status !== 200) fail(`publication refusée (HTTP ${published.status}) ; la release reste en brouillon : ${created.json.html_url}`);
   console.log(`\nPubliée : ${published.json.html_url}`);
-  // Les bornes lisent ce flux : vérifié tel qu'elles le recevront.
-  // Une préversion : lue comme une borne qui accepte les préversions.
-  // GitHub met sa liste des releases à jour avec quelques secondes de retard (le 25/10/2026,
-  // 0.1.3-essai.2 lue « 0.1.3-essai.1 ») : on relit jusqu'à voir la version publiée.
+  // Les bornes lisent ce flux : vérifié tel qu'elles le recevront, de leurs deux façons.
+  // - Aujourd'hui : la plus haute étiquette (update.checkForUpdate). Une préversion : lue comme une
+  //   borne qui accepte les préversions.
+  // - Les bornes installées avant le 28/11/2026 : seulement les premières releases de la liste de
+  //   GitHub (update.newestListedRelease). GitHub la range par jour, puis par nom d'étiquette comme
+  //   du texte : le 27/11/2026, la 0.2.4-essai.100 est arrivée 27e, après essai.74, et aucune de ces
+  //   bornes ne l'a vue ; la publication ne l'avait signalé que par un avertissement.
+  // GitHub met sa liste à jour avec quelques secondes de retard (le 25/10/2026, 0.1.3-essai.2 lue
+  // « 0.1.3-essai.1 ») : on relit jusqu'à voir la version publiée. Lu avec le jeton (5 000 requêtes
+  // par heure au lieu de 60) : l'ordre est le même, les brouillons sont écartés comme sans jeton.
+  const readAs = update.channelFetch({ repository: target, token });
+  const listUrl = privateRepo ? update.releasesApiUrl(privateRepo, undefined, update.PRIVATE_RELEASES_LISTED) : update.releasesApiUrl();
+  const listedCount = privateRepo ? update.PRIVATE_RELEASES_LISTED : update.PUBLIC_RELEASES_LISTED;
   let check;
+  let listed;
   for (let attempt = 0; attempt < 12; attempt++) {
     if (attempt) await new Promise((resolve) => setTimeout(resolve, 5000));
-    check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease, ...(privateRepo && { channel: { repository: privateRepo, token } }) }).catch((error) => error);
-    if (!(check instanceof Error) && check.latest.version === version) break;
+    check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease, fetch: readAs, ...(privateRepo && { channel: { repository: privateRepo, token } }) }).catch((error) => error);
+    listed = await update.newestListedRelease(listUrl, { fetch: readAs, viaApi: Boolean(privateRepo) }).then((best) => best?.version ?? '(aucune)', (error) => error);
+    if (!(check instanceof Error) && check.latest.version === version && listed === version) break;
   }
-  if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
-  else if (check.latest.version !== version) console.log(`Attention : au bout d'une minute, les bornes lisent encore la version ${check.latest.version}, pas ${version} : à vérifier sur GitHub.`);
-  else console.log(`Flux lu comme une borne : version ${check.latest.version}${privateRepo ? ' (essai privé : seules les bornes qui ont ce canal d’essai la voient)' : prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
+  const unseen = [];
+  if (check instanceof Error) unseen.push(`son flux n'est pas lisible par les bornes (${check.message})`);
+  else if (check.latest.version !== version) unseen.push(`au bout d'une minute, les bornes lisent encore la version ${check.latest.version}`);
+  if (listed instanceof Error) unseen.push(`la liste des releases est illisible (${listed.message})`);
+  else if (listed !== version) {
+    unseen.push(
+      `les bornes installées avant le 28/11/2026, qui ne lisent que les ${listedCount} premières releases de la liste de GitHub, y trouvent au mieux la ${listed}. ` +
+        `GitHub range cette liste par jour, puis par nom d'étiquette comme du texte (« essai.100 » après « essai.74 ») : elles la verront à la première publication d'un autre jour (UTC). ` +
+        `Sur une borne en attente : CYBERPINBALL_MAJ_URL=${update.releaseAssetUrl(version, update.UPDATE_FEED_NAME, target)}`,
+    );
+  }
+  if (!unseen.length) console.log(`Flux lu comme une borne, par les étiquettes et par les ${listedCount} premières releases de la liste : version ${version}${privateRepo ? ' (essai privé : seules les bornes qui ont ce canal d’essai la voient)' : prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
   if (!prerelease) {
     const problems = await directDownloadProblems(repository, version);
     if (problems.length) console.log(`Attention : téléchargement direct des README pas encore sur ${version} :\n  ${problems.join('\n  ')}`);
     else console.log(`Téléchargement direct des README : ${DIRECT_DOWNLOADS.join(' et ')} de la version ${version}.`);
   }
+  // Publiée, mais pas vue : la publication échoue (le train le signale, sans la relancer : le numéro est pris).
+  if (unseen.length) fail(`la release ${version} est publiée (${published.json.html_url}), mais ${unseen.join(' ; ')}.`);
 }

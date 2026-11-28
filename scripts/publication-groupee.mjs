@@ -105,9 +105,14 @@ export function publicationPlan({ pending, retry = false, leger = false }) {
   return { reprendre, args: [leger ? '--leger' : '--rapide', ...(reprendre ? [] : ['--essai'])] };
 }
 
-/** Un échec avant le commit de préversion ne doit pas republier la version précédente. */
-export function publicationRetry({ before, head, subject, reprendre, leger }) {
+/**
+ * Un échec avant le commit de préversion ne doit pas republier la version précédente. Un échec
+ * après la mise en ligne de la release (ligne « Publiée : » de publier.mjs, puis contrôle des bornes
+ * en échec, 28/11/2026) non plus : le numéro est pris, la relance échouerait sur « existe déjà ».
+ */
+export function publicationRetry({ before, head, subject, reprendre, leger, out = '' }) {
   if (!/^Version [0-9]+[.][0-9]+[.][0-9]+-essai[.][0-9]+$/.test(subject) || (!reprendre && before === head)) return undefined;
+  if (/^Publiée : https?:\/\//m.test(out)) return undefined;
   return { head, leger };
 }
 
@@ -796,10 +801,13 @@ export async function publishGrouped({ cwd = process.cwd(), say = console.log, w
     if (result.etapes?.length) say(`Durées de la publication${lot.version ? ` ${lot.version}` : ''} : ${stepsSummary(result)}.`);
     if (result.code !== 0) {
       const head = lot.frozen ?? git(['rev-parse', 'HEAD'], main);
-      const interrupted = publicationRetry({ before: lot.verified, head, subject: git(['log', '-1', '--format=%s', head], main), reprendre: lot.plan.reprendre, leger: lot.args[0] === '--leger' });
+      const interrupted = publicationRetry({ before: lot.verified, head, subject: git(['log', '-1', '--format=%s', head], main), reprendre: lot.plan.reprendre, leger: lot.args[0] === '--leger', out: result.out ?? '' });
+      const online = /^Publiée : https?:\/\//m.test(result.out ?? '');
       if (interrupted) writeJson(retryFile, interrupted);
+      else if (online) fs.rmSync(retryFile, { force: true });
       writeTrainState(dir, { ...readTrainState(dir), publication: 'echec' });
-      say(`\nPublication${lot.version ? ` de la ${lot.version}` : ''} en échec : voir la sortie ci-dessus. npm run publication-groupee la relance${lot.frozen ? ' (même numéro)' : ' telle quelle'}.`);
+      if (online) say(`\nPréversion${lot.version ? ` ${lot.version}` : ''} en ligne, mais le contrôle des bornes a échoué : voir la sortie ci-dessus. Pas de relance sous le même numéro.`);
+      else say(`\nPublication${lot.version ? ` de la ${lot.version}` : ''} en échec : voir la sortie ci-dessus. npm run publication-groupee la relance${lot.frozen ? ' (même numéro)' : ' telle quelle'}.`);
       return false;
     }
     fs.rmSync(retryFile, { force: true });

@@ -392,6 +392,20 @@ export function releasesApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API,
 }
 
 /**
+ * All the version tags of the repository (git/matching-refs, one API request). The list of the
+ * releases is not in version order: GitHub sorts it by day, then by tag name as text. On
+ * 27/11/2026, v0.2.4-essai.100 came 27th, after essai.74 ("1" before "7"): no cabinet saw it in
+ * the first ten. The tags are all there, whatever their order; some 0.4 KB each (28 KB compressed
+ * for 586 tags, against 437 KB for ten releases with their notes).
+ */
+export function tagsApiUrl(repository = UPDATE_REPOSITORY, api = GITHUB_API): string {
+  return `${api}/repos/${repository}/git/matching-refs/tags/v`;
+}
+
+/** Highest tags tried, at most: a tag without a published release (draft, feed not sent yet) is passed over. */
+export const TAGS_TRIED = 5;
+
+/**
  * Patience of the searches (patientfetch.ts): the delay bounds the absence of progress, not the
  * length of the transfer, and a passing network error is tried again. Tests: shorter.
  */
@@ -448,7 +462,7 @@ export function channelFetch(channel: PrivateChannel | undefined, base: typeof f
 }
 
 /** Most recent release of a GitHub API list, and the API address of each attached file of the list. */
-interface NewestRelease {
+export interface NewestRelease {
   version: string;
   /** Address of the feed: for download (public repository), or of the API (private repository). */
   feed: string;
@@ -456,16 +470,21 @@ interface NewestRelease {
   apiUrls: Map<string, string>;
 }
 
-async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSignal | undefined, viaApi: boolean, patience: UpdatePatience | undefined): Promise<NewestRelease | undefined> {
-  const response = await readUpdateSite(listUrl, get, signal, patience, {
+type ListedRelease = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string; url?: string }[] };
+
+/** Reads a JSON answer of the GitHub API. */
+async function readApi(url: string, get: typeof fetch, signal: AbortSignal | undefined, patience: UpdatePatience | undefined): Promise<unknown> {
+  const response = await readUpdateSite(url, get, signal, patience, {
     headers: { accept: 'application/vnd.github+json', 'cache-control': 'no-cache' },
   });
   if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
-  type Listed = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string; url?: string }[] };
-  const listed = JSON.parse(response.text) as Listed[];
+  return JSON.parse(response.text);
+}
+
+/** Highest-version release of a list that has a feed (drafts are not listed without a token); adds the API address of each attached file to `apiUrls`. */
+function newestOf(listed: ListedRelease[], viaApi: boolean, apiUrls: Map<string, string>): NewestRelease | undefined {
   let best: NewestRelease | undefined;
-  const apiUrls = new Map<string, string>();
-  for (const r of Array.isArray(listed) ? listed : []) {
+  for (const r of listed) {
     if (r.draft) continue;
     for (const a of r.assets ?? []) if (a.browser_download_url && a.url) apiUrls.set(a.browser_download_url, a.url);
     const version = r.tag_name?.replace(/^v/, '');
@@ -478,12 +497,105 @@ async function newestRelease(listUrl: string, get: typeof fetch, signal: AbortSi
 }
 
 /**
+ * Highest version among the first releases of the list, as GitHub orders it: all that the cabinets
+ * installed before the tags were read (28/11/2026) look at. The publication checks it too
+ * (scripts/publier.mjs): a release out of these first ones stays invisible to them.
+ */
+export async function newestListedRelease(listUrl: string, opts: { fetch?: typeof fetch; signal?: AbortSignal; patience?: UpdatePatience; viaApi?: boolean } = {}): Promise<NewestRelease | undefined> {
+  const listed = await readApi(listUrl, opts.fetch ?? fetch, opts.signal, opts.patience);
+  return newestOf(Array.isArray(listed) ? (listed as ListedRelease[]) : [], Boolean(opts.viaApi), new Map());
+}
+
+/** Versions of the repository's tags (git/matching-refs), highest first. */
+async function taggedVersions(url: string, get: typeof fetch, signal: AbortSignal | undefined, patience: UpdatePatience | undefined): Promise<string[]> {
+  const refs = await readApi(url, get, signal, patience);
+  const versions = (Array.isArray(refs) ? (refs as { ref?: unknown }[]) : [])
+    .map((r) => (typeof r?.ref === 'string' ? r.ref.replace(/^refs\/tags\/v/, '') : ''))
+    .filter((v) => isVersion(v));
+  return versions.sort((a, b) => compareAppVersions(b, a));
+}
+
+/**
+ * Where a repository's releases are read. The tags give the highest version whatever the order of
+ * the list; the list stays the fallback (tags unreadable) and, for the private channel, gives the
+ * API addresses of the attached files of older releases.
+ */
+interface ReleaseSource {
+  listUrl: string;
+  /** Undefined: the list alone (tests of the list, an address given by hand). */
+  tagsUrl?: string;
+  /** Public repository: download address of a release's feed, tried by HEAD (no API request). */
+  feedOf?: (version: string) => string;
+  /** Private repository: API address of a release, by its tag. */
+  releaseOf?: (version: string) => string;
+}
+
+function publicSource(releasesUrl: string | undefined): ReleaseSource {
+  if (releasesUrl) return { listUrl: releasesUrl };
+  return { listUrl: releasesApiUrl(), tagsUrl: tagsApiUrl(), feedOf: (version) => releaseAssetUrl(version, UPDATE_FEED_NAME) };
+}
+
+function privateSource(channel: PrivateChannel): ReleaseSource {
+  const api = channel.api ?? GITHUB_API;
+  return {
+    listUrl: releasesApiUrl(channel.repository, channel.api, PRIVATE_RELEASES_LISTED),
+    tagsUrl: tagsApiUrl(channel.repository, api),
+    releaseOf: (version) => `${api}/repos/${channel.repository}/releases/tags/v${encodeURIComponent(version)}`,
+  };
+}
+
+/**
+ * Highest published version of a repository, whatever the order of GitHub's list: its highest tag
+ * whose release is published with a feed (a draft's tag is passed over). Public repository: the
+ * tags, then the feed tried by HEAD; the list only if the tags cannot be read. Private repository:
+ * the list (API addresses of the files), then the higher tags, each read through the API.
+ */
+async function newestRelease(source: ReleaseSource, get: typeof fetch, signal: AbortSignal | undefined, viaApi: boolean, patience: UpdatePatience | undefined): Promise<NewestRelease | undefined> {
+  const tags = async (): Promise<string[]> => {
+    if (!source.tagsUrl) return [];
+    try {
+      return await taggedVersions(source.tagsUrl, get, signal, patience);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      return [];
+    }
+  };
+  if (source.feedOf) {
+    for (const version of (await tags()).slice(0, TAGS_TRIED)) {
+      const feed = source.feedOf(version);
+      const head = await readUpdateSite(feed, get, signal, patience, { method: 'HEAD', redirect: 'follow', headers: { 'cache-control': 'no-cache' } }).catch((error) => {
+        if (signal?.aborted) throw error;
+        return undefined;
+      });
+      if (head?.ok) return { version, feed, apiUrls: new Map() };
+      // Site that does not answer properly: the list decides.
+      if (head?.status !== 404) break;
+    }
+    return newestListedRelease(source.listUrl, { fetch: get, ...(signal ? { signal } : {}), ...(patience ? { patience } : {}), viaApi });
+  }
+  const apiUrls = new Map<string, string>();
+  const listed = await readApi(source.listUrl, get, signal, patience);
+  const best = newestOf(Array.isArray(listed) ? (listed as ListedRelease[]) : [], viaApi, apiUrls);
+  if (!source.releaseOf) return best;
+  const higher = (await tags()).filter((v) => !best || compareAppVersions(v, best.version) > 0);
+  for (const version of higher.slice(0, TAGS_TRIED)) {
+    const release = await readApi(source.releaseOf(version), get, signal, patience).catch((error) => {
+      if (signal?.aborted) throw error;
+      return undefined;
+    });
+    const found = release && typeof release === 'object' ? newestOf([release as ListedRelease], viaApi, apiUrls) : undefined;
+    if (found?.version === version) return found;
+  }
+  return best;
+}
+
+/**
  * Address of the most recent feed, pre-releases included: the one of the highest-version release
- * that has one (drafts are not listed without a token). The feed is still checked by its
- * signature: the list only says where to look for it.
+ * that has one. The feed is still checked by its signature: the tags and the list only say where
+ * to look for it.
  */
 export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal; patience?: UpdatePatience } = {}): Promise<string> {
-  const best = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), opts.fetch ?? fetch, opts.signal, false, opts.patience);
+  const best = await newestRelease(publicSource(opts.releasesUrl), opts.fetch ?? fetch, opts.signal, false, opts.patience);
   if (!best) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
   return best.feed;
 }
@@ -512,7 +624,7 @@ export async function checkForUpdate(opts: {
   const listed = !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL;
   if ((opts.prereleases || opts.channel) && listed) {
     // Unreadable list (API limit reached...): the feed of the releases, always readable.
-    const pub = await newestRelease(opts.releasesUrl ?? releasesApiUrl(), plain, opts.signal, false, opts.patience).catch((error) => {
+    const pub = await newestRelease(publicSource(opts.releasesUrl), plain, opts.signal, false, opts.patience).catch((error) => {
       if (opts.signal?.aborted) throw error;
       return undefined;
     });
@@ -521,7 +633,7 @@ export async function checkForUpdate(opts: {
       const channel = opts.channel;
       get = channelFetch(channel, plain);
       try {
-        privateRelease = await newestRelease(releasesApiUrl(channel.repository, channel.api, PRIVATE_RELEASES_LISTED), get, opts.signal, true, opts.patience);
+        privateRelease = await newestRelease(privateSource(channel), get, opts.signal, true, opts.patience);
       } catch (error) {
         if (opts.signal?.aborted) throw error;
         throw new Error(t('Canal d’essai {repository} illisible : {message} Vérifie le jeton de canal-essai.json, ou reviens aux versions publiques.', { repository: channel.repository, message: (error as Error).message }));

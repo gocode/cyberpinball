@@ -1115,6 +1115,8 @@ async function retours(request, env, url, now, ctx) {
 // Une borne qui ne joint plus GitHub (un réseau où seul l'IPv6 passe : GitHub n'a pas d'IPv6, ce
 // service si) lit ses mises à jour ici : le service va les chercher sur GitHub à sa place.
 //   GET /maj/api/releases?per_page=N            la liste des publications (API de GitHub), N ≤ 30
+//   GET /maj/api/tags                            les étiquettes v… (git/matching-refs) : la plus haute
+//                                                version, quel que soit l'ordre de la liste (28/11/2026)
 //   GET /maj/github/releases/<chemin>            un fichier publié : releases/download/<tag>/<nom>
 //                                                ou releases/latest/download/<nom> (Range transmis)
 //   GET /telecharger                             l'installeur de la dernière version finale, pour un
@@ -1149,6 +1151,13 @@ export async function updateRelay(request, url, get = fetch) {
     if (path === '/maj/api/releases') {
       const perPage = Math.min(30, Math.max(1, Number.parseInt(url.searchParams.get('per_page') ?? '10', 10) || 10));
       const upstream = await get(`https://api.github.com/repos/${UPDATE_REPOSITORY}/releases?per_page=${perPage}`, {
+        headers: githubHeaders('application/vnd.github+json'),
+        cf: { cacheTtl: RELEASES_CACHE_S, cacheEverything: true },
+      });
+      return relayed(upstream);
+    }
+    if (path === '/maj/api/tags') {
+      const upstream = await get(`https://api.github.com/repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/v`, {
         headers: githubHeaders('application/vnd.github+json'),
         cf: { cacheTtl: RELEASES_CACHE_S, cacheEverything: true },
       });

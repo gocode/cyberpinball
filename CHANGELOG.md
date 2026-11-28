@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Mise à jour : la borne trouve toujours la version la plus récente publiée, quel que soit l'ordre de la liste de GitHub. Le 27/11/2026, la 0.2.4-essai.100 était rangée par GitHub après la essai.74 et aucune borne ne la voyait. La borne lit maintenant la liste des étiquettes de versions, plus légère (environ 28 Ko au lieu de 437 Ko), et ne garde la liste des publications qu'en secours. Le relais de Cyber Pinball transmet aussi les étiquettes ; le canal d'essai privé suit la même règle.
+- Publication : quand les bornes ne voient pas la nouvelle version, la publication échoue au lieu d'un simple avertissement. Le contrôle couvre aussi les bornes installées avant cette correction, qui ne lisent que les dix premières publications de la liste. Le train ne relance jamais une publication déjà en ligne sous le même numéro.
 - PuP-Packs : VPX ne s'arrête plus au démarrage d'un PuP-Pack dont une image de capture du DMD porte un numéro trop grand. The Avengers (Pro) se fermait ainsi dès la première image du DMD. Le plugin PuP de VPX corrigé ("patched Cyber Pinball 9") ignore ces images et lit les autres. S'il ne peut rien lire, le pack joue sans ses déclencheurs DMD.
 - Arrêt de VPX : quand VPX s'arrête juste après le démarrage du PuP-Pack, Cyber Pinball le dit et propose de rejouer la table sans son PuP-Pack (Start), qu'il range alors à part. "Réactiver le PuP-Pack", dans "Parties du jeu", le remet tel quel.
 - Rapports : quand VPX s'arrête sans laisser de rapport de plantage, le rapport joint l'événement de Windows qui nomme le module fautif (par exemple le plugin PuP), et l'écran d'arrêt le cite.

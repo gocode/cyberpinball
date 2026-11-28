@@ -22,6 +22,7 @@ import {
   installedSocle,
   loadPrereleaseSetting,
   missedReleases,
+  newestListedRelease,
   prereleaseFeedUrl,
   openEnvelope,
   recordPendingUpdate,
@@ -32,6 +33,7 @@ import {
   signManifest,
   stagedAppDir,
   swapAppDir,
+  tagsApiUrl,
   lightUpdateInterrupted,
   takeUpdateOutcome,
   unpackAppPackage,
@@ -211,6 +213,86 @@ test('connexion lente : la liste des publications et le flux aboutissent ; site 
 test('liste des publications publiques réduite : dix au lieu de trente (environ 1 Mo sur une connexion lente)', () => {
   assert.equal(releasesApiUrl(), `https://api.github.com/repos/${UPDATE_REPOSITORY}/releases?per_page=10`);
   assert.equal(releasesApiUrl('o/essais', 'http://x', 30), 'http://x/repos/o/essais/releases?per_page=30');
+  assert.equal(tagsApiUrl(), `https://api.github.com/repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/v`);
+});
+
+// Le 27/11/2026, la liste de GitHub (par jour, puis par nom d'étiquette comme du texte) a rangé
+// v0.2.4-essai.100 après essai.74 : hors des dix premières, aucune borne ne l'a vue. L'invariant :
+// la plus haute version publiée est trouvée, quel que soit l'ordre de la liste.
+test('liste de GitHub mal ordonnée (la 100 après la 74) : la plus haute version publiée est trouvée', async () => {
+  const k = keys();
+  const essai = (n: number) => `0.2.4-essai.${n}`;
+  const feedUrl = (v: string) => releaseAssetUrl(v, 'cyberpinball-maj.json');
+  const published = new Set([...Array.from({ length: 28 }, (_, i) => essai(73 + i)), '0.2.3']);
+  // L'ordre réel du 28/11/2026 : 99 à 74, puis 100, puis 73.
+  const order = [...Array.from({ length: 26 }, (_, i) => 99 - i), 100, 73];
+  const list = order.map((n) => ({ tag_name: `v${essai(n)}`, draft: false, prerelease: true, assets: [{ name: 'cyberpinball-maj.json', browser_download_url: feedUrl(essai(n)) }] }));
+  // Les étiquettes, dans l'ordre de GitHub (texte) ; la 101 est un brouillon : son flux ne se lit pas.
+  const tags = [...published, essai(101)].sort().map((v) => ({ ref: `refs/tags/v${v}` }));
+  let tagsStatus = 200;
+  const seen: string[] = [];
+  const get = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    seen.push(`${init?.method ?? 'GET'} ${url}`);
+    if (url === releasesApiUrl()) return Response.json(list.slice(0, 10));
+    if (url === tagsApiUrl()) return tagsStatus === 200 ? Response.json(tags) : new Response('{"message":"API rate limit exceeded"}', { status: tagsStatus });
+    const version = /\/download\/v([^/]+)\/cyberpinball-maj\.json$/.exec(url)?.[1];
+    if (!version || !published.has(version)) return new Response('Not Found', { status: 404 });
+    return new Response(init?.method === 'HEAD' ? null : JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), 'https://example.org/x.exe', version), k.priv)));
+  }) as typeof fetch;
+
+  // Les dix premières de la liste seules (lecture des bornes d'avant) : la 99, le défaut constaté.
+  assert.equal((await newestListedRelease(releasesApiUrl(), { fetch: get }))?.version, essai(99));
+  // Par les étiquettes : la 100, le brouillon 101 écarté.
+  seen.length = 0;
+  const check = await checkForUpdate({ current: essai(99), prereleases: true, publicKey: k.pub, fetch: get });
+  assert.equal(check.status, 'available');
+  assert.equal(check.latest.version, essai(100));
+  assert.equal(await prereleaseFeedUrl({ fetch: get }), feedUrl(essai(100)));
+  // Léger : la liste (plus de 100 Ko par release, notes comprises) n'est pas lue quand les étiquettes répondent.
+  assert.ok(!seen.some((s) => s.includes('/releases?per_page')), seen.join('\n'));
+  assert.ok(seen.includes(`HEAD ${feedUrl(essai(101))}`) && seen.includes(`HEAD ${feedUrl(essai(100))}`));
+
+  // Étiquettes illisibles (limite de l'API) : la liste, comme avant, plutôt que rien.
+  tagsStatus = 403;
+  assert.equal((await checkForUpdate({ current: essai(98), prereleases: true, publicKey: k.pub, fetch: get })).latest.version, essai(99));
+});
+
+test('canal d’essai privé, liste mal ordonnée : la plus haute étiquette, lue par l’API avec le jeton', async () => {
+  const k = keys();
+  const api = 'https://api.example.test';
+  const channel = { repository: 'o/essais', token: 'bon-jeton', api };
+  const release = (v: string, n: number) => ({
+    tag_name: `v${v}`,
+    draft: false,
+    assets: [
+      { name: 'cyberpinball-maj.json', url: `${api}/repos/o/essais/releases/assets/${n}`, browser_download_url: `https://github.com/o/essais/releases/download/v${v}/cyberpinball-maj.json` },
+      { name: 'CyberPinball-Setup.exe', url: `${api}/repos/o/essais/releases/assets/${n}00`, browser_download_url: `https://github.com/o/essais/releases/download/v${v}/CyberPinball-Setup.exe` },
+    ],
+  });
+  const feeds: Record<string, string> = { '9': '0.2.4-essai.9', '10': '0.2.4-essai.10' };
+  const seen: { url: string; auth: string | null }[] = [];
+  const get = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    const auth = new Headers(init?.headers).get('authorization');
+    seen.push({ url, auth });
+    if (url.startsWith('https://api.github.com/') || url.startsWith('https://github.com/')) return new Response('', { status: 404 });
+    if (auth !== 'Bearer bon-jeton') return new Response('', { status: 401 });
+    if (url === `${api}/repos/o/essais/releases?per_page=30`) return Response.json([release('0.2.4-essai.9', 9)]);
+    if (url === tagsApiUrl('o/essais', api)) return Response.json(['0.2.4-essai.10', '0.2.4-essai.9', '0.2.4-essai.11'].map((v) => ({ ref: `refs/tags/v${v}` })));
+    if (url === `${api}/repos/o/essais/releases/tags/v0.2.4-essai.10`) return Response.json(release('0.2.4-essai.10', 10));
+    if (url === `${api}/repos/o/essais/releases/tags/v0.2.4-essai.11`) return Response.json({ ...release('0.2.4-essai.11', 11), draft: true });
+    const n = /\/releases\/assets\/(\d+)$/.exec(url)?.[1];
+    const version = n ? feeds[n] : undefined;
+    if (!version) return new Response('', { status: 404 });
+    return new Response(JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), `https://github.com/o/essais/releases/download/v${version}/CyberPinball-Setup.exe`, version), k.priv)));
+  }) as typeof fetch;
+  const check = await checkForUpdate({ current: '0.2.4-essai.9', channel, publicKey: k.pub, fetch: get });
+  assert.equal(check.latest.version, '0.2.4-essai.10');
+  // L'installeur de la release trouvée par son étiquette passe aussi par l'API (dépôt privé).
+  assert.equal(check.latest.installer.url, `${api}/repos/o/essais/releases/assets/1000`);
+  assert.ok(seen.filter((s) => s.url.startsWith(api)).every((s) => s.auth === 'Bearer bon-jeton'));
+  assert.ok(seen.filter((s) => !s.url.startsWith(api)).every((s) => s.auth === null), 'le jeton ne quitte pas l’API du canal');
 });
 
 test('téléchargement : vérifié, repris s’il est intact, supprimé s’il est faux ; anciens installeurs retirés', async () => {
