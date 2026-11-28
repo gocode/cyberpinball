@@ -11,6 +11,8 @@ son interface).
 
 ## 0.2.4
 
+- Quitter une table dont VPX reste bloqué à la fermeture (écran figé, son de la bille en boucle) ne demande plus de redémarrer la borne : si VPX ne se ferme pas dans les 10 secondes qui suivent la fin de la partie, Cyber Pinball le ferme, relève la partie et te ramène à l'écran des tables, avec une note qui explique ce qui s'est passé.
+- Quand VPX s'est figé en arrêtant le PuP-Pack, la note te propose de jouer la table sans son PuP-Pack.
 - Mise à jour : la borne trouve toujours la version la plus récente publiée, quel que soit l'ordre de la liste de GitHub. Le 27/11/2026, la 0.2.4-essai.100 était rangée par GitHub après la essai.74 et aucune borne ne la voyait. La borne lit maintenant la liste des étiquettes de versions, plus légère (environ 28 Ko au lieu de 437 Ko), et ne garde la liste des publications qu'en secours. Le relais de Cyber Pinball transmet aussi les étiquettes ; le canal d'essai privé suit la même règle.
 - Publication : quand les bornes ne voient pas la nouvelle version, la publication échoue au lieu d'un simple avertissement. Le contrôle couvre aussi les bornes installées avant cette correction, qui ne lisent que les dix premières publications de la liste. Le train ne relance jamais une publication déjà en ligne sous le même numéro.
 - PuP-Packs : VPX ne s'arrête plus au démarrage d'un PuP-Pack dont une image de capture du DMD porte un numéro trop grand. The Avengers (Pro) se fermait ainsi dès la première image du DMD. Le plugin PuP de VPX corrigé ("patched Cyber Pinball 9") ignore ces images et lit les autres. S'il ne peut rien lire, le pack joue sans ses déclencheurs DMD.

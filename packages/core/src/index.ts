@@ -154,6 +154,7 @@ export * from './vpxinspector';
 export * from './gametracker';
 export * from './soloinspect';
 export * from './vpxfailure';
+export * from './vpxshutdown';
 export * from './windowsfault';
 export * from './vpxgamelog';
 export * from './fileerror';

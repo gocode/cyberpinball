@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { classifyVpxWindow, DIALOG_CLASS, t, vpxExitName, vpxMissingLibrary, VR_PREVIEW_TITLE, VPX_HUNG_EXIT_CODE, type WindowsFault } from '@cyberpinball/core';
+import { classifyVpxWindow, DIALOG_CLASS, t, vpxClosingLogged, vpxExitName, vpxMissingLibrary, vpxStuckInPup, VR_PREVIEW_TITLE, VPX_HUNG_EXIT_CODE, watchVpxShutdown, type WindowsFault } from '@cyberpinball/core';
 import { readWindowsFault } from './windows-fault';
 import {
   allowAnyForeground,
@@ -147,6 +147,9 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   /** Partie dans le casque : depuis quand la fenêtre de VPX ne répond plus, et si Cyber Pinball l'a fermé pour ça. */
   let hungSince: number | undefined;
   let hungKilled = false;
+  /** Depuis quand VPX se ferme sans y arriver, et si Cyber Pinball l'a fermé pour ça. */
+  let shutdownSince: number | undefined;
+  let shutdownKilled = false;
   /** Fenêtres déjà traitées (masquées, fermées ou signalées), par HWND. */
   const handled = new Set<bigint>();
   /** Formulaires d'options de la table validés (OK pressé), par HWND, et quand. */
@@ -261,6 +264,34 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         else if (Date.now() - hungSince > HUNG_KILL_MS) {
           hungKilled = true;
           notices.push(t('VPX ne répondait plus dans le casque : Cyber Pinball l’a fermé.'));
+          child.kill();
+        }
+      }
+
+      // Fermeture qui ne se termine pas (PinCab, 28/11/2026, Back to the Future) : VPX écrit « Closing
+      // player… », s'arrête dans l'arrêt du PuP-Pack et ne rend plus la main ; l'écran reste figé, le son
+      // de la bille boucle et le front-end attend toujours la fin du processus. Une fermeture normale
+      // prend moins de deux secondes : passé VPX_SHUTDOWN_KILL_MS, Cyber Pinball ferme VPX (vpxshutdown.ts).
+      // Valable avec ou sans casque : la fenêtre de jeu a disparu, ou ne répond plus pendant que le journal
+      // dit que la partie se ferme.
+      if (player && !failure && !shutdownKilled) {
+        let ending = !windows.some((w) => w.handle === player!.handle);
+        if (!ending) {
+          try {
+            ending = isHung(player) && vpxClosingLogged(readLogEnd(opts.vpxPrefDir), t0);
+          } catch {
+            ending = false;
+          }
+        }
+        const watch = watchVpxShutdown(shutdownSince, ending, Date.now());
+        shutdownSince = watch.since;
+        if (watch.kill) {
+          shutdownKilled = true;
+          notices.push(
+            vpxStuckInPup(readLogEnd(opts.vpxPrefDir))
+              ? t('VPX ne se fermait pas, bloqué à l’arrêt du PuP-Pack : Cyber Pinball l’a fermé. Si cela revient sur cette table, joue-la sans son PuP-Pack.')
+              : t('VPX ne se fermait pas après la fin de la partie : Cyber Pinball l’a fermé.'),
+          );
           child.kill();
         }
       }
@@ -405,6 +436,23 @@ export function vpxPrefDir(version: string): string {
   // Jusqu’à la 10.8.0, GetMyPrefPath ne met pas la version dans le chemin.
   const classic = classicVpx(version);
   return path.join(process.env.APPDATA ?? os.homedir(), 'VPinballX', ...(classic ? [] : [minor]));
+}
+
+/** Les derniers 64 Ko du journal de VPX (cumulatif, plusieurs Mo : jamais relu en entier à chaque tour). */
+function readLogEnd(prefDir: string, bytes = 65_536): string {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(path.join(prefDir, 'vpinball.log'), 'r');
+    const size = fs.fstatSync(fd).size;
+    const length = Math.min(size, bytes);
+    const buf = Buffer.alloc(length);
+    fs.readSync(fd, buf, 0, length, size - length);
+    return buf.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
 }
 
 // 120 lignes : de quoi voir la fin de la partie (« Closing player… ») avant un plantage à la fermeture,

@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Quitting a table where VPX hangs while closing (frozen screen, ball sound looping) no longer forces you to restart the cabinet: if VPX does not close within 10 seconds after the game ends, Cyber Pinball closes it, records the game and takes you back to the tables screen, with a note explaining what happened.
+- When VPX froze while stopping the PuP-Pack, the note suggests playing the table without its PuP-Pack.
 - Update: the cabinet always finds the most recent published version, whatever the order of GitHub's list. On 27/11/2026, GitHub ranked 0.2.4-essai.100 after essai.74 and no cabinet saw it. The cabinet now reads the lighter list of version tags (about 28 KB instead of 437 KB) and keeps the list of releases only as a fallback. The Cyber Pinball relay forwards the tags too; the private test channel follows the same rule.
 - Publishing: when the cabinets do not see the new version, publishing fails instead of only warning. The check also covers the cabinets installed before this fix, which only read the first ten releases of the list. The merge train never relaunches a release already online under the same number.
 - PuP-Packs: VPX no longer stops when a PuP-Pack starts if one of its DMD capture images has a number that is too large. The Avengers (Pro) closed this way on the first DMD frame. The PuP plugin of the patched VPX ("patched Cyber Pinball 9") skips these images and reads the others. If it can read none, the pack plays without its DMD triggers.

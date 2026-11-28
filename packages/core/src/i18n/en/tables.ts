@@ -575,6 +575,8 @@ export const messages: Record<string, string> = {
   'VPX s’est terminé avec le code {code}.': 'VPX exited with code {code}.',
   'VPX ne répondait plus dans le casque : Cyber Pinball l’a fermé.': 'VPX stopped responding in the headset: Cyber Pinball closed it.',
   'VPX ne répondait plus en quittant : Windows l’a fermé.': 'VPX stopped responding while quitting: Windows closed it.',
+  'VPX ne se fermait pas, bloqué à l’arrêt du PuP-Pack : Cyber Pinball l’a fermé. Si cela revient sur cette table, joue-la sans son PuP-Pack.': 'VPX would not close, stuck while stopping the PuP-Pack: Cyber Pinball closed it. If it keeps happening on this table, play it without its PuP-Pack.',
+  'VPX ne se fermait pas après la fin de la partie : Cyber Pinball l’a fermé.': 'VPX would not close after the game ended: Cyber Pinball closed it.',
   // app/src/archives.ts
   '{name} : introuvable.': '{name}: not found.',
   '{name} : archive illisible ({error}).': '{name}: unreadable archive ({error}).',
