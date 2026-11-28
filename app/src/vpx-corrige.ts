@@ -18,6 +18,8 @@
 //   de la 5436 ; les vidéos d'un écran PuP non affiché (DMD, topper) se terminent, la file avance, la musique démarre.
 // - le plugin PuP encore (série 9, 27/11/2026) : un nom de PupCapture que libpupdmd ne sait pas lire (12341241234.bmp de
 //   The Avengers Pro) ne termine plus VPX en 0xC0000409 ; le pack joue avec les captures lisibles.
+// - relevés de fluidité (série 10, 28/11/2026) : chaque seconde, le journal de VPX dit ce que coûtent les vidéos PuP
+//   (« PuP live »), le fil logique (« Logic live ») et le fil de rendu (« Render live »), images en retard à part.
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -141,8 +143,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 9 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 9;
+/** Série de correctifs livrée (« patched Cyber Pinball 10 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 10;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

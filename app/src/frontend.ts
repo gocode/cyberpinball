@@ -363,6 +363,7 @@ import {
 import { bringToFront, foregroundWindow, keysDown, listWindows, moveWindow, probeDisplayLinks, processIdsByName, runningProcessNames, setWindowBounds, stripWindowFrame, visibleWindowsOf, type WindowInfo } from '@cyberpinball/win-displays';
 import { applyFuturePinballScreens, describeFuturePinballScreenChanges } from './futurepinball-screens';
 import { logFuturePinballLaunch, logFuturePinballLibraries, logFuturePinballView } from './futurepinball-diagnostics';
+import { tuneGameProcess } from './fluidite-partie';
 import { closePupStartedDuringGame, detectFuturePinball, futurePinballBamMenu, futurePinballButtonKeys, futurePinballNudgeKeys, futurePinballPlan, placeDmdMirror, placeFuturePinballWindow, placePupWindows, placeVirtualDmd, startDmdMirror } from './futurepinball-play';
 import { bridgeNudgeKeys } from './nudge-keys';
 import { observedDisplays, simulatedDisplays } from './displays';
@@ -6951,6 +6952,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   };
   // DMD masqué pour cette table : sa fenêtre rangée hors des écrans avant même de paraître (in-game-menu.ts).
   if (configuration && simulated === undefined) inGameMenu.watchHiddenDmd({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir });
+  // VPX en priorité au-dessus de la normale : la cadence tient sur une machine chargée (fluidite-partie.ts).
+  if (simulated === undefined) tuneGameProcess(game.pid, (line) => console.log(line));
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');

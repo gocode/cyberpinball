@@ -1,0 +1,126 @@
+diff --git a/plugins/pup/PUPMediaPlayer.cpp b/plugins/pup/PUPMediaPlayer.cpp
+index ad41b1d..2535e11 100644
+--- a/plugins/pup/PUPMediaPlayer.cpp
++++ b/plugins/pup/PUPMediaPlayer.cpp
+@@ -34,6 +34,64 @@ namespace PUP {
+ 
+ std::atomic<uint32_t> PUPMediaPlayer::m_nextAudioStreamId = 0;
+ 
++// Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 10): cost of the PuP videos, one "PuP live" line per second in the log while videos play.
++// Render thread: texture uploads (count, MB, time, longest) and time spent in Render (lock waits included).
++// Decoder threads: frames converted to RGBA (count, time), and those converted for a screen not rendered for 1 s.
++namespace
++{
++   struct PupLiveStats
++   {
++      std::atomic<uint64_t> uploads { 0 }, uploadBytes { 0 }, uploadNs { 0 }, uploadMaxNs { 0 }, renderNs { 0 };
++      std::atomic<uint64_t> converted { 0 }, convertNs { 0 }, unseen { 0 };
++      std::atomic<uint64_t> nextLogTicks { 0 };
++   };
++   PupLiveStats g_pupLive;
++
++   void PupLiveMax(std::atomic<uint64_t>& a, uint64_t v)
++   {
++      uint64_t c = a.load(std::memory_order_relaxed);
++      while (v > c && !a.compare_exchange_weak(c, v, std::memory_order_relaxed)) { }
++   }
++
++   void PupLiveTick()
++   {
++      const uint64_t now = SDL_GetTicks();
++      uint64_t next = g_pupLive.nextLogTicks.load(std::memory_order_relaxed);
++      if (next == 0)
++      {
++         g_pupLive.nextLogTicks.compare_exchange_strong(next, now + 1000);
++         return;
++      }
++      if (now < next || !g_pupLive.nextLogTicks.compare_exchange_strong(next, now + 1000))
++         return;
++      const uint64_t uploads = g_pupLive.uploads.exchange(0), bytes = g_pupLive.uploadBytes.exchange(0), uploadNs = g_pupLive.uploadNs.exchange(0),
++                     maxNs = g_pupLive.uploadMaxNs.exchange(0), renderNs = g_pupLive.renderNs.exchange(0), converted = g_pupLive.converted.exchange(0),
++                     convertNs = g_pupLive.convertNs.exchange(0), unseen = g_pupLive.unseen.exchange(0);
++      if (uploads == 0 && converted == 0)
++         return;
++      LOGI(std::format("PuP live: uploads={} MB={:.1f} upload={:.1f}ms max={:.2f}ms render={:.1f}ms converted={} convert={:.1f}ms unseen={}", uploads,
++         static_cast<double>(bytes) / 1e6, static_cast<double>(uploadNs) / 1e6, static_cast<double>(maxNs) / 1e6, static_cast<double>(renderNs) / 1e6, converted,
++         static_cast<double>(convertNs) / 1e6, unseen));
++   }
++
++   struct PupLiveRenderScope
++   {
++      const uint64_t start = SDL_GetTicksNS();
++      ~PupLiveRenderScope() { g_pupLive.renderNs.fetch_add(SDL_GetTicksNS() - start, std::memory_order_relaxed); }
++   };
++
++   void PupLiveUpload(VPXTexture* texture, int width, int height, const void* image)
++   {
++      const uint64_t start = SDL_GetTicksNS();
++      UpdateTexture(texture, width, height, VPXTextureFormat::VPXTEXFMT_sRGBA8, image);
++      const uint64_t ns = SDL_GetTicksNS() - start;
++      g_pupLive.uploads.fetch_add(1, std::memory_order_relaxed);
++      g_pupLive.uploadBytes.fetch_add(static_cast<uint64_t>(width) * height * 4, std::memory_order_relaxed);
++      g_pupLive.uploadNs.fetch_add(ns, std::memory_order_relaxed);
++      PupLiveMax(g_pupLive.uploadMaxNs, ns);
++   }
++}
++
+ PUPMediaPlayer::PUPMediaPlayer(const string& name)
+    : m_name(name)
+    , m_frames(3)
+@@ -428,7 +486,7 @@ void PUPMediaPlayer::RenderLastFrame(VPXRenderContext2D* const ctx, const SDL_Re
+    if (!frame.uploaded)
+    {
+       frame.uploaded = true;
+-      UpdateTexture(&frame.texture, frame.frame->width, frame.frame->height, VPXTextureFormat::VPXTEXFMT_sRGBA8, frame.frame->data[0]);
++      PupLiveUpload(&frame.texture, frame.frame->width, frame.frame->height, frame.frame->data[0]);
+    }
+    if (frame.texture == nullptr)
+       return;
+@@ -442,6 +500,8 @@ void PUPMediaPlayer::Render(VPXRenderContext2D* const ctx, const SDL_Rect& destR
+    if (!m_running && m_holdTexture == nullptr && !IsPlaying() && (SDL_GetTicks() - m_endTicks) >= 100)
+       return;
+ 
++   PupLiveTick();
++   const PupLiveRenderScope liveScope;
+    std::lock_guard lock(m_mutex);
+ 
+    if (!m_running)
+@@ -500,7 +560,7 @@ void PUPMediaPlayer::Render(VPXRenderContext2D* const ctx, const SDL_Rect& destR
+       // UpdateTexture updates the texture in place, or transparently substitutes it by a fresh one
+       // when it is still referenced by a pending GPU upload
+       selectedFrame.uploaded = true;
+-      UpdateTexture(&selectedFrame.texture, selectedFrame.frame->width, selectedFrame.frame->height, VPXTextureFormat::VPXTEXFMT_sRGBA8, selectedFrame.frame->data[0]);
++      PupLiveUpload(&selectedFrame.texture, selectedFrame.frame->width, selectedFrame.frame->height, selectedFrame.frame->data[0]);
+    }
+    if (selectedFrame.texture == nullptr)
+    {
+@@ -799,8 +859,10 @@ void PUPMediaPlayer::HandleVideoFrame(AVFrame* frame)
+    // Take ownership of the frame
+    FrameInfo& selectedFrame = m_frames[selectedFrameSlot];
+    int targetWidth, targetHeight;
++   uint64_t lastRenderTicks;
+    {
+       std::lock_guard lock(m_mutex);
++      lastRenderTicks = m_lastRenderTicks;
+       selectedFrame.valid = false;
+       // Read m_bounds under the lock to avoid a data race with SetBounds()
+       targetWidth = m_bounds.w > 0 ? m_bounds.w : m_pVideoContext->width;
+@@ -843,6 +905,7 @@ void PUPMediaPlayer::HandleVideoFrame(AVFrame* frame)
+       m_libAv._av_image_fill_arrays(selectedFrame.frame->data, selectedFrame.frame->linesize, selectedFrame.buffer, targetFormat, targetWidth, targetHeight, 1);
+    }
+ 
++   const uint64_t convertStart = SDL_GetTicksNS();
+    // Create/Update conversion context when source format is known (so after decoding at least one frame)
+    m_swsContext = m_libAv._sws_getCachedContext(m_swsContext, frame->width, frame->height, static_cast<AVPixelFormat>(frame->format), selectedFrame.frame->width, selectedFrame.frame->height,
+       static_cast<AVPixelFormat>(selectedFrame.frame->format), SWS_BILINEAR, NULL, NULL, NULL);
+@@ -882,6 +945,10 @@ void PUPMediaPlayer::HandleVideoFrame(AVFrame* frame)
+          SDL_UnlockSurface(sdlMask);
+       }
+    }
++   g_pupLive.converted.fetch_add(1, std::memory_order_relaxed);
++   g_pupLive.convertNs.fetch_add(SDL_GetTicksNS() - convertStart, std::memory_order_relaxed);
++   if (lastRenderTicks == 0 || SDL_GetTicks() - lastRenderTicks > 1000)
++      g_pupLive.unseen.fetch_add(1, std::memory_order_relaxed);
+ 
+    // Update frame information & mark it as valid for selection by the renderer thread
+    {

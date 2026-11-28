@@ -1,0 +1,183 @@
+diff --git a/src/core/player.cpp b/src/core/player.cpp
+index 37bd155..38279ff 100644
+--- a/src/core/player.cpp
++++ b/src/core/player.cpp
+@@ -2099,6 +2099,69 @@ void Player::FramePacingGameLoop()
+ 
+ extern void PrecompSplineTonemap(const float displayMaxLum, float out[6]);
+ 
++// Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 10): where the logic thread spends each frame, one
++// "Logic live" line per second while playing: frames, late frames (longer than 1.5 refresh periods) and the mean
++// time per frame in each profiler section (script, physics, prepare frame, plugins' prepare-frame callbacks, misc,
++// sleep), over all frames and over the late ones, so a frontend can tell what makes a table miss frames.
++namespace
++{
++struct LogicLiveStats
++{
++   enum Part { SCRIPT, PHYSICS, PREPARE, PLUGINS, MISC, SLEEP, PARTS };
++   uint64_t start = 0;
++   uint64_t lastFrame = 0;
++   uint32_t frames = 0, late = 0;
++   uint64_t all[PARTS] {}, slow[PARTS] {};
++   uint64_t scriptMax = 0, physicsMax = 0, frameMax = 0;
++   uint64_t pluginsUs = 0; // the plugins' prepare-frame callbacks of the frame being prepared
++
++   void Frame(const FrameProfiler& p, const float refreshRate, const bool playing)
++   {
++      const uint64_t now = usec();
++      if (lastFrame != 0 && playing)
++      {
++         const uint64_t length = now - lastFrame;
++         const uint64_t prepare = p.Get(FrameProfiler::PROFILE_PREPARE_FRAME);
++         const uint64_t parts[PARTS] = { p.Get(FrameProfiler::PROFILE_SCRIPT), p.Get(FrameProfiler::PROFILE_PHYSICS), prepare > pluginsUs ? prepare - pluginsUs : 0, pluginsUs,
++            p.Get(FrameProfiler::PROFILE_MISC), p.Get(FrameProfiler::PROFILE_SLEEP) };
++         const bool isLate = refreshRate > 0.f && static_cast<double>(length) > 1.5e6 / static_cast<double>(refreshRate);
++         frames++;
++         if (isLate)
++            late++;
++         for (int i = 0; i < PARTS; i++)
++         {
++            all[i] += parts[i];
++            if (isLate)
++               slow[i] += parts[i];
++         }
++         scriptMax = std::max(scriptMax, parts[SCRIPT]);
++         physicsMax = std::max(physicsMax, parts[PHYSICS]);
++         frameMax = std::max(frameMax, length);
++      }
++      lastFrame = now;
++      pluginsUs = 0;
++      if (start == 0)
++         start = now;
++      if (now - start < 1000000ull)
++         return;
++      if (frames != 0)
++      {
++         const auto mean = [](const uint64_t total, const uint32_t n) { return n ? static_cast<double>(total) / static_cast<double>(n) / 1000.0 : 0.0; };
++         PLOGI << std::format("Logic live: frames={} late={} max={:.1f}ms | all: script={:.2f} physics={:.2f} prepare={:.2f} plugins={:.2f} misc={:.2f} sleep={:.2f}"
++                              " | late: script={:.2f} physics={:.2f} prepare={:.2f} plugins={:.2f} misc={:.2f} sleep={:.2f} | script max={:.1f}ms physics max={:.1f}ms",
++            frames, late, static_cast<double>(frameMax) / 1000.0, mean(all[SCRIPT], frames), mean(all[PHYSICS], frames), mean(all[PREPARE], frames), mean(all[PLUGINS], frames),
++            mean(all[MISC], frames), mean(all[SLEEP], frames), mean(slow[SCRIPT], late), mean(slow[PHYSICS], late), mean(slow[PREPARE], late), mean(slow[PLUGINS], late),
++            mean(slow[MISC], late), mean(slow[SLEEP], late), static_cast<double>(scriptMax) / 1000.0, static_cast<double>(physicsMax) / 1000.0);
++      }
++      const uint64_t keepLast = lastFrame;
++      *this = LogicLiveStats();
++      start = now;
++      lastFrame = keepLast;
++   }
++};
++LogicLiveStats g_logicLive;
++}
++
+ void Player::PrepareFrame()
+ {
+    // Rendering outputs to m_renderDevice->GetBackBufferTexture(). If MSAA is used, it is resolved as part of the rendering (i.e. this surface is NOT the MSAA render surface but its resolved copy)
+@@ -2108,6 +2171,7 @@ void Player::PrepareFrame()
+    span* tagSpan = new span(series, 1, _T("Prepare"));
+    #endif
+ 
++   g_logicLive.Frame(m_logicProfiler, m_playfieldWnd ? m_playfieldWnd->GetRefreshRate() : 0.f, IsPlaying()); // Modified by Cyber Pinball (patched Cyber Pinball 10)
+    m_logicProfiler.NewFrame(m_time_msec);
+    m_logicProfiler.EnterProfileSection(FrameProfiler::PROFILE_PREPARE_FRAME);
+ 
+@@ -2115,7 +2179,9 @@ void Player::PrepareFrame()
+    m_lastKnownGoodCounter++;
+    m_startFrameTick = usec();
+ 
++   const uint64_t pluginsStart = usec(); // Modified by Cyber Pinball (patched Cyber Pinball 10)
+    m_pluginAPI.BroadcastVPXMsg(m_onPrepareFrameMsgId, nullptr);
++   g_logicLive.pluginsUs += usec() - pluginsStart;
+ 
+    // Update visually animated parts (e.g. primitives, reels, gates, lights, bumper-skirts, hittargets, etc)
+    if (IsPlaying())
+diff --git a/src/renderer/RenderDevice.cpp b/src/renderer/RenderDevice.cpp
+index a29c7ad..d5479bb 100644
+--- a/src/renderer/RenderDevice.cpp
++++ b/src/renderer/RenderDevice.cpp
+@@ -1073,6 +1073,67 @@ struct GpuFrameSummary
+          refreshRate > 0.f ? 1000.0 / refreshRate : 0.0);
+    }
+ };
++
++// Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 10): where the render thread spends each frame, one
++// "Render live" line per second: frames, late frames (more than 1.5 refresh periods between two presents), the GPU
++// frame length (mean, max, frames over the refresh period) and the mean time per frame in each render profiler
++// section, over all frames and over the late ones. Read with the "Logic live" line of the logic thread (player.cpp).
++struct RenderLiveStats
++{
++   enum Part { WAIT, WAIT_SC, SUBMIT, FLIP, SLEEP, PARTS };
++   uint64_t start = 0;
++   uint64_t lastPresent = 0;
++   uint32_t frames = 0, late = 0;
++   uint64_t all[PARTS] {}, slow[PARTS] {};
++   uint32_t gpuFrames = 0, gpuOver = 0;
++   uint64_t gpuTotal = 0, gpuMax = 0;
++
++   void Gpu(const uint64_t us, const float refreshRate)
++   {
++      gpuFrames++;
++      gpuTotal += us;
++      gpuMax = std::max(gpuMax, us);
++      if (refreshRate > 0.f && static_cast<double>(us) > 1e6 / static_cast<double>(refreshRate))
++         gpuOver++;
++   }
++
++   void Frame(const FrameProfiler& p, const uint64_t present, const float refreshRate)
++   {
++      if (lastPresent != 0)
++      {
++         const bool isLate = refreshRate > 0.f && static_cast<double>(present - lastPresent) > 1.5e6 / static_cast<double>(refreshRate);
++         const uint64_t parts[PARTS] = { p.Get(FrameProfiler::PROFILE_RENDER_WAIT), p.Get(FrameProfiler::PROFILE_RENDER_WAIT_SC), p.Get(FrameProfiler::PROFILE_RENDER_SUBMIT),
++            p.Get(FrameProfiler::PROFILE_RENDER_FLIP), p.Get(FrameProfiler::PROFILE_RENDER_SLEEP) };
++         frames++;
++         if (isLate)
++            late++;
++         for (int i = 0; i < PARTS; i++)
++         {
++            all[i] += parts[i];
++            if (isLate)
++               slow[i] += parts[i];
++         }
++      }
++      lastPresent = present;
++      if (start == 0)
++         start = present;
++      if (present - start < 1000000ull)
++         return;
++      if (frames != 0)
++      {
++         const auto mean = [](const uint64_t total, const uint32_t n) { return n ? static_cast<double>(total) / static_cast<double>(n) / 1000.0 : 0.0; };
++         PLOGI << std::format("Render live: frames={} late={} gpu={:.2f}ms gpu max={:.1f}ms gpu over={} | all: wait={:.2f} waitsc={:.2f} submit={:.2f} flip={:.2f} sleep={:.2f}"
++                              " | late: wait={:.2f} waitsc={:.2f} submit={:.2f} flip={:.2f} sleep={:.2f}",
++            frames, late, mean(gpuTotal, gpuFrames), static_cast<double>(gpuMax) / 1000.0, gpuOver, mean(all[WAIT], frames), mean(all[WAIT_SC], frames),
++            mean(all[SUBMIT], frames), mean(all[FLIP], frames), mean(all[SLEEP], frames), mean(slow[WAIT], late), mean(slow[WAIT_SC], late), mean(slow[SUBMIT], late),
++            mean(slow[FLIP], late), mean(slow[SLEEP], late));
++      }
++      const uint64_t keepLast = lastPresent;
++      *this = RenderLiveStats();
++      start = present;
++      lastPresent = keepLast;
++   }
++};
+ }
+ 
+ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+@@ -1081,6 +1142,7 @@ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+    GpuFrameSummary gpuGame;
+    uint64_t gpuMinuteStart = usec();
+    const float gpuRefreshRate = g_pplayer && g_pplayer->m_playfieldWnd ? g_pplayer->m_playfieldWnd->GetRefreshRate() : 0.f;
++   RenderLiveStats renderLive; // Modified by Cyber Pinball (patched Cyber Pinball 10)
+    uint64_t lastSubmitTimestamp = 0;
+    uint64_t lastSyncTimestamp = 0;
+    bool bgfxVSync = false; // Is VSync requested on BGFX's Present operation (note that the VSync on Present will only block if the present queue is filled)
+@@ -1411,7 +1473,10 @@ void RenderDevice::BGFXDesktopRenderLoop(const bgfx::Init& init)
+                gpuMinute = GpuFrameSummary();
+                gpuMinuteStart = lastSyncTimestamp;
+             }
++            if (stats->gpuTimerFreq != 0)
++               renderLive.Gpu(m_lastGPUFrameLength, gpuRefreshRate); // Modified by Cyber Pinball (patched Cyber Pinball 10)
+          }
++         renderLive.Frame(*g_pplayer->m_renderProfiler, lastSyncTimestamp, gpuRefreshRate); // Modified by Cyber Pinball (patched Cyber Pinball 10)
+       }
+ 
+       // Screenshot handling (state is concurrently written by the logic thread in CaptureScreenshot)

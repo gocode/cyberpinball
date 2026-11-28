@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.5
 
+- In-game smoothness on a busy machine, CPU scheduling: Cyber Pinball runs VPX at "above normal" priority (ABOVE_NORMAL_PRIORITY_CLASS) during the game. When other programs use the processor in the background (updates, a browser, another front-end left open), VPX's render thread no longer loses its time slices and stays within the frame budget (8.3 ms at 120 Hz) while the ball is rolling. Measured at 120 Hz with a PuP-Pack and 12 busy background threads: drops to 90 fps go from 75% of play time to 0%. High priority is not used, so it never gets ahead of Windows drivers and services; no Windows or VPX setting is changed.
+- Patched VPX, patch set 10 (smoothness readings): every second of play, the VPX log tells what the PuP-Pack videos cost, the logic thread (script, physics, plugins, waiting) and the render thread (GPU time, waiting for the screen), with late frames counted apart. On Back to the Future at 120 Hz, these readings show that the drops come from frames the GPU takes more than 8.3 ms to draw, not from the processor nor the PuP-Pack (video upload: 2% of the render thread's time). Diagnostics only: neither rendering nor videos change.
 - Applications: Netflix, Prime Video, Disney+, YouTube, Twitch and Spotify now show their real icon, sharp at any size and shipped with the software: nothing is fetched online for them, so they also show offline.
 
 ## 0.2.4

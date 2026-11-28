@@ -244,6 +244,39 @@ test('correctif 09 (série 9) : une exception de libpupdmd sur PupCapture ne ter
   assert.ok(sorted.indexOf('09-pup-pupcapture-sans-plantage.patch') > sorted.indexOf('07-pup-amont-bdbccaf30.patch'), 'appliqué après le 07, dont il modifie le code');
 });
 
+test('correctifs 10 et 11 (série 10) : le coût de chaque image va au journal, une ligne par seconde, sans rien changer au jeu', () => {
+  // Fluidité en partie, 28/11/2026 : pour savoir pourquoi une partie descend sous la fréquence de l'écran, VPX écrit
+  // chaque seconde ce que coûtent les vidéos PuP (« PuP live »), le fil logique (« Logic live ») et le fil de rendu
+  // (« Render live »), y compris pour les seules images en retard. Diagnostic pur : aucun réglage ni rendu modifié.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
+  const attendus: Record<string, { files: string[]; lines: RegExp[] }> = {
+    '10-pup-cout-au-journal.patch': { files: ['plugins/pup/PUPMediaPlayer.cpp'], lines: [/PuP live/] },
+    '11-images-par-etape-au-journal.patch': {
+      files: ['src/core/player.cpp', 'src/renderer/RenderDevice.cpp'],
+      lines: [/"Logic live: frames=\{\} late=\{\}/, /"Render live: frames=\{\} late=\{\} gpu=/],
+    },
+  };
+  for (const [name, { files, lines }] of Object.entries(attendus)) {
+    const diff = fs.readFileSync(path.join(dir, name), 'utf8');
+    assert.doesNotMatch(diff, /\r/, `${name} : fins de ligne LF, comme les sources de VPX`);
+    assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 10\)/, name);
+    const touched = [...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]!);
+    assert.deepEqual(touched, files, `${name} : rien d'autre que ces fichiers`);
+    const removed = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+    if (name.startsWith('11-')) assert.deepEqual(removed, [], `${name} : aucune ligne de VPX retirée, le correctif ne fait qu'ajouter des relevés`);
+    for (const line of lines) assert.match(diff, line, name);
+  }
+  // Le 10 ne retire que les deux envois d'image au GPU, remplacés par un seul envoi chronométré, au même format.
+  const pup = fs.readFileSync(path.join(dir, '10-pup-cout-au-journal.patch'), 'utf8');
+  const pupRemoved = pup.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  assert.equal(pupRemoved.length, 2);
+  for (const l of pupRemoved) assert.match(l, /^-\s+UpdateTexture\(.*VPXTEXFMT_sRGBA8, \w+(\.\w+)*->data\[0\]\);$/);
+  assert.match(pup, /^\+\s+UpdateTexture\(texture, width, height, VPXTextureFormat::VPXTEXFMT_sRGBA8, image\);$/m, 'même envoi, même format : la vidéo n’est pas dégradée');
+  // Une ligne par seconde au plus : le journal d'une longue partie reste lisible et l'écriture ne coûte rien.
+  const logique = fs.readFileSync(path.join(dir, '11-images-par-etape-au-journal.patch'), 'utf8');
+  assert.equal([...logique.matchAll(/< 1000000ull\)/g)].length, 2, 'le fil logique et le fil de rendu écrivent au plus une fois par seconde');
+});
+
 test('la série livrée est celle du correctif le plus récent', () => {
   // Le journal de VPX, ses rapports et l'adresse des sources publiées disent la série : un nouveau correctif la fait monter.
   const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
