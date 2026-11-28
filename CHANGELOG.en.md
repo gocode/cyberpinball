@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.2.4
 
+- Pinball FX Midnight and Surprise table were developed by Emeric (lechable472-cloud): thanks to him. What's new says so.
+- Pinball FX Midnight: you can now move through its pause menu with the flippers. In play, the flippers stay Shift only, with no extra arrow (arrows changed the table view and, in menus, switched tabs on every hit). Once you open the menu with Exit or Pause, the left flipper goes up and the right flipper goes down; Start or the plunger confirm, and Exit or Pause close it again.
 - What's new: Pinball FX Midnight is flagged as beta.
 - Quitting a table where VPX hangs while closing (frozen screen, ball sound looping) no longer forces you to restart the cabinet: if VPX does not close within 10 seconds after the game ends, Cyber Pinball closes it, records the game and takes you back to the tables screen, with a note explaining what happened.
 - When VPX froze while stopping the PuP-Pack, the note suggests playing the table without its PuP-Pack.
@@ -20,7 +22,6 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Applications: a thin strip in the application's colour runs along the top of the screen while a page is loading, so you can tell whether your click started a page or did nothing.
 - The strip goes out as soon as the page has loaded, ignores ads and embedded players, and does not light up for a very short load.
 - To know this, Edge opens a debugging pipe reserved for Cyber Pinball (no port, nothing listens on your machine), for applications only; signing in to Google stays free of debugging.
-- Pinball FX Midnight: the cabinet's flippers now move through its menus (Left and Right arrows sent along with Shift, as for Pinball FX3).
 - Pinball FX Midnight: before each game, Cyber Pinball now places the DMD and backglass windows as it does for Pinball FX (Mods\Cabinet\Settings.ini, once "Cabinet Mode" is turned on in the game), puts the game window on the playfield screen and applies the cabinet's rotation.
 - Media proposals: the screen now opens straight away. The VPinMediaDB previews ("Preview on its way…"), the VPForums and VPUniverse results and the file sizes arrive afterwards and fill the screen as they come, instead of everything being awaited before it opens. A slow connection, or the wait VPUniverse imposes, no longer blocks choosing a backglass or a playfield.
 - Previews are received six at a time instead of one by one (on a slow connection the wait of each request added up), and a preview already requested is not downloaded twice.

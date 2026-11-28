@@ -70,7 +70,7 @@ export const NEWS: readonly NewsItem[] = [
     // (0.1.14) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'pinballfx-midnight',
     beta: true,
-    date: '2026-11-27',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Pinball FX Midnight sur la roue'); },
     get detail() { return t('Les tables de Pinball FX Midnight, autre jeu de Zen Studios, lancées depuis la roue, de 1 à 4 joueurs.'); },
@@ -78,6 +78,7 @@ export const NEWS: readonly NewsItem[] = [
       return [
         t('Pinball FX Midnight (anciennement Pinball M) est un jeu à part de Pinball FX, avec ses propres tables (Chucky, Dead by Daylight, The Thing…). Il vient de Steam, qui gère l’accès aux tables.'),
         t('Cyber Pinball retrouve le jeu, même dans une bibliothèque Steam secondaire. Après Jouer sur la fiche d’une table, choisis 1 à 4 joueurs ; c’est aussi le cas pour Pinball FX.'),
+        t('Développé par Emeric (lechable472-cloud), merci à lui.'),
       ];
     },
     get where() { return t('Menu système › Tables › Ajouter une table › Tables de Pinball FX Midnight'); },
@@ -87,7 +88,7 @@ export const NEWS: readonly NewsItem[] = [
     // Applications (26/11/2026) : « Pinball FX sur la roue » (0.1.13) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
     id: 'applications',
-    date: '2026-11-26',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Applications'); },
     get detail() { return t('Netflix, YouTube, Spotify ou ton serveur de la maison, en plein écran sur la borne.'); },
@@ -105,7 +106,7 @@ export const NEWS: readonly NewsItem[] = [
     // Table surprise (26/11/2026), contribution d'un joueur sur GitHub ; « Retours et propositions »
     // (0.1.13) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'table-surprise',
-    date: '2026-11-26',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Table surprise'); },
     get detail() { return t('Tiens les deux flippers sur la roue : une table de la collection est tirée au hasard.'); },
@@ -113,6 +114,7 @@ export const NEWS: readonly NewsItem[] = [
       return [
         t('Sur la roue, tiens les deux flippers une seconde et demie : les logos des tables défilent comme à la loterie, puis l’une d’elles est tirée. Relâche les deux flippers et la partie démarre ; Exit ou un MagnaSave annule.'),
         t('Le tirage se fait dans la collection affichée. Une table s’en écarte dans Gérer la table > Table surprise ; une collection s’écarte du tirage de « Toutes les tables » dans Collections.'),
+        t('Développé par Emeric (lechable472-cloud), merci à lui.'),
       ];
     },
     get where() { return t('Sur la roue : les deux flippers tenus'); },
@@ -123,7 +125,7 @@ export const NEWS: readonly NewsItem[] = [
     // Animations des LED hors partie (25/11/2026) : « Groupes » (0.1.14) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
     id: 'animations-led',
-    date: '2026-11-25',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Animations des LED'); },
     get detail() { return t('Tes LED adressables s’animent aux couleurs de la table choisie, et se taisent quand une partie démarre.'); },
@@ -140,7 +142,7 @@ export const NEWS: readonly NewsItem[] = [
     // Recherche dans le Menu système (24/11/2026) ; « La Communauté » (0.1.11) sort de la liste pour
     // la garder à 24. Date à poser au jour de la version finale.
     id: 'recherche-menu',
-    date: '2026-11-24',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Rechercher dans le Menu système'); },
     get detail() { return t('Tape une lettre dans le Menu système : les réglages qui correspondent s’affichent aussitôt.'); },
@@ -157,7 +159,7 @@ export const NEWS: readonly NewsItem[] = [
     // Mode débogage (23/11/2026) : les mesures de tous les écrans en direct, par-dessus l'un d'eux. « Les crédits de vos tables » (0.1.11)
     // sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'mode-debogage',
-    date: '2026-11-23',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Le mode débogage'); },
     get detail() { return t('Les mesures de tous tes écrans en direct : cadence, chargements, processeur, mémoire.'); },
@@ -174,7 +176,7 @@ export const NEWS: readonly NewsItem[] = [
     // Cadrage des tables choisi sur une image (23/11/2026) ; « Le Juke-box » (0.1.9) sort de la liste pour la garder
     // à 24. Date à poser au jour de la version finale.
     id: 'cadrage-des-tables',
-    date: '2026-11-23',
+    date: '2026-11-28',
     version: '0.2.4',
     get title() { return t('Le cadrage des tables, choisi sur ta table'); },
     get detail() { return t('Choisis comment les tables remplissent l’écran, en voyant ta propre table rendue par VPX.'); },

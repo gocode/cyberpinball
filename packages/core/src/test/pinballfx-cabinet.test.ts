@@ -19,6 +19,10 @@ import {
   zenGameKeys,
   zenJoystickKeys,
   zenKeyboardEchoes,
+  ZenMenuState,
+  zenMenuButtons,
+  zenMenuJoystickKeys,
+  zenMenuKeyboardEchoes,
   type CabinetButtons,
 } from '..';
 import { REPO_ROOT } from './i18n-scan';
@@ -140,14 +144,58 @@ test('borne au clavier, Pinball FX3 : chaque flipper reçoit en plus la flèche 
   assert.ok(zenKeyboardEchoes(undefined, 'pinballfx3').size > 0);
 });
 
-// PinCab, 27/11/2026 : Pinball FX Midnight, impossible de naviguer aux flips (Maj seul, comme FX3 sans ses flèches).
-test('Pinball FX Midnight : flèches aux flippers pour ses menus, Maj gardé pour la partie, comme FX3', () => {
+// PinCab, 27 et 28/11/2026 : Pinball FX Midnight, impossible de naviguer aux flips. Mesuré : Maj et flèche
+// ensemble changent d'onglet à chaque coup ; le menu pause ne se parcourt qu'avec haut et bas (gauche,
+// droite et Maj n'y font rien) ; en partie, Maj est le flipper et les flèches changent la vue.
+test('Pinball FX Midnight : Maj seul aux flippers en partie, haut et bas dans le menu pause', () => {
   const keys = zenJoystickKeys(PINSCAPE, 'pinballfxmidnight');
-  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft', 'ArrowLeft']);
-  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight', 'ArrowRight']);
+  assert.deepEqual(keys.get(JOY(5)), ['ShiftLeft'], 'en partie : Maj seul, aucune flèche de plus');
+  assert.deepEqual(keys.get(JOY(4)), ['ShiftRight']);
   assert.deepEqual(keys.get(JOY(12)), ['Enter']);
-  assert.deepEqual([...zenKeyboardEchoes(KEYBOARD, 'pinballfxmidnight')], [['ShiftLeft', ['ArrowLeft']], ['ShiftRight', ['ArrowRight']]]);
+  assert.equal(zenKeyboardEchoes(KEYBOARD, 'pinballfxmidnight').size, 0, 'au clavier non plus, hors menu');
+  assert.equal(hasArrowMenus('pinballfxmidnight'), false);
   assert.equal(hasArrowMenus('pinballfx'), false);
+  assert.equal(hasArrowMenus('pinballfx3'), true);
+  // Menu ouvert : les flippers montent et descendent, le reste des boutons est inchangé.
+  const menu = zenMenuJoystickKeys(PINSCAPE, 'pinballfxmidnight');
+  assert.deepEqual(menu.get(JOY(5)), ['ArrowUp']);
+  assert.deepEqual(menu.get(JOY(4)), ['ArrowDown']);
+  assert.deepEqual(menu.get(JOY(12)), ['Enter']);
+  assert.deepEqual(menu.get(JOY(7)), ['ArrowUp'], 'MagnaSave gauche inchangé');
+  assert.deepEqual([...zenMenuKeyboardEchoes(KEYBOARD, 'pinballfxmidnight')], [['ShiftLeft', ['ArrowUp']], ['ShiftRight', ['ArrowDown']]]);
+  for (const other of ['pinballfx', 'pinballfx3', undefined] as const) {
+    assert.equal(zenMenuJoystickKeys(PINSCAPE, other).size, 0, `aucun menu aux flippers pour ${other}`);
+    assert.equal(zenMenuKeyboardEchoes(KEYBOARD, other).size, 0);
+    assert.equal(zenMenuButtons(PINSCAPE, other).toggle.size, 0);
+  }
+});
+
+test('menu pause de Midnight : Exit ou Pause l’ouvre et le ferme, Start le ferme, Start hors menu ne change rien', () => {
+  const { toggle, confirm } = zenMenuButtons(PINSCAPE, 'pinballfxmidnight');
+  assert.deepEqual([...toggle].sort(), [JOY(13), JOY(8)].sort());
+  assert.deepEqual([...confirm].sort(), [JOY(12), JOY(9)].sort());
+  const state = new ZenMenuState(toggle, confirm);
+  assert.equal(state.press(JOY(12)), false, 'lanceur en partie');
+  assert.equal(state.open, false);
+  assert.equal(state.press(JOY(8)), true);
+  assert.equal(state.open, true, 'Exit ouvre la pause');
+  assert.equal(state.press(JOY(5)), false, 'un flipper ne change pas l’état');
+  assert.equal(state.press(JOY(12)), true);
+  assert.equal(state.open, false, 'Start valide « Reprendre le jeu »');
+  state.press(JOY(13));
+  state.press(JOY(13));
+  assert.equal(state.open, false, 'Pause ouvre puis ferme');
+});
+
+test('touches d’un bouton relâchées comme à l’appui, même si le menu a changé entre-temps', () => {
+  const p = new ZenKeyPresser(new Map([['f', ['ShiftLeft']]]), new Map([['f', ['ArrowUp']]]));
+  assert.deepEqual(p.press('f', true), [{ key: 'ShiftLeft', down: true }]);
+  p.menuOpen = true;
+  assert.deepEqual(p.press('f', false), [{ key: 'ShiftLeft', down: false }]);
+  assert.deepEqual(p.press('f', true), [{ key: 'ArrowUp', down: true }]);
+  p.menuOpen = false;
+  assert.deepEqual(p.press('f', false), [{ key: 'ArrowUp', down: false }]);
+  assert.deepEqual(p.releaseAll(), []);
 });
 
 test('Pinball FX Midnight : dossier du mode borne et rotation dans le dossier PinballM', () => {
@@ -319,6 +367,39 @@ test('pont, Pinball FX3 : flipper gauche = Maj gauche puis flèche gauche ; appu
   listener!(JOY(2), true);
   stop();
   assert.ok(logs.some((l) => /1 appui\(s\) de bouton envoyé\(s\) au jeu, 1 gardé\(s\)/.test(l)), logs.join('\n'));
+});
+
+test('pont, Pinball FX Midnight : flipper = Maj en partie, haut ou bas une fois le menu ouvert par Exit', (t) => {
+  const zen = require(path.join(REPO_ROOT, 'app', 'dist', 'zen-keys.js')) as ZenKeysModule;
+  const logs: string[] = [];
+  t.mock.method(console, 'log', (msg: string) => logs.push(msg));
+  let listener: ((code: string, down: boolean) => void) | undefined;
+  const sent: [number, boolean][] = [];
+  const stop = zen.bridgeZenKeys(PINSCAPE, () => 42, { foregroundPid: () => 42, key: (vk, down) => sent.push([vk, down]), watch: (l) => ((listener = l), () => undefined) }, 'pinballfxmidnight');
+  const tap = (code: string) => {
+    listener!(code, true);
+    listener!(code, false);
+  };
+  const take = () => sent.splice(0).map(([vk, down]) => `${vk.toString(16).padStart(2, '0')}${down ? '+' : '-'}`);
+  tap(JOY(5));
+  assert.deepEqual(take(), ['a0+', 'a0-'], 'en partie : Maj gauche seul');
+  tap(JOY(8)); // Exit : le menu pause s'ouvre
+  assert.deepEqual(take(), ['1b+', '1b-']);
+  tap(JOY(5));
+  tap(JOY(4));
+  assert.deepEqual(take(), ['26+', '26-', '28+', '28-'], 'menu : flèche haut puis bas, plus de Maj');
+  listener!(JOY(5), true); // flipper tenu pendant que le menu se ferme : relâché comme il a été appuyé
+  tap(JOY(9)); // lanceur : valide « Reprendre le jeu », le menu se ferme
+  listener!(JOY(5), false);
+  assert.deepEqual(take(), ['26+', '0d+', '0d-', '26-']);
+  tap(JOY(5));
+  assert.deepEqual(take(), ['a0+', 'a0-'], 'de retour en partie');
+  assert.ok(logs.some((l) => /menu du jeu ouvert/.test(l)) && logs.some((l) => /menu du jeu fermé/.test(l)), logs.join('\n'));
+  stop();
+  // Pinball FX3 : aucun suivi du menu (ses flèches gauche et droite partent à chaque coup, voir plus haut).
+  const before = logs.length;
+  zen.bridgeZenKeys(PINSCAPE, () => 42, { foregroundPid: () => 42, key: () => undefined, watch: (l) => ((listener = l), () => undefined) }, 'pinballfx3')();
+  assert.ok(!logs.slice(before).some((l) => /menu du jeu/.test(l)), logs.slice(before).join('\n'));
 });
 
 test('pont : touches seulement quand le jeu a le premier plan, relâchées à la fin', () => {

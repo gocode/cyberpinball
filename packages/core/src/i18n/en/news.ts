@@ -9,6 +9,7 @@ export const messages: Record<string, string> = {
     'Pinball FX Midnight (formerly Pinball M) is a separate game from Pinball FX, with its own tables (Chucky, Dead by Daylight, The Thing…). It comes from Steam, which manages access to the tables.',
   'Cyber Pinball retrouve le jeu, même dans une bibliothèque Steam secondaire. Après Jouer sur la fiche d’une table, choisis 1 à 4 joueurs ; c’est aussi le cas pour Pinball FX.':
     'Cyber Pinball finds the game, even in a secondary Steam library. After Play on a table’s page, pick 1 to 4 players; the same goes for Pinball FX.',
+  'Développé par Emeric (lechable472-cloud), merci à lui.': 'Developed by Emeric (lechable472-cloud), thanks to him.',
   'Menu système › Tables › Ajouter une table › Tables de Pinball FX Midnight': 'System menu › Tables › Add a table › Pinball FX Midnight tables',
   // Applications (26/11/2026)
   'Netflix, YouTube, Spotify ou ton serveur de la maison, en plein écran sur la borne.': 'Netflix, YouTube, Spotify or your home server, full screen on the cabinet.',

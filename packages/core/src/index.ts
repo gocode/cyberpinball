@@ -32,6 +32,7 @@ export * from './pinballfx3-windows';
 export * from './pinballfx3-folder';
 export * from './zen-media';
 export * from './pinballfx-cabinet';
+export * from './pinballfx-menu';
 export * from './buttons-backup';
 export * from './zen';
 export * from './tableorder';

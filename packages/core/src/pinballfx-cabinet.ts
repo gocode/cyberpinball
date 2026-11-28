@@ -250,12 +250,13 @@ export const PINBALLFX3_EXTRA_KEYS: Readonly<Partial<Record<ButtonId, string>>> 
 };
 
 /**
- * Jeux de Zen dont les menus se parcourent aux flèches gauche et droite : Pinball FX3, et Pinball FX
- * Midnight (27/11/2026, PinCab : ses flips ne permettaient pas de naviguer avec Maj seul, comme FX3).
- * Pinball FX (2023) se parcourt aux flippers eux-mêmes.
+ * Jeux de Zen dont les menus se parcourent aux flèches gauche et droite : Pinball FX3.
+ * Pinball FX (2023) se parcourt aux flippers eux-mêmes. Pinball FX Midnight a ses flèches haut et bas
+ * seulement dans son menu pause, et Maj y changerait d'onglet : voir pinballfx-menu.ts (28/11/2026 :
+ * Maj et flèche ensemble, envoyés à chaque coup de flipper, rendaient ses menus impossibles à parcourir).
  */
 export function hasArrowMenus(game?: ZenGameKey): boolean {
-  return game === 'pinballfx3' || game === 'pinballfxmidnight';
+  return game === 'pinballfx3';
 }
 
 /** Touches d'un rôle dans le jeu de Zen `game` (sans jeu précisé : celles de Pinball FX). */
@@ -323,12 +324,22 @@ export function zenKeyboardEchoes(source: ButtonsSource, zenGame?: ZenGameKey): 
  */
 export class ZenKeyPresser {
   private readonly holders = new Map<string, Set<string>>();
+  /** Touches de chaque bouton tenu, prises à l'appui : le relâchement les lâche même si le menu a changé entre-temps. */
+  private readonly active = new Map<string, readonly string[]>();
+  /** Menu du jeu ouvert : `menuKeys` remplace les touches des boutons qu'il nomme. */
+  menuOpen = false;
 
-  constructor(private readonly keys: ReadonlyMap<string, readonly string[]>) {}
+  constructor(
+    private readonly keys: ReadonlyMap<string, readonly string[]>,
+    private readonly menuKeys: ReadonlyMap<string, readonly string[]> = new Map(),
+  ) {}
 
   press(button: string, down: boolean): { key: string; down: boolean }[] {
     const out: { key: string; down: boolean }[] = [];
-    for (const key of this.keys.get(button) ?? []) {
+    if (down) this.active.set(button, (this.menuOpen ? this.menuKeys.get(button) : undefined) ?? this.keys.get(button) ?? []);
+    const pressed = this.active.get(button) ?? [];
+    if (!down) this.active.delete(button);
+    for (const key of pressed) {
       const set = this.holders.get(key) ?? new Set<string>();
       const before = set.size;
       if (down) set.add(button);

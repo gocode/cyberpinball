@@ -20,7 +20,20 @@
 // FOCUS_CHECK_MS, la plus grande fenêtre du jeu (la table, sur le playfield) reprend le premier plan
 // quand une autre fenêtre du jeu l'a ; le journal nomme la première fenêtre ainsi corrigée.
 
-import { BamMenuRouter, windowsVk, ZenKeyPresser, zenJoystickKeys, zenKeyboardEchoes, type BamMenuButtons, type ButtonsSource, type ZenGameKey } from '@cyberpinball/core';
+import {
+  BamMenuRouter,
+  windowsVk,
+  ZenKeyPresser,
+  zenJoystickKeys,
+  zenKeyboardEchoes,
+  ZenMenuState,
+  zenMenuButtons,
+  zenMenuJoystickKeys,
+  zenMenuKeyboardEchoes,
+  type BamMenuButtons,
+  type ButtonsSource,
+  type ZenGameKey,
+} from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, keysDown, listWindows, setKeyDown, type WindowInfo } from '@cyberpinball/win-displays';
 
 /** Contrôle de la fenêtre qui a le clavier pendant une partie de Zen : rapide, sans charge. */
@@ -97,8 +110,13 @@ export function bridgeZenKeys(
   const keys = other ? other.keys : zenJoystickKeys(source, game);
   const echoes = !other && system.keysDown && system.every ? zenKeyboardEchoes(source, game) : new Map<string, string[]>();
   const label = other ? other.name : 'Jeu de Zen'; // i18n-ignore : journal
-  if (keys.size === 0 && echoes.size === 0) return () => undefined;
-  const presser = new ZenKeyPresser(new Map([...keys, ...echoes]));
+  // Pinball FX Midnight : menu pause parcouru par haut et bas (flippers), tant que le menu est ouvert (pinballfx-menu.ts).
+  const menuKeys = !other ? zenMenuJoystickKeys(source, game) : new Map<string, string[]>();
+  const menuEchoes = !other && system.keysDown && system.every ? zenMenuKeyboardEchoes(source, game) : new Map<string, string[]>();
+  const menuButtons = !other ? zenMenuButtons(source, game) : { toggle: new Set<string>(), confirm: new Set<string>() };
+  const menuState = menuKeys.size || menuEchoes.size ? new ZenMenuState(menuButtons.toggle, menuButtons.confirm) : undefined;
+  if (keys.size === 0 && echoes.size === 0 && !menuState) return () => undefined;
+  const presser = new ZenKeyPresser(new Map([...keys, ...echoes]), new Map([...menuKeys, ...menuEchoes]));
   const menu = other?.bam
     ? new BamMenuRouter(
         other.bam.buttons,
@@ -137,6 +155,10 @@ export function bridgeZenKeys(
       sent++;
     }
     if (menu?.available && menu.button(code, down)) return;
+    if (down && menuState?.press(code)) {
+      presser.menuOpen = menuState.open;
+      console.log(`${label} : menu du jeu ${menuState.open ? 'ouvert, flippers = haut et bas' : 'fermé, flippers = Maj'}.`); // i18n-ignore : journal
+    }
     for (const k of presser.press(code, down)) send(k.key, k.down);
   };
   const stopWatch = keys.size
@@ -145,7 +167,9 @@ export function bridgeZenKeys(
       })
     : () => undefined;
   // Touches de flipper au clavier : appuis et relâchements vus d'un sondage à l'autre.
-  const polled = [...echoes.keys()].map((code) => ({ code, vk: windowsVk(code)! }));
+  // Midnight : aussi les touches du clavier qui ouvrent, ferment ou valident le menu du jeu (Échap, Entrée).
+  const polledCodes = new Set([...echoes.keys(), ...menuEchoes.keys(), ...[...(menuState ? [...menuButtons.toggle, ...menuButtons.confirm] : [])].filter((c) => !c.startsWith('SDLJoy_'))]);
+  const polled = [...polledCodes].filter((code) => windowsVk(code) !== undefined).map((code) => ({ code, vk: windowsVk(code)! }));
   const pressed = new Set<string>();
   const stopPoll = polled.length
     ? system.every!(KEYBOARD_POLL_MS, () => {
@@ -162,7 +186,8 @@ export function bridgeZenKeys(
   const stopFocus = !other && system.focusTable && system.every ? system.every(FOCUS_CHECK_MS, keepTableFocused) : () => undefined;
   if (keys.size) console.log(`${label} : ${keys.size} bouton(s) du joystick rendus au jeu comme des touches du clavier.`); // i18n-ignore : journal
   if (menu?.available) console.log(`${label} : les deux MagnaSave ensemble ouvrent le menu de BAM (touche ${other!.bam!.vk}).`); // i18n-ignore : journal
-  if (polled.length) console.log(`${label} : ${polled.length} flipper(s) au clavier (${polled.map((p) => p.code).join(', ')}) doublés des flèches des menus.`); // i18n-ignore : journal
+  if (echoes.size) console.log(`${label} : ${echoes.size} flipper(s) au clavier (${[...echoes.keys()].join(', ')}) doublés des flèches des menus.`); // i18n-ignore : journal
+  if (menuState) console.log(`${label} : menu du jeu suivi aux boutons Exit/Pause et Start (flippers = haut et bas tant qu'il est ouvert).`); // i18n-ignore : journal
   return () => {
     stopWatch();
     stopPoll();
