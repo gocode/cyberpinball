@@ -69,6 +69,7 @@ export const NEWS: readonly NewsItem[] = [
     // Pinball FX Midnight (27/11/2026), contribution d'un joueur sur GitHub ; « Parties en direct »
     // (0.1.14) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'pinballfx-midnight',
+    beta: true,
     date: '2026-11-27',
     version: '0.2.4',
     get title() { return t('Pinball FX Midnight sur la roue'); },

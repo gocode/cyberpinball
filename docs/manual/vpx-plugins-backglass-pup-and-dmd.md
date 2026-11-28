@@ -360,6 +360,7 @@ A PuP-Pack, for example, often draws a frame on the backglass (bottom centre) wh
 1. **Enter VPX's menu**: from the details screen, "Régler l'affichage en partie" (Adjust display in game) (the table starts with the menu open on framing, and the game does not count in the statistics); or, during any game, both MagnaSave buttons pressed together (Credit and Start on a cabinet without MagnaSave), then "Tous les réglages de VPX" (All VPX settings) in Cyber Pinball's in-game settings (above); F12 on a keyboard directly.
    `[Input] Mapping.InGameUI` keeps F12 only, **even without recorded buttons**: it is then the only `[Input]` key Cyber Pinball writes (`inGameMenuSetting`, `packages/core/src/buttons.ts`), and the combination that earlier versions wrote there is removed.
    Exit is never part of it: on its own, it quits the game.
+   The MagnaSave in-game settings also have a "Cadrage de cette table" (This table's framing) line, which opens VPX's "Point of View" page directly: the framing is adjusted live there and saved for the table.
 2. **Adjust**: "Point Of View" for framing; Exit goes back to the menu's home page, then "Display Settings" > "Backglass Display", "ScoreView Display" (the DMD) or "Topper Display": position and size to the pixel, applied live; the window can also be dragged with the mouse.
 3. **Save** (Start): "Save as Table Override" writes to the table's `.ini`, for that table only; "Save Globally" to `VPinballX.ini`, for every table.
 
@@ -367,12 +368,15 @@ Buttons in VPX's menu (`InputManager.cpp`), listed on the adjustment's loading s
 
 | Button | In VPX's menu |
 | --- | --- |
-| Left, right MagnaSave | change line |
-| Flippers | adjust the value |
+| Flippers left, right | change line (left: previous, right: next) |
+| Left MagnaSave | decrease the value, or cancel |
+| Right MagnaSave | increase the value, or confirm |
 | Start | save: for this table or for all |
 | Credit | cancel the changes |
 | Plunger | default value |
 | Exit | previous page, then close the menu; with the menu closed, quit the game |
+
+On a cabinet without MagnaSave, the flippers keep adjusting the value (VPX then has no other button to increase or confirm); VPX's keys are rewritten by themselves at the next launch, and the reminder for display adjustment in game ("Change line", "Adjust, confirm or cancel") shows the right buttons.
 
 VPX only lights up "Save" after a change (`InGameUIPage::IsModified`): after Credit (cancel), it stays greyed out.
 The reminder says so, "Save greyed out: nothing changed; Launch turns it back on": the Launch button (default value) is enough to light it up again.
@@ -392,7 +396,7 @@ The reminder says so, "Save greyed out: nothing changed; Launch turns it back on
   VPX reads the priority from the table's settings: for a table that draws its DMD (PinMAME ROM, `CreateObject("FlexDMD.FlexDMD")` or `UltraDMD.DMDObject`, DMD folder) and whose script does not write the score on the pack itself (`LabelNew`, `LabelInit`), the diagnosis writes `[ScoreView] Priority.PUP = 0` in the table's `.ini` ("Le PuP-Pack cacherait le DMD de la table", The PuP-Pack would hide the table's DMD, `pupHidesDmd`), and the menu does it by itself before the game.
   The pack keeps the backglass and the topper; a value already set for the table in the VPX menu is kept.
   Case found on *2001* (UltraDMD score, "DMD on Fulldmd" option).
-- **Limits**: without MagnaSave, you cannot change line in VPX's menu (`UIUp`, `UIDown`); the stacking order of two overlapping VPX windows (DMD on the backglass) is left to Windows.
+- **Limits**: without MagnaSave, the flippers only adjust the value: you cannot increase, confirm or cancel with a button in VPX's menu; the stacking order of two overlapping VPX windows (DMD on the backglass) is left to Windows.
 
 ### DMD colours and ROM names
 
@@ -404,3 +408,16 @@ Diagnostics offers to try colours for another ROM revision and flags unread form
 
 The technical sheet shows the installed patched version; its sources and dependency sources are published with the patches and build recipe.
 The build reuses VPX and its PuP plugin only when the hashes of both binaries, sources, patches, dependencies and tools match the last successful build; otherwise it rebuilds.
+
+What each series of the patched VPX 10.8.1 fixes for the player:
+
+- **Series 5**: the automatic import of an old POV framing file no longer crashes when a table is launched directly; old numeric fields that are empty or unreadable are ignored, and valid framing and settings are kept.
+- **Series 6**: on a cabinet with DudesCab boards, VPX no longer crashes when closing (0xC0000005) while DOF unloads.
+  The VPX 10.8.1 DOF library stopped the board a second time after its real shutdown; before each game Cyber Pinball installs a DOF library (`plugins/dof/dof64.dll`) rebuilt with the fixes its authors have published since.
+  VPX's DOF plugin and your configuration do not change.
+  If VPX still crashes that way when closing, the failure screen says the game was played, that nothing needs repairing in the table, and that it is a known defect of the VPX 10.8.1 DOF library, fixed from series 6.
+- **Series 8**: the PuP plugin takes over the one from VPX's development version.
+  The videos of a PuP screen that is not displayed (DMD, topper) now end on time, the queue moves on, the background music starts and the pack's sounds no longer overlap; the plugin of the released VPX versions kept those videos frozen, and the rest of the pack never came.
+  As in PinUP Player, a table that redeclares a playlist from its script changes its order and rest time.
+- **Series 9**: VPX no longer stops when a PuP-Pack starts whose DMD capture image has too large a number (*The Avengers (Pro)* closed on the very first DMD image).
+  The plugin ignores those images and reads the others; if it cannot read any, the pack plays without its DMD triggers.

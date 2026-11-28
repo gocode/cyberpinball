@@ -5,6 +5,7 @@
 Cyber Pinball lance aussi les tables de **Pinball FX** (Zen Studios, 2023), acheté sur Steam ou sur Epic.
 **En bêta** : l'entrée de l'entonnoir et la ligne « Pinball FX » de la fiche portent la pastille « BÊTA », l'écran des tables le dit en tête.
 Pinball FX3 (« Pinball FX Classic ») a sa rubrique : [Tables de Pinball FX3](tables-de-pinball-fx3.md), Future Pinball aussi : [Tables de Future Pinball](tables-de-future-pinball.md).
+**Pinball FX Midnight** (anciennement Pinball M, un autre jeu de Zen Studios) passe par le même code : voir « Pinball FX Midnight » plus bas.
 Ses tables ne sont pas des fichiers : ce sont des contenus du jeu, désignés par un numéro.
 Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » avec une **fiche** `.pinballfx` (JSON : `{ "PinballFX": { "Table": 156 } }`), son `.info` et ses médias, comme une table VPX ; la roue, les collections, les favoris, les statistiques et les médias marchent donc de la même façon.
 
@@ -44,7 +45,7 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Un Pinball FX resté ouvert est fermé avant la partie.
   Pinball FX met 20 à 25 s à ouvrir une table : au-delà de 120 s sans fenêtre, la partie échoue avec son explication.
 - **Quitter** : quitter la table dans le jeu ramène à son propre menu ; un **appui long sur Exit** (2 s) ferme le jeu et revient à la roue.
-  Le cartouche du chargement l'écrit ; le raccourci d'arrêt d'une partie bloquée marche aussi.
+  L'écran de chargement l'écrit en une pastille au bas de l'écran (« Pour revenir à Cyber Pinball : maintiens Exit 2 s ») ; le raccourci d'arrêt d'une partie bloquée marche aussi.
 - **Rotation de l'image sur une borne** : avant chaque partie, Cyber Pinball règle la rotation forcée de l'image du jeu (Options > Vidéo du jeu) dans le même sens que ses propres fenêtres du playfield, pour un joueur placé au bord des flippers.
   La table est face au joueur au lieu de rester en paysage.
   Le réglage est écrit dans `LocalSettings.cfg` (`%LOCALAPPDATA%\PinballFX\Saved\PersistentDownloadDir\<boutique>\LocalSettings.cfg`, section `video` : `useForcedDisplayRotation`, et `forcedDisplayRotation` à `Rot_90`, `Rot_180` ou `Rot_270`), le reste du fichier gardé tel quel.
@@ -53,9 +54,10 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Pinball FX3 n'a pas d'équivalent : ses réglages sont chiffrés (voir [Tables de Pinball FX3](tables-de-pinball-fx3.md)).
 - **Mode borne réglé par Cyber Pinball** : rien à régler dans le menu « Cabinet Support » du jeu.
   Avant chaque partie, Cyber Pinball active le mode borne et pose la fenêtre du DMD du jeu sur l'écran DMD de la borne, d'après sa propre configuration des écrans ; sur un FullDMD, le DMD prend la bande centrale au format 4:1, comme celui de Visual Pinball.
-  La fenêtre du fronton du jeu est éteinte : une seule image sur le fronton, celle choisie à l'ajout de la table, affichée par Cyber Pinball comme hors du mode borne.
-  Allumée, elle se posait par-dessus et, son image absente (menus du jeu, table choisie dans le jeu), montrait le chemin du fichier qu'elle cherchait ; aucune image n'est déposée dans le dossier du mode borne du jeu.
-  Seules l'activation, la place et la taille du DMD et l'extinction du fronton sont écrites dans `<jeu>\PinballFX\Mods\Cabinet\Settings.ini` ; le reste (DMD externe, marges, taille des points, numéro d'écran) est laissé tel quel, et un fichier en UTF-16 le reste.
+  Le jeu pose aussi sa fenêtre sur l'écran du playfield, à sa taille, pendant la partie : il ignore l'écran et la taille écrits dans ses réglages et s'ouvrait toujours sur l'écran principal.
+  La fenêtre du fronton du jeu est allumée sur l'écran du fronton de la borne : pendant la partie, le jeu y affiche lui-même le fronton de la table, comme les autres jeux.
+  Cyber Pinball lui donne l'image de fronton de la table (`Table_<numéro>.png`, dans le dossier du mode borne du jeu, sans jamais remplacer une image déjà là) ; une table sans image de fronton garde celui de Cyber Pinball, jamais un chemin de fichier.
+  Seules l'activation, la place et la taille des fenêtres du DMD et du fronton sont écrites dans `<jeu>\PinballFX\Mods\Cabinet\Settings.ini` ; le reste (DMD externe, marges, taille des points, numéro d'écran) est laissé tel quel, et un fichier en UTF-16 le reste.
   Ce fichier n'existe qu'une fois « Cabinet Support » ouvert une fois dans le jeu : sans lui, rien n'est écrit, et la partie se lance quand même.
 - **DMD envoyé à dmdext** : avec l'option « appareil externe » de son mode borne (`DmdDevice64.dll` de dmd-extensions : colorisation, PuP-Packs), le jeu ouvre le DMD virtuel de dmdext, là où `DmdDevice.ini` le place, parfois par-dessus le fronton.
   Pendant la partie, Cyber Pinball le pose sur l'écran DMD de la borne tel qu'il est, comme le DMD de Future Pinball : toute la largeur de l'écran, au format 4:1, au milieu.
@@ -79,6 +81,17 @@ Chacune a dans le dossier des tables un dossier « Titre (Fabricant Année) » a
   Les autres écrans montrent leur média selon « Médias pendant la partie » (voir [Médias des jeux](medias-des-jeux.md)).
   Un jeu qui change la définition d'un écran pendant la partie ne déplace pas les fenêtres du front-end : chacune suit l'écran de son rôle, reconnu à son identité et non à ses anciennes coordonnées.
   Une fenêtre trouvée sur l'écran d'un autre rôle est notée dans le journal et reposée sur le sien.
+- **Nombre de joueurs** (Pinball FX et Pinball FX Midnight) : après Jouer sur la fiche d'une table, choisis 1 à 4 joueurs avec les flippers et Start ; Exit revient à la fiche.
+  Ton bouton Valider valide aussi et ton bouton Retour revient à la fiche, comme Start et Exit : sur une borne où Valider et Retour sont d'autres boutons (les MagnaSave, par exemple), seul Start validait.
+  Pinball FX garde aussi l'entraînement, le mode Pro des tables Williams et Bally et ses quatre défis dans « Autres modes ».
+  Le téléphone, Table surprise et les lancements directs restent à un joueur.
+- **Pinball FX Midnight** (anciennement Pinball M) : pris en charge sur Steam, avec ses tables et ses parties comme Pinball FX.
+  Cyber Pinball retrouve l'installation, y compris dans une bibliothèque Steam secondaire, et lance ses tables depuis la roue ; Steam gère l'accès aux tables.
+  Menu système > Tables > Ajouter une table > **« Tables de Pinball FX Midnight »** propose quelques tables connues, et « Ajouter par numéro de table » accepte les autres.
+  Une ligne des Nouveautés le présente, et « Essayer » ouvre cet écran.
+  Les écrans et le DMD se règlent dans le menu « Cabinet Support » du jeu, une fois « Cabinet Mode » activé.
+  Avant chaque partie, Cyber Pinball place alors, comme pour Pinball FX, les fenêtres du DMD et du fronton (`<jeu>\PinballM\Mods\Cabinet\Settings.ini`), pose la fenêtre du jeu sur l'écran du playfield et applique la rotation de la borne.
+  Les flippers de la borne parcourent ses menus : les flèches gauche et droite partent en plus de Maj, comme pour Pinball FX3.
 - **Ce que Pinball FX ne donne pas** : pas de ROM ni de NVRAM, donc ni tableau des scores ni classement ; pas de VR, pas de réglages en partie, pas de DMD lu par Cyber Pinball.
   Son DMD externe (`DmdDevice64.dll` de dmd-extensions), ses marges et la taille de ses points se règlent dans le **mode borne** du jeu ; Cyber Pinball n'y écrit que la rotation de l'image, l'activation, la place du DMD et l'extinction du fronton.
   Sur la fiche, ce qui ne s'applique pas reste à sa place, grisé, avec la raison : « Parties du jeu », « Fichiers de la table », « Réglages de cette table », « Régler l'affichage en partie », « DMD sur la roue », « Jouer et enregistrer », « Diagnostiquer et réparer », « Jouer avec un ami », « Tableau des scores ».

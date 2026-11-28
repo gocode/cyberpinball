@@ -81,4 +81,9 @@ Nothing to install, no app store: the page is still the one the cabinet serves, 
   On Android, Chrome opens the shortcut of an HTTP page in a tab, address bar included.
   If the router gives the cabinet another address, only the shortcut that follows the cabinet (stable address over the Internet) or the cabinet's name (iPhone) finds it; a shortcut to the IP address means scanning the QR code once (reserving the cabinet's address in the router avoids it).
   The page still travels in clear text (limit described for the built-in browser remote).
+**"Add to Home Screen" tips.**
+On Android, the tip says the remote goes full screen at the first touch (Chrome does not open a local-network HTTP page as a real app, but full screen rids it of the address bar).
+On iPhone, it reminds you of iOS 26's "Open as Web App" option, without which the shortcut reopens Safari with its bars; the shortcut that follows the cabinet also opens without bars.
+On a notched screen, in landscape, the page and the action sheet stay clear of the notch and the rounded corners.
+
 - **Tests**: `remote.test.ts` (recognised without a QR code, after a restart, takeover, forgotten); `remote-kept.test.ts` (file, eight at most, dubious entries, damaged file); `telecommande.test.ts` replays an off-screen scenario: two real phone pages off screen, each with its own storage, acceptance, the tip, the screen left, Disconnect then Resume, the page reopened without an address, takeover, Forget, Cyber Pinball closed then restarted on the same port, and no key in the log.

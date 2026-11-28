@@ -142,7 +142,34 @@ Test : [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test
 
 Fiche de la table > Gérer la table… > Point de vue indique ce qui cadre la table : cadrage commun de la borne, POV fourni avec la table ou POV importé.
 « Importer un POV… » accepte un .pov ou le .ini d'un POV VPX 10.8 depuis Téléchargements, une clé USB ou un disque ; il est rangé avec cette table et n'agit que sur elle.
-Un POV qui placerait les flippers du mauvais côté est refusé avec sa raison ; un POV fourni est proposé dans le diagnostic quand un cadrage a déjà été choisi.
-Un passage en cadrage manuel sans vue enregistrée n'est pas un cadrage propre à la table : le diagnostic propose le cadrage de la borne.
+Un POV qui placerait les flippers du mauvais côté est refusé avec sa raison .
+Un passage en cadrage manuel sans vue enregistrée n'est pas un cadrage propre à la table : le diagnostic le signale et mène à « Point de vue » (« Ce qu'il manque pour jouer » ne change plus le cadrage d'une table sans te le demander).
 Avec VPX corrigé, « Ajuster la table » garde le fond du plateau à l'écran : le bas décoratif et le vide au-dessus sortent en priorité, puis un étirement en largeur de 15 % au plus comble ce qui manque.
 « Garder le haut de la table » et « Étirement maximal en largeur » se règlent dans Réglages de VPX > Vue de la table et cadrage, et dans le menu de VPX en partie avec hauteur et recul des yeux.
+
+### Cadrage des tables et Point de vue : styles, aperçus, historique (bêta)
+
+Menu système › Ma borne › VPX › Cadrage des tables choisit le style commun de la borne : sur un écran 16:9, une table ne tient pas sans compromis.
+Les trois formats se nomment pour dire ce qu'ils font : « Plein cadre, bas rogné » (par défaut), « Table entière, bandes » et « Plein cadre, table élargie ».
+Chacun est montré sur ta propre table, rendu par VPX sans rien afficher sur la borne : la vignette dit « VPX génère le rendu… » avec un loader animé pendant ce temps.
+Les aperçus ont un fond rayé bleuté là où VPX rend du noir pur (bandes, marges), pour voir où commencent les bords de la table, et un liseré clair autour de l'image.
+Choisir un cadrage ne relance pas VPX pour les autres cartes : la clé du cache suit le cadrage réellement appliqué, pas le texte du `.ini` (sous cadrage automatique, une vue laissée dans le `.ini` ne compte pas).
+Les images des cadrages s'affichent enfin : elles étaient rendues par VPX mais le front-end les refusait (cartes vides).
+Fiche de la table > Gérer la table… > Point de vue montre chaque cadrage sur une image de la table et permet un style propre à cette table seule.
+« Rétablir le cadrage précédent » revient au cadrage d'avant.
+La vue réglée à la main dans le menu de VPX est gardée dans l'historique quand un style, un POV importé ou le cadrage d'origine la remplace ; elle reste proposée sous « Ma vue personnalisée » et n'est jamais remplacée.
+Deux préréglages d'essai (bêta), pour une table seule et jamais pour la borne, sont à comparer sur les aperçus :
+- « Plein cadre, au plus près des coins » rapproche les coins du plateau de ceux de l'écran (étirement jusqu'à 50 % et œil relevé), en deux variantes, « écran incliné » (le fond du plateau est un peu tronqué) et « écran à plat » ; l'œil relevé est retiré dès qu'un autre cadrage reprend la table.
+- « Œil bas, table élargie » reprend les caractéristiques d'une vue réglée à la main sur une borne (œil plus bas, vitre abaissée, table élargie) : un point de départ à ajuster dans le menu de VPX.
+« Chercher un POV en ligne… » est à côté d'« Importer un POV… » : même recherche que pour les autres parties du jeu (base des tables, VPUniverse, VPForums, Téléchargements, « Chercher sur le web… »), le POV choisi est rangé avec la table, et une source qui n'a rien l'écrit (« rien trouvé »).
+Le parcours d'une table propose « Choisir le cadrage » et, quand la base VPS en connaît, un POV de la communauté.
+En partie, les réglages des MagnaSave ont une ligne « Cadrage de cette table », qui ouvre la page « Point of View » du menu de VPX ; le réglage fait là est gardé dans l'historique.
+
+#### Cadrage d'origine des tables reprises
+
+Une table reprise de PinUP Popper, de PinballY ou d'un dossier de VPX garde son cadrage d'origine quel que soit le chemin d'ajout (dossier, archive, glisser-déposer), pas seulement depuis l'écran de reprise d'une installation.
+Cyber Pinball lit les réglages du VPX qui la jouait (son `VPinballX.ini`, ou le registre pour un VPX d'avant 10.8) et fige son mode (Manuel, Ajuster, Remplir), les mesures de l'écran et la vue ; l'installation d'origine n'est jamais modifiée.
+Le VPX qui jouait chaque table de Popper est retrouvé par le dossier et le script de lancement de son émulateur (10.7 ou 10.8) : sans lui, le cadrage de Popper n'était repris pour aucune table.
+Ce cadrage est proposé dans « Point de vue » sous « Cadrage de l'installation d'origine ».
+Les tables reprises avant cette version retrouvent une fois leur cadrage d'origine, sauf si tu en as choisi un dans Cyber Pinball ; le cadrage d'avant reste dans l'historique et « Rétablir le cadrage précédent » le remet.
+VPX 10.8.0 reprend aussi le POV fourni avec la table quand des valeurs de vue partielles le masquaient (une vue déjà réglée reste prioritaire).

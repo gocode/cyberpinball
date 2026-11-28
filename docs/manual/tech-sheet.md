@@ -59,3 +59,6 @@ Five destinations, since the cabinet has no mail app:
 
 Code: blocks, checks, anonymisation and report in [packages/core/src/techsheet.ts](../../packages/core/src/techsheet.ts); reading in [app/src/tech-facts.ts](../../app/src/tech-facts.ts); screens in [app/src/tech-sheet.ts](../../app/src/tech-sheet.ts); phone page in `app/renderer/telephone/telephone.js` (`reportOffer`).
 [techsheet.test.ts](../../packages/core/src/test/techsheet.test.ts) pins the reading of the probe, the NVIDIA driver version, the refresh rates, the health checks, the blocks, anonymisation (never the account, the PC or an address in any file of the ZIP) and the short summary.
+
+**Graphics cards.**
+The tech sheet lists every graphics card in its summary and names the card concerned by each driver alert, without deducing which one the game uses.

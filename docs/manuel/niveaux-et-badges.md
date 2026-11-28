@@ -59,6 +59,9 @@ Chaque personne invitée vérifiée sur sa carte ajoute à ce qui est permis ce 
 Le niveau ne change jamais une place dans un classement.
 Rien ne compte en mode invité ni pendant un essai sans opérateur.
 
+**Niveau en cours de vérification.**
+Un niveau trop élevé pour l'ancienneté connue du joueur s'affiche « Niveau en cours de vérification » au lieu de « Niveau ? ».
+
 ### Badges
 
 Cinquante-six badges en douze familles : Parcours, Temps de jeu, Explorateur, Progrès, Tableau d'honneur, Classements, En ligne, Salons, Entre joueurs, Communauté, Découvertes et Secrets.

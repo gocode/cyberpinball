@@ -25,4 +25,7 @@ Browsing on the phone therefore also moves the selection at the cabinet.
 - **Messages**: the phone sends `jb`: `open`, `row` (a line received), `play`, `up`, `pause`, `shuffle`, `repeat`, `seek` (0 to 1), `next`, `prev`, `manage`, `exit`; a line is its received key (200 characters at most).
   Any other word cuts the link.
   The cabinet passes each command to the player, like a click (`click`), and checks everything.
+**Signing in to YouTube.**
+The Edge window where you sign in to YouTube, from the cabinet, opens full screen, without a title bar.
+
 - **Tests**: `telecommande.test.ts` replays the Juke-box in the off-screen rankings scenario (`demo-telephone-scores`): the playlists without management mixed in, their covers reduced under a token, an open playlist, its buttons apart from the tracks, a greyed track with its reason, a track played in one tap, the mini player, the player and its time, pause, next, seeking, back, "Manage".

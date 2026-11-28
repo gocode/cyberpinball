@@ -26,6 +26,10 @@ The autopilot goes through the same doors.
 [guestmode.test.ts](../../packages/core/src/test/guestmode.test.ts) pins the invariants: the list of open doors (opening one means writing it there with its reason), every declared door is used in `app/src`, the game page and the messages declare their doors, and **every input source in `app/src`** (`ipcMain` channel, global shortcut, `before-input-event`, joystick buttons) is counted file by file: a new one makes the test fail until it says which door it goes through.
 The lock, the hint, the combination (held buttons, timer, release, game in progress) and the saved setting are tested there too.
 
+**Locked collection.**
+A locked collection alone decides which tables are visible and playable, even when empty; a collection that cannot be found shows no table.
+The Surprise table draws within the imposed collection, minus the excluded tables, and only among the tables marked as suitable for the family.
+
 **Limits.**
 During a game, Cyber Pinball's in-game settings (both MagnaSaves: DMD position, VPX menu) are closed to guests (`game.settings` door); VPX keeps its own controls: its menu (F12 on a keyboard) and its settings stay reachable, and Exit leaves the game as usual.
 Guest mode does not lock Windows (Windows key, Alt+Tab, Ctrl+Alt+Del), nor the wizard started separately from the launcher.

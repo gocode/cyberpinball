@@ -26,6 +26,10 @@ L'autopilote passe par les mêmes portes.
 [guestmode.test.ts](../../packages/core/src/test/guestmode.test.ts) fixe les invariants : la liste des portes ouvertes (en ouvrir une demande de l'y écrire avec sa raison), chaque porte déclarée sert dans `app/src`, la fiche et les messages déclarent leurs portes, et **toute source d'entrées de `app/src`** (canal `ipcMain`, raccourci global, `before-input-event`, boutons du joystick) est relevée fichier par fichier : une nouvelle fait échouer le test tant qu'on n'a pas dit par quelle porte elle passe.
 Le verrou, l'indice, la combinaison (boutons tenus, minuterie, relâchement, partie en cours) et l'enregistrement y sont testés aussi.
 
+**Collection verrouillée.**
+Une collection verrouillée décide seule des tables visibles et jouables, même vide ; une collection introuvable ne montre aucune table.
+La Table surprise y tire dans la collection imposée, moins les tables exclues, et seulement parmi les tables marquées adaptées à la famille.
+
 **Limites.**
 Pendant une partie, les réglages en partie de Cyber Pinball (les deux MagnaSave : position du DMD, menu de VPX) sont fermés à l'invité (porte `game.settings`) ; VPX garde ses propres commandes : son menu (F12 au clavier) et ses réglages restent accessibles, et Exit quitte la partie comme d'habitude.
 Le mode invité ne verrouille pas Windows (touche Windows, Alt+Tab, Ctrl+Alt+Suppr), ni l'assistant lancé à part depuis le lanceur.

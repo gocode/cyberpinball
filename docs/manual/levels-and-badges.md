@@ -59,6 +59,9 @@ Each invited player checked on their card adds to what is allowed what they can 
 The level never changes a place in a ranking.
 Nothing counts in guest mode or during an unattended test.
 
+**Level being verified.**
+A level too high for the player's known seniority is shown as "Niveau en cours de vérification" (Level being verified) instead of "Niveau ?".
+
 ### Badges
 
 Fifty-six badges in twelve families: Journey, Play time, Explorer, Progress, Honor roll, Rankings, Online, Chat rooms, Between players, Community, Discoveries and Secrets.

@@ -14,6 +14,7 @@ Les fenêtres du front-end ne sont plus masquées pendant une partie : elles res
 Le playfield garde l'écran de chargement (vidéo de chargement du jeu, ou écran de secours ; au bureau, l'encart des commandes) jusqu'à l'apparition de la fenêtre de jeu, puis chaque écran passe à son **fond de partie** : le média du jeu, figé par défaut, visible seulement sur un écran que VPX n'occupe pas (topper sans fenêtre, backglass sans `.directb2s`, DMD absent) ; voir « Chargement et partie ».
 Chaque fenêtre reçoit pour cela un état `game` (table, médias, lecture de chaque rôle), rendu par `renderGame` (`app/renderer/frontend.js`).
 Au retour, le front-end reprend le premier plan comme avant.
+Pendant la partie, les boutons du joystick ne vont plus au front-end : il ne reprend plus le premier plan à VPX.
 
 Une seule règle couvre tous les moments, le **gardien des écrans** (`app/src/screen-guard.ts`, démarré par `main.ts` avant toute autre fenêtre, sauf l'écran d'attente d'un autre menu ouvert) :
 
@@ -39,6 +40,8 @@ Une seule règle couvre tous les moments, le **gardien des écrans** (`app/src/s
   Au démarrage, chaque fenêtre du front-end prend le premier plan en apparaissant ; après une partie, seul le playfield le reprend, et le DMD et le fronton ne l'ont jamais : leur barre, réaffichée, restait devant (par moments sur le DMD, parfois sur le playfield).
   Désormais, chaque barre est rangée sous la fenêtre du front-end de son écran avant d'être réaffichée (`placeWindowBelow`, sans rien activer), puis le gardien des barres repasse au retour de partie, au retour du bureau, à chaque changement d'écrans ou de zone de travail, chaque fois qu'une fenêtre du front-end reprend le premier plan, et à chaque relecture du gardien des écrans : une barre devant une fenêtre du front-end est remise derrière (« Barre des tâches (Shell_SecondaryTrayWnd) devant « Cyber Pinball — DMD » sur l’écran « DMD » (retour d’une partie) : remise derrière. »).
   Jamais quand un autre programme a le premier plan (VPX en partie, menu Démarrer).
+  Quand Windows réaffiche sans cesse la barre des tâches en pleine partie (Copilot, menu Démarrer, notification au premier plan), Cyber Pinball ne la remasque plus en rafale : il la laisse un moment, et le journal dit quel programme avait le premier plan.
+  Ces rafales figeaient VPX quelques secondes et faisaient sortir le fronton du plein écran, comme si les écrans étaient redétectés.
   Une barre que Windows remet devant cinq fois en dix secondes est masquée comme pendant une partie, avec le même témoin, jusqu'au mode bureau ou à la fermeture.
   Rien n'est réglé dans Windows : seul l'ordre des fenêtres change, comme l'Explorateur le fait lui-même ;
 - **journal des écrans** (`<données>\logs\ecrans.txt`, 512 Ko au plus, les entrées les plus anciennes retirées) : à chaque bascule (démarrage du front-end, début de partie, fenêtre de jeu de VPX affichée, retour de partie, bureau Windows et retour, changement d'écrans, barre remise derrière), le premier plan de Windows, pour chaque écran de la borne la fenêtre de Cyber Pinball qui le couvre et tout ce qui est au-dessus d'elle (« BARRE DES TÂCHES DEVANT », « DÉCOUVERT »), et le rectangle de chaque barre des tâches, visible ou masquée, au premier plan permanent ou non.
@@ -102,6 +105,9 @@ Chaque autre fenêtre visible de VPX est classée (`classifyVpxWindow`, `package
   Le message reste au journal de la borne : « Message du script de la table validé par OK, la partie continue : « … » ».
   Si la boîte est encore là 3 s après, la partie s'arrête comme pour une erreur.
   Une question (Oui / Non, Annuler) et les boîtes de VPX lui-même (titre « Visual Pinball ») arrêtent toujours la partie ;
+- **aide de débogage de `core.vbs`** (« Click YES to Add a ball to the Trough… »), ouverte sur une table à ROM par un bouton lié à Extra Ball ou par la touche F12 : c'est une question Oui / Non / Annuler, que Cyber Pinball traitait comme une erreur fatale.
+  Elle est maintenant fermée par Annuler, sans effet sur la table, et une ligne du journal explique ce qui s'est passé.
+  Cyber Pinball ne répond jamais Oui ni Non à ta place, et les autres questions des tables restent fatales ;
 - **fenêtre de l'éditeur**, si une autre version de VPX en ouvrait une : l'éditeur (classe `VPinball`), l'éditeur de script (`CVFrame`), « Preparing Table » et le débogueur sont masqués (les fermer quitterait VPX ou poserait une question), l'audit de la table (boîte « Dialog » dont le texte commence par « Table audit: » ou « This table contains error(s) ») est fermé ; la partie continue, le jeu reprend le premier plan ;
 - **fenêtre inconnue** : laissée à l'écran.
 
@@ -112,6 +118,8 @@ Un `vpinball.log` que ce lancement n'a pas écrit (plus ancien que lui, `logWrit
 VPX planté avant d'écrire la moindre ligne de son journal n'avait pas encore ouvert la table : l'écran d'échec dit « VPX s'est arrêté en démarrant », la panne de VPX et non de la table, avec une même signature pour toutes les tables (`vpxStartupCrash`, [vpxfailure.ts](../../packages/core/src/vpxfailure.ts)).
 Cyber Pinball compare alors les fichiers de son VPX à ceux de l'archive (voir « Fichiers de VPX contrôlés » dans [Installation et organisation des fichiers](installation-et-organisation-des-fichiers.md#installation-et-organisation-des-fichiers)) : remplacés hors de Cyber Pinball, ils sont nommés à l'écran et Start remet leurs originaux ; sinon l'écran renvoie à « Santé de la borne ».
 Cas réel : un autre VPX copié par-dessus celui de Cyber Pinball (SDL 3.2.18 à la place de 3.4.14) arrêtait VPX 0,2 s après chaque lancement, sur toutes les tables.
+VPX arrêté juste après le démarrage du PuP-Pack : l'écran d'échec le dit et propose de rejouer la table sans son PuP-Pack (Start), rangé à part ; « Réactiver le PuP-Pack », dans « Parties du jeu », le remet tel quel (voir [PuP-Pack désactivé, table par table](pup-pack-desactive-table-par-table.md#pup-pack-désactivé-table-par-table)).
+Quand VPX s'arrête sans laisser de rapport de plantage, le rapport joint l'événement de Windows qui nomme le module fautif (le plugin PuP, par exemple), et l'écran d'arrêt le cite.
 
 **Rapport d'une partie échouée.**
 L'écran d'échec propose « Flipper : envoyer un rapport aux développeurs » (au téléphone, « Envoyer un rapport aux développeurs ») : le problème déjà rappelé, la fiche technique, la santé de la borne et les journaux joints, chiffrés et anonymisés comme le rapport de la [fiche technique](fiche-technique.md#fiche-technique).
@@ -142,6 +150,16 @@ Un texte vu une seule fois, ou qui se sert des variables internes de la minuteri
 Ni la table ni les scripts de VPX sur le disque ne sont modifiés.
 Le diagnostic le dit dans la fiche de la table (« Script qui arrête la partie à chaque minuterie », ou « … à chaque clignotement et à chaque minuterie », action « Ne compiler chaque texte qu'une fois ») et le répare avant chaque partie ; les fichiers de la table nomment alors le `.vbs` « minuteries sans analyse de l'antivirus ».
 Tests : `minuteries-texte.test.ts` (repérage, lignes à leur place, même résultat avec et sans correctif par `cscript`, core.vbs installé, diagnostic).
+Les minuteries décrites par un texte (*Guardians of the Galaxy*, *Game of Thrones*…) sont compilées une seule fois, et celles écrites telles quelles dans la table le sont d'un seul coup au chargement, au lieu d'une analyse à chaque échéance.
+**Commande rangée dans un texte avant d'être exécutée** (`Execute qCmd` de *Guardians of the Galaxy*, à chaque scène) : même cause, même arrêt.
+Le diagnostic les repère (« Script qui arrête la partie à chaque commande exécutée ») et la copie du script que joue VPX compile chaque texte une seule fois ; la table n'est jamais modifiée, et un texte qui dépend de la procédure qui l'exécute reste exécuté comme avant.
+Un script adapté par une version précédente de Cyber Pinball est refait d'office avant la partie avec les correctifs d'aujourd'hui, au lieu d'être pris pour un script venu d'ailleurs.
+Quand la partie s'arrête par à-coups, le journal dit si le script de la table faisait analyser du texte par l'antivirus à ce moment-là (`amsi.dll` et `vbscript.dll` relevés sur la pile), et le journal comme le rapport nomment l'antivirus en cause : Microsoft Defender, McAfee (`mc-sec-plugin-x64.dll`, `mfe*`), Avast et AVG, Bitdefender, Kaspersky, ESET, Malwarebytes, Sophos, ou tout autre antivirus qui se déclare comme fournisseur AMSI.
+Avant, seul Defender était reconnu : un à-coup causé par un autre antivirus restait sans explication.
+**Composants .NET des scripts** : les anciens composants ActiveX .NET des scripts de table utilisent le moteur .NET présent sur Windows, même sans .NET 3.5.
+Cela évite l'arrêt de l'initialisation des musiques, puis les erreurs UltraDMD en cascade, sans modifier les tables.
+**Erreurs de script de la dernière partie** : le diagnostic donne la première erreur de script et le nombre d'erreurs de la dernière partie de la table, sans confondre les tables, et retire ce constat après une nouvelle partie sans erreur.
+Il indique aussi les scripts complémentaires que VPX n'a pas pu charger, avant les erreurs de variables ou d'objets qui en découlent, pour cette dernière partie seulement.
 **Appel refusé par le fronton B2S de VPX** (`b2sArgs`) : le plugin B2S de VPX 10.8.1, qui tient lieu de B2S Server, n'accepte que des nombres à certaines places de ses fonctions (`B2SSetData`, `B2SSetScore`, `B2SSetLED`…).
 Un nombre écrit en texte (« "1" ») passe ; tout autre texte est refusé (« Failed to convert a parameter in call to B2S_Server.B2SSetData » dans `vpinball.log`), et la procédure du script qui faisait l'appel s'arrête, alors que B2S Server l'acceptait.
 *Champions League 2023* s'arrêtait ainsi pendant son initialisation, avant de créer son DMD : « Objet requis: 'UltraDMD' » sur tout le plateau, à chaque tour.
@@ -790,3 +808,4 @@ Une ROM sans ses fichiers de son est notée sans musique sans faire échouer l'e
 Après une partie avec record ou joueur dépassé, le retour montre score, record, XP détaillés, place gagnée et prochain objectif, puis Rejouer, message préparé entre amis, Défier et Retour aux tables selon le contexte.
 Les animations des badges et du niveau viennent ensuite.
 VPX 10.8.1-5436 patched Cyber Pinball 4 réunit fréquence indépendante des écrans annexes, cadrage, décodage des GIF PuP hors du rendu et temps GPU ; il est posé dès le démarrage après mise à jour.
+Les séries suivantes (5 à 9) corrigent des arrêts de VPX et du plugin PuP : voir [VPX corrigé livré avec Cyber Pinball](plugins-de-vpx-backglass-pup-et-dmd.md#vpx-corrigé-livré-avec-cyber-pinball).

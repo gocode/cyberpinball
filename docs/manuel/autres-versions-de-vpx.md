@@ -34,6 +34,7 @@ Restent réservés au VPX de Cyber Pinball : la réalité virtuelle, le réglage
 La fiche le dit (« Pas de réalité virtuelle, réglage de l'affichage en partie… pour ces tables. »), et « Régler l'affichage en partie » n'y paraît pas.
 Une partie entre amis sur une telle table est refusée avant le lancement (« Partie entre amis impossible avec VPX 10.8.0 »), comme un exécutable déplacé ou désinstallé (« VPX 10.8.0 introuvable »), avec le chemin pour revenir au VPX de Cyber Pinball.
 Le journal note chaque partie (« Partie (…) avec un autre VPX : VPX 10.8.0, …, ses propres réglages. »).
+Un VPX 10.8.0 se lance sans la fenêtre de l'éditeur, et la partie se quitte avec le bouton Quitter de la borne, même si ce VPX utilise d'autres boutons.
 
 **Table enregistrée par un VPX plus récent.**
 Chaque table garde la version du format du VPX qui l'a enregistrée (`readVpxFileVersion`) ; un VPX plus ancien affiche une fenêtre d'erreur et la charge mal.

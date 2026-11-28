@@ -14,13 +14,13 @@ Joueurs réunit les anciens accès Mes amis et Joueurs en ligne : demandes reçu
 « Tous les connectés » ouvre la liste complète ; tables partagées en médaillons (favorites d'abord) et amis en commun en pastilles aident à choisir un joueur.
 Le QR code de téléchargement « Faites découvrir Cyber Pinball » paraît sur l'Accueil au bureau et dans Joueurs en borne.
 Profil ouvre votre profil avec Modifier mon profil, Confidentialité et Mon compte ; Mon niveau, Mes badges et Historique des parties sont aussi dans Menu système > Arène > Progression.
-Les parties instantanées et les classements sont désormais dans l'Arène.
+Les parties en direct et les classements sont désormais dans l'Arène.
 
 Dans Joueurs et dans Réglages de la communauté :
 
 | Entrée | Ce qu'elle montre |
 | --- | --- |
-| Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur le profil d'un joueur, entier ou ses quatre premiers caractères), les bornes « À proximité (réseau local) » et celles « Vus récemment ». Start sur un joueur ouvre son profil : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », et « Bloquer … ». |
+| Trouver un joueur | L'annuaire : « Chercher un nom… » (sans accents ni casse ; ou l'identifiant vu sur le profil d'un joueur, entier ou ses quatre premiers caractères), les bornes « Sur mon réseau local » et celles « Vus récemment ». Start sur un joueur ouvre son profil : « Envoyer une demande d'ami », ou « Annuler la demande », « Accepter », « Refuser », et « Bloquer … ». |
 | Demandes d'amis | Reçues (à valider, pastille rouge jusqu'à la roue dentée) et envoyées (« En attente : remise dès que sa borne sera en ligne »). |
 | Partage et réseau | Le réseau seul : partage activé ou non, réseau local, bibliothèque partagée ou non, débit des téléchargements, pare-feu de Windows, état en direct des tables Stern SAM, le rappel de ce que voient les autres, joueurs bloqués. Le pseudo, l'avatar, le pays, les réglages de ce que voient les autres et la suppression du compte sont dans Mon profil. La sélection s'ouvre sur « Retour » : un Start par mégarde ne coupe pas le partage. |
 | Masquer les notifications pendant les parties | Désactivé par défaut : la connexion d'un ami, une demande de rejoindre une partie, les nouvelles de la partie entre amis s'affichent aussi pendant les parties, avec leur son (voir « Partout, même en partie » dans [Notifications de l'écran des tables](notifications-de-l-ecran-des-tables.md#notifications-de-lécran-des-tables)). Start bascule ; activé, rien ne s'affiche ni ne sonne pendant une partie, tout attend le front-end. |
@@ -28,7 +28,7 @@ Dans Joueurs et dans Réglages de la communauté :
 
 **Jouer en local.**
 Menu système > Communauté > « Réglages de la communauté » > « Jouer en local » coupe le partage et arrête le réseau des bornes.
-Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties instantanées, les classements en ligne, les médaillons Communauté et Arène de la roue, les défis, « Jouer avec un ami » et « Partie instantanée » sur la fiche des tables, et la Communauté au téléphone.
+Disparaissent alors les niveaux, les XP et les badges à l'écran (la carte du joueur, les moments de badge et de niveau), les amis, les joueurs en ligne et les demandes d'amis, les messages et leur pastille, les salons, les groupes, les parties en direct, les classements en ligne, les médaillons Communauté et Arène de la roue, les défis, « Jouer avec un ami » et « Parties en direct » sur la fiche des tables, et la Communauté au téléphone.
 Le tableau des scores d'une table ne garde que ceux de cette borne, sans onglets de portée.
 Dans Mon profil ne restent que Modifier mon profil (pseudo, avatar, pays) et Mon compte : Mon niveau, Mes badges, l'historique des parties et la Confidentialité sont retirés aussi.
 Restent toutes les tables et leurs scores sur cette borne, le Juke-box, la mise à jour de Cyber Pinball, les Nouveautés, Retours et propositions.
@@ -89,10 +89,10 @@ Au premier calcul, ceux que l'historique mérite sont donnés sans évènement :
 
 **Réseau local.**
 Une balise de multidiffusion (`239.255.42.99:47999`, TTL 1, toutes les 5 s) annonce la borne ; les bornes voisines se relient par TCP chiffré (secret-stream, le même Noise que Hyperswarm), même sans Internet.
-« À proximité » tant que la balise date de moins d'une minute.
+« Sur mon réseau local » tant que la balise date de moins d'une minute.
 La balise rejoint son groupe carte réseau par carte réseau (IPv4, hors bouclage), et de nouveau à chaque annonce : `addMembership` sans carte prend celle de la route par défaut et lève (`EHOSTUNREACH`, `ENODEV`) quand il n'y en a pas, borne démarrée avant son réseau, câble débranché, VPN qui prend la route.
 Une carte refusée n'empêche pas les autres, et une carte qui arrive plus tard est prise à l'annonce suivante.
-**Une panne du réseau local n'est jamais bloquante** : Internet continue, « Partage et réseau » dit « Réseau local : indisponible » avec sa raison (« aucune carte réseau connectée », ou l'erreur du système), « À proximité » la montre grisée, et un réseau local qui n'a pas pu s'ouvrir (port pris) est réessayé tout seul, 30 s puis le double à chaque échec, jusqu'à 5 min.
+**Une panne du réseau local n'est jamais bloquante** : Internet continue, « Partage et réseau » dit « Réseau local : indisponible » avec sa raison (« aucune carte réseau connectée », ou l'erreur du système), « Sur mon réseau local » la montre grisée, et un réseau local qui n'a pas pu s'ouvrir (port pris) est réessayé tout seul, 30 s puis le double à chaque échec, jusqu'à 5 min.
 Un démarrage raté côté Internet referme tout ce qu'il avait ouvert et se réessaie au même rythme ; seul lui affiche « Réseau indisponible » et « Bloquant » dans « Mes amis ».
 
 **Présence : en ligne, hors ligne, liste à jour.**
@@ -570,7 +570,7 @@ Tests : [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 Dans la roue, juste après le Juke-box et avant le médaillon Collections et les tables de chaque collection, un médaillon sur l'anneau chromé commun ouvre la communauté : son nom en vert, le nombre de joueurs en ligne et d'amis en ligne dessous.
 Partout (médaillon, affiche, Menu système, onglets de « Joueurs en ligne », téléphone), le nombre de joueurs en ligne, et celui de votre pays, ne s'affiche qu'au-delà de cinq, comme les présents d'un salon : un réseau presque vide, chiffré, découragerait ; les joueurs restent nommés, et vos amis en ligne se comptent toujours.
 Start ouvre l'Accueil à onglets, le même écran que Menu système > Communauté ; le retour rejoint la roue.
-Les parties instantanées (voir ci-dessous) et les classements, qui ouvrent sur deux portes, « Joueurs » et « Tables », sont dans l'Arène, son médaillon à côté de celui de la Communauté.
+Les parties en direct (voir ci-dessous) et les classements, qui ouvrent sur deux portes, « Joueurs » et « Tables », sont dans l'Arène, son médaillon à côté de celui de la Communauté.
 « Joueurs » classe les joueurs par leurs XP, en onglets Amis, National et Mondial (Start ou MagnaSave passe de l'un à l'autre), de la semaine (les XP gagnés depuis lundi, à zéro chaque lundi) ou de tout temps (les flippers passent de l'une à l'autre).
 Il s'ouvre sur National · Cette semaine (Mondial sans pays choisi) : la semaine d'abord, où chacun a sa chance.
 Chaque ligne donne le rang, le drapeau, la pastille du joueur avec son niveau et sa présence, son pseudo et ses XP, l'autre période en petit (« 12 400 XP au total », « +850 cette semaine ») ; à égalité, le même rang.
@@ -601,7 +601,7 @@ Tous les joueurs que votre borne a croisés, amis ou non (l'annuaire du réseau,
 Viennent ensuite, dans « Hors ligne », tous les autres : vos amis d'abord, puis le plus récemment vu (« Vu il y a 3 j »).
 Chaque ligne porte la pastille du joueur, son drapeau devant son nom (le drapeau Cyber Pinball, une bille comète, pour un joueur qui n'a pas dit son pays ; de même dans les classements et les salons), un anneau vert autour de la pastille quand il est connecté, et dessous ce qu'il fait (« En partie », sur quelle table entre amis, « En ligne », « Vu il y a 3 j ») et ce qui vous rapproche (« 6 tables en commun », « Sur votre réseau local ») ; « Ami » (hors de la section des amis) ou « Demande envoyée » dans la même ligne.
 La **table en cours** n'est montrée qu'entre amis.
-MagnaSave passe d'un **filtre** à l'autre, en onglets au-dessus de la liste : Tous, Mon pays, À proximité (le réseau local), Mêmes tables (les joueurs dont les scores classés portent sur des tables que vous avez, le plus de tables en commun d'abord).
+MagnaSave passe d'un **filtre** à l'autre, en onglets au-dessus de la liste : Tous, Mon pays, Sur mon réseau local (le réseau local), Mêmes tables (les joueurs dont les scores classés portent sur des tables que vous avez, le plus de tables en commun d'abord).
 Un filtre qui ne peut rien montrer reste visible, grisé, sa raison à la place du nombre (« Réseau local coupé », « Pays non choisi »).
 Start sur un joueur, ami ou non, ouvre son profil (présence et bibliothèque d'un ami ; demande d'ami, « J'aime », blocage).
 
@@ -621,24 +621,24 @@ Le module est [livepresence.ts](../../packages/core/src/livepresence.ts), l'écr
 **Essais.**
 [livepresence.test.ts](../../packages/core/src/test/livepresence.test.ts) : signal signé, refusé s'il est changé, trop vieux ou du futur ; le plus récent l'emporte, seul le nouveau se relaie ; groupes, ordre et filtres de la liste ; entre deux bornes qui ne sont pas amies (réseau d'essai en 127.0.0.1), « en ligne » arrive, « en partie » sans la table, l'option coupe le signal.
 
-### Parties instantanées
+### Parties en direct
 
 Une partie en direct ouverte à tous, amis ou non.
 Un joueur l'ouvre, choisit le nombre de joueurs, et elle s’affiche dans l’Arène de chaque borne en ligne ; n'importe qui la rejoint, et **dès qu'elle est complète, elle part d'elle-même pour tout le monde**.
 La partie elle-même est celle des amis (voir « Communauté : le réseau des bornes ») : chacun joue sur sa borne, la même version de la table, avec les réglages de l'hôte, un départ commun et les résultats de chacun.
 
 **Ouvrir une partie.**
-Arène > Partie instantanée > « Ouvrir une partie instantanée » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
-Aussi depuis la fiche d'une table : « Partie instantanée », juste après « Jouer avec un ami ».
+Arène > Parties en direct > « Ouvrir une partie en direct » : la table (vos tables VPX), puis le nombre de joueurs, vous compris (2, 3 ou 4).
+Aussi depuis la fiche d'une table : « Parties en direct », juste après « Jouer avec un ami ».
 Le salon d'attente s'ouvre : « En attente de 2 joueurs », les joueurs déjà là et les places libres.
 À chaque arrivée, une notification (« Tiltman a rejoint votre partie ») et une ligne en tête du salon (« Encore 1 joueur et elle part »).
 « Annuler la partie » la retire de toutes les listes, et ceux qui l'avaient rejointe en sont prévenus.
 Une partie qui n'est pas complète en trente minutes se ferme d'elle-même.
 Une seule partie à la fois : en ouvrir une autre ferme la précédente.
-Au téléphone, Communauté > Joueurs montre les parties ouvertes et « Ouvrir une partie instantanée » (voir Communauté au téléphone).
+Au téléphone, Communauté > Joueurs montre les parties ouvertes et « Ouvrir une partie en direct » (voir Communauté au téléphone).
 
 **Rejoindre.**
-Communauté > Partie instantanée : les parties ouvertes par les autres, la plus récente d'abord.
+Communauté > Parties en direct : les parties ouvertes par les autres, la plus récente d'abord.
 Chaque ligne porte la pastille et le drapeau de l'hôte, la table, depuis quand elle est ouverte, combien de joueurs sont là, les places restantes, et ce que vous avez de la table : « Même version », sinon la ligne est grisée avec sa raison (« Autre version de cette table chez vous », « Vous n'avez pas cette table »).
 Start sur une partie jouable : la table est vérifiée sur votre borne, puis vous entrez dans le salon de l'hôte (« Connexion à la borne de Kiko… » le temps que les deux bornes se rejoignent).
 « Quitter la partie » libère votre place.
@@ -731,7 +731,7 @@ Un joueur exclu par la modération ne peut plus écrire dans un groupe : ses mes
 **Sans serveur, sans borne étrangère.**
 Un groupe est une suite de lignes signées chacune par son auteur (`grp` : création avec son accès, invitation, arrivée, refus, départ, retrait, changement d'accès, message, réaction, retrait d'un message, table de la semaine).
 Chaque borne de membre garde la suite et en tire le groupe en la rejouant dans l'ordre des dates : une ligne d'un joueur qui n'était pas membre à ce moment ne compte pas ; seul le créateur retire et change l'accès ; une arrivée sans invitation ne compte que si le groupe est public à ce moment, qu'il reste de la place et que le joueur n'en a pas été retiré.
-Les bornes des membres se relient directement par leur clé (comme les joueurs d'une partie instantanée), amies ou non, et les messages ne passent par aucune borne étrangère au groupe.
+Les bornes des membres se relient directement par leur clé (comme les joueurs d'une partie en direct), amies ou non, et les messages ne passent par aucune borne étrangère au groupe.
 Toutes les 20 secondes, et dès qu'un membre devient joignable, chacune lui donne d'abord ses propres lignes (son arrivée, si le membre ne la connaît pas encore), puis dit d'une empreinte ce qu'elle a de chaque groupe (`grp-sum`) ; une empreinte différente fait dire la liste des lignes (`grp-have`), et l'autre envoie celles qui manquent.
 Un message écrit part aussitôt vers les membres joignables, qui le relaient : un membre absent le reçoit de n'importe quel autre membre, à son retour.
 Une invitation (`grp-invite` : les lignes d'appartenance et la table de la semaine, sans les messages) part à la borne de l'ami invité jusqu'à son accusé (`grp-invite-ok`) ; un refus part vers qui a invité.
@@ -924,3 +924,40 @@ Le destinataire peut refuser ; à l'échéance, le plus haut score gagne 40 XP, 
 Seuls les scores relevés par Cyber Pinball comptent ; les joueurs bloqués ou exclus des salons ne peuvent pas vous défier.
 Les défis signés sont relayés de borne en borne, sans serveur : vous n'avez pas besoin d'être connectés en même temps.
 Les notifications annoncent réception, score dépassé, six dernières heures, résultat ou refus ; l'Activité récente garde une seule ligne par défi.
+
+**Fin de partie : la carte et le bilan.**
+À la fin d'une partie solo sur une table dont le score se lit en direct, une carte s'affiche par-dessus le plateau, sans quitter VPX ni lui prendre la main.
+Elle montre ton score (et « Ton record ! » quand tu bats ton meilleur), le top 3 de ton pays, ta place en 4e ligne si tu n'y es pas, puis ta place au monde.
+Flip gauche : défier un joueur sur cette table.
+Flip droit : continuer, la carte se ferme et tu reviens au jeu.
+La carte attend que tu aies fini d'entrer tes initiales, et se ferme d'elle-même si tu relances une partie.
+Sans classement (mode invité, partage désactivé, VPX d'essai…), elle donne ton score et dit pourquoi le classement manque.
+Quand VPX se ferme, tu reviens directement sur la roue, sur la table que tu viens de jouer.
+Après chaque partie dont le score est connu, même pour un premier score, une partie quittée en cours ou une partie sans record, le bilan s'ouvre : ton score, ton record, tes XP, ta place au classement et le prochain joueur à battre.
+Il s'affiche dans une fenêtre en plus de la roue, restée entière et visible, au lieu d'un écran plein : sur la borne, au-dessus de la roue ; au bureau, dans le cadre du plateau, à côté de la roue.
+Sur une table sans classement en ligne (table originale), la fenêtre montre le tableau des scores de la table, avec ta partie en évidence.
+Elle s'en va au premier geste : un flipper pour passer à la table suivante, Exit pour la fermer, Start pour rejouer tout de suite la même table ; une fois fermée, elle ne revient plus, même si tu reviens sur la table juste après.
+Défier un joueur reste possible depuis la carte de fin de partie du jeu, et les messages depuis la messagerie.
+
+**Scores relevés pendant la partie.**
+Quand la table se prête à la lecture en direct, le score de chaque partie est relevé pendant que tu joues, plus seulement à la fermeture de VPX ; une session à plusieurs parties garde chacune d'elles au tableau des scores, avec son heure.
+Le relevé passe par l'inspector de VPX, comme les parties entre amis, sans copier ni modifier ta table ; il demande la règle du pare-feu de VPX (« Partage et réseau », dans les réglages de la communauté).
+Sans elle, le score se relève comme avant, à la fermeture de VPX.
+Au lancement, certaines tables affichent encore un instant le score de la partie d'avant : il n'est plus compté comme une partie quittée, donc plus de doublon au tableau de la borne ni aux classements, et ceux déjà gardés par les préversions sont retirés.
+Une partie quittée en cours (à la 2e bille, par exemple) garde son dernier score et compte comme les autres : tableau des scores de la borne, classements, défis et niveau.
+Quand le score n'est lu qu'à la fermeture de VPX (la ROM n'écrit sa mémoire qu'à ce moment), quitter la table en cours de partie, seul à la table, ne fait plus passer pour un score final ce que la ROM avait à l'arrêt.
+Si la ROM dit que la partie n'était pas finie, le score reste sur ta borne, marqué « partie quittée » dans le tableau des scores de la table, sans être publié aux classements, compté dans un défi ni retenu comme record du niveau.
+Une partie qui va jusqu'au bout, ou dont le score entre au tableau d'honneur de la table, compte comme avant ; quand la carte de la ROM ne dit pas si la partie est finie (certaines machines), la partie compte aussi comme avant.
+
+**Défis, communauté et profil.**
+L'onglet Défis de l'Arène a son bouton « Lancer un défi » : il ouvre le choix de la table, puis du joueur ; sans partie jouée, il est grisé avec sa raison.
+Partage coupé : « Régler le partage » s'ouvre sur place depuis l'onglet Défis, la Communauté et mon profil.
+Sur les cartes des joueurs à découvrir, le pseudo n'est plus écrasé et son niveau ne passe plus sur les boutons ; « Voir le profil » puis « Ajouter en ami » ont leur propre rangée sous le texte, et le « +25 XP » des boutons reste lisible à la borne.
+Mon profil dit la vérité sur son état : « Partage désactivé », « Profil public désactivé » ou « Profil public en cours de préparation ».
+Sur le profil d'un joueur dont l'activité est masquée, l'en-tête le dit, l'onglet Badges n'affiche plus un faux « Aucun encore », et Start sur la carte la réaffiche d'un geste.
+Start sur la publication d'un autre joueur annonce « Tu aimes cette publication » ou « Tu n'aimes plus cette publication », et la note du titre dit ce que fait Start.
+Les tables du jour ouvertes depuis l'Arène proposent « Retour : Arène ».
+
+**Noms d'écrans.**
+« À proximité » s'appelle maintenant « Sur mon réseau local » (filtre des joueurs et rubrique de « Trouver un joueur »).
+« Instantanée » s'appelle « Parties en direct » partout (menus, fiches, notes), et les libellés génériques d'une partie entre amis s'appellent « Partie entre amis », pour ne plus la confondre avec une partie en direct.

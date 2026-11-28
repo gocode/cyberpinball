@@ -908,6 +908,8 @@ Fiche d'une table > « Médias du jeu » > un média > **« Voir les proposition
   - les **vignettes de la base VPS** : le plateau de chaque version de la table et le fronton de chaque `.directb2s` (de 352 × 626 à 1 000 × 750, « basse définition »), souvent la seule image d'un jeu absent de VPinMediaDB : 2 608 jeux en ont une du plateau, 1 746 du fronton ;
   - les **musiques de la base VPS** (`soundFiles`) : liens de partage Dropbox vers un mp3 ou un ogg, téléchargés seulement quand on choisit la carte, un par un.
     Le fichier reçu est contrôlé à sa signature (`isAudioFile`) : un lien mort renvoie une page HTML, la carte dit alors « Lien mort ».
+- **Ouverture immédiate** : l'écran des propositions s'ouvre tout de suite, puis se remplit à mesure : les aperçus de VPinMediaDB (« Aperçu en route… », avec le même loader animé que les images de jeu), les résultats de VPForums et de VPUniverse et le poids des fichiers arrivent ensuite, les aperçus six à la fois et sans doublon.
+  Une connexion lente, ou l'attente imposée par VPUniverse, ne bloque plus le choix d'un fronton ou d'un plateau.
 - **Choisir** : Start sur une proposition la met dans le brouillon, comme un fichier du dossier d'import (une nouvelle page pour le prospectus et les règles).
   Un fichier en ligne est téléchargé et vérifié (MD5 de VPinMediaDB) au moment du choix ; un fichier de la table est copié, l'original reste en place.
   La carte dit « Actuel » ou « Choisi, à enregistrer » ; la carte « Actuel » d'un fichier en ligne montre le fichier de la borne (la vidéo elle-même, pas l'image d'aperçu du site).

@@ -360,6 +360,7 @@ Un PuP-Pack, par exemple, dessine souvent un cadre sur le fronton (en bas, au ce
 1. **Entrer dans le menu de VPX** : depuis la fiche, « Régler l'affichage en partie » (la table démarre menu ouvert sur le cadrage, la partie ne compte pas dans les statistiques) ; ou, pendant n'importe quelle partie, les deux MagnaSave appuyés ensemble (Crédit et Start sur une borne sans MagnaSave), puis « Tous les réglages de VPX » dans les réglages en partie de Cyber Pinball (ci-dessus) ; F12 au clavier directement.
    `[Input] Mapping.InGameUI` ne garde que F12, **même sans relevé des boutons** : c'est alors la seule clé de `[Input]` que Cyber Pinball écrit (`inGameMenuSetting`, `packages/core/src/buttons.ts`), et la combinaison qu'y écrivaient les versions précédentes en est retirée.
    Exit n'y entre jamais : seul, il quitte la partie.
+   Les réglages en partie des MagnaSave ont aussi une ligne « Cadrage de cette table », qui ouvre directement la page « Point of View » du menu de VPX : le cadrage s'y retouche en direct et s'enregistre pour la table.
 2. **Régler** : « Point Of View » pour le cadrage ; Exit ramène à l'accueil du menu, puis « Display Settings » > « Backglass Display », « ScoreView Display » (le DMD) ou « Topper Display » : position et taille au pixel près, appliquées en direct ; la fenêtre se tire aussi à la souris.
 3. **Enregistrer** (Start) : « Save as Table Override » écrit dans le `.ini` de la table, pour elle seule ; « Save Globally » dans `VPinballX.ini`, pour toutes les tables.
 
@@ -367,12 +368,15 @@ Boutons du menu de VPX (`InputManager.cpp`), rappelés sur l'écran de chargemen
 
 | Bouton | Dans le menu de VPX |
 | --- | --- |
-| MagnaSave gauche, droit | changer de ligne |
-| Flippers | régler la valeur |
+| Flippers gauche, droit | changer de ligne (gauche : précédente, droit : suivante) |
+| MagnaSave gauche | diminuer la valeur, ou annuler |
+| MagnaSave droit | augmenter la valeur, ou valider |
 | Start | enregistrer : pour cette table ou pour toutes |
 | Crédit | annuler les changements |
 | Lanceur | valeur par défaut |
 | Exit | page précédente, puis fermer le menu ; menu fermé, quitter la partie |
+
+Sur une borne sans MagnaSave, les flippers gardent le réglage de la valeur (VPX n'a alors aucun autre bouton pour augmenter ou valider) ; les touches de VPX se réécrivent d'elles-mêmes au prochain lancement, et le rappel du réglage de l'affichage en partie (« Changer de ligne », « Régler, valider ou annuler ») montre les bons boutons.
 
 VPX n'allume « Enregistrer » qu'après un changement (`InGameUIPage::IsModified`) : après Crédit (annuler), il reste grisé.
 L'aide-mémoire le dit, « Enregistrer grisé : rien n'a changé ; Lancer le rallume » : le Lanceur (valeur par défaut) suffit à le rallumer.
@@ -392,7 +396,7 @@ L'aide-mémoire le dit, « Enregistrer grisé : rien n'a changé ; Lancer le ral
   VPX lit la priorité dans les réglages de la table : pour une table qui dessine son DMD (ROM de PinMAME, `CreateObject("FlexDMD.FlexDMD")` ou `UltraDMD.DMDObject`, dossier du DMD) et dont le script n'écrit pas lui-même le score sur le pack (`LabelNew`, `LabelInit`), le diagnostic écrit `[ScoreView] Priority.PUP = 0` dans le `.ini` de la table (« Le PuP-Pack cacherait le DMD de la table », `pupHidesDmd`), et le front-end le fait seul avant la partie.
   Le pack garde le fronton et le topper ; une valeur déjà réglée pour la table dans le menu de VPX est respectée.
   Cas trouvé sur *2001* (score UltraDMD, option « DMD on Fulldmd »).
-- **Limites** : sans MagnaSave, on ne change pas de ligne dans le menu de VPX (`UIUp`, `UIDown`) ; l'ordre d'empilement de deux fenêtres de VPX qui se chevauchent (DMD sur le fronton) est laissé à Windows.
+- **Limites** : sans MagnaSave, les flippers ne servent qu'à régler la valeur : on ne peut pas augmenter, valider ni annuler au bouton dans le menu de VPX ; l'ordre d'empilement de deux fenêtres de VPX qui se chevauchent (DMD sur le fronton) est laissé à Windows.
 
 ### Couleurs du DMD, nom de ROM
 
@@ -404,3 +408,16 @@ Le diagnostic propose d'essayer une colorisation d'une autre révision de ROM et
 
 La fiche technique indique la version corrigée installée ; ses sources et celles de ses dépendances sont publiées avec les correctifs et la recette de construction.
 La fabrication réutilise VPX et son plugin PuP seulement si les empreintes des deux binaires, des sources, des correctifs, des dépendances et des outils correspondent à la dernière compilation réussie ; sinon elle reconstruit.
+
+Ce que chaque série du VPX 10.8.1 corrigé règle pour le joueur :
+
+- **Série 5** : l'import automatique d'un ancien fichier de cadrage POV ne plante plus au lancement direct d'une table ; les champs numériques anciens vides ou illisibles sont ignorés, le cadrage et les réglages valides sont conservés.
+- **Série 6** : sur une borne à cartes DudesCab, VPX ne plante plus en se fermant (0xC0000005) pendant le déchargement de DOF.
+  La bibliothèque DOF de VPX 10.8.1 arrêtait la carte une seconde fois après sa vraie fermeture ; Cyber Pinball pose avant chaque partie une bibliothèque DOF (`plugins/dof/dof64.dll`) reconstruite avec les correctifs publiés depuis par ses auteurs.
+  Le plugin DOF de VPX et ta configuration ne changent pas.
+  Si VPX plante encore ainsi en se fermant, l'écran d'échec dit que la partie s'est jouée, que rien n'est à réparer dans la table, et que c'est un défaut connu de la bibliothèque DOF de VPX 10.8.1, corrigé à partir de la série 6.
+- **Série 8** : le plugin PuP reprend celui de la version de développement de VPX.
+  Les vidéos d'un écran PuP qui n'est pas affiché (DMD, topper) se terminent à l'heure, la file d'attente avance, la musique de fond démarre et les sons du pack ne se superposent plus ; le plugin des versions publiées de VPX gardait ces vidéos figées, et la suite du pack ne venait jamais.
+  Comme dans PinUP Player, une table qui redéclare une playlist depuis son script en change l'ordre et le temps de repos.
+- **Série 9** : VPX ne s'arrête plus au démarrage d'un PuP-Pack dont une image de capture du DMD porte un numéro trop grand (*The Avengers (Pro)* se fermait dès la première image du DMD).
+  Le plugin ignore ces images et lit les autres ; s'il ne peut rien lire, le pack joue sans ses déclencheurs DMD.

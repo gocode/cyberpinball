@@ -82,4 +82,9 @@ Rien à installer, aucun magasin d'applications : la page reste celle que sert l
   Sur Android, Chrome ouvre le raccourci d'une page HTTP dans un onglet, barre d'adresse comprise.
   Si la box donne une autre adresse à la borne, seul le raccourci qui suit la borne (adresse stable par Internet) ou le nom de la borne (iPhone) la retrouvent ; un raccourci vers l'adresse IP oblige à scanner le QR une fois (réserver l'adresse de la borne dans la box l'évite).
   La page voyage toujours en clair (limite décrite pour la télécommande du navigateur intégré).
+**Conseils d'« Ajouter à l'écran d'accueil ».**
+Sur Android, le conseil précise que la télécommande passe en plein écran au premier toucher (Chrome n'ouvre pas en vraie application une page HTTP du réseau local, mais le plein écran la débarrasse de la barre d'adresse).
+Sur iPhone, il rappelle l'option « Ouvrir comme app web » d'iOS 26, sans laquelle le raccourci rouvre Safari avec ses barres ; le raccourci qui suit la borne s'ouvre lui aussi sans barres.
+Sur un écran à encoche, en paysage, la page et la feuille d'actions s'écartent de l'encoche et des coins arrondis.
+
 - **Essais** : `remote.test.ts` (reconnu sans QR, après un redémarrage, prise de main, oublié) ; `remote-kept.test.ts` (fichier, huit au plus, entrées douteuses, fichier abîmé) ; `telecommande.test.ts` rejoue un scénario hors écran : deux vraies pages du téléphone hors écran, chacune son stockage, l'acceptation, l'astuce, l'écran quitté, Déconnecter puis Reprendre, la page rouverte sans adresse, la prise de main, Oublier, Cyber Pinball fermé puis relancé sur le même port, et aucune clé au journal.

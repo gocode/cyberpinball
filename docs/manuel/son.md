@@ -113,6 +113,32 @@ Les boutons **Volume −**, **Volume +** et **Muet** (facultatifs, étape « Bou
   Captures : `volume-borne-niveau.png`, `volume-borne-coupe.png`.
   Tests : [cabinetvolume.test.ts](../../packages/core/src/test/cabinetvolume.test.ts).
 
+**Volume au téléphone.**
+Un bouton haut-parleur dans la barre du haut de la télécommande règle le son de la borne : au front-end, pendant une partie, au Juke-box comme dans les applications ouvertes sur la borne.
+Il ouvre une réglette avec le niveau du moment : Volume −, Volume + (garde le doigt appuyé pour aller plus vite) et Muet, comme les boutons de volume de la borne, dont la pastille s'affiche sur le plateau à chaque appui.
+Le bouton Retour d'un Android replie la réglette.
+Les touches volume du téléphone règlent toujours son propre son : une page web ne peut pas les capter, d'où ces boutons à l'écran.
+Le volume de la borne règle aussi le son d'Edge et des applications ouvertes sur la borne : il suit, du même écart, la sortie par défaut de Windows (où joue Edge) et toute sortie où un programme joue, en plus des sorties choisies à l'étape « Son » ; avant, une barre de son et un Muet pouvaient rester sans effet.
+La réglette dit pourquoi le son ne bouge pas (Windows ne répond pas, aucune sortie audio, ou réglage non pris par une sortie) au lieu de rester muette.
+
+### Mode nuit
+
+Pour jouer sans déranger, le mode nuit baisse d'un coup ce que tu choisis, ligne par ligne : un voile noir sur les écrans du front-end, le son (un pourcentage du volume de Windows, 0 % pour le muet), la luminosité ou l'extinction des LED, les toys coupés (solénoïdes, shaker…).
+**Réglages** : Menu système > Ma borne > « Configuration de la borne » > « Mode nuit » (ligne après le son) : écrans, son, LED, toys, horaire.
+Il s'active depuis les réglages, d'un bouton de l'interface facultatif, ou, au choix, la nuit de l'horaire de la borne (lien facultatif) ; éteint pendant la nuit, l'horaire ne le rallume pas avant la nuit suivante.
+Le bouton se relève à l'étape « Boutons de l'interface », en plus du bouton avancé des boutons du jeu (section repliée « Boutons avancés » du récapitulatif, vide par défaut) : un appui l'active ou le retire, au front-end comme en partie.
+Le voile noir s'applique dans la roue et les menus (plus seulement en mode attente), jamais pendant une partie.
+À la désactivation, le volume d'avant revient, sauf une sortie que tu as réglée aux boutons entre-temps.
+Pendant une partie, les toys et les LED suivent aussi, par une variante du `Cabinet.xml` posée le temps de la partie (journal de restauration : un plantage se répare au démarrage suivant).
+Cela vaut seulement si la configuration DOF est celle écrite par Cyber Pinball ; une configuration faite à la main n'est jamais touchée, et l'écran de réglages dit pourquoi l'option est sans effet.
+
+### Sortie audio en VR
+
+Le réglage « Sortie audio en VR » (Menu système > Ma borne > Réalité virtuelle et vision 3D, détaillé dans [Lancement d'une partie](lancement-d-une-partie.md)) choisit où sort le son dans le casque : Automatique, La borne, ou n'importe quelle sortie audio de Windows (utile pour un casque, comme un Pimax, dont le périphérique audio n'est pas reconnu).
+Quand aucune sortie de casque n'est reconnue, le journal liste les sorties audio de Windows vues.
+
+**Aperçu sonore** d'une carte de l'écran des tables : il s'arrête quand une partie démarre, au lieu de continuer par-dessus la musique de la table.
+
 ### Volume du jeu
 
 Une ROM trop faible face aux bruits mécaniques de la table (Medieval Madness sur un PinCab, 12/11/2026) ne se corrige ni par le volume de la borne, qui monte tout, ni par PinMAME : son réglage `volume` (`HKCU\Software\Freeware\Visual PinMame\<rom>`) est une atténuation, déjà à 0, son maximum.

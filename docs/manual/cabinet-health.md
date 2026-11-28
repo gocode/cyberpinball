@@ -62,6 +62,17 @@ A Blocking line in the last check puts the red dot on "Santé de la borne", on t
 Code: the lines and their states in [packages/core/src/health.ts](../../packages/core/src/health.ts), the check, the cache and the page in `app/src/health.ts`, the rendering in `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) pins every state of every check and that **every line leads to a real screen**: a system menu entry placed in the tree and provided by the application, a table's diagnosis, the list of tables to review or the VPX installation.
 
+**ZeDMD that does not answer VPX.**
+If "ZeDMD : oui" (ZeDMD: yes) is chosen but the ZeDMD still does not answer VPX, the cabinet says so (real DMD screen, Health, report) and names the usual cause: an old firmware (4.x) that VPX no longer understands.
+When a serial port does not answer like a ZeDMD, the message adds that the firmware may be too old and says what to do: update the firmware, then choose "ZeDMD : oui".
+
+**Fewer false warnings.**
+Small, almost empty volumes are no longer flagged as almost full, and the EDID refresh-rate margins no longer trigger advice to change the cable.
+
+**Taskbar.**
+No more VPX frozen for a few seconds in the middle of a game when Windows keeps showing the taskbar again (Copilot, Start menu or a notification in the foreground): Cyber Pinball no longer hides it again in a burst, it leaves it a while, and the log says which program had the foreground.
+These bursts also made the backglass leave full screen, as if the screens were being detected again.
+
 ### Refresh rates and rendering stalls
 
 A playfield below its available refresh rate remains worth checking; a secondary screen below its possible rate is informational when it does not affect the ball.

@@ -65,6 +65,9 @@ The team changes the status of ideas, replies, hides or merges duplicates (the d
 Code: [packages/core/src/feedback.ts](../../packages/core/src/feedback.ts) (protocol, sealing, duplicates, consent); [app/src/feedback-service.ts](../../app/src/feedback-service.ts) (the service seen from the cabinet, the queue); [app/src/feedback-menu.ts](../../app/src/feedback-menu.ts) (the screens).
 [feedback.test.ts](../../packages/core/src/test/feedback.test.ts) and [retours-service.test.ts](../../packages/core/src/test/retours-service.test.ts) pin the sealing, the signature, duplicates, consent, and that the cabinet and the service speak the same protocol; [retours-traduction.test.ts](../../packages/core/src/test/retours-traduction.test.ts) the translations, [feedback-etats.test.ts](../../packages/core/src/test/feedback-etats.test.ts) the status badges, [rapport-pieces-jointes.test.ts](../../packages/core/src/test/rapport-pieces-jointes.test.ts) the attached files.
 
+**The "En préversion" status.**
+A new "En préversion" (In preview) status says an idea is done and you can already try it in the preview, before the final version; it has its own badge (a flask, outlined in green).
+
 ### My conversations with the team
 
 System menu > Help and info > Feedback and ideas > My conversations with the team lets you read and answer replies to reports.

@@ -18,7 +18,7 @@ Ce qui change d'un jeu à l'autre est décrit ici.
   Seules **Fish Tales** et **Sorcerer's Lair** sont gratuites, sur tous les comptes ; les autres tables ne s'ouvrent que si elles sont achetées sur le compte Steam, et les messages de Cyber Pinball le rappellent pour elles seulement.
   L'écran « Tables de Pinball FX3 » le dit en tête, avec l'adresse de l'aide de Zen (`pinballfx.com/?page_id=7754`) ; la fiche d'une table a une ligne « Mode borne ».
 - **Première ouverture du jeu sur ce PC** : tant que Pinball FX3 n'a jamais été ouvert sur ce PC (pas de `SystemConfigCache.dat` dans son dossier), son mode borne n'y est pas activé et il s'ouvrirait sur son écran d'accueil, en paysage.
-  Avant de lancer la table, Cyber Pinball affiche alors « Première ouverture de Pinball FX3 sur ce PC » : ce qu'il faut faire dans le jeu (icône de borne à côté du profil, « Activer », puis la rotation du plateau et les écrans du fronton et du DMD), puis fermer le jeu par Exit tenu et relancer la table ; pour une table payante, le rappel de l'achat.
+  Avant de lancer la table, Cyber Pinball affiche alors « Première ouverture de Pinball FX3 sur ce PC » : ce qu'il faut faire dans le jeu (icône de borne à côté du profil, « Activer », puis l'orientation à saisir, d'après le côté des flippers de ta borne ; le DMD et le fronton seront replacés par Cyber Pinball), puis fermer le jeu par Exit tenu et relancer la table ; pour une table payante, le rappel de l'achat.
   Start ouvre le jeu quand même, pour le régler ; Exit revient au front-end.
   Ces réglages sont chiffrés par le jeu (fichiers `.dat` de son dossier et de son profil Steam) : Cyber Pinball ne peut ni les lire ni les écrire, contrairement à la rotation de Pinball FX.
   Une fois le jeu ouvert sur ce PC, rien ne dit plus si son mode borne est actif : le message ne revient pas.
@@ -57,12 +57,18 @@ Ce qui change d'un jeu à l'autre est décrit ici.
 - **Table restée sur l'écran d'accueil du jeu** : la fenêtre est la même sur l'écran d'accueil et sur une table, Cyber Pinball ne peut pas le voir.
   Une partie de moins de 45 s affiche au retour **« Pinball FX3 est resté sur son écran d'accueil ? »** avec les causes possibles, au conditionnel : table pas sur ce compte Steam (jamais pour Fish Tales ni Sorcerer's Lair, gratuites), mode borne pas activé, et pour « Mars » le défaut connu du jeu qui ouvre « Attack from Mars » quand le compte a les deux tables.
   Une fenêtre jamais parue (120 s) échoue avec son explication, comme pour Pinball FX.
-- **Quitter** : comme Pinball FX, un **appui long sur Exit** (2 s) ferme le jeu et revient à la roue ; le cartouche du chargement l'écrit au nom du jeu.
+- **Quitter** : comme Pinball FX, un **appui long sur Exit** (2 s) ferme le jeu et revient à la roue ; l'écran de chargement l'écrit au nom du jeu, en une pastille au bas de l'écran.
 - **Boutons et écrans sur une borne** : comme pour Pinball FX, les boutons de joystick d'une borne envoient au jeu les touches de son écran Contrôles > Clavier, et les écrans où le jeu dessine lui sont laissés (voir [Tables de Pinball FX](tables-de-pinball-fx.md)).
   Les menus de Pinball FX3 se parcourent aux flèches gauche et droite, sur lesquelles Maj ne fait rien : chaque flipper envoie donc aussi la flèche de son côté (`PINBALLFX3_EXTRA_KEYS`), ce qui permet d'atteindre l'icône de borne et d'activer le mode borne sans clavier ; en partie, les flippers lèvent toujours les batteurs.
   Sur une borne au clavier (encodeur clavier, clavier), la touche d'un flipper arrive seule au jeu : bonne en partie, sans effet dans les menus.
   Pendant la partie, Cyber Pinball lit donc ces touches et envoie en plus la flèche de leur côté, sans rien retarder aux flippers : rien ne s'intercale entre la touche et le jeu.
   Pinball FX3 en plein écran 1080p sur un playfield 4K change la définition de l'écran, et Windows redispose les autres : les fenêtres du front-end suivent chacune l'écran de son rôle, sans plateau tourné sur l'écran du DMD ni DMD sur le fronton.
+- **Fenêtres placées par Cyber Pinball** : en mode borne, une fois la partie lancée, Cyber Pinball place lui-même les fenêtres du DMD et du fronton sur les écrans de ces rôles.
+  Avant, elles s'ouvraient où les réglages du jeu les avaient mises (DMD décentré, fronton décalé de 101 px et rogné en bas, relevé sur un PinCab).
+  Rien à faire : si le jeu remet une fenêtre ailleurs malgré quatre essais, le journal le signale et Cyber Pinball la laisse.
+  Quand le playfield s'ouvre en mode fenêtré (barre de titre, boutons réduire et agrandir, cadre), Cyber Pinball retire la bordure et cale la fenêtre sur l'écran du playfield ; un playfield déjà sans bordure n'est pas touché.
+  Le DMD n'est plus centré au milieu de l'écran du FullDMD : quand la table a un média FullDMD avec un cadre (le même repérage que pour VPX), Cyber Pinball pose le DMD dans ce cadre.
+  L'activation du mode borne et l'orientation restent à régler dans le jeu (ses réglages sont chiffrés).
 - **Orientation** : la rotation de l'image se règle dans le mode borne du jeu, Cyber Pinball ne l'écrit pas.
   Pour que ce réglage vaille d'un front-end à l'autre, Pinball FX3 démarre sur l'écran du playfield tel que Windows l'oriente, comme avec un autre front-end : l'orientation de Windows revient juste avant le lancement, ne bouge plus pendant la partie, et celle que Cyber Pinball donne au playfield pour Visual Pinball reprend au retour à la roue (voir [Orientation et cadrage des tables](orientation-et-cadrage-des-tables.md#orientation-du-bureau-à-la-sortie)).
   Sur une borne où Cyber Pinball tourne cet écran pour Visual Pinball, une orientation saisie dans FX3 quand il démarrait sur celle de la session donne désormais une image à l'envers.

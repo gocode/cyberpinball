@@ -14,13 +14,13 @@ Players combines the former My friends and Players online entries: received requ
 All online players opens the complete list; shared tables appear as medallions (favourites first) and mutual friends as avatars.
 The Share Cyber Pinball download QR code appears on Home in desktop mode and in Players on a cabinet.
 Profile opens your profile with Edit my profile, Privacy and My account; My level, My badges and Game history are also under System menu > Arena > Progression.
-Instant games and leaderboards now belong to Arena.
+Live games and leaderboards now belong to Arena.
 
 In Players and in Community settings:
 
 | Entry | What it shows |
 | --- | --- |
-| Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's profile, whole or its first four characters), cabinets "À proximité (réseau local)" (Nearby, local network) and "Vus récemment" (Seen recently). Start on a player opens their profile: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, and "Bloquer …" (Block …). |
+| Trouver un joueur (Find a player) | The directory: "Chercher un nom…" (Search for a name, ignoring accents and case; or the ID shown on a player's profile, whole or its first four characters), cabinets "Sur mon réseau local" (On my local network) and "Vus récemment" (Seen recently). Start on a player opens their profile: "Envoyer une demande d'ami" (Send a friend request), or cancel, accept, decline, and "Bloquer …" (Block …). |
 | Demandes d'amis (Friend requests) | Received (to answer, red dot up to the gear) and sent ("En attente : remise dès que sa borne sera en ligne", Waiting: delivered as soon as their cabinet is online). |
 | Partage et réseau (Sharing and network) | The network only: sharing on or off, local network, library shared or not, download speed, Windows Firewall, live state of Stern SAM tables, the reminder of what others see, blocked players. The nickname, the avatar, the country, the settings of what others see and deleting the account are in My profile. The selection opens on "Retour" (Back): a stray Start does not turn sharing off. |
 | Masquer les notifications pendant les parties (Hide notifications during games) | Off by default: a friend coming online, a request to join a game, the news of a game with friends also show during games, with their sound (see "Everywhere, even in a game" in [Tables menu notifications](tables-menu-notifications.md#tables-menu-notifications)). Start toggles; on, nothing shows or rings during a game, everything waits for the menu. |
@@ -28,7 +28,7 @@ In Players and in Community settings:
 
 **Local play.**
 System menu > Community > "Réglages de la communauté" (Community settings) > "Jouer en local" (Local play) turns sharing off and stops the cabinet network.
-Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, instant games, online rankings, the Community and Arena medallions on the wheel, challenges, "Jouer avec un ami" (Play with a friend) and "Partie instantanée" (Instant game) on the table sheets, and the Community on the phone all disappear.
+Then the levels, XP and badges on screen (the player card, the badge and level moments), friends, players online and friend requests, messages and their badge, rooms, groups, live games, online rankings, the Community and Arena medallions on the wheel, challenges, "Jouer avec un ami" (Play with a friend) and "Parties en direct" (Live game) on the table sheets, and the Community on the phone all disappear.
 A table's scoreboard keeps only this cabinet's scores, with no scope tabs.
 In My profile only Edit my profile (nickname, avatar, country) and My account remain: My level, My badges, the game history and Privacy are removed too.
 All the tables and their scores on this cabinet, the Juke-box, Cyber Pinball updates, What's new, Feedback and ideas stay.
@@ -89,10 +89,10 @@ On the first computation, those the history deserves are granted without an even
 
 **Local network.**
 A multicast beacon (`239.255.42.99:47999`, TTL 1, every 5 s) announces the cabinet; neighbouring cabinets connect over encrypted TCP (secret-stream, the same Noise as Hyperswarm), even without the Internet.
-"Nearby" as long as the beacon is less than a minute old.
+"Sur mon réseau local" as long as the beacon is less than a minute old.
 The beacon joins its group network adapter by network adapter (IPv4, loopback excluded), and again at every announcement: `addMembership` without an adapter uses the default route's and throws (`EHOSTUNREACH`, `ENODEV`) when there is none, a cabinet started before its network, an unplugged cable, a VPN taking the route.
 A refused adapter does not stop the others, and an adapter that shows up later is picked up at the next announcement.
-**A local network failure is never blocking**: the Internet carries on, "Sharing and network" says "Local network: unavailable" with its reason ("no network adapter connected", or the system error), "Nearby" shows it greyed out, and a local network that could not open (port taken) is retried automatically, 30 s then twice as long after each failure, up to 5 min.
+**A local network failure is never blocking**: the Internet carries on, "Sharing and network" says "Local network: unavailable" with its reason ("no network adapter connected", or the system error), "Sur mon réseau local" shows it greyed out, and a local network that could not open (port taken) is retried automatically, 30 s then twice as long after each failure, up to 5 min.
 A failed start on the Internet side closes everything it had opened and is retried at the same pace; only it shows "Network unavailable" and "Blocking" in "My friends".
 
 **Presence: online, offline, list up to date.**
@@ -570,7 +570,7 @@ Tests: [invitations.test.ts](../../packages/core/src/test/invitations.test.ts).
 On the wheel, right after the Juke-box and before the Collections medallion and the tables of each collection, a medallion on the shared chrome ring opens the community: its name in green, the number of players online and friends online below.
 Everywhere (medallion, poster, System menu, "Joueurs en ligne" (Players online) tabs, phone), the number of players online, and that of your country, only shows above five, like the people present in a room: a nearly empty network, in figures, would put people off; players stay named, and your online friends are always counted.
 Start opens the **home screen**, the same screen as System menu > Community, its "Retour" (Back) returning to the wheel: at the top, the number of players online and what others see, then "Mon profil" (My profile), "Joueurs en ligne" (Players online), "Mes amis" (My friends, with the badge of received requests), "Messages" (messaging between friends), "Groupes et salons" (Groups and rooms, see "Groups" and "Rooms by country" below) and "Réglages de la communauté" (Community settings).
-Instant games (see below) and the leaderboards, which open on two doors, "Joueurs" (Players) and "Tables", are in the Arena, its medallion next to the Community one.
+Live games (see below) and the leaderboards, which open on two doors, "Joueurs" (Players) and "Tables", are in the Arena, its medallion next to the Community one.
 "Joueurs" (Players) ranks players by their XP, in Friends, National and Worldwide tabs (Start or MagnaSave goes from one to the next), for the week (XP earned since Monday, back to zero every Monday) or of all time (the flippers switch between them).
 It opens on National · This week (Worldwide without a chosen country): the week first, where everyone has a chance.
 Each line gives the rank, the flag, the player's avatar with their level and presence, their nickname and their XP, the other period in small print ("12 400 XP au total" (12,400 XP in total), "+850 cette semaine" (+850 this week)); tied players share the same rank.
@@ -601,7 +601,7 @@ Every player your cabinet has come across, friends or not (the network directory
 Then, under "Hors ligne" (Offline), all the others: your friends first, then the most recently seen ("Vu il y a 3 j", Seen 3 days ago).
 Each line carries the player's badge, their flag before their name (the Cyber Pinball flag, a comet ball, for a player who has not given their country; the same in the leaderboards and chat rooms), a green ring around the badge when they are connected, and below it what they are doing ("En partie", Playing, with the table between friends; "En ligne", Online; "Vu il y a 3 j", Seen 3 days ago) and what you have in common ("6 tables en commun", 6 tables in common; "Sur votre réseau local", On your local network); "Ami" (Friend, outside the friends section) or "Demande envoyée" (Request sent) on the same line.
 The **current table** is only shown between friends.
-MagnaSave goes from one **filter** to the next, as tabs above the list: Tous (All), Mon pays (My country), À proximité (Nearby: the local network), Mêmes tables (Same tables: players whose ranked scores are on tables you have, the most tables in common first).
+MagnaSave goes from one **filter** to the next, as tabs above the list: Tous (All), Mon pays (My country), Sur mon réseau local (On my local network), Mêmes tables (Same tables: players whose ranked scores are on tables you have, the most tables in common first).
 A filter that cannot show anything stays visible, greyed out, its reason in place of the number ("Réseau local coupé", Local network off; "Pays non choisi", No country chosen).
 Start on a player, friend or not, opens their profile (a friend's presence and library; friend request, likes, blocking).
 
@@ -621,24 +621,24 @@ The module is [livepresence.ts](../../packages/core/src/livepresence.ts), the sc
 **Tests.**
 [livepresence.test.ts](../../packages/core/src/test/livepresence.test.ts): signed signal, refused if changed, too old or from the future; the most recent wins, only the new one is relayed; groups, order and filters of the list; between two cabinets that are not friends (test network on 127.0.0.1), "online" arrives, "playing" without the table, the option cuts the signal.
 
-### Instant games
+### Live games
 
 A live game open to everyone, friends or not.
 A player opens it, chooses the number of players, and it shows up in the Community of every cabinet online; anyone can join it, and **as soon as it is full, it starts by itself for everyone**.
 The game itself is the one played between friends (see "Community: the cabinet network"): each player plays on their own cabinet, the same version of the table, with the host's settings, a common start and everyone's results.
 
 **Opening a game.**
-Community > Partie instantanée (Instant game) > "Ouvrir une partie instantanée" (Open an instant game): the table (your VPX tables), then the number of players, yourself included (2, 3 or 4).
-Also from a table's sheet: "Partie instantanée" (Instant game), right after "Jouer avec un ami" (Play with a friend).
+Community > Parties en direct (Live games) > "Ouvrir une partie en direct" (Open a live game): the table (your VPX tables), then the number of players, yourself included (2, 3 or 4).
+Also from a table's sheet: "Parties en direct" (Live game), right after "Jouer avec un ami" (Play with a friend).
 The waiting room opens: "Waiting for 2 players", the players already there and the free seats.
 Each arrival brings a notification ("Tiltman joined your game") and a line at the top of the room ("1 more player and it starts").
 "Annuler la partie" (Cancel the game) removes it from every list, and players who had joined are told.
 A game that is not full within thirty minutes closes by itself.
 One game at a time: opening another one closes the previous one.
-On the phone, Community > Players shows the open games and "Ouvrir une partie instantanée" (Open an instant game) (see Community on the phone).
+On the phone, Community > Players shows the open games and "Ouvrir une partie en direct" (Open a live game) (see Community on the phone).
 
 **Joining.**
-Community > Partie instantanée: the games opened by others, most recent first.
+Community > Parties en direct: the games opened by others, most recent first.
 Each line shows the host's badge and flag, the table, how long it has been open, how many players are there, the seats left, and what you have of the table: "Same version", otherwise the line is greyed out with its reason ("You have another version of this table", "You don't have this table").
 Start on a playable game: the table is checked on your cabinet, then you enter the host's room ("Connecting to Kiko's cabinet…" while the two cabinets reach each other).
 "Quitter la partie" (Leave the game) frees your seat.
@@ -731,7 +731,7 @@ A player excluded by the moderation can no longer write in a group: their messag
 **No server, no outside cabinet.**
 A group is a series of lines each signed by its author (`grp`: creation with its access, invitation, arrival, decline, departure, removal, access change, message, reaction, message deletion, table of the week).
 Each member's cabinet keeps the series and derives the group from it by replaying it in date order: a line from a player who was not a member at that time does not count; only the creator removes and changes the access; an arrival without invitation only counts if the group is public at that time, has room left and the player was not removed from it.
-The members' cabinets connect directly by their key (like the players of an instant game), friends or not, and the messages go through no cabinet outside the group.
+The members' cabinets connect directly by their key (like the players of an live game), friends or not, and the messages go through no cabinet outside the group.
 Every 20 seconds, and as soon as a member becomes reachable, each one first gives it its own lines (its arrival, if the member does not know it yet), then states with a fingerprint what it has of each group (`grp-sum`); a different fingerprint makes the other list its lines (`grp-have`), and the missing ones are sent.
 A written message goes at once to the reachable members, who relay it: an absent member receives it from any other member when they come back.
 An invitation (`grp-invite`: the membership lines and the table of the week, without the messages) goes to the invited friend's cabinet until it is acknowledged (`grp-invite-ok`); a decline goes to the inviter.
@@ -924,3 +924,40 @@ The recipient can decline; at the deadline the highest score earns 40 XP, then R
 Only scores recorded by Cyber Pinball count; blocked players or those excluded from rooms cannot challenge you.
 Signed challenges are relayed cabinet to cabinet without a server: you need not be online at the same time.
 Notifications announce receipt, an overtaken score, the final six hours, result or refusal; Recent activity keeps a single row per challenge.
+
+**End of game: the card and the summary.**
+At the end of a solo game on a table whose score is read live, a card appears over the playfield, without leaving VPX or taking control from it.
+It shows your score (and "Ton record !" (Your record!) when you beat your best), the top 3 of your country, your place on a 4th line if you are not in it, then your place in the world.
+Left flip: challenge a player on this table.
+Right flip: continue, the card closes and you go back to the game.
+The card waits until you have finished entering your initials, and closes by itself if you start another game.
+Without a leaderboard (guest mode, sharing off, test VPX…), it gives your score and says why the ranking is missing.
+When VPX closes, you come straight back to the wheel, on the table you have just played.
+After every game whose score is known, even a first score, a game quit part-way or a game with no record, the summary opens: your score, your record, your XP, your place in the ranking and the next player to beat.
+It appears in an extra window, the wheel staying whole and visible, instead of a full screen: on the cabinet, above the wheel; on the desktop, in the playfield frame, next to the wheel.
+On a table without an online leaderboard (original table), the window shows the table's scoreboard, with your game highlighted.
+It goes away at the first gesture: a flipper to move to the next table, Exit to close it, Start to replay the same table at once; once closed, it does not come back, even if you return to the table right after.
+Challenging a player remains possible from the game's end-of-game card, and messages from the inbox.
+
+**Scores read during the game.**
+When the table allows live reading, each game's score is read while you play, no longer only when VPX closes; a session of several games keeps each of them in the scoreboard, with its time.
+The reading goes through VPX's inspector, like games between friends, without copying or changing your table; it asks for VPX's firewall rule ("Partage et réseau" (Sharing and network), in the community settings).
+Without it, the score is read as before, when VPX closes.
+At launch, some tables still show the previous game's score for a moment: it is no longer counted as a game quit part-way, so there is no more duplicate in the cabinet's scoreboard or the leaderboards, and those already kept by earlier previews are removed.
+A game quit part-way (at the 2nd ball, say) keeps its last score and counts like the others: the cabinet's scoreboard, leaderboards, challenges and level.
+When the score is only read when VPX closes (the ROM only writes its memory then), quitting the table part-way, alone at the table, no longer passes for a final score what the ROM held at the stop.
+If the ROM says the game was not over, the score stays on your cabinet, marked "partie quittée" (game quit) in the table's scoreboard, without being published to the leaderboards, counted in a challenge or kept as the level's record.
+A game that goes to the end, or whose score enters the table's honour roll, counts as before; when the ROM's map does not say whether the game is over (some machines), the game also counts as before.
+
+**Challenges, community and profile.**
+The Challenges tab of the Arena has its "Lancer un défi" (Launch a challenge) button: it opens the choice of the table, then of the player; with no game played, it is greyed out with its reason.
+Sharing off: "Régler le partage" (Set up sharing) opens in place from the Challenges tab, the Community and my profile.
+On the cards of players to discover, the nickname is no longer squashed and its level no longer sits over the buttons; "Voir le profil" (View the profile) then "Ajouter en ami" (Add as a friend) have their own row under the text, and the "+25 XP" of the buttons stays readable at the cabinet.
+My profile tells the truth about its state: "Partage désactivé" (Sharing off), "Profil public désactivé" (Public profile off) or "Profil public en cours de préparation" (Public profile being prepared).
+On the profile of a player whose activity is hidden, the header says so, the Badges tab no longer shows a false "Aucun encore" (None yet), and Start on the card shows it again in one gesture.
+Start on another player's post announces "Tu aimes cette publication" (You like this post) or "Tu n'aimes plus cette publication" (You no longer like this post), and the title's note says what Start does.
+The tables of the day opened from the Arena offer "Retour : Arène" (Back: Arena).
+
+**Screen names.**
+"À proximité" (Nearby) is now called "Sur mon réseau local" (On my local network) (filter of the players and section of "Trouver un joueur" (Find a player)).
+"Instantanée" (Instant) is called "Parties en direct" (Live games) everywhere (menus, sheets, notes), and the generic labels of a game between friends are called "Partie entre amis" (Game with friends), so it is no longer confused with a live game.

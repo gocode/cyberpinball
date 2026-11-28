@@ -41,6 +41,7 @@ Une nouvelle rubrique prend son titre ci-dessous, à sa place, et sa traduction 
 ## [Tables de Pinball FX](manuel/tables-de-pinball-fx.md)
 ## [Tables de Pinball FX3](manuel/tables-de-pinball-fx3.md)
 ## [Tables de Future Pinball](manuel/tables-de-future-pinball.md)
+## [Applications](manuel/applications.md)
 ## [Jamais enfermé : le web depuis chaque écran d'ajout](manuel/jamais-enferme-le-web-depuis-chaque-ecran-d.md)
 ## [Le téléphone comme télécommande du navigateur intégré](manuel/le-telephone-comme-telecommande-du-navigateur.md)
 ## [Le téléphone comme télécommande du front-end](manuel/le-telephone-comme-telecommande-du-front-end.md)

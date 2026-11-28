@@ -62,6 +62,17 @@ Un point Bloquant au dernier relevé met la pastille rouge sur « Santé de la b
 Code : les lignes et leurs états dans [packages/core/src/health.ts](../../packages/core/src/health.ts), le relevé, le cache et la page dans `app/src/health.ts`, le rendu dans `app/renderer/library.js` (`renderHealth`).
 [health.test.ts](../../packages/core/src/test/health.test.ts) fixe chaque état de chaque contrôle et que **chaque ligne mène à un écran réel** : une entrée du menu système rangée dans l'arbre et fournie par l'application, le diagnostic d'une table, la liste des tables à revoir ou l'installation de VPX.
 
+**ZeDMD qui ne répond pas à VPX.**
+Si « ZeDMD : oui » est choisi mais que le ZeDMD ne répond toujours pas à VPX, la borne le dit (écran DMD réel, Santé, rapport) et nomme la cause fréquente : un firmware ancien (4.x) que VPX ne comprend plus.
+Quand un port série ne répond pas comme un ZeDMD, le message ajoute que le firmware est peut-être trop ancien et dit quoi faire : mettre à jour le firmware, puis choisir « ZeDMD : oui ».
+
+**Moins de faux avertissements.**
+Les petits volumes presque vides ne sont plus signalés comme presque pleins, et les marges de fréquence de l'EDID ne déclenchent plus un conseil de changement de câble.
+
+**Barre des tâches.**
+Plus de VPX figé quelques secondes en pleine partie quand Windows réaffiche sans cesse la barre des tâches (Copilot, menu Démarrer ou notification au premier plan) : Cyber Pinball ne la remasque plus en rafale, il la laisse un moment, et le journal dit quel programme avait le premier plan.
+Ces rafales faisaient aussi sortir le fronton du plein écran, comme si les écrans étaient redétectés.
+
 ### Fréquences et arrêts de rendu
 
 Le playfield sous sa fréquence possible reste à vérifier ; un écran annexe sous sa fréquence possible est seulement informatif s'il ne change pas la bille.

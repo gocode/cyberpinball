@@ -20,6 +20,8 @@ What the phone drives follows what the cabinet shows (`RemoteMode`): the site pa
   A held flipper repeats after 0.4 s, every 70 ms (`isAutoRepeat`): the menu speeds up as under a real button, the phone's button says "Défilement rapide" (Fast scroll).
   A held button is released when the finger lifts or leaves the button, when the page goes to the background, when the link is cut, after 20 s at most.
   Top of the page: the screen shown and what is selected on it.
+- **Volume**: the remote also sets the sound of Edge and of the applications open on the cabinet.
+  It only set the outputs chosen at the "Sound" step (backglass, playfield) while Edge plays on Windows' default output, which may be another one, hence a sound bar and a Mute with no effect; the volume now follows, by the same amount, the default output and every output where a program plays.
 - **The phone's Back button** (Android, or the back gesture) steps back through the remote's screens instead of closing it, like the page's own back buttons.
   It closes an open sheet (⋮ menu, reactions…), leaves a conversation, a profile, a full-screen page or the Juke-box player, goes up a section in Menus or out of a playlist in the Juke-box, and brings the other tabs back to Screen.
   On Screen, it goes back on the screen open on the cabinet, as if you touched its back button; when the cabinet's browser is open, it returns to its previous page.
@@ -43,5 +45,9 @@ What the phone drives follows what the cabinet shows (`RemoteMode`): the site pa
   On return, the phone drives the menu again.
 - **Guest mode**: the phone's buttons go through the same doors as the cabinet's (`GUEST_DOORS`); the phone **never unlocks** guest mode (its presses do not count in the combination); sending files is closed (`phone.files`); the remote screen is in the system menu, closed to guests.
 - **Phone page, menu mode**: `body[data-mode]`, one detailed panel at a time (the keyboard wins, the transfer goes on and its percentage stays on "Envoyer"); when the visible height drops below 680 px (phone keyboard open), a typing view replaces the buttons; Start turns dark again when "Valider" is on screen or a flipper is held (a single green); an unavailable tool stays, greyed out with its reason ("Aucun champ" (No field), "Après la partie").
+**A touch during a screen change.**
+An entry touched at the moment a detail of the screen changes (a progress figure, a note) does what it announces; the cabinet used to ignore it, the screen having changed version in the meantime.
+A touch on a screen that has truly changed is still ignored.
+
 - **Tests**: `remote.test.ts` (buttons, text, transfer: closed messages, cleaned names, sealed chunks refused from elsewhere, large chunks correct and fast); `telecommande.test.ts` replays the scenario end to end: the real table management off screen, the QR read **from the screenshot of the screen itself**, the real phone page accepted by Start, Exit and a held flipper on the phone, typing and confirming, a file sent byte for byte, then the refusals (over 2 GB, guest mode, name climbing folders, chunk from another connection, replayed chunk, other host), a game, "Récupérer" taking and giving back the phone, the on-screen keyboard's QR, inactivity, Disconnect, closing; the layout guard rereads every cabinet screen.
   `guestmode.test.ts` pins the path through `handleKey` and the `phone.files` door.

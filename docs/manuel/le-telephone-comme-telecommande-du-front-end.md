@@ -20,6 +20,8 @@ Ce que pilote le téléphone suit ce que la borne montre (`RemoteMode`) : la pag
   Un flipper tenu se répète après 0,4 s, toutes les 70 ms (`isAutoRepeat`) : le front-end accélère comme sous un vrai bouton, le bouton du téléphone dit « Défilement rapide ».
   Un bouton tenu est relâché quand le doigt se lève ou sort du bouton, quand la page passe en arrière-plan, quand la liaison se coupe, après 20 s au plus.
   Tête de la page : l'écran affiché et ce qui y est choisi.
+- **Volume** : la télécommande règle aussi le son d'Edge et des applications ouvertes à la borne.
+  Il ne réglait que les sorties choisies à l'étape « Son » (fronton, plateau) alors qu'Edge joue sur la sortie par défaut de Windows, qui peut être une autre, d'où une barre de son et un Muet sans effet ; le volume suit maintenant, du même écart, la sortie par défaut et toute sortie où un programme joue.
 - **Le bouton Retour du téléphone** (Android, ou le geste retour) remonte les écrans de la télécommande au lieu de la fermer, comme les retours de la page.
   Il ferme une feuille ouverte (menu ⋮, réactions…), revient d'un fil, d'un profil, d'une page plein écran ou du lecteur du Juke-box, remonte d'une rubrique dans Menus ou d'une playlist dans le Juke-box, et ramène les autres onglets à l'Écran.
   Sur l'Écran, il fait le retour de l'écran ouvert à la borne, comme si on le touchait ; quand le navigateur de la borne est ouvert, il revient à sa page précédente.
@@ -43,5 +45,9 @@ Ce que pilote le téléphone suit ce que la borne montre (`RemoteMode`) : la pag
   Au retour, le téléphone pilote de nouveau le front-end.
 - **Mode invité** : les boutons du téléphone passent par les mêmes portes que ceux de la borne (`GUEST_DOORS`) ; le téléphone **ne déverrouille jamais** le mode invité (ses appuis ne comptent pas dans la combinaison) ; l'envoi de fichiers est fermé (`phone.files`) ; l'écran de la télécommande est dans le menu système, fermé à l'invité.
 - **Page du téléphone, mode menu** : `body[data-mode]`, un seul panneau détaillé à la fois (le clavier l'emporte, l'envoi continue et son pourcentage reste sur « Envoyer ») ; quand la hauteur visible tombe sous 680 px (clavier du téléphone ouvert), une vue de saisie remplace les boutons ; Start redevient sombre quand « Valider » est à l'écran ou qu'un flipper est tenu (un seul vert) ; un outil indisponible reste, grisé avec sa raison (« Aucun champ », « Après la partie »).
+**Un toucher pendant un changement d'écran.**
+Une entrée touchée au moment où un détail de l'écran change (une progression, une note) fait bien ce qu'elle annonce ; la borne l'ignorait, l'écran ayant changé de version entre-temps.
+Un toucher sur un écran vraiment changé reste ignoré.
+
 - **Essais** : `remote.test.ts` (boutons, texte, envoi : messages fermés, noms nettoyés, morceaux scellés et refusés d'ailleurs, gros morceaux justes et rapides) ; `telecommande.test.ts` rejoue le parcours de bout en bout : la vraie gestion des tables hors écran, le QR lu **sur la capture même de l'écran**, la vraie page du téléphone acceptée par Start, Exit et un flipper tenu au téléphone, la saisie et sa validation, un fichier envoyé octet pour octet, puis les refus (plus de 2 Go, mode invité, nom qui remonte les dossiers, morceau d'une autre connexion, morceau rejoué, autre hôte), une partie, « Récupérer » qui prend et rend le téléphone, le QR du clavier à l'écran, l'inactivité, Déconnecter, la fermeture ; le garde-fou de mise en page relit chaque écran.
   `guestmode.test.ts` fixe le passage par `handleKey` et la porte `phone.files`.

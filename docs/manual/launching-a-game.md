@@ -14,6 +14,7 @@ The menu windows are no longer hidden during a game: they stay behind VPX's wind
 The playfield keeps the loading screen (the game's loading video, or a fallback screen; on a desktop, the controls panel) until the game window appears, then each screen switches to its **in-game background**: the game's media, frozen by default, visible only on a screen VPX does not use (topper without a window, backglass without a `.directb2s`, no DMD); see "Loading and play".
 For this, each window receives a `game` state (table, media, playback of each role), rendered by `renderGame` (`app/renderer/frontend.js`).
 On return, the menu takes the foreground back as before.
+During the game, the joystick buttons no longer go to the front-end: it no longer takes the foreground back from VPX.
 
 A single rule covers every moment, the **screen guard** (`app/src/screen-guard.ts`, started by `main.ts` before any other window, except the waiting screen for another running frontend):
 
@@ -39,6 +40,8 @@ A single rule covers every moment, the **screen guard** (`app/src/screen-guard.t
   At startup, each menu window takes the foreground as it appears; after a game, only the playfield takes it back, and the DMD and backglass never have it: their taskbar, shown again, stayed in front (at times on the DMD, sometimes on the playfield).
   Now each taskbar is put under the menu window of its screen before being shown again (`placeWindowBelow`, without activating anything), then the taskbar guard runs again when coming back from a game, from the desktop, at every screen or work area change, every time a menu window takes the foreground back, and at every screen guard check: a taskbar in front of a menu window is put back behind (« Barre des tâches (Shell_SecondaryTrayWnd) devant « Cyber Pinball — DMD » sur l’écran « DMD » (retour d’une partie) : remise derrière. »).
   Never while another program has the foreground (VPX in game, Start menu).
+  When Windows keeps showing the taskbar again in the middle of a game (Copilot, Start menu, a notification in the foreground), Cyber Pinball no longer hides it again in bursts: it leaves it alone for a while, and the log says which program had the foreground.
+  Those bursts froze VPX for a few seconds and made the backglass leave full screen, as if the screens were being detected again.
   A taskbar that Windows brings back in front five times within ten seconds is hidden as during a game, with the same marker, until desktop mode or until the application closes.
   Nothing is set in Windows: only the window order changes, as Explorer does itself;
 - **screens log** (`<data>\logs\ecrans.txt`, 512 KB at most, oldest entries removed): at every switch (menu startup, game start, VPX game window shown, back from a game, Windows desktop and back, screen change, taskbar put back behind), the Windows foreground window, for each cabinet screen the Cyber Pinball window that covers it and everything above it (« BARRE DES TÂCHES DEVANT », taskbar in front; « DÉCOUVERT », uncovered), and the rectangle of each taskbar, shown or hidden, permanently on top or not.
@@ -102,6 +105,9 @@ Every other visible VPX window is classified (`classifyVpxWindow`, `packages/cor
   The message stays in the cabinet log: "Message du script de la table validé par OK, la partie continue : « … »" (Message from the table's script accepted with OK, the game goes on).
   If the box is still there 3 s later, the game stops as for an error.
   A question (Yes / No, Cancel) and VPX's own boxes (titled "Visual Pinball") still stop the game;
+- **`core.vbs` debug help** ("Click YES to Add a ball to the Trough…"), opened on a ROM table by a button bound to Extra Ball or by the F12 key: it is a Yes / No / Cancel question that Cyber Pinball used to treat as a fatal error.
+  It is now closed with Cancel, with no effect on the table, and a log line explains what happened.
+  Cyber Pinball never answers Yes or No for you, and the tables' other questions remain fatal;
 - **editor window**, if another version of VPX opened one: the editor (class `VPinball`), the script editor (`CVFrame`), "Preparing Table" and the debugger are hidden (closing them would quit VPX or ask a question), the table audit ("Dialog" box whose text starts with "Table audit:" or "This table contains error(s)") is closed; the game goes on, and the game window takes the foreground back;
 - **unknown window**: left on screen.
 
@@ -112,6 +118,8 @@ A `vpinball.log` that this launch did not write (older than it, `logWrittenSince
 VPX crashing before writing a single line of its log had not opened the table yet: the failure screen says "VPX s'est arrêté en démarrant" (VPX stopped while starting), a VPX fault rather than the table's, with one signature for all tables (`vpxStartupCrash`, [vpxfailure.ts](../../packages/core/src/vpxfailure.ts)).
 Cyber Pinball then compares its VPX's files with those of the archive (see "Checked VPX files" in [Installation and file layout](installation-and-file-layout.md#installation-and-file-layout)): replaced outside Cyber Pinball, they are named on the screen and Start puts their originals back; otherwise the screen points to "Santé de la borne" (Cabinet health).
 Real case: another VPX copied over Cyber Pinball's (SDL 3.2.18 instead of 3.4.14) stopped VPX 0.2 s after every launch, on every table.
+VPX stopped right after the PuP-Pack starts: the failure screen says so and offers to replay the table without its PuP-Pack (Start), set aside; "Re-enable the PuP-Pack", in "Game parts", puts it back as it was (see [PuP-Pack disabled, table by table](pup-pack-disabled-table-by-table.md#pup-pack-disabled-table-by-table)).
+When VPX stops without leaving a crash report, the report attaches the Windows event that names the faulty module (the PuP plugin, for example), and the stop screen quotes it.
 
 **Report of a failed game.**
 The failure screen offers "Flipper : envoyer un rapport aux développeurs" (Flipper: send a report to the developers) (on the phone, "Envoyer un rapport aux développeurs"): the problem already filled in, the tech sheet, the cabinet health and the logs attached, encrypted and anonymised like the [tech sheet](tech-sheet.md#tech-sheet) report.
@@ -142,6 +150,16 @@ A text seen only once, or one that uses the timer's internal variables, still ru
 Neither the table nor VPX's scripts on disk are modified.
 The diagnosis says so on the table's page ("Script qui arrête la partie à chaque minuterie" (Script that stops the game at every timer), or "… à chaque clignotement et à chaque minuterie" (… at every blink and every timer), action "Ne compiler chaque texte qu'une fois" (Compile each text only once)) and repairs it before every game; the table's files then name the `.vbs` "minuteries sans analyse de l'antivirus" (timers without antivirus scans).
 Tests: `minuteries-texte.test.ts` (detection, lines in place, same result with and without the fix when run by `cscript`, installed core.vbs, diagnosis).
+Timers described as text (*Guardians of the Galaxy*, *Game of Thrones*…) are compiled only once, and those written as plain code in the table are compiled in one go at load time, instead of being scanned at every due time.
+**Command stored in a text before being run** (`Execute qCmd` in *Guardians of the Galaxy*, at every scene): same cause, same stop.
+The diagnosis spots them ("Script qui arrête la partie à chaque commande exécutée", Script that stops the game at every command run) and the copy of the script VPX plays compiles each text only once; the table is never modified, and a text that depends on the procedure running it is still run as before.
+A script adapted by a previous version of Cyber Pinball is redone before the game with today's fixes, instead of being taken for a script from elsewhere.
+When the game stops in jerks, the log says whether the table's script was having text scanned by the antivirus at that moment (`amsi.dll` and `vbscript.dll` seen on the stack), and the log and the report name the antivirus at fault: Microsoft Defender, McAfee (`mc-sec-plugin-x64.dll`, `mfe*`), Avast and AVG, Bitdefender, Kaspersky, ESET, Malwarebytes, Sophos, or any other antivirus that declares itself as an AMSI provider.
+Before, only Defender was recognised: a jerk caused by another antivirus stayed unexplained.
+**.NET components in scripts**: the old .NET ActiveX components of table scripts use the .NET engine present on Windows, even without .NET 3.5.
+This avoids the music initialisation stopping, then the cascade of UltraDMD errors, without modifying the tables.
+**Script errors of the last game**: the diagnosis gives the first script error and the number of errors of the table's last game, without mixing tables up, and removes that finding after a new game with no error.
+It also lists the additional scripts VPX could not load, before the variable or object errors that follow from it, for that last game only.
 **Call refused by VPX's B2S backglass** (`b2sArgs`): VPX 10.8.1's B2S plugin, which stands in for B2S Server, only accepts numbers in some places of its functions (`B2SSetData`, `B2SSetScore`, `B2SSetLED`…).
 A number written as text (`"1"`) goes through; any other text is refused ("Failed to convert a parameter in call to B2S_Server.B2SSetData" in `vpinball.log`), and the script procedure that made the call stops, whereas B2S Server accepted it.
 *Champions League 2023* stopped that way during its initialisation, before creating its DMD: "Objet requis: 'UltraDMD'" (Object required) all over the playfield, at every tick.
@@ -790,3 +808,4 @@ A ROM missing its sound files is marked as having no music without crashing the 
 After a record or overtaken player, the post-game screen shows score, record, detailed XP, gained place and next target, then Replay, a prepared message between friends, Challenge and Back to tables as appropriate.
 Badge and level animations follow.
 VPX 10.8.1-5436 patched Cyber Pinball 4 combines independent secondary-screen refresh rates, framing, PuP GIF decoding outside rendering and GPU timing; it is installed at startup after an update.
+The following series (5 to 9) fix VPX and PuP plugin stops: see [Patched VPX shipped with Cyber Pinball](vpx-plugins-backglass-pup-and-dmd.md#patched-vpx-shipped-with-cyber-pinball).

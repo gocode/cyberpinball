@@ -11,6 +11,7 @@ son interface).
 
 ## 0.2.4
 
+- Nouveautés : Pinball FX Midnight est signalé en bêta.
 - Quitter une table dont VPX reste bloqué à la fermeture (écran figé, son de la bille en boucle) ne demande plus de redémarrer la borne : si VPX ne se ferme pas dans les 10 secondes qui suivent la fin de la partie, Cyber Pinball le ferme, relève la partie et te ramène à l'écran des tables, avec une note qui explique ce qui s'est passé.
 - Quand VPX s'est figé en arrêtant le PuP-Pack, la note te propose de jouer la table sans son PuP-Pack.
 - Mise à jour : la borne trouve toujours la version la plus récente publiée, quel que soit l'ordre de la liste de GitHub. Le 27/11/2026, la 0.2.4-essai.100 était rangée par GitHub après la essai.74 et aucune borne ne la voyait. La borne lit maintenant la liste des étiquettes de versions, plus légère (environ 28 Ko au lieu de 437 Ko), et ne garde la liste des publications qu'en secours. Le relais de Cyber Pinball transmet aussi les étiquettes ; le canal d'essai privé suit la même règle.

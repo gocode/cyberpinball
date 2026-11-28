@@ -65,6 +65,9 @@ L'équipe change l'état des propositions, y répond, masque ou regroupe les dou
 Code : [packages/core/src/feedback.ts](../../packages/core/src/feedback.ts) (protocole, scellement, doublons, accord) ; [app/src/feedback-service.ts](../../app/src/feedback-service.ts) (le service vu de la borne, la file d'attente) ; [app/src/feedback-menu.ts](../../app/src/feedback-menu.ts) (les écrans).
 [feedback.test.ts](../../packages/core/src/test/feedback.test.ts) et [retours-service.test.ts](../../packages/core/src/test/retours-service.test.ts) fixent le scellement, la signature, les doublons, l'accord, et que la borne et le service parlent le même protocole ; [retours-traduction.test.ts](../../packages/core/src/test/retours-traduction.test.ts) les traductions, [feedback-etats.test.ts](../../packages/core/src/test/feedback-etats.test.ts) les pastilles d'état, [rapport-pieces-jointes.test.ts](../../packages/core/src/test/rapport-pieces-jointes.test.ts) les fichiers joints.
 
+**État « En préversion ».**
+Un nouvel état « En préversion » dit qu'une idée est faite et que tu peux déjà l'essayer dans la préversion, avant la version finale ; il a sa pastille (une fiole, en contour vert).
+
 ### Mes échanges avec l'équipe
 
 Menu système > Aide et infos > Retours et propositions > Mes échanges avec l'équipe permet de lire les réponses à vos rapports et d'y répondre.

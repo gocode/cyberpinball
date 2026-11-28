@@ -5,6 +5,7 @@
 Cyber Pinball also launches **Pinball FX** tables (Zen Studios, 2023), bought on Steam or Epic.
 **In beta**: the funnel entry and the table page's "Pinball FX" row carry the "BETA" pill, and the tables screen says so at the top.
 Pinball FX3 ("Pinball FX Classic") has its own section: [Pinball FX3 tables](pinball-fx3-tables.md), and so does Future Pinball: [Future Pinball tables](future-pinball-tables.md).
+**Pinball FX Midnight** (formerly Pinball M, a different Zen Studios game) goes through the same code: see "Pinball FX Midnight" below.
 Its tables aren't files: they are game content, identified by a number.
 Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an **entry file** `.pinballfx` (JSON: `{ "PinballFX": { "Table": 156 } }`), its `.info` and its media, like a VPX table; the wheel, collections, favourites, statistics and media therefore work the same way.
 
@@ -44,7 +45,7 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   A Pinball FX left open is closed before the game.
   Pinball FX takes 20 to 25 s to open a table: after 120 s without a window, the game fails with its explanation.
 - **Quitting**: quitting the table in the game goes back to its own menu; **holding Exit** (2 s) closes the game and returns to the wheel.
-  The loading card says so; the shortcut that stops a stuck game works too.
+  The loading screen says so in a pill at the bottom of the screen ("To get back to Cyber Pinball: hold Exit for 2 s"); the shortcut that stops a stuck game works too.
 - **Image rotation on a cabinet**: before each game, Cyber Pinball sets the game's forced display rotation (the game's Options > Video) in the same direction as its own playfield windows, for a player standing at the flipper edge.
   The table faces the player instead of staying in landscape.
   The setting is written to `LocalSettings.cfg` (`%LOCALAPPDATA%\PinballFX\Saved\PersistentDownloadDir\<store>\LocalSettings.cfg`, `video` section: `useForcedDisplayRotation`, and `forcedDisplayRotation` set to `Rot_90`, `Rot_180` or `Rot_270`), the rest of the file kept as it is.
@@ -53,9 +54,10 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   Pinball FX3 has no equivalent: its settings are encrypted (see [Pinball FX3 tables](pinball-fx3-tables.md)).
 - **Cabinet mode set by Cyber Pinball**: nothing to set in the game's "Cabinet Support" menu.
   Before each game, Cyber Pinball turns cabinet mode on and places the game's DMD window on the cabinet's DMD screen, from its own screen setup; on a FullDMD, the DMD takes the central band in 4:1 shape, like Visual Pinball's.
-  The game's backglass window is turned off: a single picture on the backglass, the one chosen when the table was added, shown by Cyber Pinball as outside cabinet mode.
-  Turned on, it sat on top and, when its picture was missing (the game's menus, a table chosen in the game), showed the path of the file it was looking for; no picture is put in the game's cabinet mode folder.
-  Only the activation, the DMD's place and size and the backglass being turned off are written to `<game>\PinballFX\Mods\Cabinet\Settings.ini`; the rest (external DMD, padding, dot size, monitor number) is left as it is, and a UTF-16 file stays UTF-16.
+  The game also puts its window on the playfield screen, at its size, during the game: it ignores the screen and size written in its settings and always opened on the main screen.
+  The game's backglass window is turned on, on the cabinet's backglass screen: during the game, the game itself shows the table's backglass there, like the other games.
+  Cyber Pinball gives it the table's backglass picture (`Table_<number>.png`, in the game's cabinet mode folder, never replacing a picture already there); a table without a backglass picture keeps Cyber Pinball's own, never a file path.
+  Only the activation and the place and size of the DMD and backglass windows are written to `<game>\PinballFX\Mods\Cabinet\Settings.ini`; the rest (external DMD, padding, dot size, monitor number) is left as it is, and a UTF-16 file stays UTF-16.
   This file only exists once "Cabinet Support" has been opened once in the game: without it, nothing is written, and the game starts anyway.
 - **DMD sent to dmdext**: with its cabinet mode's "external device" option (`DmdDevice64.dll` from dmd-extensions: colorisation, PuP-Packs), the game opens dmdext's virtual DMD where `DmdDevice.ini` puts it, sometimes on top of the backglass.
   During the game, Cyber Pinball places it on the cabinet's DMD screen as it is, like Future Pinball's DMD: the full width of the screen, in 4:1 shape, in the middle.
@@ -79,6 +81,17 @@ Each one gets a "Title (Manufacturer Year)" folder in the tables folder with an 
   The other screens show their media according to "Médias pendant la partie" (Media during play) (see [Game media](game-media.md)).
   A game that changes a screen's resolution during play doesn't shift the front-end's windows: each one follows its role's screen, recognised by its identity and not by its old coordinates.
   A window found on another role's screen is logged and put back on its own.
+- **Number of players** (Pinball FX and Pinball FX Midnight): after Play on a table's page, pick 1 to 4 players with the flippers and Start; Exit goes back to the page.
+  Your Confirm button confirms too and your Back button returns to the page, like Start and Exit: on a cabinet where Confirm and Back are other buttons (the MagnaSave, for example), only Start confirmed.
+  Pinball FX also keeps Practice, Pro mode on Williams and Bally tables and its four challenges under "Other modes".
+  The phone, Table surprise and direct launches stay at one player.
+- **Pinball FX Midnight** (formerly Pinball M): supported on Steam, with its tables and games working like Pinball FX's.
+  Cyber Pinball finds the installation, including in a secondary Steam library, and launches its tables from the wheel; Steam manages access to the tables.
+  System menu > Tables > Add a table > **"Pinball FX Midnight tables"** lists a few known tables, and "Add by table number" accepts the others.
+  A line in What's new introduces it, and "Try it" opens this screen.
+  Displays and the DMD are set in the game's "Cabinet Support" menu, once "Cabinet Mode" is turned on.
+  Before each game, Cyber Pinball then places, as for Pinball FX, the DMD and backglass windows (`<game>\PinballM\Mods\Cabinet\Settings.ini`), puts the game window on the playfield screen and applies the cabinet's rotation.
+  The cabinet's flippers move through its menus: the Left and Right arrows are sent along with Shift, as for Pinball FX3.
 - **What Pinball FX doesn't provide**: no ROM or NVRAM, so no score board or ranking; no VR, no in-game settings, no DMD read by Cyber Pinball.
   Its external DMD (`DmdDevice64.dll` from dmd-extensions), its padding and its dot size are set in the game's **cabinet mode**; Cyber Pinball only writes the image rotation, the activation, the DMD's place and the backglass being turned off.
   On the table page, what doesn't apply stays in place, greyed out, with the reason: "Game parts", "Table files", "Settings for this table", "Adjust display in game", "DMD on the wheel", "Play and record", "Diagnose and fix", "Play with a friend", "Scoreboard".

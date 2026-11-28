@@ -167,6 +167,39 @@ Lecture par sondage, 100 fois par seconde, dans le processus principal (`package
   Avant la 0.1.11-essai.27, l'assistant passait avant VPX : une borne qui n'avait que des boutons de joystick ne pouvait ni relever ses boutons ni son lanceur au premier lancement.
   Tests : [first-run.test.ts](../../packages/core/src/test/first-run.test.ts).
 
+**Boutons avancés** (étape « Boutons » de l'assistant et des réglages des boutons de la borne).
+Une section repliée, en bas de la liste, te laisse affecter Crédit 2, 3 et 4 (autres monnayeurs), Fire (la barre de verrouillage), Afficher les règles, le Mode debug (statistiques d'affichage de VPX) et le Mode nuit.
+Tous sont facultatifs et vides par défaut ; l'assistant ne te les demande pas un par un.
+Crédit 1 est facultatif lui aussi : une borne n'a besoin que d'un monnayeur, Crédit 1 ou l'un des Crédits 2 à 4.
+Sans touche, Crédit 1 n'est plus actif dans VPX, et le menu de VPX en partie, l'aide et « Annuler les changements » suivent le premier monnayeur relevé.
+Le bouton Mode nuit bascule le mode d'un appui, au front-end comme en partie (voir [Son](son.md)).
+Les gâchettes analogiques des manettes se relèvent comme boutons de l'interface et du jeu, avec leur axe et leur sens reconnus par SDL et transmis à VPX ; les capteurs analogiques des pincabs ne deviennent pas des boutons.
+
+**Annuler la dernière touche.**
+Au récapitulatif et pendant le relevé, « Annuler la dernière touche » défait, aux flippers comme à la souris, chaque touche relevée, passée ou remise par défaut, une à une.
+La touche prise à un autre bouton lui est rendue, et l'écran dit ce qui a été défait, sans quitter l'étape.
+Les icônes des deux jeux de boutons sont à leur place : la manette pour « Boutons du jeu », le bouton d'arcade pour « Boutons de l'interface ».
+L'écran du relevé du Bureau Windows dit que le même bouton de joystick ramène Cyber Pinball, et qu'au clavier il faut Ctrl+Maj+D ou la barre des tâches.
+Quand tu ouvres l'assistant depuis le menu, l'écran dit tout de suite « Ouverture de l'assistant… ».
+Sur un seul écran, l'assistant va jusqu'au choix du DMD incrusté dans le playfield, même sans écran pour le backglass.
+
+**Boutons pendant une partie.**
+Un bouton lié à Extra Ball (ou la touche F12) n'arrête plus la partie : il ouvrait l'aide de débogage des tables à ROM de core.vbs (« Click YES to Add a ball to the Trough… »), que Cyber Pinball prenait pour une erreur fatale.
+Elle est maintenant fermée par Annuler, sans effet sur la table, et une ligne du journal explique ce qui s'est passé ; les autres questions des tables restent fatales, et Cyber Pinball ne répond jamais Oui ni Non à ta place.
+Pendant une partie, les boutons du joystick ne vont plus au front-end : il ne reprend plus le premier plan à VPX.
+Dans le menu de VPX en partie, les boutons suivent la navigation de Cyber Pinball : les flippers changent de ligne (gauche : précédente, droit : suivante), les MagnaSave règlent, valident ou annulent (gauche : diminuer ou annuler, droit : augmenter ou valider).
+Sur une borne sans MagnaSave, les flippers gardent le réglage, VPX n'ayant alors aucun autre bouton pour augmenter ou valider.
+Le rappel du réglage de l'affichage en partie (« Changer de ligne », « Régler, valider ou annuler ») montre les bons boutons ; les touches de VPX se réécrivent d'elles-mêmes au prochain lancement.
+
+**Table surprise** (bêta).
+Dans la roue, maintiens les deux flippers 1,5 seconde pour tirer au hasard une table de la collection active, avec une loterie de logos sur le plateau ; la partie part quand tu relâches les deux flippers.
+Exit ou un MagnaSave annule.
+Tant que les deux flippers sont tenus, leurs répétitions sont ignorées : la roue ne bouge plus pendant le geste.
+Seules les tables que tu as autorisées entrent dans le tirage : fiche de la table, Gérer la table > « Table surprise », qui dit « Peut sortir » ou « Ne sort jamais ».
+Toutes les tables jouables de la collection affichée y entrent, sans rien confirmer table par table, et une mise à jour de la table ou de VPX ne la retire plus ; celles de Pinball FX (quelle que soit la boutique : Steam, Epic…) et de Pinball FX3 y entrent aussi.
+Pour écarter toute une collection du tirage dans « Toutes les tables » : Menu système > Tables > Collections > « Exclure du tirage… », puis Start sur la collection (pour une collection personnelle : Gérer mes collections > la collection > « Exclure du tirage de Toutes les tables »).
+Dans la liste des collections, une collection écartée affiche « hors tirage » ; tirer dans la collection elle-même reste possible.
+
 ### Sortir d'une longue liste : la liste et les actions de l'écran
 
 Un écran de gestion qui montre une **liste de contenu** (les tables d'« Ajouter à un jeu », les cartes de « Médias du jeu », les tuiles d'une galerie de fichiers, la bibliothèque d'un ami, les fichiers et les emplacements du sélecteur, les lignes de la Santé de la borne, les téléchargements) a deux zones : la liste, et les actions de l'écran (« Retour », les autres gestes).

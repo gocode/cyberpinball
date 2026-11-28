@@ -59,3 +59,6 @@ Cinq destinations, la borne n'ayant pas de messagerie :
 
 Code : blocs, contrôles, anonymisation et rapport dans [packages/core/src/techsheet.ts](../../packages/core/src/techsheet.ts) ; relevé dans [app/src/tech-facts.ts](../../app/src/tech-facts.ts) ; écrans dans [app/src/tech-sheet.ts](../../app/src/tech-sheet.ts) ; page du téléphone dans `app/renderer/telephone/telephone.js` (`reportOffer`).
 [techsheet.test.ts](../../packages/core/src/test/techsheet.test.ts) fixe la lecture du relevé, la version d'un pilote NVIDIA, les fréquences, les contrôles de la santé, les blocs, l'anonymisation (jamais le compte, le PC ni une adresse dans aucun fichier du ZIP) et le résumé court.
+
+**Cartes graphiques.**
+La fiche technique cite toutes les cartes graphiques dans son résumé et nomme la carte concernée par chaque alerte de pilote, sans déduire laquelle est utilisée par la partie.

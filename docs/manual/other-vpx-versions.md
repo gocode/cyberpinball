@@ -34,6 +34,7 @@ Kept for Cyber Pinball's VPX: virtual reality, in-game display adjustment, games
 The sheet says so ("Pas de réalité virtuelle, réglage de l'affichage en partie… pour ces tables." (No virtual reality, in-game display adjustment… for these tables.)), and "Régler l'affichage en partie" (Adjust the display during a game) does not show there.
 A game with friends on such a table is refused before the launch ("Partie entre amis impossible avec VPX 10.8.0" (Game with friends not available with VPX 10.8.0)), as is an executable moved or uninstalled ("VPX 10.8.0 introuvable" (VPX 10.8.0 not found)), with the way back to Cyber Pinball's VPX.
 The log notes each game ("Partie (…) avec un autre VPX : VPX 10.8.0, …, ses propres réglages.").
+A VPX 10.8.0 starts without the editor window, and the game is left with the cabinet's Quit button, even if that VPX uses other buttons.
 
 **Table saved by a newer VPX.**
 Each table keeps the format version of the VPX that saved it (`readVpxFileVersion`); an older VPX shows an error window and loads it badly.

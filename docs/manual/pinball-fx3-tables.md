@@ -18,7 +18,7 @@ What differs from one game to the other is described here.
   Only **Fish Tales** and **Sorcerer's Lair** are free, on every account; the other tables only open if they are bought on the Steam account, and Cyber Pinball's messages remind you of it for them only.
   The "Pinball FX3 tables" screen says so at the top, with the address of Zen's help (`pinballfx.com/?page_id=7754`); a table's page has a "Cabinet mode" line.
 - **The game's first opening on this PC**: as long as Pinball FX3 has never been opened on this PC (no `SystemConfigCache.dat` in its folder), its cabinet mode isn't turned on there and it would open on its home screen, in landscape.
-  Before starting the table, Cyber Pinball then shows "First time Pinball FX3 opens on this PC": what to do in the game (cabinet icon next to the profile, "Activate", then the playfield rotation and the backglass and DMD screens), then close the game by holding Exit and start the table again; for a paid table, the purchase reminder.
+  Before starting the table, Cyber Pinball then shows "First time Pinball FX3 opens on this PC": what to do in the game (cabinet icon next to the profile, "Activate", then the orientation to enter, from the side the flippers are on in your cabinet; Cyber Pinball will put the DMD and backglass back in place), then close the game by holding Exit and start the table again; for a paid table, the purchase reminder.
   Start opens the game anyway, to set it up; Exit goes back to the front-end.
   The game encrypts these settings (`.dat` files in its folder and its Steam profile): Cyber Pinball can neither read nor write them, unlike Pinball FX's rotation.
   Once the game has been opened on this PC, nothing tells any more whether its cabinet mode is on: the message doesn't come back.
@@ -57,12 +57,18 @@ What differs from one game to the other is described here.
 - **Table stuck on the game's home screen**: the window is the same on the home screen and on a table, Cyber Pinball can't see it.
   A game shorter than 45 s shows on return **"Did Pinball FX3 stay on its home screen?"** with the possible causes, in the conditional: table not on this Steam account (never for Fish Tales or Sorcerer's Lair, which are free), cabinet mode not turned on, and for "Mars" the game's known bug that opens "Attack from Mars" when the account has both tables.
   A window that never shows up (120 s) fails with its explanation, as for Pinball FX.
-- **Quitting**: as for Pinball FX, **holding Exit** (2 s) closes the game and returns to the wheel; the loading card says so with the game's name.
+- **Quitting**: as for Pinball FX, **holding Exit** (2 s) closes the game and returns to the wheel; the loading screen says so with the game's name, in a pill at the bottom of the screen.
 - **Buttons and screens on a cabinet**: as for Pinball FX, the joystick buttons of a cabinet send the game the keys of its Controls > Keyboard screen, and the screens the game draws on are left to it (see [Pinball FX tables](pinball-fx-tables.md)).
   Pinball FX3's menus are browsed with the left and right arrows, on which Shift does nothing: each flipper therefore also sends the arrow on its side (`PINBALLFX3_EXTRA_KEYS`), which lets you reach the cabinet icon and turn on cabinet mode without a keyboard; in a game, the flippers still raise the flippers on the table.
   On a keyboard cabinet (keyboard encoder, keyboard), a flipper's key reaches the game alone: right during play, no effect in the menus.
   During the game, Cyber Pinball therefore reads these keys and also sends the arrow on their side, without delaying the flippers at all: nothing comes between the key and the game.
   Pinball FX3 in 1080p full screen on a 4K playfield changes the screen's resolution, and Windows rearranges the others: the front-end's windows each follow their role's screen, with no rotated playfield on the DMD screen and no DMD on the backglass.
+- **Windows placed by Cyber Pinball**: in cabinet mode, once the game has started, Cyber Pinball itself places the DMD and backglass windows on the screens of those roles.
+  Before, they opened where the game's settings had put them (DMD off-centre, backglass shifted by 101 px and cropped at the bottom, observed on a PinCab).
+  Nothing to do: if the game puts a window elsewhere again despite four tries, the log says so and Cyber Pinball leaves it.
+  When the playfield opens in windowed mode (title bar, minimise and maximise buttons, frame), Cyber Pinball removes the border and fits the window to the playfield screen; a playfield already without a border is left alone.
+  The DMD is no longer centred in the middle of the FullDMD screen: when the table has a FullDMD media with a frame (the same detection as for VPX), Cyber Pinball puts the DMD in that frame.
+  Turning cabinet mode on and the orientation are still set in the game (its settings are encrypted).
 - **Orientation**: the image rotation is set in the game's cabinet mode, Cyber Pinball doesn't write it.
   So that this setting holds from one front-end to another, Pinball FX3 starts on the playfield screen as Windows orients it, as with another front-end: the Windows orientation comes back just before the launch, no longer moves during the game, and the one Cyber Pinball gives the playfield for Visual Pinball comes back on returning to the wheel (see [Table orientation and framing](table-orientation-and-framing.md#desktop-orientation-on-exit)).
   On a cabinet where Cyber Pinball rotates that screen for Visual Pinball, an orientation entered in FX3 when it started on the session's one now gives an upside-down image.

@@ -142,7 +142,34 @@ Test: [cadrage-repris.test.ts](../../packages/core/src/test/cadrage-repris.test.
 
 Table sheet > Manage table… > Point of view identifies the framing: shared cabinet framing, the table's supplied POV or an imported POV.
 Import a POV… accepts a .pov or VPX 10.8 POV .ini from Downloads, a USB drive or disk; it is stored with this table and affects only it.
-A POV putting the flippers on the wrong side is refused with its reason; a supplied POV is offered in diagnostics when framing is already chosen.
-Switching to manual framing without a saved view is not a per-table view: diagnostics offers cabinet framing.
+A POV putting the flippers on the wrong side is refused with its reason.
+Switching to manual framing without a saved view is not a per-table view: diagnostics reports it and leads to "Point de vue" (Point of view) ("What's missing to play" no longer changes a table's framing without asking you).
 With patched VPX, Fit Table keeps the back of the playfield on screen: lower decoration and empty space above are cropped first, then width stretching of at most 15% fills the gap.
 Keep the top of the table and Maximum width stretch are available in VPX settings > Table view and framing, and VPX's in-game menu with eye height and distance.
+
+### Table framing and Point of view: styles, previews, history (beta)
+
+System menu > My cabinet > VPX > Cadrage des tables (Table framing) picks the cabinet's shared style: on a 16:9 screen, a table does not fit without a compromise.
+The three formats are named for what they do: "Plein cadre, bas rogné" (Full frame, bottom cropped) (default), "Table entière, bandes" (Whole table, bands) and "Plein cadre, table élargie" (Full frame, table widened).
+Each is shown on your own table, rendered by VPX without showing anything on the cabinet: the thumbnail says "VPX génère le rendu…" (VPX is generating the render) with an animated loader meanwhile.
+Previews have a bluish striped background where VPX renders pure black (bands, margins), to see where the table's edges really begin, and a light edge around the image.
+Choosing a framing does not start VPX again for the other cards: the cache key follows the framing actually applied, not the `.ini` text (under automatic framing, a view left in the `.ini` does not count).
+The framing images are finally displayed: VPX rendered them but the front-end refused to show them (empty cards).
+Table sheet > Manage table… > Point de vue shows each framing on an image of the table and lets you pick a style for this table alone.
+"Rétablir le cadrage précédent" (Restore the previous framing) goes back to the earlier framing.
+The view you set by hand in VPX's menu is kept in the history when a style, an imported POV or the original framing replaces it; it stays offered under "Ma vue personnalisée" (My custom view) and is never overwritten.
+Two trial presets (beta), for a single table and never for the cabinet, are to be compared on the previews:
+- "Plein cadre, au plus près des coins" (Full frame, closest to the corners) brings the playfield corners closer to the screen's (stretch up to 50% and a raised eye), in two variants, "écran incliné" (tilted screen) (the back of the playfield is slightly cropped) and "écran à plat" (flat screen); the raised eye is removed as soon as another framing takes the table over.
+- "Œil bas, table élargie" (Low eye, table widened) takes the characteristics of a view set by hand on a cabinet (lower eye, lowered glass, widened table): a starting point to adjust in VPX's menu.
+"Chercher un POV en ligne…" (Search for a POV online…) sits next to "Importer un POV…": same search as for the other game parts (tables database, VPUniverse, VPForums, Downloads, "Chercher sur le web…"), the chosen POV is stored with the table, and a source with nothing says so ("rien trouvé", nothing found).
+A table's path offers "Choisir le cadrage" (Choose the framing) and, when the VPS database knows one, a community POV.
+In game, the MagnaSave settings have a "Cadrage de cette table" (This table's framing) line, which opens the "Point of View" page of VPX's menu; the setting made there is kept in the history.
+
+#### Original framing of tables brought in
+
+A table brought in from PinUP Popper, PinballY or a VPX folder keeps its original framing whatever the way it was added (folder, archive, drag and drop), not only from an installation's import screen.
+Cyber Pinball reads the settings of the VPX that played it (its `VPinballX.ini`, or the registry for a VPX before 10.8) and freezes its mode (Manual, Fit, Fill), the screen measurements and the view; the original installation is never modified.
+The VPX that played each Popper table is found through the folder and launch script of its emulator (10.7 or 10.8): without it, Popper's framing was kept for no table at all.
+This framing is offered in "Point de vue" under "Cadrage de l'installation d'origine" (Original installation's framing).
+Tables brought in before this version get their original framing back once, unless you chose one in Cyber Pinball; the earlier framing stays in the history and "Rétablir le cadrage précédent" puts it back.
+VPX 10.8.0 also takes the table's supplied POV when partial view values masked it (a view already set keeps priority).

@@ -64,3 +64,8 @@ Un test fixe l'invariant : la question passe avant toute étape dans `handleKey`
 
 **« Placer librement… »** : à l'étape des écrans, après les écrans entiers et les emplacements tout faits (bas du backglass en 4:1 ou 16:9, incrustation dans le playfield), le backglass, le DMD et le topper proposent « Placer librement… ».
 Start ouvre l'éditeur de disposition sur ce rôle, posé sur son écran enregistré (sinon un écran libre, sinon celui du backglass), le curseur sur la ligne « Zone » ; « Revenir à l'assistant » garde la place choisie et passe au rôle suivant, Exit revient à la question telle qu'elle était.
+
+**Type du DMD : jamais deviné d'après la forme.**
+Le type choisi (DMD seul ou FullDMD) n'est plus jamais recalculé d'après la forme de la zone : un DMD placé librement en 1280x481 sur un écran 1280x720 restait DMD jusqu'à 480 lignes puis basculait en FullDMD ; il reste un DMD, quelle que soit la taille donnée à sa zone dans l'assistant ou dans Disposition des écrans.
+Un DMD placé librement dans une partie d'écran, sans que son type soit connu, fait demander « FullDMD ou DMD seul ? » pour cette place.
+Dans Configuration de la borne > Écran du DMD, « C'est un DMD seul » garde la zone placée à la main au lieu de la remplacer par une bande 4:1 ; une zone seule sur un écran large, sans type choisi, est signalée « À vérifier » quelle que soit sa forme.

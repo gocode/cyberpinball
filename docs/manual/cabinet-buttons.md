@@ -167,6 +167,39 @@ Polled 100 times a second in the main process (`packages/win-displays/src/joysti
   Before 0.1.11-essai.27, the wizard ran before VPX: a cabinet with only joystick buttons could neither capture its buttons nor its plunger on first launch.
   Tests: [first-run.test.ts](../../packages/core/src/test/first-run.test.ts).
 
+**Advanced buttons** ("Boutons" (Buttons) step of the wizard and of the cabinet buttons settings).
+A folded section, at the bottom of the list, lets you assign Credit 2, 3 and 4 (other coin slots), Fire (the lockbar), Show rules, Debug mode (VPX's display statistics) and Night mode.
+All of them are optional and empty by default; the wizard does not ask for them one by one.
+Credit 1 is optional too: a cabinet only needs one coin slot, Credit 1 or one of Credits 2 to 4.
+With no key, Credit 1 is no longer active in VPX, and VPX's in-game menu, the help and "Annuler les changements" (Cancel the changes) follow the first coin slot captured.
+The Night mode button toggles the mode in one press, in the front-end as in a game (see [Sound](sound.md)).
+The analogue triggers of game controllers can be captured as interface and game buttons, with their axis and direction recognised by SDL and passed on to VPX; the analogue sensors of pincabs do not become buttons.
+
+**Undo the last key.**
+In the summary and during capture, "Annuler la dernière touche" (Undo the last key) undoes, with the flippers as with the mouse, each key captured, skipped or reset to default, one by one.
+The key taken from another button is given back to it, and the screen says what was undone, without leaving the step.
+The icons of the two button sets are in the right place: the controller for "Boutons du jeu" (Game buttons), the arcade button for "Boutons de l'interface" (Interface buttons).
+The capture screen of the Windows desktop says that the same joystick button brings Cyber Pinball back, and that on the keyboard you need Ctrl+Shift+D or the taskbar.
+When you open the wizard from the menu, the screen immediately says "Ouverture de l'assistant…" (Opening the wizard…).
+On a single screen, the wizard goes as far as the choice of the DMD embedded in the playfield, even with no screen for the backglass.
+
+**Buttons during a game.**
+A button bound to Extra Ball (or the F12 key) no longer stops the game: it opened the ROM-table debug help of core.vbs ("Click YES to Add a ball to the Trough…"), which Cyber Pinball took for a fatal error.
+It is now closed with Cancel, with no effect on the table, and a log line explains what happened; the other questions of the tables stay fatal, and Cyber Pinball never answers Yes or No for you.
+During a game, the joystick buttons no longer go to the front-end: it no longer takes the foreground back from VPX.
+In VPX's in-game menu, the buttons follow Cyber Pinball's navigation: the flippers change line (left: previous, right: next), the MagnaSave buttons adjust, confirm or cancel (left: decrease or cancel, right: increase or confirm).
+On a cabinet without MagnaSave, the flippers keep the adjustment, since VPX then has no other button to increase or confirm.
+The reminder of the in-game display setting ("Changer de ligne" (Change line), "Régler, valider ou annuler" (Adjust, confirm or cancel)) shows the right buttons; VPX's keys rewrite themselves at the next launch.
+
+**Surprise table** (beta).
+In the wheel, hold both flippers for 1.5 seconds to draw a table at random from the active collection, with a lottery of logos on the playfield; the game starts when you release both flippers.
+Exit or a MagnaSave cancels.
+As long as both flippers are held, their repeats are ignored: the wheel no longer moves during the gesture.
+Only the tables you have allowed enter the draw: the table's sheet, Manage the table > "Table surprise", which says "Peut sortir" (Can come up) or "Ne sort jamais" (Never comes up).
+All the playable tables of the displayed collection enter it, with nothing to confirm table by table, and an update of the table or of VPX no longer removes it; those of Pinball FX (whatever the store: Steam, Epic…) and of Pinball FX3 enter it too.
+To leave a whole collection out of the draw in "Toutes les tables" (All tables): System menu > Tables > Collections > "Exclure du tirage…" (Leave out of the draw), then Start on the collection (for a personal collection: Manage my collections > the collection > "Exclure du tirage de Toutes les tables").
+In the list of collections, a collection left out shows "hors tirage" (out of the draw); drawing within the collection itself remains possible.
+
 ### Leaving a long list: the list and the screen actions
 
 A management screen that shows a **content list** (the tables of "Ajouter à un jeu" (Add to a game), the cards of "Médias du jeu" (Game media), the tiles of a file gallery, a friend's library, the files and places of the file picker, the lines of the cabinet health page, the downloads) has two zones: the list, and the screen actions ("Retour" (Back), the other gestures).

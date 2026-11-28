@@ -113,6 +113,32 @@ The **Volume −**, **Volume +** and **Mute** buttons (optional, "Boutons" step)
   Captures: `volume-borne-niveau.png`, `volume-borne-coupe.png`.
   Tests: [cabinetvolume.test.ts](../../packages/core/src/test/cabinetvolume.test.ts).
 
+**Volume on the phone.**
+A speaker button in the remote's top bar sets the cabinet's sound: in the menu, during a game, in the Juke-box and in applications opened on the cabinet.
+It opens a slider with the current level: Volume −, Volume + (keep your finger down to go faster) and Mute, like the cabinet's volume buttons, whose badge shows on the playfield at each press.
+An Android's Back button folds the slider away.
+The phone's own volume keys still set its own sound: a web page cannot capture them, hence these on-screen buttons.
+The cabinet volume also sets the sound of Edge and of applications opened on the cabinet: by the same step it follows Windows' default output (where Edge plays) and any output where a program plays, in addition to the outputs chosen in the "Sound" step; before, a volume bar and a Mute could stay without effect.
+The slider says why the sound does not move (Windows does not answer, no audio output, or a setting not taken by an output) instead of staying silent.
+
+### Night mode
+
+To play without disturbing anyone, night mode lowers in one go what you choose, line by line: a black veil on the menu's screens, the sound (a percentage of Windows' volume, 0% for mute), the LEDs' brightness or switch-off, and toys cut (solenoids, shaker…).
+**Settings**: System menu > My cabinet > "Configuration de la borne" (Cabinet configuration) > "Mode nuit" (Night mode) (line after the sound): screens, sound, LEDs, toys, schedule.
+It turns on from the settings, from an optional interface button, or, as you choose, at night on the cabinet's schedule (optional link); turned off during the night, the schedule does not turn it back on before the next night.
+The button is captured in the "Interface buttons" step, in addition to the advanced button of the game buttons (collapsed "Advanced buttons" section of the summary, empty by default): one press turns it on or removes it, in the menu as in a game.
+The black veil also applies on the wheel and in the menus (not just in attract mode), never during a game.
+On deactivation, the previous volume comes back, except for an output you adjusted with the buttons in the meantime.
+During a game, toys and LEDs follow too, through a variant of `Cabinet.xml` placed for the length of the game (restore log: a crash is repaired at the next start).
+This only applies if the DOF configuration is the one Cyber Pinball wrote; a hand-made configuration is never touched, and the settings screen says why the option has no effect.
+
+### VR audio output
+
+The "VR audio output" setting (System menu > My cabinet > Virtual reality and 3D vision, detailed in [Launching a game](launching-a-game.md)) chooses where the sound goes in the headset: Automatic, The cabinet, or any Windows audio output (useful for a headset, such as a Pimax, whose audio device is not recognised).
+When no headset output is recognised, the log lists the Windows audio outputs it saw.
+
+**Audio preview** of a card on the tables screen: it stops when a game starts, instead of carrying on over the table's music.
+
 ### Game volume
 
 A ROM too quiet next to the table's mechanical sounds (Medieval Madness on a PinCab, 11/12/2026) is fixed neither by the cabinet volume, which raises everything, nor by PinMAME: its `volume` setting (`HKCU\Software\Freeware\Visual PinMame\<rom>`) is an attenuation, already at 0, its maximum.

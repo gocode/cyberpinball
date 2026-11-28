@@ -64,3 +64,8 @@ A test pins the invariant: the question comes before any step in `handleKey`, th
 
 **"Placer librement…"** (Place freely…): at the screens step, after the whole screens and the ready-made spots (bottom of the backglass in 4:1 or 16:9, inset in the playfield), the backglass, DMD and topper offer "Placer librement…".
 Start opens the layout editor on that role, placed on its saved screen (otherwise a free screen, otherwise the backglass screen), with the cursor on the "Zone" line; "Revenir à l'assistant" (Back to the wizard) keeps the chosen spot and moves on to the next role, Exit returns to the question as it was.
+
+**DMD type: never guessed from the shape.**
+The chosen type (DMD only or FullDMD) is never recalculated from the shape of the area: a DMD placed freely at 1280x481 on a 1280x720 screen stayed a DMD up to 480 lines then switched to FullDMD; it stays a DMD, whatever size its area is given in the wizard or in Screen layout.
+A DMD placed freely in part of a screen, with its type unknown, makes the wizard ask "FullDMD ou DMD seul ?" (FullDMD or DMD only?) for that place.
+In Cabinet configuration > DMD screen, "C'est un DMD seul" (It is a DMD only) keeps the area placed by hand instead of replacing it with a 4:1 strip; a lone area on a wide screen, with no type chosen, is flagged "À vérifier" (To check) whatever its shape.

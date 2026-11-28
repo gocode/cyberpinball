@@ -908,6 +908,8 @@ A table's details screen > "Médias du jeu" (Game media) > a media item > **"Voi
   - the **VPS database thumbnails**: the playfield of each version of the table and the backglass of each `.directb2s` (from 352 × 626 to 1,000 × 750, "basse définition" (low definition)), often the only image of a game missing from VPinMediaDB: 2,608 games have a playfield one, 1,746 a backglass one;
   - the **VPS database music** (`soundFiles`): Dropbox share links to an mp3 or ogg, downloaded only when you choose the card, one at a time.
     The received file is checked by its signature (`isAudioFile`): a dead link returns an HTML page, and the card then says "Lien mort" (Dead link).
+- **Immediate opening**: the suggestions screen opens right away, then fills in as results arrive: the VPinMediaDB previews ("Aperçu en route…" (Preview on its way), with the same animated loader as the game images), the VPForums and VPUniverse results and the file sizes come later, previews six at a time and without duplicates.
+  A slow connection, or the wait VPUniverse imposes, no longer blocks choosing a backglass or a playfield.
 - **Choosing**: Start on a suggestion puts it in the draft, like a file from the import folder (a new page for the flyer and the rules).
   An online file is downloaded and verified (VPinMediaDB MD5) at the moment it is chosen; a file from the table is copied, and the original stays in place.
   The card says "Actuel" (Current) or "Choisi, à enregistrer" (Chosen, to be saved); the "Actuel" card of an online file shows the cabinet's file (the video itself, not the site's preview image).

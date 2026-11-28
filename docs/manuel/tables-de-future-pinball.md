@@ -15,6 +15,16 @@ Une table de Future Pinball est un fichier `.fpt`, comme un `.vpx` : elle a dans
   Le choix est gardé dans `<données>\future-pinball.json` et passe avant les emplacements habituels ; **« Revenir aux emplacements habituels »** l'oublie.
   Ce qui est trouvé n'est pas mémorisé : un jeu installé ensuite est vu aussitôt.
   BAM est reconnu à son lanceur, `BAM\FPLoader.exe` dans le dossier du jeu.
+  Un jeu installé ailleurs (`C:\vPinball\FuturePinball`, `C:\Games`…) reste détecté et utilisé tel quel, sans rien déplacer ; l'écran « Tables de Future Pinball » et l'ajout d'une table disent quel dossier est utilisé et pourquoi.
+- **Installer Future Pinball et BAM** : Menu système > Tables > Ajouter une table > « Tables de Future Pinball » > **« Installer Future Pinball et BAM… »** les télécharge et les installe dans le dossier de Cyber Pinball.
+  Rien n'est livré avec Cyber Pinball : les auteurs ne parlent pas de redistribution, tu télécharges donc chez eux, avec ton accord.
+  L'écran dit ce qui est téléchargé, d'où et où, et vérifie qu'il reste 300 Mo sur le disque avant de télécharger ; l'empreinte du fichier est vérifiée.
+  L'installateur de l'auteur n'est pas lancé, car il s'arrête sur sa page de licence, même en mode silencieux : l'écran te montre en entier les deux contrats (celui de Future Pinball et celui de BAM) et n'extrait les fichiers qu'après ton accord, gardé à côté du jeu.
+  L'extraction se fait par innoextract, un petit outil libre téléchargé lui aussi à la demande, sans demande d'administrateur ; les fichiers sont posés sans modification, et tes tables, bibliothèques, musiques et scripts déjà présents ne sont jamais écrasés.
+  Cette installation n'a ni désinstalleur, ni raccourcis, ni association des fichiers `.fpt` : Cyber Pinball lance lui-même les tables, et supprimer le dossier de Future Pinball dans Cyber Pinball suffit à tout retirer ; l'écran de demande le dit avant le téléchargement.
+  Si l'extraction échoue sur ton PC (antivirus, droits, disque), un écran « Installer à la main » te guide : ouvrir l'installateur de l'auteur déjà téléchargé et vérifié, lire et accepter son contrat, puis « J'ai fini : vérifier » retrouve Future Pinball où que tu l'aies installé.
+- **Reprendre une installation existante** : tu peux reprendre les tables, bibliothèques, musiques et scripts de l'ancienne installation dans celle de Cyber Pinball ; la liste, la taille et la destination sont affichées avant la copie, rien n'est écrasé, l'ancienne installation reste intacte.
+  La reprise reprend aussi les vues de BAM (la caméra réglée de chaque table) : une vue que BAM avait créée par défaut et que personne n'avait réglée est remplacée en gardant l'ancienne à côté ; une vue que tu avais enregistrée n'est jamais écrasée.
 - **Ajouter ses tables** : Menu système > Tables > Ajouter une table > **« Tables de Future Pinball »**.
   L'écran montre le jeu trouvé (« Trouvé sur ce PC » ou « Dossier choisi à la main »), ou « Introuvable » avec les endroits cherchés, puis les `.fpt` du dossier Tables du jeu et de ses sous-dossiers (deux niveaux), triés par nom.
   Une table déjà dans le front-end porte « Dans le front-end » et Start ouvre sa fiche ; Exit revient alors à cet écran.
@@ -33,6 +43,8 @@ Une table de Future Pinball est un fichier `.fpt`, comme un `.vpx` : elle a dans
   Une archive qui ne contient que des bibliothèques, comme les sons, voix et musiques d'une table livrés à part, est rangée de même dans Libraries.
   Rien n'est écrasé : une bibliothèque déjà là reste celle du jeu (d'autres tables s'en servent), et une autre table du même nom est copiée à côté, sous « Titre (2).fpt ».
   Les autres fichiers (lisez-moi, images, vidéos de présentation) ne vont nulle part.
+  Avant la partie, Cyber Pinball lit les bibliothèques (`.fpl`) que la table cite et repère celles qui manquent dans le jeu (par exemple les sons de Ghostbusters, livrés dans une seconde archive).
+  Une bibliothèque que l'ancienne installation avait encore est remise sans rien écraser ; sinon le journal le dit, nomme l'archive reçue qui la contient peut-être et rappelle d'utiliser « Ajouter une table » dessus.
   Dans « Ce qu'il faut » d'une version Future Pinball, il ne faut que la table : un fronton animé (`.directb2s`) proposé par la fiche sert à VPX, et l'écran le dit, Future Pinball dessinant son propre fronton.
 - **Lancement** : `"Future Pinball.exe" /open "<table>.fpt" /play /exit`, lancé depuis le dossier du jeu (ses bibliothèques `.fpl`), avec le `.fpt` du dossier de la table.
   Avec BAM, la partie passe par son lanceur, comme avec les autres front-ends : `"BAM\FPLoader.exe" /open "<table>.fpt" /play /exit /arcaderender /STAYINRAM`, lancé depuis le dossier de BAM ; sans `/STAYINRAM`, BAM ne charge pas ses réglages.
@@ -40,18 +52,26 @@ Une table de Future Pinball est un fichier `.fpt`, comme un `.vpx` : elle a dans
   La partie est celle de Pinball FX : chargement, barres des tâches masquées, autres front-ends ouverts signalés, statistiques et niveau, retour à la roue.
   Sans BAM, le jeu est reconnu à la première fenêtre visible de son propre processus, jamais à un titre qu'une page web pourrait porter.
   Avec BAM, il est reconnu à son exécutable, « Future Pinball.exe », même quand FPLoader le lance à part ; un Future Pinball déjà ouvert avant le lancement n'est pas pris pour la partie, et FPLoader, s'il reste ouvert, est fermé à la fin.
-  Quitter la table dans le jeu le ferme (`/exit`) et ramène à la roue ; un **appui long sur Exit** (2 s) le ferme aussi.
+  Quitter la table dans le jeu le ferme (`/exit`) et ramène à la roue ; un **appui long sur Exit** (2 s) le ferme aussi, et l'écran de chargement l'écrit en une pastille au bas de l'écran (« Pour revenir à Cyber Pinball : maintiens Exit 2 s »).
 - **Boutons d'une borne à joystick** (Pinscape, encodeur en mode manette) : Future Pinball ne lit que le clavier, et son propre réglage de manette ne marche que sous un Windows en anglais.
   Pendant la partie, Cyber Pinball rend donc chaque bouton de joystick relevé par l'assistant sous la touche que les préférences du jeu donnent à son rôle (Préférences > Touches, lues dans le registre de l'utilisateur ; ses touches d'origine si elles manquent).
   Sont rendus : flippers, lanceur, Start, crédit, secousses gauche, droite et avant, MagnaSave gauche et droit (les « Special 1 » et « Special 2 » du jeu) ; Exit envoie Échap, qui quitte la table.
   Les touches ne partent que quand le jeu est au premier plan, et celles encore tenues sont relâchées à la fin de la partie ; les boutons d'un encodeur clavier arrivent au jeu tels quels.
+- **Vue de la table aux boutons de la borne** (borne sans clavier, boutons de joystick) : en partie, appuie sur les deux boutons MagnaSave ensemble, le menu de BAM s'ouvre et tu règles la vue de la table avec les boutons de la borne.
+  Les flippers changent la valeur, les MagnaSave choisissent la ligne, Start valide, Exit ferme le menu (la partie continue) ; menu fermé, tes boutons se comportent comme avant.
+  BAM enregistre lui-même la vue de la table et la relit au lancement suivant.
+  La touche d'ouverture est lue dans le fichier `bam.cfg` de BAM (Menu) ; sans réglage lisible, c'est celle du manuel de BAM.
+  Une borne dont les MagnaSave sont au clavier garde le menu de BAM à son clavier.
+  L'aide s'affiche en tête de l'écran « Tables de Future Pinball ».
 - **Secousses** : Future Pinball ne lit pas l'accéléromètre d'un Pinscape.
   Pendant la partie, Cyber Pinball suit l'accéléromètre choisi à l'étape « Tilt » (voir [Tilt](tilt.md#tilt)) et, à chaque à-coup franc, frappe une fois la touche de secousse du jeu de ce côté : gauche, droite ou vers l'avant, d'après ses préférences.
   Le sens suit le réglage de l'accéléromètre pour VPX : une borne dont VPX secoue juste secoue juste ici.
   Une courte pause suit chaque secousse, pour que le rebond de la caisse ne compte pas comme une seconde ; rien n'est envoyé quand le jeu n'est pas au premier plan, ni avec l'accéléromètre réglé sur « Aucun ».
   À la fin de la partie, le journal compte les secousses envoyées de chaque côté.
 - **Fenêtre et écrans** : ouvert en fenêtre ailleurs que sur le playfield, le jeu y est posé ; en plein écran, il reste là où ses préférences l'ont mis.
-  Ses écrans et son cadrage se règlent dans ses préférences (Vidéo) ; « Régler l'affichage en partie » reste grisé avec cette raison.
+  Le jeu retient le nom Windows de l'écran (« \\.\DISPLAY2 »), que Windows renumérote parfois : le playfield pouvait s'ouvrir sur l'écran du DMD, les écrans se réarrangeaient et le playfield gardait une image fixe pendant la partie.
+  Cyber Pinball règle donc ces deux écrans, playfield et fronton, d'après ta borne avant chaque partie.
+  Son cadrage se règle dans ses préférences (Vidéo) ; « Régler l'affichage en partie » reste grisé avec cette raison.
   La partie garde l'orientation que Cyber Pinball donne au playfield pour la session : lancée sur celle de Windows, la table s'afficherait à l'envers (voir [Orientation et cadrage des tables](orientation-et-cadrage-des-tables.md#orientation-du-bureau-à-la-sortie)).
   Comme pour les jeux de Zen, les écrans où ses fenêtres annexes dessinent (fronton, DMD) lui sont laissés, et les autres montrent leur média selon « Médias pendant la partie » (voir [Tables de Pinball FX](tables-de-pinball-fx.md)).
 - **DMD sur l'écran DMD, par dmdext** : Future Pinball dessine son DMD dans sa fenêtre du fronton.
@@ -60,7 +80,9 @@ Une table de Future Pinball est un fichier `.fpt`, comme un `.vpx` : elle a dans
   Son DMD virtuel est posé par Cyber Pinball sur l'écran DMD tel qu'il est pendant la partie, toute la largeur de l'écran au format d'un DMD (4:1), au milieu : le plein écran du jeu fait déplacer des écrans par Windows, et la place écrite dans `DmdDevice.ini` tombait alors hors de tout écran.
   Un DMD que le joueur a déjà placé entièrement sur l'écran DMD reste où il est.
   L'écran DMD est laissé à dmdext comme à une fenêtre du jeu.
-- **PuP-Pack d'une table** (tables « PinEvent », comme Retroflair BAM Edition) : la table lance PinUP Player, qui place ses fenêtres d'après son propre réglage (`PinUpPlayer.ini`), écrit pour une autre disposition des écrans.
+- **Tables « PinEvent »** (comme Retroflair BAM Edition) : elles se jouent avec le DMD et les sons de Future Pinball, sans rien à installer de plus ; Cyber Pinball ne te demande plus d'installer PinUP Player ni PinUP Popper.
+  Le lecteur de PuP-Packs (PinUP Player) qu'une table lance parfois n'est plus pris pour PinUP Popper (plus de fausse alerte « PinUP Popper est ouvert »), et il se ferme avec la partie.
+  Quand il est là, il place ses fenêtres d'après son propre réglage (`PinUpPlayer.ini`), écrit pour une autre disposition des écrans.
   Pendant la partie, Cyber Pinball pose chaque fenêtre de PinUP Player sur tout l'écran de son rôle, tel qu'il est à cet instant : l'écran 0 de PinUP sur le topper, le 2 sur le fronton, le 5 sur le FullDMD ; les autres restent où PinUP les met.
   Ces écrans sont laissés au PuP-Pack, et le réglage de PinUP n'est pas modifié.
 - **Partie impossible** : jeu introuvable (le message renvoie à « Tables de Future Pinball » pour choisir son dossier), fichier de la table absent, ou chemin que la ligne de commande ne saurait passer (guillemet) : dit avant tout lancement.

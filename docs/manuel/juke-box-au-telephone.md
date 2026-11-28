@@ -25,4 +25,7 @@ Parcourir au téléphone déplace donc aussi la sélection à la borne.
 - **Messages** : le téléphone envoie `jb` : `open`, `row` (une ligne reçue), `play`, `up`, `pause`, `shuffle`, `repeat`, `seek` (0 à 1), `next`, `prev`, `manage`, `exit` ; une ligne est sa clé reçue (200 caractères au plus).
   Tout autre mot coupe la liaison.
   La borne passe chaque commande au lecteur, comme un clic (`click`), et vérifie tout.
+**Connexion à YouTube.**
+La fenêtre d'Edge où tu te connectes à YouTube, depuis la borne, s'ouvre en plein écran, sans barre de titre.
+
 - **Essais** : `telecommande.test.ts` rejoue le Juke-box dans le scénario hors écran des classements (`demo-telephone-scores`) : les playlists sans la gestion mêlée, leurs pochettes réduites sous jeton, une playlist ouverte, ses boutons à part des morceaux, un morceau grisé avec sa raison, un morceau lu d'un toucher, le mini-lecteur, le lecteur et son temps, pause, suivant, avance, retour, « Gérer ».

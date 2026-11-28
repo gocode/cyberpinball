@@ -41,6 +41,7 @@ A new section gets its heading below, in its place, and its translation in [manu
 ## [Pinball FX tables](manual/pinball-fx-tables.md)
 ## [Pinball FX3 tables](manual/pinball-fx3-tables.md)
 ## [Future Pinball tables](manual/future-pinball-tables.md)
+## [Applications](manual/applications.md)
 ## [Never stuck: the web from every adding screen](manual/never-stuck-the-web-from-every-adding-screen.md)
 ## [The phone as a remote for the built-in browser](manual/the-phone-as-a-remote-for-the-built-in-browser.md)
 ## [The phone as a remote for the menu](manual/the-phone-as-a-remote-for-the-menu.md)

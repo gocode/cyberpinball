@@ -21,6 +21,10 @@ Un `.vbs` venu d'ailleurs n'est pas touché.
 **Rien ne le rallume.**
 Le diagnostic dit « PuP-Pack désactivé » (information) et ne réclame rien ; les réparations faites avant chaque partie remettent le script sans PuP, jamais le pack ; la santé de la borne et « Ce qu'il manque pour jouer » le comptent comme fait ; « Parties du jeu » ne cherche ni ne propose de pack à télécharger pour lui ; le partage entre amis ne l'envoie pas ; une mise à jour du pack installée par le plan d'ajout se range dans `pupvideos (off)` et reste désactivée.
 
+**Après un arrêt de VPX au démarrage du PuP-Pack.**
+Quand VPX s'arrête juste après le démarrage du PuP-Pack, Cyber Pinball le dit sur l'écran d'échec et propose de rejouer la table sans son PuP-Pack (Start).
+C'est la même désactivation que ci-dessus : le pack est rangé à part dans `pupvideos (off)`, et « Réactiver le PuP-Pack », dans « Parties du jeu », le remet tel quel.
+
 **Pack partagé.**
 `pupvideos` est commun aux tables d'un même dossier : les autres versions qui chargent le même pack (même ROM, même nom) se jouent aussi sans lui.
 L'écran de confirmation les nomme avant de désactiver, et elles disent « désactivé » elles aussi ; le pack se réactive depuis n'importe laquelle.
