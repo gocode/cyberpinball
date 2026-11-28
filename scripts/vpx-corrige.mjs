@@ -1,6 +1,7 @@
 // Construit le VPX corrigé de Cyber Pinball : VPinballX_BGFX64.exe et le plugin PuP de VPX 10.8.1-5436, avec les
 // correctifs de packages/vpx-corrige/correctifs, et la bibliothèque DOF (plugins\dof\dof64.dll, libdof de la 5436) avec
-// ceux de packages/vpx-corrige/correctifs-libdof (voir son LISEZMOI). Cyber Pinball les pose à la place de ceux de
+// ceux de packages/vpx-corrige/correctifs-libdof ; bgfx, lié à l'exécutable, reçoit ceux de
+// packages/vpx-corrige/correctifs-bgfx (voir son LISEZMOI). Cyber Pinball les pose à la place de ceux de
 // l'archive officielle (app/src/vpx-corrige.ts) ; les autres plugins et les bibliothèques restent ceux de la 5436.
 //   node scripts/vpx-corrige.mjs            -> build\vpx-corrige\VPinballX_BGFX64.exe (et .pdb), plugins\pup\plugin-pup64.dll,
 //                                              plugins\dof\dof64.dll
@@ -33,13 +34,23 @@ export const VPX_CORRIGE_PUP = 'plugin-pup64.dll';
 export const VPX_CORRIGE_DOF = 'dof64.dll';
 /** Correctifs de libdof (série 6) : la recette les applique aux sources de la libdof de la 5436. */
 export const LIBDOF_PATCHES = path.join(VPX_CORRIGE_SOURCE, 'correctifs-libdof');
+/** Correctifs de bgfx (série 11) : la recette les applique au fork de bgfx de VPX, lié statiquement à l'exécutable. */
+export const BGFX_PATCHES = path.join(VPX_CORRIGE_SOURCE, 'correctifs-bgfx');
+
+/** Les correctifs .patch d'un dossier, dans l'ordre, et leur empreinte (repère de la dépendance qui les reçoit). */
+function patchSet(dir) {
+  const patches = fs.readdirSync(dir).filter((f) => f.endsWith('.patch')).sort();
+  const hash = crypto.createHash('sha256');
+  for (const p of patches) hash.update(fs.readFileSync(path.join(dir, p)));
+  return { patches, key: hash.digest('hex').slice(0, 16) };
+}
 
 /**
  * La version corrigée : commit de la 5436, révision gardée (le format des tables, les plugins et les réglages en
  * dépendent). `patch` : numéro de la série de correctifs, nommée en anglais partout où elle se voit (« patched Cyber
  * Pinball 1 ») : version produit de l'exécutable, journal de VPX, release des sources, fiche technique.
  */
-export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 10 };
+export const VPX_BASE = { commit: 'af26b2d9392b4c9ec3e3edff4bbd69562085a44c', revision: '5436', patch: 11 };
 VPX_BASE.sha = `af26b2d93-patched-cyberpinball-${VPX_BASE.patch}`;
 
 const work = process.env.CYBERPINBALL_VPX_BUILD ?? path.join(process.env.LOCALAPPDATA ?? os.tmpdir(), 'cpvpx');
@@ -405,7 +416,7 @@ function buildInputs(cmake) {
   return filesFingerprint([
     fileURLToPath(import.meta.url), path.join(repo, 'scripts', 'vpx-cache.mjs'),
     path.join(repo, 'scripts', 'casque-vr.mjs'),
-    path.join(VPX_CORRIGE_SOURCE, 'correctifs'), LIBDOF_PATCHES,
+    path.join(VPX_CORRIGE_SOURCE, 'correctifs'), LIBDOF_PATCHES, BGFX_PATCHES,
     path.join(repo, 'packages', 'installer', 'components.json'),
     vpxCorrigeSrcDir(), path.join(vpxBuildDir(), 'CMakeCache.txt'), cmakeExe,
     libdofSrcDir(), path.join(libdofBuildDir(), 'CMakeCache.txt'),
@@ -480,10 +491,13 @@ function buildLocked(cmake, clean, dofOnly) {
   copy(path.join(fiDir, 'build', 'Release', 'freeimage64.lib'), path.join(lib, 'freeimage64.lib'));
   copy(path.join(fiDir, 'Source', 'FreeImage.h'), path.join(inc, 'FreeImage.h'));
 
-  // bgfx (statique), au commit du fork de VPX, dans bgfx.cmake.
-  const bgfx = dependency('bgfx', `${deps.bgfxCmake}-${deps.bgfx}`, (dir) => {
+  // bgfx (statique), au commit du fork de VPX, dans bgfx.cmake, avec les correctifs de correctifs-bgfx (le repère de la
+  // dépendance porte leur empreinte : un correctif changé reconstruit bgfx, puis l'exécutable qui le lie).
+  const bgfxPatches = patchSet(BGFX_PATCHES);
+  const bgfx = dependency('bgfx', `${deps.bgfxCmake}-${deps.bgfx}-${bgfxPatches.key}`, (dir) => {
     const cm = fetchTarball(`https://github.com/bkaradzic/bgfx.cmake/releases/download/v${deps.bgfxCmake}/bgfx.cmake.v${deps.bgfxCmake}.tar.gz`, `bgfx.cmake.v${deps.bgfxCmake}.tar.gz`, path.join(dir, 'x'));
     const fork = fetchTarball(`https://github.com/vbousquet/bgfx/archive/${deps.bgfx}.tar.gz`, `bgfx-${deps.bgfx}.tar.gz`, path.join(dir, 'fork'));
+    for (const p of bgfxPatches.patches) run('git', ['apply', '--whitespace=nowarn', path.join(BGFX_PATCHES, p)], fork, `bgfx : correctif ${p}`);
     fs.rmSync(path.join(cm, 'bgfx'), { recursive: true, force: true });
     fs.renameSync(fork, path.join(cm, 'bgfx'));
     for (const [file, target, name] of [

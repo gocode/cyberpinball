@@ -66,6 +66,25 @@ export interface NewsItem {
 /** Les nouveautés, la plus récente d'abord. */
 export const NEWS: readonly NewsItem[] = [
   {
+    // Contrôle parental (28/11/2026), contribution d'un joueur sur GitHub ; « Niveaux » (0.1.14) sort
+    // de la liste pour la garder à 24. Date à poser au jour de la version finale.
+    id: 'controle-parental',
+    beta: true,
+    date: '2026-11-28',
+    version: '0.2.5',
+    get title() { return t('Contrôle parental'); },
+    get detail() { return t('Un code PIN protège les collections et les tables de ton choix : les autres restent à portée des enfants.'); },
+    get more() {
+      return [
+        t('Active-le dans Menu système › Ma borne › Contrôle parental : choisis un code à quatre chiffres, puis les collections ou les tables à protéger. Sur la borne, les flippers font défiler le chiffre et Start le valide.'),
+        t('Une table protégée reste verrouillée partout (Favoris, recherche, Table surprise, défilement au repos). Un code correct l’ouvre le temps que tu choisis, sans jamais interrompre une partie.'),
+        t('Développé par Emeric (lechable472-cloud), merci à lui.'),
+      ];
+    },
+    get where() { return t('Menu système › Ma borne › Contrôle parental'); },
+    reach: { kind: 'system', id: 'parental' },
+  },
+  {
     // Pinball FX Midnight (27/11/2026), contribution d'un joueur sur GitHub ; « Parties en direct »
     // (0.1.14) sort de la liste pour la garder à 24. Date à poser au jour de la version finale.
     id: 'pinballfx-midnight',
@@ -458,22 +477,6 @@ export const NEWS: readonly NewsItem[] = [
     },
     get where() { return t('Menu système › Ma borne › DMD et LED › LED et retours (DOF)'); },
     reach: { kind: 'system', id: 'dof' },
-  },
-  {
-    // Ajoutée après coup (17/11/2026) : les niveaux étaient sortis en préversion sans leur ligne.
-    id: 'niveaux',
-    date: '2026-11-17',
-    version: '0.1.14',
-    get title() { return t('Niveaux'); },
-    get detail() { return t('Tes parties, tes progrès, tes badges et la vie entre joueurs te font monter de niveau.'); },
-    get more() {
-      return [
-        t('Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Ton niveau monte et ne baisse jamais ; ta carte de joueur, en haut de l’écran des tables, le montre avec sa barre.'),
-        t('Un badge reçu a son moment au retour de la partie, avec son animation et sa musique, et le passage de niveau a ses rayons. « Mon niveau » dit ce qui rapporte des XP et quels badges sont les plus proches.'),
-      ];
-    },
-    get where() { return t('Communauté › Mon niveau'); },
-    reach: { kind: 'level' },
   },
 ];
 

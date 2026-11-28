@@ -20,6 +20,9 @@
 //   The Avengers Pro) ne termine plus VPX en 0xC0000409 ; le pack joue avec les captures lisibles.
 // - relevés de fluidité (série 10, 28/11/2026) : chaque seconde, le journal de VPX dit ce que coûtent les vidéos PuP
 //   (« PuP live »), le fil logique (« Logic live ») et le fil de rendu (« Render live »), images en retard à part.
+// - l'exécutable encore (série 11, 28/11/2026) : bgfx donne trois tampons au lieu de deux aux fenêtres annexes
+//   (backglass, ScoreView, topper) ; sur un écran annexe plus lent que le playfield, l'image suivante n'attend plus
+//   que l'écran rende la précédente, attente qui bloquait toute la carte graphique (images du playfield en retard).
 // Les autres plugins et les bibliothèques restent ceux de l'archive.
 //
 // Seulement sur la version pour laquelle il est construit (VPX_CORRIGE_VERSION) : un autre VPX (essai 10.9, VPX de
@@ -143,8 +146,8 @@ export function installVpxCorrigeAtStartup(vpx: { exe: string; version: string }
   return r;
 }
 
-/** Série de correctifs livrée (« patched Cyber Pinball 10 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
-export const VPX_CORRIGE_PATCH = 10;
+/** Série de correctifs livrée (« patched Cyber Pinball 11 ») : la même que VPX_BASE.patch de scripts/vpx-corrige.mjs. */
+export const VPX_CORRIGE_PATCH = 11;
 
 /** Le VPX corrigé livré est-il en place (tous ses fichiers) ? Son numéro de série de correctifs, sinon undefined. */
 export function vpxCorrigeInPlace(vpxDir: string, version: string | undefined, appDir: string): number | undefined {

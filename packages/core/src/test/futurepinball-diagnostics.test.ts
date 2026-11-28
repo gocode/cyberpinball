@@ -44,7 +44,7 @@ test('son : une sortie par défaut autre que celle de l’étape « Son », à 0
   const text = r.lines.join('\n');
   assert.match(text, /Écran du playfield \(HDMI\)/);
   assert.match(text, /vise « Haut-parleurs \(Realtek\) » \(playfield\)/);
-  assert.match(text, /ne change ni la sortie par défaut de Windows ni son routage/);
+  assert.doesNotMatch(text, /ne change ni la sortie par défaut/, 'Cyber Pinball la pose désormais (game-audio-route.ts)');
   assert.match(text, /à 0 %.*muette/);
   // Coupée : même constat.
   assert.equal(futurePinballSoundReport({ defaultOutput: { id: HDMI, level: 0.8, muted: true }, outputs, audio }).silent, true);

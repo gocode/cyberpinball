@@ -245,6 +245,8 @@ export interface WindowsChange {
 export const WINDOWS_CHANGES: WindowsChange[] = [
   // Orientation de l’écran du playfield pour la session seulement (rien dans le réglage de Windows) : décidée dans l’assistant, sur Start, confirmée en 15 s, après un avertissement si un autre menu est installé ; redonnée au démarrage, rendue à chaque sortie et au mode bureau (sessionorientation.ts). Le réglage de Windows n’est écrit que pour lui rendre l’orientation qu’une version d’avant le 27/10/2026 y avait laissée, sur Start.
   { call: 'setDisplayOrientation', files: ['app/src/display-orientation.ts'] },
+  // Sortie audio par défaut de Windows (28/11/2026), pour les seuls jeux sans choix de sortie (Pinball FX, FX3, Midnight, Future Pinball) : la sortie de l’étape « Son » est posée avant le lancement, l’ancienne rendue à la fin de la partie, et au démarrage suivant si Cyber Pinball s’est arrêté en route (témoin audio-defaut-avant-jeu.json) ; jamais rendue si le joueur a changé de sortie entre-temps. Un autre menu qui joue pendant ce temps entend la sortie de la borne, comme avec ces jeux lancés seuls sur la borne.
+  { call: 'setDefaultEndpoint', files: ['app/src/game-audio-route.ts'] },
   // Appel Windows de setDisplayOrientation.
   { call: 'ChangeDisplaySettingsExW', files: ['packages/win-displays/src/orientation.ts'] },
   // Barres des tâches masquées pendant une partie, puis seulement celles-là réaffichées ; fenêtres de l’éditeur de VPX masquées. Seulement des fenêtres de VPX ou de l’Explorateur, rien d’enregistré. (La fenêtre du DMD de VPX n’est jamais masquée : VPX la remontrerait ; « Position du DMD » la range hors des écrans, in-game-menu.ts.)
@@ -287,8 +289,6 @@ export const FORBIDDEN_WINDOWS_CALLS: string[] = [
   'RegDeleteValue',
   'reg add',
   'reg delete',
-  'SetDefaultEndpoint',
-  'IPolicyConfig',
   'setLoginItemSettings',
   'SystemParametersInfo',
   'SetDisplayConfig',

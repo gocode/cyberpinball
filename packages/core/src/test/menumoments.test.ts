@@ -443,7 +443,7 @@ test('un seul son : la musique du menu se tait pendant l’écoute d’une carte
   // Le rendu joue le son de la carte choisie, celle qui a une action (library.js).
   const renderer = fs.readFileSync(path.join(APP, 'renderer', 'library.js'), 'utf8');
   assert.match(renderer, /renderThumb\(c\.thumb, c\.action === cursor\)/);
-  const order = frontend.indexOf("library: state.phase === 'library' ? library.view() : undefined");
+  const order = frontend.indexOf("library: state.phase === 'library' && !protectedLibrary() ? library.view() : undefined");
   assert.ok(order > 0 && order < frontend.indexOf("sound: role === 'playfield' ? soundView() : undefined"), 'vue de la bibliothèque construite avant le son');
 });
 
@@ -481,7 +481,8 @@ test('feuilles du menu : une classe n’est définie que dans une feuille (sauf 
   // hub.css, l'écran à onglets et à cartes (hub.js), ses classes hub-* ; arena.css, l'affiche de l'Arène (arena.js), ses classes ar-*.
   // applications.css, la grille et la fiche des Applications (applications.js), ses classes ap-*.
   // root-access-ecran.css, la carte du fronton pendant Root Access (root-access-ecran.js), ses classes ra-*.
-  assert.deepEqual(sheets.sort(), ['applications.css', 'arena.css', 'community.css', 'fallback.css', 'frontend.css', 'guide.css', 'hub.css', 'intro.css', 'jukebox.css', 'library.css', 'niveau.css', 'root-access-ecran.css', 'schema-manettes.css', 'table-surprise.css', 'theme.css']);
+  // parental-pin.css, la saisie du code du contrôle parental (parental-pin.js), ses classes parental-pin-*.
+  assert.deepEqual(sheets.sort(), ['applications.css', 'arena.css', 'community.css', 'fallback.css', 'frontend.css', 'guide.css', 'hub.css', 'intro.css', 'jukebox.css', 'library.css', 'niveau.css', 'parental-pin.css', 'root-access-ecran.css', 'schema-manettes.css', 'table-surprise.css', 'theme.css']);
   const shared = new Set(['current', 'selected', 'mouse']);
   const seen = new Map<string, string>();
   const clashes: string[] = [];

@@ -279,11 +279,48 @@ test('correctifs 10 et 11 (série 10) : le coût de chaque image va au journal, 
 
 test('la série livrée est celle du correctif le plus récent', () => {
   // Le journal de VPX, ses rapports et l'adresse des sources publiées disent la série : un nouveau correctif la fait monter.
-  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs');
-  const series = fs.readdirSync(dir).filter((f) => f.endsWith('.patch'))
-    .flatMap((f) => [...fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/patched Cyber Pinball (\d+)\)/g)].map((m) => Number(m[1])));
+  // Tous les dossiers de correctifs comptent (VPX, libdof, bgfx) : la série 11 ne touche que bgfx.
+  const root = path.join(REPO_ROOT, 'packages', 'vpx-corrige');
+  const dirs = fs.readdirSync(root).filter((d) => /^correctifs(-|$)/.test(d)).map((d) => path.join(root, d));
+  assert.ok(dirs.length >= 3, 'correctifs, correctifs-libdof, correctifs-bgfx');
+  const series = dirs.flatMap((dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.patch'))
+    .flatMap((f) => [...fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/patched Cyber Pinball (\d+)\)/g)].map((m) => Number(m[1]))));
   assert.ok(series.length, 'les correctifs disent leur série');
   assert.equal(Math.max(...series), (corrige as unknown as { VPX_CORRIGE_PATCH: number }).VPX_CORRIGE_PATCH);
+});
+
+test('série 11, bgfx : au moins trois tampons pour les fenêtres annexes, rien d’autre ne change', () => {
+  // Fluidité en partie, 28/11/2026 (Back to the Future et son PuP-Pack, playfield 120 Hz, écrans annexes 60 Hz) : avec
+  // deux tampons, l'image d'une fenêtre annexe attendait que son écran plus lent libère le tampon affiché, et bloquait
+  // toute la file de la carte graphique : 9 % d'images du playfield en retard, 1 % avec trois tampons.
+  const dir = path.join(REPO_ROOT, 'packages', 'vpx-corrige', 'correctifs-bgfx');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['01-fenetres-annexes-trois-tampons.patch']);
+  const diff = fs.readFileSync(path.join(dir, '01-fenetres-annexes-trois-tampons.patch'), 'utf8');
+  assert.doesNotMatch(diff, /\r/, 'fins de ligne LF, comme les sources de bgfx');
+  assert.match(diff, /Modified by Cyber Pinball, \d{4}-\d{2}-\d{2} \(patched Cyber Pinball 11\)/, 'le code modifié dit qui l’a modifié, et quand');
+  assert.deepEqual([...diff.matchAll(/^diff --git a\/(\S+)/gm)].map((m) => m[1]), ['src/renderer_d3d11.cpp']);
+  const removed = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  assert.deepEqual(removed, [], 'rien de bgfx retiré');
+  const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++') && !/^\+\s*(\/\/.*)?$/.test(l));
+  // Seulement le nombre de tampons, seulement en mode flip, jamais diminué : ni le format, ni la synchronisation, ni le
+  // swapchain principal (dont le nombre de tampons vient de VPX) ne bougent.
+  assert.deepEqual(added.map((l) => l.trim()), [
+    '+\t\tif (DXGI_SWAP_EFFECT_FLIP_DISCARD == scd.swapEffect || DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL == scd.swapEffect)'.trim(),
+    '+\t\t{'.trim(),
+    '+\t\t\tscd.bufferCount = bx::max<uint32_t>(scd.bufferCount, 3);'.trim(),
+    '+\t\t}'.trim(),
+  ]);
+  assert.match(diff, /^@@ .* @@ namespace bgfx \{ namespace d3d11\n \t\tscd\.ndt {8}= NULL;\n \t\tscd\.sampleDesc = s_msaa\[0\];$/m, 'dans FrameBufferD3D11::create (fenêtres annexes), après la copie de la description du swapchain principal');
+
+  // La recette applique les correctifs au fork, avant la compilation, et le repère de bgfx porte leur empreinte.
+  const recette = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige.mjs'), 'utf8');
+  assert.match(recette, /dependency\('bgfx', `\$\{deps\.bgfxCmake\}-\$\{deps\.bgfx\}-\$\{bgfxPatches\.key\}`/);
+  assert.match(recette, /for \(const p of bgfxPatches\.patches\) run\('git', \['apply'.*BGFX_PATCHES, p\)\], fork,/);
+  assert.match(recette, /LIBDOF_PATCHES, BGFX_PATCHES,/, 'les correctifs de bgfx font partie des entrées du certificat');
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8'), /'correctifs-bgfx'\]/);
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, '.gitattributes'), 'utf8'), /^packages\/vpx-corrige\/correctifs-bgfx\/\*\.patch -text$/m);
+  for (const doc of ['LISEZMOI.md', 'README.md'])
+    assert.ok(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'vpx-corrige', doc), 'utf8').includes('`correctifs-bgfx/`'), `${doc} décrit le correctif`);
 });
 
 test('série 6, bibliothèque DOF : posée à côté du plugin-dof64.dll officiel, qui n’est jamais touché', () => {
@@ -342,7 +379,7 @@ test('série 6 : correctifs de libdof (amont 0383246 et c79bcff), recette, fabri
   assert.match(recette, /path\.join\(out, 'plugins', 'dof', VPX_CORRIGE_DOF\)/, 'la DLL fait partie des sorties du certificat');
   const fabriquer = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'fabriquer.mjs'), 'utf8');
   assert.match(fabriquer, /\[VPX_CORRIGE_DOF, 'LICENSE-libdof'\]/, 'la DLL et sa licence partent avec l’application');
-  assert.match(fabriquer, /\['correctifs', 'correctifs-libdof'\]/);
+  assert.match(fabriquer, /\['correctifs', 'correctifs-libdof'[,\]]/);
   const sources = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'vpx-corrige-sources.mjs'), 'utf8');
   for (const lib of ['libdof-', 'libusb-', 'libserialport-', 'hidapi-', 'libftdi-']) assert.ok(sources.includes(`'${lib}'`), `sources complètes : ${lib}`);
   assert.ok(sources.includes('plugins/dof/dof64.dll'), 'la release des sources nomme la DLL');

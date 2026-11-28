@@ -67,6 +67,7 @@ export const SYSTEM_ITEM_IDS = [
   'tech-sheet',
   'debug-mode',
   'cabinet',
+  'parental',
   'vpx-presets',
   'vpx-framing',
   'vpx-settings',
@@ -193,7 +194,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Ma borne'); },
     get detail() { return t('Configuration, VPX, DMD et LED, VR et vision 3D, télécommande, démarrage, santé et sauvegardes'); },
-    entries: ['cabinet', 'vpx', 'dmd', 'realite-virtuelle', 'phone-remote', 'demarrage', 'sante'],
+    entries: ['cabinet', 'vpx', 'dmd', 'realite-virtuelle', 'phone-remote', 'demarrage', 'sante', 'parental'],
   },
   vpx: {
     id: 'vpx',
@@ -385,6 +386,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'debug-mode': { icon: 'gauge', get label() { return t('Mode débogage'); } },
   // Boutons, écrans, son, langue de la borne, configurations, assistant (frontend.ts, cabinetSetupItems).
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
+  parental: { icon: 'lock', get label() { return t('Contrôle parental'); } },
   // Qualité de l'image et fluidité en un choix (app/src/qualite-vpx.ts) : Auto, Performance, Équilibré, Qualité, Ultra.
   'vpx-presets': { icon: 'gauge', get label() { return t('Pré-réglages'); } },
   // Le cadrage de toutes les tables en vue borne, choisi sur une image de sa table (app/src/cadrage-menu.ts).

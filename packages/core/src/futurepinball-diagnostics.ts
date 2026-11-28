@@ -3,10 +3,9 @@
 // Lignes de journal : en français seulement, comme celles du reste du journal.
 //
 // Son : Future Pinball (FMOD 3) n'a aucun réglage de sortie, il joue sur la sortie par défaut de Windows.
-// VPX reçoit son périphérique dans son INI ; ici rien ne peut le diriger, et Cyber Pinball ne change
-// jamais la sortie par défaut ni le routage par application de Windows (coexistence.ts). Sur une borne
-// dont le son part par des haut-parleurs et dont la sortie par défaut est l'écran HDMI du playfield,
-// la partie est donc muette. Le journal dit laquelle des deux sorties joue et comment elle est réglée.
+// VPX reçoit son périphérique dans son INI ; ici rien ne peut le diriger : depuis le 28/11/2026 Cyber
+// Pinball pose la sortie de l'étape « Son » comme sortie par défaut le temps de la partie, puis la rend
+// (game-audio-route.ts). Le journal dit laquelle des deux sorties joue et comment elle est réglée.
 //
 // Vue : BAM garde la caméra de chaque table dans BAM\cfg\<table>.cfg et, à défaut, dans BAM\default.cfg ;
 // une table sans fichier reçoit la vue par défaut. Le journal dit laquelle est lue, et si une ancienne
@@ -68,7 +67,7 @@ export function futurePinballSoundReport(input: { defaultOutput?: DefaultOutputS
   const elsewhere = !!wanted && !same(wanted.id, defaultOutput.id);
   if (wanted && elsewhere) {
     const target = outputName(wanted.id, outputs, audio) ?? wanted.id;
-    lines.push(`Son : l’étape « Son » de la borne vise « ${target} » (${wanted.role}) ; Future Pinball n’y sort pas. Cyber Pinball ne change ni la sortie par défaut de Windows ni son routage par application.`); // i18n-ignore : journal
+    lines.push(`Son : l’étape « Son » de la borne vise « ${target} » (${wanted.role}) , mais la sortie par défaut de Windows est une autre : Future Pinball n’y sort pas (Cyber Pinball la pose avant la partie ; la ligne « Son : » du lancement dit pourquoi elle ne l’a pas fait).`); // i18n-ignore : journal
   }
   if (silent) lines.push(`Son : cette sortie est ${defaultOutput.muted ? 'coupée' : 'à 0 %'} : la partie est muette.`); // i18n-ignore : journal
   return { elsewhere, silent, lines };

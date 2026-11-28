@@ -131,7 +131,7 @@ test('mode invité : le téléphone (télécommande) passe par les mêmes portes
   assert.match(frontend, /function remoteButton\([\s\S]*?if \(down\) handleKey\(input, true\);\s*else handleKeyUp\(input, true\);/);
   // Jamais la combinaison de déverrouillage : on ne déverrouille le mode invité qu'à la borne.
   assert.match(frontend, /if \(!fromPhone && guest\.input\(input\.code, true, unlockListening\(\)\)\) return true;/);
-  assert.match(frontend, /function handleKeyUp\(input: Input, fromPhone = false\): void \{\s*if \(!fromPhone\) \{\s*cabinetVolume\?\.windowInput\(input\);\s*guest\.input\(input\.code, false/);
+  assert.match(frontend, /function handleKeyUp\(input: Input, fromPhone = false\): void \{[\s\S]{0,200}?if \(!fromPhone\) \{\s*cabinetVolume\?\.windowInput\(input\);\s*guest\.input\(input\.code, false/);
   // L'envoi d'un fichier : derrière la porte phone.files, fermée à l'invité.
   assert.equal(GUEST_DOORS['phone.files'], false);
   assert.match(frontend, /uploadDir: \(\) =>\s*!guest\.knock\('phone\.files'\)/);

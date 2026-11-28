@@ -54,6 +54,8 @@ export interface GameReturnHost {
   board?(table: TableEntry): readonly BoardLine[];
   /** La carte peut-elle s'ouvrir maintenant (la roue à l'écran, pas de partie, ni jeu local ni invité) ? */
   canOpen(): boolean;
+  /** La protection de la table est revérifiée tant que sa carte peut être affichée. */
+  tableAllowed?(table: TableEntry): boolean;
   log(line: string): void;
   now?(): number;
 }
@@ -245,6 +247,12 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
     shown = undefined;
   }
 
+  const tableAllowed = (table: TableEntry) => host.tableAllowed?.(table) !== false;
+  function showing(): boolean {
+    if (shown && !tableAllowed(shown.f.table)) close('table verrouillée'); // i18n-ignore : journal
+    return shown !== undefined;
+  }
+
   return {
     expect() {
       expected = now();
@@ -254,13 +262,13 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
     },
     holding: () => expected !== undefined && now() - expected < EXPECT_MAX_MS,
     news,
-    showing: () => !!shown,
+    showing,
     view() {
-      if (!shown) return undefined;
+      if (!showing() || !shown) return undefined;
       return { key: shown.key, hub: hubOf(shown), hint: t('Start : rejouer · Flippers : changer de table · Exit : fermer') };
     },
     key(kind) {
-      if (!shown) return false;
+      if (!showing() || !shown) return false;
       // Un bouton encore tenu en sortant de la partie : la carte reste, la touche ne fait rien.
       if (now() - shown.at < GAME_RETURN_GUARD_MS) return true;
       const table = shown.f.table;
@@ -274,6 +282,7 @@ export function createGameReturn(host: GameReturnHost): GameReturn {
     dismiss: close,
     report(f) {
       expected = undefined;
+      if (!tableAllowed(f.table)) return false;
       const n = news(f) ?? {};
       if (!f.report.best) {
         host.log(`Retour de partie : aucun score relevé sur ${f.table.title}, pas de carte.`); // i18n-ignore : journal

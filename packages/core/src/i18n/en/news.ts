@@ -2,6 +2,14 @@
 // app/src/news-menu.ts). Clé : le texte français. Les noms déjà traduits ailleurs (Nouveautés,
 // Parties en direct, Groupes privés, Retours et propositions…) ne sont pas répétés ici.
 export const messages: Record<string, string> = {
+  // Contrôle parental (28/11/2026)
+  'Contrôle parental': 'Parental controls',
+  'Un code PIN protège les collections et les tables de ton choix : les autres restent à portée des enfants.': 'A PIN protects the collections and tables you choose; the others stay within the children’s reach.',
+  'Active-le dans Menu système › Ma borne › Contrôle parental : choisis un code à quatre chiffres, puis les collections ou les tables à protéger. Sur la borne, les flippers font défiler le chiffre et Start le valide.':
+    'Turn it on in System menu › My cabinet › Parental controls: choose a four-digit code, then the collections or tables to protect. On the cabinet, the flippers scroll the digit and Start confirms it.',
+  'Une table protégée reste verrouillée partout (Favoris, recherche, Table surprise, défilement au repos). Un code correct l’ouvre le temps que tu choisis, sans jamais interrompre une partie.':
+    'A protected table stays locked everywhere (Favorites, search, Surprise table, idle scrolling). A correct code opens it for the time you choose, without ever interrupting a game.',
+  'Menu système › Ma borne › Contrôle parental': 'System menu › My cabinet › Parental controls',
   // Pinball FX Midnight (27/11/2026)
   'Pinball FX Midnight sur la roue': 'Pinball FX Midnight on the wheel',
   'Les tables de Pinball FX Midnight, autre jeu de Zen Studios, lancées depuis la roue, de 1 à 4 joueurs.': 'The tables of Pinball FX Midnight, another Zen Studios game, launched from the wheel, with 1 to 4 players.',
@@ -102,13 +110,6 @@ export const messages: Record<string, string> = {
   'Des LED adressables sans Cabinet.xml sont signalées avec le port probable de leur contrôleur, et des bandes pilotées par une Wemos D1 reçoivent d’office les réglages qu’attend son micrologiciel.':
     'Addressable LEDs without a Cabinet.xml are flagged with the likely port of their controller, and strips driven by a Wemos D1 automatically get the settings its firmware expects.',
   'Menu système › Ma borne › DMD et LED › LED et retours (DOF)': 'System menu › My cabinet › DMD and LEDs › LED and feedback (DOF)',
-  'Niveaux': 'Levels',
-  'Tes parties, tes progrès, tes badges et la vie entre joueurs te font monter de niveau.': 'Your games, your progress, your badges and life among players raise your level.',
-  'Chaque partie, chaque record battu, chaque classement de la semaine, chaque badge reçu et la vie entre joueurs rapportent des XP. Ton niveau monte et ne baisse jamais ; ta carte de joueur, en haut de l’écran des tables, le montre avec sa barre.':
-    'Every game, every record beaten, every weekly ranking, every badge earned and life among players bring XP. Your level goes up and never goes down; your player card, at the top of the tables screen, shows it with its bar.',
-  'Un badge reçu a son moment au retour de la partie, avec son animation et sa musique, et le passage de niveau a ses rayons. « Mon niveau » dit ce qui rapporte des XP et quels badges sont les plus proches.':
-    'A badge earned gets its moment when you come back from the game, with its animation and music, and reaching a new level has its rays. “My level” tells you what brings XP and which badges are closest.',
-  'Communauté › Mon niveau': 'Community › My level',
 
 
   'Communauté › Groupes': 'Community › Groups',

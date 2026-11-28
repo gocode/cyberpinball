@@ -206,7 +206,7 @@ for (const name of fs.readdirSync(installerDir)) {
     // La bibliothèque DOF corrigée (série 6) et sa licence (libdof).
     fs.mkdirSync(path.join(dir, 'plugins', 'dof'), { recursive: true });
     for (const f of [VPX_CORRIGE_DOF, 'LICENSE-libdof']) fs.copyFileSync(path.join(path.dirname(exe), 'plugins', 'dof', f), path.join(dir, 'plugins', 'dof', f));
-    for (const patches of ['correctifs', 'correctifs-libdof']) {
+    for (const patches of ['correctifs', 'correctifs-libdof', 'correctifs-bgfx']) {
       fs.mkdirSync(path.join(dir, patches), { recursive: true });
       for (const f of fs.readdirSync(path.join(VPX_CORRIGE_SOURCE, patches))) fs.copyFileSync(path.join(VPX_CORRIGE_SOURCE, patches, f), path.join(dir, patches, f));
     }

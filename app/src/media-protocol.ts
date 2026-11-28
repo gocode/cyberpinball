@@ -46,10 +46,10 @@ export function allowJukebox(file: string): void {
 }
 
 /** Branche le protocole ; `allowedDirs` est relu à chaque requête (tables ajoutées, retirées). */
-export function serveMedias(allowedDirs: () => string[]): void {
+export function serveMedias(allowedDirs: () => string[], mayRead: (file: string) => boolean = () => true): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const file = mediaPathFromUrl(request.url);
-    if (!file || !(isServedMedia(file, allowedDirs()) || previews.has(file.toLowerCase()) || jukebox.has(file.toLowerCase()))) return refuse(request.url, 403);
+    if (!file || !mayRead(file) || !(isServedMedia(file, allowedDirs()) || previews.has(file.toLowerCase()) || jukebox.has(file.toLowerCase()))) return refuse(request.url, 403);
     let stat: fs.Stats;
     try {
       // Un lien symbolique pourrait mener hors des dossiers autorisés : refusé.
@@ -57,7 +57,7 @@ export function serveMedias(allowedDirs: () => string[]): void {
     } catch {
       return refuse(file, 404);
     }
-    if (!stat.isFile()) return refuse(file, 403);
+    if (!stat.isFile() || !mayRead(file)) return refuse(file, 403);
     return respond(file, stat.size, request.headers.get('range'));
   });
 }

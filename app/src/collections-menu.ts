@@ -115,10 +115,8 @@ export function createCollectionsItem(host: {
           label: c.label,
           key: `collection:${c.id}`,
           run: () => {
-            if (!count) return;
-            host.collections.choose(c.id);
-            if (from) from.shown();
-            else lib.leave();
+            if (!count && !host.collections.protectedEntry?.(c.id)) return;
+            host.collections.choose(c.id, () => { if (from) from.shown(); else lib.leave(); });
           },
         }) - 1;
       const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail, surprise?.excluded(c.id) ? t('hors tirage') : undefined].filter(Boolean).join(' · ') : (c.reason ?? '');
@@ -345,6 +343,7 @@ export interface CollectionsHost {
   friends?(tables: readonly TableEntry[]): FriendsShelf;
   /** Collection imposée par le mode invité. */
   guestCollection(): string | undefined;
+  parental?: { allowed(id: string): boolean; hidden(): boolean; tableVisible(table: TableEntry): boolean; mayEdit(id: string): boolean; restoredMembers(id: string): TableEntry[] | undefined; request(id: string, next: () => void): void; changed(id: string): void };
   /** Rang de la table de départ dans une collection (« Table au démarrage »). */
   startIndex(tables: readonly TableEntry[]): number;
   redraw(): void;
@@ -354,6 +353,10 @@ export interface CollectionsHost {
 export interface CollectionsMenu {
   /** Les collections du moment (vides comprises). */
   list(): Collection<TableEntry>[];
+  inventory(): Collection<TableEntry>[];
+  parentalInventory(): readonly { id: string; tables: readonly { id: string }[] }[];
+  context(): string | undefined;
+  protectedEntry(id: string): boolean;
   /** La collection montrée : celle du mode invité s'il en impose une, sinon l'active. */
   current(): Collection<TableEntry>;
   /** Sans repli sur Toutes : un tirage ne contourne jamais une collection vide ou supprimée. */
@@ -368,7 +371,7 @@ export interface CollectionsMenu {
   /** MagnaSave : la collection voisine, en sautant les vides ; false si rien n'a changé. */
   step(direction: -1 | 1): boolean;
   /** Clic sur une ligne de la liste : cette collection, si elle n'est pas vide. */
-  choose(id: string): boolean;
+  choose(id: string, whenOpened?: () => void): boolean;
   /** La collection imposée par le mode invité (aucun changement permis). */
   locked(): boolean;
   /** Au démarrage : la table de départ, dans la collection active. */
@@ -422,7 +425,7 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     return friendsCache.value;
   }
 
-  function list(): Collection<TableEntry>[] {
+  function inventory(): Collection<TableEntry>[] {
     // Les amis en ligne changent sans prévenir : la liste se refait au plus toutes les deux secondes.
     // Les tables relues (ajout, favori, partie jouée) sont un nouveau tableau : tout se refait.
     const tables = host.tables();
@@ -434,16 +437,44 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     return cache.list;
   }
 
+  let policyGroups: { from: Collection<TableEntry>[]; list: { id: string; tables: readonly { id: string }[] }[] } | undefined;
+  function parentalInventory() {
+    const from = inventory();
+    if (policyGroups?.from === from) return policyGroups.list;
+    const list = from.map((group) => ({ id: group.id, tables: settings.mine.find((entry) => entry.id === group.id)?.tables.map((id) => ({ id })) ?? group.tables }));
+    policyGroups = { from, list };
+    return list;
+  }
+
+  function protectedEntry(id: string): boolean { return host.parental?.allowed(id) === false; }
+
+  function project(c: Collection<TableEntry>): Collection<TableEntry> {
+    if (protectedEntry(c.id)) return { ...c, tables: [], icon: 'lock', reason: t('Collection verrouillée') };
+    if (!host.parental) return c;
+    const members = host.parental.restoredMembers(c.id) ?? c.tables;
+    const tables = members.filter(host.parental.tableVisible);
+    return members === c.tables && tables.length === c.tables.length ? c : { ...c, tables };
+  }
+
+  function list(): Collection<TableEntry>[] {
+    return inventory().filter((c) => !protectedEntry(c.id) || !host.parental?.hidden()).map(project);
+  }
+
+  function context(): string | undefined { return host.guestCollection() ?? active; }
+
   function current(): Collection<TableEntry> {
-    const all = list();
+    const all = inventory();
     const forced = host.guestCollection();
     if (forced) {
       const locked = all.find((c) => c.id === forced);
-      return locked ?? { ...all[0]!, label: t('Collection imposée en mode invité'), tables: [] };
+      return locked ? project(locked) : { ...all[0]!, label: t('Collection imposée en mode invité'), tables: [] };
     }
     const wanted = findCollection(all, active);
-    // Une collection devenue vide (dernier favori retiré, ami parti) : Toutes, jusqu'à ce qu'on en change.
-    return wanted.tables.length ? wanted : all[0]!;
+    const shown = project(wanted);
+    // Une collection verrouillée reste affichée (cadenas) tant que le contrôle parental ne la masque pas.
+    if (shown.tables.length || (protectedEntry(wanted.id) && !host.parental?.hidden())) return shown;
+    // Une collection devenue vide (dernier favori retiré, ami parti) : Toutes (ou la première non protégée), jusqu'à ce qu'on en change.
+    return project(all.find((c) => !protectedEntry(c.id)) ?? all[0]!);
   }
 
   function shelf(adjust = true): { tables: TableEntry[]; index: number } {
@@ -466,7 +497,7 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
   }
 
   function open(next: Collection<TableEntry>): boolean {
-    if (next.id === current().id) return false;
+    if (next.id === active) return false;
     remember();
     active = next.id;
     settings = { ...settings, active: next.id };
@@ -475,16 +506,22 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     } catch (error) {
       console.log(`Collections : réglage non enregistré (${(error as Error).message}).`);
     }
-    const index = memory.indexIn(next.id, next.tables, host.startIndex(next.tables));
-    if (next.tables[index]) host.select(next.tables[index]!);
+    host.parental?.changed(next.id);
+    const shown = project(next);
+    const index = memory.indexIn(shown.id, shown.tables, host.startIndex(shown.tables));
+    if (shown.tables[index]) host.select(shown.tables[index]!);
     console.log(`Collections : ${next.id} (${next.tables.length}).`);
     return true;
   }
 
   return {
     list,
+    inventory,
+    parentalInventory,
+    context,
+    protectedEntry,
     current,
-    exact: () => list().find((c) => c.id === (host.guestCollection() ?? active)),
+    exact: () => { const found = inventory().find((c) => c.id === context()); return found ? project(found) : undefined; },
     shelf,
     move(offset) {
       const s = shelf();
@@ -498,10 +535,16 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
       if (host.guestCollection()) return false;
       return open(stepCollection(list(), current().id, direction));
     },
-    choose(id) {
+    choose(id, whenOpened) {
       if (host.guestCollection()) return false;
-      const c = findCollection(list(), id);
-      return c.id === id && c.tables.length > 0 && open(c);
+      const c = inventory().find((entry) => entry.id === id);
+      if (!c || !(host.parental?.restoredMembers(id) ?? c.tables).length) return false;
+      const done = () => { const changed = open(c); whenOpened?.(); return changed; };
+      if (protectedEntry(id)) {
+        host.parental?.request(id, done);
+        return false;
+      }
+      return done();
     },
     locked: () => Boolean(host.guestCollection()),
     mine: () => settings.mine,
@@ -512,8 +555,8 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
       return made.id;
     },
     renameMine: (id, name) => save(renameMyCollection(settings, id, name), `${id} renommée`), // i18n-ignore : journal
-    removeMine: (id) => save(removeMyCollection(settings, id), `${id} supprimée`), // i18n-ignore : journal
-    setTable: (id, table, on) => save(setTableInMyCollection(settings, id, table.id, on), `${table.id} ${on ? 'ajoutée à' : 'retirée de'} ${id}`), // i18n-ignore : journal
+    removeMine: (id) => { if (host.parental?.mayEdit(id) !== false) save(removeMyCollection(settings, id), `${id} supprimée`); }, // i18n-ignore : journal
+    setTable: (id, table, on) => { if (host.parental?.mayEdit(id) !== false) save(setTableInMyCollection(settings, id, table.id, on), `${table.id} ${on ? 'ajoutée à' : 'retirée de'} ${id}`); }, // i18n-ignore : journal
     keys: () => settings.keys,
     setKeys(keys) {
       const { keys: _old, ...rest } = settings;

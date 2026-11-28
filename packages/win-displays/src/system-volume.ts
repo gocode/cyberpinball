@@ -254,6 +254,37 @@ export function readEndpointVolumes(ids: readonly string[] = [], scope: Endpoint
   });
 }
 
+const CLSID_POLICY_CONFIG = '870AF99C-171D-4F9E-AF0D-E63DF40C2BC9';
+const IID_POLICY_CONFIG = 'F8679F50-850A-41CF-9C72-430F290290C8';
+/** IPolicyConfig (interface non documentée, celle que règle « Définir comme périphérique par défaut ») : SetDefaultEndpoint. */
+const POLICY_SET_DEFAULT_ENDPOINT = 13;
+const E_MULTIMEDIA = 1;
+let setDefaultProto: koffi.TypeObject | undefined;
+
+/**
+ * Fait de la sortie `id` (IMMDevice::GetId) la sortie par défaut de Windows, pour la console et le multimédia
+ * (les rôles où jouent les jeux), comme le fait le panneau Son. Rend faux si Windows refuse (sortie absente,
+ * interface indisponible) : rien n'est alors changé. Pour les jeux qui n'ont aucun choix de sortie
+ * (Pinball FX, Future Pinball) : l'appelant remet l'ancienne sortie à la fin de la partie.
+ */
+export function setDefaultEndpoint(id: string): boolean {
+  if (process.platform !== 'win32') return false;
+  try {
+    const w = loadApi();
+    setDefaultProto ??= koffi.proto('int32_t __stdcall CP_SetDefaultEndpoint(void *self, str16 id, int role)');
+    const out: unknown[] = [null];
+    if (w.CoCreateInstance(guid(CLSID_POLICY_CONFIG), null, CLSCTX_ALL, guid(IID_POLICY_CONFIG), out) < 0 || !out[0]) return false;
+    try {
+      const results = [E_CONSOLE, E_MULTIMEDIA].map((role) => call(out[0], POLICY_SET_DEFAULT_ENDPOINT, setDefaultProto!, id, role));
+      return results.every((hr) => hr >= 0);
+    } finally {
+      call(out[0], RELEASE, w.proto.release);
+    }
+  } catch {
+    return false;
+  }
+}
+
 /** Règle chaque sortie (niveau, son coupé) ; rend celles qui l'ont été. */
 export function writeEndpointVolumes(volumes: readonly EndpointVolume[]): EndpointVolume[] {
   return withEnumerator((w, enumerator) =>

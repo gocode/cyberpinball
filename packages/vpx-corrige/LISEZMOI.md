@@ -6,8 +6,8 @@ Cyber Pinball installe Visual Pinball X 10.8.1-5436 depuis son archive officiell
 Les autres plugins et les bibliothèques restent ceux de l'archive officielle.
 Un autre VPX (version d'essai, VPX installé par l'utilisateur) n'est jamais touché.
 
-Série de correctifs actuelle : « patched Cyber Pinball 10 ».
-Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-10`.
+Série de correctifs actuelle : « patched Cyber Pinball 11 ».
+Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les tables s'y règlent) ; la version produit de l'exécutable, le journal de VPX et ses rapports de plantage affichent `af26b2d93-patched-cyberpinball-11`.
 
 ## Correctifs
 
@@ -22,6 +22,8 @@ Le numéro de version reste 10.8.1.5436 (Cyber Pinball, les plugins et les table
 
 - `correctifs-libdof/` (bibliothèque DOF, série 6) : la libdof de la 5436 (commit `eef645d9`) avec le report des commits [0383246](https://github.com/vpinball/libdof/commit/03832462f10d19b1795e2292646193ca39e51fbd) et [c79bcff](https://github.com/vpinball/libdof/commit/c79bcff5be61e3c10022d2e6fa25f207e038bc53) (partie `FinishUpdaterThread`) de libdof. En se déchargeant, la 5436 arrêtait une carte DudesCab une seconde fois, après sa vraie fermeture, et VPX plantait en se fermant (0xC0000005). Le destructeur de la DudesCab ne relance plus l'arrêt, et le fil de sortie d'un contrôleur est toujours attendu au lieu d'être abandonné. L'interface de la bibliothèque (`include/DOF/DOF.h`) ne change pas : le `plugin-dof64.dll` officiel la charge telle quelle.
 
+- `correctifs-bgfx/` (bgfx, lié à l'exécutable, série 11) : `01-fenetres-annexes-trois-tampons.patch` donne au moins trois tampons au lieu de deux au swapchain de chaque fenêtre annexe (backglass, ScoreView, topper). Avec deux tampons en mode flip, l'image dessinée pour une fenêtre sur un écran plus lent (60 Hz à côté d'un playfield à 120 Hz) attendait que cet écran rende le tampon encore affiché, et cette attente bloquait toute la file de la carte graphique, playfield compris. Mesuré sur Back to the Future avec son PuP-Pack (playfield 4K à 120 Hz, deux écrans à 60 Hz, pré-réglage Qualité, 150 s de partie) : images du playfield en retard de 8,95 % à 1,12 %, moyenne de 110 à 119 images par seconde, aucune seconde sous 115 au lieu de 75. Le swapchain principal et la qualité d'image ne changent pas.
+
 ## Construire
 
 Le correctif `05-pov-sans-editeur.patch` protège l’import automatique des anciens cadrages POV : lors d’un lancement direct, aucun éditeur Windows n’existe et VPX tentait pourtant de rafraîchir ses propriétés, provoquant un accès mémoire interdit juste après `InitTablePostLoad`. Les champs numériques anciens vides ou illisibles sont également ignorés. Le fichier importé est nommé dans le journal.
@@ -35,4 +37,4 @@ Le plugin PuP est lié aux DLL de l'archive officielle (SDL_image, SDL_ttf, pupd
 ## Licence
 
 VPX est distribué sous GPLv3+ (et une licence dérivée de MAME pour une partie des fichiers), voir le fichier `LICENSE` joint ; libdof sous sa propre licence, jointe dans `plugins/dof/LICENSE-libdof`.
-Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-10
+Les sources complètes de ces fichiers (VPX au commit `af26b2d93`, les bibliothèques avec lesquelles ils sont construits, les correctifs et la recette) sont publiées ici : https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-11

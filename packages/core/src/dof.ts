@@ -112,6 +112,8 @@ export interface DetectedDofController {
   device: ObservedUsbDevice;
   /** Numéros d'ini possibles : un seul quand le matériel est sûr. */
   numbers: number[];
+  /** Autres numéros d'ini qui conviennent sans avertissement (numéro d'unité Pinscape réglé sur la carte). */
+  accepted?: number[];
   /** false : identifiant partagé avec d'autres matériels (LedWiz ou Pinscape, convertisseur série…). */
   certain: boolean;
   /** Le numéro d'unité est réglé sur la carte et n'est pas lisible sans l'ouvrir : on suppose 1. */
@@ -119,6 +121,9 @@ export interface DetectedDofController {
   /** Autres types possibles pour ce périphérique. */
   alternatives?: DofControllerType[];
 }
+
+/** Numéros d'ini d'un Pinscape KL25Z : unité Pinscape 1 à 16 → 51 à 66. */
+const PINSCAPE_UNIT_NUMBERS: number[] = Array.from({ length: 16 }, (_, i) => 51 + i);
 
 function hex4(n: number): string {
   return n.toString(16).toUpperCase().padStart(4, '0');
@@ -173,9 +178,14 @@ export function detectDofControllers(devices: ObservedUsbDevice[], hidNames: Hid
   for (const d of physicalDevices(devices, (x) => x.vid === 0xfafa && (x.pid & 0xfff0) === 0x00f0)) {
     const unit = (d.pid & 0x0f) + 1;
     const name = nameOf(d);
+    // libdof (Pinscape.cpp, PinscapeAutoConfigurator.cpp) : le PID ne donne que le numéro LedWiz de la
+    // carte (l'émulation LedWiz, 8 par défaut : FAFA:00F7). Le numéro Pinscape (50 + unité) est lu
+    // dans la carte par une requête HID, réglage distinct (1 par défaut → 51), qu'on ne lit pas
+    // sans l'ouvrir. Un Pinscape répond donc à la fois comme LedWiz n° PID et comme Pinscape 51 à
+    // 66 : l'un ou l'autre des ini suffit (cas réel du 28/11/2026 : directoutputconfig8.ini, qui marche).
     if (name.includes('pinscape pico') || name.includes('pinscapepico')) add(d, { type: 'PinscapePico', numbers: [119 + unit], certain: true });
-    else if (name.includes('pinscape')) add(d, { type: 'Pinscape', numbers: [50 + unit], certain: true });
-    else add(d, { type: 'LedWiz', numbers: [unit, 50 + unit], certain: false, alternatives: ['Pinscape'] });
+    else if (name.includes('pinscape')) add(d, { type: 'Pinscape', numbers: [unit, 51], accepted: PINSCAPE_UNIT_NUMBERS, certain: true, unitAssumed: true });
+    else add(d, { type: 'LedWiz', numbers: [unit, 51], accepted: PINSCAPE_UNIT_NUMBERS, certain: false, alternatives: ['Pinscape'] });
   }
   // LedWiz de zebsboards (20A0, fabricant « zebsboards » : le nom seul ne se lit pas sans ouvrir).
   for (const d of physicalDevices(devices, (x) => x.vid === 0x20a0 && (x.pid & 0xfff0) === 0x00f0)) {
@@ -183,7 +193,7 @@ export function detectDofControllers(devices: ObservedUsbDevice[], hidNames: Hid
   }
   // Pinscape KL25Z en mode natif (pid.codes 1209:EAEA) : l'unité est réglée sur la carte.
   for (const d of physicalDevices(devices, (x) => x.vid === 0x1209 && x.pid === 0xeaea)) {
-    add(d, { type: 'Pinscape', numbers: [51], certain: true, unitAssumed: true });
+    add(d, { type: 'Pinscape', numbers: [51], accepted: PINSCAPE_UNIT_NUMBERS, certain: true, unitAssumed: true });
   }
   // Pinscape Pico : reconnu à son nom de produit (libdof n'a pas de filtre d'identifiant).
   for (const d of physicalDevices(devices, (x) => /pinscape ?pico/i.test(nameOf(x)) && !(x.vid === 0xfafa && (x.pid & 0xfff0) === 0x00f0))) {
@@ -896,7 +906,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
   }
   for (const d of detected) {
     if (d.type === 'TeensyStripController' || !setup.ini.length) continue;
-    if (!d.numbers.some((n) => numbers.has(n))) {
+    if (![...d.numbers, ...(d.accepted ?? [])].some((n) => numbers.has(n))) {
       push(
         'missingIni',
         'warning',
@@ -908,7 +918,7 @@ export function dofFindings(setup: DofSetup, detected: DetectedDofController[], 
       );
     }
   }
-  const used = new Set<number>([...detected.flatMap((d) => d.numbers), ...(setup.cabinet?.equivalents.map((e) => e.number) ?? [])]);
+  const used = new Set<number>([...detected.flatMap((d) => [...d.numbers, ...(d.accepted ?? [])]),...(setup.cabinet?.equivalents.map((e) => e.number) ?? [])]);
   for (const f of setup.ini) {
     if (!used.has(f.number)) {
       push('orphanIni', 'info', t('{file} : aucun contrôleur branché ne lit ce numéro (contrôleur débranché, ou numéro d’unité réglé autrement sur la carte).', { file: path.basename(f.file) }));

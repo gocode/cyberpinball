@@ -3,7 +3,7 @@
 // code source complet, celui des composants qu'il utilise compris). L'archive réunit exactement ce que la construction
 // a téléchargé (sources de VPX au commit de la 5436, SDL3, SDL_image, SDL_ttf, FreeImage, bgfx, OpenXR, FFmpeg,
 // libdmdutil, libpupdmd, PinMAME, et pour dof64.dll : libdof, libusb, libserialport, hidapi, libftdi), les correctifs
-// (correctifs et correctifs-libdof), la recette et les
+// (correctifs, correctifs-libdof et correctifs-bgfx), la recette et les
 // licences. La release n'a ni numéro de version ni flux de mise à jour : les bornes ne la lisent pas (update.ts).
 //   node scripts/vpx-corrige-sources.mjs            -> crée la release si elle manque (jeton : scripts/jeton-github.mjs)
 //   node scripts/vpx-corrige-sources.mjs --archive  -> l'archive seule, dans build\vpx-corrige

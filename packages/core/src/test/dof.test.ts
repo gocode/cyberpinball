@@ -99,8 +99,33 @@ test('DOF : contrôleurs reconnus à leurs identifiants USB', () => {
 test('DOF : le nom du joystick (SDL) départage Pinscape et LedWiz', () => {
   const found = detectDofControllers([usb(0xfafa, 0x00f7)], [{ vid: 0xfafa, pid: 0x00f7, name: 'Pinscape Controller' }]);
   assert.equal(found[0]!.type, 'Pinscape');
-  assert.deepEqual(found[0]!.numbers, [58], 'unité 8 (PID 00F7) → 58');
+  assert.deepEqual(found[0]!.numbers, [8, 51], 'PID 00F7 → LedWiz 8 ; unité Pinscape par défaut → 51');
   assert.equal(found[0]!.certain, true);
+});
+
+// Cas réel du 28/11/2026 (deux joueurs et une borne réelle) : Pinscape FAFA:00F7 (LedWiz 8 par défaut),
+// configtool importé avec directoutputconfig8.ini et 30.ini, DOF fonctionne. libdof ne déduit pas le
+// numéro Pinscape du PID (il le lit dans la carte, 51 à 66) : « aucun directoutputconfig58.ini » était faux.
+test('DOF : un Pinscape FAFA:00F7 est satisfait par l’ini 8 (LedWiz) ou par un ini 51 à 66 (Pinscape), jamais exigé en 58', () => {
+  const devices = [usb(0xfafa, 0x00f7)];
+  const hids = [{ vid: 0xfafa, pid: 0x00f7, name: 'Pinscape Controller' }];
+  const findings = (...nums: number[]) => {
+    const dir = tmp();
+    for (const n of nums) fs.writeFileSync(path.join(dir, `directoutputconfig${n}.ini`), INI);
+    return dofFindings(readDofSetup(dir), detectDofControllers(devices, hids), devices).filter((f) => f.code === 'missingIni');
+  };
+  assert.deepEqual(findings(8, 30), [], 'ini 8 : le Pinscape joue comme LedWiz 8');
+  assert.deepEqual(findings(51), [], 'ini 51 : unité Pinscape 1');
+  assert.deepEqual(findings(53), [], 'ini 53 : unité Pinscape 3 réglée sur la carte');
+  assert.deepEqual(findings(58), [], 'ini 58 : unité Pinscape 8 réglée sur la carte');
+  const manque = findings(30);
+  assert.equal(manque.length, 1, 'ni 8 ni 51 à 66 : à signaler');
+  assert.match(manque[0]!.message, /8 ou 51/);
+  // Un ini 8 ou 5x n'est pas orphelin pour ce Pinscape.
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'directoutputconfig8.ini'), INI);
+  fs.writeFileSync(path.join(dir, 'directoutputconfig52.ini'), INI);
+  assert.deepEqual(dofFindings(readDofSetup(dir), detectDofControllers(devices, hids), devices).filter((f) => f.code === 'orphanIni'), []);
 });
 
 test('DOF : un périphérique composite compte une fois, avec le port de son interface', () => {

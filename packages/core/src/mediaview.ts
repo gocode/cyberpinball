@@ -253,6 +253,8 @@ export interface MenuMediaOptions {
   cabinet?: Cabinet;
   /** Rotation de la mise en page du playfield (menuRotation) : donne le bord des flippers. */
   rotation: Rotation;
+  allowed?(table: TableEntry): boolean;
+  served?(table: TableEntry, file: string): void;
   /** Extraire l'image du .directb2s en tâche de fond (défaut : oui). */
   b2s?: boolean;
   /** Musique tirée de la ROM (romaudio.ts) : repli de la musique du jeu. */
@@ -297,6 +299,7 @@ export class MenuMedias {
 
   /** Média d'un rôle pour une table (dmd : DMD ou FullDMD selon son écran). */
   roleMedia(table: TableEntry, role: RoleId): MediaView {
+    if (this.opts.allowed?.(table) === false) return this.defaultMedia(role);
     return toMediaView(table, role, this.resolve(table, role), this.edge);
   }
 
@@ -307,17 +310,20 @@ export class MenuMedias {
 
   /** Média d'un type donné sur l'écran d'un rôle : la vidéo de chargement (Loading) du playfield. */
   typeMedia(table: TableEntry, role: RoleId, type: MediaType): MediaView {
+    if (this.opts.allowed?.(table) === false) return this.defaultMedia(role);
     return toMediaView(table, role, this.resolve(table, type), this.edge);
   }
 
   /** Logo du jeu pour la liste du menu, s'il existe (sinon le titre en texte). */
   wheel(table: TableEntry): string | undefined {
+    if (this.opts.allowed?.(table) === false) return undefined;
     const resolved = this.resolve(table, 'Wheel');
     return resolved.file && resolved.kind === 'image' ? mediaUrl(resolved.file) : undefined;
   }
 
   /** Musique du jeu (Audio) ou son de lancement (AudioLaunch) : adresse du fichier, s'il existe. */
   sound(table: TableEntry, type: 'Audio' | 'AudioLaunch'): string | undefined {
+    if (this.opts.allowed?.(table) === false) return undefined;
     const resolved = this.resolve(table, type);
     return resolved.file && resolved.kind === 'audio' ? mediaUrl(resolved.file) : undefined;
   }
@@ -350,7 +356,10 @@ export class MenuMedias {
     const key = `${table.file.toLowerCase()}|${what}`;
     const known = this.memo.get(key);
     const ttl = this.opts.ttlMs ?? 10_000;
-    if (known && this.now() - known.at < ttl) return known.value;
+    if (known && this.now() - known.at < ttl) {
+      if (known.value.file) this.opts.served?.(table, known.value.file);
+      return known.value;
+    }
     const options = {
       cabinet: this.opts.cabinet,
       flipperEdge: this.edge,
@@ -362,6 +371,7 @@ export class MenuMedias {
     const root = this.opts.root ?? path.join(this.opts.dataDir, 'sans-racine');
     const value = isRole(what) ? resolveRoleMedia(table, root, what, options) : resolveMedia(table, root, what, options);
     this.memo.set(key, { at: this.now(), value });
+    if (value.file) this.opts.served?.(table, value.file);
     return value;
   }
 

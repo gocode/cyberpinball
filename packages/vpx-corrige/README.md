@@ -6,8 +6,8 @@ Cyber Pinball installs Visual Pinball X 10.8.1-5436 from its official archive, t
 Other plugins and libraries stay those of the official archive.
 Another VPX (trial version, VPX installed by the user) is never touched.
 
-Current patch set: "patched Cyber Pinball 10".
-The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-10`.
+Current patch set: "patched Cyber Pinball 11".
+The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on it); the executable's product version, the VPX log and its crash reports show `af26b2d93-patched-cyberpinball-11`.
 
 ## Patches
 
@@ -22,6 +22,8 @@ The version number stays 10.8.1.5436 (Cyber Pinball, plugins and tables rely on 
 
 - `correctifs-libdof/` (DOF library, patch set 6): the libdof of 5436 (commit `eef645d9`) with a backport of libdof commits [0383246](https://github.com/vpinball/libdof/commit/03832462f10d19b1795e2292646193ca39e51fbd) and [c79bcff](https://github.com/vpinball/libdof/commit/c79bcff5be61e3c10022d2e6fa25f207e038bc53) (its `FinishUpdaterThread` part). While unloading, 5436 shut a DudesCab board down a second time, after it was really closed, and VPX crashed while closing (0xC0000005). The DudesCab destructor no longer runs the shutdown again, and a controller's output thread is always waited for instead of being abandoned. The library interface (`include/DOF/DOF.h`) does not change: the official `plugin-dof64.dll` loads it as is.
 
+- `correctifs-bgfx/` (bgfx, linked into the executable, patch set 11): `01-fenetres-annexes-trois-tampons.patch` gives the swap chain of each secondary window (backglass, ScoreView, topper) at least three buffers instead of two. With two flip-model buffers, the frame drawn for a window on a slower display (60 Hz beside a 120 Hz playfield) waited until that display released the buffer still on screen, and the wait stalled the whole GPU queue, playfield included. Measured on Back to the Future with its PuP-Pack (4K 120 Hz playfield, two 60 Hz displays, Quality preset, 150 s of play): late playfield frames went from 8.95 % to 1.12 %, average 110 to 119 fps, no second under 115 fps instead of 75. The main swap chain and the image quality do not change.
+
 ## Build
 
 Patch `05-pov-sans-editeur.patch` guards automatic imports of legacy POV views: direct launches have no Windows editor, yet VPX tried to refresh its properties, causing an access violation immediately after `InitTablePostLoad`. Empty or invalid legacy numeric fields are also ignored. The imported file is identified in the log.
@@ -35,4 +37,4 @@ The PuP plugin links against the DLLs of the official archive (SDL_image, SDL_tt
 ## License
 
 VPX is distributed under GPLv3+ (and a MAME-derived license for part of the files), see the attached `LICENSE` file; libdof under its own license, attached as `plugins/dof/LICENSE-libdof`.
-The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-10
+The complete sources of these files (VPX at commit `af26b2d93`, the libraries they are built with, the patches and the recipe) are published here: https://github.com/gocode/cyberpinball/releases/tag/sources-vpx-10.8.1-5436-patched-cyberpinball-11

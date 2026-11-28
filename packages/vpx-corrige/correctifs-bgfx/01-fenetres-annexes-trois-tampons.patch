@@ -1,0 +1,21 @@
+diff --git a/src/renderer_d3d11.cpp b/src/renderer_d3d11.cpp
+index 7d4b395..12e2570 100644
+--- a/src/renderer_d3d11.cpp
++++ b/src/renderer_d3d11.cpp
+@@ -5486,6 +5486,16 @@ namespace bgfx { namespace d3d11
+ 		scd.ndt        = NULL;
+ 		scd.sampleDesc = s_msaa[0];
+ 
++		// Modified by Cyber Pinball, 2026-11-28 (patched Cyber Pinball 11): at least three buffers for the swap chain of a
++		// secondary window (backglass, ScoreView, topper). With two flip-model buffers, the frame drawn for a window on a
++		// slower display (60 Hz beside a 120 Hz playfield) waits until its display releases the buffer still on screen,
++		// and that wait stalls the whole GPU queue, playfield included: late playfield frames. A third buffer lets the
++		// next frame be drawn while the previous one is still shown. The main swap chain is unchanged.
++		if (DXGI_SWAP_EFFECT_FLIP_DISCARD == scd.swapEffect || DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL == scd.swapEffect)
++		{
++			scd.bufferCount = bx::max<uint32_t>(scd.bufferCount, 3);
++		}
++
+ 		ID3D11Device* device = s_renderD3D11->m_device;
+ 
+ 		HRESULT hr = s_renderD3D11->m_dxgi.createSwapChain(device

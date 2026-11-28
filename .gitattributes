@@ -2,3 +2,4 @@
 # en CRLF à l'extraction, sinon ils ne s'appliquent plus (scripts/vpx-corrige.mjs).
 packages/vpx-corrige/correctifs/*.patch -text
 packages/vpx-corrige/correctifs-libdof/*.patch -text
+packages/vpx-corrige/correctifs-bgfx/*.patch -text
